@@ -1,0 +1,28 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>SmartBike2K Web Server</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <link rel="icon" href="data:,">
+  <link rel="stylesheet" type="text/css" href="style.css">
+</head>
+
+<body>
+  <h1>BLE Device Simulator</h1>
+  <p>GPIO state: <strong> %STATE%</strong></p>
+  <p><a href="/on"><button class="button">ON</button></a></p>
+  <p><a href="/off"><button class="button button2">OFF</button></a></p>
+
+  <h2>Sim Heart Rate</h2>
+  <p><span id="hrValue">%HRVALUE%</span></p>
+  <p><input type="range" onchange="updateHRSlider(this)" id="HRSlider" min="40" max="250" value=%HRVALUE% step="1" class="slider2"></p>
+  <p><label class="switch"><input type="checkbox" onload="toggleHRCheckbox(this)" onchange="toggleHRCheckbox(this)" checked=%HROUTPUT% id="hroutput"><span class="slider"></span></label></p>
+ 
+  <h2>Sim Power Output</h2>
+  <p><span id="wattsValue">%WATTSVALUE%</span></p>
+  <p><input type="range" onchange="updateWattsSlider(this)" id="WattsSlider" min="0" max="2000" value=%WATTSVALUE% step="1" class="slider2"></p>
+  <p><label class="switch"><input type="checkbox" onload="toggleWattsCheckbox(this)" onchange="toggleWattsCheckbox(this)" checked=%WATTSOUTPUT% id="wattsoutput"><span class="slider"></span></label></p>
+  
+  
+</body>
+</html>

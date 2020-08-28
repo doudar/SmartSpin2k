@@ -1,0 +1,52 @@
+<!DOCTYPE html>
+<html>
+<body>
+
+<h1><strong>Settings</strong></h1>
+<p style="text-align: left;"></p>
+<form action="/send_settings.html">
+<table border="0" style="height: 30px; width: 36.0582%; border-collapse: collapse; border-style: none;" height="182" cellspacing="1">
+<tbody>
+<tr style="height: 20px;">
+<td style="width: 14%; height: 20px;"><label for="ssid">SSID</label></td>
+<td style="width: 14%; height: 20px;">
+<p style="text-align: left;"><label for="ssid"></label><input ssid="ssid" type="text" value="smartBike2k" /></p>
+</td>
+</tr>
+<tr style="height: 20px;">
+<td style="width: 14%; height: 20px;">
+<p><label for="password">Password</label></p>
+</td>
+<td style="width: 14%; height: 20px;"><input password="password" type="text" value="password" /></td>
+</tr>
+<tr style="height: 20px;">
+<td style="width: 14%; height: 20px;">
+<p><label for="inclineStep">Incline Step</label></p>
+</td>
+<td style="width: 14%; height: 20px;"><input inclinestep="inclineStep" type="text" value="from javascript" /></td>
+</tr>
+<tr style="height: 20px;">
+<td style="width: 14%; height: 20px;">
+<p><label for="shiftStep">Shift Step</label></p>
+</td>
+<td style="width: 14%; height: 20px;"><input shiftstep="shiftStep" type="text" value="from javascript" /></td>
+</tr>
+<tr style="height: 20px;">
+<td style="width: 14%; height: 20px;">
+<p><label for="inclineMultiplier">Incline Multiplier</label></p>
+</td>
+<td style="width: 14%; height: 20px;"><input inclinemultiplier="inclineMultiplier" type="text" value="from javascript" /></td>
+</tr>
+</tbody>
+</table>
+<input type="submit" value="Submit" /></form>
+<p><br></p>
+<form action="/load_defaults.html">
+    <input type="submit" value="Reset to Defaults">
+  </form> 
+<p><br></p>
+<form action="/reboot.html">
+    <input type="submit" value="Reboot!">
+  </form> 
+</body>
+</html>
