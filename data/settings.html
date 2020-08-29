@@ -1,41 +1,48 @@
 <!DOCTYPE html>
 <html>
-<body>
+    <head>
+        <title>SmartBike2K Web Server</title>
+        <meta name="viewport" content="width=device-width, initial-scale=1">
+        <link rel="icon" href="data:,">
+        <link rel="stylesheet" type="text/css" href="style.css">
+      </head>
 
+
+<body>
 <h1><strong>Settings</strong></h1>
-<p style="text-align: left;"></p>
-<form action="/send_settings.html">
+<h2><p style="text-align: left;"></p>
+<form action="/send_settings">
 <table border="0" style="height: 30px; width: 36.0582%; border-collapse: collapse; border-style: none;" height="182" cellspacing="1">
 <tbody>
 <tr style="height: 20px;">
-<td style="width: 14%; height: 20px;"><label for="ssid">SSID</label></td>
 <td style="width: 14%; height: 20px;">
-<p style="text-align: left;"><label for="ssid"></label><input ssid="ssid" type="text" value="smartBike2k" /></p>
+<p><label for="ssid">SSID</label></p>
 </td>
+<td style="width: 14%; height: 20px;"><input type="text" id="ssid" name="ssid" value="smartBike2k" /></td>
 </tr>
 <tr style="height: 20px;">
 <td style="width: 14%; height: 20px;">
 <p><label for="password">Password</label></p>
 </td>
-<td style="width: 14%; height: 20px;"><input password="password" type="text" value="password" /></td>
+<td style="width: 14%; height: 20px;"><input type="text" id="password" name="password" value="password" /></td>
 </tr>
 <tr style="height: 20px;">
 <td style="width: 14%; height: 20px;">
 <p><label for="inclineStep">Incline Step</label></p>
 </td>
-<td style="width: 14%; height: 20px;"><input inclinestep="inclineStep" type="text" value="from javascript" /></td>
+<td style="width: 14%; height: 20px;"><input type="text" id="inclineStep" name="inclineStep" value="from javascript" /></td>
 </tr>
 <tr style="height: 20px;">
 <td style="width: 14%; height: 20px;">
 <p><label for="shiftStep">Shift Step</label></p>
 </td>
-<td style="width: 14%; height: 20px;"><input shiftstep="shiftStep" type="text" value="from javascript" /></td>
+<td style="width: 14%; height: 20px;"><input type="text" id="shiftStep" name="shiftStep" value="from javascript" /></td>
 </tr>
 <tr style="height: 20px;">
 <td style="width: 14%; height: 20px;">
 <p><label for="inclineMultiplier">Incline Multiplier</label></p>
 </td>
-<td style="width: 14%; height: 20px;"><input inclinemultiplier="inclineMultiplier" type="text" value="from javascript" /></td>
+<td style="width: 14%; height: 20px;"><input type="text" id="inclineMultiplier" name="inclineMultiplier" value="from javascript" /></td>
 </tr>
 </tbody>
 </table>
@@ -48,5 +55,6 @@
 <form action="/reboot.html">
     <input type="submit" value="Reboot!">
   </form> 
+</h2>
 </body>
 </html>

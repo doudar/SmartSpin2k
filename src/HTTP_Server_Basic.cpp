@@ -39,21 +39,42 @@ File file = SPIFFS.open("/settings.html","r");
   file.close();
 });
 
+server.on("/send_settings", [](){
+config.setSsid                (server.arg("ssid"));
+config.setPassword            (server.arg("password"));
+config.setInclineStep         (server.arg("inclineStep").toFloat());
+config.setShiftStep           (server.arg("shiftStep").toInt());
+config.setInclineMultiplier   (server.arg("inclineMultiplier").toFloat());
+server.send(200, "text/plain", "OK");
+Serial.println("Config Updated From Web");
+});
+
 server.on("/load_defaults.html", [](){
 Serial.println("Setting Defaults from Web Request");
 config.setDefaults();
+config.saveToSPIFFS();
+server.send(200, "text/plain", "OK");
 });
 
 server.on("/reboot.html", [](){
 Serial.println("Rebooting from Web Request");
+server.send(200, "text/plain", "OK");
 ESP.restart();
 });
 
 server.on("/hrslider", []() {
   String value=server.arg("value");
+    if(value == "enable"){config.setSimulateHr(true);
+    server.send(200, "text/plain", "OK");
+    Serial.println("HR Simulator turned on");
+    }else if(value == "disable"){config.setSimulateHr(false);
+    server.send(200, "text/plain", "OK");
+    Serial.println("HR Simulator turned off");
+    }else{
   config.setSimulatedHr(value.toInt());
-  Serial.printf("HR is now: %d \n", config.getSimulatedHr());
+  Serial.printf("HR is now: %d BPM\n", config.getSimulatedHr());
   server.send(200, "text/plain", "OK");
+    }
   Serial.println("Webclient High Water Mark:");
   Serial.println(uxTaskGetStackHighWaterMark(webClientTask));
   });
@@ -75,17 +96,23 @@ server.on("/hrslider", []() {
   Serial.println(uxTaskGetStackHighWaterMark(webClientTask));
  });
 
- server.on("/hrvalue", [](){
+ server.on("/hrValue", [](){
  char outString[MAX_BUFFER_SIZE];
  snprintf(outString, MAX_BUFFER_SIZE, "%d", config.getSimulatedHr());
  server.send(200, "text/plain", outString);
  });
 
-server.on("/wattsvalue", [](){
+server.on("/wattsValue", [](){
  char outString[MAX_BUFFER_SIZE];
  snprintf(outString, MAX_BUFFER_SIZE, "%d", config.getSimulatedWatts());
  server.send(200, "text/plain", outString);
  });
+
+ server.on("/configJSON", [](){
+ server.send(200, "text/plain", config.returnJSON());
+ });
+
+
 
 
 /********************************************End Server Handlers*******************************/

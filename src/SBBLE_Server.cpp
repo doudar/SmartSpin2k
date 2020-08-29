@@ -1,3 +1,9 @@
+
+
+/* Assioma Pedal Information for later
+BLE Advertised Device found: Name: ASSIOMA17287L, Address: e8:fe:6e:91:9f:16, appearance: 1156, manufacturer data: 640302018743, serviceUUID: 00001818-0000-1000-8000-00805f9b34fb
+*/
+
 //#include <smartbike_parameters.h>
 //#include <Main.h>
 #include <SBBLE_Server.h>

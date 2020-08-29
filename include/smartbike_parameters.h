@@ -59,9 +59,10 @@ class userParameters
     void    setSsid(String sid)              {ssid = sid;}
     void    setPassword(String pwd)           {password = pwd;} 
   
-    void saveToSPIFFS();
-    void loadFromSPIFFS();
-    void printFile();
+    String  returnJSON();
+    void    saveToSPIFFS();
+    void    loadFromSPIFFS();
+    void    printFile();
 
 };
 

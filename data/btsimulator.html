@@ -1,85 +1,120 @@
 <!DOCTYPE html>
 <html>
+
 <head>
   <title>SmartBike2K Web Server</title>
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <link rel="icon" href="data:,">
   <style>
-html {
-    font-family: Helvetica;
-    display: inline-block;
-    margin: 0px auto;
-    text-align: center;
-  }
-  h1{
-    color: #0F3376;
-    padding: 1vh;
-  }
-  h2{
-    color: #000000;
-    font-size: 1.5rem;
-    font-weight: bold;
-  }
-  p{
-    font-size: 1rem;
-  }
-  .switch {
-    position: relative; 
-    display: inline-block; 
-    width: 120px; 
-    height: 68px} 
-  .switch input {
-    display: none}
-  .slider {
-    position: absolute; 
-    top: 0; 
-    left: 0; 
-    right: 0; 
-    bottom: 0; 
-    background-color: #ccc; 
-    border-radius: 34px;
-  }
-  .slider:before {
-    position: absolute; 
-    content: ""; 
-    height: 52px; 
-    width: 52px; 
-    left: 8px; 
-    bottom: 8px; 
-    background-color: #fff; 
-    -webkit-transition: .4s; 
-    transition: .4s; 
-    border-radius: 68px;
-  }
-  input:checked+.slider {
-    background-color: #2196F3}
-  input:checked+.slider:before {
-    -webkit-transform: translateX(52px); 
-    -ms-transform: translateX(52px); 
-    transform: translateX(52px);
-  }
-  .slider2 { 
-    -webkit-appearance: none; 
-    margin: 5px; 
-    width: 300px; 
-    height: 20px; 
-    background: #ccc;
-    /*outline:8px ridge rgba(170,50,220, .6);
+    html {
+      font-family: Helvetica;
+      display: inline-block;
+      margin: 0px auto;
+      text-align: center;
+    }
+
+    h1 {
+      color: #0F3376;
+      padding: 1vh;
+    }
+
+    h2 {
+      color: #000000;
+      font-size: 1.5rem;
+      font-weight: bold;
+    }
+
+    p {
+      font-size: 1rem;
+    }
+
+    .switch {
+      position: relative;
+      display: inline-block;
+      width: 120px;
+      height: 68px
+    }
+
+    .switch input {
+      display: none
+    }
+
+    .slider {
+      position: absolute;
+      top: 0;
+      left: 0;
+      right: 0;
+      bottom: 0;
+      background-color: #ccc;
+      border-radius: 34px;
+    }
+
+    .slider:before {
+      position: absolute;
+      content: "";
+      height: 52px;
+      width: 52px;
+      left: 8px;
+      bottom: 8px;
+      background-color: #fff;
+      -webkit-transition: .4s;
+      transition: .4s;
+      border-radius: 68px;
+    }
+
+    input:checked+.slider {
+      background-color: #2196F3
+    }
+
+    input:checked+.slider:before {
+      -webkit-transform: translateX(52px);
+      -ms-transform: translateX(52px);
+      transform: translateX(52px);
+    }
+
+    .slider2 {
+      -webkit-appearance: none;
+      margin: 5px;
+      width: 300px;
+      height: 20px;
+      background: #ccc;
+      /*outline:8px ridge rgba(170,50,220, .6);
     border-radius: 2rem;*/
-    outline: none;
-    -webkit-transition: .2s; transition: opacity .2s;
-  }
-  .slider2::-webkit-slider-thumb {
-    -webkit-appearance: none; 
-    appearance: none; width: 30px; 
-    height: 30px; background: #2f4468; 
-    cursor: pointer;
-  }
-  .slider2::-moz-range-thumb { width: 30px; 
-    height: 30px; background: #2f4468; 
-    cursor: pointer; 
-  } 
+      outline: none;
+      -webkit-transition: .2s;
+      transition: opacity .2s;
+    }
+
+    .slider2::-webkit-slider-thumb {
+      -webkit-appearance: none;
+      appearance: none;
+      width: 30px;
+      height: 30px;
+      background: #2f4468;
+      cursor: pointer;
+    }
+
+    .slider2::-moz-range-thumb {
+      width: 30px;
+      height: 30px;
+      background: #2f4468;
+      cursor: pointer;
+    }
   </style>
+  <!--
+<script>
+  function load() {
+    ;
+  }
+  window.onload = load;
+</script>
+<script>
+  const load = () => {
+    ;
+  } 
+  window.onload = load; 
+
+</script> -->
 
 </head>
 
@@ -87,99 +122,108 @@ html {
   <h1>BLE Device Simulator</h1>
 
   <h2>Sim Heart Rate</h2>
-  <p><span id="hrValue">"Loading..."</span></p>
-  <p><input type="range" onchange="updateHRSlider(this)" id="HRSlider" min="40" max="250" value="0" step="1" class="slider2"></p>
-  <p><label class="switch"><input type="checkbox" onload="toggleHRCheckbox(this)" onchange="toggleHRCheckbox(this)" id="hroutput"><span class="slider"></span></label></p>
- 
-  <h2>Sim Power Output</h2>
-  <p><span id="wattsValue">"Loading..."</span></p>
-  <p><input type="range" onchange="updateWattsSlider(this)" id="WattsSlider" min="0" max="2000" value="0" step="1" class="slider2"></p>
-  <p><label class="switch"><input type="checkbox" onload="toggleWattsCheckbox(this)" onchange="toggleWattsCheckbox(this)" id="wattsoutput"><span class="slider"></span></label></p>
-  <script>
+  <p><span id="hrValue"></span></p>
+  <p><input type="range" onload="requestConfigValues()" onchange="updateHRSlider(this)" id="HRSlider"
+      min="40" max="250" value="0" step="1" class="slider2"></p>
+  <p><label class="switch"><input type="checkbox" onload="toggleHRCheckbox(this, true)"
+  onchange="toggleHRCheckbox(this,true)" id="hroutput"><span
+        class="slider"></span></label></p>
 
-  function toggleHRCheckbox(element) {
-    if(element.checked){
+  <h2>Sim Power Output</h2>
+  <p><span id="wattsValue"></span></p>
+  <p><input type="range" onload="requestConfigValues()" onchange="updateWattsSlider(this)"
+      id="WattsSlider" min="0" max="2000" value="0" step="1" class="slider2"></p>
+  <p><label class="switch"><input type="checkbox" onload="toggleWattsCheckbox(this,true)"
+        onchange="toggleWattsCheckbox(this,true)" id="wattsoutput"><span class="slider"></span></label></p>
+
+</body>
+<script>
+
+  function toggleHRCheckbox(element,updateServer) {
+    if (element.checked) {
       document.getElementById("HRSlider").hidden = false;
       document.getElementById("hrValue").hidden = false;
-  }
-    else{
+    }
+    else {
       document.getElementById("HRSlider").hidden = true;
       document.getElementById("hrValue").hidden = true;
-  }
-  var xhr = new XMLHttpRequest();
-    if(element.checked){ 
-      xhr.open("GET", "/hrslider?value=enable", true); 
-      xhr.send();
-  }
-    else{
-      xhr.open("GET", "/hrslider?value=disable", true); 
+    }
+    if(updateServer){
+      var xhr = new XMLHttpRequest();
+    if (element.checked) {
+      xhr.open("GET", "/hrslider?value=enable", true);
       xhr.send();
     }
-}
+    else {
+      xhr.open("GET", "/hrslider?value=disable", true);
+      xhr.send();
+    }}
+  }
 
-  function toggleWattsCheckbox(element){
-    if(element.checked){
+  function toggleWattsCheckbox(element,updateServer) {
+    if (element.checked) {
       document.getElementById("WattsSlider").hidden = false;
       document.getElementById("wattsValue").hidden = false;
-  }
-    else{
+    }
+    else {
       document.getElementById("WattsSlider").hidden = true;
       document.getElementById("wattsValue").hidden = true;
+    }
+
+    if(updateServer){
+    var xhr = new XMLHttpRequest();
+    if (element.checked) {
+      xhr.open("GET", "/wattsslider?value=enable", true);
+      xhr.send();
+    }
+    else {
+      xhr.open("GET", "/wattsslider?value=disable", true);
+      xhr.send();
+    }}
   }
-  var xhr = new XMLHttpRequest();
-    if(element.checked){ 
-      xhr.open("GET", "/wattsslider?value=enable", true); 
-      xhr.send();
-  }
-    else{
-      xhr.open("GET", "/wattsslider?value=disable", true); 
-      xhr.send();
-    }
 
+  function updateHRSlider(element) {
+    var sliderValue = document.getElementById("HRSlider").value;
+    document.getElementById("hrValue").innerHTML = sliderValue + " BPM";
+    var xhr = new XMLHttpRequest();
+    xhr.open("GET", "/hrslider?value=" + sliderValue, true);
+    xhr.send();
   }
 
-    function updateHRSlider(element) {
-      var sliderValue = document.getElementById("HRSlider").value;
-      document.getElementById("hrValue").innerHTML = sliderValue + " BPM";
-      var xhr = new XMLHttpRequest();
-      xhr.open("GET", "/hrslider?value="+sliderValue, true);
-      xhr.send();
-    }
+  function updateWattsSlider(element) {
+    var sliderValue = document.getElementById("WattsSlider").value;
+    document.getElementById("wattsValue").innerHTML = sliderValue + " Watts";
+    var xhr = new XMLHttpRequest();
+    xhr.open("GET", "/wattsslider?value=" + sliderValue, true);
+    xhr.send();
+  }
 
-    function updateWattsSlider(element) {
-      var sliderValue = document.getElementById("WattsSlider").value;
-      document.getElementById("wattsValue").innerHTML = sliderValue + " Watts";
-      var xhr = new XMLHttpRequest();
-      xhr.open("GET", "/wattsslider?value="+sliderValue, true);
-      xhr.send();
-    }
+  //Update values on specified interval
+  setInterval(function () {
 
-//Update HR on specified interval
- setInterval(function ( ) {
-  var xhttp = new XMLHttpRequest();
-  xhttp.onreadystatechange = function() {
-    if (this.readyState == 4 && this.status == 200) {
-      document.getElementById("hrValue").innerHTML = this.responseText + " BPM";
-      document.getElementById("HRSlider").value = this.responseText;
-    }
-  };
-  xhttp.open("GET", "/hrvalue", true);
-  xhttp.send();
-}, 4000 ) ;
+    requestConfigValues();
 
-//Update Watts on specified interval
-setInterval(function ( ) {
-  var xhttp = new XMLHttpRequest();
-  xhttp.onreadystatechange = function() {
-    if (this.readyState == 4 && this.status == 200) {
-      document.getElementById("wattsValue").innerHTML = this.responseText + " Watts";
-      document.getElementById("WattsSlider").value = this.responseText;
-    }
-  };
-  xhttp.open("GET", "/wattsvalue", true);
-  xhttp.send();
-}, 5000 ) ;
+  }, 5000);
+
+  function requestConfigValues() {
+    var xhttp = new XMLHttpRequest();
+    xhttp.onreadystatechange = function () {
+      if (this.readyState == 4 && this.status == 200) {
+        var obj = JSON.parse(this.responseText);
+        document.getElementById("wattsValue").innerHTML = obj.simulatedWatts + " Watts";
+        document.getElementById("WattsSlider").value = obj.simulatedWatts;
+        document.getElementById("hrValue").innerHTML = obj.simulatedHr + " BPM";
+        document.getElementById("HRSlider").value = obj.simulatedHr;
+        document.getElementById("hroutput").checked = obj.simulateHr;
+        document.getElementById("wattsoutput").checked = obj.simulatePower;
+        toggleHRCheckbox(document.getElementById("hroutput"),false);
+        toggleWattsCheckbox( document.getElementById("wattsoutput"),false);
+        
+      }
+    };
+    xhttp.open("GET", "/configJSON", true);
+    xhttp.send();
+  }
 
 </script>
-</body>
 </html>

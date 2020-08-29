@@ -15,12 +15,41 @@ void userParameters::setDefaults()
     simulatePower       = false;
     simulateHr          = true;
     ERGMode             = false;
-    wifiOn              = false;
+    wifiOn              = true;
     ssid                = "***REMOVED***";
     password            = "***REMOVED***";
 }
 
 //---------------------------------------------------------------------------------
+//-- return all config as one a single JSON string
+String userParameters::returnJSON()
+{
+  // Allocate a temporary JsonDocument
+  // Don't forget to change the capacity to match your requirements.
+  // Use arduinojson.org/assistant to compute the capacity.
+  StaticJsonDocument<256> doc;
+
+  // Set the values in the document
+
+    doc["filename"]           = filename;
+    doc["incline"]            = incline;
+    doc["simulatedWatts"]     = simulatedWatts;
+    doc["simulatedHr"]        = simulatedHr;
+    doc["inclineStep"]        = inclineStep;
+    doc["shiftStep"]          = shiftStep;
+    doc["inclineMultiplier"]  = inclineMultiplier;
+    doc["simulatePower"]      = simulatePower;
+    doc["simulateHr"]         = simulateHr;
+    doc["ERGMode"]            = ERGMode;
+    doc["wifiOn"]             = wifiOn;
+    doc["ssid"]               = ssid;
+    doc["password"]           = password;
+
+  String output;
+  serializeJson(doc, output);
+  return output;
+}
+
 //-- Saves all parameters to SPIFFS
 void userParameters::saveToSPIFFS()
 {
