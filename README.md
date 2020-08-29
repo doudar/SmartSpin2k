@@ -1,13 +1,13 @@
-
+<div style="margin-left: 6rem;">
+<md><pre>
+  
 
 
 smartbike2k
 
 Hardware (3d Printed) and Software Project that uses an ESP32 and servo motor to control spin bikes that have a resistance knob. The initial target is to get it working with Zwift (which it is).
 
-<div style="margin-left: 6rem;">
-<md><pre>
-  
+
 Hardware:
 
 1x ESP32 Dev Board             https://www.amazon.com/gp/product/B073QDK74F <br />
@@ -18,7 +18,7 @@ Hardware:
 2x Push Button Switches        https://www.amazon.com//dp/B076RLL1KM/ <br />
 2x 608 Skate Bearings          https://www.amazon.com//dp/B07R7PR72H/ <br />
 
-</pre></md></div>
+
 
 Documentation to follow.
 
@@ -27,3 +27,4 @@ This is my first GitHub project and one of my first (recent) large coding projec
 <img src="Pictures/CadPreview.jpg" alt="Cad Preview" style="height: 300px; width: 100"/>
 <img src="Pictures/AssembledSideView.jpg" alt="Assembled SideView" style="height: 300px; width: 100"/>
 
+</pre></md></div>
