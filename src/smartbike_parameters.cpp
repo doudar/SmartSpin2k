@@ -16,8 +16,8 @@ void userParameters::setDefaults()
     simulateHr          = true;
     ERGMode             = false;
     wifiOn              = true;
-    ssid                = "***REMOVED***";
-    password            = "***REMOVED***";
+    ssid                = "SmartBike2k";
+    password            = "password";
 }
 
 //---------------------------------------------------------------------------------
