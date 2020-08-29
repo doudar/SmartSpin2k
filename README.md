@@ -5,3 +5,8 @@ Hardware and Software Project that uses an ESP32 and servo motor to control spin
 Documentation to follow.
 
 This is my first GitHub project and one of my first (recent) large coding projects, so any help or feedback is greatly appreciated.
+
+<img src="Pictures/CadPreview.jpg" alt="Assembled SideView" style="height: 300px"/>
+
+<img src="Pictures/AssembledSideView.jpg" alt="Assembled SideView" style="height: 300px"/>
+
