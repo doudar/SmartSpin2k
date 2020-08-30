@@ -22,7 +22,17 @@ The initial target is to get it working with Zwift (which it is).
 ### Esp32 Connection Diagram
 <img src="Pictures/SmartBike2k_Esp32_Connections.png" alt="esp32 connections" style="height: 300px; width: 100"/>
 
-This is my first GitHub project and one of my first (recent) large coding projects, so any help or feedback is greatly appreciated.
+
+The hardware mentioned above mounts into a 3d printed enclosure which then easily attaches to a spin bike.
+
 
 <img src="Pictures/CadPreview.JPG" alt="Cad Preview" style="height: 300px; width: 100"/>
+
+The Finished assembly looks somthing like this early prototype. 
+
 <img src="Pictures/AssembledSideView.jpg" alt="Assembled SideView" style="height: 300px; width: 100"/>
+
+This is my first GitHub project and one of my first (recent) large coding projects, so any help or feedback is greatly appreciated.
+
+
+
