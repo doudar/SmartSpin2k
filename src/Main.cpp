@@ -17,9 +17,9 @@ int letSomthingElseRun = 200;
  int maxStepperSpeed = 600;
 
 // Define output pins
-const int radioPin = 19; //Should be 27 - switched for testing
+const int radioPin = 27; //Should be 27 - Occasionally I switch for testing
 const int shiftDownPin = 18;
-const int shiftUpPin = 27; //Should be 19 - switched for testing
+const int shiftUpPin = 19; //Should be 19 - Occasionally I switch for testing
 const int stepPin = 17;
 const int dirPin = 16;
 const int ledPin = 2; //Blue LED on the ESP32
