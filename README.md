@@ -26,11 +26,16 @@ The initial target is to get it working with Zwift (which it is).
 The hardware mentioned above mounts into a 3d printed enclosure which then easily attaches to a spin bike.
 
 
-<img src="Pictures/CadPreview.JPG" alt="Cad Preview" style="height: 300px; width: 100"/>
+<img src="Pictures/CadPreview.JPG" alt="Cad Preview" style="height: 200px; width: 100"/>
 
-The Finished assembly looks somthing like this early prototype. 
+The Finished assembly looks somthing like this prototype. 
 
-<img src="Pictures/AssembledSideView.jpg" alt="Assembled SideView" style="height: 300px; width: 100"/>
+<img src="Pictures/AssembledSideView.jpg" alt="Assembled SideView" style="height: 200px; width: 100"/>
+
+Here is the earliest prototype mounted on a spin bike. (Cardboard wrapped in ducktape enclosure :) ) 
+
+<img src="Pictures/prototype_on_spin_bike.jpg" alt="Assembled SideView" style="height: 200px; width: 100"/>
+
 
 This is my first GitHub project and one of my first (recent) large coding projects, so any help or feedback is greatly appreciated.
 
