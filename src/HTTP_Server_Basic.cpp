@@ -218,6 +218,12 @@ WiFi.softAP(config.getSsid(), config.getPassword());
 
 
 void stopWifi(){ //This function causes a crash. Instead of using it, we're currently just rebooting the device. 
+
+  // https://docs.espressif.com/projects/esp-idf/en/latest/esp32/api-guides/wifi.html#wi-fi-deinit-phase  
+  // Wi-Fi Deinit phase s8.1-s8.3:  call esp_wifi_disconnect(); esp_wifi_stop(); esp_wifi_deinit() ; 
+  // then wait five minutes for ASSOC_EXPIRE or AUTH_EXPIRE?;    
+  // maybe consider just sending a de-authentication with esp_wifi_deauth_sta() and skip the five minute wait? 
+  
   Serial.println("Disconnecting WiFi");
   WiFi.setSleep(true);
   WiFi.disconnect(true); 
