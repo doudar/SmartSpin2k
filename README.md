@@ -38,6 +38,9 @@ But if you're adventerious and handy you can probably take a look at my pictures
 ### Esp32 Connection Diagram
 <img src="Pictures/SmartBike2k_Esp32_Connections.png" alt="esp32 connections" style="height: 300px; width: 100"/> 
 
+### A4988 Connection Diagram
+<img src="Pictures/SmartBike2k_A4988_Connections.png" alt="esp32 connections" style="height: 200px; width: 100"/> 
+
 The hardware mentioned above mounts into a 3d printed enclosure which then easily attaches to a spin bike.
 
 
