@@ -28,7 +28,6 @@ String userParameters::returnJSON()
   // Don't forget to change the capacity to match your requirements.
   // Use arduinojson.org/assistant to compute the capacity.
   StaticJsonDocument<256> doc;
-
   // Set the values in the document
 
     doc["filename"]           = filename;
@@ -89,7 +88,6 @@ void userParameters::saveToSPIFFS()
   if (serializeJson(doc, file) == 0) {
     Serial.println(F("Failed to write to file"));
   }
-
   // Close the file
    file.close();
 }

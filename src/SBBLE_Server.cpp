@@ -91,7 +91,7 @@ class MyServerCallbacks : public BLEServerCallbacks
     // vTaskDelay(5000);
   }
 };
-/******************************************************* BLE CLIENT */
+/***********************************BLE CLIENT. EXPERIMENTAL TESTING *******************/ 
 // The remote service we wish to connect to.
 static BLEUUID serviceUUID((uint16_t)0x180D); //Could eventually set these to the defines we have at the top of the file.
 // The characteristic of the remote service we are interested in.
@@ -274,9 +274,11 @@ void bleClient()
   // delay(1000); // Delay a second between loops.
 } // End of loop
 
-/************************************************************END BLE CLIENT*/
+/**********************************END OF EXPERIMENTAL BLE CLIENT TESTING******************/
 
-//BLE callback for data recieved from client removed IRAM_ATTR
+
+
+/**************BLE Server Callbacks *************************/
 class MyCallbacks : public BLECharacteristicCallbacks
 {
   void onWrite(BLECharacteristic *pCharacteristic)
