@@ -36,9 +36,7 @@ So for $700-$1000 you can build a fully functional smart bike! If you already ha
 But if you're adventerious and handy you can probably take a look at my pictures below and the attached project and start tinkering. Feel free to reach out in the meantime as I'd love to help someone get this working for themselves.
 
 ### Esp32 Connection Diagram
-<img src="Pictures/SmartBike2k_Esp32_Connections.png" alt="esp32 connections" style="height: 300px; width: 100"/>
-
-*Enable Pin is not configured yet. Coming very soon. 
+<img src="Pictures/SmartBike2k_Esp32_Connections.png" alt="esp32 connections" style="height: 300px; width: 100"/> 
 
 The hardware mentioned above mounts into a 3d printed enclosure which then easily attaches to a spin bike.
 
