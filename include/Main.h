@@ -27,9 +27,8 @@ void IRAM_ATTR changeRadioStateButton();
 void switchRadioState();
 
 
-// This is a declaration of your variable, which tells the linker this value
-// is found elsewhere.  Anyone who wishes to use it must include global.h,
-// either directly or indirectly.
+// I don't like this (not sure why really, but it allows the config variable 
+//to be accessable in all of the .cpp files
 extern userParameters config;
 
 #endif
