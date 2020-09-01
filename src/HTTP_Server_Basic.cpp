@@ -1,9 +1,4 @@
-/*
-ESP32 Web Server - AP Mode
-modified on 25 MAy 2019
-by Mohammadreza Akbari @ Electropeak
-https://electropeak.com/learn
-*/
+
 #include <Main.h>
 #include <WiFi.h>
 #include <WebServer.h>
