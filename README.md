@@ -2,7 +2,7 @@
 # SmartBike2k
 
 Hardware (3d Printed) and Software Project that uses an ESP32 and servo motor to control spin bikes that have a resistance knob. 
-The initial target is to get it working with Zwift (which it is).
+The initial working target was Zwift: stationary bike up hills and feel the burn.
 
 ## Background
 I travel for a living and a hotel I frequent has spin bikes. I started bringing my own power meter pedals with to use on the spin bike so I could ride Zwift but the experience just isn't the same without automatic resistance on the hills. Then one day I was looking down at that simple to turn knob and I had a thought - With the power meter pedals attached, almost everything is already in place on this $300 spin bike to turn it into the equivelant of a $3,000 computer controlled smark bike! And so here we are....
