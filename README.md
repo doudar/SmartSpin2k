@@ -5,7 +5,7 @@ Hardware (3d Printed) and Software Project that uses an ESP32 and servo motor to
 The initial working target was Zwift: stationary bike up hills and feel the burn.
 
 ## Background
-I travel for a living and a hotel I frequent has spin bikes. I started bringing my own power meter pedals with to use on the spin bike so I could ride Zwift but the experience just isn't the same without automatic resistance on the hills. Then one day I was looking down at that simple to turn knob and I had a thought - With the power meter pedals attached, almost everything is already in place on this $300 spin bike to turn it into the equivelant of a $3,000 computer controlled smark bike! And so here we are....
+I travel for a living and most hotels have spin bikes. I started carrying my own power meter pedals for the spin bikes so I could ride Zwift but the experience just isn't the same without automatic resistance on the hills. Then one day I was looking down at that simple to turn knob and I had a thought - With the power meter pedals attached, almost everything is already in place on this $300 spin bike to turn it into the equivalent of a $3,000 computer controlled smart bike! And so here we are....
 
 ## Summary of function
 The power meter pedals send cycling power and cadence to Zwift (or any other cycling app). Smartbike 2k connects to the APP as a controllable trainer which then simulates gradient by automatically turning the knob a set amount for each percent grade change on your virtual road. Very soon the pedals will be able to connect directly to SmartBike2k (with the data relayed to your app of choice) which will enable ERG mode (where SmartBike2k adjusts the knob to make you maintain a steady watt output no matter what your cadence is) on the spin bike. In addition to adjusting the knob, SmartBike2k also has shifter buttons to simulate virtual shifting. 
@@ -33,7 +33,7 @@ So for $700-$1000 you can build a fully functional smart bike! If you already ha
 
 
 ### Full Documentation Soon
-But if you're adventerious and handy you can probably take a look at my pictures below and the attached project and start tinkering. Feel free to reach out in the meantime as I'd love to help someone get this working for themselves.
+But if you're adventerious and handy you can probably take a look at my pictures below or the assembly video and start tinkering. Feel free to reach out in the meantime as I'd love to help someone get this working for themselves.  
 
 ### Esp32 Connection Diagram
 <img src="Pictures/SmartBike2k_Esp32_Connections.png" alt="esp32 connections" style="height: 300px; width: 100"/> 
