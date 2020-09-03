@@ -8,7 +8,7 @@ bool changeRadioState = false;
 // the following variables are unsigned longs because the time, measured in
 // milliseconds, will quickly become a bigger number than can be stored in an int.
 unsigned long lastDebounceTime = 0; // the last time the output pin was toggled
-unsigned long debounceDelay = 2000; // the debounce time; increase if the output flickers
+unsigned long debounceDelay = 1000; // the debounce time; increase if the output flickers
 
 //vTaskDelay timer Delay
 int letSomthingElseRun = 200;
