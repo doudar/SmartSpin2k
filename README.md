@@ -1,3 +1,4 @@
+[![Watch the video](http://i3.ytimg.com/vi/cPiIlZ2P5Ac/hqdefault.jpg)](https://youtu.be/cPiIlZ2P5Ac)
 
 # SmartSpin2K
 
