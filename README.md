@@ -14,19 +14,19 @@ The power meter pedals send cycling power and cadence to Zwift (or any other cyc
 
 |qty   |         Part             |              Link                      |
 |:-----:|--------------------------|---------------------------------------:|
-|1      | ESP32 Dev Board          | https://www.amazon.com/dp/B073QDK74F/  |
-|1      | NEMA 17 Pancake Stepper  | https://www.amazon.com/dp/B07TB4RWLS/  |
-|1      | A4988 Driver Board       | https://www.amazon.com/dp/B01FFGAKK8/  |
-|1      | LM2596 Buck Converter    | https://www.amazon.com/dp/B07C2QF1T1/  |
-|1      | 12V Power Supply         | https://www.amazon.com/dp/B01461MOGQ/  |
+|1      | ESP32 Dev Board          | <a target="_blank" href="https://www.amazon.com/gp/product/B073QDK74F/ref=as_li_tl?ie=UTF8&camp=1789&creative=9325&creativeASIN=B073QDK74F&linkCode=as2&tag=doudar-20&linkId=b3b820a02e67ea96384e4d4c2e7e2fc4">ESP-32 Dev Board </a><img src="//ir-na.amazon-adsystem.com/e/ir?t=doudar-20&l=am2&o=1&a=B073QDK74F" width="1" height="1" border="0" alt="" style="border:none !important; margin:0px !important;" />  |
+|1      | NEMA 17 Pancake Stepper  | <a target="_blank" href="https://www.amazon.com/gp/product/B07TB4RWLS/ref=as_li_tl?ie=UTF8&camp=1789&creative=9325&creativeASIN=B07TB4RWLS&linkCode=as2&tag=doudar-20&linkId=7d6838312db1cdf3ed3a69c86b150651">Nema 17 Pancake Stepper Motor</a><img src="//ir-na.amazon-adsystem.com/e/ir?t=doudar-20&l=am2&o=1&a=B07TB4RWLS" width="1" height="1" border="0" alt="" style="border:none !important; margin:0px !important;" />  |
+|1      | A4988 Driver Board       | <a target="_blank" href="https://www.amazon.com/gp/product/B01FFGAKK8/ref=as_li_tl?ie=UTF8&camp=1789&creative=9325&creativeASIN=B01FFGAKK8&linkCode=as2&tag=doudar-20&linkId=cd16de10c13b21b02f140d4af4a41ebb">A4988 Compatible StepStick</a><img src="//ir-na.amazon-adsystem.com/e/ir?t=doudar-20&l=am2&o=1&a=B01FFGAKK8" width="1" height="1" border="0" alt="" style="border:none !important; margin:0px !important;" />  |
+|1      | LM2596 Buck Converter    | <a target="_blank" href="https://www.amazon.com/gp/product/B07C2QF1T1/ref=as_li_tl?ie=UTF8&camp=1789&creative=9325&creativeASIN=B07C2QF1T1&linkCode=as2&tag=doudar-20&linkId=9b163bfdc2fffab96dc432ad2dbd7bea"> LM2596 DC-DC Adjustable Buck Converter</a><img src="//ir-na.amazon-adsystem.com/e/ir?t=doudar-20&l=am2&o=1&a=B07C2QF1T1" width="1" height="1" border="0" alt="" style="border:none !important; margin:0px !important;" />  |
+|1      | 12V Power Supply         | <a target="_blank" href="https://www.amazon.com/gp/product/B01461MOGQ/ref=as_li_tl?ie=UTF8&camp=1789&creative=9325&creativeASIN=B01461MOGQ&linkCode=as2&tag=doudar-20&linkId=fe7efd64e9920680e89e1ac9213bd7ab">12v Power Supply</a><img src="//ir-na.amazon-adsystem.com/e/ir?t=doudar-20&l=am2&o=1&a=B01461MOGQ" width="1" height="1" border="0" alt="" style="border:none !important; margin:0px !important;" />  |
 |2      | Push Button Switches     | https://www.amazon.com/dp/B076RLL1KM/  |
 |2      | 608 Skate Bearings       | https://www.amazon.com/dp/B07R7PR72H/  |
 
 Optional equipment so you can actually use it for fitness:
 |qty    |         Part             |              Link                      |
 |:-----:|--------------------------|---------------------------------------:|
-|1      |Assioma Pedals(or similar)| https://cycling.favero.com/shop/       |                   
-|1      |Cheap Spin Bike Check Ebay| https://www.amazon.com//dp/B08FDCW184/ |
+|1      |Assioma Pedals(or similar)| <a target="_blank" href="https://www.amazon.com/gp/product/B08BDPFY9Y/ref=as_li_tl?ie=UTF8&camp=1789&creative=9325&creativeASIN=B08BDPFY9Y&linkCode=as2&tag=doudar-20&linkId=f79dddc28e6b5bdd317bb2dbce4fad8c">FAVERO Assioma Uno</a><img src="//ir-na.amazon-adsystem.com/e/ir?t=doudar-20&l=am2&o=1&a=B08BDPFY9Y" width="1" height="1" border="0" alt="" style="border:none !important; margin:0px !important;" />       |                   
+|1      |Cheap Spin Bike Check Ebay| <a target="_blank" href="https://www.amazon.com/gp/product/B08FDCW184/ref=as_li_tl?ie=UTF8&camp=1789&creative=9325&creativeASIN=B08FDCW184&linkCode=as2&tag=doudar-20&linkId=e78975c4a750cec5349cea961f24115c">Indoor Exercise Bike</a><img src="//ir-na.amazon-adsystem.com/e/ir?t=doudar-20&l=am2&o=1&a=B08FDCW184" width="1" height="1" border="0" alt="" style="border:none !important; margin:0px !important;" /> |
 
 
 So for $700-$1000 you can build a fully functional smart bike! If you already have a Peleton bike collecting dust in the corner, this will work on that too!
