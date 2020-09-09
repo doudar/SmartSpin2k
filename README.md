@@ -1,5 +1,5 @@
 
-# SmartBike2k
+# SmartSpin2K
 
 Hardware (3d Printed) and Software Project that uses an ESP32 and servo motor to control spin bikes that have a resistance knob. 
 The initial working target was Zwift: stationary bike up hills and feel the burn.
