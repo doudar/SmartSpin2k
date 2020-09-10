@@ -34,7 +34,26 @@ So for $700-$1000 you can build a fully functional smart bike! If you already ha
 
 
 ### Full Documentation Soon
-But if you're adventerious and handy you can probably take a look at my pictures below or the assembly video and start tinkering. Feel free to reach out in the meantime as I'd love to help someone get this working for themselves.  
+But if you're adventerious and handy you can probably take a look at my pictures below or the assembly video and start tinkering. Feel free to reach out in the meantime as I'd love to help someone get this working for themselves. In short, the process is:
+
+1: Get Microsoft Visual Code installed. 
+2: Install PlatformIO into Visual Code.
+3: Install the ESP32 package into PlatformIO
+4: Install the Arduino-Core Package for PlatformIO
+5: Compile the project and upload to an ESP32
+6: Print all the hardware. You'll need 1 Bottom Case, 1 Knob Cup, Both Spur Gears, 1 Stepper Crossbar, 1 Top Cover and a knob insert that fits your spin bike. PETG works well.
+7: If you're using the same switches for the shifters, you can optionally print the provided files. Previously I was using tape as a protective enclosure and it worked fine (if ugly).
+8: Wire all of the connections outside the case. Use push on connectors if possible. 
+9: Press both bearings into the recess.
+10: Install the power supply, stepper driver and ESP32 into their brackets.
+11: Install the power plug and shifter plug. 
+12: Push the large gear down into the bearing. From the other side slide the knob cup onto it's shaft.  
+13: Attach the stepper crossbar to the stepper motor.
+14: Install the stepper motor. 
+15: Put the cover on. 
+
+ummm that was easy...right? :)
+
 
 ### Esp32 Connection Diagram
 <img src="Pictures/SmartBike2k_Esp32_Connections.png" alt="esp32 connections" style="height: 300px; width: 100"/> 
