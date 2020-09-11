@@ -18,9 +18,9 @@ int maxStepperSpeed = 600;
 
 // Define output pins
 const int radioPin = 27; //Should be 27 - Occasionally I switch for testing
-const int enablePin = 21;
-const int shiftUpPin = 19; //Should be 19 - Occasionally I switch for testing
-const int shiftDownPin = 18;
+const int shiftUpPin = 21; //Recently changed from 19 te enable all three stepper pins to be in a row for easy cable manufacture
+const int shiftDownPin = 19;
+const int enablePin = 18;
 const int stepPin = 17;
 const int dirPin = 16;
 const int ledPin = 2; //Blue LED on the ESP32
@@ -61,23 +61,23 @@ void setup()
   config.saveToSPIFFS();
 
   Serial.println("Configuring Hardware Pins");
+  pinMode(radioPin, INPUT_PULLUP);
   pinMode(shiftUpPin, INPUT_PULLUP);   // Push-Button with input Pullup
   pinMode(shiftDownPin, INPUT_PULLUP); // Push-Button with input Pullup
-  pinMode(radioPin, INPUT_PULLUP);
   pinMode(ledPin, OUTPUT);
   pinMode(enablePin, OUTPUT);
   pinMode(dirPin, OUTPUT);  // Stepper Direction Pin
   pinMode(stepPin, OUTPUT); // Stepper Step Pin
+  digitalWrite(enablePin, HIGH); //Should be called a disable Pin - High Disables FETs
   digitalWrite(dirPin, LOW);
   digitalWrite(stepPin, LOW);
-  digitalWrite(enablePin, HIGH); //Should be called a disable Pin - High Disables FETs
   digitalWrite(ledPin, LOW);
 
   Serial.println("Creating Interrupts");
   //Setup Interrups so shifters work at anytime
-  attachInterrupt(digitalPinToInterrupt(shiftUpPin), shiftUp, CHANGE);
-  attachInterrupt(digitalPinToInterrupt(shiftDownPin), shiftDown, CHANGE);
-  attachInterrupt(digitalPinToInterrupt(radioPin), changeRadioStateButton, CHANGE);
+  attachInterrupt(digitalPinToInterrupt(shiftUpPin), shiftUp, FALLING);
+  attachInterrupt(digitalPinToInterrupt(shiftDownPin), shiftDown, FALLING);
+  attachInterrupt(digitalPinToInterrupt(radioPin), changeRadioStateButton, FALLING);
 
   Serial.println("Setting up cpu Tasks");
   //create a task that will be executed in the moveStepper function, with priority 1 and executed on core 0
