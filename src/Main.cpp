@@ -18,9 +18,9 @@ int maxStepperSpeed = 600;
 
 // Define output pins
 const int radioPin = 27; //Should be 27 - Occasionally I switch for testing
-const int shiftUpPin = 21; //Recently changed from 19 te enable all three stepper pins to be in a row for easy cable manufacture
-const int shiftDownPin = 19;
-const int enablePin = 18;
+const int shiftUpPin = 19; 
+const int shiftDownPin = 18;
+const int enablePin = 5; //Recently changed from 21 te enable all three stepper pins to be in a row for easy cable manufacture
 const int stepPin = 17;
 const int dirPin = 16;
 const int ledPin = 2; //Blue LED on the ESP32
