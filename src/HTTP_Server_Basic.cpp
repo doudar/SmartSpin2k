@@ -42,6 +42,7 @@ config.setShiftStep           (server.arg("shiftStep").toInt());
 config.setInclineMultiplier   (server.arg("inclineMultiplier").toFloat());
 server.send(200, "text/plain", "OK");
 Serial.println("Config Updated From Web");
+config.saveToSPIFFS();
 });
 
 server.on("/load_defaults.html", [](){

@@ -8,7 +8,7 @@ bool changeRadioState = false;
 // the following variables are unsigned longs because the time, measured in
 // milliseconds, will quickly become a bigger number than can be stored in an int.
 unsigned long lastDebounceTime = 0; // the last time the output pin was toggled
-unsigned long debounceDelay = 1000; // the debounce time; increase if the output flickers
+unsigned long debounceDelay = 500; // the debounce time; increase if the output flickers
 
 //vTaskDelay timer Delay
 int letSomthingElseRun = 200;
@@ -75,8 +75,8 @@ void setup()
 
   Serial.println("Creating Interrupts");
   //Setup Interrups so shifters work at anytime
-  attachInterrupt(digitalPinToInterrupt(shiftUpPin), shiftUp, FALLING);
-  attachInterrupt(digitalPinToInterrupt(shiftDownPin), shiftDown, FALLING);
+  attachInterrupt(digitalPinToInterrupt(shiftUpPin), shiftUp, RISING);
+  attachInterrupt(digitalPinToInterrupt(shiftDownPin), shiftDown, RISING);
   attachInterrupt(digitalPinToInterrupt(radioPin), changeRadioStateButton, FALLING);
 
   Serial.println("Setting up cpu Tasks");
@@ -175,7 +175,7 @@ void switchRadioState()
 
 void moveStepper(void *pvParameters)
 {
-  //int acceleration = 3000;
+  int acceleration = 500;
   //int currentAcceleration = acceleration;
   //bool accelerating = true;
   int targetPosition = 0;
@@ -199,49 +199,47 @@ void moveStepper(void *pvParameters)
 
     if (stepperPosition == targetPosition)
     {
+      vTaskDelay(300 / portTICK_PERIOD_MS);
       digitalWrite(enablePin, HIGH); //disable output FETs so stepper can cool
-      vTaskDelay(600 / portTICK_PERIOD_MS);
+      vTaskDelay(300 / portTICK_PERIOD_MS);
       //currentAcceleration = acceleration;
     }
     else
     {
       digitalWrite(enablePin, LOW); //enable FETs for impending move
+      vTaskDelay(1); //Need a small delay here for outputs to stabalize
 
       if (stepperPosition < targetPosition)
       {
         if (lastDir == false)
         {
           //delayMicroseconds(currentAcceleration);
-          vTaskDelay(100);
-          //vTaskDelay(200);
-          //currentAcceleration = acceleration;
+          vTaskDelay(100); //Stepper was running in opposite direction. Give it time to stop.
         }
         digitalWrite(dirPin, HIGH);
         digitalWrite(stepPin, HIGH);
-        //delayMicroseconds (currentAcceleration);
-        vTaskDelay(1);
+        delayMicroseconds (acceleration);
+        //vTaskDelay(1);
         digitalWrite(stepPin, LOW);
         stepperPosition++;
         lastDir = true;
-        //Serial.println("Clockwise");
-      }
+           }
       else // must be (stepperPosition > targetPosition)
       {
         if (lastDir == true)
         {
-          vTaskDelay(100);
+          vTaskDelay(100); //Stepper was running in opposite direction. Give it time to stop.
           //currentAcceleration = acceleration;
         }
         digitalWrite(dirPin, LOW);
         digitalWrite(stepPin, HIGH);
-        //delayMicroseconds (currentAcceleration);
-        vTaskDelay(1);
+        delayMicroseconds (acceleration);
+        //vTaskDelay(1);
         digitalWrite(stepPin, LOW);
         stepperPosition--;
         lastDir = false;
       }
-      //delayMicroseconds(currentAcceleration); //low delay
-      vTaskDelay(1);
+     
     }
   }
   Serial.println("Exited Motor Control Loop. That was Weird.");
