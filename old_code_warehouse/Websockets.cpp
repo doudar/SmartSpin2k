@@ -3,7 +3,7 @@
 // BLE code based on examples from https://github.com/nkolban
 // Copyright 2020 Anthony Doud
 // This work is licensed under the GNU General Public License v2
-// Physical hardware build from plans in the SmartSpin2k repository are licensed under Cern Open Hardware Licence version 2 Permissive
+// Physical hardware prototypes build from plans in the SmartSpin2k repository are licensed under Cern Open Hardware Licence version 2 Permissive
 
 #include <AsyncWebSocket.h>
 
