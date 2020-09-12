@@ -1,4 +1,4 @@
-SmartSpin2K - A buildable software & hardware project that can upgrades a spin bike into a smart bike. 
+SmartSpin2K - A buildable software & hardware project that can upgrade a stationary spin bike into a smart bike. 
 
 This software registers an ESP32 as a BLE FTMS device which then uses a stepper motor to turn the resistance knob on a regular spin bike.
 BLE code based on examples from https://github.com/nkolban
