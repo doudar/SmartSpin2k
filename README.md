@@ -21,7 +21,7 @@ The power meter pedals send cycling power and cadence to Zwift (or any other cyc
 |1      | LM2596 Buck Converter    | https://amzn.to/33ofggY  |
 |1      | 12V Power Supply         | https://amzn.to/2FeDuSR  |
 |2      | Tactile Switches         | https://amzn.to/33ezmKx |
-|2      | 608 Skate Bearings       | https://www.amazon.com/dp/B07R7PR72H/  |
+|2      | 608 Skate Bearings       | https://amzn.to/3isBzrW  |
 
 Optional equipment so you can actually use it for fitness:
 |qty    |         Part             |              Link                      |
