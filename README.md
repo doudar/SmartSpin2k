@@ -19,7 +19,7 @@ The power meter pedals send cycling power and cadence to Zwift (or any other cyc
 |1      | NEMA 17 Pancake Stepper  | https://amzn.to/35tNiCW |
 |1      | A4988 Driver Board       | https://amzn.to/35w2EqA |
 |1      | LM2596 Buck Converter    | https://amzn.to/33ofggY  |
-|1      | 12V Power Supply         | https://amzn.to/2FeDuSR  |
+|1      | 12V Power Supply         | https://amzn.to/3hqrTNw  |
 |2      | Tactile Switches         | https://amzn.to/33ezmKx |
 |2      | 608 Skate Bearings       | https://amzn.to/3isBzrW  |
 
