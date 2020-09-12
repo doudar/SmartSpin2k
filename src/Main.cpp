@@ -82,8 +82,8 @@ void setup()
 
   Serial.println("Creating Interrupts");
   //Setup Interrups so shifters work at anytime
-  attachInterrupt(digitalPinToInterrupt(shiftUpPin), shiftUp, RISING);
-  attachInterrupt(digitalPinToInterrupt(shiftDownPin), shiftDown, RISING);
+  attachInterrupt(digitalPinToInterrupt(shiftUpPin), shiftUp, CHANGE);
+  attachInterrupt(digitalPinToInterrupt(shiftDownPin), shiftDown, CHANGE);
   attachInterrupt(digitalPinToInterrupt(radioPin), changeRadioStateButton, FALLING);
 
   Serial.println("Setting up cpu Tasks");
@@ -273,9 +273,13 @@ void IRAM_ATTR shiftUp() // Handle the shift up interrupt IRAM_ATTR is to keep t
 {
   if (deBounce())
   {
+    if(!digitalRead(shiftUpPin)) //double checking to make sure the interrupt wasn't triggered by emf
+    {
     shifterPosition = (shifterPosition + config.getShiftStep());
     Serial.println("Shift UP");
     Serial.println(shifterPosition);
+    }
+    else {lastDebounceTime = 0;} //Probably Triggered by EMF, reset the debounce
   }
 }
 
@@ -283,9 +287,13 @@ void IRAM_ATTR shiftDown() //Handle the shift down interrupt
 {
   if (deBounce())
   {
+    if(!digitalRead(shiftDownPin)) //double checking to make sure the interrupt wasn't triggered by emf
+    {
     shifterPosition = (shifterPosition - config.getShiftStep());
     Serial.println("Shift DOWN");
     Serial.println(shifterPosition);
+    }
+    else {lastDebounceTime = 0} //Probably Triggered by EMF, reset the debounce
   }
 }
 
