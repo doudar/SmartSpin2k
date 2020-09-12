@@ -30,7 +30,7 @@ Optional equipment so you can actually use it for fitness:
 |1      |Cheap Spin Bike Check Ebay| https://amzn.to/33mPmKj |
 
 
-So for $700-$1000 you can build a fully functional smart bike! If you already have a Peleton bike collecting dust in the corner, this will work on that too!
+So for $700-$1000 you can build a fully functional smart bike! If you already have a Peloton bike collecting dust in the corner, this will work on that too!
 
 
 ### Full Documentation Soon
