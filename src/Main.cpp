@@ -293,7 +293,7 @@ void IRAM_ATTR shiftDown() //Handle the shift down interrupt
     Serial.println("Shift DOWN");
     Serial.println(shifterPosition);
     }
-    else {lastDebounceTime = 0} //Probably Triggered by EMF, reset the debounce
+    else {lastDebounceTime = 0;} //Probably Triggered by EMF, reset the debounce
   }
 }
 
