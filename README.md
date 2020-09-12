@@ -26,8 +26,8 @@ The power meter pedals send cycling power and cadence to Zwift (or any other cyc
 Optional equipment so you can actually use it for fitness:
 |qty    |         Part             |              Link                      |
 |:-----:|--------------------------|---------------------------------------:|
-|1      |Assioma Pedals(or similar)| <a target="_blank" href="https://www.amazon.com/gp/product/B08BDPFY9Y/ref=as_li_tl?ie=UTF8&camp=1789&creative=9325&creativeASIN=B08BDPFY9Y&linkCode=as2&tag=doudar-20&linkId=f79dddc28e6b5bdd317bb2dbce4fad8c">FAVERO Assioma Uno</a><img src="//ir-na.amazon-adsystem.com/e/ir?t=doudar-20&l=am2&o=1&a=B08BDPFY9Y" width="1" height="1" border="0" alt="" style="border:none !important; margin:0px !important;" />       |                   
-|1      |Cheap Spin Bike Check Ebay| <a target="_blank" href="https://www.amazon.com/gp/product/B08FDCW184/ref=as_li_tl?ie=UTF8&camp=1789&creative=9325&creativeASIN=B08FDCW184&linkCode=as2&tag=doudar-20&linkId=e78975c4a750cec5349cea961f24115c">Indoor Exercise Bike</a><img src="//ir-na.amazon-adsystem.com/e/ir?t=doudar-20&l=am2&o=1&a=B08FDCW184" width="1" height="1" border="0" alt="" style="border:none !important; margin:0px !important;" /> |
+|1      |Assioma Pedals(or similar)| https://amzn.to/3ioSjk7|                   
+|1      |Cheap Spin Bike Check Ebay| https://amzn.to/33mPmKj |
 
 
 So for $700-$1000 you can build a fully functional smart bike! If you already have a Peleton bike collecting dust in the corner, this will work on that too!
