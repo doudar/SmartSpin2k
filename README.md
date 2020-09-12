@@ -18,7 +18,7 @@ The power meter pedals send cycling power and cadence to Zwift (or any other cyc
 |1      | ESP32 Dev Board          | https://amzn.to/2ZNyjQX  |
 |1      | NEMA 17 Pancake Stepper  | https://amzn.to/35tNiCW |
 |1      | A4988 Driver Board       | https://amzn.to/35w2EqA |
-|1      | LM2596 Buck Converter    | <a target="_blank" href="https://www.amazon.com/gp/product/B07C2QF1T1/ref=as_li_tl?ie=UTF8&camp=1789&creative=9325&creativeASIN=B07C2QF1T1&linkCode=as2&tag=doudar-20&linkId=9b163bfdc2fffab96dc432ad2dbd7bea"> LM2596 DC-DC Adjustable Buck Converter</a><img src="//ir-na.amazon-adsystem.com/e/ir?t=doudar-20&l=am2&o=1&a=B07C2QF1T1" width="1" height="1" border="0" alt="" style="border:none !important; margin:0px !important;" />  |
+|1      | LM2596 Buck Converter    | https://amzn.to/33ofggY  |
 |1      | 12V Power Supply         | <a target="_blank" href="https://www.amazon.com/gp/product/B01461MOGQ/ref=as_li_tl?ie=UTF8&camp=1789&creative=9325&creativeASIN=B01461MOGQ&linkCode=as2&tag=doudar-20&linkId=fe7efd64e9920680e89e1ac9213bd7ab">12v Power Supply</a><img src="//ir-na.amazon-adsystem.com/e/ir?t=doudar-20&l=am2&o=1&a=B01461MOGQ" width="1" height="1" border="0" alt="" style="border:none !important; margin:0px !important;" />  |
 |2      | Tactile Switches         | https://amzn.to/33ezmKx |
 |2      | 608 Skate Bearings       | https://www.amazon.com/dp/B07R7PR72H/  |
