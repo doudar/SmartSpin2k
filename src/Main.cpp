@@ -24,13 +24,13 @@ int letSomthingElseRun = 200;
 int maxStepperSpeed = 600;
 
 // Define output pins
-const int radioPin = 27; //Should be 27 - Occasionally I switch for testing
+const int radioPin = 27; 
 const int shiftUpPin = 19; 
 const int shiftDownPin = 18;
-const int enablePin = 5; //Recently changed from 21 te enable all three stepper pins to be in a row for easy cable manufacture
+const int enablePin = 5; 
 const int stepPin = 17;
 const int dirPin = 16;
-const int ledPin = 2; //Blue LED on the ESP32
+const int ledPin = 2; //one of those stupid blinding Blue LED's on the ESP32
 
 // Default size for the shifter step
 const int shiftStep = 400;
@@ -107,20 +107,22 @@ void setup()
   /************************************************StartingBLE Server***********************/
   if (config.getWifiOn())
   {
-    Serial.println("Starting Config wifi on");
+    Serial.println("Starting config mode");
+    BLEserverScan();
     startWifi();
     startHttpServer();
     digitalWrite(ledPin, LOW);
   }
   else
   {
-    Serial.println("Starting Config wifi off");
-    BLEserverScan(); //Scan for Known BLE Servers
+    Serial.println("Starting regular mode");
+    //BLEserverScan(); //Scan for Known BLE Servers
+    BLEserverScan();
+    startBLEServer();
     digitalWrite(ledPin, HIGH);
   }
 
-  //BLEserverScan(); //Scan for Known BLE Servers
-  startBLEServer(); //Start our own BLE server
+  //startBLEServer(); //Start our own BLE server
 }
 
 void loop()
@@ -160,9 +162,9 @@ void loop()
 //the interface, we're just going to update the configuration, save it and then reboot. For Now. Hopefully this can be sorted out in the future.
 void switchRadioState()
 {
-  if (config.getWifiOn())
+  if (digitalRead(radioPin))
   { //wifi is currently on, turn it off, turn BT client on.
-    Serial.println("User Pressed Radio Button to turn WiFi Off");
+    Serial.println("User Pressed Radio Button to turn configuration mode off");
     config.setWifiOn(false);
     config.saveToSPIFFS();
     delay(100);
@@ -171,7 +173,7 @@ void switchRadioState()
   }
   else
   {
-    Serial.println("User Pressed Radio Button to turn WiFi On");
+    Serial.println("User Pressed Radio Button to turn configuration mode on");
     config.setWifiOn(true); //wifi is currently off, turn it on, turn BT client off.
     config.saveToSPIFFS();
     delay(100);

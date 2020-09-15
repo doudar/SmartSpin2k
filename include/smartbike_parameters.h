@@ -9,6 +9,7 @@
 
 // define all data parameters
 #include <Arduino.h>
+//#include <vector>
 
 /*espidf stuff
 #include <stdio.h>
@@ -34,21 +35,26 @@ class userParameters
     bool wifiOn;
     String ssid;
     String password;
+    String foundDevices = " ";
+    String connectedDevices = " ";
+    
     public:
+    const char* getFilename()                {return filename.c_str();}
+    float       getIncline()                 {return incline;}
+    int         getSimulatedWatts()          {return simulatedWatts;}
+    int         getSimulatedHr()             {return simulatedHr;}
+    float       getInclineStep()             {return inclineStep;}
+    int         getShiftStep()               {return shiftStep;}
+    float       getInclineMultiplier()       {return inclineMultiplier;}
+    bool        getSimulatePower()           {return simulatePower;}
+    bool        getSimulateHr()              {return simulateHr;}
+    bool        getERGMode()                 {return ERGMode;}
+    bool        getWifiOn()                  {return wifiOn;}
+    const char* getSsid()                    {return ssid.c_str();}
+    const char* getPassword()                {return password.c_str();}
+    const char* getFoundDevices()            {return foundDevices.c_str();}
+    const char* getConnectedDevices()        {return connectedDevices.c_str();}
    
-    const char* getFilename()           {return filename.c_str();}
-    float       getIncline()            {return incline;}
-    int         getSimulatedWatts()     {return simulatedWatts;}
-    int         getSimulatedHr()        {return simulatedHr;}
-    float       getInclineStep()        {return inclineStep;}
-    int         getShiftStep()          {return shiftStep;}
-    float       getInclineMultiplier()  {return inclineMultiplier;}
-    bool        getSimulatePower()      {return simulatePower;}
-    bool        getSimulateHr()         {return simulateHr;}
-    bool        getERGMode()            {return ERGMode;}
-    bool        getWifiOn()             {return wifiOn;}
-    const char* getSsid()               {return ssid.c_str();}
-    const char* getPassword()           {return password.c_str();}
 
     void    setDefaults();
     void    setFilename(String flnm)         {filename = flnm;}
@@ -63,12 +69,15 @@ class userParameters
     void    setERGMode(bool erg)             {ERGMode = erg;}
     void    setWifiOn(bool wifi)             {wifiOn = wifi;}
     void    setSsid(String sid)              {ssid = sid;}
-    void    setPassword(String pwd)           {password = pwd;} 
+    void    setPassword(String pwd)          {password = pwd;} 
+    void    setfoundDevices(String fdev)     {foundDevices = fdev;};
+    void    setConnectedDevices(String cdev) {connectedDevices = cdev;}
   
     String  returnJSON();
     void    saveToSPIFFS();
     void    loadFromSPIFFS();
     void    printFile();
+
 
 };
 

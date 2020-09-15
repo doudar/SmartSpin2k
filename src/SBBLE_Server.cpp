@@ -16,11 +16,15 @@ BLE Advertised Device found: Name: ASSIOMA17287L, Address: e8:fe:6e:91:9f:16, ap
 #include <BLEUtils.h>
 #include <BLEServer.h>
 #include <BLE2902.h>
+#include <ArduinoJson.h>
 
 //BLE Server Settings
 String BLEName = "SmartBike2K";
 bool _BLEClientConnected = false;
 int toggle = false;
+//int numDevices = 0;
+//String foundDevices[];
+
 byte heartRateMeasurement[5] = {0b00000, 60, 0, 0, 0};
 /********************************Bit field Flag Example***********************************/
 // 0000000000001 - 1   - 0x001 - Pedal Power Balance Present
@@ -98,7 +102,8 @@ class MyServerCallbacks : public BLEServerCallbacks
 };
 /***********************************BLE CLIENT. EXPERIMENTAL TESTING *******************/ 
 // The remote service we wish to connect to.
-static BLEUUID serviceUUID((uint16_t)0x180D); //Could eventually set these to the defines we have at the top of the file.
+static BLEUUID heartServiceUUID((uint16_t)0x180D); //Could eventually set these to the defines we have at the top of the file.
+static BLEUUID powerServiceUUID((uint16_t)0x1818);
 // The characteristic of the remote service we are interested in.
 static BLEUUID charUUID((uint16_t)0x2A37);
 
@@ -108,6 +113,7 @@ static boolean doScan = false;
 static BLERemoteCharacteristic *pRemoteCharacteristic;
 static BLEAdvertisedDevice *myDevice;
 
+//Testing server notify with heart rate data
 static void notifyCallback(
     BLERemoteCharacteristic *pBLERemoteCharacteristic,
     uint8_t *pData,
@@ -148,16 +154,16 @@ bool connectToServer()
 
   pClient->setClientCallbacks(new MyClientCallback());
 
-  // Connect to the remove BLE Server.
+  // Connect to the remote BLE Server.
   pClient->connect(myDevice); // if you pass BLEAdvertisedDevice instead of address, it will be recognized type of peer device address (public or private)
   Serial.println(" - Connected to server");
 
   // Obtain a reference to the service we are after in the remote BLE server.
-  BLERemoteService *pRemoteService = pClient->getService(serviceUUID);
+  BLERemoteService *pRemoteService = pClient->getService(heartServiceUUID);
   if (pRemoteService == nullptr)
   {
     Serial.print("Failed to find our service UUID: ");
-    Serial.println(serviceUUID.toString().c_str());
+    Serial.println(heartServiceUUID.toString().c_str());
     pClient->disconnect();
     return false;
   }
@@ -202,7 +208,7 @@ class MyAdvertisedDeviceCallbacks : public BLEAdvertisedDeviceCallbacks
     Serial.println(advertisedDevice.toString().c_str());
 
     // We have found a device, let us now see if it contains the service we are looking for.
-    if (advertisedDevice.haveServiceUUID() && advertisedDevice.isAdvertisingService(serviceUUID))
+    if (advertisedDevice.getName() == config.getConnectedDevices() || advertisedDevice.getAddress().toString() == config.getConnectedDevices())
     {
 
       BLEDevice::getScan()->stop();
@@ -215,8 +221,7 @@ class MyAdvertisedDeviceCallbacks : public BLEAdvertisedDeviceCallbacks
 };    // MyAdvertisedDeviceCallbacks
 
 void BLEserverScan()
-{ //Was setup()
-
+{ 
   Serial.println("Starting Arduino BLE Client application...");
   BLEDevice::init("");
 
@@ -228,8 +233,44 @@ void BLEserverScan()
   pBLEScan->setInterval(1349);
   pBLEScan->setWindow(449);
   pBLEScan->setActiveScan(true);
-  pBLEScan->start(5, false);
-} // End of setup.
+  BLEScanResults foundDevices = pBLEScan->start(5, false);
+
+  //********************** Load the scan into a Json String
+    int count = foundDevices.getCount();
+
+  StaticJsonDocument<500> devices;
+  
+  String device = "";
+  //JsonObject root = devices.createNestedObject();
+  //JsonArray server = devices.createNestedObject("server");
+  for (int i = 0; i < count; i++)
+  {
+    BLEAdvertisedDevice d = foundDevices.getDevice(i);
+    if(d.isAdvertisingService(CYCLINGPOWERSERVICE_UUID) || d.isAdvertisingService(HEARTSERVICE_UUID)){
+    device = "device " + String(i);
+    devices[device]["address"] = d.getAddress().toString();
+ 
+    if (d.haveName())
+    {
+      devices[device]["name"] = d.getName();
+    }
+
+    if (d.haveServiceUUID())
+    {
+       devices[device]["UUID"] = d.getServiceUUID().toString();
+    }
+    }
+  }
+  String output;
+  serializeJson(devices, output);
+  Serial.println(output);
+  config.setfoundDevices(output);
+
+  if(doConnect){  //Works but inhibits the BLE Server Scan. Too late at night to fix. another day. 
+    connectToServer();
+  }
+}
+// End of setup.
 
 // This is the Arduino main loop function.
 void bleClient()

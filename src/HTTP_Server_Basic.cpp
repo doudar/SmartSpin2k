@@ -47,9 +47,17 @@ config.setPassword            (server.arg("password"));
 config.setInclineStep         (server.arg("inclineStep").toFloat());
 config.setShiftStep           (server.arg("shiftStep").toInt());
 config.setInclineMultiplier   (server.arg("inclineMultiplier").toFloat());
+config.setConnectedDevices    (server.arg("bleDropdown"));
 server.send(200, "text/plain", "OK");
 Serial.println("Config Updated From Web");
+Serial.println(server.arg("bleDropdown"));
+Serial.println(config.getConnectedDevices());
 config.saveToSPIFFS();
+});
+
+server.on("/BLEServers", [](){
+Serial.println("Sending BLE device list to HTTP Client");
+server.send(200, "text/plain", config.getFoundDevices());
 });
 
 server.on("/load_defaults.html", [](){

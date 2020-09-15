@@ -1,60 +1,144 @@
 <!DOCTYPE html>
 <html>
-    <head>
-        <title>SmartBike2K Web Server</title>
-        <meta name="viewport" content="width=device-width, initial-scale=1">
-        <link rel="icon" href="data:,">
-        <link rel="stylesheet" type="text/css" href="style.css">
-      </head>
+
+<head>
+  <title>SmartBike2K Web Server</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <link rel="icon" href="data:,">
+
+</head>
 
 
 <body>
-<h1><strong>Settings</strong></h1>
-<h2><p style="text-align: left;"></p>
-<form action="/send_settings">
-<table border="0" style="height: 30px; width: 36.0582%; border-collapse: collapse; border-style: none;" height="182" cellspacing="1">
-<tbody>
-<tr style="height: 20px;">
-<td style="width: 14%; height: 20px;">
-<p><label for="ssid">SSID</label></p>
-</td>
-<td style="width: 14%; height: 20px;"><input type="text" id="ssid" name="ssid" value="smartBike2k" /></td>
-</tr>
-<tr style="height: 20px;">
-<td style="width: 14%; height: 20px;">
-<p><label for="password">Password</label></p>
-</td>
-<td style="width: 14%; height: 20px;"><input type="text" id="password" name="password" value="password" /></td>
-</tr>
-<tr style="height: 20px;">
-<td style="width: 14%; height: 20px;">
-<p><label for="inclineStep">Incline Step</label></p>
-</td>
-<td style="width: 14%; height: 20px;"><input type="text" id="inclineStep" name="inclineStep" value="from javascript" /></td>
-</tr>
-<tr style="height: 20px;">
-<td style="width: 14%; height: 20px;">
-<p><label for="shiftStep">Shift Step</label></p>
-</td>
-<td style="width: 14%; height: 20px;"><input type="text" id="shiftStep" name="shiftStep" value="from javascript" /></td>
-</tr>
-<tr style="height: 20px;">
-<td style="width: 14%; height: 20px;">
-<p><label for="inclineMultiplier">Incline Multiplier</label></p>
-</td>
-<td style="width: 14%; height: 20px;"><input type="text" id="inclineMultiplier" name="inclineMultiplier" value="from javascript" /></td>
-</tr>
-</tbody>
-</table>
-<input type="submit" value="Submit" /></form>
-<p><br></p>
-<form action="/load_defaults.html">
-    <input type="submit" value="Reset to Defaults">
-  </form> 
-<p><br></p>
-<form action="/reboot.html">
-    <input type="submit" value="Reboot!">
-  </form> 
-</h2>
+  <h1><strong>Settings</strong></h1>
+  <h2>
+    <p style="text-align: left;"></p>
+    <form action="/send_settings">
+      <table border="0" style="height: 30px; width: 36.0582%; border-collapse: collapse; border-style: none;"
+        height="182" cellspacing="1">
+        <tbody>
+          <tr style="height: 20px;">
+            <td style="width: 14%; height: 20px;">
+              <p><label for="ssid">SSID</label></p>
+            </td>
+            <td style="width: 14%; height: 20px;"><input type="text" id="ssid" name="ssid" value="loading" /></td>
+          </tr>
+          <tr style="height: 20px;">
+            <td style="width: 14%; height: 20px;">
+              <p><label for="password">Password</label></p>
+            </td>
+            <td style="width: 14%; height: 20px;"><input type="text" id="password" name="password" value="loading" />
+            </td>
+          </tr>
+          <tr style="height: 20px;">
+            <td style="width: 14%; height: 20px;">
+              <p><label for="inclineStep">Incline Step</label></p>
+            </td>
+            <td style="width: 14%; height: 20px;"><input type="text" id="inclineStep" name="inclineStep"
+                value="loading" /></td>
+          </tr>
+          <tr style="height: 20px;">
+            <td style="width: 14%; height: 20px;">
+              <p><label for="shiftStep">Shift Step</label></p>
+            </td>
+            <td style="width: 14%; height: 20px;"><input type="text" id="shiftStep" name="shiftStep" value="loading" />
+            </td>
+          </tr>
+          <tr style="height: 20px;">
+            <td style="width: 14%; height: 20px;">
+              <p><label for="inclineMultiplier">Incline Multiplier</label></p>
+            </td>
+            <td style="width: 14%; height: 20px;"><input type="text" id="inclineMultiplier" name="inclineMultiplier"
+                value="loading" /></td>
+          </tr>
+        </tbody>
+        <tr style="height: 20px;">
+          <td style="width: 14%; height: 20px;">
+            <p><label for="Nearby Bluetooth Devices">BLE Devices</label></p>
+          </td>
+          <td style="width: 14%; height: 20px;"><select id="bleDropdown" name="bleDropdown" value="loading" /></td>
+        </tr>
+        </tbody>
+      </table>
+      <input type="submit" value="Submit" />
+    </form>
+    <p><br></p>
+    <form action="/load_defaults.html">
+      <input type="submit" value="Reset to Defaults">
+    </form>
+    <p><br></p>
+    <form action="/reboot.html">
+      <input type="submit" value="Reboot!">
+    </form>
+  </h2>
 </body>
+
+<script>
+
+  let dropdown = document.getElementById('bleDropdown');
+  dropdown.length = 0;
+
+  let defaultOption = document.createElement('option');
+  defaultOption.text = 'Choose BLE Device To Connect';
+
+  dropdown.add(defaultOption);
+  dropdown.selectedIndex = 0;
+
+  const request = new XMLHttpRequest();
+  request.open('GET', "/BLEServers", true);
+
+  request.onload = function () {
+    if (request.status === 200) {
+      const data = JSON.parse(request.responseText);
+      let option;
+      for (var key in data) {
+        option = document.createElement('option');
+        if (data[key].name) {
+          option.text = data[key].name;
+        }
+        else {
+          option.text = data[key].address;
+        }
+        dropdown.add(option);
+      }
+    }
+    else {
+      // Reached the server, but it returned an error
+    }
+    //requestConfigValues();
+  }
+
+  request.onerror = function () {
+    console.error('An error occurred fetching the JSON');
+  };
+
+  request.send();
+
+  //Update values on specified interval loading late because this tiny webserver hates frequent requests
+   setInterval(function () {
+    if (document.getElementById("ssid").value == "loading"){
+    requestConfigValues();
+    }
+
+  }, 1000);
+
+  function requestConfigValues() {
+    var xhttp = new XMLHttpRequest();
+    xhttp.onreadystatechange = function () {
+      if (this.readyState == 4 && this.status == 200) {
+        var obj = JSON.parse(this.responseText);
+        document.getElementById("ssid").value = obj.ssid;
+        document.getElementById("password").value = obj.password;
+        document.getElementById("inclineStep").value = obj.inclineStep;
+        document.getElementById("shiftStep").value = obj.shiftStep;
+        document.getElementById("inclineMultiplier").value = obj.inclineMultiplier;
+
+      }
+    };
+    xhttp.open("GET", "/configJSON", true);
+    xhttp.send();
+  }
+
+</script>
+
 </html>

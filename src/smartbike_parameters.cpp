@@ -24,6 +24,8 @@ void userParameters::setDefaults()
     wifiOn              = true;
     ssid                = "SmartBike2k";
     password            = "password";
+    foundDevices        = "";
+    connectedDevices    = ""; 
 }
 
 //---------------------------------------------------------------------------------
@@ -33,7 +35,7 @@ String userParameters::returnJSON()
   // Allocate a temporary JsonDocument
   // Don't forget to change the capacity to match your requirements.
   // Use arduinojson.org/assistant to compute the capacity.
-  StaticJsonDocument<256> doc;
+  StaticJsonDocument<512> doc;
   // Set the values in the document
 
     doc["filename"]           = filename;
@@ -49,6 +51,8 @@ String userParameters::returnJSON()
     doc["wifiOn"]             = wifiOn;
     doc["ssid"]               = ssid;
     doc["password"]           = password;
+    //doc["foundDevices"]       = foundDevices;
+    doc["connectedDevices"]   = connectedDevices; 
 
   String output;
   serializeJson(doc, output);
@@ -72,7 +76,7 @@ void userParameters::saveToSPIFFS()
   // Allocate a temporary JsonDocument
   // Don't forget to change the capacity to match your requirements.
   // Use arduinojson.org/assistant to compute the capacity.
-  StaticJsonDocument<256> doc;
+  StaticJsonDocument<512> doc;
 
   // Set the values in the document
 
@@ -89,6 +93,8 @@ void userParameters::saveToSPIFFS()
     doc["wifiOn"]             = wifiOn;
     doc["ssid"]               = ssid;
     doc["password"]           = password;
+    //doc["foundDevices"]       = foundDevices;
+    doc["connectedDevices"]   = connectedDevices; 
 
   // Serialize JSON to file
   if (serializeJson(doc, file) == 0) {
@@ -137,6 +143,8 @@ void userParameters::loadFromSPIFFS() {
     setWifiOn           (doc["wifiOn"]);
     setSsid             (doc["ssid"]);
     setPassword         (doc["password"]);
+    //setfoundDevices     (doc["foundDevices"]);
+    setConnectedDevices (doc["connectedDevices"]);
 
     Serial.printf("Config File Loaded: %s \n", filename.c_str());        
     file.close();
