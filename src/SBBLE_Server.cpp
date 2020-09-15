@@ -128,7 +128,7 @@ static void notifyCallback(
   Serial.println((char *)pData);
   Serial.printf("%d \n", pData[0]);
   Serial.printf("%d \n", pData[1]);
-  config.setSimulatedHr((int)pData[1]);
+  userConfig.setSimulatedHr((int)pData[1]);
 }
 
 class MyClientCallback : public BLEClientCallbacks
@@ -208,7 +208,7 @@ class MyAdvertisedDeviceCallbacks : public BLEAdvertisedDeviceCallbacks
     Serial.println(advertisedDevice.toString().c_str());
 
     // We have found a device, let us now see if it contains the service we are looking for.
-    if (advertisedDevice.getName() == config.getConnectedDevices() || advertisedDevice.getAddress().toString() == config.getConnectedDevices())
+    if (advertisedDevice.getName() == userConfig.getConnectedDevices() || advertisedDevice.getAddress().toString() == userConfig.getConnectedDevices())
     {
 
       BLEDevice::getScan()->stop();
@@ -264,7 +264,7 @@ void BLEserverScan()
   String output;
   serializeJson(devices, output);
   Serial.println(output);
-  config.setfoundDevices(output);
+  userConfig.setfoundDevices(output);
 
   if(doConnect){  //Works but inhibits the BLE Server Scan. Too late at night to fix. another day. 
     connectToServer();
@@ -350,13 +350,13 @@ class MyCallbacks : public BLECharacteristicCallbacks
         buf[1] = rxValue[4]; // (Most significant byte)
 
         int port = bytes_to_s16(buf[1], buf[0]);
-        config.setIncline(port);
-        if (config.getERGMode())
+        userConfig.setIncline(port);
+        if (userConfig.getERGMode())
         {
-          config.setERGMode(false);
+          userConfig.setERGMode(false);
         }
         Serial.print("   Target Incline: ");
-        Serial.print(config.getIncline() / 100);
+        Serial.print(userConfig.getIncline() / 100);
         Serial.println("*********");
       }
 
@@ -364,13 +364,13 @@ class MyCallbacks : public BLECharacteristicCallbacks
 
       if ((int)rxValue[0] == 5)
       {
-        config.setSimulatedWatts(bytes_to_s16(rxValue[2], rxValue[1]));
-        if (!config.getERGMode())
+        userConfig.setSimulatedWatts(bytes_to_s16(rxValue[2], rxValue[1]));
+        if (!userConfig.getERGMode())
         {
-          config.setERGMode(true);
+          userConfig.setERGMode(true);
         }
         Serial.print("   Target Watts: ");
-        Serial.print(config.getSimulatedWatts()); //not displaying numbers less than 256 correctly but they do get sent to Zwift correctly.
+        Serial.print(userConfig.getSimulatedWatts()); //not displaying numbers less than 256 correctly but they do get sent to Zwift correctly.
         Serial.println("*********");
       }
     }
@@ -434,15 +434,15 @@ void BLENotify()
   if (_BLEClientConnected)
   {
     //update the BLE information on the server
-    heartRateMeasurement[1] = config.getSimulatedHr();
-    cyclingPowerMeasurement[2] = config.getSimulatedWatts();
+    heartRateMeasurement[1] = userConfig.getSimulatedHr();
+    cyclingPowerMeasurement[2] = userConfig.getSimulatedWatts();
     heartRateMeasurementCharacteristic.setValue(heartRateMeasurement, 5);
     heartRateMeasurementCharacteristic.notify();
     //vTaskDelay(10/portTICK_RATE_MS);
     //Set New Watts.
     int remainder, quotient;
-    quotient = config.getSimulatedWatts() / 256;
-    remainder = config.getSimulatedWatts() % 256;
+    quotient = userConfig.getSimulatedWatts() / 256;
+    remainder = userConfig.getSimulatedWatts() % 256;
     cyclingPowerMeasurement[2] = remainder;
     cyclingPowerMeasurement[3] = quotient;
     cyclingPowerMeasurementCharacteristic.setValue(cyclingPowerMeasurement, 19);

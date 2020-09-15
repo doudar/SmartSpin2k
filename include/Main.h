@@ -34,9 +34,9 @@ void IRAM_ATTR changeRadioStateButton();
 void switchRadioState();
 
 
-// I don't like this (not sure why really, but it allows the config variable 
+// I don't like this (not sure why really, but it allows the userConfig variable 
 //to be accessable in all of the .cpp files
-extern userParameters config;
+extern userParameters userConfig;
 
 #endif
 

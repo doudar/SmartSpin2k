@@ -44,8 +44,8 @@ TaskHandle_t moveStepperTask;
 //TaskHandle_t deBounceTask; //debounce our button presses using a standalone timer
 
 //*************************Load The Config*********************************
-userParameters config;
-//userParameters *configptr = &config;
+userParameters userConfig;
+//userParameters *userConfig.tr = &userConfig.
 ///////////////////////////////////////////////////////BEGIN SETUP/////////////////////////////////////
 
 void setup()
@@ -63,9 +63,9 @@ void setup()
   }
 
   //Load Config
-  config.loadFromSPIFFS();
-  config.printFile(); //Print config contents to serial
-  config.saveToSPIFFS();
+  userConfig.loadFromSPIFFS();
+  userConfig.printFile(); //Print userConfig.contents to serial
+  userConfig.saveToSPIFFS();
 
   Serial.println("Configuring Hardware Pins");
   pinMode(radioPin, INPUT_PULLUP);
@@ -105,9 +105,9 @@ void setup()
   Serial.println("Stepper Task Created");
 
   /************************************************StartingBLE Server***********************/
-  if (config.getWifiOn())
+  if (userConfig.getWifiOn())
   {
-    Serial.println("Starting config mode");
+    Serial.println("Starting userConfig.mode");
     BLEserverScan();
     startWifi();
     startHttpServer();
@@ -130,14 +130,14 @@ void loop()
 
   BLENotify();
   vTaskDelay(500 / portTICK_RATE_MS); //guessing it's good to have task delays seperating client & Server?
-  if (!config.getWifiOn())
+  if (!userConfig.getWifiOn())
   {
     bleClient();
   }
-  if (displayValue != config.getIncline() / (float)1000)
+  if (displayValue != userConfig.getIncline() / (float)1000)
   {
     Serial.println("Target Incline:");
-    displayValue = config.getIncline() / (float)1000;
+    displayValue = userConfig.getIncline() / (float)1000;
     Serial.println(displayValue);
   }
 
@@ -158,24 +158,24 @@ void loop()
   //vTaskDelay(4000/portTICK_RATE_MS);
 }
 
-//Switching the radios on and off after services are defined causes crashes so instead of reconfiguring the services and then downing
-//the interface, we're just going to update the configuration, save it and then reboot. For Now. Hopefully this can be sorted out in the future.
+//Switching the radios on and off after services are defined causes crashes so instead of reuserConfig.ring the services and then downing
+//the interface, we're just going to update the userConfig.ration, save it and then reboot. For Now. Hopefully this can be sorted out in the future.
 void switchRadioState()
 {
   if (digitalRead(radioPin))
   { //wifi is currently on, turn it off, turn BT client on.
-    Serial.println("User Pressed Radio Button to turn configuration mode off");
-    config.setWifiOn(false);
-    config.saveToSPIFFS();
+    Serial.println("User Pressed Radio Button to turn userConfig.ration mode off");
+    userConfig.setWifiOn(false);
+    userConfig.saveToSPIFFS();
     delay(100);
     Serial.println("rebooting...");
     ESP.restart();
   }
   else
   {
-    Serial.println("User Pressed Radio Button to turn configuration mode on");
-    config.setWifiOn(true); //wifi is currently off, turn it on, turn BT client off.
-    config.saveToSPIFFS();
+    Serial.println("User Pressed Radio Button to turn userConfig.ration mode on");
+    userConfig.setWifiOn(true); //wifi is currently off, turn it on, turn BT client off.
+    userConfig.saveToSPIFFS();
     delay(100);
     Serial.println("rebooting...");
     ESP.restart();
@@ -192,7 +192,7 @@ void moveStepper(void *pvParameters)
   while (1)
   {
 
-    targetPosition = shifterPosition + (config.getIncline() * config.getInclineMultiplier());
+    targetPosition = shifterPosition + (userConfig.getIncline() * userConfig.getInclineMultiplier());
     /*
       if(abs(stepperPosition-targetPosition)>(shiftStep/2)){
         if(currentAcceleration>maxStepperSpeed){
@@ -277,7 +277,7 @@ void IRAM_ATTR shiftUp() // Handle the shift up interrupt IRAM_ATTR is to keep t
   {
     if(!digitalRead(shiftUpPin)) //double checking to make sure the interrupt wasn't triggered by emf
     {
-    shifterPosition = (shifterPosition + config.getShiftStep());
+    shifterPosition = (shifterPosition + userConfig.getShiftStep());
     Serial.println("Shift UP");
     Serial.println(shifterPosition);
     }
@@ -291,7 +291,7 @@ void IRAM_ATTR shiftDown() //Handle the shift down interrupt
   {
     if(!digitalRead(shiftDownPin)) //double checking to make sure the interrupt wasn't triggered by emf
     {
-    shifterPosition = (shifterPosition - config.getShiftStep());
+    shifterPosition = (shifterPosition - userConfig.getShiftStep());
     Serial.println("Shift DOWN");
     Serial.println(shifterPosition);
     }

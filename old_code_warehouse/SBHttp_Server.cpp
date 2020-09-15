@@ -73,24 +73,24 @@ String processor(const String& var){
   }
 
   if(var =="HROUTPUT"){ 
-      if(config.getSimulateHr()){return "checked";}
+      if(userConfig.getSimulateHr()){return "checked";}
       else{return "";}
   }
 
     if(var =="WATTSOUTPUT"){ 
-      if(config.getSimulatePower()){return "checked";}
+      if(userConfig.getSimulatePower()){return "checked";}
       else{return "";}
   }
 
   if(var =="HRVALUE"){
-  snprintf(outString, MAX_BUFFER_SIZE, "%d", config.getSimulatedHr());
+  snprintf(outString, MAX_BUFFER_SIZE, "%d", userConfig.getSimulatedHr());
   strncat(outString, " BPM", 4);
   //Serial.printf("outString: %s \n", outString);
   return outString;
   }
 
   if(var =="WATTSVALUE"){ 
-  snprintf(outString, MAX_BUFFER_SIZE, "%d", config.getSimulatedWatts());
+  snprintf(outString, MAX_BUFFER_SIZE, "%d", userConfig.getSimulatedWatts());
   strncat(outString, " Watts", 6);
   return outString;
   }
@@ -105,7 +105,7 @@ void startHttpServer(){
   // Connect to Wi-Fi
   Serial.println();
   Serial.println("Configuring access point...");
-  WiFi.softAP(config.getSsid(), config.getPassword());
+  WiFi.softAP(userConfig.getSsid(), userConfig.getPassword());
   vTaskDelay(50);
   IPAddress myIP = WiFi.softAPIP();
   Serial.print("AP IP address: ");
@@ -149,8 +149,8 @@ void startHttpServer(){
     String inputMessage;
     if (request->hasParam(webIntParameter)) {
       inputMessage = request->getParam(webIntParameter)->value();
-      config.setSimulatedHr(inputMessage.toInt());
-      Serial.printf("Heart Rate in Config is %d\n", config.getSimulatedHr());
+      userConfig.setSimulatedHr(inputMessage.toInt());
+      Serial.printf("Heart Rate in Config is %d\n", userConfig.getSimulatedHr());
     }
     else {
       inputMessage = "No message sent";
@@ -165,8 +165,8 @@ void startHttpServer(){
     String inputMessage;
     if (request->hasParam(webIntParameter)) {
       inputMessage = request->getParam(webIntParameter)->value();
-      config.setSimulatedWatts(inputMessage.toInt());
-      Serial.printf("Watt in Config is %d\n", config.getSimulatedWatts());
+      userConfig.setSimulatedWatts(inputMessage.toInt());
+      Serial.printf("Watt in Config is %d\n", userConfig.getSimulatedWatts());
     }
     else {
       inputMessage = "No message sent";
@@ -181,9 +181,9 @@ void startHttpServer(){
     String inputMessage;
     if (request->hasParam(webIntParameter)) {
       inputMessage = request->getParam(webIntParameter)->value();
-      if(inputMessage == "checked"){config.setSimulateHr(true);}
-      else{config.setSimulateHr(false);}
-      Serial.printf("HR output is set to %s\n", config.getSimulateHr() ? "On":"Off");
+      if(inputMessage == "checked"){userConfig.setSimulateHr(true);}
+      else{userConfig.setSimulateHr(false);}
+      Serial.printf("HR output is set to %s\n", userConfig.getSimulateHr() ? "On":"Off");
     }
     else {
       inputMessage = "No message sent";
@@ -198,9 +198,9 @@ void startHttpServer(){
     String inputMessage;
     if (request->hasParam(webIntParameter)) {
       inputMessage = request->getParam(webIntParameter)->value();
-      if(inputMessage == "checked"){config.setSimulatePower(true);}
-      else{config.setSimulatePower(false);}
-      Serial.printf("Power output is set to %s\n", config.getSimulatePower() ? "On":"Off");
+      if(inputMessage == "checked"){userConfig.setSimulatePower(true);}
+      else{userConfig.setSimulatePower(false);}
+      Serial.printf("Power output is set to %s\n", userConfig.getSimulatePower() ? "On":"Off");
     }
     else {
       inputMessage = "No message sent";
@@ -221,6 +221,6 @@ void loop(){
   //Autosave every 30 seconds
   vTaskDelay(30000/portTICK_PERIOD_MS);
   Serial.println("Autosaving Configuration");
-  config.saveToSPIFFS();
-  config.printFile();
+  userConfig.saveToSPIFFS();
+  userConfig.printFile();
 }*/

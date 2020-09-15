@@ -11,15 +11,12 @@
 #include <Main.h>
 //#include <smartbike_parameters.h>
 
-
-
 void startHttpServer();
 void stopHttpServer();
 void webClientUpdate(void * pvParameters);
 void handleIndexFile();
 void handleStyleCss();
 void handleHrSlider();
-
 
 //wifi Function
 void stopWifi();

@@ -15,6 +15,7 @@
 #include <WiFiClient.h>
 
 
+
 TaskHandle_t webClientTask;
 #define MAX_BUFFER_SIZE 20
 
@@ -42,28 +43,28 @@ File file = SPIFFS.open("/settings.html","r");
 });
 
 server.on("/send_settings", [](){
-config.setSsid                (server.arg("ssid"));
-config.setPassword            (server.arg("password"));
-config.setInclineStep         (server.arg("inclineStep").toFloat());
-config.setShiftStep           (server.arg("shiftStep").toInt());
-config.setInclineMultiplier   (server.arg("inclineMultiplier").toFloat());
-config.setConnectedDevices    (server.arg("bleDropdown"));
+userConfig.setSsid                (server.arg("ssid"));
+userConfig.setPassword            (server.arg("password"));
+userConfig.setInclineStep         (server.arg("inclineStep").toFloat());
+userConfig.setShiftStep           (server.arg("shiftStep").toInt());
+userConfig.setInclineMultiplier   (server.arg("inclineMultiplier").toFloat());
+userConfig.setConnectedDevices    (server.arg("bleDropdown"));
 server.send(200, "text/plain", "OK");
 Serial.println("Config Updated From Web");
 Serial.println(server.arg("bleDropdown"));
-Serial.println(config.getConnectedDevices());
-config.saveToSPIFFS();
+Serial.println(userConfig.getConnectedDevices());
+userConfig.saveToSPIFFS();
 });
 
 server.on("/BLEServers", [](){
 Serial.println("Sending BLE device list to HTTP Client");
-server.send(200, "text/plain", config.getFoundDevices());
+server.send(200, "text/plain", userConfig.getFoundDevices());
 });
 
 server.on("/load_defaults.html", [](){
 Serial.println("Setting Defaults from Web Request");
-config.setDefaults();
-config.saveToSPIFFS();
+userConfig.setDefaults();
+userConfig.saveToSPIFFS();
 server.send(200, "text/plain", "OK");
 });
 
@@ -75,15 +76,15 @@ ESP.restart();
 
 server.on("/hrslider", []() {
   String value=server.arg("value");
-    if(value == "enable"){config.setSimulateHr(true);
+    if(value == "enable"){userConfig.setSimulateHr(true);
     server.send(200, "text/plain", "OK");
     Serial.println("HR Simulator turned on");
-    }else if(value == "disable"){config.setSimulateHr(false);
+    }else if(value == "disable"){userConfig.setSimulateHr(false);
     server.send(200, "text/plain", "OK");
     Serial.println("HR Simulator turned off");
     }else{
-  config.setSimulatedHr(value.toInt());
-  Serial.printf("HR is now: %d BPM\n", config.getSimulatedHr());
+  userConfig.setSimulatedHr(value.toInt());
+  Serial.printf("HR is now: %d BPM\n", userConfig.getSimulatedHr());
   server.send(200, "text/plain", "OK");
     }
   Serial.println("Webclient High Water Mark:");
@@ -92,15 +93,15 @@ server.on("/hrslider", []() {
 
   server.on("/wattsslider", []() {
   String value=server.arg("value");
-    if(value == "enable"){config.setSimulatePower(true);
+    if(value == "enable"){userConfig.setSimulatePower(true);
     server.send(200, "text/plain", "OK");
     Serial.println("Watt Simulator turned on");
-    }else if(value == "disable"){config.setSimulatePower(false);
+    }else if(value == "disable"){userConfig.setSimulatePower(false);
     server.send(200, "text/plain", "OK");
     Serial.println("Watt Simulator turned off");
     }else{
-  config.setSimulatedWatts(value.toInt());
-  Serial.printf("Watts are now: %d \n", config.getSimulatedWatts());
+  userConfig.setSimulatedWatts(value.toInt());
+  Serial.printf("Watts are now: %d \n", userConfig.getSimulatedWatts());
   server.send(200, "text/plain", "OK");
     }
   Serial.println("Webclient High Water Mark:");
@@ -109,18 +110,18 @@ server.on("/hrslider", []() {
 
  server.on("/hrValue", [](){
  char outString[MAX_BUFFER_SIZE];
- snprintf(outString, MAX_BUFFER_SIZE, "%d", config.getSimulatedHr());
+ snprintf(outString, MAX_BUFFER_SIZE, "%d", userConfig.getSimulatedHr());
  server.send(200, "text/plain", outString);
  });
 
 server.on("/wattsValue", [](){
  char outString[MAX_BUFFER_SIZE];
- snprintf(outString, MAX_BUFFER_SIZE, "%d", config.getSimulatedWatts());
+ snprintf(outString, MAX_BUFFER_SIZE, "%d", userConfig.getSimulatedWatts());
  server.send(200, "text/plain", outString);
  });
 
- server.on("/configJSON", [](){
- server.send(200, "text/plain", config.returnJSON());
+ server.on("/userConfig.SON", [](){
+ server.send(200, "text/plain", userConfig.returnJSON());
  });
 
 
@@ -188,10 +189,10 @@ void startWifi(){
   int i = 0;
 
 //Trying Station mode first: 
-  Serial.printf("Connecting to %s\n", config.getSsid());
-  if(String(WiFi.SSID()) != config.getSsid()) {
+  Serial.printf("Connecting to %s\n", userConfig.getSsid());
+  if(String(WiFi.SSID()) != userConfig.getSsid()) {
     WiFi.mode(WIFI_STA);
-    WiFi.begin(config.getSsid(), config.getPassword());
+    WiFi.begin(userConfig.getSsid(), userConfig.getPassword());
   }
 
   while (WiFi.status() != WL_CONNECTED) {
@@ -207,13 +208,13 @@ void startWifi(){
   }
   if(WiFi.status() == WL_CONNECTED){
   Serial.println("");
-  Serial.printf("Connected to %s IP address: ", config.getSsid()); //Need to implement Fallback Timer <--------------------------------------------------------
+  Serial.printf("Connected to %s IP address: ", userConfig.getSsid()); //Need to implement Fallback Timer <--------------------------------------------------------
   Serial.println(WiFi.localIP());
   }
 
 // Couldn't connect to existing network, Create SoftAP
 if(WiFi.status() != WL_CONNECTED){
-WiFi.softAP(config.getSsid(), config.getPassword());
+WiFi.softAP(userConfig.getSsid(), userConfig.getPassword());
 //WiFi.softAPConfig(local_ip, gateway, subnet);
   vTaskDelay(50);
   IPAddress myIP = WiFi.softAPIP();
