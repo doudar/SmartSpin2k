@@ -107,7 +107,7 @@ void setup()
   /************************************************StartingBLE Server***********************/
   if (userConfig.getWifiOn())
   {
-    Serial.println("Starting userConfig.mode");
+    Serial.println("****************Starting userConfig.mode*******************");
     BLEserverScan();
     startWifi();
     startHttpServer();
@@ -115,7 +115,7 @@ void setup()
   }
   else
   {
-    Serial.println("Starting regular mode");
+    Serial.println("****************Starting regular mode*********************");
     //BLEserverScan(); //Scan for Known BLE Servers
     BLEserverScan();
     startBLEServer();

@@ -153,7 +153,7 @@ void userParameters::loadFromSPIFFS() {
 // Prints the content of a file to the Serial
 void userParameters::printFile() {
   // Open file for reading
-  Serial.printf("Contents of file: %s/n", filename.c_str());
+  Serial.printf("Contents of file: %s\n", filename.c_str());
   File file = SPIFFS.open(filename);
   if (!file) {
     Serial.println(F("Failed to read file"));
