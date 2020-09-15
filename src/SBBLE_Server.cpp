@@ -208,7 +208,7 @@ class MyAdvertisedDeviceCallbacks : public BLEAdvertisedDeviceCallbacks
     Serial.println(advertisedDevice.toString().c_str());
 
     // We have found a device, let us now see if it contains the service we are looking for.
-    if (advertisedDevice.getName() == userConfig.getConnectedDevices() || advertisedDevice.getAddress().toString() == userConfig.getConnectedDevices())
+    if ((advertisedDevice.haveName() && advertisedDevice.getName() == userConfig.getConnectedDevices()) || advertisedDevice.getAddress().toString() == userConfig.getConnectedDevices())
     {
 
       BLEDevice::getScan()->stop();
