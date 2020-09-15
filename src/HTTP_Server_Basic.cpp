@@ -120,7 +120,7 @@ server.on("/wattsValue", [](){
  server.send(200, "text/plain", outString);
  });
 
- server.on("/userConfig.SON", [](){
+ server.on("/configJSON", [](){
  server.send(200, "text/plain", userConfig.returnJSON());
  });
 
