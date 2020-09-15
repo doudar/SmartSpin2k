@@ -9,15 +9,6 @@
 
 // define all data parameters
 #include <Arduino.h>
-//#include <vector>
-
-/*espidf stuff
-#include <stdio.h>
-#include <freertos/FreeRTOS.h>
-#include <freertos/task.h>
-#include "sdkconfig.h"
-*/
-//bool readConfigFile(char*, bool);
 
 class userParameters
 {

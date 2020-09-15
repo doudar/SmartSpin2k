@@ -9,7 +9,7 @@
 #define HTTP_SERVER_BASIC_H
 
 #include <Main.h>
-#include <smartbike_parameters.h>
+//#include <smartbike_parameters.h>
 
 
 
