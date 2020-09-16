@@ -59,6 +59,7 @@ byte ftmsMachineStatus[8] = {0, 0, 0, 0, 0, 0, 0, 0};                           
 
 // This creates a macro that converts 8 bit LSB,MSB to Signed 16b
 #define bytes_to_s16(MSB, LSB) (((signed int)((signed char)MSB))) << 8 | (((signed char)LSB))
+#define bytes_to_u16(MSB, LSB) (((unsigned int)((unsigned char)MSB))) << 8 | (((unsigned char)LSB))
 
 //Creating Characteristics
 BLECharacteristic heartRateMeasurementCharacteristic(
@@ -133,7 +134,7 @@ static void notifyCallback(
   }
   if(pBLERemoteCharacteristic->getUUID().toString() == CYCLINGPOWERMEASUREMENT_UUID.toString())
   {
-  userConfig.setSimulatedWatts(bytes_to_s16(pData[4], pData[3]));
+  userConfig.setSimulatedWatts(bytes_to_u16(pData[3], pData[4]));
   Serial.println((char *)pData);
   Serial.printf("%d \n", pData[0]);
   Serial.printf("%d \n", pData[1]);
