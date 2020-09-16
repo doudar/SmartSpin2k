@@ -1,0 +1,1 @@
+{"filename":"/config.txt","incline":0,"simulatedWatts":100,"simulatedHr":60,"inclineStep":400,"shiftStep":400,"inclineMultiplier":1,"simulatePower":false,"simulateHr":true,"ERGMode":false,"wifiOn":true,"ssid":"NetwalkerLair","password":"notHere","connectedDevices":""}

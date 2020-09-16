@@ -15,7 +15,7 @@ bool changeRadioState = false;
 // the following variables are unsigned longs because the time, measured in
 // milliseconds, will quickly become a bigger number than can be stored in an int.
 unsigned long lastDebounceTime = 0; // the last time the output pin was toggled
-unsigned long debounceDelay = 500; // the debounce time; increase if the output flickers
+unsigned long debounceDelay = 500;  // the debounce time; increase if the output flickers
 
 //vTaskDelay timer Delay
 int letSomthingElseRun = 200;
@@ -24,10 +24,10 @@ int letSomthingElseRun = 200;
 int maxStepperSpeed = 600;
 
 // Define output pins
-const int radioPin = 27; 
-const int shiftUpPin = 19; 
+const int radioPin = 27;
+const int shiftUpPin = 19;
 const int shiftDownPin = 18;
-const int enablePin = 5; 
+const int enablePin = 5;
 const int stepPin = 17;
 const int dirPin = 16;
 const int ledPin = 2; //one of those stupid blinding Blue LED's on the ESP32
@@ -73,8 +73,8 @@ void setup()
   pinMode(shiftDownPin, INPUT_PULLUP); // Push-Button with input Pullup
   pinMode(ledPin, OUTPUT);
   pinMode(enablePin, OUTPUT);
-  pinMode(dirPin, OUTPUT);  // Stepper Direction Pin
-  pinMode(stepPin, OUTPUT); // Stepper Step Pin
+  pinMode(dirPin, OUTPUT);       // Stepper Direction Pin
+  pinMode(stepPin, OUTPUT);      // Stepper Step Pin
   digitalWrite(enablePin, HIGH); //Should be called a disable Pin - High Disables FETs
   digitalWrite(dirPin, LOW);
   digitalWrite(stepPin, LOW);
@@ -84,7 +84,7 @@ void setup()
   //Setup Interrups so shifters work at anytime
   attachInterrupt(digitalPinToInterrupt(shiftUpPin), shiftUp, CHANGE);
   attachInterrupt(digitalPinToInterrupt(shiftDownPin), shiftDown, CHANGE);
-  attachInterrupt(digitalPinToInterrupt(radioPin), changeRadioStateButton, FALLING);
+  attachInterrupt(digitalPinToInterrupt(radioPin), changeRadioStateButton, CHANGE);
 
   Serial.println("Setting up cpu Tasks");
   //create a task that will be executed in the moveStepper function, with priority 1 and executed on core 0
@@ -103,7 +103,7 @@ void setup()
       0);                    /* pin task to core 0 */
   //vTaskStartScheduler();
   Serial.println("Stepper Task Created");
-
+  userConfig.setWifiOn(!digitalRead(radioPin));
   /************************************************StartingBLE Server***********************/
   if (userConfig.getWifiOn())
   {
@@ -128,11 +128,19 @@ void setup()
 void loop()
 {
 
+  if (userConfig.getWifiOn())
+  {
+    digitalWrite(ledPin, LOW); //blink led in configuration mode
+  }
   BLENotify();
   vTaskDelay(500 / portTICK_RATE_MS); //guessing it's good to have task delays seperating client & Server?
   if (!userConfig.getWifiOn())
   {
     bleClient();
+  }
+  else //blink led in configuration mode
+  {
+    digitalWrite(ledPin, HIGH); 
   }
   if (displayValue != userConfig.getIncline() / (float)1000)
   {
@@ -164,7 +172,7 @@ void switchRadioState()
 {
   if (digitalRead(radioPin))
   { //wifi is currently on, turn it off, turn BT client on.
-    Serial.println("User Pressed Radio Button to turn userConfig.ration mode off");
+    Serial.println("User Pressed Radio Button to turn Configuration mode off");
     userConfig.setWifiOn(false);
     userConfig.saveToSPIFFS();
     delay(100);
@@ -173,7 +181,7 @@ void switchRadioState()
   }
   else
   {
-    Serial.println("User Pressed Radio Button to turn userConfig.ration mode on");
+    Serial.println("User Pressed Radio Button to turn Configuration mode on");
     userConfig.setWifiOn(true); //wifi is currently off, turn it on, turn BT client off.
     userConfig.saveToSPIFFS();
     delay(100);
@@ -216,7 +224,7 @@ void moveStepper(void *pvParameters)
     else
     {
       digitalWrite(enablePin, LOW); //enable FETs for impending move
-      vTaskDelay(1); //Need a small delay here for outputs to stabalize
+      vTaskDelay(1);                //Need a small delay here for outputs to stabalize
 
       if (stepperPosition < targetPosition)
       {
@@ -227,12 +235,12 @@ void moveStepper(void *pvParameters)
         }
         digitalWrite(dirPin, HIGH);
         digitalWrite(stepPin, HIGH);
-        delayMicroseconds (acceleration);
+        delayMicroseconds(acceleration);
         //vTaskDelay(1);
         digitalWrite(stepPin, LOW);
         stepperPosition++;
         lastDir = true;
-           }
+      }
       else // must be (stepperPosition > targetPosition)
       {
         if (lastDir == true)
@@ -242,13 +250,12 @@ void moveStepper(void *pvParameters)
         }
         digitalWrite(dirPin, LOW);
         digitalWrite(stepPin, HIGH);
-        delayMicroseconds (acceleration);
+        delayMicroseconds(acceleration);
         //vTaskDelay(1);
         digitalWrite(stepPin, LOW);
         stepperPosition--;
         lastDir = false;
       }
-     
     }
   }
   Serial.println("Exited Motor Control Loop. That was Weird.");
@@ -275,13 +282,16 @@ void IRAM_ATTR shiftUp() // Handle the shift up interrupt IRAM_ATTR is to keep t
 {
   if (deBounce())
   {
-    if(!digitalRead(shiftUpPin)) //double checking to make sure the interrupt wasn't triggered by emf
+    if (!digitalRead(shiftUpPin)) //double checking to make sure the interrupt wasn't triggered by emf
     {
-    shifterPosition = (shifterPosition + userConfig.getShiftStep());
-    Serial.println("Shift UP");
-    Serial.println(shifterPosition);
+      shifterPosition = (shifterPosition + userConfig.getShiftStep());
+      Serial.println("Shift UP");
+      Serial.println(shifterPosition);
     }
-    else {lastDebounceTime = 0;} //Probably Triggered by EMF, reset the debounce
+    else
+    {
+      lastDebounceTime = 0;
+    } //Probably Triggered by EMF, reset the debounce
   }
 }
 
@@ -289,13 +299,16 @@ void IRAM_ATTR shiftDown() //Handle the shift down interrupt
 {
   if (deBounce())
   {
-    if(!digitalRead(shiftDownPin)) //double checking to make sure the interrupt wasn't triggered by emf
+    if (!digitalRead(shiftDownPin)) //double checking to make sure the interrupt wasn't triggered by emf
     {
-    shifterPosition = (shifterPosition - userConfig.getShiftStep());
-    Serial.println("Shift DOWN");
-    Serial.println(shifterPosition);
+      shifterPosition = (shifterPosition - userConfig.getShiftStep());
+      Serial.println("Shift DOWN");
+      Serial.println(shifterPosition);
     }
-    else {lastDebounceTime = 0;} //Probably Triggered by EMF, reset the debounce
+    else
+    {
+      lastDebounceTime = 0;
+    } //Probably Triggered by EMF, reset the debounce
   }
 }
 
