@@ -148,7 +148,7 @@ server.on("/wattsValue", [](){
   xTaskCreatePinnedToCore(
     webClientUpdate,   /* Task function. */
     "webClientUpdate",     /* name of task. */
-    3000,       /* Stack size of task */
+    4000,       /* Stack size of task Used to be 3000*/
     NULL,        /* parameter of the task */
     1,           /* priority of the task  - 29 worked*/
     &webClientTask,     /* Task handle to keep track of created task */

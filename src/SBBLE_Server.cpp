@@ -105,7 +105,6 @@ class MyServerCallbacks : public BLEServerCallbacks
 static BLEUUID heartServiceUUID((uint16_t)0x180D); //Could eventually set these to the defines we have at the top of the file.
 static BLEUUID powerServiceUUID((uint16_t)0x1818);
 // The characteristic of the remote service we are interested in.
-static BLEUUID charUUID((uint16_t)0x2A37);
 
 static boolean doConnect = false;
 static boolean connected = false;
@@ -125,10 +124,26 @@ static void notifyCallback(
   Serial.print(" of data length ");
   Serial.println(length);
   Serial.print("data: ");
+
+  if(pBLERemoteCharacteristic->getUUID().toString() == HEARTCHARACTERISTIC_UUID.toString())
+  {
+  userConfig.setSimulatedHr((int)pData[1]);
+  Serial.println((char *)pData);
+  Serial.printf("%d \n", pData[1]);
+  }
+  if(pBLERemoteCharacteristic->getUUID().toString() == CYCLINGPOWERMEASUREMENT_UUID.toString())
+  {
+  userConfig.setSimulatedWatts(bytes_to_s16(pData[4], pData[3]));
   Serial.println((char *)pData);
   Serial.printf("%d \n", pData[0]);
   Serial.printf("%d \n", pData[1]);
-  userConfig.setSimulatedHr((int)pData[1]);
+  Serial.printf("%d \n", pData[2]);
+  Serial.printf("%d \n", pData[3]);
+  Serial.printf("%d \n", pData[4]);
+  Serial.printf("%d \n", pData[5]);
+  Serial.printf("%d \n", pData[6]);
+  Serial.printf("%d \n", pData[7]);
+  }
 }
 
 class MyClientCallback : public BLEClientCallbacks
@@ -159,22 +174,22 @@ bool connectToServer()
   Serial.println(" - Connected to server");
 
   // Obtain a reference to the service we are after in the remote BLE server.
-  BLERemoteService *pRemoteService = pClient->getService(heartServiceUUID);
+  BLERemoteService *pRemoteService = pClient->getService(CYCLINGPOWERSERVICE_UUID);
   if (pRemoteService == nullptr)
   {
     Serial.print("Failed to find our service UUID: ");
-    Serial.println(heartServiceUUID.toString().c_str());
+    Serial.println(CYCLINGPOWERSERVICE_UUID.toString().c_str());
     pClient->disconnect();
     return false;
   }
   Serial.println(" - Found our service");
 
   // Obtain a reference to the characteristic in the service of the remote BLE server.
-  pRemoteCharacteristic = pRemoteService->getCharacteristic(charUUID);
+  pRemoteCharacteristic = pRemoteService->getCharacteristic(CYCLINGPOWERMEASUREMENT_UUID);
   if (pRemoteCharacteristic == nullptr)
   {
     Serial.print("Failed to find our characteristic UUID: ");
-    Serial.println(charUUID.toString().c_str());
+    Serial.println(CYCLINGPOWERMEASUREMENT_UUID.toString().c_str());
     pClient->disconnect();
     return false;
   }
