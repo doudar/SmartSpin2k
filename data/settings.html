@@ -52,13 +52,6 @@
                 value="loading" /></td>
           </tr>
         </tbody>
-        <tr style="height: 20px;">
-          <td style="width: 14%; height: 20px;">
-            <p><label for="Nearby Bluetooth Devices">BLE Devices</label></p>
-          </td>
-          <td style="width: 14%; height: 20px;"><select id="bleDropdown" name="bleDropdown" value="loading" /></td>
-        </tr>
-        </tbody>
       </table>
       <input type="submit" value="Submit" />
     </form>
@@ -75,44 +68,6 @@
 
 <script>
 
-  let dropdown = document.getElementById('bleDropdown');
-  dropdown.length = 0;
-
-  let defaultOption = document.createElement('option');
-  defaultOption.text = 'Choose BLE Device To Connect';
-
-  dropdown.add(defaultOption);
-  dropdown.selectedIndex = 0;
-
-  const request = new XMLHttpRequest();
-  request.open('GET', "/BLEServers", true);
-
-  request.onload = function () {
-    if (request.status === 200) {
-      const data = JSON.parse(request.responseText);
-      let option;
-      for (var key in data) {
-        option = document.createElement('option');
-        if (data[key].name) {
-          option.text = data[key].name;
-        }
-        else {
-          option.text = data[key].address;
-        }
-        dropdown.add(option);
-      }
-    }
-    else {
-      // Reached the server, but it returned an error
-    }
-    //requestConfigValues();
-  }
-
-  request.onerror = function () {
-    console.error('An error occurred fetching the JSON');
-  };
-
-  request.send();
 
   //Update values on specified interval loading late because this tiny webserver hates frequent requests
    setInterval(function () {

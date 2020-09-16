@@ -1,0 +1,75 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+  <title>SmartSpin2K Bluetooth Scanner</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <link rel="icon" href="data:,">
+
+</head>
+
+<body>
+    <h1><strong>Select a Bluetooth Power Meter To Connect To</strong></h1>
+<form action="/send_settings">
+<table>
+    <tbody>
+        <tr style="height: 20px;">
+            <td style="width: 14%; height: 20px;">
+                <p><label for="Nearby Bluetooth Devices">BLE Devices</label></p>
+            </td>
+            <td style="width: 14%; height: 20px;"><select id="bleDropdown" name="bleDropdown" value="loading" /></td>
+        </tr>
+    </tbody>
+</table>
+<input type="submit" value="Submit" />
+</form>
+<p><br></p>
+<form action="/BLEScan">
+  <input type="submit" value="Scan for new Devices!">
+</form>
+</body>
+
+<script>
+    let dropdown = document.getElementById('bleDropdown');
+    dropdown.length = 0;
+
+    let defaultOption = document.createElement('option');
+    defaultOption.text = 'Choose BLE Device To Connect';
+
+    dropdown.add(defaultOption);
+    dropdown.selectedIndex = 0;
+
+    const request = new XMLHttpRequest();
+    request.open('GET', "/BLEServers", true);
+
+    request.onload = function () {
+        if (request.status === 200) {
+            const data = JSON.parse(request.responseText);
+            let option;
+            for (var key in data) {
+                option = document.createElement('option');
+                if (data[key].name) {
+                    option.text = data[key].name;
+                }
+                else {
+                    option.text = data[key].address;
+                }
+                dropdown.add(option);
+            }
+        }
+        else {
+            // Reached the server, but it returned an error
+        }
+        //requestConfigValues();
+    }
+
+    request.onerror = function () {
+        console.error('An error occurred fetching the JSON');
+    };
+
+    request.send();
+
+
+
+</script>
+</html>

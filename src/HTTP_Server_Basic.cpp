@@ -42,17 +42,24 @@ File file = SPIFFS.open("/settings.html","r");
   file.close();
 });
 
+server.on("/bluetoothscanner.html", [](){
+File file = SPIFFS.open("/bluetoothscanner.html","r");
+  server.streamFile(file, "text/html");
+  Serial.printf("Served: %s", file.name());
+  file.close();
+});
+
 server.on("/send_settings", [](){
-userConfig.setSsid                (server.arg("ssid"));
-userConfig.setPassword            (server.arg("password"));
-userConfig.setInclineStep         (server.arg("inclineStep").toFloat());
-userConfig.setShiftStep           (server.arg("shiftStep").toInt());
-userConfig.setInclineMultiplier   (server.arg("inclineMultiplier").toFloat());
-userConfig.setConnectedDevices    (server.arg("bleDropdown"));
-server.send(200, "text/plain", "OK");
+if(!server.arg("ssid").isEmpty())             {userConfig.setSsid                (server.arg("ssid"));                        }
+if(!server.arg("password").isEmpty())         {userConfig.setPassword            (server.arg("password"));                    }
+if(!server.arg("inclineStep").isEmpty())      {userConfig.setInclineStep         (server.arg("inclineStep").toFloat());       }
+if(!server.arg("shiftStep").isEmpty())        {userConfig.setShiftStep           (server.arg("shiftStep").toInt());           }
+if(!server.arg("inclineMultiplier").isEmpty()){userConfig.setInclineMultiplier   (server.arg("inclineMultiplier").toFloat()); }
+if(!server.arg("bleDropdown").isEmpty())      {userConfig.setConnectedDevices    (server.arg("bleDropdown"));                 }
+String response = "<!DOCTYPE html><html><body>Saving Settings....</body><script> setTimeout(\"location.href = 'http://smartbike2k.local/settings.html';\",5000);</script></html>" ;
+server.send(200, "text/html", response);
 Serial.println("Config Updated From Web");
-Serial.println(server.arg("bleDropdown"));
-Serial.println(userConfig.getConnectedDevices());
+userConfig.printFile();
 userConfig.saveToSPIFFS();
 });
 
@@ -61,16 +68,25 @@ Serial.println("Sending BLE device list to HTTP Client");
 server.send(200, "text/plain", userConfig.getFoundDevices());
 });
 
+server.on("/BLEScan", [](){
+Serial.println("Scanning for BLE Devices");
+BLEserverScan();
+String response = "<!DOCTYPE html><html><body>Scanning for BLE Devices. Please wait 10 seconds.</body><script> setTimeout(\"location.href = 'http://smartbike2k.local/bluetoothscanner.html';\",10000);</script></html>" ;
+server.send(200, "text/html", response);
+});
+
 server.on("/load_defaults.html", [](){
 Serial.println("Setting Defaults from Web Request");
 userConfig.setDefaults();
 userConfig.saveToSPIFFS();
-server.send(200, "text/plain", "OK");
+String response = "Loading Defaults....<script> setTimeout(\"location.href ='http://smartbike2k.local/settings.html';\",5000); </script>";
+server.send(200, "text/html", response);
 });
 
 server.on("/reboot.html", [](){
 Serial.println("Rebooting from Web Request");
-server.send(200, "text/plain", "OK");
+String response = "Rebooting....<script> setTimeout(\"location.href = 'http://smartbike2k.local/index.html';\",5000); </script>";
+server.send(200, "text/html", response);
 ESP.restart();
 });
 
@@ -202,7 +218,7 @@ void startWifi(){
     if(i>5)
     {
       i = 0;
-      Serial.println("Couldn't connect. Switching to AP mode");
+      Serial.println("Couldn't Connect. Switching to AP mode");
       break;
     }
   }

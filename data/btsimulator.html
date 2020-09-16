@@ -101,21 +101,6 @@
       cursor: pointer;
     }
   </style>
-  <!--
-<script>
-  function load() {
-    ;
-  }
-  window.onload = load;
-</script>
-<script>
-  const load = () => {
-    ;
-  } 
-  window.onload = load; 
-
-</script> -->
-
 </head>
 
 <body>
@@ -203,7 +188,7 @@
 
     requestConfigValues();
 
-  }, 5000);
+  }, 2000);
 
   function requestConfigValues() {
     var xhttp = new XMLHttpRequest();
@@ -216,9 +201,10 @@
         document.getElementById("HRSlider").value = obj.simulatedHr;
         document.getElementById("hroutput").checked = obj.simulateHr;
         document.getElementById("wattsoutput").checked = obj.simulatePower;
-        toggleHRCheckbox(document.getElementById("hroutput"),false);
-        toggleWattsCheckbox( document.getElementById("wattsoutput"),false);
-        
+        document.getElementById("WattsSlider").hidden = obj.simulatePower;
+        document.getElementById("wattsValue").hidden = obj.simulatePower;
+        document.getElementById("HRSlider").hidden = obj.simulateHr;
+        document.getElementById("hrValue").hidden = obj.simulateHr;
       }
     };
     xhttp.open("GET", "/configJSON", true);
