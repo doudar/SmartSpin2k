@@ -125,25 +125,18 @@ static void notifyCallback(
   Serial.print(" of data length ");
   Serial.println(length);
   Serial.print("data: ");
-
+  //Serial.println((char *)pData);
+for(int i = 0; i<length; i++){
+   Serial.printf("%x ,", pData[i]);
+}
+Serial.println("");
   if(pBLERemoteCharacteristic->getUUID().toString() == HEARTCHARACTERISTIC_UUID.toString())
   {
   userConfig.setSimulatedHr((int)pData[1]);
-  Serial.println((char *)pData);
-  Serial.printf("%d \n", pData[1]);
   }
   if(pBLERemoteCharacteristic->getUUID().toString() == CYCLINGPOWERMEASUREMENT_UUID.toString())
   {
   userConfig.setSimulatedWatts(bytes_to_u16(pData[3], pData[4]));
-  Serial.println((char *)pData);
-  Serial.printf("%d \n", pData[0]);
-  Serial.printf("%d \n", pData[1]);
-  Serial.printf("%d \n", pData[2]);
-  Serial.printf("%d \n", pData[3]);
-  Serial.printf("%d \n", pData[4]);
-  Serial.printf("%d \n", pData[5]);
-  Serial.printf("%d \n", pData[6]);
-  Serial.printf("%d \n", pData[7]);
   }
 }
 
