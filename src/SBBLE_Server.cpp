@@ -22,8 +22,18 @@ BLE Advertised Device found: Name: ASSIOMA17287L, Address: e8:fe:6e:91:9f:16, ap
 String BLEName = "SmartBike2K";
 bool _BLEClientConnected = false;
 int toggle = false;
-//int numDevices = 0;
-//String foundDevices[];
+
+//PID Constants
+const double kp = 2;
+const double ki = 5;
+const double kd = 1;
+//PID Variables
+unsigned long currentTime, previousTime;
+double elapsedTime;
+double error;
+double lastError = 0;
+double input, output, setPoint;
+double cumError, rateError;
 
 byte heartRateMeasurement[5] = {0b00000, 60, 0, 0, 0};
 /********************************Bit field Flag Example***********************************/
@@ -378,10 +388,11 @@ class MyCallbacks : public BLECharacteristicCallbacks
         {
           userConfig.setERGMode(true);
         }
+        userConfig.setIncline(computePID(userConfig.getSimulatedWatts(), targetWatts)); //Updating incline via PID...This should be interesting.....
         Serial.printf("   Target Watts: %d", targetWatts);
         Serial.print(userConfig.getSimulatedWatts()); //not displaying numbers less than 256 correctly but they do get sent to Zwift correctly.
         Serial.println("*********");
-        
+
 
 
       }
@@ -464,4 +475,20 @@ void BLENotify()
     //vTaskDelay(2000/portTICK_RATE_MS);
     //pfitnessMachineControlPoint->notify();
   }
+}
+
+double computePID(double inp, double Setpoint){     
+        currentTime = millis();                //get current time
+        elapsedTime = (double)(currentTime - previousTime);        //compute time elapsed from previous computation
+        
+        error = Setpoint - inp;                                // determine error
+        cumError += error * elapsedTime;                // compute integral
+        rateError = (error - lastError)/elapsedTime;   // compute derivative
+ 
+        double out = kp*error + ki*cumError + kd*rateError;                //PID output               
+ 
+        lastError = error;                                //remember current error
+        previousTime = currentTime;                        //remember current time
+ 
+        return out;                                        //have function return the PID output
 }
