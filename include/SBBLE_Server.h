@@ -13,5 +13,6 @@ void BLENotify();
 bool connectToServer();
 void BLEserverScan();
 void bleClient();
+double computePID(double, double);
 
 #endif
