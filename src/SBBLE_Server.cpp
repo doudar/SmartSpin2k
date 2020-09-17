@@ -136,7 +136,7 @@ Serial.println("");
   }
   if(pBLERemoteCharacteristic->getUUID().toString() == CYCLINGPOWERMEASUREMENT_UUID.toString())
   {
-  userConfig.setSimulatedWatts(bytes_to_u16(pData[2], pData[3]));
+  userConfig.setSimulatedWatts(bytes_to_u16(pData[3], pData[2]));
   }
 }
 
