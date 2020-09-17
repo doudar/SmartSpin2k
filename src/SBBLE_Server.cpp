@@ -373,14 +373,17 @@ class MyCallbacks : public BLECharacteristicCallbacks
 
       if ((int)rxValue[0] == 5)
       {
-        userConfig.setSimulatedWatts(bytes_to_s16(rxValue[2], rxValue[1]));
+        int targetWatts = bytes_to_s16(rxValue[2], rxValue[1]);
         if (!userConfig.getERGMode())
         {
           userConfig.setERGMode(true);
         }
-        Serial.print("   Target Watts: ");
+        Serial.printf("   Target Watts: %d", targetWatts);
         Serial.print(userConfig.getSimulatedWatts()); //not displaying numbers less than 256 correctly but they do get sent to Zwift correctly.
         Serial.println("*********");
+        
+
+
       }
     }
   }
