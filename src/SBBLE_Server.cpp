@@ -96,8 +96,8 @@ class MyServerCallbacks : public BLEServerCallbacks
 
 
 /***********************************BLE CLIENT. EXPERIMENTAL TESTING ********************/
-
-
+void bleClient(){}
+void BLEserverScan(){}
 
 /**********************************END OF EXPERIMENTAL BLE CLIENT TESTING*****************/
 
