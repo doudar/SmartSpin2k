@@ -217,7 +217,7 @@ void moveStepper(void *pvParameters)
     if (stepperPosition == targetPosition)
     {
       vTaskDelay(300 / portTICK_PERIOD_MS);
-      digitalWrite(enablePin, HIGH); //disable output FETs so stepper can cool
+      //digitalWrite(enablePin, HIGH); //disable output FETs so stepper can cool
       vTaskDelay(300 / portTICK_PERIOD_MS);
       //currentAcceleration = acceleration;
     }

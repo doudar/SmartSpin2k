@@ -69,7 +69,7 @@ byte ftmsMachineStatus[8] = {0, 0, 0, 0, 0, 0, 0, 0};                           
 
 // This creates a macro that converts 8 bit LSB,MSB to Signed 16b
 #define bytes_to_s16(MSB, LSB) (((signed int)((signed char)MSB))) << 8 | (((signed char)LSB))
-#define bytes_to_u16(MSB, LSB) (((unsigned int)((unsigned char)MSB))) << 8 | (((unsigned char)LSB))
+#define bytes_to_u16(MSB, LSB) (((signed int)((signed char)MSB))) << 8 | (((unsigned char)LSB))
 
 //Creating Characteristics
 BLECharacteristic heartRateMeasurementCharacteristic(
@@ -368,7 +368,7 @@ class MyCallbacks : public BLECharacteristicCallbacks
         buf[0] = rxValue[3]; // (Least significant byte)
         buf[1] = rxValue[4]; // (Most significant byte)
 
-        int port = bytes_to_s16(buf[1], buf[0]);
+        int port = bytes_to_u16(buf[1], buf[0]);
         userConfig.setIncline(port);
         if (userConfig.getERGMode())
         {
