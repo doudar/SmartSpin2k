@@ -12,11 +12,12 @@ BLE Advertised Device found: Name: ASSIOMA17287L, Address: e8:fe:6e:91:9f:16, ap
 //#include <smartbike_parameters.h>
 //#include <Main.h>
 #include <SBBLE_Server.h>
-#include <BLEDevice.h>
-#include <BLEUtils.h>
-#include <BLEServer.h>
-#include <BLE2902.h>
+//#include <BLEDevice.h>
+//#include <BLEUtils.h>
+//#include <BLEServer.h>
+//#include <BLE2902.h>
 #include <ArduinoJson.h>
+#include <NimBLEDevice.h>
 
 //BLE Server Settings
 String BLEName = "SmartBike2K";
@@ -35,7 +36,10 @@ double lastError = 0;
 double input, output, setPoint;
 double cumError, rateError;
 
-byte heartRateMeasurement[5] = {0b00000, 60, 0, 0, 0};
+BLECharacteristic *heartRateMeasurementCharacteristic;
+BLECharacteristic *cyclingPowerMeasurementCharacteristic;
+BLECharacteristic *fitnessMachineFeature;
+
 /********************************Bit field Flag Example***********************************/
 // 0000000000001 - 1   - 0x001 - Pedal Power Balance Present
 // 0000000000010 - 2   - 0x002 - Pedal Power Balance Reference
@@ -50,6 +54,7 @@ byte heartRateMeasurement[5] = {0b00000, 60, 0, 0, 0};
 // 0010000000000 - Bottom Dead Spot Angle Present (bit 10)
 // 0100000000000 - Accumulated Energy Present (bit 11)
 // 1000000000000 - Offset Compensation Indicator (bit 12)
+byte heartRateMeasurement[5] = {0b00000, 60, 0, 0, 0};
 byte cyclingPowerMeasurement[19] = {0b0000000000000, 0, 200, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0};            // 3rd byte is reported power
 byte ftmsService[16] = {0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0};                                                 // 5th byte to enable the FTMS bike service
 byte ftmsFeature[32] = {0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0}; //3rd bit enables incline support
@@ -71,29 +76,6 @@ byte ftmsMachineStatus[8] = {0, 0, 0, 0, 0, 0, 0, 0};                           
 #define bytes_to_s16(MSB, LSB) (((signed int)((signed char)MSB))) << 8 | (((signed char)LSB))
 #define bytes_to_u16(MSB, LSB) (((unsigned int)((unsigned char)MSB))) << 8 | (((unsigned char)LSB))
 
-//Creating Characteristics
-BLECharacteristic heartRateMeasurementCharacteristic(
-    HEARTCHARACTERISTIC_UUID,
-    BLECharacteristic::PROPERTY_NOTIFY);
-
-BLECharacteristic cyclingPowerMeasurementCharacteristic(
-    CYCLINGPOWERMEASUREMENT_UUID,
-    BLECharacteristic::PROPERTY_NOTIFY);
-
-BLECharacteristic fitnessMachineFeature(
-    FITNESSMACHINEFEATURE_UUID,
-    BLECharacteristic::PROPERTY_READ);
-
-BLECharacteristic fitnessMachineControlPoint(
-    FITNESSMACHINECONTROLPOINT_UUID,
-    BLECharacteristic::PROPERTY_WRITE |
-        BLECharacteristic::PROPERTY_NOTIFY |
-        BLECharacteristic::PROPERTY_INDICATE);
-
-BLECharacteristic fitnessMachineStatus(
-    FITNESSMACHINESTATUS_UUID,
-    BLECharacteristic::PROPERTY_NOTIFY);
-
 //Creating Server Callbacks
 class MyServerCallbacks : public BLEServerCallbacks
 {
@@ -111,237 +93,13 @@ class MyServerCallbacks : public BLEServerCallbacks
     // vTaskDelay(5000);
   }
 };
-/***********************************BLE CLIENT. EXPERIMENTAL TESTING *******************/ 
-// The remote service we wish to connect to.
-static BLEUUID heartServiceUUID((uint16_t)0x180D); //Could eventually set these to the defines we have at the top of the file.
-static BLEUUID powerServiceUUID((uint16_t)0x1818);
-// The characteristic of the remote service we are interested in.
-
-static boolean doConnect = false;
-static boolean connected = false;
-static boolean doScan = false;
-static BLERemoteCharacteristic *pRemoteCharacteristic;
-static BLEAdvertisedDevice *myDevice;
-
-//Testing server notify with heart rate data
-static void notifyCallback(
-    BLERemoteCharacteristic *pBLERemoteCharacteristic,
-    uint8_t *pData,
-    size_t length,
-    bool isNotify)
-{
-  Serial.print("Notify callback for characteristic ");
-  Serial.print(pBLERemoteCharacteristic->getUUID().toString().c_str());
-  Serial.print(" of data length ");
-  Serial.println(length);
-  Serial.print("data: ");
-  //Serial.println((char *)pData);
-for(int i = 0; i<length; i++){
-   Serial.printf("%x ,", pData[i]);
-}
-Serial.println("");
-  if(pBLERemoteCharacteristic->getUUID().toString() == HEARTCHARACTERISTIC_UUID.toString())
-  {
-  userConfig.setSimulatedHr((int)pData[1]);
-  }
-  if(pBLERemoteCharacteristic->getUUID().toString() == CYCLINGPOWERMEASUREMENT_UUID.toString())
-  {
-  userConfig.setSimulatedWatts(bytes_to_u16(pData[3], pData[2]));
-  }
-}
-
-class MyClientCallback : public BLEClientCallbacks
-{
-  void onConnect(BLEClient *pclient)
-  {
-  }
-
-  void onDisconnect(BLEClient *pclient)
-  {
-    connected = false;
-    Serial.println("onDisconnect");
-  }
-};
-
-bool connectToServer()
-{
-  Serial.print("Forming a connection to ");
-  Serial.println(myDevice->getAddress().toString().c_str());
-
-  BLEClient *pClient = BLEDevice::createClient();
-  Serial.println(" - Created client");
-
-  pClient->setClientCallbacks(new MyClientCallback());
-
-  // Connect to the remote BLE Server.
-  pClient->connect(myDevice); // if you pass BLEAdvertisedDevice instead of address, it will be recognized type of peer device address (public or private)
-  Serial.println(" - Connected to server");
-
-  // Obtain a reference to the service we are after in the remote BLE server.
-  BLERemoteService *pRemoteService = pClient->getService(CYCLINGPOWERSERVICE_UUID);
-  if (pRemoteService == nullptr)
-  {
-    Serial.print("Failed to find our service UUID: ");
-    Serial.println(CYCLINGPOWERSERVICE_UUID.toString().c_str());
-    pClient->disconnect();
-    return false;
-  }
-  Serial.println(" - Found our service");
-
-  // Obtain a reference to the characteristic in the service of the remote BLE server.
-  pRemoteCharacteristic = pRemoteService->getCharacteristic(CYCLINGPOWERMEASUREMENT_UUID);
-  if (pRemoteCharacteristic == nullptr)
-  {
-    Serial.print("Failed to find our characteristic UUID: ");
-    Serial.println(CYCLINGPOWERMEASUREMENT_UUID.toString().c_str());
-    pClient->disconnect();
-    return false;
-  }
-  Serial.println(" - Found our characteristic");
-
-  // Read the value of the characteristic.
-  if (pRemoteCharacteristic->canRead())
-  {
-    std::string value = pRemoteCharacteristic->readValue();
-    Serial.print("The characteristic value was: ");
-    Serial.println(value.c_str());
-  }
-
-  if (pRemoteCharacteristic->canNotify())
-    pRemoteCharacteristic->registerForNotify(notifyCallback);
-
-  connected = true;
-  return true;
-}
-/**
- * Scan for BLE servers and find the first one that advertises the service we are looking for.
- */
-class MyAdvertisedDeviceCallbacks : public BLEAdvertisedDeviceCallbacks
-{
-  /**
-   * Called for each advertising BLE server.
-   */
-  void onResult(BLEAdvertisedDevice advertisedDevice)
-  {
-    Serial.print("BLE Advertised Device found: ");
-    Serial.println(advertisedDevice.toString().c_str());
-
-    // We have found a device, let us now see if it contains the service we are looking for.
-    if ((advertisedDevice.haveName() && advertisedDevice.getName() == userConfig.getConnectedDevices()) || advertisedDevice.getAddress().toString() == userConfig.getConnectedDevices())
-    {
-
-      BLEDevice::getScan()->stop();
-      myDevice = new BLEAdvertisedDevice(advertisedDevice);
-      doConnect = true;
-      doScan = true;
-
-    } // Found our server
-  }   // onResult
-};    // MyAdvertisedDeviceCallbacks
-
-void BLEserverScan()
-{ 
-  Serial.println("Starting Arduino BLE Client application...");
-  BLEDevice::init("");
-
-  // Retrieve a Scanner and set the callback we want to use to be informed when we
-  // have detected a new device.  Specify that we want active scanning and start the
-  // scan to run for 5 seconds.
-  BLEScan *pBLEScan = BLEDevice::getScan();
-  pBLEScan->setAdvertisedDeviceCallbacks(new MyAdvertisedDeviceCallbacks());
-  pBLEScan->setInterval(1349);
-  pBLEScan->setWindow(449);
-  pBLEScan->setActiveScan(true);
-  BLEScanResults foundDevices = pBLEScan->start(5, false);
-
-  //********************** Load the scan into a Json String
-    int count = foundDevices.getCount();
-
-  StaticJsonDocument<500> devices;
-  
-  String device = "";
-  //JsonObject root = devices.createNestedObject();
-  //JsonArray server = devices.createNestedObject("server");
-  for (int i = 0; i < count; i++)
-  {
-    BLEAdvertisedDevice d = foundDevices.getDevice(i);
-    if(d.isAdvertisingService(CYCLINGPOWERSERVICE_UUID) || d.isAdvertisingService(HEARTSERVICE_UUID)){
-    device = "device " + String(i);
-    devices[device]["address"] = d.getAddress().toString();
- 
-    if (d.haveName())
-    {
-      devices[device]["name"] = d.getName();
-    }
-
-    if (d.haveServiceUUID())
-    {
-       devices[device]["UUID"] = d.getServiceUUID().toString();
-    }
-    }
-  }
-  String output;
-  serializeJson(devices, output);
-  Serial.println(output);
-  userConfig.setfoundDevices(output);
-
-  if(doConnect){  //Works but inhibits the BLE Server Scan. Too late at night to fix. another day. 
-    connectToServer();
-  }
-}
-// End of setup.
-
-// This is the Arduino main loop function.
-void bleClient()
-{
-
-  // If the flag "doConnect" is true then we have scanned for and found the desired
-  // BLE Server with which we wish to connect.  Now we connect to it.  Once we are
-  // connected we set the connected flag to be true.
-  if (doConnect == true)
-  {
-    if (connectToServer())
-    {
-      Serial.println("We are now connected to the BLE Server.");
-    }
-    else
-    {
-      Serial.println("We have failed to connect to the server; there is nothin more we will do.");
-    }
-    doConnect = false;
-  }
-
-  // If we are connected to a peer BLE Server, update the characteristic each time we are reached
-  // with the current time since boot.
-  if (connected)
-  {
-    //String newValue = "Time since boot: " + String(millis() / 1000);
-    //std::string serverValue;
-    // Serial.println("Setting new characteristic value to \"" + newValue + "\"");
-    //
-    // Set the characteristic's value to be the array of bytes that is actually a string.
-    //pRemoteCharacteristic->writeValue(newValue.c_str(), newValue.length());
-    //serverValue = pRemoteCharacteristic->readValue();
-
-    //Serial.printf("Value from BLE Server Was: ");
-    // for(const auto& text : serverValue) {   // Range-for!
-    //     Serial.printf(" %d", text);
-    //   }
-    //    Serial.printf("\n");
-    vTaskDelay(100/portTICK_PERIOD_MS);
-  }
-  else if (doScan)
-  {
-    Serial.println("Device disconnected. Scanning Again.");
-    BLEDevice::getScan()->start(0); // this is just eample to start scan after disconnect, most likely there is better way to do it in arduino
-  }
-
-  // delay(1000); // Delay a second between loops.
-} // End of loop
-
-/**********************************END OF EXPERIMENTAL BLE CLIENT TESTING******************/
 
 
+/***********************************BLE CLIENT. EXPERIMENTAL TESTING ********************/
+
+
+
+/**********************************END OF EXPERIMENTAL BLE CLIENT TESTING*****************/
 
 /**************BLE Server Callbacks *************************/
 class MyCallbacks : public BLECharacteristicCallbacks
@@ -392,9 +150,6 @@ class MyCallbacks : public BLECharacteristicCallbacks
         Serial.printf("   Target Watts: %d", targetWatts);
         Serial.print(userConfig.getSimulatedWatts()); //not displaying numbers less than 256 correctly but they do get sent to Zwift correctly.
         Serial.println("*********");
-
-
-
       }
     }
   }
@@ -402,40 +157,54 @@ class MyCallbacks : public BLECharacteristicCallbacks
 
 void startBLEServer()
 {
+  //Server Setup
+  BLEDevice::init(BLEName.c_str());
+  NimBLEServer *pServer = BLEDevice::createServer();
+  
+  //HEART RATE MONITOR SERVICE SETUP
+  BLEService *pService = pServer->createService(HEARTSERVICE_UUID);
+  BLECharacteristic *heartRateMeasurementCharacteristic = pService->createCharacteristic(
+      HEARTCHARACTERISTIC_UUID,
+      NIMBLE_PROPERTY::NOTIFY);
+
+  //Power Meter MONITOR SERVICE SETUP
+  BLEService *pPowerMonitor = pServer->createService(CYCLINGPOWERSERVICE_UUID);
+  BLECharacteristic *cyclingPowerMeasurementCharacteristic = pPowerMonitor->createCharacteristic(
+      CYCLINGPOWERMEASUREMENT_UUID,
+      NIMBLE_PROPERTY::NOTIFY);
+
+  //Fitness Machine service setup
+  BLEService *pFitnessMachineService = pServer->createService(FITNESSMACHINESERVICE_UUID);
+  BLECharacteristic *fitnessMachineFeature = pFitnessMachineService->createCharacteristic(
+      FITNESSMACHINEFEATURE_UUID,
+      NIMBLE_PROPERTY::READ);
+
+  BLECharacteristic *fitnessMachineControlPoint = pFitnessMachineService->createCharacteristic(
+      FITNESSMACHINECONTROLPOINT_UUID,
+      NIMBLE_PROPERTY::WRITE |
+          NIMBLE_PROPERTY::NOTIFY |
+          NIMBLE_PROPERTY::INDICATE);
+
+  BLECharacteristic *fitnessMachineStatus = pFitnessMachineService->createCharacteristic(
+      FITNESSMACHINESTATUS_UUID,
+      NIMBLE_PROPERTY::NOTIFY);
+
+  pServer->setCallbacks(new MyServerCallbacks());
+  //Creating Characteristics
+
   //Bluetooth Server Setup
   Serial.println("Starting BLE work!");
 
   //Create BLE Server
-  BLEDevice::init(BLEName.c_str());
-  BLEServer *pServer = BLEDevice::createServer();
-  pServer->setCallbacks(new MyServerCallbacks());
 
-  //HEART RATE MONITOR SERVICE SETUP
-  BLEService *pService = pServer->createService(HEARTSERVICE_UUID);
-  pService->addCharacteristic(&heartRateMeasurementCharacteristic);
-  heartRateMeasurementCharacteristic.addDescriptor(new BLE2902());
-  heartRateMeasurementCharacteristic.setValue(heartRateMeasurement, 5);
 
-  //Power Meter MONITOR SERVICE SETUP
-  BLEService *pPowerMonitor = pServer->createService(CYCLINGPOWERSERVICE_UUID);
-  pPowerMonitor->addCharacteristic(&cyclingPowerMeasurementCharacteristic);
-  cyclingPowerMeasurementCharacteristic.addDescriptor(new BLE2902());
-  cyclingPowerMeasurementCharacteristic.setValue(cyclingPowerMeasurement, 19);
+  heartRateMeasurementCharacteristic->setValue(heartRateMeasurement, 5);
+  cyclingPowerMeasurementCharacteristic->setValue(cyclingPowerMeasurement, 19);
+  fitnessMachineFeature->setValue(ftmsFeature, 32);
+  fitnessMachineControlPoint->setValue(ftmsControlPoint, 8);
+  fitnessMachineControlPoint->setCallbacks(new MyCallbacks());
 
-  //Fitness Machine service setup
-  BLEService *pFitnessMachineService = pServer->createService(FITNESSMACHINESERVICE_UUID);
-  pFitnessMachineService->addCharacteristic(&fitnessMachineFeature);
-  fitnessMachineFeature.addDescriptor(new BLE2902());
-  fitnessMachineFeature.setValue(ftmsFeature, 32);
-
-  pFitnessMachineService->addCharacteristic(&fitnessMachineControlPoint);
-  fitnessMachineControlPoint.addDescriptor(new BLE2902());
-  fitnessMachineControlPoint.setValue(ftmsControlPoint, 8);
-  fitnessMachineControlPoint.setCallbacks(new MyCallbacks());
-
-  pFitnessMachineService->addCharacteristic(&fitnessMachineStatus);
-  fitnessMachineStatus.addDescriptor(new BLE2902());
-  fitnessMachineStatus.setValue(ftmsMachineStatus, 8);
+  fitnessMachineStatus->setValue(ftmsMachineStatus, 8);
 
   pServer->getAdvertising()->addServiceUUID(HEARTSERVICE_UUID);
   pServer->getAdvertising()->addServiceUUID(CYCLINGPOWERSERVICE_UUID);
@@ -459,8 +228,8 @@ void BLENotify()
     //update the BLE information on the server
     heartRateMeasurement[1] = userConfig.getSimulatedHr();
     cyclingPowerMeasurement[2] = userConfig.getSimulatedWatts();
-    heartRateMeasurementCharacteristic.setValue(heartRateMeasurement, 5);
-    heartRateMeasurementCharacteristic.notify();
+    heartRateMeasurementCharacteristic->setValue(heartRateMeasurement, 5);
+    heartRateMeasurementCharacteristic->notify();
     //vTaskDelay(10/portTICK_RATE_MS);
     //Set New Watts.
     int remainder, quotient;
@@ -468,27 +237,28 @@ void BLENotify()
     remainder = userConfig.getSimulatedWatts() % 256;
     cyclingPowerMeasurement[2] = remainder;
     cyclingPowerMeasurement[3] = quotient;
-    cyclingPowerMeasurementCharacteristic.setValue(cyclingPowerMeasurement, 19);
-    cyclingPowerMeasurementCharacteristic.notify();
+    cyclingPowerMeasurementCharacteristic->setValue(cyclingPowerMeasurement, 19);
+    cyclingPowerMeasurementCharacteristic->notify();
     //vTaskDelay(10/portTICK_RATE_MS);
-    fitnessMachineFeature.notify();
+    fitnessMachineFeature->notify();
     //vTaskDelay(2000/portTICK_RATE_MS);
     //pfitnessMachineControlPoint->notify();
   }
 }
 
-double computePID(double inp, double Setpoint){     
-        currentTime = millis();                //get current time
-        elapsedTime = (double)(currentTime - previousTime);        //compute time elapsed from previous computation
-        
-        error = Setpoint - inp;                                // determine error
-        cumError += error * elapsedTime;                // compute integral
-        rateError = (error - lastError)/elapsedTime;   // compute derivative
- 
-        double out = kp*error + ki*cumError + kd*rateError;                //PID output               
- 
-        lastError = error;                                //remember current error
-        previousTime = currentTime;                        //remember current time
- 
-        return out;                                        //have function return the PID output
+double computePID(double inp, double Setpoint)
+{
+  currentTime = millis();                             //get current time
+  elapsedTime = (double)(currentTime - previousTime); //compute time elapsed from previous computation
+
+  error = Setpoint - inp;                        // determine error
+  cumError += error * elapsedTime;               // compute integral
+  rateError = (error - lastError) / elapsedTime; // compute derivative
+
+  double out = kp * error + ki * cumError + kd * rateError; //PID output
+
+  lastError = error;          //remember current error
+  previousTime = currentTime; //remember current time
+
+  return out; //have function return the PID output
 }
