@@ -201,10 +201,10 @@
         document.getElementById("HRSlider").value = obj.simulatedHr;
         document.getElementById("hroutput").checked = obj.simulateHr;
         document.getElementById("wattsoutput").checked = obj.simulatePower;
-        document.getElementById("WattsSlider").hidden = obj.simulatePower;
-        document.getElementById("wattsValue").hidden = obj.simulatePower;
-        document.getElementById("HRSlider").hidden = obj.simulateHr;
-        document.getElementById("hrValue").hidden = obj.simulateHr;
+        document.getElementById("WattsSlider").hidden = !obj.simulatePower;
+        document.getElementById("wattsValue").hidden = !obj.simulatePower;
+        document.getElementById("HRSlider").hidden = !obj.simulateHr;
+        document.getElementById("hrValue").hidden = !obj.simulateHr;
       }
     };
     xhttp.open("GET", "/configJSON", true);
