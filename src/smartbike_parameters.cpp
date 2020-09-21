@@ -25,7 +25,8 @@ void userParameters::setDefaults()
     ssid                = "SmartBike2k";
     password            = "password";
     foundDevices        = "";
-    connectedDevices    = ""; 
+    connectedPowerMeter    = ""; 
+    connectedHeartMonitor = "";
 }
 
 //---------------------------------------------------------------------------------
@@ -51,9 +52,9 @@ String userParameters::returnJSON()
     doc["wifiOn"]             = wifiOn;
     doc["ssid"]               = ssid;
     doc["password"]           = password;
-    //doc["foundDevices"]       = foundDevices;
-    doc["connectedDevices"]   = connectedDevices; 
-
+    //doc["foundDevices"]       = foundDevices;  I don't see a need currently in keeping this boot to boot
+    doc["connectedPowerMeter"]   = connectedPowerMeter; 
+    doc["connectedHeartMonitor"]   = connectedHeartMonitor; 
   String output;
   serializeJson(doc, output);
   return output;
@@ -93,8 +94,9 @@ void userParameters::saveToSPIFFS()
     doc["wifiOn"]             = wifiOn;
     doc["ssid"]               = ssid;
     doc["password"]           = password;
-    //doc["foundDevices"]       = foundDevices;
-    doc["connectedDevices"]   = connectedDevices; 
+    //doc["foundDevices"]       = foundDevices; 
+    doc["connectedPowerMeter"]   = connectedPowerMeter; 
+    doc["connectedHeartMonitor"]   = connectedHeartMonitor; 
 
   // Serialize JSON to file
   if (serializeJson(doc, file) == 0) {
@@ -144,7 +146,8 @@ void userParameters::loadFromSPIFFS() {
     setSsid             (doc["ssid"]);
     setPassword         (doc["password"]);
     //setfoundDevices     (doc["foundDevices"]);
-    setConnectedDevices (doc["connectedDevices"]);
+    setConnectedPowerMeter (doc["connectedPowerMeter"]);
+    setConnectedHeartMonitor (doc["connectedHeartMonitor"]);
 
     Serial.printf("Config File Loaded: %s \n", filename.c_str());        
     file.close();

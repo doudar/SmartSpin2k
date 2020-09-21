@@ -27,8 +27,9 @@ class userParameters
     String ssid;
     String password;
     String foundDevices = " ";
-    String connectedDevices = " ";
-    
+    String connectedPowerMeter = " ";
+    String connectedHeartMonitor = " ";
+
     public:
     const char* getFilename()                {return filename.c_str();}
     float       getIncline()                 {return incline;}
@@ -44,8 +45,8 @@ class userParameters
     const char* getSsid()                    {return ssid.c_str();}
     const char* getPassword()                {return password.c_str();}
     const char* getFoundDevices()            {return foundDevices.c_str();}
-    const char* getConnectedDevices()        {return connectedDevices.c_str();}
-   
+    const char* getconnectedPowerMeter()        {return connectedPowerMeter.c_str();}
+    const char* getconnectedHeartMonitor()        {return connectedHeartMonitor.c_str();}
 
     void    setDefaults();
     void    setFilename(String flnm)         {filename = flnm;}
@@ -61,8 +62,9 @@ class userParameters
     void    setWifiOn(bool wifi)             {wifiOn = wifi;}
     void    setSsid(String sid)              {ssid = sid;}
     void    setPassword(String pwd)          {password = pwd;} 
-    void    setfoundDevices(String fdev)     {foundDevices = fdev;};
-    void    setConnectedDevices(String cdev) {connectedDevices = cdev;}
+    void    setFoundDevices(String fdev)     {foundDevices = fdev;};
+    void    setConnectedPowerMeter(String cpm) {connectedPowerMeter = cpm;}
+    void    setConnectedHeartMonitor(String cHr) {connectedHeartMonitor = cHr;}
   
     String  returnJSON();
     void    saveToSPIFFS();
