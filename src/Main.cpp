@@ -104,11 +104,12 @@ void setup()
   //vTaskStartScheduler();
   Serial.println("Stepper Task Created");
   userConfig.setWifiOn(!digitalRead(radioPin));
+  setupBLE();
   /************************************************StartingBLE Server***********************/
   if (userConfig.getWifiOn())
   {
     Serial.println("****************Starting userConfig.mode*******************");
-    BLEserverScan();
+    //BLEServerScan(true);
     startWifi();
     startHttpServer();
     digitalWrite(ledPin, LOW);
@@ -117,12 +118,19 @@ void setup()
   {
     Serial.println("****************Starting regular mode*********************");
     //BLEserverScan(); //Scan for Known BLE Servers
-    BLEserverScan();
-    startBLEServer();
+    //startBLEServer();
+    Serial.println("BLE Server Started");
+    //BLEServerScan(true);
+    Serial.println(" - BLE Client Initialized");
+    //startBLEServer();
     digitalWrite(ledPin, HIGH);
   }
 
-  //startBLEServer(); //Start our own BLE server
+//TEMP ADDING THIS FOR TESTING:::
+    startWifi();
+    startHttpServer();
+    /////
+    startBLEServer(); //Start our own BLE server
 }
 
 void loop()
@@ -132,20 +140,22 @@ void loop()
   {
     digitalWrite(ledPin, LOW); //blink led in configuration mode
   }
+  
   BLENotify();
   vTaskDelay(500 / portTICK_RATE_MS); //guessing it's good to have task delays seperating client & Server?
+   bleClient();
   if (!userConfig.getWifiOn())
   {
-    bleClient();
+    //bleClient();
   }
   else //blink led in configuration mode
   {
     digitalWrite(ledPin, HIGH); 
   }
-  if (displayValue != userConfig.getIncline() / (float)1000)
+  if (displayValue != userConfig.getIncline() / (float)100)
   {
-    Serial.println("Target Incline:");
-    displayValue = userConfig.getIncline() / (float)1000;
+    Serial.println("Main Target Incline:");
+    displayValue = userConfig.getIncline() / (float)100;
     Serial.println(displayValue);
   }
 

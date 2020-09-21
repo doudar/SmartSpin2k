@@ -55,7 +55,7 @@ if(!server.arg("password").isEmpty())         {userConfig.setPassword           
 if(!server.arg("inclineStep").isEmpty())      {userConfig.setInclineStep         (server.arg("inclineStep").toFloat());       }
 if(!server.arg("shiftStep").isEmpty())        {userConfig.setShiftStep           (server.arg("shiftStep").toInt());           }
 if(!server.arg("inclineMultiplier").isEmpty()){userConfig.setInclineMultiplier   (server.arg("inclineMultiplier").toFloat()); }
-if(!server.arg("bleDropdown").isEmpty())      {userConfig.setConnectedDevices    (server.arg("bleDropdown"));                 }
+if(!server.arg("bleDropdown").isEmpty())      {userConfig.setConnectedPowerMeter    (server.arg("bleDropdown"));                 }
 String response = "<!DOCTYPE html><html><body>Saving Settings....</body><script> setTimeout(\"location.href = 'http://smartbike2k.local/settings.html';\",5000);</script></html>" ;
 server.send(200, "text/html", response);
 Serial.println("Config Updated From Web");
@@ -70,7 +70,7 @@ server.send(200, "text/plain", userConfig.getFoundDevices());
 
 server.on("/BLEScan", [](){
 Serial.println("Scanning for BLE Devices");
-BLEserverScan();
+//BLEServerScan(false);
 String response = "<!DOCTYPE html><html><body>Scanning for BLE Devices. Please wait 10 seconds.</body><script> setTimeout(\"location.href = 'http://smartbike2k.local/bluetoothscanner.html';\",10000);</script></html>" ;
 server.send(200, "text/html", response);
 });

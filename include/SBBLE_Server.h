@@ -11,8 +11,10 @@
 void startBLEServer();
 void BLENotify();
 bool connectToServer();
-void BLEserverScan();
+void BLEServerScan(bool connectRequest);
 void bleClient();
+void startBleClient();
 double computePID(double, double);
+void setupBLE();
 
 #endif
