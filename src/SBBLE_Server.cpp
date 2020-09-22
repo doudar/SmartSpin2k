@@ -34,9 +34,9 @@ static BLEAdvertisedDevice *myDevice;
 BLERemoteCharacteristic *pBLERemoteCharacteristic; */
 
 //PID Constants
-const double kp = 2;
-const double ki = 5;
-const double kd = 1;
+const double kp = 1;
+const double ki = 0;
+const double kd = 0;
 //PID Variables
 unsigned long currentTime, previousTime;
 double elapsedTime;
