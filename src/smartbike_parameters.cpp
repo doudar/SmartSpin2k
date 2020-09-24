@@ -15,6 +15,7 @@ void userParameters::setDefaults()
     incline             = 0.0;
     simulatedWatts      = 100;
     simulatedHr         = 60;
+    simulatedCad        = 90;
     inclineStep         = 400;
     shiftStep           = 400;
     inclineMultiplier   = 1.0;
@@ -43,6 +44,7 @@ String userParameters::returnJSON()
     doc["incline"]            = incline;
     doc["simulatedWatts"]     = simulatedWatts;
     doc["simulatedHr"]        = simulatedHr;
+    doc["simulatedCad"]       = simulatedCad;
     doc["inclineStep"]        = inclineStep;
     doc["shiftStep"]          = shiftStep;
     doc["inclineMultiplier"]  = inclineMultiplier;
@@ -85,6 +87,7 @@ void userParameters::saveToSPIFFS()
     doc["incline"]            = incline;
     doc["simulatedWatts"]     = simulatedWatts;
     doc["simulatedHr"]        = simulatedHr;
+    doc["simulatedCad"]       = simulatedCad;
     doc["inclineStep"]        = inclineStep;
     doc["shiftStep"]          = shiftStep;
     doc["inclineMultiplier"]  = inclineMultiplier;
@@ -136,6 +139,7 @@ void userParameters::loadFromSPIFFS() {
     setIncline          (doc["incline"]);
     setSimulatedWatts   (doc["simulatedWatts"]);
     setSimulatedHr      (doc["simulatedHr"]);
+    setSimulatedCad     (doc["simulatedCad"]);
     setInclineStep      (doc["inclineStep"]);
     setShiftStep        (doc["shiftStep"]);
     setInclineMultiplier(doc["inclineMultiplier"]);

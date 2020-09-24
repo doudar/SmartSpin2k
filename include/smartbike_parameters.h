@@ -17,6 +17,7 @@ class userParameters
     float incline;
     int simulatedWatts;
     int simulatedHr;
+    int simulatedCad;
     float inclineStep;
     int shiftStep;
     float inclineMultiplier;
@@ -35,6 +36,7 @@ class userParameters
     float       getIncline()                 {return incline;}
     int         getSimulatedWatts()          {return simulatedWatts;}
     int         getSimulatedHr()             {return simulatedHr;}
+    int         getSimulatedCad()            {return simulatedCad;}
     float       getInclineStep()             {return inclineStep;}
     int         getShiftStep()               {return shiftStep;}
     float       getInclineMultiplier()       {return inclineMultiplier;}
@@ -53,6 +55,7 @@ class userParameters
     void    setIncline(float inc)            {incline = inc;}
     void    setSimulatedWatts(int w)         {simulatedWatts = w;}
     void    setSimulatedHr(int hr)           {simulatedHr = hr;}
+    void    setSimulatedCad(int cad)         {simulatedCad = cad;}
     void    setInclineStep(float is)         {inclineStep = is;}
     void    setShiftStep(int ss)             {shiftStep = ss;}
     void    setInclineMultiplier(float im)   {inclineMultiplier = im;}

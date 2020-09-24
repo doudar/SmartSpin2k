@@ -34,7 +34,7 @@ static BLEAdvertisedDevice *myDevice;
 BLERemoteCharacteristic *pBLERemoteCharacteristic; */
 
 //PID Constants
-const double kp = 1;
+const double kp = 1.5;
 const double ki = 0;
 const double kd = 0;
 //PID Variables
@@ -44,6 +44,9 @@ double error;
 double lastError = 0;
 double input, output, setPoint;
 double cumError, rateError;
+//Cadence computation Variables
+long crankRev[2] = {0, 0};
+long crankEventTime[2] = {0, 0};
 
 BLECharacteristic *heartRateMeasurementCharacteristic;
 BLECharacteristic *cyclingPowerMeasurementCharacteristic;
@@ -64,7 +67,7 @@ BLECharacteristic *fitnessMachineFeature;
 // 0100000000000 - Accumulated Energy Present (bit 11)
 // 1000000000000 - Offset Compensation Indicator (bit 12)
 byte heartRateMeasurement[5] = {0b00000, 60, 0, 0, 0};
-byte cyclingPowerMeasurement[19] = {0b0000000000000, 0, 200, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0};            // 3rd byte is reported power
+byte cyclingPowerMeasurement[13] = {0b0000000100011, 0, 200, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0};                              // 3rd & 2nd byte is reported power
 byte ftmsService[16] = {0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0};                                                 // 5th byte to enable the FTMS bike service
 byte ftmsFeature[32] = {0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0}; //3rd bit enables incline support
 byte ftmsControlPoint[8] = {0, 0, 0, 0, 0, 0, 0, 0};                                                                     //0x08 we need to return a value of 1 for any sucessful change
@@ -72,8 +75,32 @@ byte ftmsMachineStatus[8] = {0, 0, 0, 0, 0, 0, 0, 0};                           
 
 #define HEARTSERVICE_UUID BLEUUID((uint16_t)0x180D)
 #define HEARTCHARACTERISTIC_UUID BLEUUID((uint16_t)0x2A37)
+
+#define CSCSERVICE_UUID BLEUUID((uint16_t)0x1816)
+#define CSCMEASUREMENT_UUID BLEUUID((uint16_t)0x2A5B)
+
 #define CYCLINGPOWERSERVICE_UUID BLEUUID((uint16_t)0x1818)
 #define CYCLINGPOWERMEASUREMENT_UUID BLEUUID((uint16_t)0x2A63)
+
+/*INFO FOR CALCULATING CADENCE FROM THE POWER SERVICE
+
+Instantaneous Cadence = (Difference in two successive Cumulative Crank Revolutions
+values) / (Difference in two successive Last Crank Event Time values)
+
+So probably do somthing like this to calculate cadence:
+
+long crankRev[2] = 0,0;
+long crankEventTime[2] = 0.0;
+crankRev[2] = crankRev[1]; 
+crankRev[1] = BLEMeasurement;
+crankEventTime[2] = crankEventTime[1];
+crankEventTime[1] = BLEMeasurement;
+cadenceFromPowerMeter = (crankRev[1]-crankRev[2])/(crankEventTime[1]-crankEventTime[2]);  
+
+To make more fun: The ‘crank event time’ is a free-running-count of 1/1024 second units and it represents the time
+when the crank revolution was detected by the crank rotation sensor. Since several crank
+events can occur between transmissions, only the Last Crank Event Time value is transmitted.
+The Last Crank Event Time value rolls over every 64 seconds.*/
 
 //FitnessMachineServiceDefines//
 #define FITNESSMACHINESERVICE_UUID BLEUUID((uint16_t)0x1826)
@@ -84,6 +111,7 @@ byte ftmsMachineStatus[8] = {0, 0, 0, 0, 0, 0, 0, 0};                           
 // This creates a macro that converts 8 bit LSB,MSB to Signed 16b
 #define bytes_to_s16(MSB, LSB) (((signed int)((signed char)MSB))) << 8 | (((signed char)LSB))
 #define bytes_to_u16(MSB, LSB) (((signed int)((signed char)MSB))) << 8 | (((unsigned char)LSB))
+// Potentially, somthing like this is a better way of doing this ^^  data.getUint16(1, true)
 
 //Creating Server Callbacks
 class MyServerCallbacks : public BLEServerCallbacks
@@ -108,135 +136,182 @@ class MyServerCallbacks : public BLEServerCallbacks
 // The remote service we wish to connect to.
 static BLEUUID serviceUUID = CYCLINGPOWERSERVICE_UUID;
 // The characteristic of the remote service we are interested in.
-static BLEUUID    charUUID = CYCLINGPOWERMEASUREMENT_UUID;
+static BLEUUID charUUID = CYCLINGPOWERMEASUREMENT_UUID;
 
 static boolean doConnect = false;
 static boolean connected = false;
 static boolean doScan = false;
-static BLERemoteCharacteristic* pRemoteCharacteristic;
-static BLEAdvertisedDevice* myDevice;
+static BLERemoteCharacteristic *pRemoteCharacteristic;
+static BLEAdvertisedDevice *myDevice;
 
 static void notifyCallback(
-  BLERemoteCharacteristic* pBLERemoteCharacteristic,
-  uint8_t* pData,
-  size_t length,
-  bool isNotify) {
-    Serial.print("Notify callback for characteristic ");
-    Serial.print(pBLERemoteCharacteristic->getUUID().toString().c_str());
-    Serial.print(" of data length ");
-    Serial.println(length);
-    Serial.print("data: ");
-    Serial.println((char*)pData);
+    BLERemoteCharacteristic *pBLERemoteCharacteristic,
+    uint8_t *pData,
+    size_t length,
+    bool isNotify)
+{
+  Serial.print("Notify callback for characteristic ");
+  Serial.print(pBLERemoteCharacteristic->getUUID().toString().c_str());
+  Serial.print(" of data length ");
+  Serial.println(length);
+  Serial.print("data: ");
+  Serial.println((char *)pData);
 
   if (pBLERemoteCharacteristic->getUUID().toString() == HEARTCHARACTERISTIC_UUID.toString())
   {
     userConfig.setSimulatedHr((int)pData[1]);
   }
+
   if (pBLERemoteCharacteristic->getUUID().toString() == CYCLINGPOWERMEASUREMENT_UUID.toString())
   {
+    int i = sizeof(pData); //Bypass our calculation and feed this directly to the power output so we don't multiply errors:
+    while (i > 0)
+    {
+      cyclingPowerMeasurement[i-1] = pData[i-1];
+      i--;
+    }
+
     userConfig.setSimulatedWatts(bytes_to_u16(pData[3], pData[2]));
+    //This needs to be changed to read the bit field because this data could potentially shift positions in the characteristic
+    //depending on what other fields are activated.
+
+    //if ((int)pData[0] == 23)
+    //{ //last crank time is present in power Measurement data, lets extract it
+      crankRev[1] = crankRev[1];
+      crankRev[0] = bytes_to_u16(pData[6], pData[5]);
+      crankEventTime[1] = crankEventTime[1];
+      crankEventTime[0] = bytes_to_u16(pData[8], pData[7]);
+      userConfig.setSimulatedCad((crankRev[0] - crankRev[1]) / (crankEventTime[0] - crankEventTime[1]));
+      Serial.printf("Calculated Cadence was: %d", userConfig.getSimulatedCad());
+    //}
   }
-
-
 }
 
 /**  None of these are required as they will be handled by the library with defaults. **
- **                       Remove as you see fit for your needs                        */  
-class MyClientCallback : public BLEClientCallbacks {
-  void onConnect(BLEClient* pclient) {
+ **                       Remove as you see fit for your needs                        */
+class MyClientCallback : public BLEClientCallbacks
+{
+  void onConnect(BLEClient *pclient)
+  {
   }
 
-  void onDisconnect(BLEClient* pclient) {
+  void onDisconnect(BLEClient *pclient)
+  {
     connected = false;
     Serial.println("onDisconnect");
   }
-/***************** New - Security handled here ********************
+  /***************** New - Security handled here ********************
 ****** Note: these are the same return values as defaults ********/
-  uint32_t onPassKeyRequest(){
+  uint32_t onPassKeyRequest()
+  {
     Serial.println("Client PassKeyRequest");
-    return 123456; 
+    return 123456;
   }
-  bool onConfirmPIN(uint32_t pass_key){
-    Serial.print("The passkey YES/NO number: ");Serial.println(pass_key);
-    return true; 
+  bool onConfirmPIN(uint32_t pass_key)
+  {
+    Serial.print("The passkey YES/NO number: ");
+    Serial.println(pass_key);
+    return true;
   }
 
-  void onAuthenticationComplete(ble_gap_conn_desc desc){
+  void onAuthenticationComplete(ble_gap_conn_desc desc)
+  {
     Serial.println("Starting BLE work!");
   }
-/*******************************************************************/
+  /*******************************************************************/
 };
 
-bool connectToServer() {
-    Serial.print("Forming a connection to ");
-    Serial.println(myDevice->getAddress().toString().c_str());
-    
-    BLEClient*  pClient  = BLEDevice::createClient();
-    Serial.println(" - Created client");
+bool connectToServer()
+{
 
-    pClient->setClientCallbacks(new MyClientCallback());
+  int sucessful = 0;
 
-    // Connect to the remove BLE Server.
-    pClient->connect(myDevice);  // if you pass BLEAdvertisedDevice instead of address, it will be recognized type of peer device address (public or private)
-    Serial.println(" - Connected to server");
+  Serial.print("Forming a connection to ");
+  Serial.println(myDevice->getAddress().toString().c_str());
 
-    // Obtain a reference to the service we are after in the remote BLE server.
-    BLERemoteService* pRemoteService = pClient->getService(serviceUUID);
-    if (pRemoteService == nullptr) {
-      Serial.print("Failed to find our service UUID: ");
-      Serial.println(serviceUUID.toString().c_str());
-      pClient->disconnect();
-      return false;
-    }
-    Serial.println(" - Found our service");
+  BLEClient *pClient = BLEDevice::createClient();
+  Serial.println(" - Created client");
 
+  pClient->setClientCallbacks(new MyClientCallback());
+
+  // Connect to the remove BLE Server.
+  pClient->connect(myDevice); // if you pass BLEAdvertisedDevice instead of address, it will be recognized type of peer device address (public or private)
+  Serial.println(" - Connected to server");
+
+  // Obtain a reference to the service we are after in the remote BLE server.
+  BLERemoteService *pRemoteService = pClient->getService(serviceUUID);
+  if (pRemoteService == nullptr)
+  {
+    Serial.print("Failed to find our service UUID: ");
+    Serial.println(serviceUUID.toString().c_str());
+  }
+  else
+  {
+    Serial.println(" - Found service:");
+    Serial.println(pRemoteService->getUUID().toString().c_str());
+    sucessful++;
 
     // Obtain a reference to the characteristic in the service of the remote BLE server.
     pRemoteCharacteristic = pRemoteService->getCharacteristic(charUUID);
-    if (pRemoteCharacteristic == nullptr) {
+    if (pRemoteCharacteristic == nullptr)
+    {
       Serial.print("Failed to find our characteristic UUID: ");
       Serial.println(charUUID.toString().c_str());
-      pClient->disconnect();
-      return false;
     }
-    Serial.println(" - Found our characteristic");
+    else
+    {
+      Serial.println(" - Found Characteristic:");
+      Serial.println(pRemoteCharacteristic->getUUID().toString().c_str());
+      sucessful++;
+    }
 
     // Read the value of the characteristic.
-    if(pRemoteCharacteristic->canRead()) {
+    if (pRemoteCharacteristic->canRead())
+    {
       std::string value = pRemoteCharacteristic->readValue();
       Serial.print("The characteristic value was: ");
       Serial.println(value.c_str());
     }
 
-    if(pRemoteCharacteristic->canNotify())
+    if (pRemoteCharacteristic->canNotify())
+    {
       pRemoteCharacteristic->registerForNotify(notifyCallback);
-
+    }
+  }
+  if (sucessful > 0)
+  {
     connected = true;
     return true;
+  }
+  pClient->disconnect();
+  return false;
 }
 
 /**
  * Scan for BLE servers and find the first one that advertises the service we are looking for.
  */
-class MyAdvertisedDeviceCallbacks: public BLEAdvertisedDeviceCallbacks {
- /**
+class MyAdvertisedDeviceCallbacks : public BLEAdvertisedDeviceCallbacks
+{
+  /**
    * Called for each advertising BLE server.
    */
-   
-/*** Only a reference to the advertised device is passed now
-  void onResult(BLEAdvertisedDevice advertisedDevice) { **/     
-  void onResult(BLEAdvertisedDevice* advertisedDevice) {
+
+  /*** Only a reference to the advertised device is passed now
+  void onResult(BLEAdvertisedDevice advertisedDevice) { **/
+  void onResult(BLEAdvertisedDevice *advertisedDevice)
+  {
     Serial.print("BLE Advertised Device found: ");
     Serial.println(advertisedDevice->toString().c_str());
 
     // We have found a device, let us now see if it contains the service we are looking for.
-/********************************************************************************
+    /********************************************************************************
     if (advertisedDevice.haveServiceUUID() && advertisedDevice.isAdvertisingService(serviceUUID)) {
 ********************************************************************************/
-    if (advertisedDevice->haveServiceUUID() && advertisedDevice->isAdvertisingService(serviceUUID)) {
+    if (advertisedDevice->haveServiceUUID() && advertisedDevice->isAdvertisingService(serviceUUID))
+    {
 
       BLEDevice::getScan()->stop();
-/*******************************************************************
+      /*******************************************************************
       myDevice = new BLEAdvertisedDevice(advertisedDevice);
 *******************************************************************/
       myDevice = advertisedDevice; /** Just save the reference now, no need to copy the object */
@@ -244,19 +319,19 @@ class MyAdvertisedDeviceCallbacks: public BLEAdvertisedDeviceCallbacks {
       doScan = true;
 
     } // Found our server
-  } // onResult
-}; // MyAdvertisedDeviceCallbacks
+  }   // onResult
+};    // MyAdvertisedDeviceCallbacks
 
+void setupBLE()
+{
 
-void setupBLE() {
-  
   Serial.println("Starting Arduino BLE Client application...");
   BLEDevice::init(BLEName.c_str());
 
   // Retrieve a Scanner and set the callback we want to use to be informed when we
   // have detected a new device.  Specify that we want active scanning and start the
   // scan to run for 5 seconds.
-  BLEScan* pBLEScan = BLEDevice::getScan();
+  BLEScan *pBLEScan = BLEDevice::getScan();
   pBLEScan->setAdvertisedDeviceCallbacks(new MyAdvertisedDeviceCallbacks());
   pBLEScan->setInterval(1349);
   pBLEScan->setWindow(449);
@@ -264,17 +339,21 @@ void setupBLE() {
   pBLEScan->start(5, false);
 } // End of setup.
 
-
 // This is the Arduino main loop function.
-void bleClient() {
+void bleClient()
+{
 
   // If the flag "doConnect" is true then we have scanned for and found the desired
-  // BLE Server with which we wish to connect.  Now we connect to it.  Once we are 
+  // BLE Server with which we wish to connect.  Now we connect to it.  Once we are
   // connected we set the connected flag to be true.
-  if (doConnect == true) {
-    if (connectToServer()) {
+  if (doConnect == true)
+  {
+    if (connectToServer())
+    {
       Serial.println("We are now connected to the BLE Server.");
-    } else {
+    }
+    else
+    {
       Serial.println("We have failed to connect to the server; there is nothin more we will do.");
     }
     doConnect = false;
@@ -282,15 +361,18 @@ void bleClient() {
 
   // If we are connected to a peer BLE Server, update the characteristic each time we are reached
   // with the current time since boot.
-  if (connected) {
+  if (connected)
+  {
     Serial.println("Recieved data from server:");
     Serial.println(pRemoteCharacteristic->getUUID().toString().c_str());
     Serial.println(pRemoteCharacteristic->getValue().c_str());
-  }else if(doScan){
-    Serial.println("Scanning Again for reconnect");
-    BLEDevice::getScan()->start(0);  // this is just eample to start scan after disconnect, most likely there is better way to do it in arduino
   }
-  
+  else if (doScan)
+  {
+    Serial.println("Scanning Again for reconnect");
+    BLEDevice::getScan()->start(0); // this is just eample to start scan after disconnect, most likely there is better way to do it in arduino
+  }
+
   //delay(1000); // Delay a second between loops.
 } // End of loop
 
@@ -434,7 +516,7 @@ void BLENotify()
   {
     //update the BLE information on the server
     heartRateMeasurement[1] = userConfig.getSimulatedHr();
-    cyclingPowerMeasurement[2] = userConfig.getSimulatedWatts();
+    //cyclingPowerMeasurement[2] = userConfig.getSimulatedWatts();
     heartRateMeasurementCharacteristic->setValue(heartRateMeasurement, 5);
     heartRateMeasurementCharacteristic->notify();
     //vTaskDelay(10/portTICK_RATE_MS);
@@ -444,7 +526,7 @@ void BLENotify()
     remainder = userConfig.getSimulatedWatts() % 256;
     cyclingPowerMeasurement[2] = remainder;
     cyclingPowerMeasurement[3] = quotient;
-    cyclingPowerMeasurementCharacteristic->setValue(cyclingPowerMeasurement, 19);
+    cyclingPowerMeasurementCharacteristic->setValue(cyclingPowerMeasurement, 13);
     cyclingPowerMeasurementCharacteristic->notify();
     //vTaskDelay(10/portTICK_RATE_MS);
     fitnessMachineFeature->notify();
