@@ -156,6 +156,7 @@ static void notifyCallback(
   Serial.println(length);
   Serial.print("data: ");
   Serial.println((char *)pData);
+  //Serial.println((HEX)pData[1]);
 
   if (pBLERemoteCharacteristic->getUUID().toString() == HEARTCHARACTERISTIC_UUID.toString())
   {
@@ -164,26 +165,29 @@ static void notifyCallback(
 
   if (pBLERemoteCharacteristic->getUUID().toString() == CYCLINGPOWERMEASUREMENT_UUID.toString())
   {
-    int i = sizeof(pData); //Bypass our calculation and feed this directly to the power output so we don't multiply errors:
-    while (i > 0)
+    int i = 0; //Bypass our calculation and feed this directly to the power output so we don't multiply errors:
+    while (i < sizeof(pData))
     {
-      cyclingPowerMeasurement[i-1] = pData[i-1];
-      i--;
+      cyclingPowerMeasurement[i] = (byte)pData[i];
+      i++;
     }
+     Serial.println("This should match the line above");
+     Serial.println((char *)cyclingPowerMeasurement);
+    
 
     userConfig.setSimulatedWatts(bytes_to_u16(pData[3], pData[2]));
     //This needs to be changed to read the bit field because this data could potentially shift positions in the characteristic
     //depending on what other fields are activated.
 
-    //if ((int)pData[0] == 23)
-    //{ //last crank time is present in power Measurement data, lets extract it
+    if ((int)pData[0] == 35) //Don't let the hex to decimal confuse you. 
+    { //last crank time is present in power Measurement data, lets extract it
       crankRev[1] = crankRev[1];
       crankRev[0] = bytes_to_u16(pData[6], pData[5]);
       crankEventTime[1] = crankEventTime[1];
       crankEventTime[0] = bytes_to_u16(pData[8], pData[7]);
       userConfig.setSimulatedCad((crankRev[0] - crankRev[1]) / (crankEventTime[0] - crankEventTime[1]));
       Serial.printf("Calculated Cadence was: %d", userConfig.getSimulatedCad());
-    //}
+    }
   }
 }
 
@@ -527,6 +531,8 @@ void BLENotify()
     cyclingPowerMeasurement[2] = remainder;
     cyclingPowerMeasurement[3] = quotient;
     cyclingPowerMeasurementCharacteristic->setValue(cyclingPowerMeasurement, 13);
+    Serial.println("CyclingPowerMeasurementCharacteristic notify value:");
+    Serial.println((char *)cyclingPowerMeasurement);
     cyclingPowerMeasurementCharacteristic->notify();
     //vTaskDelay(10/portTICK_RATE_MS);
     fitnessMachineFeature->notify();
