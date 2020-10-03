@@ -321,7 +321,7 @@ class MyAdvertisedDeviceCallbacks : public BLEAdvertisedDeviceCallbacks
   }   // onResult
 };    // MyAdvertisedDeviceCallbacks
 
-void setupBLE()
+void setupBLE() //COmmon BLE setup for both Client and sServer
 {
 
   Serial.println("Starting Arduino BLE Client application...");

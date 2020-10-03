@@ -54,6 +54,8 @@ void setup()
   // Serial port for debugging purposes
   Serial.begin(512000);
 
+  Serial.printf("Program Version: %s %s \n",__DATE__, __TIME__);
+
   // Initialize SPIFFS
   Serial.println("Mounting Filesystem");
   if (!SPIFFS.begin(true))
@@ -106,31 +108,18 @@ void setup()
   userConfig.setWifiOn(!digitalRead(radioPin));
   setupBLE();
   /************************************************StartingBLE Server***********************/
-  if (userConfig.getWifiOn())
-  {
-    Serial.println("****************Starting userConfig.mode*******************");
-    //BLEServerScan(true);
-    startWifi();
-    startHttpServer();
-    digitalWrite(ledPin, LOW);
-  }
-  else
-  {
+
+  
     Serial.println("****************Starting regular mode*********************");
     //BLEserverScan(); //Scan for Known BLE Servers
     //startBLEServer();
     Serial.println("BLE Server Started");
     //BLEServerScan(true);
     Serial.println(" - BLE Client Initialized");
-    //startBLEServer();
     digitalWrite(ledPin, HIGH);
-  }
-
-//TEMP ADDING THIS FOR TESTING:::
     startWifi();
     startHttpServer();
-    /////
-    startBLEServer(); //Start our own BLE server
+    startBLEServer();
 }
 
 void loop()
@@ -158,46 +147,7 @@ void loop()
     displayValue = userConfig.getIncline() / (float)100;
     Serial.println(displayValue);
   }
-
-  if (changeRadioState)
-  {
-    switchRadioState();
-  }
-
-  // Serial.println("Move Stepper High Water Mark:");
-  // Serial.println(uxTaskGetStackHighWaterMark(moveStepperTask));
-
-  //  Serial.println("BLE Stopping");
-  // btStop();
   vTaskDelay(500 / portTICK_RATE_MS);
-  // Serial.println("BLE Starting");
-  // btStart();
-  //startBLEServer();
-  //vTaskDelay(4000/portTICK_RATE_MS);
-}
-
-//Switching the radios on and off after services are defined causes crashes so instead of reuserConfig.ring the services and then downing
-//the interface, we're just going to update the userConfig.ration, save it and then reboot. For Now. Hopefully this can be sorted out in the future.
-void switchRadioState()
-{
-  if (digitalRead(radioPin))
-  { //wifi is currently on, turn it off, turn BT client on.
-    Serial.println("User Pressed Radio Button to turn Configuration mode off");
-    userConfig.setWifiOn(false);
-    userConfig.saveToSPIFFS();
-    delay(100);
-    Serial.println("rebooting...");
-    ESP.restart();
-  }
-  else
-  {
-    Serial.println("User Pressed Radio Button to turn Configuration mode on");
-    userConfig.setWifiOn(true); //wifi is currently off, turn it on, turn BT client off.
-    userConfig.saveToSPIFFS();
-    delay(100);
-    Serial.println("rebooting...");
-    ESP.restart();
-  }
 }
 
 void moveStepper(void *pvParameters)
@@ -319,14 +269,5 @@ void IRAM_ATTR shiftDown() //Handle the shift down interrupt
     {
       lastDebounceTime = 0;
     } //Probably Triggered by EMF, reset the debounce
-  }
-}
-
-void IRAM_ATTR changeRadioStateButton() //Handle the change radio state interrupt
-{
-  if (deBounce())
-  {
-    Serial.println("changeRadioStateButton() Was Called");
-    changeRadioState = true; //if I try to call switchRadioState() directly in this interrupt it causes a crash
   }
 }

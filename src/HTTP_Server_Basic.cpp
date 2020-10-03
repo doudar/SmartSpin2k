@@ -5,7 +5,6 @@
 // This work is licensed under the GNU General Public License v2
 // Prototype hardware build from plans in the SmartSpin2k repository are licensed under Cern Open Hardware Licence version 2 Permissive
 
-
 #include <Main.h>
 #include <WiFi.h>
 #include <WebServer.h>
@@ -127,7 +126,7 @@ if(!server.arg("inclineStep").isEmpty())      {userConfig.setInclineStep        
 if(!server.arg("shiftStep").isEmpty())        {userConfig.setShiftStep           (server.arg("shiftStep").toInt());           }
 if(!server.arg("inclineMultiplier").isEmpty()){userConfig.setInclineMultiplier   (server.arg("inclineMultiplier").toFloat()); }
 if(!server.arg("bleDropdown").isEmpty())      {userConfig.setConnectedPowerMeter    (server.arg("bleDropdown"));                 }
-String response = "<!DOCTYPE html><html><body>Saving Settings....</body><script> setTimeout(\"location.href = 'http://smartbike2k.local/settings.html';\",5000);</script></html>" ;
+String response = "<!DOCTYPE html><html><body>Saving Settings....</body><script> setTimeout(\"location.href = 'http://smartbike2k.local/settings.html';\",2000);</script></html>" ;
 server.send(200, "text/html", response);
 Serial.println("Config Updated From Web");
 userConfig.printFile();
@@ -150,13 +149,13 @@ server.on("/load_defaults.html", [](){
 Serial.println("Setting Defaults from Web Request");
 userConfig.setDefaults();
 userConfig.saveToSPIFFS();
-String response = "Loading Defaults....<script> setTimeout(\"location.href ='http://smartbike2k.local/settings.html';\",5000); </script>";
+String response = "Loading Defaults....<script> setTimeout(\"location.href ='http://smartbike2k.local/settings.html';\",2000); </script>";
 server.send(200, "text/html", response);
 });
 
 server.on("/reboot.html", [](){
 Serial.println("Rebooting from Web Request");
-String response = "Rebooting....<script> setTimeout(\"location.href = 'http://smartbike2k.local/index.html';\",5000); </script>";
+String response = "Rebooting....<script> setTimeout(\"location.href = 'http://smartbike2k.local/index.html';\",2000); </script>";
 server.send(200, "text/html", response);
 ESP.restart();
 });
@@ -245,8 +244,6 @@ server.on("/wattsValue", [](){
     }
   });
 
-
-
 /********************************************End Server Handlers*******************************/
 
   xTaskCreatePinnedToCore(
@@ -264,23 +261,6 @@ server.begin();
 Serial.println("HTTP server started");
 
 }
-
-void stopHttpServer() //had crashing issues with this function currently using a reboot instead
-{
-Serial.println("Stopping HTTP vTask");
- vTaskDelete(webClientTask);
- Serial.println("Http Task Deleted");
- //delay(1000);
- Serial.println("Closing HTTP Connections");
- //server.
- //server.close();
- //Serial.println("Stopping HTTP Server");
- //server.stop();
- //Serial.println("Server Stopped");
- //vTaskDelay(50/portTICK_PERIOD_MS);
-
-}
-
 
 void webClientUpdate(void * pvParameters) {
 for(;;){
@@ -345,22 +325,4 @@ WiFi.softAP(userConfig.getSsid(), userConfig.getPassword());
   Serial.print("Open http://");
   Serial.print("smartbike2k");
   Serial.println(".local/");
-}
-
-
-
-void stopWifi(){ //This function causes a crash. Instead of using it, we're currently just rebooting the device. 
-
-  // https://docs.espressif.com/projects/esp-idf/en/latest/esp32/api-guides/wifi.html#wi-fi-deinit-phase  
-  // Wi-Fi Deinit phase s8.1-s8.3:  call esp_wifi_disconnect(); esp_wifi_stop(); esp_wifi_deinit() ; 
-  // then wait five minutes for ASSOC_EXPIRE or AUTH_EXPIRE?;    
-  // maybe consider just sending a de-authentication with esp_wifi_deauth_sta() and skip the five minute wait? 
-  
-  Serial.println("Disconnecting WiFi");
-  WiFi.setSleep(true);
-  WiFi.disconnect(true); 
-  Serial.println("Turning WiFi Off");
-  WiFi.mode(WIFI_OFF);
-  Serial.println("WiFI Turned Off");
- //WiFi.forceSleepBegin();
 }
