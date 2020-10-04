@@ -7,7 +7,6 @@
 #ifndef SMARTBIKE_PARAMETERS_H
 #define SMARTBIKE_PARAMETERS_H
 
-// define all data parameters
 #include <Arduino.h>
 
 class userParameters

@@ -106,7 +106,7 @@ The Last Crank Event Time value rolls over every 64 seconds.*/
 // This creates a macro that converts 8 bit LSB,MSB to Signed 16b
 #define bytes_to_s16(MSB, LSB) (((signed int)((signed char)MSB))) << 8 | (((signed char)LSB))
 #define bytes_to_u16(MSB, LSB) (((signed int)((signed char)MSB))) << 8 | (((unsigned char)LSB))
-// Potentially, somthing like this is a better way of doing this ^^  data.getUint16(1, true)
+// Potentially, something like this is a better way of doing this ^^  data.getUint16(1, true)
 
 //Creating Server Callbacks
 class MyServerCallbacks : public BLEServerCallbacks
@@ -151,7 +151,10 @@ static void notifyCallback(
   Serial.println(length);
   Serial.print("data: ");
   Serial.println((char *)pData);
-  //Serial.println((HEX)pData[1]);
+    for (int i = 0; i < length; i++)
+  {
+    Serial.printf("%x ,", pData[i]);
+  }
 
   if (pBLERemoteCharacteristic->getUUID().toString() == HEARTCHARACTERISTIC_UUID.toString())
   {
@@ -160,15 +163,11 @@ static void notifyCallback(
 
   if (pBLERemoteCharacteristic->getUUID().toString() == CYCLINGPOWERMEASUREMENT_UUID.toString())
   {
-    int i = 0; //Bypass our calculation and feed this directly to the power output so we don't multiply errors:
-    while (i < sizeof(pData))
+    for (int i = 0; i < length; i++)
     {
       cyclingPowerMeasurement[i] = (byte)pData[i];
       i++;
     }
-     Serial.println("This should match the line above");
-     Serial.println((char *)cyclingPowerMeasurement);
-    
 
     userConfig.setSimulatedWatts(bytes_to_u16(pData[3], pData[2]));
     //This needs to be changed to read the bit field because this data could potentially shift positions in the characteristic
@@ -274,7 +273,12 @@ bool connectToServer()
 
     if (pRemoteCharacteristic->canNotify())
     {
+      Serial.println("Subscribed to notifications");
       pRemoteCharacteristic->registerForNotify(notifyCallback);
+    }
+    else
+    {
+      Serial.println("Unable to subscribe to notifications");
     }
   }
   if (sucessful > 0)

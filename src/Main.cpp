@@ -41,13 +41,11 @@ float displayValue = 0.0;
 
 //Setup a task so the stepper will run on a different core thean the main code to prevent studdering
 TaskHandle_t moveStepperTask;
-//TaskHandle_t deBounceTask; //debounce our button presses using a standalone timer
 
 //*************************Load The Config*********************************
 userParameters userConfig;
-//userParameters *userConfig.tr = &userConfig.
-///////////////////////////////////////////////////////BEGIN SETUP/////////////////////////////////////
 
+///////////////////////////////////////////////////////BEGIN SETUP/////////////////////////////////////
 void setup()
 {
 
@@ -86,7 +84,6 @@ void setup()
   //Setup Interrups so shifters work at anytime
   attachInterrupt(digitalPinToInterrupt(shiftUpPin), shiftUp, CHANGE);
   attachInterrupt(digitalPinToInterrupt(shiftDownPin), shiftDown, CHANGE);
-  attachInterrupt(digitalPinToInterrupt(radioPin), changeRadioStateButton, CHANGE);
 
   Serial.println("Setting up cpu Tasks");
   //create a task that will be executed in the moveStepper function, with priority 1 and executed on core 0
@@ -132,15 +129,8 @@ void loop()
   
   BLENotify();
   vTaskDelay(500 / portTICK_RATE_MS); //guessing it's good to have task delays seperating client & Server?
-   bleClient();
-  if (!userConfig.getWifiOn())
-  {
-    //bleClient();
-  }
-  else //blink led in configuration mode
-  {
-    digitalWrite(ledPin, HIGH); 
-  }
+  bleClient();
+
   if (displayValue != userConfig.getIncline() / (float)100)
   {
     Serial.println("Main Target Incline:");
