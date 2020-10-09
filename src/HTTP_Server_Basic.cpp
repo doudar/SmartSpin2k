@@ -7,17 +7,27 @@
 
 #include <Main.h>
 #include <WiFi.h>
+//#include <WiFiMulti.h>
 #include <WebServer.h>
 #include <HTTP_Server_Basic.h>
+//#include <HTTPClient.h>
+#include <HTTPUpdate.h>
 #include <SPIFFS.h>
 #include <ESPmDNS.h>
-#include <WiFiClient.h>
+#include <WiFiClientSecure.h>
 #include <Update.h>
 
 File fsUploadFile;
 
 TaskHandle_t webClientTask;
 #define MAX_BUFFER_SIZE 20
+
+//Automatic Firmware update Defines
+HTTPClient http;
+const String FirmwareVer = {"0.0.10.1"};
+#define URL_fw_Version "https://raw.githubusercontent.com/doudar/OTAUpdates/main/version.txt"
+#define URL_fw_Bin "https://raw.githubusercontent.com/doudar/OTAUpdates/main/firmware.bin"
+#define URL_fw_spiffs "https://raw.githubusercontent.com/doudar/OTAUpdates/main/spiffs.bin"
 
 //OTA Update pages. Not stored in SPIFFS because we will use this to restore the webserver files if they get corrupt.
 /* Style */
@@ -388,4 +398,62 @@ void startWifi()
   Serial.print("Open http://");
   Serial.print("smartbike2k");
   Serial.println(".local/");
+}
+
+void FirmwareUpdate()
+{
+  Serial.println("Checking for newer firmware");
+  http.begin(URL_fw_Version, "CC AA 48 48 66 46 0E 91 53 2C 9C 7C 23 2A B1 74 4D 29 9D 33"); // check version URL
+  delay(100);
+  int httpCode = http.GET(); // get data from version file
+  delay(100);
+  String payload;
+  if (httpCode == HTTP_CODE_OK) // if version received
+  {
+    payload = http.getString(); // save received version
+    Serial.println(payload);
+  }
+  else
+  {
+    Serial.print("error in downloading version file:");
+    Serial.println(httpCode);
+  }
+
+  http.end();
+  if (httpCode == HTTP_CODE_OK) // if version received
+  {
+    if (payload == FirmwareVer)
+    {
+      Serial.println("Device already on latest firmware version");
+    }
+    else
+    {
+      Serial.println("New firmware detected!");
+      Serial.printf("Upgrading from |%s| to |%s|", FirmwareVer.c_str(), payload.c_str());
+
+      WiFiClientSecure client;
+      httpUpdate.setLedPin(LED_BUILTIN, LOW);
+      Serial.println("Updating FileSystem");
+    
+      t_httpUpdate_return ret = httpUpdate.update(client, URL_fw_spiffs);
+      if (ret == HTTP_UPDATE_OK) {
+      Serial.println("Updating Program");
+      ret = httpUpdate.update(client, URL_fw_Bin);
+      switch (ret)
+      {
+      case HTTP_UPDATE_FAILED:
+        Serial.printf("HTTP_UPDATE_FAILD Error (%d): %s\n", httpUpdate.getLastError(), httpUpdate.getLastErrorString().c_str());
+        break;
+
+      case HTTP_UPDATE_NO_UPDATES:
+        Serial.println("HTTP_UPDATE_NO_UPDATES");
+        break;
+
+      case HTTP_UPDATE_OK:
+        Serial.println("HTTP_UPDATE_OK");
+        break;
+      }
+      }
+    }
+  }
 }

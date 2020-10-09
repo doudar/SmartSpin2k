@@ -116,6 +116,7 @@ void setup()
     digitalWrite(ledPin, HIGH);
     startWifi();
     startHttpServer();
+    FirmwareUpdate();
     startBLEServer();
 }
 

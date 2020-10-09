@@ -15,6 +15,7 @@ void webClientUpdate(void * pvParameters);
 void handleIndexFile();
 void handleStyleCss();
 void handleHrSlider();
+void FirmwareUpdate();
 
 //wifi Function
 void startWifi();
