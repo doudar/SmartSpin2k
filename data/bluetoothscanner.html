@@ -4,11 +4,10 @@
 <head>
   <title>SmartSpin2K Bluetooth Scanner</title>
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <link rel="icon" href="data:,">
 
 </head>
 
-<body>
+<body style="background-color:#3498db;">
     <h1><strong>Select a Bluetooth Power Meter To Connect To</strong></h1>
 <form action="/send_settings">
 <table>
@@ -69,7 +68,19 @@
 
     request.send();
 
-
+    //define function to load css
+var loadCss = function(){
+    var cssLink = document.createElement('link');
+    cssLink.rel = 'stylesheet';
+    cssLink.href = 'style.css';
+    var head = document.getElementsByTagName('head')[0];
+    head.parentNode.insertBefore(cssLink, head);
+};
+ 
+//Delay loading css to not swamp webserver
+window.addEventListener('load', function (){
+  setTimeout(loadCss, 100);
+}, false);
 
 </script>
 </html>

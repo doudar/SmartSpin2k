@@ -126,7 +126,7 @@ class MyServerCallbacks : public BLEServerCallbacks
   }
 };
 
-/***********************************BLE CLIENT. EXPERIMENTAL TESTING ********************/
+/***********************************BLE CLIENT. ****************************************/
 
 // The remote service we wish to connect to.
 static BLEUUID serviceUUID = CYCLINGPOWERSERVICE_UUID;
@@ -379,7 +379,60 @@ void bleClient()
   //delay(1000); // Delay a second between loops.
 } // End of loop
 
-/**********************************END OF EXPERIMENTAL BLE CLIENT TESTING*****************/
+void BLEServerScan(bool connectRequest)
+{
+  doConnect = connectRequest;
+  Serial.println("Scanning for BLE servers and putting them into a list...");
+
+  // Retrieve a Scanner and set the callback we want to use to be informed when we
+  // have detected a new device.  Specify that we want active scanning and start the
+  // scan to run for 5 seconds.
+  BLEScan *pBLEScan = BLEDevice::getScan();
+  pBLEScan->setAdvertisedDeviceCallbacks(new MyAdvertisedDeviceCallbacks());
+  pBLEScan->setInterval(1349);
+  pBLEScan->setWindow(449);
+  pBLEScan->setActiveScan(true);
+  BLEScanResults foundDevices = pBLEScan->start(5, false);
+
+  // Load the scan into a Json String
+  int count = foundDevices.getCount();
+
+  StaticJsonDocument<500> devices;
+
+  String device = "";
+  //JsonObject root = devices.createNestedObject();
+  //JsonArray server = devices.createNestedObject("server");
+  for (int i = 0; i < count; i++)
+  {
+    BLEAdvertisedDevice d = foundDevices.getDevice(i);
+    if (d.isAdvertisingService(CYCLINGPOWERSERVICE_UUID) || d.isAdvertisingService(HEARTSERVICE_UUID))
+    {
+      device = "device " + String(i);
+      devices[device]["address"] = d.getAddress().toString();
+
+      if (d.haveName())
+      {
+        devices[device]["name"] = d.getName();
+      }
+
+      if (d.haveServiceUUID())
+      {
+        devices[device]["UUID"] = d.getServiceUUID().toString();
+      }
+    }
+  }
+  String output;
+  serializeJson(devices, output);
+  Serial.println(output);
+  //userConfig.setfoundDevices(output);
+
+  if (doConnect)
+  { //Works but inhibits the BLE Server Scan. Too late at night to fix. another day.
+    connectToServer();
+  }
+}
+
+
 
 /**************BLE Server Callbacks *************************/
 class MyCallbacks : public BLECharacteristicCallbacks

@@ -5,12 +5,13 @@
 // This work is licensed under the GNU General Public License v2
 // Prototype hardware build from plans in the SmartSpin2k repository are licensed under Cern Open Hardware Licence version 2 Permissive
 
+
 #include <Main.h>
-#include <WiFi.h>
+//#include <WiFi.h>
 //#include <WiFiMulti.h>
 #include <WebServer.h>
 #include <HTTP_Server_Basic.h>
-//#include <HTTPClient.h>
+#include <HTTPClient.h>
 #include <HTTPUpdate.h>
 #include <SPIFFS.h>
 #include <ESPmDNS.h>
@@ -24,7 +25,8 @@ TaskHandle_t webClientTask;
 
 //Automatic Firmware update Defines
 HTTPClient http;
-const String FirmwareVer = {"0.0.10.1"};
+const String FirmwareVer = {"0.0.10.4"};
+#define URL_fw_Server "https://raw.githubusercontent.com/doudar/OTAUpdates/main/"
 #define URL_fw_Version "https://raw.githubusercontent.com/doudar/OTAUpdates/main/version.txt"
 #define URL_fw_Bin "https://raw.githubusercontent.com/doudar/OTAUpdates/main/firmware.bin"
 #define URL_fw_spiffs "https://raw.githubusercontent.com/doudar/OTAUpdates/main/spiffs.bin"
@@ -55,6 +57,51 @@ String OTALoginIndex =
     "}"
     "</script>" +
     OTAStyle;
+
+String noIndexHTML = 
+"<!DOCTYPE html>"
+"<html>"
+"<body>"
+"The webserver files need to be updated."
+"Please enter the credentials for your network or upload a new filesystem image using the link below."
+"<head>"
+"  <title>SmartBike2K Web Server</title>"
+"  <meta name='viewport' content='width=device-width, initial-scale=1'>"
+" <link rel='icon' href='data:,'>"
+"</head>"
+"<body>"
+"  <h1><strong>Network Settings</strong></h1>"
+"  <h2>"
+"    <p style='text-align: left;'></p>"
+"    <form action='/send_settings'>"
+"      <table border='0' style='height: 30px; width: 36.0582%; border-collapse: collapse; border-style: none;'"
+"        height='182' cellspacing='1'>"
+"        <tbody>"
+"          <tr style='height: 20px;'>"
+"            <td style='width: 14%; height: 20px;'>"
+"              <p><label for='ssid'>SSID</label></p>"
+"            </td>"
+"            <td style='width: 14%; height: 20px;'><input type='text' id='ssid' name='ssid' value='' /></td>"
+"          </tr>"
+"          <tr style='height: 20px;'>"
+"            <td style='width: 14%; height: 20px;'>"
+"              <p><label for='password'>Password</label></p>"
+"            </td>"
+"            <td style='width: 14%; height: 20px;'><input type='text' id='password' name='password' value='' />"
+"            </td>"
+"          </tr>"
+"          </tr>"
+"        </tbody>"
+"      </table>"
+"      <input type='submit' value='Submit' />"
+"    </form>"
+"<p style='text-align: center;'><strong><a href='login'>Update Firmware</a></strong></p></h2>"
+"<p><br></p>"
+"    <form action='/reboot.html'>"
+"      <input type='submit' value='Reboot!'>"
+"    </form>"
+"</body>"
+"</html> " + OTAStyle;
 
 /* Server Index Page */
 String OTAServerIndex =
@@ -133,13 +180,18 @@ void startHttpServer()
   });
 
   server.on("/send_settings", []() {
+    String tString;
     if (!server.arg("ssid").isEmpty())
     {
-      userConfig.setSsid(server.arg("ssid"));
+      tString = server.arg("ssid");
+      tString.trim();
+      userConfig.setSsid(tString);
     }
     if (!server.arg("password").isEmpty())
     {
-      userConfig.setPassword(server.arg("password"));
+      tString = server.arg("password");
+      tString.trim();
+      userConfig.setPassword(tString);
     }
     if (!server.arg("inclineStep").isEmpty())
     {
@@ -171,7 +223,7 @@ void startHttpServer()
 
   server.on("/BLEScan", []() {
     Serial.println("Scanning for BLE Devices");
-    //BLEServerScan(false);
+    BLEServerScan(false);
     String response = "<!DOCTYPE html><html><body>Scanning for BLE Devices. Please wait 10 seconds.</body><script> setTimeout(\"location.href = 'http://smartbike2k.local/bluetoothscanner.html';\",10000);</script></html>";
     server.send(200, "text/html", response);
   });
@@ -340,9 +392,15 @@ void webClientUpdate(void *pvParameters)
 
 void handleIndexFile()
 {
+  if(SPIFFS.exists("/index.html")){
   File file = SPIFFS.open("/index.html", "r");
   server.streamFile(file, "text/html");
   file.close();
+  }else{
+    Serial.println("index.html not found. Sending builtin");
+    server.send(200, "text/html", noIndexHTML);
+  }
+
 }
 
 void handleStyleCss()
@@ -400,17 +458,22 @@ void startWifi()
   Serial.println(".local/");
 }
 
+
+//Github Folder Certificate 5f3f7ac2569f50a4667647c6a18ca007aaedbb8e
+
 void FirmwareUpdate()
 {
   Serial.println("Checking for newer firmware");
-  http.begin(URL_fw_Version, "CC AA 48 48 66 46 0E 91 53 2C 9C 7C 23 2A B1 74 4D 29 9D 33"); // check version URL
+  http.begin(URL_fw_Server + String("version.txt"), "CC AA 48 48 66 46 0E 91 53 2C 9C 7C 23 2A B1 74 4D 29 9D 33"); // check version URL
   delay(100);
   int httpCode = http.GET(); // get data from version file
   delay(100);
   String payload;
   if (httpCode == HTTP_CODE_OK) // if version received
   {
+    Serial.println("Version info recieved:");
     payload = http.getString(); // save received version
+    payload.trim();
     Serial.println(payload);
   }
   else
@@ -434,9 +497,11 @@ void FirmwareUpdate()
       WiFiClientSecure client;
       httpUpdate.setLedPin(LED_BUILTIN, LOW);
       Serial.println("Updating FileSystem");
-    
-      t_httpUpdate_return ret = httpUpdate.update(client, URL_fw_spiffs);
+      t_httpUpdate_return ret = httpUpdate.updateSpiffs(client, URL_fw_spiffs);
+      vTaskDelay(100/portTICK_PERIOD_MS);
       if (ret == HTTP_UPDATE_OK) {
+      Serial.println("Saving Config.txt");
+      userConfig.saveToSPIFFS();
       Serial.println("Updating Program");
       ret = httpUpdate.update(client, URL_fw_Bin);
       switch (ret)
@@ -457,3 +522,5 @@ void FirmwareUpdate()
     }
   }
 }
+
+

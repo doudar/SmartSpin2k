@@ -1,17 +1,37 @@
 <!DOCTYPE html>
 <html>
-  <head>
-    <title>SmartBike2K Web Server</title>
-    <meta name="viewport" content="width=device-width, initial-scale=1">
-    <link rel="icon" href="data:,">
-    <link rel="stylesheet" type="text/css" href="style.css">
-  </head>
 
-  <body>
+<head>
+  <title>SmartBike2K Web Server</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+</head>
+
+<body style="background-color:#3498db;">
   <h1 style="text-align: center;"><strong>SmartBike2k</strong></h1>
-  <h2><p style="text-align: center;"><strong><a href="btsimulator.html">BLE Device Simulator</a></strong></p>
-  <p style="text-align: center;"><strong><a href="settings.html">Settings</a></strong></p>
-  <p style="text-align: center;"><strong><a href="bluetoothscanner.html">Bluetooth scanner</a></strong></p></h2>
-  <p style="text-align: center;"><strong><a href="login">Update Firmware</a></strong></p></h2>
+  <h2>
+    <p style="text-align: center;"><strong><a href="btsimulator.html">BLE Device Simulator</a></strong></p>
+    <p style="text-align: center;"><strong><a href="settings.html">Settings</a></strong></p>
+    <p style="text-align: center;"><strong><a href="bluetoothscanner.html">Bluetooth scanner</a></strong></p>
+    <p style="text-align: center;"><strong><a href="login">Update Firmware</a></strong></p>
+  </h2>
 </body>
+<script>
+
+  //define function to load css
+  var loadCss = function () {
+    var cssLink = document.createElement('link');
+    cssLink.rel = 'stylesheet';
+    cssLink.href = 'style.css';
+    var head = document.getElementsByTagName('head')[0];
+    head.parentNode.insertBefore(cssLink, head);
+  };
+
+  //Delay loading css to not swamp webserver
+  window.addEventListener('load', function () {
+    setTimeout(loadCss, 100);
+  }, false);
+
+
+</script>
+
 </html>

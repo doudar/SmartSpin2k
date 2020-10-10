@@ -1,12 +1,13 @@
 html {
-    font-family: Helvetica;
+    font-family: sans-serif;
     display: inline-block;
     margin: 0px auto;
     text-align: center;
+    background-color: #3498db;
   }
   h1{
     color: #0F3376;
-    padding: 1vh;
+    padding: 2rem;
   }
   h2{
     color: #000000;
