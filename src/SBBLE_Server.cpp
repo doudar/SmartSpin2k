@@ -154,6 +154,7 @@ static void notifyCallback(
     for (int i = 0; i < length; i++)
   {
     Serial.printf("%x ,", pData[i]);
+    debugToHTML += pData[i];
   }
 
   if (pBLERemoteCharacteristic->getUUID().toString() == HEARTCHARACTERISTIC_UUID.toString())
@@ -424,7 +425,7 @@ void BLEServerScan(bool connectRequest)
   String output;
   serializeJson(devices, output);
   Serial.println(output);
-  //userConfig.setfoundDevices(output);
+  userConfig.setFoundDevices(output);
 
   if (doConnect)
   { //Works but inhibits the BLE Server Scan. Too late at night to fix. another day.

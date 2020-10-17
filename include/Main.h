@@ -21,6 +21,7 @@ void IRAM_ATTR shiftDown();
 //Main program variable that stores most everything
 extern userParameters userConfig;
 extern const String FirmwareVer;
+extern String debugToHTML; //Variable that will store debugging information that will get appended and then cleared once posted to HTML or a timer expires.
 
 #endif
 

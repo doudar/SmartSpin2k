@@ -9,7 +9,8 @@
 #include <Arduino.h>
 #include <SPIFFS.h>
 
-const String FirmwareVer = {"0.0.10.5"};
+const String FirmwareVer = {"0.0.10.6"};
+String debugToHTML = "Current Firmware Version: " + FirmwareVer;
 
 bool lastDir = true; //Stepper Last Direction
 bool changeRadioState = false;
@@ -141,6 +142,13 @@ void loop()
     Serial.println(displayValue);
   }
   vTaskDelay(500 / portTICK_RATE_MS);
+
+if(debugToHTML.length()>50){ //Clear up memory
+  debugToHTML = " ";
+}
+
+
+
 }
 
 void moveStepper(void *pvParameters)

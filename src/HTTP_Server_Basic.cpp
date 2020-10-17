@@ -303,7 +303,10 @@ void startHttpServer()
   });
 
   server.on("/configJSON", []() {
-    server.send(200, "text/plain", userConfig.returnJSON());
+    String tString;
+    tString = userConfig.returnJSON() + "'debug':" + "'" + debugToHTML + "'";
+    server.send(200, "text/plain", tString);
+    debugToHTML = " ";
   });
 
   server.on("/login", HTTP_GET, []() {
