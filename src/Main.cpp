@@ -9,6 +9,8 @@
 #include <Arduino.h>
 #include <SPIFFS.h>
 
+const String FirmwareVer = {"0.0.10.5"};
+
 bool lastDir = true; //Stepper Last Direction
 bool changeRadioState = false;
 // Debounce Setup
