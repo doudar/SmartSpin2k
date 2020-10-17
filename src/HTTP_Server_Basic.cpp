@@ -25,7 +25,6 @@ TaskHandle_t webClientTask;
 
 //Automatic Firmware update Defines
 HTTPClient http;
-const String FirmwareVer = {"0.0.10.5"};
 #define URL_fw_Server "https://raw.githubusercontent.com/doudar/OTAUpdates/main/"
 #define URL_fw_Version "https://raw.githubusercontent.com/doudar/OTAUpdates/main/version.txt"
 #define URL_fw_Bin "https://raw.githubusercontent.com/doudar/OTAUpdates/main/firmware.bin"

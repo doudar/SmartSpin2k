@@ -20,6 +20,7 @@ void IRAM_ATTR shiftDown();
 
 //Main program variable that stores most everything
 extern userParameters userConfig;
+extern const String FirmwareVer = {"0.0.10.5"};
 
 #endif
 
