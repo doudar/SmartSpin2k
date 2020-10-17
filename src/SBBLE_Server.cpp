@@ -479,9 +479,14 @@ class MyCallbacks : public BLECharacteristicCallbacks
         {
           userConfig.setERGMode(true);
         }
-        userConfig.setIncline(computePID(userConfig.getSimulatedWatts(), targetWatts)); //Updating incline via PID...This should be interesting.....
+        computeERG(userConfig.getSimulatedWatts(), targetWatts);
+        //userConfig.setIncline(computePID(userConfig.getSimulatedWatts(), targetWatts)); //Updating incline via PID...This should be interesting.....
+        Serial.println("ERG MODE");
         Serial.printf("   Target Watts: %d", targetWatts);
         Serial.print(userConfig.getSimulatedWatts()); //not displaying numbers less than 256 correctly but they do get sent to Zwift correctly.
+        Serial.println("*********");
+        Serial.print("   Target Incline: ");
+        Serial.print(userConfig.getIncline() / 100);
         Serial.println("*********");
       }
     }
@@ -608,4 +613,34 @@ double computePID(double inp, double Setpoint)
   previousTime = currentTime; //remember current time
 
   return out; //have function return the PID output
+}
+
+void computeERG(int currentWatts, int setPoint){
+  float incline = userConfig.getIncline();
+  if(abs(currentWatts-setPoint)<20){ //Within Deadband calculation
+    if(currentWatts>setPoint){
+      userConfig.setIncline(incline-(abs(currentWatts-setPoint)*(userConfig.getShiftStep()/300)));
+    }
+    if(currentWatts<setPoint){
+      userConfig.setIncline(incline+(abs(currentWatts-setPoint)*(userConfig.getShiftStep()/300)));
+    }
+    return;
+  }
+   if(abs(currentWatts-setPoint)<100){ //intermediate calculation
+    if(currentWatts>setPoint){
+      userConfig.setIncline(incline-(abs(currentWatts-setPoint)*(userConfig.getShiftStep()/100)));
+    }
+    if(currentWatts<setPoint){
+      userConfig.setIncline(incline+(abs(currentWatts-setPoint)*(userConfig.getShiftStep()/100)));
+    }
+    return;
+  }
+   //Aggressive calculation
+    if(currentWatts>setPoint){
+      userConfig.setIncline(incline-(abs(currentWatts-setPoint)*(userConfig.getShiftStep()/50))); //We assume one shift step ~ 50 watts
+    }
+    if(currentWatts<setPoint){
+      userConfig.setIncline(incline+(abs(currentWatts-setPoint)*(userConfig.getShiftStep()/50)));
+    }
+    return;
 }

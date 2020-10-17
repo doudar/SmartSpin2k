@@ -25,7 +25,7 @@ TaskHandle_t webClientTask;
 
 //Automatic Firmware update Defines
 HTTPClient http;
-const String FirmwareVer = {"0.0.10.4"};
+const String FirmwareVer = {"0.0.10.5"};
 #define URL_fw_Server "https://raw.githubusercontent.com/doudar/OTAUpdates/main/"
 #define URL_fw_Version "https://raw.githubusercontent.com/doudar/OTAUpdates/main/version.txt"
 #define URL_fw_Bin "https://raw.githubusercontent.com/doudar/OTAUpdates/main/firmware.bin"
@@ -460,11 +460,11 @@ void startWifi()
 
 
 //Github Folder Certificate 5f3f7ac2569f50a4667647c6a18ca007aaedbb8e
-
+// old cert info:: CC AA 48 48 66 46 0E 91 53 2C 9C 7C 23 2A B1 74 4D 29 9D 33
 void FirmwareUpdate()
 {
   Serial.println("Checking for newer firmware");
-  http.begin(URL_fw_Server + String("version.txt"), "CC AA 48 48 66 46 0E 91 53 2C 9C 7C 23 2A B1 74 4D 29 9D 33"); // check version URL
+  http.begin(URL_fw_Server + String("version.txt")); // check version URL
   delay(100);
   int httpCode = http.GET(); // get data from version file
   delay(100);
