@@ -180,7 +180,12 @@ static void notifyCallback(
       crankRev[0] = bytes_to_u16(pData[6], pData[5]);
       crankEventTime[1] = crankEventTime[1];
       crankEventTime[0] = bytes_to_u16(pData[8], pData[7]);
+      if(crankEventTime[0]+crankEventTime[1]>0){ //test for a possible divide by 0 error
       userConfig.setSimulatedCad((crankRev[0] - crankRev[1]) / (crankEventTime[0] - crankEventTime[1]));
+      }
+      else {
+        userConfig.setSimulatedCad(0);
+      }
       Serial.printf("Calculated Cadence was: %d", userConfig.getSimulatedCad());
     }
   }
