@@ -361,8 +361,8 @@ void bleClient()
   if (connected)
   {
     debugDirector("Recieved data from server:");
-    debugDirector(pRemoteCharacteristic->getUUID().toString().c_str());
-    debugDirector(pRemoteCharacteristic->getValue().c_str());
+    //debugDirector(pRemoteCharacteristic->getUUID().toString().c_str());
+    //debugDirector(pRemoteCharacteristic->getValue().c_str());
   }
   else if (doScan)
   {
