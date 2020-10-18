@@ -77,7 +77,7 @@
     </form>
    <br>
     
-    <div id="debug" name="debug"style="height:400px;width:700px;border:1px solid #ccc;font:16px/26px Georgia, Garamond, Serif;overflow:auto;"> loading </div>
+    <div id="debug" name="debug"style="text-align: center;height:400px;width:700px;border:1px solid #ccc;font:16px/26px Georgia, Garamond, Serif;overflow:auto;"> loading </div>
 <br>
 
   </h2>
@@ -88,10 +88,7 @@
 
   //Update values on specified interval loading late because this tiny webserver hates frequent requests
    setInterval(function () {
-    if (document.getElementById("ssid").value == "loading"){
     requestConfigValues();
-    }
-
   }, 1000);
 
   function requestConfigValues() {
@@ -109,7 +106,7 @@
         document.getElementById("simulatedWatts").value = obj.simulatedWatts;
         document.getElementById("simulatedCad").value = obj.simulatedCad;
         document.getElementById("connectedPowerMeter").value = obj.connectedPowerMeter;
-        document.getelementByID("debug").innerHTML = obj.debug;
+        document.getElementById("debug").innerHTML += obj.debug;
       }
     };
     xhttp.open("GET", "/configJSON", true);

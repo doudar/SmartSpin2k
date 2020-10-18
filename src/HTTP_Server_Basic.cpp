@@ -171,6 +171,13 @@ void startHttpServer()
     file.close();
   });
 
+    server.on("/status.html", []() {
+    File file = SPIFFS.open("/status.html", "r");
+    server.streamFile(file, "text/html");
+    Serial.printf("Served: %s", file.name());
+    file.close();
+  });
+
   server.on("/bluetoothscanner.html", []() {
     File file = SPIFFS.open("/bluetoothscanner.html", "r");
     server.streamFile(file, "text/html");
@@ -304,7 +311,9 @@ void startHttpServer()
 
   server.on("/configJSON", []() {
     String tString;
-    tString = userConfig.returnJSON() + "'debug':" + "'" + debugToHTML + "'";
+    tString = userConfig.returnJSON();
+    tString.remove(tString.length()-1,1);
+    tString += String(",\"debug\":") + "\"" + debugToHTML + "\"}";
     server.send(200, "text/plain", tString);
     debugToHTML = " ";
   });

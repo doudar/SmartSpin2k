@@ -426,6 +426,7 @@ void BLEServerScan(bool connectRequest)
   serializeJson(devices, output);
   Serial.println(output);
   userConfig.setFoundDevices(output);
+  debugToHTML += "<br>Bluetooth Client Found Devices: " + output;
 
   if (doConnect)
   { //Works but inhibits the BLE Server Scan. Too late at night to fix. another day.

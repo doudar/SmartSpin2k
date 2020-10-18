@@ -9,8 +9,8 @@
 #include <Arduino.h>
 #include <SPIFFS.h>
 
-const String FirmwareVer = {"0.0.10.6"};
-String debugToHTML = "Current Firmware Version: " + FirmwareVer;
+const String FirmwareVer = {"0.0.10.7"};
+String debugToHTML = "<br>Current Firmware Version: " + FirmwareVer;
 
 bool lastDir = true; //Stepper Last Direction
 bool changeRadioState = false;
@@ -139,12 +139,13 @@ void loop()
   {
     Serial.println("Main Target Incline:");
     displayValue = userConfig.getIncline() / (float)100;
+    debugToHTML += "<br>Main Target Incline: " + String(displayValue);
     Serial.println(displayValue);
   }
   vTaskDelay(500 / portTICK_RATE_MS);
 
-if(debugToHTML.length()>50){ //Clear up memory
-  debugToHTML = " ";
+if(debugToHTML.length()>500){ //Clear up memory
+  debugToHTML = "<br>HTML Debug Truncated. Increase buffer if required.";
 }
 
 
