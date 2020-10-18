@@ -446,7 +446,7 @@ void startWifi()
   }
   if (WiFi.status() == WL_CONNECTED)
   {
-    debugDirector("Connected to " + String(userConfig.getSsid()) + " IP address: " + String(WiFi.localIP()));
+    debugDirector("Connected to " + String(userConfig.getSsid()) + " IP address: " + WiFi.localIP().toString());
   }
 
   // Couldn't connect to existing network, Create SoftAP
@@ -456,7 +456,7 @@ void startWifi()
     //WiFi.softAPConfig(local_ip, gateway, subnet);
     vTaskDelay(50);
     IPAddress myIP = WiFi.softAPIP();
-    debugDirector("AP IP address: " + String(myIP));
+    debugDirector("AP IP address: " + myIP.toString());
   }
   MDNS.begin("smartbike2k"); //<-----------Need to add variable to change this globally
   debugDirector("Open http://smartbike2k.local/");
