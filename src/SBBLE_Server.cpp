@@ -182,7 +182,7 @@ static void notifyCallback(
       else {
         userConfig.setSimulatedCad(0);
       }
-      debugDirector("Crank Revolutions: " + String(crankRev[1] + " Crank Time: " + String(crankEventTime[1])));
+      debugDirector("Crank Revolutions: " + String(crankRev[1]) + " Crank Time: " + String(crankEventTime[1]));
       debugDirector("Calculated Cadence was: " + String(userConfig.getSimulatedCad()));
     }
   }
