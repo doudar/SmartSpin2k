@@ -9,7 +9,7 @@
 #include <Arduino.h>
 #include <SPIFFS.h>
 
-const String FirmwareVer = {"0.0.10.7"};
+const String FirmwareVer = {"0.0.10.8"};
 String debugToHTML = "<br>Current Firmware Version: " + FirmwareVer;
 
 bool lastDir = true; //Stepper Last Direction
@@ -53,7 +53,7 @@ void setup()
   // Serial port for debugging purposes
   Serial.begin(512000);
 
-  debugDirector("Program Version: %s %s \n", __DATE__, __TIME__);
+  debugDirector("Program Version: " + String(__DATE__)  + String(__TIME__));
 
   // Initialize SPIFFS
   debugDirector("Mounting Filesystem");
