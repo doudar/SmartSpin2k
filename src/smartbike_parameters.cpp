@@ -8,6 +8,7 @@
 //#include <FS.h>                     //Filesystem read/write
 #include <ArduinoJson.h>
 #include <SPIFFS.h>                 //needed for Spiffs
+#include <Main.h>
 
 // Set all defaults except filename as that is set on object initialization.
 void userParameters::setDefaults()
@@ -69,10 +70,10 @@ void userParameters::saveToSPIFFS()
   SPIFFS.remove(filename);
 
   // Open file for writing
-  Serial.printf("Writing File: %s \n", filename.c_str());
+  debugDirector("Writing File: " + filename);
   File file = SPIFFS.open(filename, FILE_WRITE);
   if (!file) {
-    Serial.println(F("Failed to create file"));
+    debugDirector(F("Failed to create file"));
     return;
   }
 
@@ -103,7 +104,7 @@ void userParameters::saveToSPIFFS()
 
   // Serialize JSON to file
   if (serializeJson(doc, file) == 0) {
-    Serial.println(F("Failed to write to file"));
+    debugDirector(F("Failed to write to file"));
   }
   // Close the file
    file.close();
@@ -112,12 +113,12 @@ void userParameters::saveToSPIFFS()
 // Loads the JSON configuration from a file into a userParameters Object
 void userParameters::loadFromSPIFFS() {
   // Open file for reading
-  Serial.printf("Reading File: %s \n", filename.c_str());
+  debugDirector("Reading File: " + filename);
   File file = SPIFFS.open(filename);
 
   //load defaults if filename doesn't exist
  if(!file){ 
-   Serial.println("Couldn't find configuration file. Loading Defaults");
+   debugDirector("Couldn't find configuration file. Loading Defaults");
    setDefaults();
   return;
   }
@@ -129,7 +130,7 @@ void userParameters::loadFromSPIFFS() {
   // Deserialize the JSON document
   DeserializationError error = deserializeJson(doc, file);
   if (error){
-    Serial.println(F("Failed to read file, using default configuration"));
+    debugDirector(F("Failed to read file, using default configuration"));
     setDefaults();
     return;
   }
@@ -153,26 +154,25 @@ void userParameters::loadFromSPIFFS() {
     setConnectedPowerMeter (doc["connectedPowerMeter"]);
     setConnectedHeartMonitor (doc["connectedHeartMonitor"]);
 
-    Serial.printf("Config File Loaded: %s \n", filename.c_str());        
+    debugDirector("Config File Loaded: " + filename);        
     file.close();
 }
 
 // Prints the content of a file to the Serial
 void userParameters::printFile() {
   // Open file for reading
-  Serial.printf("Contents of file: %s\n", filename.c_str());
+  debugDirector("Contents of file: " + filename);
   File file = SPIFFS.open(filename);
   if (!file) {
-    Serial.println(F("Failed to read file"));
+    debugDirector(F("Failed to read file"));
     return;
   }
 
   // Extract each characters by one by one
   while (file.available()) {
-    Serial.print((char)file.read());
+    debugDirector((char)file.read(), false);
   }
-  Serial.println();
-
+  debugDirector();
   // Close the file
   file.close();
 }

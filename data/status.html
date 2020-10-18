@@ -8,7 +8,7 @@
 
 
 <body style="background-color:#3498db;">
-  <h1 style="text-align: center;"><strong>Status</strong></h1>
+  <h1 style="text-align: left;"><strong>Status</strong></h1>
   <h2>
     <p style="text-align: left;"></p>
     <form action="requestConfigValues()">
@@ -69,15 +69,12 @@
             </td>
             <td style="width: 14%; height: 20px;"><input type="text" id="connectedPowerMeter" name="ConnectedPowerMeter" value="loading" /></td>
           </tr>
-
-          
         </tbody>
       </table>
-      <p style="text-align: center;"><input type="submit" value="Refresh!" /></p>
     </form>
    <br>
-    
-    <div id="debug" name="debug"style="text-align: center;height:400px;width:700px;border:1px solid #ccc;font:16px/26px Georgia, Garamond, Serif;overflow:auto;"> loading </div>
+    <p style="text-align: left;">Debugging Info:</p>
+    <div id="debug" name="debug"style="background-color:black;background-image:radial-gradient(rgba(0,150,0,0.75), black 120%);text-align: left;height:400px;width:700px;border:1px solid #ccc;color:white;font:1.3rem Inconsolata, monospace;overflow:auto;text-shadow: 0 0 4px #C8C8C8;"> loading </div>
 <br>
 
   </h2>
@@ -85,6 +82,14 @@
 
 <script>
 
+
+var element = document.getElementById("debug");
+element.scrollTop = element.scrollHeight;
+
+function updateScroll(){
+    var element = document.getElementById("debug");
+    element.scrollTop = element.scrollHeight;
+}
 
   //Update values on specified interval loading late because this tiny webserver hates frequent requests
    setInterval(function () {
@@ -107,6 +112,7 @@
         document.getElementById("simulatedCad").value = obj.simulatedCad;
         document.getElementById("connectedPowerMeter").value = obj.connectedPowerMeter;
         document.getElementById("debug").innerHTML += obj.debug;
+        updateScroll();
       }
     };
     xhttp.open("GET", "/configJSON", true);

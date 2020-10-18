@@ -37,10 +37,8 @@ const int ledPin = 2; //one of those stupid blinding Blue LED's on the ESP32
 
 // Default size for the shifter step
 const int shiftStep = 400;
-volatile int shifterPosition = 0;
-volatile int stepperPosition = 0;
-
-float displayValue = 0.0;
+int shifterPosition = 0; //Changed from volitile int
+int stepperPosition = 0;
 
 //Setup a task so the stepper will run on a different core thean the main code to prevent studdering
 TaskHandle_t moveStepperTask;
@@ -55,13 +53,13 @@ void setup()
   // Serial port for debugging purposes
   Serial.begin(512000);
 
-  Serial.printf("Program Version: %s %s \n",__DATE__, __TIME__);
+  debugDirector("Program Version: %s %s \n", __DATE__, __TIME__);
 
   // Initialize SPIFFS
-  Serial.println("Mounting Filesystem");
+  debugDirector("Mounting Filesystem");
   if (!SPIFFS.begin(true))
   {
-    Serial.println("An Error has occurred while mounting SPIFFS");
+    debugDirector("An Error has occurred while mounting SPIFFS");
     return;
   }
 
@@ -70,7 +68,7 @@ void setup()
   userConfig.printFile(); //Print userConfig.contents to serial
   userConfig.saveToSPIFFS();
 
-  Serial.println("Configuring Hardware Pins");
+  debugDirector("Configuring Hardware Pins");
   pinMode(radioPin, INPUT_PULLUP);
   pinMode(shiftUpPin, INPUT_PULLUP);   // Push-Button with input Pullup
   pinMode(shiftDownPin, INPUT_PULLUP); // Push-Button with input Pullup
@@ -83,12 +81,12 @@ void setup()
   digitalWrite(stepPin, LOW);
   digitalWrite(ledPin, LOW);
 
-  Serial.println("Creating Interrupts");
+  debugDirector("Creating Interrupts");
   //Setup Interrups so shifters work at anytime
   attachInterrupt(digitalPinToInterrupt(shiftUpPin), shiftUp, CHANGE);
   attachInterrupt(digitalPinToInterrupt(shiftDownPin), shiftDown, CHANGE);
 
-  Serial.println("Setting up cpu Tasks");
+  debugDirector("Setting up cpu Tasks");
   //create a task that will be executed in the moveStepper function, with priority 1 and executed on core 0
   //the main loop function always runs on core 1 by default
 
@@ -104,23 +102,22 @@ void setup()
       &moveStepperTask,      /* Task handle to keep track of created task */
       0);                    /* pin task to core 0 */
   //vTaskStartScheduler();
-  Serial.println("Stepper Task Created");
+  debugDirector("Stepper Task Created");
   userConfig.setWifiOn(!digitalRead(radioPin));
   setupBLE();
   /************************************************StartingBLE Server***********************/
 
-  
-    Serial.println("****************Starting regular mode*********************");
-    //BLEserverScan(); //Scan for Known BLE Servers
-    //startBLEServer();
-    Serial.println("BLE Server Started");
-    //BLEServerScan(true);
-    Serial.println(" - BLE Client Initialized");
-    digitalWrite(ledPin, HIGH);
-    startWifi();
-    startHttpServer();
-    FirmwareUpdate();
-    startBLEServer();
+  debugDirector("****************Starting regular mode*********************");
+  //BLEserverScan(); //Scan for Known BLE Servers
+  //startBLEServer();
+  debugDirector("BLE Server Started");
+  //BLEServerScan(true);
+  debugDirector(" - BLE Client Initialized");
+  digitalWrite(ledPin, HIGH);
+  startWifi();
+  startHttpServer();
+  FirmwareUpdate();
+  startBLEServer();
 }
 
 void loop()
@@ -130,26 +127,16 @@ void loop()
   {
     digitalWrite(ledPin, LOW); //blink led in configuration mode
   }
-  
+
   BLENotify();
   vTaskDelay(500 / portTICK_RATE_MS); //guessing it's good to have task delays seperating client & Server?
   bleClient();
-
-  if (displayValue != userConfig.getIncline() / (float)100)
-  {
-    Serial.println("Main Target Incline:");
-    displayValue = userConfig.getIncline() / (float)100;
-    debugToHTML += "<br>Main Target Incline: " + String(displayValue);
-    Serial.println(displayValue);
-  }
   vTaskDelay(500 / portTICK_RATE_MS);
 
-if(debugToHTML.length()>500){ //Clear up memory
-  debugToHTML = "<br>HTML Debug Truncated. Increase buffer if required.";
-}
-
-
-
+  if (debugToHTML.length() > 500)
+  { //Clear up memory
+    debugToHTML = "<br>HTML Debug Truncated. Increase buffer if required.";
+  }
 }
 
 void moveStepper(void *pvParameters)
@@ -172,7 +159,7 @@ void moveStepper(void *pvParameters)
         if(currentAcceleration < acceleration){
           currentAcceleration = currentAcceleration + 200;
         }
-      //Serial.println(abs(stepperPosition-targetPosition));
+      //debugDirector(abs(stepperPosition-targetPosition));
     }
 */
 
@@ -220,7 +207,7 @@ void moveStepper(void *pvParameters)
       }
     }
   }
-  Serial.println("Exited Motor Control Loop. That was Weird.");
+  debugDirector("Exited Motor Control Loop. That was Weird.");
 }
 
 bool IRAM_ATTR deBounce()
@@ -247,8 +234,7 @@ void IRAM_ATTR shiftUp() // Handle the shift up interrupt IRAM_ATTR is to keep t
     if (!digitalRead(shiftUpPin)) //double checking to make sure the interrupt wasn't triggered by emf
     {
       shifterPosition = (shifterPosition + userConfig.getShiftStep());
-      Serial.println("Shift UP");
-      Serial.println(shifterPosition);
+      debugDirector("Shift UP: " + String(shifterPosition));
     }
     else
     {
@@ -264,12 +250,25 @@ void IRAM_ATTR shiftDown() //Handle the shift down interrupt
     if (!digitalRead(shiftDownPin)) //double checking to make sure the interrupt wasn't triggered by emf
     {
       shifterPosition = (shifterPosition - userConfig.getShiftStep());
-      Serial.println("Shift DOWN");
-      Serial.println(shifterPosition);
+      debugDirector("Shift DOWN" + String(shifterPosition));
     }
     else
     {
       lastDebounceTime = 0;
     } //Probably Triggered by EMF, reset the debounce
+  }
+}
+
+void debugDirector(String textToPrint, bool newline)
+{
+  if (newline)
+  {
+    Serial.println(textToPrint);
+    debugToHTML += String("<br>") + textToPrint;
+  }
+  else
+  {
+    Serial.print(textToPrint);
+    debugToHTML += textToPrint;
   }
 }

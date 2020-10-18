@@ -160,28 +160,28 @@ void startHttpServer()
   server.on("/btsimulator.html", []() {
     File file = SPIFFS.open("/btsimulator.html", "r");
     server.streamFile(file, "text/html");
-    Serial.printf("Served: %s", file.name());
+    debugDirector("Served: " + String(file.name()));
     file.close();
   });
 
   server.on("/settings.html", []() {
     File file = SPIFFS.open("/settings.html", "r");
     server.streamFile(file, "text/html");
-    Serial.printf("Served: %s", file.name());
+    debugDirector("Served: " + String(file.name()));
     file.close();
   });
 
     server.on("/status.html", []() {
     File file = SPIFFS.open("/status.html", "r");
     server.streamFile(file, "text/html");
-    Serial.printf("Served: %s", file.name());
+    debugDirector("Served: " + String(file.name()));
     file.close();
   });
 
   server.on("/bluetoothscanner.html", []() {
     File file = SPIFFS.open("/bluetoothscanner.html", "r");
     server.streamFile(file, "text/html");
-    Serial.printf("Served: %s", file.name());
+    debugDirector("Served: " + String(file.name()));
     file.close();
   });
 
@@ -217,25 +217,25 @@ void startHttpServer()
     }
     String response = "<!DOCTYPE html><html><body>Saving Settings....</body><script> setTimeout(\"location.href = 'http://smartbike2k.local/settings.html';\",2000);</script></html>";
     server.send(200, "text/html", response);
-    Serial.println("Config Updated From Web");
+    debugDirector("Config Updated From Web");
     userConfig.printFile();
     userConfig.saveToSPIFFS();
   });
 
   server.on("/BLEServers", []() {
-    Serial.println("Sending BLE device list to HTTP Client");
+    debugDirector("Sending BLE device list to HTTP Client");
     server.send(200, "text/plain", userConfig.getFoundDevices());
   });
 
   server.on("/BLEScan", []() {
-    Serial.println("Scanning for BLE Devices");
+    debugDirector("Scanning for BLE Devices");
     BLEServerScan(false);
     String response = "<!DOCTYPE html><html><body>Scanning for BLE Devices. Please wait 10 seconds.</body><script> setTimeout(\"location.href = 'http://smartbike2k.local/bluetoothscanner.html';\",10000);</script></html>";
     server.send(200, "text/html", response);
   });
 
   server.on("/load_defaults.html", []() {
-    Serial.println("Setting Defaults from Web Request");
+    debugDirector("Setting Defaults from Web Request");
     userConfig.setDefaults();
     userConfig.saveToSPIFFS();
     String response = "Loading Defaults....<script> setTimeout(\"location.href ='http://smartbike2k.local/settings.html';\",2000); </script>";
@@ -243,7 +243,7 @@ void startHttpServer()
   });
 
   server.on("/reboot.html", []() {
-    Serial.println("Rebooting from Web Request");
+    debugDirector("Rebooting from Web Request");
     String response = "Rebooting....<script> setTimeout(\"location.href = 'http://smartbike2k.local/index.html';\",2000); </script>";
     server.send(200, "text/html", response);
     ESP.restart();
@@ -255,22 +255,21 @@ void startHttpServer()
     {
       userConfig.setSimulateHr(true);
       server.send(200, "text/plain", "OK");
-      Serial.println("HR Simulator turned on");
+      debugDirector("HR Simulator turned on");
     }
     else if (value == "disable")
     {
       userConfig.setSimulateHr(false);
       server.send(200, "text/plain", "OK");
-      Serial.println("HR Simulator turned off");
+      debugDirector("HR Simulator turned off");
     }
     else
     {
       userConfig.setSimulatedHr(value.toInt());
-      Serial.printf("HR is now: %d BPM\n", userConfig.getSimulatedHr());
+      debugDirector("HR is now: " + String(userConfig.getSimulatedHr()));
       server.send(200, "text/plain", "OK");
     }
-    Serial.println("Webclient High Water Mark:");
-    Serial.println(uxTaskGetStackHighWaterMark(webClientTask));
+    debugDirector("Webclient High Water Mark: " + String(uxTaskGetStackHighWaterMark(webClientTask)));
   });
 
   server.on("/wattsslider", []() {
@@ -279,22 +278,21 @@ void startHttpServer()
     {
       userConfig.setSimulatePower(true);
       server.send(200, "text/plain", "OK");
-      Serial.println("Watt Simulator turned on");
+      debugDirector("Watt Simulator turned on");
     }
     else if (value == "disable")
     {
       userConfig.setSimulatePower(false);
       server.send(200, "text/plain", "OK");
-      Serial.println("Watt Simulator turned off");
+      debugDirector("Watt Simulator turned off");
     }
     else
     {
       userConfig.setSimulatedWatts(value.toInt());
-      Serial.printf("Watts are now: %d \n", userConfig.getSimulatedWatts());
+      debugDirector("Watts are now: " + String(userConfig.getSimulatedWatts()));
       server.send(200, "text/plain", "OK");
     }
-    Serial.println("Webclient High Water Mark:");
-    Serial.println(uxTaskGetStackHighWaterMark(webClientTask));
+    debugDirector("Webclient High Water Mark: " + String(uxTaskGetStackHighWaterMark(webClientTask)));
   });
 
   server.on("/hrValue", []() {
@@ -334,7 +332,7 @@ void startHttpServer()
     HTTPUpload& upload = server.upload();
     if (upload.filename == String ("firmware.bin").c_str()){
     if (upload.status == UPLOAD_FILE_START) {
-      Serial.printf("Update: %s\n", upload.filename.c_str());
+      debugDirector("Update: " + upload.filename);
       if (!Update.begin(UPDATE_SIZE_UNKNOWN)) { //start with max available size
         Update.printError(Serial);
       }
@@ -359,7 +357,7 @@ void startHttpServer()
     if (!filename.startsWith("/")) {
       filename = "/" + filename;
     }
-    Serial.print("handleFileUpload Name: "); Serial.println(filename);
+    debugDirector("handleFileUpload Name: " + filename);
     fsUploadFile = SPIFFS.open(filename, "w");
     filename = String();
   } else if (upload.status == UPLOAD_FILE_WRITE) {
@@ -371,7 +369,7 @@ void startHttpServer()
     if (fsUploadFile) {
       fsUploadFile.close();
     }
-    Serial.print("handleFileUpload Size: "); Serial.println(upload.totalSize);
+    debugDirector(String("handleFileUpload Size: ") + String(upload.totalSize));
     server.send(200, "text/plain", String(upload.filename + " Uploaded Sucessfully."));
   } } });
 
@@ -386,10 +384,10 @@ void startHttpServer()
       &webClientTask,    /* Task handle to keep track of created task */
       tskNO_AFFINITY);   /* pin task to core 0 */
   //vTaskStartScheduler();
-  Serial.println("WebClientTaskCreated");
+  debugDirector("WebClientTaskCreated");
 
   server.begin();
-  Serial.println("HTTP server started");
+  debugDirector("HTTP server started");
 }
 
 void webClientUpdate(void *pvParameters)
@@ -408,7 +406,7 @@ void handleIndexFile()
   server.streamFile(file, "text/html");
   file.close();
   }else{
-    Serial.println("index.html not found. Sending builtin");
+    debugDirector("index.html not found. Sending builtin");
     server.send(200, "text/html", noIndexHTML);
   }
 
@@ -427,7 +425,7 @@ void startWifi()
   int i = 0;
 
   //Trying Station mode first:
-  Serial.printf("Connecting to %s\n", userConfig.getSsid());
+  debugDirector("Connecting to: " + String(userConfig.getSsid()));
   if (String(WiFi.SSID()) != userConfig.getSsid())
   {
     WiFi.mode(WIFI_STA);
@@ -437,20 +435,18 @@ void startWifi()
   while (WiFi.status() != WL_CONNECTED)
   {
     vTaskDelay(1000 / portTICK_RATE_MS);
-    Serial.print(".");
+    debugDirector(".", false);
     i++;
     if (i > 5)
     {
       i = 0;
-      Serial.println("Couldn't Connect. Switching to AP mode");
+      debugDirector("Couldn't Connect. Switching to AP mode");
       break;
     }
   }
   if (WiFi.status() == WL_CONNECTED)
   {
-    Serial.println("");
-    Serial.printf("Connected to %s IP address: ", userConfig.getSsid());
-    Serial.println(WiFi.localIP());
+    debugDirector("Connected to " + String(userConfig.getSsid()) + " IP address: " + String(WiFi.localIP()));
   }
 
   // Couldn't connect to existing network, Create SoftAP
@@ -460,13 +456,10 @@ void startWifi()
     //WiFi.softAPConfig(local_ip, gateway, subnet);
     vTaskDelay(50);
     IPAddress myIP = WiFi.softAPIP();
-    Serial.print("AP IP address: ");
-    Serial.println(myIP);
+    debugDirector("AP IP address: " + String(myIP));
   }
   MDNS.begin("smartbike2k"); //<-----------Need to add variable to change this globally
-  Serial.print("Open http://");
-  Serial.print("smartbike2k");
-  Serial.println(".local/");
+  debugDirector("Open http://smartbike2k.local/");
 }
 
 
@@ -474,7 +467,7 @@ void startWifi()
 // old cert info:: CC AA 48 48 66 46 0E 91 53 2C 9C 7C 23 2A B1 74 4D 29 9D 33
 void FirmwareUpdate()
 {
-  Serial.println("Checking for newer firmware");
+  debugDirector("Checking for newer firmware");
   http.begin(URL_fw_Server + String("version.txt")); // check version URL
   delay(100);
   int httpCode = http.GET(); // get data from version file
@@ -482,15 +475,14 @@ void FirmwareUpdate()
   String payload;
   if (httpCode == HTTP_CODE_OK) // if version received
   {
-    Serial.println("Version info recieved:");
+    debugDirector("Version info recieved:");
     payload = http.getString(); // save received version
     payload.trim();
-    Serial.println(payload);
+    debugDirector(payload);
   }
   else
   {
-    Serial.print("error in downloading version file:");
-    Serial.println(httpCode);
+    debugDirector("error in downloading version file: " + String(httpCode));
   }
 
   http.end();
@@ -498,35 +490,35 @@ void FirmwareUpdate()
   {
     if (payload == FirmwareVer)
     {
-      Serial.println("Device already on latest firmware version");
+      debugDirector("Device already on latest firmware version");
     }
     else
     {
-      Serial.println("New firmware detected!");
-      Serial.printf("Upgrading from |%s| to |%s|", FirmwareVer.c_str(), payload.c_str());
+      debugDirector("New firmware detected!");
+      debugDirector("Upgrading from " + FirmwareVer + " to " + payload);
 
       WiFiClientSecure client;
       httpUpdate.setLedPin(LED_BUILTIN, LOW);
-      Serial.println("Updating FileSystem");
+      debugDirector("Updating FileSystem");
       t_httpUpdate_return ret = httpUpdate.updateSpiffs(client, URL_fw_spiffs);
       vTaskDelay(100/portTICK_PERIOD_MS);
       if (ret == HTTP_UPDATE_OK) {
-      Serial.println("Saving Config.txt");
+      debugDirector("Saving Config.txt");
       userConfig.saveToSPIFFS();
-      Serial.println("Updating Program");
+      debugDirector("Updating Program");
       ret = httpUpdate.update(client, URL_fw_Bin);
       switch (ret)
       {
       case HTTP_UPDATE_FAILED:
-        Serial.printf("HTTP_UPDATE_FAILD Error (%d): %s\n", httpUpdate.getLastError(), httpUpdate.getLastErrorString().c_str());
+        debugDirector("HTTP_UPDATE_FAILD Error " + String(httpUpdate.getLastError()) + " : " + httpUpdate.getLastErrorString());
         break;
 
       case HTTP_UPDATE_NO_UPDATES:
-        Serial.println("HTTP_UPDATE_NO_UPDATES");
+        debugDirector("HTTP_UPDATE_NO_UPDATES");
         break;
 
       case HTTP_UPDATE_OK:
-        Serial.println("HTTP_UPDATE_OK");
+        debugDirector("HTTP_UPDATE_OK");
         break;
       }
       }
