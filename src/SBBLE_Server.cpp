@@ -172,9 +172,9 @@ static void notifyCallback(
 
     if ((int)pData[0] == 35) //Don't let the hex to decimal confuse you. 
     { //last crank time is present in power Measurement data, lets extract it
-      crankRev[1] = crankRev[1];
-      crankRev[0] = bytes_to_u16(pData[6], pData[5]);
-      crankEventTime[1] = crankEventTime[1];
+      crankRev[1] = crankRev[0];
+      crankRev[0] = bytes_to_u16(pData[5], pData[4]);
+      crankEventTime[1] = crankEventTime[0];
       crankEventTime[0] = bytes_to_u16(pData[8], pData[7]);
       if(crankEventTime[0]+crankEventTime[1]>0){ //test for a possible divide by 0 error
       userConfig.setSimulatedCad((crankRev[0] - crankRev[1]) / (crankEventTime[0] - crankEventTime[1]));
@@ -182,6 +182,7 @@ static void notifyCallback(
       else {
         userConfig.setSimulatedCad(0);
       }
+      debugDirector("Crank Revolutions: " + String(crankRev[1] + " Crank Time: " + String(crankEventTime[1])));
       debugDirector("Calculated Cadence was: " + String(userConfig.getSimulatedCad()));
     }
   }
