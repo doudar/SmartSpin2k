@@ -62,7 +62,7 @@ BLECharacteristic *fitnessMachineFeature;
 // 0100000000000 - Accumulated Energy Present (bit 11)
 // 1000000000000 - Offset Compensation Indicator (bit 12)
 byte heartRateMeasurement[5] = {0b00000, 60, 0, 0, 0};
-byte cyclingPowerMeasurement[13] = {0b0000000100011, 0, 200, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0};                              // 3rd & 2nd byte is reported power
+byte cyclingPowerMeasurement[9] = {0b0000000100011, 0, 200, 0, 0, 0, 0, 0, 0};                              // 3rd & 2nd byte is reported power
 byte ftmsService[16] = {0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0};                                                 // 5th byte to enable the FTMS bike service
 byte ftmsFeature[32] = {0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0}; //3rd bit enables incline support
 byte ftmsControlPoint[8] = {0, 0, 0, 0, 0, 0, 0, 0};                                                                     //0x08 we need to return a value of 1 for any sucessful change
@@ -161,9 +161,9 @@ static void notifyCallback(
 
   if (pBLERemoteCharacteristic->getUUID().toString() == CYCLINGPOWERMEASUREMENT_UUID.toString())
   {
-    for (int i = 0; i < length; i++)
+    for (int i = 5; i < length; i++)
     {
-      cyclingPowerMeasurement[i] = (byte)pData[i];
+      cyclingPowerMeasurement[i] = pData[i];
       i++;
     }
 
@@ -174,17 +174,18 @@ static void notifyCallback(
     if ((int)pData[0] == 35) //Don't let the hex to decimal confuse you. 
     { //last crank time is present in power Measurement data, lets extract it
       crankRev[1] = crankRev[0];
-      crankRev[0] = bytes_to_int(pData[5], pData[4]);
+      crankRev[0] = bytes_to_int(pData[6], pData[5]);
       crankEventTime[1] = crankEventTime[0];
       crankEventTime[0] = bytes_to_int(pData[8], pData[7]);
-      if(crankEventTime[0]+crankEventTime[1]>0){ //test for a possible divide by 0 error
-      userConfig.setSimulatedCad((abs(crankRev[0] - crankRev[1])*1024) / abs(crankEventTime[0] - crankEventTime[1]));
+      cyclingPowerMeasurement[8] = pData[8]; //this should be getting done above, but it's getting blanked for some reason
+      if((crankRev[0]>crankRev[1])&(crankEventTime[0]+crankEventTime[1]>0)){ //test for a possible divide by 0 error
+      userConfig.setSimulatedCad(((abs(crankRev[0] - crankRev[1])*1024) / abs(crankEventTime[0] - crankEventTime[1]))*60);
       }
       else {
         userConfig.setSimulatedCad(0);
       }
-      debugDirector("Crank Revolutions: " + String(crankRev[1]) + " Crank Time: " + String(crankEventTime[1]));
-      debugDirector("Calculated Cadence was: " + String(userConfig.getSimulatedCad()));
+     // debugDirector("Crank Revolutions: " + String(crankRev[1]) + " Crank Time: " + String(crankEventTime[1]));
+     // debugDirector("Calculated Cadence was: " + String(userConfig.getSimulatedCad()));
     }
   }
 }
@@ -440,10 +441,10 @@ class MyCallbacks : public BLECharacteristicCallbacks
 
     if (rxValue.length() > 1)
     {
-      debugDirector("********* Received Data From Zwift!");
+      debugDirector("Received Data From Zwift: ", false);
       for (const auto &text : rxValue)
       { // Range-for!
-        debugDirector(String(text, HEX) + ", ", false);
+        debugDirector(String(text, HEX) + " ", false);
       }
       /* 17 means FTMS Incline Control Mode  (aka SIM mode)*/
 
@@ -466,7 +467,7 @@ class MyCallbacks : public BLECharacteristicCallbacks
 
       if ((int)rxValue[0] == 5)
       {
-        int targetWatts = bytes_to_s16(rxValue[2], rxValue[1]);
+        int targetWatts = bytes_to_int(rxValue[2], rxValue[1]);
         if (!userConfig.getERGMode())
         {
           userConfig.setERGMode(true);
@@ -537,7 +538,7 @@ void startBLEServer()
   //Create BLE Server
 
   heartRateMeasurementCharacteristic->setValue(heartRateMeasurement, 5);
-  cyclingPowerMeasurementCharacteristic->setValue(cyclingPowerMeasurement, 19);
+  cyclingPowerMeasurementCharacteristic->setValue(cyclingPowerMeasurement, 9);
   fitnessMachineFeature->setValue(ftmsFeature, 32);
   fitnessMachineControlPoint->setValue(ftmsControlPoint, 8);
   fitnessMachineControlPoint->setCallbacks(new MyCallbacks());
@@ -566,7 +567,6 @@ void BLENotify()
   {
     //update the BLE information on the server
     heartRateMeasurement[1] = userConfig.getSimulatedHr();
-    //cyclingPowerMeasurement[2] = userConfig.getSimulatedWatts();
     heartRateMeasurementCharacteristic->setValue(heartRateMeasurement, 5);
     heartRateMeasurementCharacteristic->notify();
     //vTaskDelay(10/portTICK_RATE_MS);
@@ -576,8 +576,13 @@ void BLENotify()
     remainder = userConfig.getSimulatedWatts() % 256;
     cyclingPowerMeasurement[2] = remainder;
     cyclingPowerMeasurement[3] = quotient;
-    cyclingPowerMeasurementCharacteristic->setValue(cyclingPowerMeasurement, 13);
-    debugDirector("CyclingPowerMeasurementCharacteristic notify value: " + String((char *)cyclingPowerMeasurement));
+    cyclingPowerMeasurementCharacteristic->setValue(cyclingPowerMeasurement, 9);
+    debugDirector("CPMC value sent: ");
+          for (const auto &text : cyclingPowerMeasurement)
+      { // Range-for!
+        debugDirector(String(text, HEX) + " ", false);
+      }
+    
     cyclingPowerMeasurementCharacteristic->notify();
     //vTaskDelay(10/portTICK_RATE_MS);
     fitnessMachineFeature->notify();
@@ -605,30 +610,27 @@ double computePID(double inp, double Setpoint)
 
 void computeERG(int currentWatts, int setPoint){
   float incline = userConfig.getIncline();
-  if(abs(currentWatts-setPoint)<20){ //Within Deadband calculation
+  //if(abs(currentWatts-setPoint)<20){ //Within Deadband calculation
+    //if(currentWatts>setPoint){
+    //  userConfig.setIncline(incline-((abs(currentWatts-setPoint)*(userConfig.getShiftStep()))/300));
+    //}
+    //if(currentWatts<setPoint){
+      userConfig.setIncline(incline-(currentWatts-setPoint));
+    //}
+    /*return;
+  }else if(abs(currentWatts-setPoint)<100){ //intermediate calculation
     if(currentWatts>setPoint){
-      userConfig.setIncline(incline-(abs(currentWatts-setPoint)*(userConfig.getShiftStep()/300)));
+      userConfig.setIncline(incline-((abs(currentWatts-setPoint)*(userConfig.getShiftStep()))/100));
     }
     if(currentWatts<setPoint){
-      userConfig.setIncline(incline+(abs(currentWatts-setPoint)*(userConfig.getShiftStep()/300)));
+      userConfig.setIncline(incline+((abs(currentWatts-setPoint)*(userConfig.getShiftStep()))/100));
     }
     return;
-  }
-   if(abs(currentWatts-setPoint)<100){ //intermediate calculation
-    if(currentWatts>setPoint){
-      userConfig.setIncline(incline-(abs(currentWatts-setPoint)*(userConfig.getShiftStep()/100)));
+  }else if(currentWatts>setPoint){
+      userConfig.setIncline(incline-((abs(currentWatts-setPoint)*(userConfig.getShiftStep()))/50)); //We assume one shift step ~ 50 watts
     }
     if(currentWatts<setPoint){
-      userConfig.setIncline(incline+(abs(currentWatts-setPoint)*(userConfig.getShiftStep()/100)));
+      userConfig.setIncline(incline+((abs(currentWatts-setPoint)*(userConfig.getShiftStep()))/50));
     }
-    return;
-  }
-   //Aggressive calculation
-    if(currentWatts>setPoint){
-      userConfig.setIncline(incline-(abs(currentWatts-setPoint)*(userConfig.getShiftStep()/50))); //We assume one shift step ~ 50 watts
-    }
-    if(currentWatts<setPoint){
-      userConfig.setIncline(incline+(abs(currentWatts-setPoint)*(userConfig.getShiftStep()/50)));
-    }
-    return;
+    return;*/
 }
