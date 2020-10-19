@@ -10,5 +10,6 @@ void startBleClient();
 double computePID(double, double);
 void computeERG(int, int);
 void setupBLE();
+void computeCSC();
 
 #endif

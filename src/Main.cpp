@@ -142,38 +142,25 @@ void loop()
 void moveStepper(void *pvParameters)
 {
   int acceleration = 500;
-  //int currentAcceleration = acceleration;
-  //bool accelerating = true;
+
   int targetPosition = 0;
 
   while (1)
   {
 
     targetPosition = shifterPosition + (userConfig.getIncline() * userConfig.getInclineMultiplier());
-    /*
-      if(abs(stepperPosition-targetPosition)>(shiftStep/2)){
-        if(currentAcceleration>maxStepperSpeed){
-          currentAcceleration = currentAcceleration - 200;
-        }
-      }else{
-        if(currentAcceleration < acceleration){
-          currentAcceleration = currentAcceleration + 200;
-        }
-      //debugDirector(abs(stepperPosition-targetPosition));
-    }
-*/
 
     if (stepperPosition == targetPosition)
     {
       vTaskDelay(300 / portTICK_PERIOD_MS);
       //digitalWrite(enablePin, HIGH); //disable output FETs so stepper can cool
       vTaskDelay(300 / portTICK_PERIOD_MS);
-      //currentAcceleration = acceleration;
+  
     }
     else
     {
-      digitalWrite(enablePin, LOW); //enable FETs for impending move
-      vTaskDelay(1);                //Need a small delay here for outputs to stabalize
+      digitalWrite(enablePin, LOW);
+      vTaskDelay(1);                
 
       if (stepperPosition < targetPosition)
       {

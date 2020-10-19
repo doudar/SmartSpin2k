@@ -7,8 +7,6 @@
 
 
 #include <Main.h>
-//#include <WiFi.h>
-//#include <WiFiMulti.h>
 #include <WebServer.h>
 #include <HTTP_Server_Basic.h>
 #include <HTTPClient.h>
@@ -151,7 +149,6 @@ String OTAServerIndex =
 WebServer server(80);
 void startHttpServer()
 {
-
   /********************************************Begin Handlers***********************************/
   server.on("/", handleIndexFile);
   server.on("/style.css", handleStyleCss);
@@ -215,7 +212,7 @@ void startHttpServer()
     {
       userConfig.setConnectedPowerMeter(server.arg("bleDropdown"));
     }
-    String response = "<!DOCTYPE html><html><body>Saving Settings....</body><script> setTimeout(\"location.href = 'http://smartbike2k.local/settings.html';\",2000);</script></html>";
+    String response = "<!DOCTYPE html><html><body>Saving Settings....</body><script> setTimeout(\"location.href = 'http://smartbike2k.local/settings.html';\",1000);</script></html>";
     server.send(200, "text/html", response);
     debugDirector("Config Updated From Web");
     userConfig.printFile();
@@ -230,7 +227,7 @@ void startHttpServer()
   server.on("/BLEScan", []() {
     debugDirector("Scanning for BLE Devices");
     BLEServerScan(false);
-    String response = "<!DOCTYPE html><html><body>Scanning for BLE Devices. Please wait 10 seconds.</body><script> setTimeout(\"location.href = 'http://smartbike2k.local/bluetoothscanner.html';\",10000);</script></html>";
+    String response = "<!DOCTYPE html><html><body>Scanning for BLE Devices. Please wait.</body><script> setTimeout(\"location.href = 'http://smartbike2k.local/bluetoothscanner.html';\",5000);</script></html>";
     server.send(200, "text/html", response);
   });
 
@@ -238,13 +235,13 @@ void startHttpServer()
     debugDirector("Setting Defaults from Web Request");
     userConfig.setDefaults();
     userConfig.saveToSPIFFS();
-    String response = "Loading Defaults....<script> setTimeout(\"location.href ='http://smartbike2k.local/settings.html';\",2000); </script>";
+    String response = "Loading Defaults....<script> setTimeout(\"location.href ='http://smartbike2k.local/settings.html';\",1000); </script>";
     server.send(200, "text/html", response);
   });
 
   server.on("/reboot.html", []() {
     debugDirector("Rebooting from Web Request");
-    String response = "Rebooting....<script> setTimeout(\"location.href = 'http://smartbike2k.local/index.html';\",2000); </script>";
+    String response = "Rebooting....<script> setTimeout(\"location.href = 'http://smartbike2k.local/index.html';\",1000); </script>";
     server.send(200, "text/html", response);
     ESP.restart();
   });
@@ -462,9 +459,6 @@ void startWifi()
   debugDirector("Open http://smartbike2k.local/");
 }
 
-
-//Github Folder Certificate 5f3f7ac2569f50a4667647c6a18ca007aaedbb8e
-// old cert info:: CC AA 48 48 66 46 0E 91 53 2C 9C 7C 23 2A B1 74 4D 29 9D 33
 void FirmwareUpdate()
 {
   debugDirector("Checking for newer firmware");
@@ -496,7 +490,6 @@ void FirmwareUpdate()
     {
       debugDirector("New firmware detected!");
       debugDirector("Upgrading from " + FirmwareVer + " to " + payload);
-
       WiFiClientSecure client;
       httpUpdate.setLedPin(LED_BUILTIN, LOW);
       debugDirector("Updating FileSystem");
