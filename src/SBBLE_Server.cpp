@@ -40,8 +40,8 @@ double lastError = 0;
 double input, output, setPoint;
 double cumError, rateError;
 //Cadence computation Variables
-long crankRev[2] = {0, 0};
-long crankEventTime[2] = {0, 0};
+float crankRev[2] = {0, 0};
+float crankEventTime[2] = {0, 0};
 
 BLECharacteristic *heartRateMeasurementCharacteristic;
 BLECharacteristic *cyclingPowerMeasurementCharacteristic;
@@ -106,6 +106,7 @@ The Last Crank Event Time value rolls over every 64 seconds.*/
 // This creates a macro that converts 8 bit LSB,MSB to Signed 16b
 #define bytes_to_s16(MSB, LSB) (((signed int)((signed char)MSB))) << 8 | (((signed char)LSB))
 #define bytes_to_u16(MSB, LSB) (((signed int)((signed char)MSB))) << 8 | (((unsigned char)LSB))
+#define bytes_to_int(MSB, LSB) (((int)((unsigned char)MSB))) << 8 | (((unsigned char)LSB))
 // Potentially, something like this is a better way of doing this ^^  data.getUint16(1, true)
 
 //Creating Server Callbacks
@@ -173,11 +174,11 @@ static void notifyCallback(
     if ((int)pData[0] == 35) //Don't let the hex to decimal confuse you. 
     { //last crank time is present in power Measurement data, lets extract it
       crankRev[1] = crankRev[0];
-      crankRev[0] = bytes_to_u16(pData[5], pData[4]);
+      crankRev[0] = bytes_to_int(pData[5], pData[4]);
       crankEventTime[1] = crankEventTime[0];
-      crankEventTime[0] = bytes_to_u16(pData[8], pData[7]);
+      crankEventTime[0] = bytes_to_int(pData[8], pData[7]);
       if(crankEventTime[0]+crankEventTime[1]>0){ //test for a possible divide by 0 error
-      userConfig.setSimulatedCad((crankRev[0] - crankRev[1]) / (crankEventTime[0] - crankEventTime[1]));
+      userConfig.setSimulatedCad((abs(crankRev[0] - crankRev[1])*1024) / abs(crankEventTime[0] - crankEventTime[1]));
       }
       else {
         userConfig.setSimulatedCad(0);
