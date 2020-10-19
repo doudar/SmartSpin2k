@@ -155,8 +155,9 @@ static void notifyCallback(
   {
     debugDirector(String(pData[i], HEX) + " ", false);
   }
-  debugDirector("<-- " + String(pBLERemoteCharacteristic->getUUID().toString().c_str()));
-
+  debugDirector("<-- " + String(pBLERemoteCharacteristic->getUUID().toString().c_str()),false);
+ debugDirector("");
+ 
   if (pBLERemoteCharacteristic->getUUID().toString() == HEARTCHARACTERISTIC_UUID.toString())
   {
     userConfig.setSimulatedHr((int)pData[1]);
