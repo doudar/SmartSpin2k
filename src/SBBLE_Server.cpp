@@ -42,7 +42,9 @@ double cumError, rateError;
 //Cadence computation Variables
 float crankRev[2] = {0, 0};
 float crankEventTime[2] = {0, 0};
-bool badReading = false;
+bool goodReading = false;
+//int cooldown = 0;
+//int cooldownTimer = 10;
 //Simulated Cadence Variables
 int cscCumulativeCrankRev = 0;
 int cscLastCrankEvtTime = 0;
@@ -156,8 +158,8 @@ static void notifyCallback(
     debugDirector(String(pData[i], HEX) + " ", false);
   }
   debugDirector("<-- " + String(pBLERemoteCharacteristic->getUUID().toString().c_str()),false);
- debugDirector("");
  
+
   if (pBLERemoteCharacteristic->getUUID().toString() == HEARTCHARACTERISTIC_UUID.toString())
   {
     userConfig.setSimulatedHr((int)pData[1]);
@@ -181,22 +183,24 @@ static void notifyCallback(
       crankRev[0] = bytes_to_int(pData[6], pData[5]);
       crankEventTime[1] = crankEventTime[0];
       crankEventTime[0] = bytes_to_int(pData[8], pData[7]);
-      //cyclingPowerMeasurement[8] = pData[8]; //this should be getting done above, but it's getting blanked for some reason
+     
       if ((crankRev[0] > crankRev[1]) & (crankEventTime[0] + crankEventTime[1] > 0))
-      { //test for a possible divide by 0 error
+      { 
         userConfig.setSimulatedCad(((abs(crankRev[0] - crankRev[1]) * 1024) / abs(crankEventTime[0] - crankEventTime[1])) * 60);
-        badReading = false;
+        goodReading = true;
       }
       else
       {
-        if (!badReading) //Occasionally we get a bad reading due to rollover and we want to skip those before we set to 0
+        if (!goodReading) //Occasionally we get a bad reading due to rollover and we want to skip those before we set to 0
         {
           userConfig.setSimulatedCad(0);
         }
-        badReading = true;
+        goodReading = false;
       }
+
       // debugDirector("Crank Revolutions: " + String(crankRev[1]) + " Crank Time: " + String(crankEventTime[1]));
-      // debugDirector("Calculated Cadence was: " + String(userConfig.getSimulatedCad()));
+      debugDirector(" Cadence: " + String(userConfig.getSimulatedCad()),false);
+      debugDirector("");
     }
   }
 }
@@ -374,7 +378,7 @@ void bleClient()
   // with the current time since boot.
   if (connected)
   {
-    debugDirector("Recieved data from server:");
+    //debugDirector("Recieved data from server:");
     //debugDirector(pRemoteCharacteristic->getUUID().toString().c_str());
     //debugDirector(pRemoteCharacteristic->getValue().c_str());
   }
@@ -602,27 +606,22 @@ void BLENotify()
 
 void computeERG(int currentWatts, int setPoint)
 {
+  //cooldownTimer--;
+
   float incline = userConfig.getIncline();
-  if ((abs(currentWatts - setPoint) < 20) & (userConfig.getSimulatedCad() > 20))
+  if (userConfig.getSimulatedCad() > 20)
   {
-    userConfig.setIncline(incline - ((currentWatts - setPoint) * (userConfig.getShiftStep() / 1000))); //Within Deadband calculation, make very small changes.
-    return;
+    userConfig.setIncline(incline - ((currentWatts - setPoint) * (userConfig.getShiftStep() / 600))); //Within Deadband calculation, make very small changes.
   }
-  else if ((abs(currentWatts - setPoint) < 100) & (userConfig.getSimulatedCad() > 20))
+  if ((abs(currentWatts - setPoint) > 100) & (userConfig.getSimulatedCad() > 20))
   {
-    userConfig.setIncline(incline - ((currentWatts - setPoint) * (userConfig.getShiftStep() / 500))); //intermediate calculation. Most changes should happen here.
-    return;
+    userConfig.setIncline(incline - ((currentWatts - setPoint) * (userConfig.getShiftStep() / 1200))); //intermediate calculation. Most changes should happen here.
   }
-  else if (userConfig.getSimulatedCad() > 20)
-  {
-    userConfig.setIncline(incline - ((currentWatts - setPoint) * (userConfig.getShiftStep() / 50))); //Try to one shot it and assume one shift step ~ 50 watts.
-    return;
-  }
-  else if (userConfig.getSimulatedCad() <= 20) //user stopped pedaling. Set 0 for easy pedaling start.
-  {
-    userConfig.setIncline(0);
-    return;
-  }
+  //if ((userConfig.getSimulatedCad() > 20) & (cooldownTimer<0) & (abs(currentWatts - setPoint) > 200))
+  //{
+   // userConfig.setIncline(incline - ((currentWatts - setPoint) * (userConfig.getShiftStep() / 100))); //Try to one shot it.
+    //cooldownTimer = cooldown;
+  //}
 }
 
 void computeCSC() //What was SIG smoking when they came up with the Cycling Speed and Cadence Characteristic?
