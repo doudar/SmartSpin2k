@@ -184,14 +184,14 @@ static void notifyCallback(
       crankEventTime[1] = crankEventTime[0];
       crankEventTime[0] = bytes_to_int(pData[8], pData[7]);
      
-      if ((crankRev[0] > crankRev[1]) & (crankEventTime[0] + crankEventTime[1] > 0))
+      if ((crankRev[0] > crankRev[1]) && (crankEventTime[0] + crankEventTime[1] > 0))
       { 
         userConfig.setSimulatedCad(((abs(crankRev[0] - crankRev[1]) * 1024) / abs(crankEventTime[0] - crankEventTime[1])) * 60);
         goodReading = true;
       }
       else
       {
-        if (!goodReading) //Occasionally we get a bad reading due to rollover and we want to skip those before we set to 0
+        if (!goodReading) //Require two consecutive readings before setting 0
         {
           userConfig.setSimulatedCad(0);
         }
@@ -609,19 +609,18 @@ void computeERG(int currentWatts, int setPoint)
   //cooldownTimer--;
 
   float incline = userConfig.getIncline();
-  if (userConfig.getSimulatedCad() > 20)
+  int cad = userConfig.getSimulatedCad();
+  int newIncline;
+
+  if (cad > 20)
   {
-    userConfig.setIncline(incline - ((currentWatts - setPoint) * (userConfig.getShiftStep() / 600))); //Within Deadband calculation, make very small changes.
-  }
-  if ((abs(currentWatts - setPoint) > 100) & (userConfig.getSimulatedCad() > 20))
+    newIncline = (incline - ((currentWatts - setPoint) * 1)); //Within Deadband calculation, make very small changes.
+  if ((abs(currentWatts - setPoint) > 100) && (currentWatts<300))
   {
-    userConfig.setIncline(incline - ((currentWatts - setPoint) * (userConfig.getShiftStep() / 1200))); //intermediate calculation. Most changes should happen here.
+    newIncline = (newIncline - ((currentWatts - setPoint) * .5)); //intermediate calculation. Most changes should happen here.
   }
-  //if ((userConfig.getSimulatedCad() > 20) & (cooldownTimer<0) & (abs(currentWatts - setPoint) > 200))
-  //{
-   // userConfig.setIncline(incline - ((currentWatts - setPoint) * (userConfig.getShiftStep() / 100))); //Try to one shot it.
-    //cooldownTimer = cooldown;
-  //}
+}
+  userConfig.setIncline(newIncline);
 }
 
 void computeCSC() //What was SIG smoking when they came up with the Cycling Speed and Cadence Characteristic?
