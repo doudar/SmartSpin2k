@@ -610,17 +610,18 @@ void computeERG(int currentWatts, int setPoint)
 
   float incline = userConfig.getIncline();
   int cad = userConfig.getSimulatedCad();
-  int newIncline;
+  int newIncline = incline;
 
   if (cad > 20)
   {
     newIncline = (incline - ((currentWatts - setPoint) * 1)); //Within Deadband calculation, make very small changes.
   if ((abs(currentWatts - setPoint) > 100) && (currentWatts<300))
   {
-    newIncline = (newIncline - ((currentWatts - setPoint) * .5)); //intermediate calculation. Most changes should happen here.
+    newIncline = (newIncline - ((currentWatts - setPoint) * .5));
   }
-}
   userConfig.setIncline(newIncline);
+}
+  
 }
 
 void computeCSC() //What was SIG smoking when they came up with the Cycling Speed and Cadence Characteristic?
