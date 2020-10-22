@@ -69,8 +69,9 @@ BLECharacteristic *fitnessMachineFeature;
 // 1000000000000 - Offset Compensation Indicator (bit 12)
 byte heartRateMeasurement[5] = {0b00000, 60, 0, 0, 0};
 byte cyclingPowerMeasurement[9] = {0b0000000100011, 0, 200, 0, 0, 0, 0, 0, 0};                                           // 3rd & 2nd byte is reported power
-byte ftmsService[16] = {0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0};                                                 // 5th byte to enable the FTMS bike service
-byte ftmsFeature[32] = {0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0}; //3rd bit enables incline support
+byte ftmsService[16] = {0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0};            
+//const uint32_t ftmsFeature = 0b00000000000000000100000010000010; // flags for Fitness Machine Features Field - cadence, resistance level and inclination level                                     // 5th byte to enable the FTMS bike service
+byte ftmsFeature[32] = {0b00000000000000000000000001100100, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0}; //3rd bit enables incline support
 byte ftmsControlPoint[8] = {0, 0, 0, 0, 0, 0, 0, 0};                                                                     //0x08 we need to return a value of 1 for any sucessful change
 byte ftmsMachineStatus[8] = {0, 0, 0, 0, 0, 0, 0, 0};                                                                    //server needs to expose this. Not certain what it does.
 
@@ -82,6 +83,8 @@ byte ftmsMachineStatus[8] = {0, 0, 0, 0, 0, 0, 0, 0};                           
 
 #define CYCLINGPOWERSERVICE_UUID BLEUUID((uint16_t)0x1818)
 #define CYCLINGPOWERMEASUREMENT_UUID BLEUUID((uint16_t)0x2A63)
+#define CYCLINGPOWERFEATURE_UUID BLEUUID((uint16_t)0x2A65)
+#define SENSORLOCATION_UUID BLEUUID((uint16_t)0x2A5D)
 
 /*INFO FOR CALCULATING CADENCE FROM THE POWER SERVICE
 
@@ -108,6 +111,8 @@ The Last Crank Event Time value rolls over every 64 seconds.*/
 #define FITNESSMACHINEFEATURE_UUID BLEUUID((uint16_t)0x2ACC)
 #define FITNESSMACHINECONTROLPOINT_UUID BLEUUID((uint16_t)0x2AD9)
 #define FITNESSMACHINESTATUS_UUID BLEUUID((uint16_t)0x2ADA)
+#define FITNESSMACHINEINDOORBIKEDATA_UUID BLEUUID((uint16_t)0x2AD2)
+#define FITNESSMACHINERESISTANCELEVELRANGE_UUID BLEUUID((uint16_t)0x2AD6)
 
 // This creates a macro that converts 8 bit LSB,MSB to Signed 16b
 #define bytes_to_s16(MSB, LSB) (((signed int)((signed char)MSB))) << 8 | (((signed char)LSB))
@@ -157,8 +162,7 @@ static void notifyCallback(
   {
     debugDirector(String(pData[i], HEX) + " ", false);
   }
-  debugDirector("<-- " + String(pBLERemoteCharacteristic->getUUID().toString().c_str()),false);
- 
+  debugDirector("<-- " + String(pBLERemoteCharacteristic->getUUID().toString().c_str()), false);
 
   if (pBLERemoteCharacteristic->getUUID().toString() == HEARTCHARACTERISTIC_UUID.toString())
   {
@@ -183,9 +187,9 @@ static void notifyCallback(
       crankRev[0] = bytes_to_int(pData[6], pData[5]);
       crankEventTime[1] = crankEventTime[0];
       crankEventTime[0] = bytes_to_int(pData[8], pData[7]);
-     
+
       if ((crankRev[0] > crankRev[1]) && (crankEventTime[0] + crankEventTime[1] > 0))
-      { 
+      {
         userConfig.setSimulatedCad(((abs(crankRev[0] - crankRev[1]) * 1024) / abs(crankEventTime[0] - crankEventTime[1])) * 60);
         goodReading = true;
       }
@@ -199,7 +203,7 @@ static void notifyCallback(
       }
 
       // debugDirector("Crank Revolutions: " + String(crankRev[1]) + " Crank Time: " + String(crankEventTime[1]));
-      debugDirector(" Cadence: " + String(userConfig.getSimulatedCad()),false);
+      debugDirector(" Cadence: " + String(userConfig.getSimulatedCad()), false);
       debugDirector("");
     }
   }
@@ -524,13 +528,21 @@ void startBLEServer()
       CYCLINGPOWERMEASUREMENT_UUID,
       NIMBLE_PROPERTY::READ |
           NIMBLE_PROPERTY::NOTIFY);
+  BLECharacteristic *cyclingPowerFeatureCharacteristic = pPowerMonitor->createCharacteristic(
+      CYCLINGPOWERFEATURE_UUID,
+      NIMBLE_PROPERTY::READ);
+  BLECharacteristic *sensorLocationCharacteristic = pPowerMonitor->createCharacteristic(
+      SENSORLOCATION_UUID,
+      NIMBLE_PROPERTY::READ);
 
   //Fitness Machine service setup
   BLEService *pFitnessMachineService = pServer->createService(FITNESSMACHINESERVICE_UUID);
   fitnessMachineFeature = pFitnessMachineService->createCharacteristic(
       FITNESSMACHINEFEATURE_UUID,
       NIMBLE_PROPERTY::READ |
-          NIMBLE_PROPERTY::NOTIFY);
+          NIMBLE_PROPERTY::WRITE |
+          NIMBLE_PROPERTY::NOTIFY |
+          NIMBLE_PROPERTY::INDICATE);
 
   BLECharacteristic *fitnessMachineControlPoint = pFitnessMachineService->createCharacteristic(
       FITNESSMACHINECONTROLPOINT_UUID,
@@ -543,6 +555,10 @@ void startBLEServer()
       NIMBLE_PROPERTY::READ |
           NIMBLE_PROPERTY::NOTIFY);
 
+            BLECharacteristic *fitnessMachineIndoorBikeData = pFitnessMachineService->createCharacteristic(
+      FITNESSMACHINEINDOORBIKEDATA_UUID,
+      NIMBLE_PROPERTY::READ );
+
   pServer->setCallbacks(new MyServerCallbacks());
   //Creating Characteristics
 
@@ -552,12 +568,19 @@ void startBLEServer()
   //Create BLE Server
 
   heartRateMeasurementCharacteristic->setValue(heartRateMeasurement, 5);
+
   cyclingPowerMeasurementCharacteristic->setValue(cyclingPowerMeasurement, 9);
+  uint32_t cpfeature = (1 << 3); // Bit 3 push 1 - meaning crank rev present
+  cyclingPowerFeatureCharacteristic->setValue(cpfeature);
+  uint8_t sensorLocation = 5; //5 == left crank
+  sensorLocationCharacteristic->setValue(&sensorLocation, 1);
+
   fitnessMachineFeature->setValue(ftmsFeature, 32);
   fitnessMachineControlPoint->setValue(ftmsControlPoint, 8);
-  fitnessMachineControlPoint->setCallbacks(new MyCallbacks());
-
+  fitnessMachineIndoorBikeData->setValue(0); //Maybe enable this later. Now just exposing the char and basically saying get it from the power service. 
   fitnessMachineStatus->setValue(ftmsMachineStatus, 8);
+
+  fitnessMachineControlPoint->setCallbacks(new MyCallbacks());
 
   pHeartService->start();          //heart rate service
   pPowerMonitor->start();          //Power Meter Service
@@ -615,13 +638,12 @@ void computeERG(int currentWatts, int setPoint)
   if (cad > 20)
   {
     newIncline = (incline - ((currentWatts - setPoint) * 1)); //Within Deadband calculation, make very small changes.
-  if ((abs(currentWatts - setPoint) > 100) && (currentWatts<300))
-  {
-    newIncline = (newIncline - ((currentWatts - setPoint) * .5));
+    if ((abs(currentWatts - setPoint) > 100) && (currentWatts < 300))
+    {
+      newIncline = (newIncline - ((currentWatts - setPoint) * .5));
+    }
+    userConfig.setIncline(newIncline);
   }
-  userConfig.setIncline(newIncline);
-}
-  
 }
 
 void computeCSC() //What was SIG smoking when they came up with the Cycling Speed and Cadence Characteristic?

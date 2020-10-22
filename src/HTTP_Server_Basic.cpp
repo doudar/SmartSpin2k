@@ -233,6 +233,7 @@ void startHttpServer()
 
   server.on("/load_defaults.html", []() {
     debugDirector("Setting Defaults from Web Request");
+    SPIFFS.format();
     userConfig.setDefaults();
     userConfig.saveToSPIFFS();
     String response = "Loading Defaults....<script> setTimeout(\"location.href ='http://smartbike2k.local/settings.html';\",1000); </script>";
