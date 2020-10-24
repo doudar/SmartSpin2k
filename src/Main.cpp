@@ -9,7 +9,7 @@
 #include <Arduino.h>
 #include <SPIFFS.h>
 
-const String FirmwareVer = {"0.0.10.16"};
+const String FirmwareVer = {"0.0.10.17"};
 String debugToHTML = "<br>Current Firmware Version: " + FirmwareVer;
 
 bool lastDir = true; //Stepper Last Direction
