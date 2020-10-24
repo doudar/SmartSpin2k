@@ -49,9 +49,11 @@ bool goodReading = false;
 int cscCumulativeCrankRev = 0;
 int cscLastCrankEvtTime = 0;
 
+//BLEAdvertisementData advertisementData = BLEAdvertisementData();
 BLECharacteristic *heartRateMeasurementCharacteristic;
 BLECharacteristic *cyclingPowerMeasurementCharacteristic;
 BLECharacteristic *fitnessMachineFeature;
+BLECharacteristic *fitnessMachineIndoorBikeData;
 
 /********************************Bit field Flag Example***********************************/
 // 0000000000001 - 1   - 0x001 - Pedal Power Balance Present
@@ -67,13 +69,26 @@ BLECharacteristic *fitnessMachineFeature;
 // 0010000000000 - Bottom Dead Spot Angle Present (bit 10)
 // 0100000000000 - Accumulated Energy Present (bit 11)
 // 1000000000000 - Offset Compensation Indicator (bit 12)
+// 98765432109876543210 - bit placement helper :)
+// 00001110000000001100
+// 00000101000010000110
+// 00000000100001010100
+//               100000
 byte heartRateMeasurement[5] = {0b00000, 60, 0, 0, 0};
-byte cyclingPowerMeasurement[9] = {0b0000000100011, 0, 200, 0, 0, 0, 0, 0, 0};                                           // 3rd & 2nd byte is reported power
-byte ftmsService[16] = {0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0};            
-//const uint32_t ftmsFeature = 0b00000000000000000100000010000010; // flags for Fitness Machine Features Field - cadence, resistance level and inclination level                                     // 5th byte to enable the FTMS bike service
-byte ftmsFeature[32] = {0b00000000000000000000000001100100, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0}; //3rd bit enables incline support
-byte ftmsControlPoint[8] = {0, 0, 0, 0, 0, 0, 0, 0};                                                                     //0x08 we need to return a value of 1 for any sucessful change
-byte ftmsMachineStatus[8] = {0, 0, 0, 0, 0, 0, 0, 0};                                                                    //server needs to expose this. Not certain what it does.
+byte cyclingPowerMeasurement[9] = {0b0000000100011, 0, 200, 0, 0, 0, 0, 0, 0};
+byte cpsLocation[1] = {0b000};    //sensor location 5 == left crank
+byte cpFeature[1] = {0b00100000}; //crank information present                                         // 3rd & 2nd byte is reported power
+
+byte ftmsService[6] = {0x00, 0x00, 0x00, 0b01, 0b0100000, 0x00};
+//const uint32_t ftmsFeature = 0000100010000000010; // flags for Fitness Machine Features Field - cadence, resistance level and inclination level                                     // 5th byte to enable the FTMS bike service
+//byte ftmsFeature[32] = {0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0}; //3rd bit enables incline support
+byte ftmsControlPoint[8] = {0, 0, 0, 0, 0, 0, 0, 0}; //0x08 we need to return a value of 1 for any sucessful change
+byte ftmsMachineStatus[8] = {0, 0, 0, 0, 0, 0, 0, 0};
+
+uint8_t ftmsFeature[8] = {0x86, 0x50, 0x00, 0x00, 0x0C, 0xE0, 0x00, 0x00};                            //101000010000110 1110000000001100
+uint8_t ftmsIndoorBikeData[13] = {0x54, 0x08, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0}; //00000000100001010100 ISpeed, ICAD, TDistance, IPower, ETime
+uint8_t ftmsResistanceLevelRange[6] = {0x00, 0x00, 0x3A, 0x98, 0xC5, 0x68};
+uint8_t ftmsPowerRange[6] = {0x00, 0x00, 0xA0, 0x0F, 0x01, 0x00};
 
 #define HEARTSERVICE_UUID BLEUUID((uint16_t)0x180D)
 #define HEARTCHARACTERISTIC_UUID BLEUUID((uint16_t)0x2A37)
@@ -113,6 +128,7 @@ The Last Crank Event Time value rolls over every 64 seconds.*/
 #define FITNESSMACHINESTATUS_UUID BLEUUID((uint16_t)0x2ADA)
 #define FITNESSMACHINEINDOORBIKEDATA_UUID BLEUUID((uint16_t)0x2AD2)
 #define FITNESSMACHINERESISTANCELEVELRANGE_UUID BLEUUID((uint16_t)0x2AD6)
+#define FITNESSMACHINEPOWERRANGE_UUID BLEUUID((uint16_t)0x2AD8)
 
 // This creates a macro that converts 8 bit LSB,MSB to Signed 16b
 #define bytes_to_s16(MSB, LSB) (((signed int)((signed char)MSB))) << 8 | (((signed char)LSB))
@@ -524,19 +540,23 @@ void startBLEServer()
 
   //Power Meter MONITOR SERVICE SETUP
   BLEService *pPowerMonitor = pServer->createService(CYCLINGPOWERSERVICE_UUID);
+
   cyclingPowerMeasurementCharacteristic = pPowerMonitor->createCharacteristic(
       CYCLINGPOWERMEASUREMENT_UUID,
       NIMBLE_PROPERTY::READ |
           NIMBLE_PROPERTY::NOTIFY);
+
   BLECharacteristic *cyclingPowerFeatureCharacteristic = pPowerMonitor->createCharacteristic(
       CYCLINGPOWERFEATURE_UUID,
       NIMBLE_PROPERTY::READ);
+
   BLECharacteristic *sensorLocationCharacteristic = pPowerMonitor->createCharacteristic(
       SENSORLOCATION_UUID,
       NIMBLE_PROPERTY::READ);
 
   //Fitness Machine service setup
   BLEService *pFitnessMachineService = pServer->createService(FITNESSMACHINESERVICE_UUID);
+
   fitnessMachineFeature = pFitnessMachineService->createCharacteristic(
       FITNESSMACHINEFEATURE_UUID,
       NIMBLE_PROPERTY::READ |
@@ -553,11 +573,21 @@ void startBLEServer()
   BLECharacteristic *fitnessMachineStatus = pFitnessMachineService->createCharacteristic(
       FITNESSMACHINESTATUS_UUID,
       NIMBLE_PROPERTY::READ |
+          NIMBLE_PROPERTY::WRITE |
           NIMBLE_PROPERTY::NOTIFY);
 
-            BLECharacteristic *fitnessMachineIndoorBikeData = pFitnessMachineService->createCharacteristic(
+  fitnessMachineIndoorBikeData = pFitnessMachineService->createCharacteristic(
       FITNESSMACHINEINDOORBIKEDATA_UUID,
-      NIMBLE_PROPERTY::READ );
+      NIMBLE_PROPERTY::READ |
+          NIMBLE_PROPERTY::NOTIFY);
+
+  BLECharacteristic *fitnessMachineResistanceLevelRange = pFitnessMachineService->createCharacteristic(
+      FITNESSMACHINERESISTANCELEVELRANGE_UUID,
+      NIMBLE_PROPERTY::READ);
+
+  BLECharacteristic *fitnessMachinePowerRange = pFitnessMachineService->createCharacteristic(
+      FITNESSMACHINEPOWERRANGE_UUID,
+      NIMBLE_PROPERTY::READ);
 
   pServer->setCallbacks(new MyServerCallbacks());
   //Creating Characteristics
@@ -570,15 +600,15 @@ void startBLEServer()
   heartRateMeasurementCharacteristic->setValue(heartRateMeasurement, 5);
 
   cyclingPowerMeasurementCharacteristic->setValue(cyclingPowerMeasurement, 9);
-  uint32_t cpfeature = (1 << 3); // Bit 3 push 1 - meaning crank rev present
-  cyclingPowerFeatureCharacteristic->setValue(cpfeature);
-  uint8_t sensorLocation = 5; //5 == left crank
-  sensorLocationCharacteristic->setValue(&sensorLocation, 1);
+  cyclingPowerFeatureCharacteristic->setValue(cpFeature, 1);
+  sensorLocationCharacteristic->setValue(cpsLocation, 1);
 
-  fitnessMachineFeature->setValue(ftmsFeature, 32);
+  fitnessMachineFeature->setValue(ftmsFeature, 8);
   fitnessMachineControlPoint->setValue(ftmsControlPoint, 8);
-  fitnessMachineIndoorBikeData->setValue(0); //Maybe enable this later. Now just exposing the char and basically saying get it from the power service. 
+  fitnessMachineIndoorBikeData->setValue(ftmsIndoorBikeData, 13); //Maybe enable this later. Now just exposing the char and basically saying get it from the power service.
   fitnessMachineStatus->setValue(ftmsMachineStatus, 8);
+  fitnessMachineResistanceLevelRange->setValue(ftmsResistanceLevelRange, 6);
+  fitnessMachinePowerRange->setValue(ftmsPowerRange,6);
 
   fitnessMachineControlPoint->setCallbacks(new MyCallbacks());
 
@@ -591,7 +621,6 @@ void startBLEServer()
   pAdvertising->addServiceUUID(CYCLINGPOWERSERVICE_UUID);
   pAdvertising->addServiceUUID(FITNESSMACHINESERVICE_UUID);
   pAdvertising->setScanResponse(true);
-
   BLEDevice::startAdvertising();
 
   debugDirector("Bluetooth Characteristic defined!");
@@ -614,6 +643,7 @@ void BLENotify()
     cyclingPowerMeasurement[2] = remainder;
     cyclingPowerMeasurement[3] = quotient;
     computeCSC();
+    updateIndoorBikeDataChar();
     cyclingPowerMeasurementCharacteristic->setValue(cyclingPowerMeasurement, 9);
     for (const auto &text : cyclingPowerMeasurement)
     { // Range-for!
@@ -624,6 +654,7 @@ void BLENotify()
 
     cyclingPowerMeasurementCharacteristic->notify();
     fitnessMachineFeature->notify();
+    fitnessMachineIndoorBikeData->notify();
   }
 }
 
@@ -634,16 +665,35 @@ void computeERG(int currentWatts, int setPoint)
   float incline = userConfig.getIncline();
   int cad = userConfig.getSimulatedCad();
   int newIncline = incline;
+  int amountToChangeIncline = 0;
 
   if (cad > 20)
   {
-    newIncline = (incline - ((currentWatts - setPoint) * 1)); //Within Deadband calculation, make very small changes.
-    if ((abs(currentWatts - setPoint) > 100) && (currentWatts < 300))
+    if (abs(currentWatts - setPoint) < 50)
     {
-      newIncline = (newIncline - ((currentWatts - setPoint) * .5));
+      amountToChangeIncline = (currentWatts - setPoint) * .5;
     }
-    userConfig.setIncline(newIncline);
+    if (abs(currentWatts - setPoint) > 50)
+    {
+      amountToChangeIncline = (currentWatts - setPoint) * 1;
+    }
+    amountToChangeIncline = amountToChangeIncline / (currentWatts / 100);
   }
+
+  if (abs(amountToChangeIncline) > 2000)
+  {
+    if (amountToChangeIncline > 0)
+    {
+      amountToChangeIncline = 200;
+    }
+    if (amountToChangeIncline < 0)
+    {
+      amountToChangeIncline = -200;
+    }
+  }
+
+  newIncline = incline - amountToChangeIncline; //  }
+  userConfig.setIncline(newIncline);
 }
 
 void computeCSC() //What was SIG smoking when they came up with the Cycling Speed and Cadence Characteristic?
@@ -663,4 +713,25 @@ void computeCSC() //What was SIG smoking when they came up with the Cycling Spee
     cyclingPowerMeasurement[7] = remainder;
     cyclingPowerMeasurement[8] = quotient;
   }
+}
+
+void updateIndoorBikeDataChar()
+{
+  int cad = userConfig.getSimulatedCad();
+  int watts = userConfig.getSimulatedWatts();
+  float gearRatio = 1;
+  int speed = ((cad * 2.75 * 2.08 * 60 * gearRatio) / 10);
+  ftmsIndoorBikeData[2] = (uint8_t)(speed & 0xff);
+  ftmsIndoorBikeData[3] = (uint8_t)(speed >> 8);
+  ftmsIndoorBikeData[4] = (uint8_t)((cad * 2) & 0xff);
+  ftmsIndoorBikeData[5] = (uint8_t)((cad * 2) >> 8); // cadence value
+  ftmsIndoorBikeData[6] = 0;                         //distance
+  ftmsIndoorBikeData[7] = 0;                         //distance
+  ftmsIndoorBikeData[8] = 0;                         //distance
+  ftmsIndoorBikeData[9] = (uint8_t)((watts)&0xff);
+  ftmsIndoorBikeData[10] = (uint8_t)((watts) >> 8); // power value, constrained to avoid negative values, although the specification allows for a sint16
+  ftmsIndoorBikeData[11] = 0;                       // ET
+  ftmsIndoorBikeData[12] = 0;                       // ET
+  fitnessMachineIndoorBikeData->setValue(ftmsIndoorBikeData, 13);
+  fitnessMachineIndoorBikeData->notify();
 }

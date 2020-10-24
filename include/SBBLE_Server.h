@@ -11,5 +11,6 @@ double computePID(double, double);
 void computeERG(int, int);
 void setupBLE();
 void computeCSC();
+void updateIndoorBikeDataChar();
 
 #endif
