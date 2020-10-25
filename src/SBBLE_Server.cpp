@@ -677,7 +677,7 @@ void computeERG(int currentWatts, int setPoint)
     {
       amountToChangeIncline = (currentWatts - setPoint) * 1;
     }
-    amountToChangeIncline = amountToChangeIncline / (currentWatts / 100);
+    amountToChangeIncline = amountToChangeIncline / ((currentWatts / 100)+1);
   }
 
   if (abs(amountToChangeIncline) > 2000)
