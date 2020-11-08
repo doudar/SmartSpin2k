@@ -725,13 +725,13 @@ void updateIndoorBikeDataChar()
   ftmsIndoorBikeData[3] = (uint8_t)(speed >> 8);
   ftmsIndoorBikeData[4] = (uint8_t)((cad * 2) & 0xff);
   ftmsIndoorBikeData[5] = (uint8_t)((cad * 2) >> 8); // cadence value
-  ftmsIndoorBikeData[6] = 0;                         //distance
-  ftmsIndoorBikeData[7] = 0;                         //distance
-  ftmsIndoorBikeData[8] = 0;                         //distance
+  ftmsIndoorBikeData[6] = 0;                         //distance <
+  ftmsIndoorBikeData[7] = 0;                         //distance <-- uint24 with 1m resolution
+  ftmsIndoorBikeData[8] = 0;                         //distance <
   ftmsIndoorBikeData[9] = (uint8_t)((watts)&0xff);
   ftmsIndoorBikeData[10] = (uint8_t)((watts) >> 8); // power value, constrained to avoid negative values, although the specification allows for a sint16
-  ftmsIndoorBikeData[11] = 0;                       // ET
-  ftmsIndoorBikeData[12] = 0;                       // ET
+  ftmsIndoorBikeData[11] = 0;                       // Elapsed Time uint16 in seconds
+  ftmsIndoorBikeData[12] = 0;                       // Elapsed Time
   fitnessMachineIndoorBikeData->setValue(ftmsIndoorBikeData, 13);
   fitnessMachineIndoorBikeData->notify();
 }
