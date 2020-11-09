@@ -70,7 +70,17 @@ The hardware mentioned above mounts into a 3d printed enclosure which then easil
 
 The Finished assembly looks somthing like this prototype. 
 
-<img src="Pictures/AssembledSideView.jpg" alt="Assembled SideView" style="height: 200px; width: 100"/>
+<img src="Pictures/on_bench_with_shifters.jpg" alt="On bench with shifters" style="height: 200px; width: 100"/>
+
+Here it is mounted on a bike (ignore the piece of wood, it's no longer needed with a different hard attachment strap). 
+
+<img src="Pictures/Closeup.jpg" alt="Closeup.jpg" style="height: 200px; width: 100"/>
+
+Installed on a random Schwinn bike at the Gym:
+<img src="Pictures/Schwinn.jpg" alt="Installed On Schwinn" style="height: 200px; width: 100"/>
+
+...And here it is on a cheap magnetic HMC trainer off Amazon:
+<img src="Pictures/HMC.jpg" alt="Installed on HMC" style="height: 200px; width: 100"/>
 
 Here is the earliest prototype mounted on a spin bike. (Cardboard wrapped in ducktape enclosure :) ) 
 
