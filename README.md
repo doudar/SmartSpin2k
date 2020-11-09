@@ -13,11 +13,14 @@ The power meter pedals send cycling power and cadence to Zwift (or any other cyc
 
 ### Hardware:
 
+You'll need the quantity listed below of each item excep the driver board. You can use either the A4988 or the TMC2225 but the TMC2225 is much more cooler and quiet! 
+
 |qty   |         Part             |              Link                      |
 |:-----:|--------------------------|---------------------------------------:|
 |1      | ESP32 Dev Board          | https://amzn.to/2ZNyjQX  |
 |1      | NEMA 17 Pancake Stepper  | https://amzn.to/35tNiCW |
-|1      | A4988 Driver Board       | https://amzn.to/35w2EqA |
+|1      | A4988 Driver Board OR    | https://amzn.to/35w2EqA |
+|1      | TMC2225                  | https://amzn.to/3kctdEQ |
 |1      | LM2596 Buck Converter    | https://amzn.to/33ofggY  |
 |1      | 12V Power Supply         | https://amzn.to/3hqrTNw  |
 |2      | Tactile Switches         | https://amzn.to/33ezmKx |
@@ -67,7 +70,17 @@ The hardware mentioned above mounts into a 3d printed enclosure which then easil
 
 The Finished assembly looks somthing like this prototype. 
 
-<img src="Pictures/AssembledSideView.jpg" alt="Assembled SideView" style="height: 200px; width: 100"/>
+<img src="Pictures/on_bench_with_shifters.jpg" alt="On bench with shifters" style="height: 200px; width: 100"/>
+
+Here it is mounted on a bike (ignore the piece of wood, it's no longer needed with a different hard attachment strap). 
+
+<img src="Pictures/Closeup.jpg" alt="Closeup.jpg" style="height: 200px; width: 100"/>
+
+Installed on a random Schwinn bike at the Gym:
+<img src="Pictures/Schwinn.jpg" alt="Installed On Schwinn" style="height: 200px; width: 100"/>
+
+...And here it is on a cheap magnetic HMC trainer off Amazon:
+<img src="Pictures/HMC.jpg" alt="Installed on HMC" style="height: 200px; width: 100"/>
 
 Here is the earliest prototype mounted on a spin bike. (Cardboard wrapped in ducktape enclosure :) ) 
 
