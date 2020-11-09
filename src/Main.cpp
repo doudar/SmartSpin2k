@@ -14,17 +14,13 @@ String debugToHTML = "<br>Current Firmware Version: " + FirmwareVer;
 
 bool lastDir = true; //Stepper Last Direction
 bool changeRadioState = false;
+
 // Debounce Setup
-// the following variables are unsigned longs because the time, measured in
-// milliseconds, will quickly become a bigger number than can be stored in an int.
 unsigned long lastDebounceTime = 0; // the last time the output pin was toggled
 unsigned long debounceDelay = 500;  // the debounce time; increase if the output flickers
 
-//vTaskDelay timer Delay
-int letSomthingElseRun = 200;
-
 //Stepper Speed - Lower is faster
-int maxStepperSpeed = 600;
+int maxStepperSpeed = 500;
 
 // Define output pins
 const int radioPin = 27;
@@ -40,7 +36,7 @@ const int shiftStep = 400;
 int shifterPosition = 0; //Changed from volitile int
 int stepperPosition = 0;
 
-//Setup a task so the stepper will run on a different core thean the main code to prevent studdering
+//Setup a task so the stepper will run on a different core than the main code to prevent stuttering
 TaskHandle_t moveStepperTask;
 
 //*************************Load The Config*********************************
@@ -101,16 +97,11 @@ void setup()
       18,                    /* priority of the task  - 29 worked  at 1 I get stuttering */
       &moveStepperTask,      /* Task handle to keep track of created task */
       0);                    /* pin task to core 0 */
-  //vTaskStartScheduler();
+
   debugDirector("Stepper Task Created");
   userConfig.setWifiOn(!digitalRead(radioPin));
   setupBLE();
   /************************************************StartingBLE Server***********************/
-
-  debugDirector("****************Starting regular mode*********************");
-  //BLEserverScan(); //Scan for Known BLE Servers
-  //startBLEServer();
-  debugDirector("BLE Server Started");
   //BLEServerScan(true);
   debugDirector(" - BLE Client Initialized");
   digitalWrite(ledPin, HIGH);
@@ -118,6 +109,7 @@ void setup()
   startHttpServer();
   FirmwareUpdate();
   startBLEServer();
+  debugDirector("BLE Server Started");
 }
 
 void loop()
@@ -141,15 +133,12 @@ void loop()
 
 void moveStepper(void *pvParameters)
 {
-  int acceleration = 500;
-
+  int acceleration = maxStepperSpeed;
   int targetPosition = 0;
 
   while (1)
   {
-
     targetPosition = shifterPosition + (userConfig.getIncline() * userConfig.getInclineMultiplier());
-
     if (stepperPosition == targetPosition)
     {
       vTaskDelay(300 / portTICK_PERIOD_MS);
@@ -166,13 +155,11 @@ void moveStepper(void *pvParameters)
       {
         if (lastDir == false)
         {
-          //delayMicroseconds(currentAcceleration);
           vTaskDelay(100); //Stepper was running in opposite direction. Give it time to stop.
         }
         digitalWrite(dirPin, HIGH);
         digitalWrite(stepPin, HIGH);
         delayMicroseconds(acceleration);
-        //vTaskDelay(1);
         digitalWrite(stepPin, LOW);
         stepperPosition++;
         lastDir = true;
@@ -182,19 +169,16 @@ void moveStepper(void *pvParameters)
         if (lastDir == true)
         {
           vTaskDelay(100); //Stepper was running in opposite direction. Give it time to stop.
-          //currentAcceleration = acceleration;
         }
         digitalWrite(dirPin, LOW);
         digitalWrite(stepPin, HIGH);
         delayMicroseconds(acceleration);
-        //vTaskDelay(1);
         digitalWrite(stepPin, LOW);
         stepperPosition--;
         lastDir = false;
       }
     }
   }
-  debugDirector("Exited Motor Control Loop. That was Weird.");
 }
 
 bool IRAM_ATTR deBounce()
