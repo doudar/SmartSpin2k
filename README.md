@@ -6,10 +6,12 @@ Hardware (3d Printed) and Software Project that uses an ESP32 and servo motor to
 The initial target was to use it with Zwift: stationary bike up hills and feel the burn.
 
 ## Background
-I travel for a living and most hotels have spin bikes. I started carrying my own power meter pedals for the spin bikes so I could ride Zwift but the experience just isn't the same without automatic resistance on the hills. Then one day I was looking down at that simple to turn knob and I had a thought - With the power meter pedals attached, almost everything is already in place on this $300 spin bike to turn it into the equivalent of a $3,000 computer controlled smart bike! And so here we are....
+I travel for a living and most hotels have spin bikes. I started carrying my own power meter pedals for the spin bikes so I could ride Zwift, but the experience just isn't the same without automatic resistance on the hills. Then one day I was looking down at that simple to turn knob and I had a thought - With the power meter pedals attached, almost everything is already in place on this $300 spin bike to turn it into the equivalent of a $3,000 computer controlled smart bike! And so here we are....
 
 ## Summary of function
 The power meter pedals send cycling power and cadence to Zwift (or any other cycling app). SmartSpin2k then connects to the APP as a controllable trainer which simulates gradient by automatically turning the knob a set amount for each percent grade change on your virtual road. If you choose to pair your pedals directly to SmartSpin2k, ERG mode is also availiable which lets an app directly control your watt output reguardless of your cadence. In addition to adjusting the knob, SmartBike2k also has shifter buttons to simulate virtual shifting. 
+
+Configuration is accomplished via a web interface hosted by the SmartSpin2k. If you connect the unit to WiFi with an internet connection, it will also preform automatic software updates whenever they become availiable!  
 
 ### Hardware:
 
