@@ -13,11 +13,14 @@ The power meter pedals send cycling power and cadence to Zwift (or any other cyc
 
 ### Hardware:
 
+You'll need the quantity listed below of each item excep the driver board. You can use either the A4988 or the TMC2225 but the TMC2225 is much more cooler and quiet! 
+
 |qty   |         Part             |              Link                      |
 |:-----:|--------------------------|---------------------------------------:|
 |1      | ESP32 Dev Board          | https://amzn.to/2ZNyjQX  |
 |1      | NEMA 17 Pancake Stepper  | https://amzn.to/35tNiCW |
-|1      | A4988 Driver Board       | https://amzn.to/35w2EqA |
+|1      | A4988 Driver Board OR    | https://amzn.to/35w2EqA |
+|1      | TMC2225                  | https://amzn.to/3kctdEQ |
 |1      | LM2596 Buck Converter    | https://amzn.to/33ofggY  |
 |1      | 12V Power Supply         | https://amzn.to/3hqrTNw  |
 |2      | Tactile Switches         | https://amzn.to/33ezmKx |
