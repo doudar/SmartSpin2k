@@ -65,6 +65,8 @@ ummm that was easy...right? :)
 ### A4988 Connection Diagram
 <img src="Pictures/SmartBike2k_A4988_Connections.png" alt="esp32 connections" style="height: 200px; width: 100"/> 
 
+*note, if you're using a TMC2225 (which you should), the connections will be the same but you do not need to bridge the rst&slp because...well...they don't exist. 
+
 The hardware mentioned above mounts into a 3d printed enclosure which then easily attaches to a spin bike.
 
 
