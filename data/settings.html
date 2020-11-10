@@ -82,7 +82,8 @@
         document.getElementById("password").value = obj.password;
         document.getElementById("shiftStep").value = obj.shiftStep;
         document.getElementById("inclineMultiplier").value = obj.inclineMultiplier;
-
+        updateSlider(document.getElementById("shiftStep"),document.getElementById("shiftStepValue"));
+        updateSlider(document.getElementById("inclineMultiplier"),document.getElementById("inclineMultiplierValue"));
       }
     };
     xhttp.open("GET", "/configJSON", true);
