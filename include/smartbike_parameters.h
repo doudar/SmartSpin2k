@@ -12,18 +12,18 @@
 class userParameters
 {
     private:
-    String  filename = "/config.txt";       //Used Static -Remove
+    String  filename = "/config.txt";       //Used Static -Remove              String FirmwareUpdateURL would be nice instead
     float   incline;                        //Keep
     int     simulatedWatts;                 //Keep
     int     simulatedHr;                    //Keep
     int     simulatedCad;                   //Keep
-    float   inclineStep;                    //Not Used - Remove
+    float   inclineStep;                    //Not Used - Remove                 
     int     shiftStep;                      //Keep
     float   inclineMultiplier;              //Keep
     bool    simulatePower;                  //Keep
     bool    simulateHr;                     //Keep
     bool    ERGMode;                        //Keep
-    bool    wifiOn;                         //Depreciated - Remove
+    bool    wifiOn;                         //Depreciated - Remove              bool automaticUpdates would be nice instead
     String  ssid;                           //Keep
     String  password;                       //Keep
     String  foundDevices = " ";             //Keep
