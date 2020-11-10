@@ -9,7 +9,7 @@
 #include <Arduino.h>
 #include <SPIFFS.h>
 
-const String FirmwareVer = {"0.0.11.09"};
+const String FirmwareVer = {"0.0.11.10"};
 String debugToHTML = "<br>Current Firmware Version: " + FirmwareVer;
 bool GlobalBLEClientConnected = false;
 

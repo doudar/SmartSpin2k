@@ -5,7 +5,6 @@
 // This work is licensed under the GNU General Public License v2
 // Prototype hardware build from plans in the SmartSpin2k repository are licensed under Cern Open Hardware Licence version 2 Permissive
 
-
 #include <Main.h>
 #include <WebServer.h>
 #include <HTTP_Server_Basic.h>
@@ -15,11 +14,16 @@
 #include <ESPmDNS.h>
 #include <WiFiClientSecure.h>
 #include <Update.h>
+#include <DNSServer.h>
 
 File fsUploadFile;
 
 TaskHandle_t webClientTask;
 #define MAX_BUFFER_SIZE 20
+
+// DNS server
+const byte DNS_PORT = 53;
+DNSServer dnsServer;
 
 //Automatic Firmware update Defines
 HTTPClient http;
@@ -55,50 +59,51 @@ String OTALoginIndex =
     "</script>" +
     OTAStyle;
 
-String noIndexHTML = 
-"<!DOCTYPE html>"
-"<html>"
-"<body>"
-"The webserver files need to be updated."
-"Please enter the credentials for your network or upload a new filesystem image using the link below."
-"<head>"
-"  <title>SmartSpin2K Web Server</title>"
-"  <meta name='viewport' content='width=device-width, initial-scale=1'>"
-" <link rel='icon' href='data:,'>"
-"</head>"
-"<body>"
-"  <h1><strong>Network Settings</strong></h1>"
-"  <h2>"
-"    <p style='text-align: left;'></p>"
-"    <form action='/send_settings'>"
-"      <table border='0' style='height: 30px; width: 36.0582%; border-collapse: collapse; border-style: none;'"
-"        height='182' cellspacing='1'>"
-"        <tbody>"
-"          <tr style='height: 20px;'>"
-"            <td style='width: 14%; height: 20px;'>"
-"              <p><label for='ssid'>SSID</label></p>"
-"            </td>"
-"            <td style='width: 14%; height: 20px;'><input type='text' id='ssid' name='ssid' value='' /></td>"
-"          </tr>"
-"          <tr style='height: 20px;'>"
-"            <td style='width: 14%; height: 20px;'>"
-"              <p><label for='password'>Password</label></p>"
-"            </td>"
-"            <td style='width: 14%; height: 20px;'><input type='text' id='password' name='password' value='' />"
-"            </td>"
-"          </tr>"
-"          </tr>"
-"        </tbody>"
-"      </table>"
-"      <input type='submit' value='Submit' />"
-"    </form>"
-"<p style='text-align: center;'><strong><a href='login'>Update Firmware</a></strong></p></h2>"
-"<p><br></p>"
-"    <form action='/reboot.html'>"
-"      <input type='submit' value='Reboot!'>"
-"    </form>"
-"</body>"
-"</html> " + OTAStyle;
+String noIndexHTML =
+    "<!DOCTYPE html>"
+    "<html>"
+    "<body>"
+    "The webserver files need to be updated."
+    "Please enter the credentials for your network or upload a new filesystem image using the link below."
+    "<head>"
+    "  <title>SmartSpin2K Web Server</title>"
+    "  <meta name='viewport' content='width=device-width, initial-scale=1'>"
+    " <link rel='icon' href='data:,'>"
+    "</head>"
+    "<body>"
+    "  <h1><strong>Network Settings</strong></h1>"
+    "  <h2>"
+    "    <p style='text-align: left;'></p>"
+    "    <form action='/send_settings'>"
+    "      <table border='0' style='height: 30px; width: 36.0582%; border-collapse: collapse; border-style: none;'"
+    "        height='182' cellspacing='1'>"
+    "        <tbody>"
+    "          <tr style='height: 20px;'>"
+    "            <td style='width: 14%; height: 20px;'>"
+    "              <p><label for='ssid'>SSID</label></p>"
+    "            </td>"
+    "            <td style='width: 14%; height: 20px;'><input type='text' id='ssid' name='ssid' value='' /></td>"
+    "          </tr>"
+    "          <tr style='height: 20px;'>"
+    "            <td style='width: 14%; height: 20px;'>"
+    "              <p><label for='password'>Password</label></p>"
+    "            </td>"
+    "            <td style='width: 14%; height: 20px;'><input type='text' id='password' name='password' value='' />"
+    "            </td>"
+    "          </tr>"
+    "          </tr>"
+    "        </tbody>"
+    "      </table>"
+    "      <input type='submit' value='Submit' />"
+    "    </form>"
+    "<p style='text-align: center;'><strong><a href='login'>Update Firmware</a></strong></p></h2>"
+    "<p><br></p>"
+    "    <form action='/reboot.html'>"
+    "      <input type='submit' value='Reboot!'>"
+    "    </form>"
+    "</body>"
+    "</html> " +
+    OTAStyle;
 
 /* Server Index Page */
 String OTAServerIndex =
@@ -186,6 +191,9 @@ void startWifi()
     vTaskDelay(50);
     IPAddress myIP = WiFi.softAPIP();
     debugDirector("AP IP address: " + myIP.toString());
+    /* Setup the DNS server redirecting all the domains to the apIP */
+    dnsServer.setErrorReplyCode(DNSReplyCode::NoError);
+    dnsServer.start(DNS_PORT, "*", myIP);
   }
   MDNS.begin("SmartSpin2k"); //<-----------Need to add variable to change this globally
   MDNS.addService("http", "tcp", 80);
@@ -199,6 +207,9 @@ void startHttpServer()
   server.on("/", handleIndexFile);
   server.on("/style.css", handleStyleCss);
   server.on("/index.html", handleIndexFile);
+  server.on("/generate_204", handleIndexFile);        //Android captive portal
+  server.on("/fwlink", handleIndexFile);              //Microsoft captive portal 
+  server.on("/hotspot-detect.html", handleIndexFile); //Apple captive portal
 
   server.on("/btsimulator.html", []() {
     File file = SPIFFS.open("/btsimulator.html", "r");
@@ -214,7 +225,7 @@ void startHttpServer()
     file.close();
   });
 
-    server.on("/status.html", []() {
+  server.on("/status.html", []() {
     File file = SPIFFS.open("/status.html", "r");
     server.streamFile(file, "text/html");
     debugDirector("Served: " + String(file.name()));
@@ -354,7 +365,7 @@ void startHttpServer()
   server.on("/configJSON", []() {
     String tString;
     tString = userConfig.returnJSON();
-    tString.remove(tString.length()-1,1);
+    tString.remove(tString.length() - 1, 1);
     tString += String(",\"debug\":") + "\"" + debugToHTML + "\"}";
     server.send(200, "text/plain", tString);
     debugToHTML = " ";
@@ -440,20 +451,26 @@ void webClientUpdate(void *pvParameters)
   {
     server.handleClient();
     vTaskDelay(10 / portTICK_RATE_MS);
+    if (WiFi.getMode() == WIFI_AP)
+    {
+      dnsServer.processNextRequest();
+    }
   }
 }
 
 void handleIndexFile()
 {
-  if(SPIFFS.exists("/index.html")){
-  File file = SPIFFS.open("/index.html", "r");
-  server.streamFile(file, "text/html");
-  file.close();
-  }else{
+  if (SPIFFS.exists("/index.html"))
+  {
+    File file = SPIFFS.open("/index.html", "r");
+    server.streamFile(file, "text/html");
+    file.close();
+  }
+  else
+  {
     debugDirector("index.html not found. Sending builtin");
     server.send(200, "text/html", noIndexHTML);
   }
-
 }
 
 void handleStyleCss()
@@ -498,29 +515,28 @@ void FirmwareUpdate()
       httpUpdate.setLedPin(LED_BUILTIN, LOW);
       debugDirector("Updating FileSystem");
       t_httpUpdate_return ret = httpUpdate.updateSpiffs(client, URL_fw_spiffs);
-      vTaskDelay(100/portTICK_PERIOD_MS);
-      if (ret == HTTP_UPDATE_OK) {
-      debugDirector("Saving Config.txt");
-      userConfig.saveToSPIFFS();
-      debugDirector("Updating Program");
-      ret = httpUpdate.update(client, URL_fw_Bin);
-      switch (ret)
+      vTaskDelay(100 / portTICK_PERIOD_MS);
+      if (ret == HTTP_UPDATE_OK)
       {
-      case HTTP_UPDATE_FAILED:
-        debugDirector("HTTP_UPDATE_FAILD Error " + String(httpUpdate.getLastError()) + " : " + httpUpdate.getLastErrorString());
-        break;
+        debugDirector("Saving Config.txt");
+        userConfig.saveToSPIFFS();
+        debugDirector("Updating Program");
+        ret = httpUpdate.update(client, URL_fw_Bin);
+        switch (ret)
+        {
+        case HTTP_UPDATE_FAILED:
+          debugDirector("HTTP_UPDATE_FAILD Error " + String(httpUpdate.getLastError()) + " : " + httpUpdate.getLastErrorString());
+          break;
 
-      case HTTP_UPDATE_NO_UPDATES:
-        debugDirector("HTTP_UPDATE_NO_UPDATES");
-        break;
+        case HTTP_UPDATE_NO_UPDATES:
+          debugDirector("HTTP_UPDATE_NO_UPDATES");
+          break;
 
-      case HTTP_UPDATE_OK:
-        debugDirector("HTTP_UPDATE_OK");
-        break;
-      }
+        case HTTP_UPDATE_OK:
+          debugDirector("HTTP_UPDATE_OK");
+          break;
+        }
       }
     }
   }
 }
-
-

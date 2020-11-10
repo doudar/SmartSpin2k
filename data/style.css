@@ -95,4 +95,43 @@ html {
     margin-right:auto;
   }
 
+  .tooltip {
+    position: relative;
+    display: inline-block;
+    border-bottom: 1px dotted rgb(1, 47, 78);
+  }
+  
+  .tooltip .tooltiptext {
+    visibility: hidden;
+    width: 120px;
+    background-color: rgb(1, 47, 78);
+    color: #ccc;
+    text-align: center;
+    border-radius: 6px;
+    padding: 5px 0;
+  
+    /* Position the tooltip */
+    position: absolute;
+    z-index: 1;
+  }
+  
+  .tooltip:hover .tooltiptext {
+    visibility: visible;
+  }
+
+  .watermark
+{
+  position: absolute;
+  top: 50%;
+  left: 00%;
+  margin-right: -50%;
+  transform: translate(-50%, -50%);
+ transform: rotate(45deg);
+ margin: 0;
+ opacity:.7;
+ z-index:99;
+ color:grey;
+ font-size: 5rem
+}
+
     
