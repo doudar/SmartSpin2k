@@ -62,7 +62,7 @@ String noIndexHTML =
 "The webserver files need to be updated."
 "Please enter the credentials for your network or upload a new filesystem image using the link below."
 "<head>"
-"  <title>SmartBike2K Web Server</title>"
+"  <title>SmartSpin2K Web Server</title>"
 "  <meta name='viewport' content='width=device-width, initial-scale=1'>"
 " <link rel='icon' href='data:,'>"
 "</head>"
@@ -212,7 +212,7 @@ void startHttpServer()
     {
       userConfig.setConnectedPowerMeter(server.arg("bleDropdown"));
     }
-    String response = "<!DOCTYPE html><html><body>Saving Settings....</body><script> setTimeout(\"location.href = 'http://smartbike2k.local/settings.html';\",1000);</script></html>";
+    String response = "<!DOCTYPE html><html><body>Saving Settings....</body><script> setTimeout(\"location.href = 'http://SmartSpin2k.local/settings.html';\",1000);</script></html>";
     server.send(200, "text/html", response);
     debugDirector("Config Updated From Web");
     userConfig.printFile();
@@ -227,7 +227,7 @@ void startHttpServer()
   server.on("/BLEScan", []() {
     debugDirector("Scanning for BLE Devices");
     BLEServerScan(false);
-    String response = "<!DOCTYPE html><html><body>Scanning for BLE Devices. Please wait.</body><script> setTimeout(\"location.href = 'http://smartbike2k.local/bluetoothscanner.html';\",5000);</script></html>";
+    String response = "<!DOCTYPE html><html><body>Scanning for BLE Devices. Please wait.</body><script> setTimeout(\"location.href = 'http://SmartSpin2k.local/bluetoothscanner.html';\",5000);</script></html>";
     server.send(200, "text/html", response);
   });
 
@@ -236,13 +236,13 @@ void startHttpServer()
     SPIFFS.format();
     userConfig.setDefaults();
     userConfig.saveToSPIFFS();
-    String response = "Loading Defaults....<script> setTimeout(\"location.href ='http://smartbike2k.local/settings.html';\",1000); </script>";
+    String response = "Loading Defaults....<script> setTimeout(\"location.href ='http://SmartSpin2k.local/settings.html';\",1000); </script>";
     server.send(200, "text/html", response);
   });
 
   server.on("/reboot.html", []() {
     debugDirector("Rebooting from Web Request");
-    String response = "Rebooting....<script> setTimeout(\"location.href = 'http://smartbike2k.local/index.html';\",1000); </script>";
+    String response = "Rebooting....<script> setTimeout(\"location.href = 'http://SmartSpin2k.local/index.html';\",1000); </script>";
     server.send(200, "text/html", response);
     ESP.restart();
   });
@@ -456,8 +456,8 @@ void startWifi()
     IPAddress myIP = WiFi.softAPIP();
     debugDirector("AP IP address: " + myIP.toString());
   }
-  MDNS.begin("smartbike2k"); //<-----------Need to add variable to change this globally
-  debugDirector("Open http://smartbike2k.local/");
+  MDNS.begin("SmartSpin2k"); //<-----------Need to add variable to change this globally
+  debugDirector("Open http://SmartSpin2k.local/");
 }
 
 void FirmwareUpdate()

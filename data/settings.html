@@ -3,7 +3,7 @@
 
 <p style="text-align: left;"><strong><a href="index.html">Main Index</a></strong></p>
 <head>
-  <title>SmartBike2K Web Server</title>
+  <title>SmartSpin2K Web Server</title>
   <meta name="viewport" content="width=device-width, initial-scale=1">
 </head>
 
@@ -13,7 +13,7 @@
   <h2>
     <p style="text-align: left;"></p>
     <form action="/send_settings">
-      <table border="0" style="height: 30px; width: 36.0582%; border-collapse: collapse; border-style: none;"
+      <table class="center" style="height: 30px; width: 36.0582%; border-collapse: collapse; border-style: none;"
         height="182" cellspacing="1">
         <tbody>
           <tr style="height: 20px;">
@@ -34,28 +34,30 @@
               <p><label for="shiftStep">Shift Step</label></p>
             </td>
             <td style="width: 14%; height: 20px;">
-              <input type="range" id="shiftStep" name="shiftStep" min="50" max="1000" value="0" step="50" class="slider2" onchange="updateSlider(this, document.getElementById('shiftStepValue'))"/>
-              <span class="output" id=shiftStepValue>0</span>
+              <p style="padding: 0px; width: 10px; position: relative; top: 15px; left: 1px; color: rgb(250, 250, 250);"><span id="shiftStepValue">0</span></p>
+              <input style="position: relative; top: -25px; left: 7px;" type="range" id="shiftStep" name="shiftStep" min="50" max="1000" value="0" step="50" class="slider1" onchange="updateSlider(this, document.getElementById('shiftStepValue'))"/>
               </td>
           </tr>
-          <tr style="height: 20px;">
+          <tr style="height: 20px;" >
             <td style="width: 14%; height: 20px;">
               <p><label for="inclineMultiplier">Incline Multiplier</label></p>
             </td>
-            <td style="width: 14%; height: 20px;"><input type="range" id="inclineMultiplier" name="inclineMultiplier"
-                value="0" min="1" max="5" step="1" class="slider2" onchange="updateSlider(this, document.getElementById('inclineMultiplierValue'))"/>
-                <span class="output" id=inclineMultiplierValue>0</span>               
+            <td style="width: 14%; height: 20px;">
+              <p style="padding: 0px; width: 10px; position: relative; top: 15px; left: 1px; color: rgb(250, 250, 250);"><span id="inclineMultiplierValue">0</span></p>            
+              <input style="position: relative; top: -25px; left: 7px;" type="range" id="inclineMultiplier" name="inclineMultiplier"
+                value="0" min="1" max="5" step="1" class="slider1" onchange="updateSlider(this, document.getElementById('inclineMultiplierValue'))"/>
+                
               </td>
           </tr>
         </tbody>
       </table>
       <input type="submit" value="Submit" />
     </form>
-    <p><br></p>
+    <p></p>
     <form action="/load_defaults.html">
       <input type="submit" value="Reset to Defaults">
     </form>
-    <p><br></p>
+    <p></p>
     <form action="/reboot.html">
       <input type="submit" value="Reboot!">
     </form>

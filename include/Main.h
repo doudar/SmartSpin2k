@@ -9,7 +9,7 @@
 #define MAIN_H
 
 #include <HTTP_Server_Basic.h>
-#include <smartbike_parameters.h>
+#include <SmartSpin_parameters.h>
 #include <SBBLE_Server.h>
 
 //Function Prototypes

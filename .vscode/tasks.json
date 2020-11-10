@@ -1,0 +1,13 @@
+{
+	"version": "2.0.0",
+	"tasks": [
+		{
+			"type": "PlatformIO",
+			"task": "Upload Filesystem Image (esp32doit)",
+			"problemMatcher": [
+				"$platformio"
+			],
+			"label": "PlatformIO: Upload Filesystem Image (esp32doit)"
+		}
+	]
+}

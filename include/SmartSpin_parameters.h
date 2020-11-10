@@ -4,8 +4,8 @@
 // Copyright 2020 Anthony Doud
 // This work is licensed under the GNU General Public License v2
 // Prototype hardware build from plans in the SmartSpin2k repository are licensed under Cern Open Hardware Licence version 2 Permissive
-#ifndef SMARTBIKE_PARAMETERS_H
-#define SMARTBIKE_PARAMETERS_H
+#ifndef SmartSpin_PARAMETERS_H
+#define SmartSpin_PARAMETERS_H
 
 #include <Arduino.h>
 
@@ -17,7 +17,7 @@ class userParameters
     int     simulatedWatts;                 //Keep
     int     simulatedHr;                    //Keep
     int     simulatedCad;                   //Keep
-    float   inclineStep;                    //Not Used - Remove                 
+    float   inclineStep;                    //Not Used - Remove                 String MDNS name would be nice instead
     int     shiftStep;                      //Keep
     float   inclineMultiplier;              //Keep
     bool    simulatePower;                  //Keep

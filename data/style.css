@@ -90,29 +90,9 @@ html {
     cursor: pointer; 
   } 
 
-    .output {
-      display: inline-block;
-      position: relative;
-      width: 60px;
-      color: #fff;
-      line-height: 20px;
-      text-align: center;
-      border-radius: 3px;
-      background: #2c3e50;
-      padding: 5px 10px;
-      margin-left: 8px;
+  table.center {
+    margin-left:auto; 
+    margin-right:auto;
   }
-  
-    .output:after {
-      position: absolute;
-      top: 8px;
-      left: -7px;
-      width: 0;
-      height: 0;
-      border-top: 7px solid transparent;
-      border-right: 7px solid #2c3e50;
-      border-bottom: 7px solid transparent;
-      content: '';
-   }
 
     

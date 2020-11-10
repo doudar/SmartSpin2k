@@ -4,7 +4,7 @@
 // Copyright 2020 Anthony Doud
 // This work is licensed under the GNU General Public License v2
 // Prototype hardware build from plans in the SmartSpin2k repository are licensed under Cern Open Hardware Licence version 2 Permissive
-#include <smartbike_parameters.h>
+#include <SmartSpin_parameters.h>
 //#include <FS.h>                     //Filesystem read/write
 #include <ArduinoJson.h>
 #include <SPIFFS.h>                 //needed for Spiffs
@@ -24,7 +24,7 @@ void userParameters::setDefaults()
     simulateHr          = true;
     ERGMode             = false;
     wifiOn              = true;
-    ssid                = "SmartBike2k";
+    ssid                = "SmartSpin2k";
     password            = "password";
     foundDevices        = "";
     connectedPowerMeter    = ""; 

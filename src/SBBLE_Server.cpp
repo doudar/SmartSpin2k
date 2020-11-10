@@ -15,7 +15,7 @@ BLE Advertised Device found: Name: ASSIOMA17287L, Address: e8:fe:6e:91:9f:16, ap
 #include <Main.h>
 
 //BLE Server Settings
-String BLEName = "SmartBike2K";
+String BLEName = "SmartSpin2K";
 bool _BLEClientConnected = false;
 int toggle = false;
 
