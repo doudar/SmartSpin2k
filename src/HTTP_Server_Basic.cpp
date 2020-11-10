@@ -188,6 +188,7 @@ void startWifi()
     debugDirector("AP IP address: " + myIP.toString());
   }
   MDNS.begin("SmartSpin2k"); //<-----------Need to add variable to change this globally
+  MDNS.addService("http", "tcp", 80);
   debugDirector("Open http://SmartSpin2k.local/");
 }
 
