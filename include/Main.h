@@ -23,6 +23,7 @@ void debugDirector(String, bool = true);
 extern userParameters userConfig;
 extern const String FirmwareVer;
 extern String debugToHTML; //Variable that will store debugging information that will get appended and then cleared once posted to HTML or a timer expires.
+extern bool GlobalBLEClientConnected;
 
 #endif
 

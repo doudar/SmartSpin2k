@@ -31,24 +31,21 @@
           </tr>
           <tr style="height: 20px;">
             <td style="width: 14%; height: 20px;">
-              <p><label for="inclineStep">Incline Step</label></p>
-            </td>
-            <td style="width: 14%; height: 20px;"><input type="text" id="inclineStep" name="inclineStep"
-                value="loading" /></td>
-          </tr>
-          <tr style="height: 20px;">
-            <td style="width: 14%; height: 20px;">
               <p><label for="shiftStep">Shift Step</label></p>
             </td>
-            <td style="width: 14%; height: 20px;"><input type="text" id="shiftStep" name="shiftStep" value="loading" />
-            </td>
+            <td style="width: 14%; height: 20px;">
+              <input type="range" id="shiftStep" name="shiftStep" min="50" max="1000" value="0" step="50" class="slider2" onchange="updateSlider(this, document.getElementById('shiftStepValue'))"/>
+              <span class="output" id=shiftStepValue>0</span>
+              </td>
           </tr>
           <tr style="height: 20px;">
             <td style="width: 14%; height: 20px;">
               <p><label for="inclineMultiplier">Incline Multiplier</label></p>
             </td>
-            <td style="width: 14%; height: 20px;"><input type="text" id="inclineMultiplier" name="inclineMultiplier"
-                value="loading" /></td>
+            <td style="width: 14%; height: 20px;"><input type="range" id="inclineMultiplier" name="inclineMultiplier"
+                value="0" min="1" max="5" step="1" class="slider2" onchange="updateSlider(this, document.getElementById('inclineMultiplierValue'))"/>
+                <span class="output" id=inclineMultiplierValue>0</span>               
+              </td>
           </tr>
         </tbody>
       </table>
@@ -83,7 +80,6 @@
         var obj = JSON.parse(this.responseText);
         document.getElementById("ssid").value = obj.ssid;
         document.getElementById("password").value = obj.password;
-        document.getElementById("inclineStep").value = obj.inclineStep;
         document.getElementById("shiftStep").value = obj.shiftStep;
         document.getElementById("inclineMultiplier").value = obj.inclineMultiplier;
 
@@ -106,6 +102,11 @@ var loadCss = function(){
 window.addEventListener('load', function (){
   setTimeout(loadCss, 100);
 }, false);
+
+function updateSlider(element, valueElement) {
+    var sliderValue = element.value;
+    valueElement.innerHTML = sliderValue;
+  }
 
 </script>
 

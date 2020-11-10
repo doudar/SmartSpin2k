@@ -9,8 +9,9 @@
 #include <Arduino.h>
 #include <SPIFFS.h>
 
-const String FirmwareVer = {"0.0.10.17"};
+const String FirmwareVer = {"0.0.11.09"};
 String debugToHTML = "<br>Current Firmware Version: " + FirmwareVer;
+bool GlobalBLEClientConnected = false;
 
 bool lastDir = true; //Stepper Last Direction
 bool changeRadioState = false;
@@ -142,7 +143,9 @@ void moveStepper(void *pvParameters)
     if (stepperPosition == targetPosition)
     {
       vTaskDelay(300 / portTICK_PERIOD_MS);
-      //digitalWrite(enablePin, HIGH); //disable output FETs so stepper can cool
+      if(!GlobalBLEClientConnected){
+      digitalWrite(enablePin, HIGH); //disable output FETs so stepper can cool
+      }
       vTaskDelay(300 / portTICK_PERIOD_MS);
   
     }

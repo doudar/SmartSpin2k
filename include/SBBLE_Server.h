@@ -7,10 +7,10 @@ bool connectToServer();
 void BLEServerScan(bool connectRequest);
 void bleClient();
 void startBleClient();
-double computePID(double, double);
 void computeERG(int, int);
 void setupBLE();
 void computeCSC();
 void updateIndoorBikeDataChar();
+void updateCyclingPowerMesurementChar();
 
 #endif

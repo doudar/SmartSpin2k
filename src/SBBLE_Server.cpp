@@ -80,8 +80,6 @@ byte cpsLocation[1] = {0b000};    //sensor location 5 == left crank
 byte cpFeature[1] = {0b00100000}; //crank information present                                         // 3rd & 2nd byte is reported power
 
 byte ftmsService[6] = {0x00, 0x00, 0x00, 0b01, 0b0100000, 0x00};
-//const uint32_t ftmsFeature = 0000100010000000010; // flags for Fitness Machine Features Field - cadence, resistance level and inclination level                                     // 5th byte to enable the FTMS bike service
-//byte ftmsFeature[32] = {0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0}; //3rd bit enables incline support
 byte ftmsControlPoint[8] = {0, 0, 0, 0, 0, 0, 0, 0}; //0x08 we need to return a value of 1 for any sucessful change
 byte ftmsMachineStatus[8] = {0, 0, 0, 0, 0, 0, 0, 0};
 
@@ -101,26 +99,6 @@ uint8_t ftmsPowerRange[6] = {0x00, 0x00, 0xA0, 0x0F, 0x01, 0x00}; //1-4000
 #define CYCLINGPOWERFEATURE_UUID BLEUUID((uint16_t)0x2A65)
 #define SENSORLOCATION_UUID BLEUUID((uint16_t)0x2A5D)
 
-/*INFO FOR CALCULATING CADENCE FROM THE POWER SERVICE
-
-Instantaneous Cadence = (Difference in two successive Cumulative Crank Revolutions
-values) / (Difference in two successive Last Crank Event Time values)
-
-So probably do somthing like this to calculate cadence:
-
-long crankRev[2] = 0,0;
-long crankEventTime[2] = 0.0;
-crankRev[2] = crankRev[1]; 
-crankRev[1] = BLEMeasurement;
-crankEventTime[2] = crankEventTime[1];
-crankEventTime[1] = BLEMeasurement;
-cadenceFromPowerMeter = (crankRev[1]-crankRev[2])/(crankEventTime[1]-crankEventTime[2]);  
-
-To make more fun: The ‘crank event time’ is a free-running-count of 1/1024 second units and it represents the time
-when the crank revolution was detected by the crank rotation sensor. Since several crank
-events can occur between transmissions, only the Last Crank Event Time value is transmitted.
-The Last Crank Event Time value rolls over every 64 seconds.*/
-
 //FitnessMachineServiceDefines//
 #define FITNESSMACHINESERVICE_UUID BLEUUID((uint16_t)0x1826)
 #define FITNESSMACHINEFEATURE_UUID BLEUUID((uint16_t)0x2ACC)
@@ -130,7 +108,7 @@ The Last Crank Event Time value rolls over every 64 seconds.*/
 #define FITNESSMACHINERESISTANCELEVELRANGE_UUID BLEUUID((uint16_t)0x2AD6)
 #define FITNESSMACHINEPOWERRANGE_UUID BLEUUID((uint16_t)0x2AD8)
 
-// This creates a macro that converts 8 bit LSB,MSB to Signed 16b
+// macros to convert different types of bytes into int The naming here sucks and should be fixed.
 #define bytes_to_s16(MSB, LSB) (((signed int)((signed char)MSB))) << 8 | (((signed char)LSB))
 #define bytes_to_u16(MSB, LSB) (((signed int)((signed char)MSB))) << 8 | (((unsigned char)LSB))
 #define bytes_to_int(MSB, LSB) (((int)((unsigned char)MSB))) << 8 | (((unsigned char)LSB))
@@ -187,11 +165,6 @@ static void notifyCallback(
 
   if (pBLERemoteCharacteristic->getUUID().toString() == CYCLINGPOWERMEASUREMENT_UUID.toString())
   {
-    //for (int i = 5; i < length; i++)
-    //{
-    // cyclingPowerMeasurement[i] = pData[i];
-    // i++;
-    // }
 
     userConfig.setSimulatedWatts(bytes_to_u16(pData[3], pData[2]));
     //This needs to be changed to read the bit field because this data could potentially shift positions in the characteristic
@@ -209,7 +182,7 @@ static void notifyCallback(
         userConfig.setSimulatedCad(((abs(crankRev[0] - crankRev[1]) * 1024) / abs(crankEventTime[0] - crankEventTime[1])) * 60);
         goodReading = true;
       }
-      else
+      else //the crank rev probably didn't update
       {
         if (!goodReading) //Require two consecutive readings before setting 0
         {
@@ -218,7 +191,6 @@ static void notifyCallback(
         goodReading = false;
       }
 
-      // debugDirector("Crank Revolutions: " + String(crankRev[1]) + " Crank Time: " + String(crankEventTime[1]));
       debugDirector(" Cadence: " + String(userConfig.getSimulatedCad()), false);
       debugDirector("");
     }
@@ -628,34 +600,22 @@ void startBLEServer()
 
 void BLENotify()
 {
-
   if (_BLEClientConnected)
   {
     //update the BLE information on the server
     heartRateMeasurement[1] = userConfig.getSimulatedHr();
     heartRateMeasurementCharacteristic->setValue(heartRateMeasurement, 5);
-    heartRateMeasurementCharacteristic->notify();
-
-    //Set New Watts.
-    int remainder, quotient;
-    quotient = userConfig.getSimulatedWatts() / 256;
-    remainder = userConfig.getSimulatedWatts() % 256;
-    cyclingPowerMeasurement[2] = remainder;
-    cyclingPowerMeasurement[3] = quotient;
     computeCSC();
     updateIndoorBikeDataChar();
-    cyclingPowerMeasurementCharacteristic->setValue(cyclingPowerMeasurement, 9);
-    for (const auto &text : cyclingPowerMeasurement)
-    { // Range-for!
-      debugDirector(String(text, HEX) + " ", false);
-    }
-    debugDirector("<-- CPMC sent ", false);
-    debugDirector("");
-
+    updateCyclingPowerMesurementChar();
     cyclingPowerMeasurementCharacteristic->notify();
     fitnessMachineFeature->notify();
     fitnessMachineIndoorBikeData->notify();
+    heartRateMeasurementCharacteristic->notify();
+  }else{
+    GlobalBLEClientConnected = false;
   }
+
 }
 
 void computeERG(int currentWatts, int setPoint)
@@ -734,4 +694,22 @@ void updateIndoorBikeDataChar()
   ftmsIndoorBikeData[12] = 0;                       // Elapsed Time
   fitnessMachineIndoorBikeData->setValue(ftmsIndoorBikeData, 13);
   fitnessMachineIndoorBikeData->notify();
+}
+
+void updateCyclingPowerMesurementChar()
+{
+    int remainder, quotient;
+    quotient = userConfig.getSimulatedWatts() / 256;
+    remainder = userConfig.getSimulatedWatts() % 256;
+    cyclingPowerMeasurement[2] = remainder;
+    cyclingPowerMeasurement[3] = quotient;
+    cyclingPowerMeasurementCharacteristic->setValue(cyclingPowerMeasurement, 9);
+
+    for (const auto &text : cyclingPowerMeasurement)
+    { // Range-for!
+      debugDirector(String(text, HEX) + " ", false);
+    }
+
+    debugDirector("<-- CPMC sent ", false);
+    debugDirector("");
 }
