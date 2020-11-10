@@ -146,6 +146,51 @@ String OTAServerIndex =
     "</script>" +
     OTAStyle;
 
+//********************************WIFI Setup*************************//
+void startWifi()
+{
+
+  int i = 0;
+
+  //Trying Station mode first:
+  debugDirector("Connecting to: " + String(userConfig.getSsid()));
+  if (String(WiFi.SSID()) != userConfig.getSsid())
+  {
+    WiFi.mode(WIFI_STA);
+    WiFi.begin(userConfig.getSsid(), userConfig.getPassword());
+  }
+
+  while (WiFi.status() != WL_CONNECTED)
+  {
+    vTaskDelay(1000 / portTICK_RATE_MS);
+    debugDirector(".", false);
+    i++;
+    if (i > 5)
+    {
+      i = 0;
+      debugDirector("Couldn't Connect. Switching to AP mode");
+      WiFi.disconnect();
+      WiFi.mode(WIFI_AP);
+      break;
+    }
+  }
+  if (WiFi.status() == WL_CONNECTED)
+  {
+    debugDirector("Connected to " + String(userConfig.getSsid()) + " IP address: " + WiFi.localIP().toString());
+  }
+
+  // Couldn't connect to existing network, Create SoftAP
+  if (WiFi.status() != WL_CONNECTED)
+  {
+    WiFi.softAP(userConfig.getSsid(), userConfig.getPassword());
+    vTaskDelay(50);
+    IPAddress myIP = WiFi.softAPIP();
+    debugDirector("AP IP address: " + myIP.toString());
+  }
+  MDNS.begin("SmartSpin2k"); //<-----------Need to add variable to change this globally
+  debugDirector("Open http://SmartSpin2k.local/");
+}
+
 WebServer server(80);
 void startHttpServer()
 {
@@ -415,49 +460,6 @@ void handleStyleCss()
   File file = SPIFFS.open("/style.css", "r");
   server.streamFile(file, "text/css");
   file.close();
-}
-
-void startWifi()
-{
-
-  int i = 0;
-
-  //Trying Station mode first:
-  debugDirector("Connecting to: " + String(userConfig.getSsid()));
-  if (String(WiFi.SSID()) != userConfig.getSsid())
-  {
-    WiFi.mode(WIFI_STA);
-    WiFi.begin(userConfig.getSsid(), userConfig.getPassword());
-  }
-
-  while (WiFi.status() != WL_CONNECTED)
-  {
-    vTaskDelay(1000 / portTICK_RATE_MS);
-    debugDirector(".", false);
-    i++;
-    if (i > 5)
-    {
-      i = 0;
-      debugDirector("Couldn't Connect. Switching to AP mode");
-      break;
-    }
-  }
-  if (WiFi.status() == WL_CONNECTED)
-  {
-    debugDirector("Connected to " + String(userConfig.getSsid()) + " IP address: " + WiFi.localIP().toString());
-  }
-
-  // Couldn't connect to existing network, Create SoftAP
-  if (WiFi.status() != WL_CONNECTED)
-  {
-    WiFi.softAP(userConfig.getSsid(), userConfig.getPassword());
-    //WiFi.softAPConfig(local_ip, gateway, subnet);
-    vTaskDelay(50);
-    IPAddress myIP = WiFi.softAPIP();
-    debugDirector("AP IP address: " + myIP.toString());
-  }
-  MDNS.begin("SmartSpin2k"); //<-----------Need to add variable to change this globally
-  debugDirector("Open http://SmartSpin2k.local/");
 }
 
 void FirmwareUpdate()
