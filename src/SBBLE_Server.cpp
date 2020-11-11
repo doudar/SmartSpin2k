@@ -612,6 +612,7 @@ void BLENotify()
     fitnessMachineFeature->notify();
     fitnessMachineIndoorBikeData->notify();
     heartRateMeasurementCharacteristic->notify();
+    GlobalBLEClientConnected = true;
   }else{
     GlobalBLEClientConnected = false;
   }
