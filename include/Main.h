@@ -8,9 +8,10 @@
 #ifndef MAIN_H
 #define MAIN_H
 
-#include <HTTP_Server_Basic.h>
-#include <SmartSpin_parameters.h>
-#include <SBBLE_Server.h>
+#include "settings.h"
+#include "HTTP_Server_Basic.h"
+#include "SmartSpin_parameters.h"
+#include "SBBLE_Server.h"
 
 //Function Prototypes
 bool IRAM_ATTR deBounce();
@@ -21,8 +22,10 @@ void debugDirector(String, bool = true);
 
 //Main program variable that stores most everything
 extern userParameters userConfig;
-extern const String FirmwareVer;
-extern String debugToHTML; //Variable that will store debugging information that will get appended and then cleared once posted to HTML or a timer expires.
+
+//Variable that will store debugging information that will get appended and then cleared once posted to HTML or a timer expires.
+extern String debugToHTML; 
+
 extern bool GlobalBLEClientConnected;
 
 #endif

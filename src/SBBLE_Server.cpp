@@ -9,42 +9,27 @@
 BLE Advertised Device found: Name: ASSIOMA17287L, Address: e8:fe:6e:91:9f:16, appearance: 1156, manufacturer data: 640302018743, serviceUUID: 00001818-0000-1000-8000-00805f9b34fb
 */
 
-#include <SBBLE_Server.h>
+#include "Main.h"
+#include "SBBLE_Server.h"
+
 #include <ArduinoJson.h>
 #include <NimBLEDevice.h>
-#include <Main.h>
+
+// macros to convert different types of bytes into int The naming here sucks and should be fixed.
+#define bytes_to_s16(MSB, LSB) (((signed int)((signed char)MSB))) << 8 | (((signed char)LSB))
+#define bytes_to_u16(MSB, LSB) (((signed int)((signed char)MSB))) << 8 | (((unsigned char)LSB))
+#define bytes_to_int(MSB, LSB) (((int)((unsigned char)MSB))) << 8 | (((unsigned char)LSB))
+// Potentially, something like this is a better way of doing this ^^  data.getUint16(1, true)
 
 //BLE Server Settings
-String BLEName = "SmartSpin2K";
 bool _BLEClientConnected = false;
 int toggle = false;
 
-/*BLE Client Variables/Settings
-int scanTime = 5; //In seconds
-bool doConnect = false;
-bool connected = false;
-static BLEAdvertisedDevice *myDevice;
-//static BLERemoteCharacteristic* pRemoteHeartRateCharacteristic;  May need to configure these in order to do 2 notify callbacks.
-//static BLERemoteCharacteristic* pRemoteCylingPowerCharacteristic;
-BLERemoteCharacteristic *pBLERemoteCharacteristic; */
-
-//PID Constants
-const double kp = 1.5;
-const double ki = 0;
-const double kd = 0;
-//PID Variables
-unsigned long currentTime, previousTime;
-double elapsedTime;
-double error;
-double lastError = 0;
-double input, output, setPoint;
-double cumError, rateError;
 //Cadence computation Variables
 float crankRev[2] = {0, 0};
 float crankEventTime[2] = {0, 0};
 bool goodReading = false;
-//int cooldown = 0;
-//int cooldownTimer = 10;
+
 //Simulated Cadence Variables
 int cscCumulativeCrankRev = 0;
 int cscLastCrankEvtTime = 0;
@@ -88,31 +73,7 @@ uint8_t ftmsIndoorBikeData[13] = {0x54, 0x08, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0,
 uint8_t ftmsResistanceLevelRange[6] = {0x00, 0x00, 0x3A, 0x98, 0xC5, 0x68}; //+-15000
 uint8_t ftmsPowerRange[6] = {0x00, 0x00, 0xA0, 0x0F, 0x01, 0x00}; //1-4000
 
-#define HEARTSERVICE_UUID BLEUUID((uint16_t)0x180D)
-#define HEARTCHARACTERISTIC_UUID BLEUUID((uint16_t)0x2A37)
 
-#define CSCSERVICE_UUID BLEUUID((uint16_t)0x1816)
-#define CSCMEASUREMENT_UUID BLEUUID((uint16_t)0x2A5B)
-
-#define CYCLINGPOWERSERVICE_UUID BLEUUID((uint16_t)0x1818)
-#define CYCLINGPOWERMEASUREMENT_UUID BLEUUID((uint16_t)0x2A63)
-#define CYCLINGPOWERFEATURE_UUID BLEUUID((uint16_t)0x2A65)
-#define SENSORLOCATION_UUID BLEUUID((uint16_t)0x2A5D)
-
-//FitnessMachineServiceDefines//
-#define FITNESSMACHINESERVICE_UUID BLEUUID((uint16_t)0x1826)
-#define FITNESSMACHINEFEATURE_UUID BLEUUID((uint16_t)0x2ACC)
-#define FITNESSMACHINECONTROLPOINT_UUID BLEUUID((uint16_t)0x2AD9)
-#define FITNESSMACHINESTATUS_UUID BLEUUID((uint16_t)0x2ADA)
-#define FITNESSMACHINEINDOORBIKEDATA_UUID BLEUUID((uint16_t)0x2AD2)
-#define FITNESSMACHINERESISTANCELEVELRANGE_UUID BLEUUID((uint16_t)0x2AD6)
-#define FITNESSMACHINEPOWERRANGE_UUID BLEUUID((uint16_t)0x2AD8)
-
-// macros to convert different types of bytes into int The naming here sucks and should be fixed.
-#define bytes_to_s16(MSB, LSB) (((signed int)((signed char)MSB))) << 8 | (((signed char)LSB))
-#define bytes_to_u16(MSB, LSB) (((signed int)((signed char)MSB))) << 8 | (((unsigned char)LSB))
-#define bytes_to_int(MSB, LSB) (((int)((unsigned char)MSB))) << 8 | (((unsigned char)LSB))
-// Potentially, something like this is a better way of doing this ^^  data.getUint16(1, true)
 
 //Creating Server Callbacks
 class MyServerCallbacks : public BLEServerCallbacks
@@ -333,7 +294,7 @@ void setupBLE() //COmmon BLE setup for both Client and sServer
 {
 
   debugDirector("Starting Arduino BLE Client application...");
-  BLEDevice::init(BLEName.c_str());
+  BLEDevice::init(DEVICE_NAME);
 
   // Retrieve a Scanner and set the callback we want to use to be informed when we
   // have detected a new device.  Specify that we want active scanning and start the

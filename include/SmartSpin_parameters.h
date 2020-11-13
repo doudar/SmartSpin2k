@@ -12,7 +12,7 @@
 class userParameters
 {
     private:
-    String  filename = "/config.txt";       //Used Static -Remove              String FirmwareUpdateURL would be nice instead
+    String  firmwareUpdateURL;              //Done
     float   incline;                        //Keep
     int     simulatedWatts;                 //Keep
     int     simulatedHr;                    //Keep
@@ -31,7 +31,7 @@ class userParameters
     String  connectedHeartMonitor = " ";    //Keep    
 
     public:
-    const char* getFilename()                {return filename.c_str();}
+    const char* getfirmwareUpdateURL()                {return firmwareUpdateURL.c_str();}
     float       getIncline()                 {return incline;}
     int         getSimulatedWatts()          {return simulatedWatts;}
     int         getSimulatedHr()             {return simulatedHr;}
@@ -50,7 +50,7 @@ class userParameters
     const char* getconnectedHeartMonitor()   {return connectedHeartMonitor.c_str();}
 
     void    setDefaults();
-    void    setFilename(String flnm)            {filename = flnm;}
+    void    setfirmwareUpdateURL(String fURL)            {firmwareUpdateURL = fURL;}
     void    setIncline(float inc)               {incline = inc;}
     void    setSimulatedWatts(int w)            {simulatedWatts = w;}
     void    setSimulatedHr(int hr)              {simulatedHr = hr;}

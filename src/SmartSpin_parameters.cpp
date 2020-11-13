@@ -4,31 +4,33 @@
 // Copyright 2020 Anthony Doud
 // This work is licensed under the GNU General Public License v2
 // Prototype hardware build from plans in the SmartSpin2k repository are licensed under Cern Open Hardware Licence version 2 Permissive
-#include <SmartSpin_parameters.h>
-//#include <FS.h>                     //Filesystem read/write
-#include <ArduinoJson.h>
-#include <SPIFFS.h>                 //needed for Spiffs
-#include <Main.h>
 
-// Set all defaults except filename as that is set on object initialization.
-void userParameters::setDefaults()
+#include "Main.h"
+#include "SmartSpin_parameters.h"
+
+#include <ArduinoJson.h>
+#include <SPIFFS.h>               
+
+// Default Values
+void userParameters::setDefaults()  //Move these to set the values as #define in main.h
 {
-    incline             = 0.0;
-    simulatedWatts      = 100;
-    simulatedHr         = 60;
-    simulatedCad        = 90;
-    inclineStep         = 400;
-    shiftStep           = 400;
-    inclineMultiplier   = 1.0;
-    simulatePower       = false;
-    simulateHr          = true;
-    ERGMode             = false;
-    wifiOn              = true;
-    ssid                = "SmartSpin2k";
-    password            = "password";
-    foundDevices        = "";
-    connectedPowerMeter    = ""; 
-    connectedHeartMonitor = "";
+    firmwareUpdateURL       = FW_UPDATEURL;
+    incline                 = 0.0;
+    simulatedWatts          = 100;
+    simulatedHr             = 60;
+    simulatedCad            = 90;
+    inclineStep             = 400;
+    shiftStep               = 400;
+    inclineMultiplier       = 1.0;
+    simulatePower           = false;
+    simulateHr              = true;
+    ERGMode                 = false;
+    wifiOn                  = true;
+    ssid                    = DEVICE_NAME;
+    password                = DEFAULT_PASSWORD;
+    foundDevices            = "";
+    connectedPowerMeter     = ""; 
+    connectedHeartMonitor   = "";
 }
 
 //---------------------------------------------------------------------------------
@@ -41,7 +43,7 @@ String userParameters::returnJSON()
   StaticJsonDocument<512> doc;
   // Set the values in the document
 
-    doc["filename"]           = filename;
+    doc["firmwareUpdateURL"]  = firmwareUpdateURL;
     doc["incline"]            = incline;
     doc["simulatedWatts"]     = simulatedWatts;
     doc["simulatedHr"]        = simulatedHr;
@@ -67,11 +69,11 @@ String userParameters::returnJSON()
 void userParameters::saveToSPIFFS()
 {
   // Delete existing file, otherwise the configuration is appended to the file
-  SPIFFS.remove(filename);
+  SPIFFS.remove(configFILENAME);
 
   // Open file for writing
-  debugDirector("Writing File: " + filename);
-  File file = SPIFFS.open(filename, FILE_WRITE);
+  debugDirector("Writing File: " + String(configFILENAME));
+  File file = SPIFFS.open(configFILENAME, FILE_WRITE);
   if (!file) {
     debugDirector(F("Failed to create file"));
     return;
@@ -84,7 +86,7 @@ void userParameters::saveToSPIFFS()
 
   // Set the values in the document
 
-    doc["filename"]           = filename;
+    doc["firmwareUpdateURL"]  = firmwareUpdateURL;
     doc["incline"]            = incline;
     doc["simulatedWatts"]     = simulatedWatts;
     doc["simulatedHr"]        = simulatedHr;
@@ -113,8 +115,8 @@ void userParameters::saveToSPIFFS()
 // Loads the JSON configuration from a file into a userParameters Object
 void userParameters::loadFromSPIFFS() {
   // Open file for reading
-  debugDirector("Reading File: " + filename);
-  File file = SPIFFS.open(filename);
+  debugDirector("Reading File: " + String(configFILENAME));
+  File file = SPIFFS.open(configFILENAME);
 
   //load defaults if filename doesn't exist
  if(!file){ 
@@ -136,7 +138,7 @@ void userParameters::loadFromSPIFFS() {
   }
 
   // Copy values from the JsonDocument to the Config
-    setFilename         (doc["filename"]);
+    setfirmwareUpdateURL(doc["firmwareUpdateURL"]);
     setIncline          (doc["incline"]);
     setSimulatedWatts   (doc["simulatedWatts"]);
     setSimulatedHr      (doc["simulatedHr"]);
@@ -154,15 +156,15 @@ void userParameters::loadFromSPIFFS() {
     setConnectedPowerMeter (doc["connectedPowerMeter"]);
     setConnectedHeartMonitor (doc["connectedHeartMonitor"]);
 
-    debugDirector("Config File Loaded: " + filename);        
+    debugDirector("Config File Loaded: " + String(configFILENAME));        
     file.close();
 }
 
 // Prints the content of a file to the Serial
 void userParameters::printFile() {
   // Open file for reading
-  debugDirector("Contents of file: " + filename);
-  File file = SPIFFS.open(filename);
+  debugDirector("Contents of file: " + String(configFILENAME));
+  File file = SPIFFS.open(configFILENAME);
   if (!file) {
     debugDirector(F("Failed to read file"));
     return;
@@ -176,3 +178,5 @@ void userParameters::printFile() {
   // Close the file
   file.close();
 }
+
+

@@ -6,15 +6,14 @@
 // Prototype hardware build from plans in the SmartSpin2k repository are licensed under Cern Open Hardware Licence version 2 Permissive
 
 #include "Main.h"
+
 #include <Arduino.h>
 #include <SPIFFS.h>
 
-const String FirmwareVer = {"0.0.11.11"};
-String debugToHTML = "<br>Current Firmware Version: " + FirmwareVer;
+String debugToHTML = "<br>Current Firmware Version: " + String(FIRMWARE_VERSION);
 bool GlobalBLEClientConnected = false;
 
 bool lastDir = true; //Stepper Last Direction
-bool changeRadioState = false;
 
 // Debounce Setup
 unsigned long lastDebounceTime = 0; // the last time the output pin was toggled
@@ -23,18 +22,7 @@ unsigned long debounceDelay = 500;  // the debounce time; increase if the output
 //Stepper Speed - Lower is faster
 int maxStepperSpeed = 500;
 
-// Define output pins
-const int radioPin = 27;
-const int shiftUpPin = 19;
-const int shiftDownPin = 18;
-const int enablePin = 5;
-const int stepPin = 17;
-const int dirPin = 16;
-const int ledPin = 2; //one of those stupid blinding Blue LED's on the ESP32
-
-// Default size for the shifter step
-const int shiftStep = 400;
-int shifterPosition = 0; //Changed from volitile int
+int shifterPosition = 0;
 int stepperPosition = 0;
 
 //Setup a task so the stepper will run on a different core than the main code to prevent stuttering
@@ -66,22 +54,22 @@ void setup()
   userConfig.saveToSPIFFS();
 
   debugDirector("Configuring Hardware Pins");
-  pinMode(radioPin, INPUT_PULLUP);
-  pinMode(shiftUpPin, INPUT_PULLUP);   // Push-Button with input Pullup
-  pinMode(shiftDownPin, INPUT_PULLUP); // Push-Button with input Pullup
-  pinMode(ledPin, OUTPUT);
-  pinMode(enablePin, OUTPUT);
-  pinMode(dirPin, OUTPUT);       // Stepper Direction Pin
-  pinMode(stepPin, OUTPUT);      // Stepper Step Pin
-  digitalWrite(enablePin, HIGH); //Should be called a disable Pin - High Disables FETs
-  digitalWrite(dirPin, LOW);
-  digitalWrite(stepPin, LOW);
-  digitalWrite(ledPin, LOW);
+  pinMode(RADIO_PIN, INPUT_PULLUP);
+  pinMode(SHIFT_UP_PIN, INPUT_PULLUP);   // Push-Button with input Pullup
+  pinMode(SHIFT_DOWN_PIN, INPUT_PULLUP); // Push-Button with input Pullup
+  pinMode(LED_PIN, OUTPUT);
+  pinMode(ENABLE_PIN, OUTPUT);
+  pinMode(DIR_PIN, OUTPUT);       // Stepper Direction Pin
+  pinMode(STEP_PIN, OUTPUT);      // Stepper Step Pin
+  digitalWrite(ENABLE_PIN, HIGH); //Should be called a disable Pin - High Disables FETs
+  digitalWrite(DIR_PIN, LOW);
+  digitalWrite(STEP_PIN, LOW);
+  digitalWrite(LED_PIN, LOW);
 
   debugDirector("Creating Interrupts");
   //Setup Interrups so shifters work at anytime
-  attachInterrupt(digitalPinToInterrupt(shiftUpPin), shiftUp, CHANGE);
-  attachInterrupt(digitalPinToInterrupt(shiftDownPin), shiftDown, CHANGE);
+  attachInterrupt(digitalPinToInterrupt(SHIFT_UP_PIN), shiftUp, CHANGE);
+  attachInterrupt(digitalPinToInterrupt(SHIFT_DOWN_PIN), shiftDown, CHANGE);
 
   debugDirector("Setting up cpu Tasks");
   //create a task that will be executed in the moveStepper function, with priority 1 and executed on core 0
@@ -100,12 +88,10 @@ void setup()
       0);                    /* pin task to core 0 */
 
   debugDirector("Stepper Task Created");
-  userConfig.setWifiOn(!digitalRead(radioPin));
   setupBLE();
-  /************************************************StartingBLE Server***********************/
   //BLEServerScan(true);
   debugDirector(" - BLE Client Initialized");
-  digitalWrite(ledPin, HIGH);
+  digitalWrite(LED_PIN, HIGH);
   startWifi();
   startHttpServer();
   FirmwareUpdate();
@@ -116,9 +102,9 @@ void setup()
 void loop()
 {
 
-  if (userConfig.getWifiOn())
+  if (!GlobalBLEClientConnected)
   {
-    digitalWrite(ledPin, LOW); //blink led in configuration mode
+    digitalWrite(LED_PIN, LOW); //blink if no client connected
   }
 
   BLENotify();
@@ -130,6 +116,7 @@ void loop()
   { //Clear up memory
     debugToHTML = "<br>HTML Debug Truncated. Increase buffer if required.";
   }
+  digitalWrite(LED_PIN, HIGH);
 }
 
 void moveStepper(void *pvParameters)
@@ -144,14 +131,14 @@ void moveStepper(void *pvParameters)
     {
       vTaskDelay(300 / portTICK_PERIOD_MS);
       if(!GlobalBLEClientConnected){
-      digitalWrite(enablePin, HIGH); //disable output FETs so stepper can cool
+      digitalWrite(ENABLE_PIN, HIGH); //disable output FETs so stepper can cool
       }
       vTaskDelay(300 / portTICK_PERIOD_MS);
   
     }
     else
     {
-      digitalWrite(enablePin, LOW);
+      digitalWrite(ENABLE_PIN, LOW);
       vTaskDelay(1);                
 
       if (stepperPosition < targetPosition)
@@ -160,10 +147,10 @@ void moveStepper(void *pvParameters)
         {
           vTaskDelay(100); //Stepper was running in opposite direction. Give it time to stop.
         }
-        digitalWrite(dirPin, HIGH);
-        digitalWrite(stepPin, HIGH);
+        digitalWrite(DIR_PIN, HIGH);
+        digitalWrite(STEP_PIN, HIGH);
         delayMicroseconds(acceleration);
-        digitalWrite(stepPin, LOW);
+        digitalWrite(STEP_PIN, LOW);
         stepperPosition++;
         lastDir = true;
       }
@@ -173,10 +160,10 @@ void moveStepper(void *pvParameters)
         {
           vTaskDelay(100); //Stepper was running in opposite direction. Give it time to stop.
         }
-        digitalWrite(dirPin, LOW);
-        digitalWrite(stepPin, HIGH);
+        digitalWrite(DIR_PIN, LOW);
+        digitalWrite(STEP_PIN, HIGH);
         delayMicroseconds(acceleration);
-        digitalWrite(stepPin, LOW);
+        digitalWrite(STEP_PIN, LOW);
         stepperPosition--;
         lastDir = false;
       }
@@ -205,7 +192,7 @@ void IRAM_ATTR shiftUp() // Handle the shift up interrupt IRAM_ATTR is to keep t
 {
   if (deBounce())
   {
-    if (!digitalRead(shiftUpPin)) //double checking to make sure the interrupt wasn't triggered by emf
+    if (!digitalRead(SHIFT_UP_PIN)) //double checking to make sure the interrupt wasn't triggered by emf
     {
       shifterPosition = (shifterPosition + userConfig.getShiftStep());
       debugDirector("Shift UP: " + String(shifterPosition));
@@ -221,7 +208,7 @@ void IRAM_ATTR shiftDown() //Handle the shift down interrupt
 {
   if (deBounce())
   {
-    if (!digitalRead(shiftDownPin)) //double checking to make sure the interrupt wasn't triggered by emf
+    if (!digitalRead(SHIFT_DOWN_PIN)) //double checking to make sure the interrupt wasn't triggered by emf
     {
       shifterPosition = (shifterPosition - userConfig.getShiftStep());
       debugDirector("Shift DOWN" + String(shifterPosition));
