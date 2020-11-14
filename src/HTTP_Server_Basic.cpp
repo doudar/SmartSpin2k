@@ -377,7 +377,7 @@ void FirmwareUpdate()
   }
   else
   {
-    debugDirector("error in downloading version file: " + String(httpCode));
+    debugDirector("error downloading " + String(FW_VERSIONFILE) + " " + String(httpCode));
   }
 
   http.end();
