@@ -172,7 +172,7 @@ void userParameters::printFile() {
 
   // Extract each characters by one by one
   while (file.available()) {
-    debugDirector(String(file.read()), false);
+    debugDirector(String(char(file.read())), false);
   }
   debugDirector(String(" "));
   // Close the file

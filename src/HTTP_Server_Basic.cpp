@@ -86,39 +86,15 @@ void startHttpServer()
 {
   /********************************************Begin Handlers***********************************/
   server.on("/", handleIndexFile);
-  server.on("/style.css", handleStyleCss);
   server.on("/index.html", handleIndexFile);
   server.on("/generate_204", handleIndexFile);        //Android captive portal
   server.on("/fwlink", handleIndexFile);              //Microsoft captive portal 
   server.on("/hotspot-detect.html", handleIndexFile); //Apple captive portal
-
-  server.on("/btsimulator.html", []() {
-    File file = SPIFFS.open("/btsimulator.html", "r");
-    server.streamFile(file, "text/html");
-    debugDirector("Served: " + String(file.name()));
-    file.close();
-  });
-
-  server.on("/settings.html", []() {
-    File file = SPIFFS.open("/settings.html", "r");
-    server.streamFile(file, "text/html");
-    debugDirector("Served: " + String(file.name()));
-    file.close();
-  });
-
-  server.on("/status.html", []() {
-    File file = SPIFFS.open("/status.html", "r");
-    server.streamFile(file, "text/html");
-    debugDirector("Served: " + String(file.name()));
-    file.close();
-  });
-
-  server.on("/bluetoothscanner.html", []() {
-    File file = SPIFFS.open("/bluetoothscanner.html", "r");
-    server.streamFile(file, "text/html");
-    debugDirector("Served: " + String(file.name()));
-    file.close();
-  });
+  server.on("/style.css", handleSpiffsFile);
+  server.on("/btsimulator.html", handleSpiffsFile);
+  server.on("/settings.html", handleSpiffsFile);
+  server.on("/status.html", handleSpiffsFile);
+  server.on("/bluetoothscanner.html", handleSpiffsFile);
 
   server.on("/send_settings", []() {
     String tString;
@@ -340,25 +316,39 @@ void webClientUpdate(void *pvParameters)
 
 void handleIndexFile()
 {
-  if (SPIFFS.exists("/index.html"))
+  String filename="/index.html";
+  if (SPIFFS.exists(server.uri()))
   {
-    File file = SPIFFS.open("/index.html", "r");
+    File file = SPIFFS.open(filename, "r");
     server.streamFile(file, "text/html");
     file.close();
   }
   else
   {
-    debugDirector("index.html not found. Sending builtin");
+    debugDirector(filename + " not found. Sending builtin Index.html");
     server.send(200, "text/html", noIndexHTML);
   }
 }
 
-void handleStyleCss()
+void handleSpiffsFile()
 {
-  File file = SPIFFS.open("/style.css", "r");
-  server.streamFile(file, "text/css");
-  file.close();
+  String filename=server.uri();
+  int dotPosition = filename.lastIndexOf(".");
+  String fileType = filename.substring((dotPosition + 1), filename.length());
+  if (SPIFFS.exists(server.uri()))
+  {
+    File file = SPIFFS.open(filename, "r");
+    server.streamFile(file, "text/" + fileType);
+    file.close();
+    debugDirector("Served " + filename);
+  }
+  else
+  {
+    debugDirector(filename + " not found. Sending builtin Index.html");
+    server.send(404, "text/html", "<html><body><h1>ERROR 404 <br> FILE NOT FOUND!</h1></body></html>");
+  }
 }
+
 
 void FirmwareUpdate()
 {
@@ -370,10 +360,9 @@ void FirmwareUpdate()
   String payload;
   if (httpCode == HTTP_CODE_OK) // if version received
   {
-    debugDirector("  -Server Ver ", false);
     payload = http.getString(); // save received version
     payload.trim();
-    debugDirector(payload);
+    debugDirector("  -Server Ver " + payload);
   }
   else
   {
@@ -383,13 +372,15 @@ void FirmwareUpdate()
   http.end();
   if (httpCode == HTTP_CODE_OK) // if version received
   {
+    bool updateAnyway = false;
+    if (!SPIFFS.exists("/index.html"))
+    {
+      updateAnyway = true;
+      debugDirector("  -index.html not found. Forcing update");
+    }
     Version availiableVer(payload.c_str());
     Version currentVer(FIRMWARE_VERSION);
-    if ((currentVer > availiableVer) || (currentVer == availiableVer))
-    {
-      debugDirector("  -Current ver " + String(FIRMWARE_VERSION));
-    }
-    else
+    if ((availiableVer > currentVer) || (updateAnyway))
     {
       debugDirector("New firmware detected!");
       debugDirector("Upgrading from " + String(FIRMWARE_VERSION) + " to " + payload);
@@ -419,6 +410,10 @@ void FirmwareUpdate()
           break;
         }
       }
+    }else //don't update
+    {
+      debugDirector("  -Current ver " + String(FIRMWARE_VERSION));
     }
+    
   }
 }

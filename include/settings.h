@@ -12,6 +12,9 @@
 //Current program version info. Used for auto updates
 #define FIRMWARE_VERSION "0.0.11.15"
 
+//Update firmware on boot?
+#define AUTO_FIRMWARE_UPDATE true
+
 //Default Bluetooth WiFi and MDNS Name
 #define DEVICE_NAME "SmartSpin2K"
 

@@ -38,7 +38,7 @@ void setup()
   // Serial port for debugging purposes
   Serial.begin(512000);
 
-  debugDirector("Compiled " + String(__DATE__)  + String(__TIME__));
+  debugDirector("Compiled " + String(__DATE__) + String(__TIME__));
 
   // Initialize SPIFFS
   debugDirector("Mounting Filesystem");
@@ -91,7 +91,10 @@ void setup()
   digitalWrite(LED_PIN, HIGH);
   startWifi();
   startHttpServer();
-  FirmwareUpdate();
+  if (AUTO_FIRMWARE_UPDATE)
+  {
+    FirmwareUpdate();
+  }
   startBLEServer();
 }
 
@@ -126,16 +129,16 @@ void moveStepper(void *pvParameters)
     if (stepperPosition == targetPosition)
     {
       vTaskDelay(300 / portTICK_PERIOD_MS);
-      if(!GlobalBLEClientConnected){
-      digitalWrite(ENABLE_PIN, HIGH); //disable output FETs so stepper can cool
+      if (!GlobalBLEClientConnected)
+      {
+        digitalWrite(ENABLE_PIN, HIGH); //disable output FETs so stepper can cool
       }
       vTaskDelay(300 / portTICK_PERIOD_MS);
-  
     }
     else
     {
       digitalWrite(ENABLE_PIN, LOW);
-      vTaskDelay(1);                
+      vTaskDelay(1);
 
       if (stepperPosition < targetPosition)
       {
