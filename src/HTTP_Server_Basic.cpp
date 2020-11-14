@@ -364,7 +364,7 @@ void handleStyleCss()
 
 void FirmwareUpdate()
 {
-  debugDirector("Checking for newer firmware");
+  debugDirector("Checking for newer firmware:");
   http.begin(userConfig.getfirmwareUpdateURL() + String(FW_VERSIONFILE)); // check version URL
   delay(100);
   int httpCode = http.GET(); // get data from version file
@@ -372,7 +372,7 @@ void FirmwareUpdate()
   String payload;
   if (httpCode == HTTP_CODE_OK) // if version received
   {
-    debugDirector("Version info recieved:");
+    debugDirector("  -Server Ver ", false);
     payload = http.getString(); // save received version
     payload.trim();
     debugDirector(payload);
@@ -389,7 +389,7 @@ void FirmwareUpdate()
     Version currentVer(FIRMWARE_VERSION);
     if ((currentVer > availiableVer) || (currentVer == availiableVer))
     {
-      debugDirector("Device already on latest firmware version");
+      debugDirector("  -Current ver " + String(FIRMWARE_VERSION));
     }
     else
     {

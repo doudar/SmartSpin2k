@@ -10,7 +10,7 @@
 #include <Arduino.h>
 #include <SPIFFS.h>
 
-String debugToHTML = "<br>Current Firmware Version: " + String(FIRMWARE_VERSION);
+String debugToHTML = "<br>Firmware Version " + String(FIRMWARE_VERSION);
 bool GlobalBLEClientConnected = false;
 
 bool lastDir = true; //Stepper Last Direction
@@ -38,7 +38,7 @@ void setup()
   // Serial port for debugging purposes
   Serial.begin(512000);
 
-  debugDirector("Program Version: " + String(__DATE__)  + String(__TIME__));
+  debugDirector("Compiled " + String(__DATE__)  + String(__TIME__));
 
   // Initialize SPIFFS
   debugDirector("Mounting Filesystem");
@@ -53,7 +53,6 @@ void setup()
   userConfig.printFile(); //Print userConfig.contents to serial
   userConfig.saveToSPIFFS();
 
-  debugDirector("Configuring Hardware Pins");
   pinMode(RADIO_PIN, INPUT_PULLUP);
   pinMode(SHIFT_UP_PIN, INPUT_PULLUP);   // Push-Button with input Pullup
   pinMode(SHIFT_DOWN_PIN, INPUT_PULLUP); // Push-Button with input Pullup
@@ -87,16 +86,13 @@ void setup()
       &moveStepperTask,      /* Task handle to keep track of created task */
       0);                    /* pin task to core 0 */
 
-  debugDirector("Stepper Task Created");
   setupBLE();
   //BLEServerScan(true);
-  debugDirector(" - BLE Client Initialized");
   digitalWrite(LED_PIN, HIGH);
   startWifi();
   startHttpServer();
   FirmwareUpdate();
   startBLEServer();
-  debugDirector("BLE Server Started");
 }
 
 void loop()
