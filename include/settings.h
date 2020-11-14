@@ -9,7 +9,7 @@
 #ifndef SETTING_H
 #define SETTINGS_H
 
-//const String FirmwareVer = {"0.0.11.11"};
+//Current program version info. Used for auto updates
 #define FIRMWARE_VERSION "0.0.11.15"
 
 //Default Bluetooth WiFi and MDNS Name

@@ -21,7 +21,7 @@ void userParameters::setDefaults()  //Move these to set the values as #define in
     simulatedCad            = 90;
     inclineStep             = 400;
     shiftStep               = 400;
-    inclineMultiplier       = 1.0;
+    inclineMultiplier       = 2.0;
     simulatePower           = false;
     simulateHr              = true;
     ERGMode                 = false;
