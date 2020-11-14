@@ -320,8 +320,6 @@ void startHttpServer()
       1,                 /* priority of the task  - 29 worked*/
       &webClientTask,    /* Task handle to keep track of created task */
       tskNO_AFFINITY);   /* pin task to core 0 */
-  //vTaskStartScheduler();
-  debugDirector("WebClientTaskCreated");
 
   server.begin();
   debugDirector("HTTP server started");
