@@ -387,7 +387,7 @@ void FirmwareUpdate()
   {
     Version availiableVer(payload.c_str());
     Version currentVer(FIRMWARE_VERSION);
-    if (availiableVer > currentVer)
+    if ((currentVer > availiableVer) || (currentVer == availiableVer))
     {
       debugDirector("Device already on latest firmware version");
     }

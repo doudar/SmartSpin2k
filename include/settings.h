@@ -10,7 +10,7 @@
 #define SETTINGS_H
 
 //const String FirmwareVer = {"0.0.11.11"};
-#define FIRMWARE_VERSION "0.0.11.14"
+#define FIRMWARE_VERSION "0.0.11.15"
 
 //Default Bluetooth WiFi and MDNS Name
 #define DEVICE_NAME "SmartSpin2K"
