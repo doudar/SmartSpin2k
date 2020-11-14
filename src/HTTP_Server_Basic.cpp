@@ -180,8 +180,9 @@ void startHttpServer()
 
   server.on("/reboot.html", []() {
     debugDirector("Rebooting from Web Request");
-    String response = "Rebooting....<script> setTimeout(\"location.href = 'http://SmartSpin2k.local/index.html';\",1000); </script>";
+    String response = "Rebooting....<script> setTimeout(\"location.href = 'http://SmartSpin2k.local/index.html';\",500); </script>";
     server.send(200, "text/html", response);
+    vTaskDelay(1000/portTICK_PERIOD_MS);
     ESP.restart();
   });
 
