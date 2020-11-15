@@ -17,7 +17,7 @@ class userParameters
     int     simulatedWatts;                 //Keep
     int     simulatedHr;                    //Keep
     int     simulatedCad;                   //Keep
-    float   inclineStep;                    //Not Used - Remove                 String MDNS name would be nice instead
+    String  MdnsName;                       //Done
     int     shiftStep;                      //Keep
     float   inclineMultiplier;              //Keep
     bool    simulatePower;                  //Keep
@@ -31,12 +31,12 @@ class userParameters
     String  connectedHeartMonitor = " ";    //Keep    
 
     public:
-    const char* getfirmwareUpdateURL()                {return firmwareUpdateURL.c_str();}
+    const char* getfirmwareUpdateURL()       {return firmwareUpdateURL.c_str();}
     float       getIncline()                 {return incline;}
     int         getSimulatedWatts()          {return simulatedWatts;}
     int         getSimulatedHr()             {return simulatedHr;}
     float       getSimulatedCad()            {return simulatedCad;}
-    float       getInclineStep()             {return inclineStep;}
+    const char* getMdnsName()                {return MdnsName.c_str();}
     int         getShiftStep()               {return shiftStep;}
     float       getInclineMultiplier()       {return inclineMultiplier;}
     bool        getSimulatePower()           {return simulatePower;}
@@ -55,7 +55,7 @@ class userParameters
     void    setSimulatedWatts(int w)            {simulatedWatts = w;}
     void    setSimulatedHr(int hr)              {simulatedHr = hr;}
     void    setSimulatedCad(float cad)          {simulatedCad = cad;}
-    void    setInclineStep(float is)            {inclineStep = is;}
+    void    setMdnsName(String mdnsn)           {MdnsName = mdnsn;}
     void    setShiftStep(int ss)                {shiftStep = ss;}
     void    setInclineMultiplier(float im)      {inclineMultiplier = im;}
     void    setSimulatePower(bool sp)           {simulatePower = sp;}

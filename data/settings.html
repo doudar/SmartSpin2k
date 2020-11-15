@@ -33,6 +33,13 @@
           </tr>
           <tr style="height: 20px;">
             <td style="width: 14%; height: 20px;">
+              <p class="tooltip">MDNS Name<span class="tooltiptext">DNS Name the device will use on the network.</span></p>
+            </td>
+            <td style="width: 14%; height: 20px;"><input type="text" id="MdnsName" name="MdnsName" value="loading" />
+            </td>
+          </tr>
+          <tr style="height: 20px;">
+            <td style="width: 14%; height: 20px;">
               <p class="tooltip">Shift Step<span class="tooltiptext">Amount to move stepper per gear shift. <br><br>Try to target ~50watt changes.</span></p>
             </td>
             <td style="width: 14%; height: 20px;">
@@ -84,6 +91,7 @@
         var obj = JSON.parse(this.responseText);
         document.getElementById("ssid").value = obj.ssid;
         document.getElementById("password").value = obj.password;
+        document.getElementById("MdnsName").value = obj.MdnsName;
         document.getElementById("shiftStep").value = obj.shiftStep;
         document.getElementById("inclineMultiplier").value = obj.inclineMultiplier;
         updateSlider(document.getElementById("shiftStep"),document.getElementById("shiftStepValue"));

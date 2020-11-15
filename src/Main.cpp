@@ -21,7 +21,6 @@ unsigned long debounceDelay = 500;  // the debounce time; increase if the output
 
 //Stepper Speed - Lower is faster
 int maxStepperSpeed = 500;
-
 int shifterPosition = 0;
 int stepperPosition = 0;
 
