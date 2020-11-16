@@ -35,7 +35,7 @@
             <td style="width: 14%; height: 20px;">
               <p class="tooltip">MDNS Name<span class="tooltiptext">DNS Name the device will use on the network.</span></p>
             </td>
-            <td style="width: 14%; height: 20px;"><input type="text" id="MdnsName" name="MdnsName" value="loading" />
+            <td style="width: 14%; height: 20px;"><input type="text" id="mdnsName" name="mdnsName" value="loading" />
             </td>
           </tr>
           <tr style="height: 20px;">
@@ -49,13 +49,20 @@
           </tr>
           <tr style="height: 20px;" >
             <td style="width: 14%; height: 20px;">
-              <p class="tooltip"> Incline Multiplier<span class="tooltiptext">Increase to make incline changes more noticable. <br><br>Adjust until hills feel realistic.</span></p>
+              <p class="tooltip">Incline Multiplier<span class="tooltiptext">Increase to make incline changes more noticable. <br><br>Adjust until hills feel realistic.</span></p>
             </td>
             <td style="width: 14%; height: 20px;">
               <p style="padding: 0px; width: 10px; position: relative; top: -12px; left: 100px; color: rgb(250, 250, 250);"><span id="inclineMultiplierValue">0</span></p>            
               <input style="position: relative; top: -25px; left: 7px;" type="range" id="inclineMultiplier" name="inclineMultiplier"
-                value="0" min="1" max="5" step="1" class="slider1" onchange="updateSlider(this, document.getElementById('inclineMultiplierValue'))"/>
-                
+                value="0" min="1" max="5" step="1" class="slider1" onchange="updateSlider(this, document.getElementById('inclineMultiplierValue'))"/>    
+              </td>
+          </tr>
+          <tr style="height: 20px;" >
+            <td style="width: 14%; height: 20px;">
+              <p class="tooltip">Automatic Updates<span class="tooltiptext">Check for new firmware on boot?</span></p>
+            </td>
+            <td style="width: 14%; height: 20px;">           
+              <p><label class="switch"><input type="checkbox" id="autoUpdate"><span class="slider"></span></label></p>
               </td>
           </tr>
         </tbody>
@@ -91,9 +98,10 @@
         var obj = JSON.parse(this.responseText);
         document.getElementById("ssid").value = obj.ssid;
         document.getElementById("password").value = obj.password;
-        document.getElementById("MdnsName").value = obj.MdnsName;
+        document.getElementById("mdnsName").value = obj.mdnsName;
         document.getElementById("shiftStep").value = obj.shiftStep;
         document.getElementById("inclineMultiplier").value = obj.inclineMultiplier;
+        document.getElementById("autoUpdate").checked = obj.autoUpdate;
         updateSlider(document.getElementById("shiftStep"),document.getElementById("shiftStepValue"));
         updateSlider(document.getElementById("inclineMultiplier"),document.getElementById("inclineMultiplierValue"));
         document.getElementById("loadingWatermark").remove();

@@ -19,13 +19,13 @@ void userParameters::setDefaults()  //Move these to set the values as #define in
     simulatedWatts          = 100;
     simulatedHr             = 60;
     simulatedCad            = 90;
-    MdnsName                = DEVICE_NAME;
+    mdnsName                = DEVICE_NAME;
     shiftStep               = 400;
     inclineMultiplier       = 2.0;
     simulatePower           = false;
     simulateHr              = true;
     ERGMode                 = false;
-    wifiOn                  = true;
+    autoUpdate              = true;
     ssid                    = DEVICE_NAME;
     password                = DEFAULT_PASSWORD;
     foundDevices            = "";
@@ -48,13 +48,13 @@ String userParameters::returnJSON()
     doc["simulatedWatts"]     = simulatedWatts;
     doc["simulatedHr"]        = simulatedHr;
     doc["simulatedCad"]       = simulatedCad;
-    doc["MdnsName"]           = MdnsName;
+    doc["mdnsName"]           = mdnsName;
     doc["shiftStep"]          = shiftStep;
     doc["inclineMultiplier"]  = inclineMultiplier;
     doc["simulatePower"]      = simulatePower;
     doc["simulateHr"]         = simulateHr;
     doc["ERGMode"]            = ERGMode;
-    doc["wifiOn"]             = wifiOn;
+    doc["autoUpdate"]         = autoUpdate;
     doc["ssid"]               = ssid;
     doc["password"]           = password;
     //doc["foundDevices"]       = foundDevices;  I don't see a need currently in keeping this boot to boot
@@ -91,13 +91,13 @@ void userParameters::saveToSPIFFS()
     doc["simulatedWatts"]     = simulatedWatts;
     doc["simulatedHr"]        = simulatedHr;
     doc["simulatedCad"]       = simulatedCad;
-    doc["MdnsName"]           = MdnsName;
+    doc["mdnsName"]           = mdnsName;
     doc["shiftStep"]          = shiftStep;
     doc["inclineMultiplier"]  = inclineMultiplier;
     doc["simulatePower"]      = simulatePower;
     doc["simulateHr"]         = simulateHr;
     doc["ERGMode"]            = ERGMode;
-    doc["wifiOn"]             = wifiOn;
+    doc["autoUpdate"]         = autoUpdate;
     doc["ssid"]               = ssid;
     doc["password"]           = password;
     //doc["foundDevices"]       = foundDevices; 
@@ -138,18 +138,18 @@ void userParameters::loadFromSPIFFS() {
   }
 
   // Copy values from the JsonDocument to the Config
-    setfirmwareUpdateURL(doc["firmwareUpdateURL"]);
+    setFirmwareUpdateURL(doc["firmwareUpdateURL"]);
     setIncline          (doc["incline"]);
     setSimulatedWatts   (doc["simulatedWatts"]);
     setSimulatedHr      (doc["simulatedHr"]);
     setSimulatedCad     (doc["simulatedCad"]);
-    setMdnsName         (doc["MdnsName"]);
+    setMdnsName         (doc["mdnsName"]);
     setShiftStep        (doc["shiftStep"]);
     setInclineMultiplier(doc["inclineMultiplier"]);
     setSimulatePower    (doc["simulatePower"]);
     setSimulateHr       (doc["simulateHr"]);
     setERGMode          (doc["ERGMode"]);
-    setWifiOn           (doc["wifiOn"]);
+    setAutoUpdate       (doc["autoUpdate"]);
     setSsid             (doc["ssid"]);
     setPassword         (doc["password"]);
     //setfoundDevices     (doc["foundDevices"]);

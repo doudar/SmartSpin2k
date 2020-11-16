@@ -354,7 +354,7 @@ void handleSpiffsFile()
 void FirmwareUpdate()
 {
   debugDirector("Checking for newer firmware:");
-  http.begin(userConfig.getfirmwareUpdateURL() + String(FW_VERSIONFILE)); // check version URL
+  http.begin(userConfig.getFirmwareUpdateURL() + String(FW_VERSIONFILE)); // check version URL
   delay(100);
   int httpCode = http.GET(); // get data from version file
   delay(100);
@@ -388,14 +388,14 @@ void FirmwareUpdate()
       WiFiClientSecure client;
       httpUpdate.setLedPin(LED_BUILTIN, LOW);
       debugDirector("Updating FileSystem");
-      t_httpUpdate_return ret = httpUpdate.updateSpiffs(client, userConfig.getfirmwareUpdateURL() + String(FW_SPIFFSFILE));
+      t_httpUpdate_return ret = httpUpdate.updateSpiffs(client, userConfig.getFirmwareUpdateURL() + String(FW_SPIFFSFILE));
       vTaskDelay(100 / portTICK_PERIOD_MS);
       if (ret == HTTP_UPDATE_OK)
       {
         debugDirector("Saving Config.txt");
         userConfig.saveToSPIFFS();
         debugDirector("Updating Program");
-        ret = httpUpdate.update(client, userConfig.getfirmwareUpdateURL() + String(FW_BINFILE));
+        ret = httpUpdate.update(client, userConfig.getFirmwareUpdateURL() + String(FW_BINFILE));
         switch (ret)
         {
         case HTTP_UPDATE_FAILED:

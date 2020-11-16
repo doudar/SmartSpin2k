@@ -17,13 +17,13 @@ class userParameters
     int     simulatedWatts;                 //Keep
     int     simulatedHr;                    //Keep
     int     simulatedCad;                   //Keep
-    String  MdnsName;                       //Done
+    String  mdnsName;                       //Done
     int     shiftStep;                      //Keep
     float   inclineMultiplier;              //Keep
     bool    simulatePower;                  //Keep
     bool    simulateHr;                     //Keep
     bool    ERGMode;                        //Keep
-    bool    wifiOn;                         //Depreciated - Remove              bool automaticUpdates would be nice instead
+    bool    autoUpdate;                 //in Progress was wifiOn
     String  ssid;                           //Keep
     String  password;                       //Keep
     String  foundDevices = " ";             //Keep
@@ -31,18 +31,18 @@ class userParameters
     String  connectedHeartMonitor = " ";    //Keep    
 
     public:
-    const char* getfirmwareUpdateURL()       {return firmwareUpdateURL.c_str();}
+    const char* getFirmwareUpdateURL()       {return firmwareUpdateURL.c_str();}
     float       getIncline()                 {return incline;}
     int         getSimulatedWatts()          {return simulatedWatts;}
     int         getSimulatedHr()             {return simulatedHr;}
     float       getSimulatedCad()            {return simulatedCad;}
-    const char* getMdnsName()                {return MdnsName.c_str();}
+    const char* getMdnsName()                {return mdnsName.c_str();}
     int         getShiftStep()               {return shiftStep;}
     float       getInclineMultiplier()       {return inclineMultiplier;}
     bool        getSimulatePower()           {return simulatePower;}
     bool        getSimulateHr()              {return simulateHr;}
     bool        getERGMode()                 {return ERGMode;}
-    bool        getWifiOn()                  {return wifiOn;}
+    bool        getautoUpdate()              {return autoUpdate;}
     const char* getSsid()                    {return ssid.c_str();}
     const char* getPassword()                {return password.c_str();}
     const char* getFoundDevices()            {return foundDevices.c_str();}
@@ -50,18 +50,18 @@ class userParameters
     const char* getconnectedHeartMonitor()   {return connectedHeartMonitor.c_str();}
 
     void    setDefaults();
-    void    setfirmwareUpdateURL(String fURL)            {firmwareUpdateURL = fURL;}
+    void    setFirmwareUpdateURL(String fURL)   {firmwareUpdateURL = fURL;}
     void    setIncline(float inc)               {incline = inc;}
     void    setSimulatedWatts(int w)            {simulatedWatts = w;}
     void    setSimulatedHr(int hr)              {simulatedHr = hr;}
     void    setSimulatedCad(float cad)          {simulatedCad = cad;}
-    void    setMdnsName(String mdnsn)           {MdnsName = mdnsn;}
+    void    setMdnsName(String mdnsn)           {mdnsName = mdnsn;}
     void    setShiftStep(int ss)                {shiftStep = ss;}
     void    setInclineMultiplier(float im)      {inclineMultiplier = im;}
     void    setSimulatePower(bool sp)           {simulatePower = sp;}
     void    setSimulateHr(bool shr)             {simulateHr = shr;}
     void    setERGMode(bool erg)                {ERGMode = erg;}
-    void    setWifiOn(bool wifi)                {wifiOn = wifi;}
+    void    setAutoUpdate(bool atupd)           {autoUpdate = atupd;}
     void    setSsid(String sid)                 {ssid = sid;}
     void    setPassword(String pwd)             {password = pwd;} 
     void    setFoundDevices(String fdev)        {foundDevices = fdev;};
