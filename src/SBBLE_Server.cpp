@@ -294,7 +294,7 @@ void setupBLE() //COmmon BLE setup for both Client and sServer
 {
 
   debugDirector("Starting Arduino BLE Client application...");
-  BLEDevice::init(DEVICE_NAME);
+  BLEDevice::init(userConfig.getDeviceName());
 
   // Retrieve a Scanner and set the callback we want to use to be informed when we
   // have detected a new device.  Specify that we want active scanning and start the

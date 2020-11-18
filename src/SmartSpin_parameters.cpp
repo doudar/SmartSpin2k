@@ -19,7 +19,7 @@ void userParameters::setDefaults()  //Move these to set the values as #define in
     simulatedWatts          = 100;
     simulatedHr             = 60;
     simulatedCad            = 90;
-    mdnsName                = DEVICE_NAME;
+    deviceName                = DEVICE_NAME;
     shiftStep               = 400;
     inclineMultiplier       = 2.0;
     simulatePower           = false;
@@ -48,7 +48,7 @@ String userParameters::returnJSON()
     doc["simulatedWatts"]     = simulatedWatts;
     doc["simulatedHr"]        = simulatedHr;
     doc["simulatedCad"]       = simulatedCad;
-    doc["mdnsName"]           = mdnsName;
+    doc["deviceName"]         = deviceName;
     doc["shiftStep"]          = shiftStep;
     doc["inclineMultiplier"]  = inclineMultiplier;
     doc["simulatePower"]      = simulatePower;
@@ -91,7 +91,7 @@ void userParameters::saveToSPIFFS()
     doc["simulatedWatts"]     = simulatedWatts;
     doc["simulatedHr"]        = simulatedHr;
     doc["simulatedCad"]       = simulatedCad;
-    doc["mdnsName"]           = mdnsName;
+    doc["deviceName"]         = deviceName;
     doc["shiftStep"]          = shiftStep;
     doc["inclineMultiplier"]  = inclineMultiplier;
     doc["simulatePower"]      = simulatePower;
@@ -143,7 +143,7 @@ void userParameters::loadFromSPIFFS() {
     setSimulatedWatts   (doc["simulatedWatts"]);
     setSimulatedHr      (doc["simulatedHr"]);
     setSimulatedCad     (doc["simulatedCad"]);
-    setMdnsName         (doc["mdnsName"]);
+    setDeviceName       (doc["deviceName"]);
     setShiftStep        (doc["shiftStep"]);
     setInclineMultiplier(doc["inclineMultiplier"]);
     setSimulatePower    (doc["simulatePower"]);

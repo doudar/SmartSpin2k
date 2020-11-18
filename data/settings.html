@@ -33,9 +33,9 @@
           </tr>
           <tr style="height: 20px;">
             <td style="width: 14%; height: 20px;">
-              <p class="tooltip">MDNS Name<span class="tooltiptext">DNS Name the device will use on the network.</span></p>
+              <p class="tooltip">MDNS & Bluetooth Name<span class="tooltiptext">DNS Name the device will use on the network.</span></p>
             </td>
-            <td style="width: 14%; height: 20px;"><input type="text" id="mdnsName" name="mdnsName" value="loading" />
+            <td style="width: 14%; height: 20px;"><input type="text" id="deviceName" name="deviceName" value="loading" />
             </td>
           </tr>
           <tr style="height: 20px;">
@@ -98,7 +98,7 @@
         var obj = JSON.parse(this.responseText);
         document.getElementById("ssid").value = obj.ssid;
         document.getElementById("password").value = obj.password;
-        document.getElementById("mdnsName").value = obj.mdnsName;
+        document.getElementById("deviceName").value = obj.deviceName;
         document.getElementById("shiftStep").value = obj.shiftStep;
         document.getElementById("inclineMultiplier").value = obj.inclineMultiplier;
         document.getElementById("autoUpdate").checked = obj.autoUpdate;

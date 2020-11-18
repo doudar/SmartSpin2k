@@ -39,9 +39,9 @@
           </tr>
           <tr style="height: 20px;">
             <td style="width: 14%; height: 20px;">
-              <p><label for="MdnsName">MDNS Name</label></p>
+              <p><label for="deviceName">MDNS Name</label></p>
             </td>
-            <td style="width: 14%; height: 20px;"><input type="text" id="MdnsName" name="MdnsName"
+            <td style="width: 14%; height: 20px;"><input type="text" id="deviceName" name="deviceName"
                 value="loading" /></td>
                             <td style="width: 14%; height: 20px;">
               <p><label for="ssid">Cadence</label></p>
@@ -104,7 +104,7 @@ function updateScroll(){
         var obj = JSON.parse(this.responseText);
         document.getElementById("ssid").value = obj.ssid;
         document.getElementById("password").value = obj.password;
-        document.getElementById("MdnsName").value = obj.MdnsName;
+        document.getElementById("deviceName").value = obj.deviceName;
         document.getElementById("shiftStep").value = obj.shiftStep;
         document.getElementById("inclineMultiplier").value = obj.inclineMultiplier;
         document.getElementById("incline").value = obj.incline;

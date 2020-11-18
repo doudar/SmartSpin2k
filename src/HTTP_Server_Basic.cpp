@@ -75,9 +75,9 @@ void startWifi()
     dnsServer.setErrorReplyCode(DNSReplyCode::NoError);
     dnsServer.start(DNS_PORT, "*", myIP);
   }
-  MDNS.begin(userConfig.getMdnsName()); 
+  MDNS.begin(userConfig.getDeviceName()); 
   MDNS.addService("http", "tcp", 80);
-  debugDirector(String("Open http://") + userConfig.getMdnsName() + "local/");
+  debugDirector(String("Open http://") + userConfig.getDeviceName() + "local/");
 }
 
 WebServer server(80);
@@ -109,11 +109,11 @@ void startHttpServer()
       tString.trim();
       userConfig.setPassword(tString);
     }
-    if (!server.arg("MdnsName").isEmpty())
+    if (!server.arg("deviceName").isEmpty())
     {
-      tString = server.arg("MdnsName");
+      tString = server.arg("deviceName");
       tString.trim();
-      userConfig.setMdnsName(tString);
+      userConfig.setDeviceName(tString);
     }
     if (!server.arg("shiftStep").isEmpty())
     {
@@ -127,7 +127,7 @@ void startHttpServer()
     {
       userConfig.setConnectedPowerMeter(server.arg("bleDropdown"));
     }
-    String response = "<!DOCTYPE html><html><body>Saving Settings....</body><script> setTimeout(\"location.href = 'http://" + String(userConfig.getMdnsName()) +  ".local/settings.html';\",1000);</script></html>";
+    String response = "<!DOCTYPE html><html><body>Saving Settings....</body><script> setTimeout(\"location.href = 'http://" + String(userConfig.getDeviceName()) +  ".local/settings.html';\",1000);</script></html>";
     server.send(200, "text/html", response);
     debugDirector("Config Updated From Web");
     userConfig.printFile();
@@ -142,7 +142,7 @@ void startHttpServer()
   server.on("/BLEScan", []() {
     debugDirector("Scanning for BLE Devices");
     BLEServerScan(false);
-    String response = "<!DOCTYPE html><html><body>Scanning for BLE Devices. Please wait.</body><script> setTimeout(\"location.href = 'http://" + String(userConfig.getMdnsName()) + ".local/bluetoothscanner.html';\",5000);</script></html>";
+    String response = "<!DOCTYPE html><html><body>Scanning for BLE Devices. Please wait.</body><script> setTimeout(\"location.href = 'http://" + String(userConfig.getDeviceName()) + ".local/bluetoothscanner.html';\",5000);</script></html>";
     server.send(200, "text/html", response);
   });
 
@@ -151,13 +151,13 @@ void startHttpServer()
     SPIFFS.format();
     userConfig.setDefaults();
     userConfig.saveToSPIFFS();
-    String response = "Loading Defaults....<script> setTimeout(\"location.href ='http://" + String(userConfig.getMdnsName()) + ".local/settings.html';\",1000); </script>";
+    String response = "Loading Defaults....<script> setTimeout(\"location.href ='http://" + String(userConfig.getDeviceName()) + ".local/settings.html';\",1000); </script>";
     server.send(200, "text/html", response);
   });
 
   server.on("/reboot.html", []() {
     debugDirector("Rebooting from Web Request");
-    String response = "Rebooting....<script> setTimeout(\"location.href = 'http://" + String(userConfig.getMdnsName()) + ".local/index.html';\",500); </script>";
+    String response = "Rebooting....<script> setTimeout(\"location.href = 'http://" + String(userConfig.getDeviceName()) + ".local/index.html';\",500); </script>";
     server.send(200, "text/html", response);
     vTaskDelay(1000/portTICK_PERIOD_MS);
     ESP.restart();
@@ -318,7 +318,7 @@ void webClientUpdate(void *pvParameters)
 void handleIndexFile()
 {
   String filename="/index.html";
-  if (SPIFFS.exists(server.uri()))
+  if (SPIFFS.exists(filename))
   {
     File file = SPIFFS.open(filename, "r");
     server.streamFile(file, "text/html");
@@ -336,7 +336,7 @@ void handleSpiffsFile()
   String filename=server.uri();
   int dotPosition = filename.lastIndexOf(".");
   String fileType = filename.substring((dotPosition + 1), filename.length());
-  if (SPIFFS.exists(server.uri()))
+  if (SPIFFS.exists(filename))
   {
     File file = SPIFFS.open(filename, "r");
     server.streamFile(file, "text/" + fileType);

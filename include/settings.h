@@ -10,7 +10,7 @@
 #define SETTINGS_H
 
 //Current program version info. Used for auto updates
-#define FIRMWARE_VERSION "0.0.11.15"
+#define FIRMWARE_VERSION "0.0.11.18"
 
 //Update firmware on boot?
 #define AUTO_FIRMWARE_UPDATE true

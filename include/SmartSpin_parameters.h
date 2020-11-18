@@ -17,7 +17,7 @@ class userParameters
     int     simulatedWatts;                 //Keep
     int     simulatedHr;                    //Keep
     int     simulatedCad;                   //Keep
-    String  mdnsName;                       //Done
+    String  deviceName;                     //Done
     int     shiftStep;                      //Keep
     float   inclineMultiplier;              //Keep
     bool    simulatePower;                  //Keep
@@ -36,7 +36,7 @@ class userParameters
     int         getSimulatedWatts()          {return simulatedWatts;}
     int         getSimulatedHr()             {return simulatedHr;}
     float       getSimulatedCad()            {return simulatedCad;}
-    const char* getMdnsName()                {return mdnsName.c_str();}
+    const char* getDeviceName()              {return deviceName.c_str();}
     int         getShiftStep()               {return shiftStep;}
     float       getInclineMultiplier()       {return inclineMultiplier;}
     bool        getSimulatePower()           {return simulatePower;}
@@ -55,7 +55,7 @@ class userParameters
     void    setSimulatedWatts(int w)            {simulatedWatts = w;}
     void    setSimulatedHr(int hr)              {simulatedHr = hr;}
     void    setSimulatedCad(float cad)          {simulatedCad = cad;}
-    void    setMdnsName(String mdnsn)           {mdnsName = mdnsn;}
+    void    setDeviceName(String dvcn)          {deviceName = dvcn;}
     void    setShiftStep(int ss)                {shiftStep = ss;}
     void    setInclineMultiplier(float im)      {inclineMultiplier = im;}
     void    setSimulatePower(bool sp)           {simulatePower = sp;}
