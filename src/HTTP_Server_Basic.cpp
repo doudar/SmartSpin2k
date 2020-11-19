@@ -127,7 +127,7 @@ void startHttpServer()
     {
       userConfig.setConnectedPowerMeter(server.arg("bleDropdown"));
     }
-    String response = "<!DOCTYPE html><html><body>Saving Settings....</body><script> setTimeout(\"location.href = 'http://" + String(userConfig.getDeviceName()) +  ".local/settings.html';\",1000);</script></html>";
+    String response = "<!DOCTYPE html><html><body><h2>Settings will be applied at next reboot....</h2></body><script> setTimeout(\"location.href = 'http://" + String(userConfig.getDeviceName()) +  ".local/index.html';\",1000);</script></html>";
     server.send(200, "text/html", response);
     debugDirector("Config Updated From Web");
     userConfig.printFile();
@@ -151,15 +151,16 @@ void startHttpServer()
     SPIFFS.format();
     userConfig.setDefaults();
     userConfig.saveToSPIFFS();
-    String response = "Loading Defaults....<script> setTimeout(\"location.href ='http://" + String(userConfig.getDeviceName()) + ".local/settings.html';\",1000); </script>";
+    String response = "<!DOCTYPE html><html><body><h1>Defaults have been loaded.</h1><p><br><br> Please reconnect to the device on WiFi network: " + String(userConfig.getSsid()) + "</p></body></html>";
     server.send(200, "text/html", response);
+    ESP.restart();
   });
 
   server.on("/reboot.html", []() {
     debugDirector("Rebooting from Web Request");
     String response = "Rebooting....<script> setTimeout(\"location.href = 'http://" + String(userConfig.getDeviceName()) + ".local/index.html';\",500); </script>";
     server.send(200, "text/html", response);
-    vTaskDelay(1000/portTICK_PERIOD_MS);
+    vTaskDelay(100/portTICK_PERIOD_MS);
     ESP.restart();
   });
 
