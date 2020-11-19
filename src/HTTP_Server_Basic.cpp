@@ -77,7 +77,7 @@ void startWifi()
   }
   MDNS.begin(userConfig.getDeviceName()); 
   MDNS.addService("http", "tcp", 80);
-  debugDirector(String("Open http://") + userConfig.getDeviceName() + "local/");
+  debugDirector(String("Open http://") + userConfig.getDeviceName() + ".local/");
 }
 
 WebServer server(80);
