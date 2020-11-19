@@ -108,13 +108,14 @@ void loop()
   BLENotify();
   vTaskDelay(500 / portTICK_RATE_MS); //guessing it's good to have task delays seperating client & Server?
   bleClient();
+  digitalWrite(LED_PIN, HIGH);
   vTaskDelay(500 / portTICK_RATE_MS);
 
   if (debugToHTML.length() > 500)
   { //Clear up memory
     debugToHTML = "<br>HTML Debug Truncated. Increase buffer if required.";
   }
-  digitalWrite(LED_PIN, HIGH);
+  
 }
 
 void moveStepper(void *pvParameters)
