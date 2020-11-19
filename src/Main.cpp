@@ -90,7 +90,7 @@ void setup()
   digitalWrite(LED_PIN, HIGH);
   startWifi();
   startHttpServer();
-  if (AUTO_FIRMWARE_UPDATE)
+  if (userConfig.getautoUpdate())
   {
     FirmwareUpdate();
   }

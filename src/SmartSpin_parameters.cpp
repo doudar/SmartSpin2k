@@ -19,13 +19,13 @@ void userParameters::setDefaults()  //Move these to set the values as #define in
     simulatedWatts          = 100;
     simulatedHr             = 60;
     simulatedCad            = 90;
-    deviceName                = DEVICE_NAME;
+    deviceName              = DEVICE_NAME;
     shiftStep               = 400;
     inclineMultiplier       = 2.0;
     simulatePower           = false;
     simulateHr              = true;
     ERGMode                 = false;
-    autoUpdate              = true;
+    autoUpdate              = AUTO_FIRMWARE_UPDATE;
     ssid                    = DEVICE_NAME;
     password                = DEFAULT_PASSWORD;
     foundDevices            = "";
