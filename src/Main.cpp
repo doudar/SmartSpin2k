@@ -223,6 +223,11 @@ void resetIfShiftersHeld()
   if ((digitalRead(SHIFT_UP_PIN) == LOW) && (digitalRead(SHIFT_DOWN_PIN) == LOW))
   {
     debugDirector("Resetting to defaults via shifter buttons.");
+    for(int x=0;x<10;x++){ //blink fast to acknoledge
+      digitalWrite(LED_PIN,HIGH);
+      vTaskDelay(200/portTICK_PERIOD_MS);
+      digitalWrite(LED_PIN, LOW);
+    }
     userConfig.setDefaults();
     vTaskDelay(100 / portTICK_PERIOD_MS);
     userConfig.saveToSPIFFS();
