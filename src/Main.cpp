@@ -64,11 +64,6 @@ void setup()
   digitalWrite(STEP_PIN, LOW);
   digitalWrite(LED_PIN, LOW);
 
-  debugDirector("Creating Interrupts");
-  //Setup Interrups so shifters work at anytime
-  attachInterrupt(digitalPinToInterrupt(SHIFT_UP_PIN), shiftUp, CHANGE);
-  attachInterrupt(digitalPinToInterrupt(SHIFT_DOWN_PIN), shiftDown, CHANGE);
-
   debugDirector("Setting up cpu Tasks");
   //create a task that will be executed in the moveStepper function, with priority 1 and executed on core 0
   //the main loop function always runs on core 1 by default
@@ -95,6 +90,11 @@ void setup()
     FirmwareUpdate();
   }
   startBLEServer();
+  resetIfShiftersHeld();
+  debugDirector("Creating Shifter Interrupts");
+  //Setup Interrups so shifters work at anytime
+  attachInterrupt(digitalPinToInterrupt(SHIFT_UP_PIN), shiftUp, CHANGE);
+  attachInterrupt(digitalPinToInterrupt(SHIFT_DOWN_PIN), shiftDown, CHANGE);
 }
 
 void loop()
@@ -115,7 +115,6 @@ void loop()
   { //Clear up memory
     debugToHTML = "<br>HTML Debug Truncated. Increase buffer if required.";
   }
-  
 }
 
 void moveStepper(void *pvParameters)
@@ -216,6 +215,19 @@ void IRAM_ATTR shiftDown() //Handle the shift down interrupt
     {
       lastDebounceTime = 0;
     } //Probably Triggered by EMF, reset the debounce
+  }
+}
+
+void resetIfShiftersHeld()
+{
+  if ((digitalRead(SHIFT_UP_PIN) == LOW) && (digitalRead(SHIFT_DOWN_PIN) == LOW))
+  {
+    debugDirector("Resetting to defaults via shifter buttons.");
+    userConfig.setDefaults();
+    vTaskDelay(100 / portTICK_PERIOD_MS);
+    userConfig.saveToSPIFFS();
+    vTaskDelay(100 / portTICK_PERIOD_MS);
+    ESP.restart();
   }
 }
 
