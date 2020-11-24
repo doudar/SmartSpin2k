@@ -20,6 +20,7 @@ void IRAM_ATTR shiftUp();
 void IRAM_ATTR shiftDown(); 
 void debugDirector(String, bool = true);
 void resetIfShiftersHeld();
+void setupTMCStepperDriver();
 
 //Main program variable that stores most everything
 extern userParameters userConfig;

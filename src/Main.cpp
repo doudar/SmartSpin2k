@@ -6,9 +6,10 @@
 // Prototype hardware build from plans in the SmartSpin2k repository are licensed under Cern Open Hardware Licence version 2 Permissive
 
 #include "Main.h"
-
+#include <TMCStepper.h>
 #include <Arduino.h>
 #include <SPIFFS.h>
+#include <HardwareSerial.h>
 
 String debugToHTML = "<br>Firmware Version " + String(FIRMWARE_VERSION);
 bool GlobalBLEClientConnected = false;
@@ -23,6 +24,8 @@ unsigned long debounceDelay = 500;  // the debounce time; increase if the output
 int maxStepperSpeed = 500;
 int shifterPosition = 0;
 int stepperPosition = 0;
+HardwareSerial stepperSerial(2);
+TMC2208Stepper driver(&SERIAL_PORT, R_SENSE); // Hardware Serial
 
 //Setup a task so the stepper will run on a different core than the main code to prevent stuttering
 TaskHandle_t moveStepperTask;
@@ -36,6 +39,7 @@ void setup()
 
   // Serial port for debugging purposes
   Serial.begin(512000);
+  stepperSerial.begin(57600, SERIAL_8N2, STEPPERSERIAL_RX, STEPPERSERIAL_TX);
 
   debugDirector("Compiled " + String(__DATE__) + String(__TIME__));
 
@@ -63,6 +67,8 @@ void setup()
   digitalWrite(DIR_PIN, LOW);
   digitalWrite(STEP_PIN, LOW);
   digitalWrite(LED_PIN, LOW);
+
+  setupTMCStepperDriver();
 
   debugDirector("Setting up cpu Tasks");
   //create a task that will be executed in the moveStepper function, with priority 1 and executed on core 0
@@ -209,7 +215,7 @@ void IRAM_ATTR shiftDown() //Handle the shift down interrupt
     if (!digitalRead(SHIFT_DOWN_PIN)) //double checking to make sure the interrupt wasn't triggered by emf
     {
       shifterPosition = (shifterPosition - userConfig.getShiftStep());
-      debugDirector("Shift DOWN" + String(shifterPosition));
+      debugDirector("Shift DOWN: " + String(shifterPosition));
     }
     else
     {
@@ -223,9 +229,10 @@ void resetIfShiftersHeld()
   if ((digitalRead(SHIFT_UP_PIN) == LOW) && (digitalRead(SHIFT_DOWN_PIN) == LOW))
   {
     debugDirector("Resetting to defaults via shifter buttons.");
-    for(int x=0;x<10;x++){ //blink fast to acknoledge
-      digitalWrite(LED_PIN,HIGH);
-      vTaskDelay(200/portTICK_PERIOD_MS);
+    for (int x = 0; x < 10; x++)
+    { //blink fast to acknoledge
+      digitalWrite(LED_PIN, HIGH);
+      vTaskDelay(200 / portTICK_PERIOD_MS);
       digitalWrite(LED_PIN, LOW);
     }
     userConfig.setDefaults();
@@ -248,4 +255,29 @@ void debugDirector(String textToPrint, bool newline)
     Serial.print(textToPrint);
     debugToHTML += textToPrint;
   }
+}
+
+void setupTMCStepperDriver()
+{
+  driver.begin();          //  SPI: Init CS pins and possible SW SPI pins
+                           // UART: Init SW UART (if selected) with default 115200 baudrate
+  driver.pdn_disable(true);
+  driver.mstep_reg_select(true);
+
+
+  uint16_t msread=driver.microsteps();
+  Serial.print(" read:ms=");    Serial.println(msread); 
+  
+  driver.rms_current(1200); // Set motor RMS current
+  driver.microsteps(8);   // Set microsteps to 1/8th
+  driver.ihold(100);  //hold current
+  driver.iholddelay(10); //Controls the number of clock cycles for motor power down after standstill is detected
+  driver.TPOWERDOWN(128);
+  msread=driver.microsteps();
+  Serial.print(" read:ms=");    Serial.println(msread); 
+  driver.toff(5);
+  driver.en_spreadCycle(false);
+  driver.pwm_autoscale(true); // Needed for stealthChop
+  driver.pwm_autograd(true);
+
 }

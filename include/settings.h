@@ -49,10 +49,26 @@
 #define ENABLE_PIN 5
 
 //Hardware pin for stepper step 
-#define STEP_PIN 17
+#define STEP_PIN 25
 
 //Hardware pin for stepper dir
-#define DIR_PIN 16
+#define DIR_PIN 33
+
+// TMC2208/TMC2224 SoftwareSerial receive pin
+#define STEPPERSERIAL_RX 14 
+
+// TMC2208/TMC2224 SoftwareSerial transmit pin
+#define STEPPERSERIAL_TX 12 
+
+// TMC2208/TMC2224 HardwareSerial port
+#define SERIAL_PORT stepperSerial 
+
+// Match to your driver
+// SilentStepStick series use 0.11
+// UltiMachine Einsy and Archim2 boards use 0.2
+// Panucatt BSD2660 uses 0.1
+// Watterott TMC5160 uses 0.075
+#define R_SENSE 0.11f 
 
 //Hardware pin for indicator LED *note* internal LED on esp32 Dev board is pin 2 
 #define LED_PIN 2 

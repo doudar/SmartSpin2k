@@ -52,7 +52,7 @@
 <layer number="42" name="bRestrict" color="1" fill="10" visible="yes" active="yes"/>
 <layer number="43" name="vRestrict" color="2" fill="10" visible="yes" active="yes"/>
 <layer number="44" name="Drills" color="7" fill="1" visible="no" active="yes"/>
-<layer number="45" name="Holes" color="7" fill="1" visible="no" active="yes"/>
+<layer number="45" name="Holes" color="7" fill="1" visible="yes" active="yes"/>
 <layer number="46" name="Milling" color="3" fill="1" visible="no" active="yes"/>
 <layer number="47" name="Measures" color="7" fill="1" visible="no" active="yes"/>
 <layer number="48" name="Document" color="7" fill="1" visible="yes" active="yes"/>
@@ -84,6 +84,10 @@
 <wire x1="35" y1="0" x2="0" y2="0" width="0" layer="20" locked="yes"/>
 <text x="32.512" y="49.784" size="1.778" layer="25" rot="R270">SmartSpin2k</text>
 <text x="2.921" y="50.419" size="1.778" layer="26" rot="MR270">SmartSpin2k v1</text>
+<hole x="5.588" y="3.81" drill="1"/>
+<hole x="29.464" y="3.81" drill="1"/>
+<hole x="29.464" y="49.784" drill="1"/>
+<hole x="5.461" y="49.784" drill="1"/>
 </plain>
 <libraries>
 <library name="pinhead" urn="urn:adsk.eagle:library:325">
