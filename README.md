@@ -15,13 +15,12 @@ Configuration is accomplished via a web interface hosted by the SmartSpin2k. If 
 
 ### Hardware:
 
-You'll need the quantity listed below of each item excep the driver board. You can use either the A4988 or the TMC2225 but the TMC2225 is much more cooler and quiet! 
+You'll need the quantity listed below of each item excep the driver board. An optional PCB is in process which will make the wiring much simpler! 
 
 |qty   |         Part             |              Link                      |
 |:-----:|--------------------------|---------------------------------------:|
 |1      | ESP32 Dev Board          | https://amzn.to/2ZNyjQX  |
 |1      | NEMA 17 Pancake Stepper  | https://amzn.to/35tNiCW |
-|1      | A4988 Driver Board OR    | https://amzn.to/35w2EqA |
 |1      | TMC2225                  | https://amzn.to/3kctdEQ |
 |1      | LM2596 Buck Converter    | https://amzn.to/33ofggY  |
 |1      | 12V Power Supply         | https://amzn.to/3hqrTNw  |
@@ -58,12 +57,13 @@ But if you're adventerious and handy you can probably take a look at my pictures
 
 ummm that was easy...right? :)
 
+These diagrams are currently being updated. Please refer to settings.h in the include directory for the proper pins to connect. 
 
 ### Esp32 Connection Diagram
 <img src="Pictures/SmartBike2k_Esp32_Connections.png" alt="esp32 connections" style="height: 300px; width: 100"/> 
 
-### A4988 Connection Diagram
-<img src="Pictures/SmartBike2k_A4988_Connections.png" alt="esp32 connections" style="height: 200px; width: 100"/> 
+### TMC2225 Connection Diagram
+<img src="Pictures/SmartSpin2k_TMC2225_Connections.jpg" alt="esp32 connections" style="height: 200px; width: 100"/> 
 
 *note, if you're using a TMC2225 (which you should), the connections will be the same but you do not need to bridge the rst&slp because...well...they don't exist. 
 
