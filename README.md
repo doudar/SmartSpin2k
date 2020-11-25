@@ -57,8 +57,6 @@ But if you're adventerious and handy you can probably take a look at my pictures
 
 ummm that was easy...right? :)
 
-These diagrams are currently being updated. Please refer to settings.h in the include directory for the proper pins to connect. 
-
 ### Esp32 Connection Diagram
 <img src="Pictures/SmartSpin2k_Esp32_Connections.jpg" alt="esp32 connections" style="height: 300px; width: 100"/> 
 
