@@ -268,16 +268,19 @@ void setupTMCStepperDriver()
   uint16_t msread=driver.microsteps();
   Serial.print(" read:ms=");    Serial.println(msread); 
   
-  driver.rms_current(1200); // Set motor RMS current
+  driver.rms_current(1500); // Set motor RMS current
   driver.microsteps(8);   // Set microsteps to 1/8th
+  //driver.irun(1200);
   driver.ihold(100);  //hold current
   driver.iholddelay(10); //Controls the number of clock cycles for motor power down after standstill is detected
   driver.TPOWERDOWN(128);
   msread=driver.microsteps();
   Serial.print(" read:ms=");    Serial.println(msread); 
   driver.toff(5);
-  driver.en_spreadCycle(false);
-  driver.pwm_autoscale(true); // Needed for stealthChop
-  driver.pwm_autograd(true);
+  driver.en_spreadCycle(true);
+  driver.pwm_autoscale(false); // Needed for stealthChop
+  driver.pwm_autograd(false);
+//hold torque isnt enough
+//add erg stuff in settings.html
 
 }
