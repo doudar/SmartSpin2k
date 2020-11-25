@@ -60,7 +60,7 @@ ummm that was easy...right? :)
 These diagrams are currently being updated. Please refer to settings.h in the include directory for the proper pins to connect. 
 
 ### Esp32 Connection Diagram
-<img src="Pictures/SmartBike2k_Esp32_Connections.png" alt="esp32 connections" style="height: 300px; width: 100"/> 
+<img src="Pictures/SmartSpin2k_Esp32_Connections.jpg" alt="esp32 connections" style="height: 300px; width: 100"/> 
 
 ### TMC2225 Connection Diagram
 <img src="Pictures/SmartSpin2k_TMC_Connections.jpg" alt="esp32 connections" style="height: 200px; width: 100"/> 
