@@ -63,7 +63,7 @@ These diagrams are currently being updated. Please refer to settings.h in the in
 <img src="Pictures/SmartBike2k_Esp32_Connections.png" alt="esp32 connections" style="height: 300px; width: 100"/> 
 
 ### TMC2225 Connection Diagram
-<img src="Pictures/SmartBike2k_A4988_Connections.png" alt="esp32 connections" style="height: 200px; width: 100"/> 
+<img src="Pictures/SmartSpin2k_TMC2225_Connections.jpg" alt="esp32 connections" style="height: 200px; width: 100"/> 
 
 *note, if you're using a TMC2225 (which you should), the connections will be the same but you do not need to bridge the rst&slp because...well...they don't exist. 
 
