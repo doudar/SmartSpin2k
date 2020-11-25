@@ -46,7 +46,7 @@
 #define SHIFT_DOWN_PIN 18
 
 //Hardware pin for stepper Enable 
-#define ENABLE_PIN 5
+#define ENABLE_PIN 13
 
 //Hardware pin for stepper step 
 #define STEP_PIN 25
