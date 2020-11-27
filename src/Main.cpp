@@ -121,6 +121,10 @@ void loop()
   { //Clear up memory
     debugToHTML = "<br>HTML Debug Truncated. Increase buffer if required.";
   }
+  uint16_t currentread = driver.cs_actual();
+  uint16_t msread=driver.microsteps();
+  debugDirector(" read:current=" + String(currentread));
+  debugDirector(" read:ms=" + String(msread)); 
 }
 
 void moveStepper(void *pvParameters)
@@ -266,16 +270,19 @@ void setupTMCStepperDriver()
 
 
   uint16_t msread=driver.microsteps();
-  Serial.print(" read:ms=");    Serial.println(msread); 
+  debugDirector(" read:ms=" + msread); 
   
-  driver.rms_current(1500); // Set motor RMS current
-  driver.microsteps(8);   // Set microsteps to 1/8th
-  //driver.irun(1200);
-  driver.ihold(100);  //hold current
+  driver.rms_current(2000); // Set motor RMS current
+  
+  driver.microsteps(4);   // Set microsteps to 1/8th
+  driver.irun(255);
+  driver.ihold(200);  //hold current
   driver.iholddelay(10); //Controls the number of clock cycles for motor power down after standstill is detected
   driver.TPOWERDOWN(128);
   msread=driver.microsteps();
-  Serial.print(" read:ms=");    Serial.println(msread); 
+  uint16_t currentread = driver.cs_actual();
+  debugDirector(" read:current=" + currentread);
+  debugDirector(" read:ms=" + msread); 
   driver.toff(5);
   driver.en_spreadCycle(true);
   driver.pwm_autoscale(false); // Needed for stealthChop
