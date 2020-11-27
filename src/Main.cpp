@@ -239,10 +239,12 @@ void resetIfShiftersHeld()
       vTaskDelay(200 / portTICK_PERIOD_MS);
       digitalWrite(LED_PIN, LOW);
     }
+    for(int i=0;i<20;i++){
     userConfig.setDefaults();
-    vTaskDelay(100 / portTICK_PERIOD_MS);
+    vTaskDelay(200 / portTICK_PERIOD_MS);
     userConfig.saveToSPIFFS();
-    vTaskDelay(100 / portTICK_PERIOD_MS);
+    vTaskDelay(200 / portTICK_PERIOD_MS);
+    }
     ESP.restart();
   }
 }
