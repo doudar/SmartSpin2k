@@ -123,9 +123,22 @@ void startHttpServer()
     {
       userConfig.setInclineMultiplier(server.arg("inclineMultiplier").toFloat());
     }
-    if (!server.arg("bleDropdown").isEmpty())
+    if (!server.arg("blePMDropdown").isEmpty())
     {
-      userConfig.setConnectedPowerMeter(server.arg("bleDropdown"));
+      tString = server.arg("blePMDropdown");
+      if(!(tString.substring(0,6) == "Choose")){
+      userConfig.setConnectedPowerMeter(server.arg("blePMDropdown"));
+      }
+      else {userConfig.setConnectedPowerMeter("");}
+
+    }
+        if (!server.arg("bleHRDropdown").isEmpty())
+    {
+            tString = server.arg("bleHRDropdown");
+      if(!(tString.substring(0,6) == "Choose")){
+      userConfig.setConnectedHeartMonitor(server.arg("bleHRDropdown"));
+      }
+      else {userConfig.setConnectedHeartMonitor("");}
     }
     String response = "<!DOCTYPE html><html><body><h2>Settings will be applied at next reboot....</h2></body><script> setTimeout(\"location.href = 'http://" + String(userConfig.getDeviceName()) +  ".local/index.html';\",1000);</script></html>";
     server.send(200, "text/html", response);

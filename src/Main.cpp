@@ -265,31 +265,29 @@ void debugDirector(String textToPrint, bool newline)
 
 void setupTMCStepperDriver()
 {
-  driver.begin();          //  SPI: Init CS pins and possible SW SPI pins
-                           // UART: Init SW UART (if selected) with default 115200 baudrate
+ //need to add some of these to user_config and the web pages. 
+ 
+  driver.begin();
   driver.pdn_disable(true);
   driver.mstep_reg_select(true);
-
 
   uint16_t msread=driver.microsteps();
   debugDirector(" read:ms=" + msread); 
   
   driver.rms_current(2000); // Set motor RMS current
-  
   driver.microsteps(4);   // Set microsteps to 1/8th
   driver.irun(255);
-  driver.ihold(200);  //hold current
+  driver.ihold(200);  //hold current % 0-255
   driver.iholddelay(10); //Controls the number of clock cycles for motor power down after standstill is detected
   driver.TPOWERDOWN(128);
   msread=driver.microsteps();
   uint16_t currentread = driver.cs_actual();
+
   debugDirector(" read:current=" + currentread);
   debugDirector(" read:ms=" + msread); 
+  
   driver.toff(5);
   driver.en_spreadCycle(true);
   driver.pwm_autoscale(false); // Needed for stealthChop
   driver.pwm_autograd(false);
-//hold torque isnt enough
-//add erg stuff in settings.html
-
 }

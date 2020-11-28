@@ -9,15 +9,21 @@
 </head>
 
 <body style="background-color:#3498db;">
-    <h1><strong>Select a Bluetooth Power Meter To Connect To</strong></h1>
+    <h1><strong>Select Bluetooth Devices</strong></h1>
 <form action="/send_settings">
 <table>
     <tbody>
         <tr style="height: 20px;">
             <td style="width: 14%; height: 20px;">
-                <p><label for="Nearby Bluetooth Devices">BLE Devices</label></p>
+                <p><label for="BluetoothPMDevices">Power Meter:</label></p>
             </td>
-            <td style="width: 14%; height: 20px;"><select id="bleDropdown" name="bleDropdown" value="loading" /></td>
+            <td style="width: 14%; height: 20px;"><select id="blePMDropdown" name="blePMDropdown" value="loading"></td>
+        </tr>
+        <tr style="height: 20px;">
+            <td style="width: 14%; height: 20px;">
+                <p><label for="BluetoothHRDevices">Heart Monitor:</label></p>
+            </td>
+            <td style="width: 14%; height: 20px;"><select id="bleHRDropdown" name="bleHRDropdown" value="loading"></td>
         </tr>
     </tbody>
 </table>
@@ -30,31 +36,52 @@
 </body>
 
 <script>
-    let dropdown = document.getElementById('bleDropdown');
-    dropdown.length = 0;
+    let PMDropdown = document.getElementById('blePMDropdown');
+    let HRDropdown = document.getElementById('bleHRDropdown');
+    PMDropdown.length = 0;
+    HRDropdown.length = 0;
 
-    let defaultOption = document.createElement('option');
-    defaultOption.text = 'Choose BLE Device To Connect';
+    let defaultOptionPM = document.createElement('option');
+    defaultOptionPM.text = 'Choose Power Meter';
+    let defaultOptionHR = document.createElement('option');
+    defaultOptionHR.text = 'Choose Heart Monitor';
 
-    dropdown.add(defaultOption);
-    dropdown.selectedIndex = 0;
+    PMDropdown.add(defaultOptionPM);
+    HRDropdown.add(defaultOptionHR);
+    PMDropdown.selectedIndex = 0;
+    HRDropdown.selectedIndex = 0;
 
     const request = new XMLHttpRequest();
     request.open('GET', "/BLEServers", true);
 
-    request.onload = function () {
+    request.onload = function () { //TODO: these need to get sorted
         if (request.status === 200) {
             const data = JSON.parse(request.responseText);
-            let option;
+            let optionPM;
             for (var key in data) {
-                option = document.createElement('option');
+                if(data[key].UUID == '0x1818'){
+                optionPM = document.createElement('option');
                 if (data[key].name) {
-                    option.text = data[key].name;
+                    optionPM.text = data[key].name;
                 }
                 else {
-                    option.text = data[key].address;
+                    optionPM.text = data[key].address;
                 }
-                dropdown.add(option);
+                PMDropdown.add(optionPM);
+            }
+            }
+            let optionHR;
+            for (var key in data) {
+                if(data[key].UUID == '0x180d'){
+                optionHR = document.createElement('option');
+                if (data[key].name) {
+                    optionHR.text = data[key].name;
+                }
+                else {
+                    optionHR.text = data[key].address;
+                }
+                HRDropdown.add(optionHR);
+            }
             }
         }
         else {

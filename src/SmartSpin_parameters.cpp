@@ -57,7 +57,7 @@ String userParameters::returnJSON()
   doc["autoUpdate"] = autoUpdate;
   doc["ssid"] = ssid;
   doc["password"] = password;
-  //doc["foundDevices"]       = foundDevices;  I don't see a need currently in keeping this boot to boot
+  doc["foundDevices"]       = foundDevices;  
   doc["connectedPowerMeter"] = connectedPowerMeter;
   doc["connectedHeartMonitor"] = connectedHeartMonitor;
   String output;
@@ -101,7 +101,7 @@ void userParameters::saveToSPIFFS()
   doc["autoUpdate"] = autoUpdate;
   doc["ssid"] = ssid;
   doc["password"] = password;
-  //doc["foundDevices"]       = foundDevices;
+  //doc["foundDevices"]       = foundDevices; //I don't see a need currently in keeping this boot to boot
   doc["connectedPowerMeter"] = connectedPowerMeter;
   doc["connectedHeartMonitor"] = connectedHeartMonitor;
 

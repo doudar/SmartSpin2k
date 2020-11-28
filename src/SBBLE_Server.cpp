@@ -102,6 +102,7 @@ static BLEUUID charUUID = CYCLINGPOWERMEASUREMENT_UUID;
 
 static boolean doConnect = false;
 static boolean connected = false;
+
 static boolean doScan = false;
 static BLERemoteCharacteristic *pRemoteCharacteristic;
 static BLEAdvertisedDevice *myDevice;
@@ -265,16 +266,12 @@ class MyAdvertisedDeviceCallbacks : public BLEAdvertisedDeviceCallbacks
    * Called for each advertising BLE server.
    */
 
-  /*** Only a reference to the advertised device is passed now
-  void onResult(BLEAdvertisedDevice advertisedDevice) { **/
   void onResult(BLEAdvertisedDevice *advertisedDevice)
   {
     debugDirector("BLE Advertised Device found: " + String(advertisedDevice->toString().c_str()));
 
     // We have found a device, let us now see if it contains the service we are looking for.
-    /********************************************************************************
-    if (advertisedDevice.haveServiceUUID() && advertisedDevice.isAdvertisingService(serviceUUID)) {
-********************************************************************************/
+ 
     if (advertisedDevice->haveServiceUUID() && advertisedDevice->isAdvertisingService(serviceUUID))
     {
 
@@ -290,7 +287,7 @@ class MyAdvertisedDeviceCallbacks : public BLEAdvertisedDeviceCallbacks
   }   // onResult
 };    // MyAdvertisedDeviceCallbacks
 
-void setupBLE() //COmmon BLE setup for both Client and sServer
+void setupBLE() //Common BLE setup for both Client and Server
 {
 
   debugDirector("Starting Arduino BLE Client application...");
@@ -393,7 +390,7 @@ void BLEServerScan(bool connectRequest)
   userConfig.setFoundDevices(output);
 
   if (doConnect)
-  { //Works but inhibits the BLE Server Scan. Too late at night to fix. another day.
+  { 
     connectToServer();
   }
 }
