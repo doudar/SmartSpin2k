@@ -28,7 +28,7 @@ int toggle = false;
 //Cadence computation Variables
 float crankRev[2] = {0, 0};
 float crankEventTime[2] = {0, 0};
-bool goodReading = false;
+int noReadingIn = 0;
 
 //Simulated Cadence Variables
 int cscCumulativeCrankRev = 0;
@@ -141,15 +141,15 @@ static void notifyCallback(
       if ((crankRev[0] > crankRev[1]) && (crankEventTime[0] + crankEventTime[1] > 0))
       {
         userConfig.setSimulatedCad(((abs(crankRev[0] - crankRev[1]) * 1024) / abs(crankEventTime[0] - crankEventTime[1])) * 60);
-        goodReading = true;
+        noReadingIn = 0;
       }
       else //the crank rev probably didn't update
       {
-        if (!goodReading) //Require two consecutive readings before setting 0
+        if (noReadingIn>2) //Require three consecutive readings before setting 0 cadence
         {
           userConfig.setSimulatedCad(0);
         }
-        goodReading = false;
+        noReadingIn++;
       }
 
       debugDirector(" Cadence: " + String(userConfig.getSimulatedCad()), false);
