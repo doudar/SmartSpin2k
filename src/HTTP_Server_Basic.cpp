@@ -149,7 +149,15 @@ void startHttpServer()
 
   server.on("/BLEServers", []() {
     debugDirector("Sending BLE device list to HTTP Client");
-    server.send(200, "text/plain", userConfig.getFoundDevices());
+    String tString = "";
+    if (String(userConfig.getFoundDevices())=="null"){
+      tString += "{";  
+    } else{
+     tString += String(userConfig.getFoundDevices());
+    }
+    tString.remove(tString.length() - 1, 1);
+    tString += String(",\"connectedHeartMonitor\":\"") + userConfig.getconnectedHeartMonitor() + "\",\"connectedPowerMeter\":\"" + userConfig.getconnectedPowerMeter() + "\"}";
+    server.send(200, "text/plain", tString);
   });
 
   server.on("/BLEScan", []() {

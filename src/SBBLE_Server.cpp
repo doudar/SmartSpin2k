@@ -70,10 +70,8 @@ byte ftmsMachineStatus[8] = {0, 0, 0, 0, 0, 0, 0, 0};
 
 uint8_t ftmsFeature[8] = {0x86, 0x50, 0x00, 0x00, 0x0C, 0xE0, 0x00, 0x00};                            //101000010000110 1110000000001100
 uint8_t ftmsIndoorBikeData[13] = {0x54, 0x08, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0}; //00000000100001010100 ISpeed, ICAD, TDistance, IPower, ETime
-uint8_t ftmsResistanceLevelRange[6] = {0x00, 0x00, 0x3A, 0x98, 0xC5, 0x68}; //+-15000
-uint8_t ftmsPowerRange[6] = {0x00, 0x00, 0xA0, 0x0F, 0x01, 0x00}; //1-4000
-
-
+uint8_t ftmsResistanceLevelRange[6] = {0x00, 0x00, 0x3A, 0x98, 0xC5, 0x68};                           //+-15000
+uint8_t ftmsPowerRange[6] = {0x00, 0x00, 0xA0, 0x0F, 0x01, 0x00};                                     //1-4000
 
 //Creating Server Callbacks
 class MyServerCallbacks : public BLEServerCallbacks
@@ -95,17 +93,15 @@ class MyServerCallbacks : public BLEServerCallbacks
 
 /***********************************BLE CLIENT. ****************************************/
 
-// The remote service we wish to connect to.
-static BLEUUID serviceUUID = CYCLINGPOWERSERVICE_UUID;
-// The characteristic of the remote service we are interested in.
-static BLEUUID charUUID = CYCLINGPOWERMEASUREMENT_UUID;
-
-static boolean doConnect = false;
-static boolean connected = false;
+static boolean doConnectPM = false;
+static boolean doConnectHR = false;
+static boolean connectedPM = false;
+static boolean connectedHR = false;
 
 static boolean doScan = false;
 static BLERemoteCharacteristic *pRemoteCharacteristic;
-static BLEAdvertisedDevice *myDevice;
+static BLEAdvertisedDevice *myPowerMeter;
+static BLEAdvertisedDevice *myHeartMonitor;
 
 static void notifyCallback(
     BLERemoteCharacteristic *pBLERemoteCharacteristic,
@@ -123,6 +119,8 @@ static void notifyCallback(
   if (pBLERemoteCharacteristic->getUUID().toString() == HEARTCHARACTERISTIC_UUID.toString())
   {
     userConfig.setSimulatedHr((int)pData[1]);
+      debugDirector(" HRM: " + String(userConfig.getSimulatedHr()), false);
+      debugDirector("");
   }
 
   if (pBLERemoteCharacteristic->getUUID().toString() == CYCLINGPOWERMEASUREMENT_UUID.toString())
@@ -146,14 +144,14 @@ static void notifyCallback(
       }
       else //the crank rev probably didn't update
       {
-        if (noReadingIn>2) //Require three consecutive readings before setting 0 cadence
+        if (noReadingIn > 2) //Require three consecutive readings before setting 0 cadence
         {
           userConfig.setSimulatedCad(0);
         }
         noReadingIn++;
       }
 
-      debugDirector(" Cadence: " + String(userConfig.getSimulatedCad()), false);
+      debugDirector(" CAD: " + String(userConfig.getSimulatedCad()), false);
       debugDirector("");
     }
   }
@@ -169,7 +167,8 @@ class MyClientCallback : public BLEClientCallbacks
 
   void onDisconnect(BLEClient *pclient)
   {
-    connected = false;
+    connectedPM = false;
+    connectedHR = false; //should test to see which one dicsonnected, but this should work for now.
     debugDirector("onDisconnect");
   }
   /***************** New - Security handled here ********************
@@ -195,15 +194,60 @@ class MyClientCallback : public BLEClientCallbacks
 bool connectToServer()
 {
 
+  debugDirector("Initiating Server Connection");
+  NimBLEUUID serviceUUID;
+  NimBLEUUID charUUID;
+
   int sucessful = 0;
+  BLEAdvertisedDevice *myDevice;
+  if (doConnectPM)
+  {
+    myDevice = myPowerMeter;
+    serviceUUID = CYCLINGPOWERSERVICE_UUID;
+    charUUID = CYCLINGPOWERMEASUREMENT_UUID;
+    debugDirector("trying to connect to PM");
+  }
+  else
+  {
+    myDevice = myHeartMonitor;
+    serviceUUID = HEARTSERVICE_UUID;
+    charUUID = HEARTCHARACTERISTIC_UUID;
+    debugDirector("Trying to connect to HRM");
+  }
+
+  /*NimBLEClient *pClient = nullptr;
+
+  // Check if we have a client we should reuse first 
+  if (NimBLEDevice::getClientListSize())
+  {
+    /** Special case when we already know this device, we send false as the 
+         *  second argument in connect() to prevent refreshing the service database.
+         *  This saves considerable time and power.
+         *
+    pClient = NimBLEDevice::getClientByPeerAddress(myDevice->getAddress());
+    if (pClient)
+    {
+      if (!pClient->connect(myDevice, false))
+      {
+        Serial.println("Reconnect failed");
+        return false;
+      }
+      Serial.println("Reconnected client");
+    }
+    /** We don't already have a client that knows this device,
+         *  we will check for a client that is disconnected that we can use.
+         */
+  /*
+    else
+    {
+      pClient = NimBLEDevice::getDisconnectedClient();
+    }
+  } */
 
   debugDirector("Forming a connection to: " + String(myDevice->getAddress().toString().c_str()));
-
   BLEClient *pClient = BLEDevice::createClient();
   debugDirector(" - Created client", false);
-
   pClient->setClientCallbacks(new MyClientCallback());
-
   // Connect to the remove BLE Server.
   pClient->connect(myDevice); // if you pass BLEAdvertisedDevice instead of address, it will be recognized type of peer device address (public or private)
   debugDirector(" - Connected to server", false);
@@ -212,7 +256,7 @@ bool connectToServer()
   BLERemoteService *pRemoteService = pClient->getService(serviceUUID);
   if (pRemoteService == nullptr)
   {
-    debugDirector("Failed to find our service UUID: " + String(serviceUUID.toString().c_str()));
+    debugDirector("Failed to find service:" + String(serviceUUID.toString().c_str()));
   }
   else
   {
@@ -250,7 +294,19 @@ bool connectToServer()
   }
   if (sucessful > 0)
   {
-    connected = true;
+    debugDirector("Checking if Sucessful PM");
+    if (pRemoteService->getUUID() == CYCLINGPOWERSERVICE_UUID)
+    {
+      connectedPM = true;
+      doConnectPM = false;
+    }
+    debugDirector("Checking If Sucessful HRM");
+    if (pRemoteService->getUUID() == HEARTSERVICE_UUID)
+    {
+      connectedHR = true;
+      doConnectHR = false;
+    }
+    debugDirector("Returning True");
     return true;
   }
   pClient->disconnect();
@@ -262,46 +318,46 @@ bool connectToServer()
  */
 class MyAdvertisedDeviceCallbacks : public BLEAdvertisedDeviceCallbacks
 {
-  /**
-   * Called for each advertising BLE server.
-   */
 
   void onResult(BLEAdvertisedDevice *advertisedDevice)
   {
     debugDirector("BLE Advertised Device found: " + String(advertisedDevice->toString().c_str()));
 
-    // We have found a device, let us now see if it contains the service we are looking for.
- 
-    if (advertisedDevice->haveServiceUUID() && advertisedDevice->isAdvertisingService(serviceUUID))
+    if ((advertisedDevice->haveServiceUUID()) && (advertisedDevice->isAdvertisingService(CYCLINGPOWERSERVICE_UUID)))
     {
-
-      BLEDevice::getScan()->stop();
-      /*******************************************************************
-      myDevice = new BLEAdvertisedDevice(advertisedDevice);
-*******************************************************************/
-      myDevice = advertisedDevice; /** Just save the reference now, no need to copy the object */
-      doConnect = true;
-      doScan = true;
-
-    } // Found our server
-  }   // onResult
-};    // MyAdvertisedDeviceCallbacks
+      if ((advertisedDevice->getName() == userConfig.getconnectedPowerMeter()) || (advertisedDevice->getAddress().toString().c_str() == userConfig.getconnectedPowerMeter()) || (String(userConfig.getconnectedPowerMeter()) == ("any")))
+      {
+        // BLEDevice::getScan()->stop();
+        myPowerMeter = advertisedDevice;
+        doConnectPM = true;
+        doScan = true;
+      }
+    }
+    if ((advertisedDevice->haveServiceUUID()) && (advertisedDevice->isAdvertisingService(HEARTSERVICE_UUID)))
+    {
+      if ((advertisedDevice->getName() == userConfig.getconnectedHeartMonitor()) || (advertisedDevice->getAddress().toString().c_str() == userConfig.getconnectedHeartMonitor()) || (String(userConfig.getconnectedHeartMonitor()) == ("any")))
+      {
+        //BLEDevice::getScan()->stop();
+        myHeartMonitor = advertisedDevice;
+        doConnectHR = true;
+        doScan = true;
+      }
+    }
+  }
+};
 
 void setupBLE() //Common BLE setup for both Client and Server
 {
-
   debugDirector("Starting Arduino BLE Client application...");
   BLEDevice::init(userConfig.getDeviceName());
+ // if (!(String(userConfig.getconnectedPowerMeter())=="none")){
+ //   doConnectPM = true;
+ // }
+ // if (!(String(userConfig.getconnectedHeartMonitor())=="none")){
+ //   doConnectHR = true;
+ // }
+ // BLEServerScan(true);
 
-  // Retrieve a Scanner and set the callback we want to use to be informed when we
-  // have detected a new device.  Specify that we want active scanning and start the
-  // scan to run for 5 seconds.
-  BLEScan *pBLEScan = BLEDevice::getScan();
-  pBLEScan->setAdvertisedDeviceCallbacks(new MyAdvertisedDeviceCallbacks());
-  pBLEScan->setInterval(1349);
-  pBLEScan->setWindow(449);
-  pBLEScan->setActiveScan(true);
-  pBLEScan->start(5, false);
 } // End of setup.
 
 // This is the Arduino main loop function.
@@ -311,7 +367,7 @@ void bleClient()
   // If the flag "doConnect" is true then we have scanned for and found the desired
   // BLE Server with which we wish to connect.  Now we connect to it.  Once we are
   // connected we set the connected flag to be true.
-  if (doConnect == true)
+  if (doConnectPM == true || doConnectHR == true)
   {
     if (connectToServer())
     {
@@ -321,12 +377,11 @@ void bleClient()
     {
       debugDirector("We have failed to connect to the server; there is nothin more we will do.");
     }
-    doConnect = false;
   }
 
   // If we are connected to a peer BLE Server, update the characteristic each time we are reached
   // with the current time since boot.
-  if (connected)
+  if (connectedPM || connectedHR)
   {
     //debugDirector("Recieved data from server:");
     //debugDirector(pRemoteCharacteristic->getUUID().toString().c_str());
@@ -335,7 +390,7 @@ void bleClient()
   else if (doScan)
   {
     debugDirector("Scanning Again for reconnect");
-    BLEDevice::getScan()->start(5);
+    BLEDevice::getScan()->start(3);
     vTaskDelay(2000 / portTICK_PERIOD_MS);
   }
 
@@ -344,7 +399,7 @@ void bleClient()
 
 void BLEServerScan(bool connectRequest)
 {
-  doConnect = connectRequest;
+  //doConnect = connectRequest;
   debugDirector("Scanning for BLE servers and putting them into a list...");
 
   // Retrieve a Scanner and set the callback we want to use to be informed when we
@@ -363,8 +418,7 @@ void BLEServerScan(bool connectRequest)
   StaticJsonDocument<500> devices;
 
   String device = "";
-  //JsonObject root = devices.createNestedObject();
-  //JsonArray server = devices.createNestedObject("server");
+ 
   for (int i = 0; i < count; i++)
   {
     BLEAdvertisedDevice d = foundDevices.getDevice(i);
@@ -389,10 +443,10 @@ void BLEServerScan(bool connectRequest)
   debugDirector("Bluetooth Client Found Devices: " + output);
   userConfig.setFoundDevices(output);
 
-  if (doConnect)
-  { 
-    connectToServer();
-  }
+  // if (doConnect)
+  // {
+  //   connectToServer("0x1818");
+  // }
 }
 
 /**************BLE Server Callbacks *************************/
@@ -538,7 +592,7 @@ void startBLEServer()
   fitnessMachineIndoorBikeData->setValue(ftmsIndoorBikeData, 13); //Maybe enable this later. Now just exposing the char and basically saying get it from the power service.
   fitnessMachineStatus->setValue(ftmsMachineStatus, 8);
   fitnessMachineResistanceLevelRange->setValue(ftmsResistanceLevelRange, 6);
-  fitnessMachinePowerRange->setValue(ftmsPowerRange,6);
+  fitnessMachinePowerRange->setValue(ftmsPowerRange, 6);
 
   fitnessMachineControlPoint->setCallbacks(new MyCallbacks());
 
@@ -571,10 +625,11 @@ void BLENotify()
     fitnessMachineIndoorBikeData->notify();
     heartRateMeasurementCharacteristic->notify();
     GlobalBLEClientConnected = true;
-  }else{
+  }
+  else
+  {
     GlobalBLEClientConnected = false;
   }
-
 }
 
 void computeERG(int currentWatts, int setPoint)
@@ -596,7 +651,7 @@ void computeERG(int currentWatts, int setPoint)
     {
       amountToChangeIncline = (currentWatts - setPoint) * 1;
     }
-    amountToChangeIncline = amountToChangeIncline / ((currentWatts / 100)+1);
+    amountToChangeIncline = amountToChangeIncline / ((currentWatts / 100) + 1);
   }
 
   if (abs(amountToChangeIncline) > 2000)
@@ -657,18 +712,18 @@ void updateIndoorBikeDataChar()
 
 void updateCyclingPowerMesurementChar()
 {
-    int remainder, quotient;
-    quotient = userConfig.getSimulatedWatts() / 256;
-    remainder = userConfig.getSimulatedWatts() % 256;
-    cyclingPowerMeasurement[2] = remainder;
-    cyclingPowerMeasurement[3] = quotient;
-    cyclingPowerMeasurementCharacteristic->setValue(cyclingPowerMeasurement, 9);
+  int remainder, quotient;
+  quotient = userConfig.getSimulatedWatts() / 256;
+  remainder = userConfig.getSimulatedWatts() % 256;
+  cyclingPowerMeasurement[2] = remainder;
+  cyclingPowerMeasurement[3] = quotient;
+  cyclingPowerMeasurementCharacteristic->setValue(cyclingPowerMeasurement, 9);
 
-    for (const auto &text : cyclingPowerMeasurement)
-    { // Range-for!
-      debugDirector(String(text, HEX) + " ", false);
-    }
+  for (const auto &text : cyclingPowerMeasurement)
+  { // Range-for!
+    debugDirector(String(text, HEX) + " ", false);
+  }
 
-    debugDirector("<-- CPMC sent ", false);
-    debugDirector("");
+  debugDirector("<-- CPMC sent ", false);
+  debugDirector("");
 }

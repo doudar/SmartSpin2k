@@ -31,7 +31,7 @@
 
 void startBLEServer();
 void BLENotify();
-bool connectToServer();
+bool connectToServer(String UUID_Of_Service);
 void BLEServerScan(bool connectRequest);
 void bleClient();
 void startBleClient();

@@ -12,23 +12,23 @@
 class userParameters
 {
     private:
-    String  firmwareUpdateURL;              //Done
-    float   incline;                        //Keep
-    int     simulatedWatts;                 //Keep
-    int     simulatedHr;                    //Keep
-    int     simulatedCad;                   //Keep
-    String  deviceName;                     //Done
-    int     shiftStep;                      //Keep
-    float   inclineMultiplier;              //Keep
-    bool    simulatePower;                  //Keep
-    bool    simulateHr;                     //Keep
-    bool    ERGMode;                        //Keep
-    bool    autoUpdate;                 //in Progress was wifiOn
-    String  ssid;                           //Keep
-    String  password;                       //Keep
-    String  foundDevices = " ";             //Keep
-    String  connectedPowerMeter = " ";      //Keep
-    String  connectedHeartMonitor = " ";    //Keep    
+    String  firmwareUpdateURL;              
+    float   incline;                        
+    int     simulatedWatts;                 
+    int     simulatedHr;                    
+    int     simulatedCad;                   
+    String  deviceName;                     
+    int     shiftStep;                      
+    float   inclineMultiplier;              
+    bool    simulatePower;                  
+    bool    simulateHr;                     
+    bool    ERGMode;                      
+    bool    autoUpdate;                 
+    String  ssid;                          
+    String  password;                      
+    String  foundDevices = " ";            
+    String  connectedPowerMeter = "any";      
+    String  connectedHeartMonitor = "any";       
 
     public:
     const char* getFirmwareUpdateURL()       {return firmwareUpdateURL.c_str();}

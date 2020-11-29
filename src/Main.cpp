@@ -101,6 +101,7 @@ void setup()
   //Setup Interrups so shifters work at anytime
   attachInterrupt(digitalPinToInterrupt(SHIFT_UP_PIN), shiftUp, CHANGE);
   attachInterrupt(digitalPinToInterrupt(SHIFT_DOWN_PIN), shiftDown, CHANGE);
+  BLEServerScan(true);
 }
 
 void loop()
@@ -112,19 +113,19 @@ void loop()
   }
 
   BLENotify();
-  vTaskDelay(500 / portTICK_RATE_MS); //guessing it's good to have task delays seperating client & Server?
-  bleClient();
+  vTaskDelay(100 / portTICK_RATE_MS); //guessing it's good to have task delays seperating client & Server?
+  bleClient(); // reconnect to BLE servers if disconnected
   digitalWrite(LED_PIN, HIGH);
-  vTaskDelay(500 / portTICK_RATE_MS);
+  vTaskDelay(1000 / portTICK_RATE_MS);
 
   if (debugToHTML.length() > 500)
   { //Clear up memory
     debugToHTML = "<br>HTML Debug Truncated. Increase buffer if required.";
   }
-  uint16_t currentread = driver.cs_actual();
-  uint16_t msread=driver.microsteps();
-  debugDirector(" read:current=" + String(currentread));
-  debugDirector(" read:ms=" + String(msread)); 
+  //uint16_t currentread = driver.cs_actual();
+  //uint16_t msread=driver.microsteps();
+  //debugDirector(" read:current=" + String(currentread));
+  //debugDirector(" read:ms=" + String(msread)); 
 }
 
 void moveStepper(void *pvParameters)

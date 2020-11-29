@@ -29,8 +29,8 @@ void userParameters::setDefaults() //Move these to set the values as #define in 
   ssid = DEVICE_NAME;
   password = DEFAULT_PASSWORD;
   foundDevices = "";
-  connectedPowerMeter = "";
-  connectedHeartMonitor = "";
+  connectedPowerMeter = "any";
+  connectedHeartMonitor = "any";
 }
 
 //---------------------------------------------------------------------------------

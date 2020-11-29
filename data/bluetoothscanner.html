@@ -15,13 +15,25 @@
     <tbody>
         <tr style="height: 20px;">
             <td style="width: 14%; height: 20px;">
-                <p><label for="BluetoothPMDevices">Power Meter:</label></p>
+                <p><label for="connectedPM">Power Meter:</label></p>
+            </td>
+            <td style="width: 14%; height: 20px;"><label id="connectedPowerMeter">loading</label></td>
+        </tr>
+        <tr style="height: 20px;">
+            <td style="width: 14%; height: 20px;">
+                <p><label for="connectedHM">Heart Monitor:</label></p>
+            </td>
+            <td style="width: 14%; height: 20px;"><label id="connectedHeartMonitor">loading</label></td>
+        </tr>
+        <tr style="height: 20px;">
+            <td style="width: 14%; height: 20px;">
+                <p><label for="BluetoothPMDevices">Select New Power Meter:</label></p>
             </td>
             <td style="width: 14%; height: 20px;"><select id="blePMDropdown" name="blePMDropdown" value="loading"></td>
         </tr>
         <tr style="height: 20px;">
             <td style="width: 14%; height: 20px;">
-                <p><label for="BluetoothHRDevices">Heart Monitor:</label></p>
+                <p><label for="BluetoothHRDevices">Select New Heart Monitor:</label></p>
             </td>
             <td style="width: 14%; height: 20px;"><select id="bleHRDropdown" name="bleHRDropdown" value="loading"></td>
         </tr>
@@ -42,21 +54,27 @@
     HRDropdown.length = 0;
 
     let defaultOptionPM = document.createElement('option');
-    defaultOptionPM.text = 'Choose Power Meter';
+    defaultOptionPM.text = 'any';
     let defaultOptionHR = document.createElement('option');
-    defaultOptionHR.text = 'Choose Heart Monitor';
+    defaultOptionHR.text = 'any';
 
     PMDropdown.add(defaultOptionPM);
     HRDropdown.add(defaultOptionHR);
     PMDropdown.selectedIndex = 0;
     HRDropdown.selectedIndex = 0;
 
-    const request = new XMLHttpRequest();
-    request.open('GET', "/BLEServers", true);
-
-    request.onload = function () { //TODO: these need to get sorted
-        if (request.status === 200) {
-            const data = JSON.parse(request.responseText);
+    //Update values on specified interval loading late because this tiny webserver hates frequent requests
+   setInterval(function () {
+    if (document.getElementById("connectedPowerMeter").innerHTML == "loading"){
+    requestConfigValues();
+    }
+  }, 1000);
+    
+  function requestConfigValues() {
+    var xhttp = new XMLHttpRequest();
+    xhttp.onreadystatechange = function () {
+      if (this.readyState == 4 && this.status == 200) {
+            const data = JSON.parse(this.responseText);
             let optionPM;
             for (var key in data) {
                 if(data[key].UUID == '0x1818'){
@@ -69,6 +87,9 @@
                 }
                 PMDropdown.add(optionPM);
             }
+            optionPM = document.createElement('option');
+            optionPM.text = 'none';
+            PMDropdown.add(optionPM);
             }
             let optionHR;
             for (var key in data) {
@@ -83,18 +104,16 @@
                 HRDropdown.add(optionHR);
             }
             }
+            optionHR = document.createElement('option');
+            optionHR.text = 'none';
+            HRDropdown.add(optionHR);
+            document.getElementById("connectedPowerMeter").innerHTML = data.connectedPowerMeter;
+            document.getElementById("connectedHeartMonitor").innerHTML = data.connectedHeartMonitor;
         }
-        else {
-            // Reached the server, but it returned an error
-        }
-        //requestConfigValues();
-    }
-
-    request.onerror = function () {
-        console.error('An error occurred fetching the JSON');
     };
-
-    request.send();
+    xhttp.open('GET', "/BLEServers", true);
+    xhttp.send();
+    }
 
     //define function to load css
 var loadCss = function(){
