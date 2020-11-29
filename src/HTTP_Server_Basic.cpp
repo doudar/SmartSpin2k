@@ -154,9 +154,11 @@ void startHttpServer()
       tString += "{";  
     } else{
      tString += String(userConfig.getFoundDevices());
+     tString.remove(tString.length() - 1, 1);
+     tString += ",";
     }
-    tString.remove(tString.length() - 1, 1);
-    tString += String(",\"connectedHeartMonitor\":\"") + userConfig.getconnectedHeartMonitor() + "\",\"connectedPowerMeter\":\"" + userConfig.getconnectedPowerMeter() + "\"}";
+    
+    tString += String("\"connectedHeartMonitor\":\"") + userConfig.getconnectedHeartMonitor() + "\",\"connectedPowerMeter\":\"" + userConfig.getconnectedPowerMeter() + "\"}";
     server.send(200, "text/plain", tString);
   });
 
