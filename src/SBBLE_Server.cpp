@@ -266,6 +266,7 @@ bool connectToServer()
         return false;
       }
       Serial.println("Reconnected client");
+      pClient->setClientCallbacks(new MyClientCallback());
       BLERemoteService *pRemoteService = pClient->getService(serviceUUID);
       pRemoteCharacteristic = pRemoteService->getCharacteristic(charUUID);
       if (pRemoteCharacteristic->canNotify())
