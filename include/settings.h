@@ -36,6 +36,9 @@
 //name of local file to save configuration in SPIFFS
 #define configFILENAME "/config.txt"
 
+//Default Stepper Power
+#define STEPPER_POWER 1000
+
 //Hardware pin for rocker Switch 
 #define RADIO_PIN 27
 
@@ -72,6 +75,10 @@
 
 //Hardware pin for indicator LED *note* internal LED on esp32 Dev board is pin 2 
 #define LED_PIN 2 
+
+
+//Max tries that BLE client will perform on reconnect
+#define MAX_RECONNECT_TRIES 5;
 
 
 

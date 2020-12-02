@@ -21,6 +21,7 @@ void userParameters::setDefaults() //Move these to set the values as #define in 
   simulatedCad = 90;
   deviceName = DEVICE_NAME;
   shiftStep = 400;
+  stepperPower = STEPPER_POWER;
   inclineMultiplier = 2.0;
   simulatePower = false;
   simulateHr = true;
@@ -50,6 +51,7 @@ String userParameters::returnJSON()
   doc["simulatedCad"] = simulatedCad;
   doc["deviceName"] = deviceName;
   doc["shiftStep"] = shiftStep;
+  doc["stepperPower"] = stepperPower;
   doc["inclineMultiplier"] = inclineMultiplier;
   doc["simulatePower"] = simulatePower;
   doc["simulateHr"] = simulateHr;
@@ -94,6 +96,7 @@ void userParameters::saveToSPIFFS()
   doc["simulatedCad"] = simulatedCad;
   doc["deviceName"] = deviceName;
   doc["shiftStep"] = shiftStep;
+  doc["stepperPower"] = stepperPower;
   doc["inclineMultiplier"] = inclineMultiplier;
   doc["simulatePower"] = simulatePower;
   doc["simulateHr"] = simulateHr;
@@ -150,6 +153,7 @@ void userParameters::loadFromSPIFFS()
   setSimulatedCad(doc["simulatedCad"]);
   setDeviceName(doc["deviceName"]);
   setShiftStep(doc["shiftStep"]);
+  setStepperPower(doc["stepperPower"]);
   setInclineMultiplier(doc["inclineMultiplier"]);
   setSimulatePower(doc["simulatePower"]);
   setSimulateHr(doc["simulateHr"]);
@@ -182,6 +186,11 @@ void userParameters::loadFromSPIFFS()
   {
     autoUpdate = AUTO_FIRMWARE_UPDATE;
   }
+  if (doc["stepperPower"] == "null")
+  {
+    stepperPower = STEPPER_POWER;
+  }
+
 
   debugDirector("Config File Loaded: " + String(configFILENAME));
   file.close();

@@ -13,7 +13,7 @@
 
 String debugToHTML = "<br>Firmware Version " + String(FIRMWARE_VERSION);
 bool GlobalBLEClientConnected = false;
-
+byte testbitField = 0b1000;
 bool lastDir = true; //Stepper Last Direction
 
 // Debounce Setup
@@ -113,19 +113,16 @@ void loop()
   }
 
   BLENotify();
-  vTaskDelay(1000 / portTICK_RATE_MS); //guessing it's good to have task delays seperating client & Server?
+  vTaskDelay(500 / portTICK_RATE_MS); //guessing it's good to have task delays seperating client & Server?
   bleClient(); // reconnect to BLE servers if disconnected
   digitalWrite(LED_PIN, HIGH);
-  vTaskDelay(1000 / portTICK_RATE_MS);
+  vTaskDelay(500 / portTICK_RATE_MS);
 
   if (debugToHTML.length() > 500)
   { //Clear up memory
     debugToHTML = "<br>HTML Debug Truncated. Increase buffer if required.";
   }
-  //uint16_t currentread = driver.cs_actual();
-  //uint16_t msread=driver.microsteps();
-  //debugDirector(" read:current=" + String(currentread));
-  //debugDirector(" read:ms=" + String(msread)); 
+
 }
 
 void moveStepper(void *pvParameters)

@@ -18,7 +18,8 @@ class userParameters
     int     simulatedHr;                    
     int     simulatedCad;                   
     String  deviceName;                     
-    int     shiftStep;                      
+    int     shiftStep;         
+    int     stepperPower;             
     float   inclineMultiplier;              
     bool    simulatePower;                  
     bool    simulateHr;                     
@@ -38,6 +39,7 @@ class userParameters
     float       getSimulatedCad()            {return simulatedCad;}
     const char* getDeviceName()              {return deviceName.c_str();}
     int         getShiftStep()               {return shiftStep;}
+    int         getStepperPower()            {return stepperPower;}
     float       getInclineMultiplier()       {return inclineMultiplier;}
     bool        getSimulatePower()           {return simulatePower;}
     bool        getSimulateHr()              {return simulateHr;}
@@ -57,6 +59,7 @@ class userParameters
     void    setSimulatedCad(float cad)          {simulatedCad = cad;}
     void    setDeviceName(String dvcn)          {deviceName = dvcn;}
     void    setShiftStep(int ss)                {shiftStep = ss;}
+    void    setStepperPower(int sp)             {stepperPower = sp;}
     void    setInclineMultiplier(float im)      {inclineMultiplier = im;}
     void    setSimulatePower(bool sp)           {simulatePower = sp;}
     void    setSimulateHr(bool shr)             {simulateHr = shr;}
