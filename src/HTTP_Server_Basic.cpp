@@ -119,6 +119,11 @@ void startHttpServer()
     {
       userConfig.setShiftStep(server.arg("shiftStep").toInt());
     }
+    if (!server.arg("stepperPower").isEmpty())
+    {
+      userConfig.setStepperPower(server.arg("stepperPower").toInt());
+      updateStepperPower();
+    }
     if (!server.arg("inclineMultiplier").isEmpty())
     {
       userConfig.setInclineMultiplier(server.arg("inclineMultiplier").toFloat());
@@ -140,11 +145,12 @@ void startHttpServer()
       }
       else {userConfig.setConnectedHeartMonitor("");}
     }
+    
     String response = "<!DOCTYPE html><html><body><h2>Settings will be applied at next reboot....</h2></body><script> setTimeout(\"location.href = 'http://" + String(userConfig.getDeviceName()) +  ".local/index.html';\",1000);</script></html>";
     server.send(200, "text/html", response);
     debugDirector("Config Updated From Web");
-    userConfig.printFile();
     userConfig.saveToSPIFFS();
+    userConfig.printFile();
   });
 
   server.on("/BLEServers", []() {

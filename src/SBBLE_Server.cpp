@@ -478,10 +478,10 @@ void BLEServerScan(bool connectRequest)
   // scan to run for 5 seconds.
   BLEScan *pBLEScan = BLEDevice::getScan();
   pBLEScan->setAdvertisedDeviceCallbacks(new MyAdvertisedDeviceCallbacks());
-  pBLEScan->setInterval(1349);
-  pBLEScan->setWindow(449);
+  //pBLEScan->setInterval(1349);
+  //pBLEScan->setWindow(449);
   pBLEScan->setActiveScan(true);
-  BLEScanResults foundDevices = pBLEScan->start(10, true);
+  BLEScanResults foundDevices = pBLEScan->start(10, false);
 
   // Load the scan into a Json String
   int count = foundDevices.getCount();

@@ -122,7 +122,6 @@ void loop()
   { //Clear up memory
     debugToHTML = "<br>HTML Debug Truncated. Increase buffer if required.";
   }
-
 }
 
 void moveStepper(void *pvParameters)
@@ -272,7 +271,7 @@ void setupTMCStepperDriver()
   uint16_t msread=driver.microsteps();
   debugDirector(" read:ms=" + msread); 
   
-  driver.rms_current(2000); // Set motor RMS current
+  driver.rms_current(userConfig.getStepperPower()); // Set motor RMS current
   driver.microsteps(4);   // Set microsteps to 1/8th
   driver.irun(255);
   driver.ihold(200);  //hold current % 0-255
@@ -288,4 +287,10 @@ void setupTMCStepperDriver()
   driver.en_spreadCycle(true);
   driver.pwm_autoscale(false); // Needed for stealthChop
   driver.pwm_autograd(false);
+}
+
+void updateStepperPower()
+{
+  debugDirector("Stepper power is now " + String(userConfig.getStepperPower()));
+  driver.rms_current(userConfig.getStepperPower());
 }
