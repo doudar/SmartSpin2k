@@ -113,7 +113,7 @@ void loop()
   }
 
   BLENotify();
-  vTaskDelay(100 / portTICK_RATE_MS); //guessing it's good to have task delays seperating client & Server?
+  vTaskDelay(1000 / portTICK_RATE_MS); //guessing it's good to have task delays seperating client & Server?
   bleClient(); // reconnect to BLE servers if disconnected
   digitalWrite(LED_PIN, HIGH);
   vTaskDelay(1000 / portTICK_RATE_MS);

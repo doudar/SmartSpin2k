@@ -100,8 +100,8 @@ static boolean connectedHR = false;
 
 static boolean doScan = false;
 static BLERemoteCharacteristic *pRemoteCharacteristic;
-static BLEAdvertisedDevice *myPowerMeter;
-static BLEAdvertisedDevice *myHeartMonitor;
+static BLEAdvertisedDevice *myPowerMeter = nullptr;
+static BLEAdvertisedDevice *myHeartMonitor = nullptr;
 
 static void notifyCallback(
     BLERemoteCharacteristic *pBLERemoteCharacteristic,
@@ -116,14 +116,14 @@ static void notifyCallback(
   }
   debugDirector("<-- " + String(pBLERemoteCharacteristic->getUUID().toString().c_str()), false);
 
-  if (pBLERemoteCharacteristic->getUUID().toString() == HEARTCHARACTERISTIC_UUID.toString())
+  if (pBLERemoteCharacteristic->getUUID() == HEARTCHARACTERISTIC_UUID)
   {
     userConfig.setSimulatedHr((int)pData[1]);
-      debugDirector(" HRM: " + String(userConfig.getSimulatedHr()), false);
-      debugDirector("");
+    debugDirector(" HRM: " + String(userConfig.getSimulatedHr()), false);
+    debugDirector("");
   }
 
-  if (pBLERemoteCharacteristic->getUUID().toString() == CYCLINGPOWERMEASUREMENT_UUID.toString())
+  if (pBLERemoteCharacteristic->getUUID() == CYCLINGPOWERMEASUREMENT_UUID)
   {
 
     userConfig.setSimulatedWatts(bytes_to_u16(pData[3], pData[2]));
@@ -167,10 +167,41 @@ class MyClientCallback : public BLEClientCallbacks
 
   void onDisconnect(BLEClient *pclient)
   {
-    connectedPM = false;
-    connectedHR = false; //should test to see which one dicsonnected, but this should work for now.
-    debugDirector("onDisconnect");
+    //debugDirector("onDisconnect");
+    if(myHeartMonitor != nullptr){
+    if (myHeartMonitor->haveServiceUUID())
+    {
+      debugDirector("Detected HR Disconnect. Trying rapid reconnect");
+      connectedHR = false;
+      doConnectHR = true; //try rapid reconnect
+      //for (int i = 0; i < 15; i++)
+     // {
+     //   if (connectToServer())
+     //   {
+     //     return;
+     //   };
+     //   vTaskDelay(2000 / portTICK_PERIOD_MS);
+     // }
+    }
+    }
+    if (myPowerMeter!= nullptr){
+    if (myPowerMeter->haveServiceUUID())
+    {
+      debugDirector("Detected PM Disconnect. Trying rapid reconnect");
+      connectedPM = false;
+      doConnectPM = true; //try rapid reconnect
+      //for (int i = 0; i < 15; i++)
+      //{
+      //  if (connectToServer())
+      //  {
+      //    return;
+      //  }
+      //  vTaskDelay(2000 / portTICK_PERIOD_MS);
+      //}
+    }
   }
+  }
+
   /***************** New - Security handled here ********************
 ****** Note: these are the same return values as defaults ********/
   uint32_t onPassKeyRequest()
@@ -215,16 +246,18 @@ bool connectToServer()
     debugDirector("Trying to connect to HRM");
   }
 
-  /*NimBLEClient *pClient = nullptr;
+  NimBLEClient *pClient = nullptr;
 
-  // Check if we have a client we should reuse first 
+  // Check if we have a client we should reuse first
   if (NimBLEDevice::getClientListSize())
   {
-    /** Special case when we already know this device, we send false as the 
-         *  second argument in connect() to prevent refreshing the service database.
-         *  This saves considerable time and power.
-         *
+    // Special case when we already know this device, we send false as the
+    //     *  second argument in connect() to prevent refreshing the service database.
+    //     *  This saves considerable time and power.
+    //     *
     pClient = NimBLEDevice::getClientByPeerAddress(myDevice->getAddress());
+
+    debugDirector("Reusing Client");
     if (pClient)
     {
       if (!pClient->connect(myDevice, false))
@@ -233,23 +266,49 @@ bool connectToServer()
         return false;
       }
       Serial.println("Reconnected client");
+      BLERemoteService *pRemoteService = pClient->getService(serviceUUID);
+      pRemoteCharacteristic = pRemoteService->getCharacteristic(charUUID);
+      if (pRemoteCharacteristic->canNotify())
+      {
+        debugDirector("Subscribed to notifications");
+        pRemoteCharacteristic->subscribe(true, notifyCallback);
+        if (pRemoteService->getUUID() == CYCLINGPOWERSERVICE_UUID)
+        {
+          connectedPM = true;
+          doConnectPM = false;
+        }
+        debugDirector("Checking If Sucessful HRM");
+        if (pRemoteService->getUUID() == HEARTSERVICE_UUID)
+        {
+          connectedHR = true;
+          doConnectHR = false;
+        }
+        debugDirector("Returning True");
+        return true;
+      }
+      else
+      {
+        debugDirector("Unable to subscribe to notifications");
+        return false;
+      }
     }
     /** We don't already have a client that knows this device,
          *  we will check for a client that is disconnected that we can use.
          */
-  /*
+
     else
     {
+      debugDirector("Reconnect failed in a way I don't understand");
       pClient = NimBLEDevice::getDisconnectedClient();
     }
-  } */
+  }
 
   debugDirector("Forming a connection to: " + String(myDevice->getAddress().toString().c_str()));
-  BLEClient *pClient = BLEDevice::createClient();
+  pClient = BLEDevice::createClient();
   debugDirector(" - Created client", false);
   pClient->setClientCallbacks(new MyClientCallback());
   // Connect to the remove BLE Server.
-  pClient->connect(myDevice); // if you pass BLEAdvertisedDevice instead of address, it will be recognized type of peer device address (public or private)
+  pClient->connect(myDevice->getAddress()); // if you pass BLEAdvertisedDevice instead of address, it will be recognized type of peer device address (public or private)
   debugDirector(" - Connected to server", false);
 
   // Obtain a reference to the service we are after in the remote BLE server.
@@ -285,7 +344,7 @@ bool connectToServer()
     if (pRemoteCharacteristic->canNotify())
     {
       debugDirector("Subscribed to notifications");
-      pRemoteCharacteristic->registerForNotify(notifyCallback);
+      pRemoteCharacteristic->subscribe(true, notifyCallback);
     }
     else
     {
@@ -350,13 +409,13 @@ void setupBLE() //Common BLE setup for both Client and Server
 {
   debugDirector("Starting Arduino BLE Client application...");
   BLEDevice::init(userConfig.getDeviceName());
- // if (!(String(userConfig.getconnectedPowerMeter())=="none")){
- //   doConnectPM = true;
- // }
- // if (!(String(userConfig.getconnectedHeartMonitor())=="none")){
- //   doConnectHR = true;
- // }
- // BLEServerScan(true);
+  // if (!(String(userConfig.getconnectedPowerMeter())=="none")){
+  //   doConnectPM = true;
+  // }
+  // if (!(String(userConfig.getconnectedHeartMonitor())=="none")){
+  //   doConnectHR = true;
+  // }
+  // BLEServerScan(true);
 
 } // End of setup.
 
@@ -390,7 +449,7 @@ void bleClient()
   else if (doScan)
   {
     debugDirector("Scanning Again for reconnect");
-    BLEDevice::getScan()->start(3);
+    //BLEDevice::getScan()->start(3);
     vTaskDelay(2000 / portTICK_PERIOD_MS);
   }
 
@@ -410,7 +469,7 @@ void BLEServerScan(bool connectRequest)
   pBLEScan->setInterval(1349);
   pBLEScan->setWindow(449);
   pBLEScan->setActiveScan(true);
-  BLEScanResults foundDevices = pBLEScan->start(5, false);
+  BLEScanResults foundDevices = pBLEScan->start(10, false);
 
   // Load the scan into a Json String
   int count = foundDevices.getCount();
@@ -418,7 +477,7 @@ void BLEServerScan(bool connectRequest)
   StaticJsonDocument<500> devices;
 
   String device = "";
- 
+
   for (int i = 0; i < count; i++)
   {
     BLEAdvertisedDevice d = foundDevices.getDevice(i);
