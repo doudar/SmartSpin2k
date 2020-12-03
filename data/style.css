@@ -1,13 +1,20 @@
 html {
-    font-family: sans-serif;
-    display: inline-block;
-    margin: 0px auto;
-    text-align: center;
-    background-color: #3498db;
-  }
+  font-family: sans-serif;
+  display: inline-block;
+  margin: 10px auto;
+  text-align: center;
+  background-color: #03245c;
+}
+
+a:{
+  color:#187bcd; 
+}
+a:visited{
+  color: #2a9df4;
+}
   h1{
-    color: #0F3376;
-    padding: 2rem;
+    color: #03245c;
+    padding: .5rem;
   }
   h2{
     color: #000000;
@@ -19,10 +26,10 @@ html {
   }
   .button {
     display: inline-block;
-    background-color: #008CBA;
+    background-color: #2a9df4;
     border: line;
     border-radius: 4px;
-    color: white;
+    color: #d0efff;
     padding: 10px 40px;
     text-decoration: none;
     font-size: 20px;
@@ -47,7 +54,7 @@ html {
     right: 0; 
     bottom: 0; 
     transition: .4s;
-    background-color: rgba(27, 0, 180, 0.308); 
+    background-color: #03254c; 
     border-radius: 34px;
   }
   .slider:before {
@@ -57,14 +64,14 @@ html {
     width: 37px; 
     left: 2px; 
     bottom: 2px; 
-    background-color: #fff; 
+    background-color: #d0efff; 
     -webkit-transition: .4s; 
     transition: .4s; 
     border-radius: 68px;
   }
   input:checked+.slider {
     transition: .4s;
-    background-color: rgb(7, 23, 255)}
+    background-color: #2a9df4}
   input:checked+.slider:before {
     -webkit-transform: translateX(38px); 
     -ms-transform: translateX(38px); 
@@ -73,9 +80,9 @@ html {
   .slider2 { 
     -webkit-appearance: none; 
     margin: 5px; 
-    width: 300px; 
+    width: 270px; 
     height: 20px; 
-    background: #ccc;
+    background: #d0efff;
     /*outline:8px ridge rgba(170,50,220, .6);
     border-radius: 2rem;*/
     outline: none;
@@ -84,11 +91,11 @@ html {
   .slider2::-webkit-slider-thumb {
     -webkit-appearance: none; 
     appearance: none; width: 30px; 
-    height: 30px; background: #2f4468; 
+    height: 30px; background: #03254C; 
     cursor: pointer;
   }
   .slider2::-moz-range-thumb { width: 30px; 
-    height: 30px; background: #2f4468; 
+    height: 30px; background: #1167b1; 
     cursor: pointer; 
   } 
 
@@ -100,14 +107,14 @@ html {
   .tooltip {
     position: relative;
     display: inline-block;
-    border-bottom: 1px dotted rgb(1, 47, 78);
+    border-bottom: 1px dotted #03254c;
   }
   
   .tooltip .tooltiptext {
     visibility: hidden;
     width: 120px;
-    background-color: rgb(1, 47, 78);
-    color: #ccc;
+    background-color: #03254c;
+    color: #d0efff;
     text-align: center;
     border-radius: 6px;
     padding: 5px 0;
@@ -123,18 +130,38 @@ html {
 
   .watermark
 {
-  position: absolute;
-  top: 50%;
-  left: 00%;
-  margin-right: -50%;
-  transform: translate(-50%, -50%);
- transform: rotate(45deg);
- transition: .4s;
- margin: 0;
+  display: inline;
+  position: fixed;
+  top: 0px;
+  left: 0px;
+ transform: translate(calc(50vw - 200px), calc(50vh - 170px)) rotate(45deg);
+ transition: .4s ease-in-out;
  opacity:.7;
  z-index:99;
  color:grey;
- font-size: 5rem
+ font-size: 7rem
 }
+
+.watermark:hidden {
+  transition: visibility 0s 2s, opacity 2s linear;
+}
+
+body {
+  display: block; 
+  margin: 0 auto;
+  background-color:#1167b1;
+}
+
+fieldset{
+  border: 30px solid ; 
+  border-color:#1e3252; 
+  box-sizing: border-box; 
+  grid-area: 1 / 1; 
+  padding: 20px; 
+  margin: 0 auto;
+  z-index: -1;
+}
+
+
 
     

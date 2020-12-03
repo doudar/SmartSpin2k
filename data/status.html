@@ -1,84 +1,77 @@
 <!DOCTYPE html>
 <html>
-
-<p style="text-align: left;"><strong><a href="index.html">Main Index</a></strong></p>
 <head>
   <title>SmartSpin2K Web Server</title>
   <meta name="viewport" content="width=device-width, initial-scale=1">
 </head>
-
-
-<body style="background-color:#3498db;">
+<body>
+  <fieldset><legend><a href="http://github.com/doudar/SmartSpin2k">http://github.com/doudar/SmartSpin2k</a></legend>
+  <p style="text-align: left;"><strong><a href="index.html">Main Index</a></strong></p>
   <h1 style="text-align: left;"><strong>Status</strong></h1>
   <h2>
-    <p style="text-align: left;"></p>
     <form action="requestConfigValues()">
-      <table border="0" style="height: 30px; width: 36.0582%; border-collapse: collapse; border-style: none;"
-        height="182" cellspacing="1">
+      <table>
         <tbody>
-          <tr style="height: 20px;">
-            <td style="width: 14%; height: 20px;">
+          <tr>
+            <td>
               <p><label for="ssid">Network SSID</label></p>
             </td>
-            <td style="width: 14%; height: 20px;"><input type="text" id="ssid" name="ssid" value="loading" /></td>
-                        <td style="width: 14%; height: 20px;">
+            <td><input type="text" id="ssid" name="ssid" value="loading" /></td>
+                        <td>
               <p><label for="simulatedWatts">Watts</label></p>
             </td>
-            <td style="width: 14%; height: 20px;"><input type="text" id="simulatedWatts" name="simulatedWatts" value="loading" /></td>
+            <td><input type="text" id="simulatedWatts" name="simulatedWatts" value="loading" /></td>
           </tr>
-          <tr style="height: 20px;">
-            <td style="width: 14%; height: 20px;">
+          <tr>
+            <td>
               <p><label for="password">Network Password</label></p>
             </td>
-            <td style="width: 14%; height: 20px;"><input type="text" id="password" name="password" value="loading" />
+            <td><input type="text" id="password" name="password" value="loading" />
             </td>
-                        <td style="width: 14%; height: 20px;">
+                        <td>
               <p><label for="ssid">HR</label></p>
             </td>
-            <td style="width: 14%; height: 20px;"><input type="text" id="simulatedHr" name="simulatedHr" value="loading" /></td>
+            <td><input type="text" id="simulatedHr" name="simulatedHr" value="loading" /></td>
           </tr>
-          <tr style="height: 20px;">
-            <td style="width: 14%; height: 20px;">
+          <tr>
+            <td>
               <p><label for="deviceName">MDNS Name</label></p>
             </td>
-            <td style="width: 14%; height: 20px;"><input type="text" id="deviceName" name="deviceName"
+            <td><input type="text" id="deviceName" name="deviceName"
                 value="loading" /></td>
-                            <td style="width: 14%; height: 20px;">
+                            <td>
               <p><label for="ssid">Cadence</label></p>
             </td>
-            <td style="width: 14%; height: 20px;"><input type="text" id="simulatedCad" name="simulatedCad" value="loading" /></td>
+            <td><input type="text" id="simulatedCad" name="simulatedCad" value="loading" /></td>
           </tr>
-          <tr style="height: 20px;">
-            <td style="width: 14%; height: 20px;">
+          <tr>
+            <td>
               <p><label for="shiftStep">Shift Step</label></p>
             </td>
-            <td style="width: 14%; height: 20px;"><input type="text" id="shiftStep" name="shiftStep" value="loading" />
+            <td><input type="text" id="shiftStep" name="shiftStep" value="loading" />
             </td>
-                        <td style="width: 14%; height: 20px;">
+                        <td>
               <p><label for="ssid">Incline</label></p>
             </td>
-            <td style="width: 14%; height: 20px;"><input type="text" id="incline" name="incline" value="loading" /></td>
+            <td><input type="text" id="incline" name="incline" value="loading" /></td>
           </tr>
-          <tr style="height: 20px;">
-            <td style="width: 14%; height: 20px;">
+          <tr>
+            <td>
               <p><label for="inclineMultiplier">Incline Multiplier</label></p>
             </td>
-            <td style="width: 14%; height: 20px;"><input type="text" id="inclineMultiplier" name="inclineMultiplier"
+            <td><input type="text" id="inclineMultiplier" name="inclineMultiplier"
                 value="loading" /></td>
-                            <td style="width: 14%; height: 20px;">
+                            <td>
               <p><label for="ssid">Connected Power Meter</label></p>
             </td>
-            <td style="width: 14%; height: 20px;"><input type="text" id="connectedPowerMeter" name="ConnectedPowerMeter" value="loading" /></td>
+            <td><input type="text" id="connectedPowerMeter" name="ConnectedPowerMeter" value="loading" /></td>
           </tr>
         </tbody>
       </table>
     </form>
-   <br>
-    <p style="text-align: left;">Debugging Info:</p>
-    <div id="debug" name="debug"style="background-color:black;background-image:radial-gradient(rgba(0,150,0,0.75), black 120%);text-align: left;height:400px;width:700px;resize:both;border:1px solid #ccc;color:white;font:1.3rem Inconsolata, monospace;overflow:auto;text-shadow: 0 0 4px #C8C8C8;"> loading </div>
-<br>
-
-  </h2>
+    <p style="text-align: left; margin-left:0 auto;">Debugging Info:</p>
+    <div id="debug" name="debug"style="margin-left:0 auto;background-color:black;background-image:radial-gradient(rgba(0,150,0,0.75), black 120%);text-align: left;height:30vh;width:36%;resize:both;border:1px solid #ccc;color:white;font:1.3rem Inconsolata, monospace;overflow:auto;text-shadow: 0 0 4px #C8C8C8;"> loading </div>
+<br></h2>
 </body>
 
 <script>
