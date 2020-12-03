@@ -117,7 +117,8 @@
         updateSlider(document.getElementById("shiftStep"),document.getElementById("shiftStepValue"));
         updateSlider(document.getElementById("inclineMultiplier"),document.getElementById("inclineMultiplierValue"));
         updateSlider(document.getElementById("stepperPower"),document.getElementById("stepperPowerValue"));
-        document.getElementById("loadingWatermark").hidden();
+        document.getElementById("loadingWatermark").opacity = 0;
+        setTimeout(function(){document.getElementById("loadingWatermark").remove();}, 1000);
       }
     };
     xhttp.open("GET", "/configJSON", true);

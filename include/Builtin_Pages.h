@@ -51,7 +51,7 @@ String noIndexHTML =
     "  <title>SmartSpin2K Web Server</title>"
     "</head>"
     "<body>"
-    "<form name=networkSettings>"
+    "<form action='/send_settings'>"
     "<p><label for='ssid'>SSID</label></p>"
     "<input type='text' id='ssid' name='ssid' value='' />"
     "<label for='password'>Password</label>"

@@ -6,11 +6,11 @@ html {
   background-color: #03245c;
 }
 
-a:{
-  color:#187bcd; 
+a{
+  color:#000000; 
 }
 a:visited{
-  color: #2a9df4;
+  color: #000000;
 }
   h1{
     color: #03245c;
@@ -150,6 +150,8 @@ body {
   display: block; 
   margin: 0 auto;
   background-color:#1167b1;
+  opacity: 1;
+  transition: .5s ease-in-out;
 }
 
 fieldset{
