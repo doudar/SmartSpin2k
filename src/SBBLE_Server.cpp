@@ -40,7 +40,6 @@ BLECharacteristic *cyclingPowerMeasurementCharacteristic;
 BLECharacteristic *fitnessMachineFeature;
 BLECharacteristic *fitnessMachineIndoorBikeData;
 
-#define MAX_RECONNECT_TRIES 5;
 int reconnectTries = MAX_RECONNECT_TRIES;
 
 //New Remote Charistics to get rid of notify callbacks
@@ -79,6 +78,9 @@ uint8_t ftmsFeature[8] = {0x86, 0x50, 0x00, 0x00, 0x0C, 0xE0, 0x00, 0x00};      
 uint8_t ftmsIndoorBikeData[13] = {0x54, 0x08, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0}; //00000000100001010100 ISpeed, ICAD, TDistance, IPower, ETime
 uint8_t ftmsResistanceLevelRange[6] = {0x00, 0x00, 0x3A, 0x98, 0xC5, 0x68};                           //+-15000
 uint8_t ftmsPowerRange[6] = {0x00, 0x00, 0xA0, 0x0F, 0x01, 0x00};                                     //1-4000
+
+TaskHandle_t BLENotifyTask;
+TaskHandle_t BLEClientTask;
 
 //Creating Server Callbacks
 class MyServerCallbacks : public BLEServerCallbacks
@@ -174,19 +176,20 @@ class MyClientCallback : public BLEClientCallbacks
 
   void onDisconnect(BLEClient *pclient)
   {
-    if(pclient->getService(HEARTSERVICE_UUID) == nullptr){
- 
+    if ((pclient->getService(HEARTSERVICE_UUID)) && (!(pclient->isConnected())))
+    {
       debugDirector("Detected HR Disconnect. Trying rapid reconnect");
       connectedHR = false;
       doConnectHR = true; //try rapid reconnect
-
+      return;
     }
-        if(pclient->getService(CYCLINGPOWERSERVICE_UUID) == nullptr){
- 
+    if ((pclient->getService(CYCLINGPOWERSERVICE_UUID)) && (!(pclient->isConnected())))
+    {
+
       debugDirector("Detected PM Disconnect. Trying rapid reconnect");
       connectedPM = false;
       doConnectPM = true; //try rapid reconnect
-
+      return;
     }
   }
 
@@ -225,13 +228,16 @@ bool connectToServer()
     serviceUUID = CYCLINGPOWERSERVICE_UUID;
     charUUID = CYCLINGPOWERMEASUREMENT_UUID;
     debugDirector("trying to connect to PM");
-  } else if (doConnectHR)
+  }
+  else if (doConnectHR)
   {
     myDevice = myHeartMonitor;
     serviceUUID = HEARTSERVICE_UUID;
     charUUID = HEARTCHARACTERISTIC_UUID;
     debugDirector("Trying to connect to HRM");
-  }else {
+  }
+  else
+  {
     debugDirector("no doConnect");
     return false;
   }
@@ -239,43 +245,56 @@ bool connectToServer()
   NimBLEClient *pClient = nullptr;
 
   // Check if we have a client we should reuse first
-  if (NimBLEDevice::getClientListSize())
+  if (NimBLEDevice::getClientListSize() > 1)
   {
     // Special case when we already know this device, we send false as the
     //     *  second argument in connect() to prevent refreshing the service database.
     //     *  This saves considerable time and power.
     //     *
     pClient = NimBLEDevice::getClientByPeerAddress(myDevice->getAddress());
-
+    pClient->setConnectTimeout(3); //seconds to wait for reconnect.
     debugDirector("Reusing Client");
     if (pClient)
     {
+      debugDirector("Client RSSI " + String(pClient->getRssi()));
+      debugDirector("device RSSI " + String(myDevice->getRSSI()));
+      if (myDevice->getRSSI() == 0)
+      {
+        debugDirector("no signal detected. abortng.");
+        reconnectTries--;
+        return false;
+      }
       pClient->disconnect();
-      vTaskDelay(100/portTICK_PERIOD_MS);
+      vTaskDelay(100 / portTICK_PERIOD_MS);
       if (!pClient->connect(myDevice->getAddress(), true))
       {
-        Serial.println("Reconnect failed");
-       if(reconnectTries<1){
-        if(myDevice==myPowerMeter){
-          myPowerMeter=nullptr;
-          doConnectPM = false;
-          connectedPM = false;
+        Serial.println("Reconnect failed ");
+        reconnectTries--;
+        debugDirector(String(reconnectTries) + " left.");
+        if (reconnectTries < 1)
+        {
+          if (myDevice == myPowerMeter)
+          {
+            myPowerMeter = nullptr;
+            doConnectPM = false;
+            connectedPM = false;
+          }
+          if (myDevice == myHeartMonitor)
+          {
+            myHeartMonitor = nullptr;
+            doConnectHR = false;
+            connectedHR = false;
+          }
         }
-        if(myDevice==myHeartMonitor){
-          myHeartMonitor=nullptr;
-          doConnectHR = false;
-          connectedHR = false;
-        }
-       }
-       return false;
+        return false;
       }
       Serial.println("Reconnected client");
-      pClient->setClientCallbacks(new MyClientCallback(),true);
+      pClient->setClientCallbacks(new MyClientCallback(), true);
       BLERemoteService *pRemoteService = pClient->getService(serviceUUID);
       pRemoteCharacteristic = pRemoteService->getCharacteristic(charUUID);
       if (pRemoteCharacteristic->canNotify())
       {
-        
+
         pRemoteCharacteristic->subscribe(true, notifyCallback);
         if (pRemoteService->getUUID() == CYCLINGPOWERSERVICE_UUID)
         {
@@ -284,7 +303,7 @@ bool connectToServer()
           doConnectPM = false;
           reconnectTries = MAX_RECONNECT_TRIES;
         }
-        
+
         if (pRemoteService->getUUID() == HEARTSERVICE_UUID)
         {
           debugDirector("Found HRM on reconnect");
@@ -307,17 +326,18 @@ bool connectToServer()
     else
     {
       debugDirector("Reconnect failed in a way I don't understand");
-      pClient = NimBLEDevice::getDisconnectedClient();
+      //pClient = NimBLEDevice::getDisconnectedClient();
     }
   }
 
   debugDirector("Forming a connection to: " + String(myDevice->getAddress().toString().c_str()));
   pClient = BLEDevice::createClient();
   debugDirector(" - Created client", false);
-  pClient->setClientCallbacks(new MyClientCallback(),true);
+  pClient->setClientCallbacks(new MyClientCallback(), true);
   // Connect to the remove BLE Server.
   pClient->connect(myDevice->getAddress()); // if you pass BLEAdvertisedDevice instead of address, it will be recognized type of peer device address (public or private)
-  debugDirector(" - Connected to server", false);
+  debugDirector(" - Connected to server", true);
+  debugDirector(" - RSSI " + pClient->getRssi(), true);
 
   // Obtain a reference to the service we are after in the remote BLE server.
   BLERemoteService *pRemoteService = pClient->getService(serviceUUID);
@@ -361,14 +381,14 @@ bool connectToServer()
   }
   if (sucessful > 0)
   {
-    
+
     if (pRemoteService->getUUID() == CYCLINGPOWERSERVICE_UUID)
     {
       connectedPM = true;
       doConnectPM = false;
       debugDirector("Sucessful PM");
     }
-    
+
     if (pRemoteService->getUUID() == HEARTSERVICE_UUID)
     {
       connectedHR = true;
@@ -398,7 +418,6 @@ class MyAdvertisedDeviceCallbacks : public BLEAdvertisedDeviceCallbacks
     {
       if ((advertisedDevice->getName() == userConfig.getconnectedPowerMeter()) || (advertisedDevice->getAddress().toString().c_str() == userConfig.getconnectedPowerMeter()) || (String(userConfig.getconnectedPowerMeter()) == ("any")))
       {
-        // BLEDevice::getScan()->stop();
         myPowerMeter = advertisedDevice;
         doConnectPM = true;
         doScan = true;
@@ -408,7 +427,6 @@ class MyAdvertisedDeviceCallbacks : public BLEAdvertisedDeviceCallbacks
     {
       if ((advertisedDevice->getName() == userConfig.getconnectedHeartMonitor()) || (advertisedDevice->getAddress().toString().c_str() == userConfig.getconnectedHeartMonitor()) || (String(userConfig.getconnectedHeartMonitor()) == ("any")))
       {
-        //BLEDevice::getScan()->stop();
         myHeartMonitor = advertisedDevice;
         doConnectHR = true;
         doScan = true;
@@ -421,23 +439,23 @@ void setupBLE() //Common BLE setup for both Client and Server
 {
   debugDirector("Starting Arduino BLE Client application...");
   BLEDevice::init(userConfig.getDeviceName());
-  // if (!(String(userConfig.getconnectedPowerMeter())=="none")){
-  //   doConnectPM = true;
-  // }
-  // if (!(String(userConfig.getconnectedHeartMonitor())=="none")){
-  //   doConnectHR = true;
-  // }
-  // BLEServerScan(true);
+
+    xTaskCreatePinnedToCore(
+      bleClient,           /* Task function. */
+      "BLEClientTask", /* name of task. */
+      2500,                   /* Stack size of task */
+      NULL,                  /* parameter of the task */
+      18,                    /* priority of the task  - 29 worked  at 1 I get stuttering */
+      &BLEClientTask,      /* Task handle to keep track of created task */
+      1);       
 
 } // End of setup.
 
 // This is the Arduino main loop function.
-void bleClient()
+void bleClient(void *pvParameters)
 {
+  for(;;){
 
-  // If the flag "doConnect" is true then we have scanned for and found the desired
-  // BLE Server with which we wish to connect.  Now we connect to it.  Once we are
-  // connected we set the connected flag to be true.
   if ((doConnectPM == true) || (doConnectHR == true))
   {
     if (connectToServer())
@@ -450,23 +468,18 @@ void bleClient()
     }
   }
 
-  // If we are connected to a peer BLE Server, update the characteristic each time we are reached
-  // with the current time since boot.
   if ((connectedPM) || (connectedHR))
   {
-    //debugDirector("doConnectPM: " + String(doConnectPM) + " doConnectHR: " + String(doConnectHR));
-    //debugDirector(pRemoteCharacteristic->getUUID().toString().c_str());
-    //debugDirector(pRemoteCharacteristic->getValue().c_str());
+ 
   }
   else if (doScan)
   {
-    //debugDirector("Scanning Again for reconnect");
-    //BLEDevice::getScan()->start(3);
-    //vTaskDelay(2000 / portTICK_PERIOD_MS);
+
   }
 
-  //delay(1000); // Delay a second between loops.
-} // End of loop
+  vTaskDelay(BLE_CLIENT_DELAY/portTICK_PERIOD_MS); // Delay a second between loops.
+  //debugDirector("BLEclient High Water Mark: " + String(uxTaskGetStackHighWaterMark(BLEClientTask)));
+}}
 
 void BLEServerScan(bool connectRequest)
 {
@@ -672,34 +685,56 @@ void startBLEServer()
   pFitnessMachineService->start(); //Fitness Machine Service
 
   BLEAdvertising *pAdvertising = BLEDevice::getAdvertising();
-  pAdvertising->addServiceUUID(HEARTSERVICE_UUID);
-  pAdvertising->addServiceUUID(CYCLINGPOWERSERVICE_UUID);
   pAdvertising->addServiceUUID(FITNESSMACHINESERVICE_UUID);
+  pAdvertising->addServiceUUID(CYCLINGPOWERSERVICE_UUID);
+  pAdvertising->addServiceUUID(HEARTSERVICE_UUID);
+  
   pAdvertising->setScanResponse(true);
   BLEDevice::startAdvertising();
 
   debugDirector("Bluetooth Characteristic defined!");
+  xTaskCreatePinnedToCore(
+      BLENotify,       /* Task function. */
+      "BLENotifyTask", /* name of task. */
+      1500,            /* Stack size of task*/
+      NULL,            /* parameter of the task */
+      1,               /* priority of the task*/
+      &BLENotifyTask,  /* Task handle to keep track of created task */
+      1); /* pin task to core 0 */
+
+  debugDirector("BLE Notify Task Started");
 }
 
-void BLENotify()
+void BLENotify(void *pvParameters)
 {
-  if (_BLEClientConnected)
+  for (;;)
   {
-    //update the BLE information on the server
-    heartRateMeasurement[1] = userConfig.getSimulatedHr();
-    heartRateMeasurementCharacteristic->setValue(heartRateMeasurement, 5);
-    computeCSC();
-    updateIndoorBikeDataChar();
-    updateCyclingPowerMesurementChar();
-    cyclingPowerMeasurementCharacteristic->notify();
-    fitnessMachineFeature->notify();
-    fitnessMachineIndoorBikeData->notify();
-    heartRateMeasurementCharacteristic->notify();
-    GlobalBLEClientConnected = true;
+    if (_BLEClientConnected)
+    {
+      //update the BLE information on the server
+      heartRateMeasurement[1] = userConfig.getSimulatedHr();
+      heartRateMeasurementCharacteristic->setValue(heartRateMeasurement, 5);
+      computeCSC();
+      updateIndoorBikeDataChar();
+      updateCyclingPowerMesurementChar();
+      cyclingPowerMeasurementCharacteristic->notify();
+      fitnessMachineFeature->notify();
+      fitnessMachineIndoorBikeData->notify();
+      heartRateMeasurementCharacteristic->notify();
+      GlobalBLEClientConnected = true;
+    }
+    else
+    {
+      GlobalBLEClientConnected = false;
+    }
+     if (!_BLEClientConnected)
+  {
+    digitalWrite(LED_PIN, LOW); //blink if no client connected
   }
-  else
-  {
-    GlobalBLEClientConnected = false;
+    vTaskDelay((BLE_NOTIFY_DELAY/2)/portTICK_PERIOD_MS);
+    digitalWrite(LED_PIN, HIGH);
+    vTaskDelay((BLE_NOTIFY_DELAY/2)/portTICK_PERIOD_MS);
+    //debugDirector("BLENotify High Water Mark: " + String(uxTaskGetStackHighWaterMark(BLENotifyTask)));
   }
 }
 

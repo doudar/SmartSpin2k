@@ -30,10 +30,10 @@
 #define FITNESSMACHINEPOWERRANGE_UUID BLEUUID((uint16_t)0x2AD8)
 
 void startBLEServer();
-void BLENotify();
+void BLENotify(void *pvParameters);
 bool connectToServer();
 void BLEServerScan(bool connectRequest);
-void bleClient();
+void bleClient(void *pvParameters);
 void startBleClient();
 void computeERG(int, int);
 void setupBLE();

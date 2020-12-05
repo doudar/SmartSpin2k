@@ -10,7 +10,7 @@
 #define SETTINGS_H
 
 //Current program version info. Used for auto updates
-#define FIRMWARE_VERSION "0.0.12.4"
+#define FIRMWARE_VERSION "0.0.12.5"
 
 //Update firmware on boot?
 #define AUTO_FIRMWARE_UPDATE true
@@ -76,9 +76,15 @@
 //Hardware pin for indicator LED *note* internal LED on esp32 Dev board is pin 2 
 #define LED_PIN 2 
 
-
 //Max tries that BLE client will perform on reconnect
-#define MAX_RECONNECT_TRIES 5;
+#define MAX_RECONNECT_TRIES 10
+
+//loop speed for the SmartSpin2k BLE Server
+#define BLE_NOTIFY_DELAY 500
+
+//loop speed for the SmartSpin2k BLE Client reconnect 
+#define BLE_CLIENT_DELAY 1000
+
 
 
 

@@ -87,35 +87,29 @@ void setup()
       0);                    /* pin task to core 0 */
 
   setupBLE();
-  //BLEServerScan(true);
   digitalWrite(LED_PIN, HIGH);
+  startBLEServer();
+  BLEServerScan(true);
   startWifi();
   startHttpServer();
   if (userConfig.getautoUpdate())
   {
     FirmwareUpdate();
   }
-  startBLEServer();
   resetIfShiftersHeld();
   debugDirector("Creating Shifter Interrupts");
-  //Setup Interrups so shifters work at anytime
+  //Setup Interrups so shifters work anytime
   attachInterrupt(digitalPinToInterrupt(SHIFT_UP_PIN), shiftUp, CHANGE);
   attachInterrupt(digitalPinToInterrupt(SHIFT_DOWN_PIN), shiftDown, CHANGE);
-  BLEServerScan(true);
+  digitalWrite(LED_PIN, HIGH);
 }
 
 void loop()
 {
-
-  if (!GlobalBLEClientConnected)
-  {
-    digitalWrite(LED_PIN, LOW); //blink if no client connected
-  }
-
-  BLENotify();
+  //BLENotify();
   vTaskDelay(500 / portTICK_RATE_MS); //guessing it's good to have task delays seperating client & Server?
-  bleClient(); // reconnect to BLE servers if disconnected
-  digitalWrite(LED_PIN, HIGH);
+  //bleClient(); // reconnect to BLE servers if disconnected
+  
   vTaskDelay(500 / portTICK_RATE_MS);
 
   if (debugToHTML.length() > 500)
