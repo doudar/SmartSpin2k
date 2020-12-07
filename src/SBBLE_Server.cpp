@@ -473,7 +473,7 @@ void bleClient(void *pvParameters)
       }
       else
       {
-        debugDirector("We have failed to connect to the server; there is nothin more we will do.");
+      
       }
     }
 
