@@ -322,7 +322,7 @@ void startHttpServer()
   xTaskCreatePinnedToCore(
       webClientUpdate,   /* Task function. */
       "webClientUpdate", /* name of task. */
-      3500,              /* Stack size of task Used to be 3000*/
+      4000,              /* Stack size of task Used to be 3000*/
       NULL,              /* parameter of the task */
       10,                /* priority of the task  - 29 worked*/
       &webClientTask,    /* Task handle to keep track of created task */

@@ -242,7 +242,7 @@ bool connectToServer()
     return false;
   }
 
-  NimBLEClient *pClient = nullptr;
+  NimBLEClient *pClient;
 
   // Check if we have a client we should reuse first
   if (NimBLEDevice::getClientListSize() > 1)
@@ -252,7 +252,6 @@ bool connectToServer()
     //     *  This saves considerable time and power.
     //     *
     pClient = NimBLEDevice::getClientByPeerAddress(myDevice->getAddress());
-    pClient->setConnectTimeout(3); //seconds to wait for reconnect.
     debugDirector("Reusing Client");
     if (pClient)
     {
@@ -292,6 +291,12 @@ bool connectToServer()
       pClient->setClientCallbacks(new MyClientCallback(), true);
       BLERemoteService *pRemoteService = pClient->getService(serviceUUID);
       pRemoteCharacteristic = pRemoteService->getCharacteristic(charUUID);
+      if (pRemoteCharacteristic == nullptr)
+      {
+        debugDirector("Couldn't find Characteristic");
+        reconnectTries--;
+        return false;
+      }
       if (pRemoteCharacteristic->canNotify())
       {
 
@@ -331,10 +336,13 @@ bool connectToServer()
   }
 
   debugDirector("Forming a connection to: " + String(myDevice->getAddress().toString().c_str()));
-  pClient = BLEDevice::createClient();
+  pClient = NimBLEDevice::createClient();
   debugDirector(" - Created client", false);
   pClient->setClientCallbacks(new MyClientCallback(), true);
   // Connect to the remove BLE Server.
+  pClient->setConnectionParams(24, 24, 0, 102);
+  /** Set how long we are willing to wait for the connection to complete (seconds), default is 30. */
+  pClient->setConnectTimeout(5);
   pClient->connect(myDevice->getAddress()); // if you pass BLEAdvertisedDevice instead of address, it will be recognized type of peer device address (public or private)
   debugDirector(" - Connected to server", true);
   debugDirector(" - RSSI " + pClient->getRssi(), true);
@@ -440,46 +448,46 @@ void setupBLE() //Common BLE setup for both Client and Server
   debugDirector("Starting Arduino BLE Client application...");
   BLEDevice::init(userConfig.getDeviceName());
 
-    xTaskCreatePinnedToCore(
-      bleClient,           /* Task function. */
+  xTaskCreatePinnedToCore(
+      bleClient,       /* Task function. */
       "BLEClientTask", /* name of task. */
-      2500,                   /* Stack size of task */
-      NULL,                  /* parameter of the task */
-      18,                    /* priority of the task  - 29 worked  at 1 I get stuttering */
-      &BLEClientTask,      /* Task handle to keep track of created task */
-      1);       
+      3500,            /* Stack size of task */
+      NULL,            /* parameter of the task */
+      18,              /* priority of the task  - 29 worked  at 1 I get stuttering */
+      &BLEClientTask,  /* Task handle to keep track of created task */
+      1);
 
 } // End of setup.
 
 // This is the Arduino main loop function.
 void bleClient(void *pvParameters)
 {
-  for(;;){
-
-  if ((doConnectPM == true) || (doConnectHR == true))
+  for (;;)
   {
-    if (connectToServer())
+
+    if ((doConnectPM == true) || (doConnectHR == true))
     {
-      debugDirector("We are now connected to the BLE Server.");
+      if (connectToServer())
+      {
+        debugDirector("We are now connected to the BLE Server.");
+      }
+      else
+      {
+        debugDirector("We have failed to connect to the server; there is nothin more we will do.");
+      }
     }
-    else
+
+    if ((connectedPM) || (connectedHR))
     {
-      debugDirector("We have failed to connect to the server; there is nothin more we will do.");
     }
-  }
+    else if (doScan)
+    {
+    }
 
-  if ((connectedPM) || (connectedHR))
-  {
- 
+    vTaskDelay(BLE_CLIENT_DELAY / portTICK_PERIOD_MS); // Delay a second between loops.
+    //debugDirector("BLEclient High Water Mark: " + String(uxTaskGetStackHighWaterMark(BLEClientTask)));
   }
-  else if (doScan)
-  {
-
-  }
-
-  vTaskDelay(BLE_CLIENT_DELAY/portTICK_PERIOD_MS); // Delay a second between loops.
-  //debugDirector("BLEclient High Water Mark: " + String(uxTaskGetStackHighWaterMark(BLEClientTask)));
-}}
+}
 
 void BLEServerScan(bool connectRequest)
 {
@@ -685,10 +693,10 @@ void startBLEServer()
   pFitnessMachineService->start(); //Fitness Machine Service
 
   BLEAdvertising *pAdvertising = BLEDevice::getAdvertising();
-  pAdvertising->addServiceUUID(FITNESSMACHINESERVICE_UUID);
   pAdvertising->addServiceUUID(CYCLINGPOWERSERVICE_UUID);
+  pAdvertising->addServiceUUID(FITNESSMACHINESERVICE_UUID);
   pAdvertising->addServiceUUID(HEARTSERVICE_UUID);
-  
+
   pAdvertising->setScanResponse(true);
   BLEDevice::startAdvertising();
 
@@ -696,11 +704,11 @@ void startBLEServer()
   xTaskCreatePinnedToCore(
       BLENotify,       /* Task function. */
       "BLENotifyTask", /* name of task. */
-      1500,            /* Stack size of task*/
+      3000,            /* Stack size of task*/
       NULL,            /* parameter of the task */
       1,               /* priority of the task*/
       &BLENotifyTask,  /* Task handle to keep track of created task */
-      1); /* pin task to core 0 */
+      1);              /* pin task to core 0 */
 
   debugDirector("BLE Notify Task Started");
 }
@@ -727,13 +735,13 @@ void BLENotify(void *pvParameters)
     {
       GlobalBLEClientConnected = false;
     }
-     if (!_BLEClientConnected)
-  {
-    digitalWrite(LED_PIN, LOW); //blink if no client connected
-  }
-    vTaskDelay((BLE_NOTIFY_DELAY/2)/portTICK_PERIOD_MS);
+    if (!_BLEClientConnected)
+    {
+      digitalWrite(LED_PIN, LOW); //blink if no client connected
+    }
+    vTaskDelay((BLE_NOTIFY_DELAY / 2) / portTICK_PERIOD_MS);
     digitalWrite(LED_PIN, HIGH);
-    vTaskDelay((BLE_NOTIFY_DELAY/2)/portTICK_PERIOD_MS);
+    vTaskDelay((BLE_NOTIFY_DELAY / 2) / portTICK_PERIOD_MS);
     //debugDirector("BLENotify High Water Mark: " + String(uxTaskGetStackHighWaterMark(BLENotifyTask)));
   }
 }
@@ -813,7 +821,6 @@ void updateIndoorBikeDataChar()
   ftmsIndoorBikeData[11] = 0;                       // Elapsed Time uint16 in seconds
   ftmsIndoorBikeData[12] = 0;                       // Elapsed Time
   fitnessMachineIndoorBikeData->setValue(ftmsIndoorBikeData, 13);
-  fitnessMachineIndoorBikeData->notify();
 }
 
 void updateCyclingPowerMesurementChar()
@@ -824,7 +831,7 @@ void updateCyclingPowerMesurementChar()
   cyclingPowerMeasurement[2] = remainder;
   cyclingPowerMeasurement[3] = quotient;
   cyclingPowerMeasurementCharacteristic->setValue(cyclingPowerMeasurement, 9);
-
+  debugDirector("");
   for (const auto &text : cyclingPowerMeasurement)
   { // Range-for!
     debugDirector(String(text, HEX) + " ", false);
