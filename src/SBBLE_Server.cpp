@@ -146,7 +146,7 @@ static void notifyCallback(
       crankEventTime[1] = crankEventTime[0];
       crankEventTime[0] = bytes_to_int(pData[8], pData[7]);
 
-      if ((crankRev[0] > crankRev[1]) && (crankEventTime[0] + crankEventTime[1] > 0))
+      if ((crankRev[0] > crankRev[1]) && (crankEventTime[0] - crankEventTime[1] != 0))
       {
         userConfig.setSimulatedCad(((abs(crankRev[0] - crankRev[1]) * 1024) / abs(crankEventTime[0] - crankEventTime[1])) * 60);
         noReadingIn = 0;
@@ -157,7 +157,7 @@ static void notifyCallback(
         {
           userConfig.setSimulatedCad(0);
         }
-        noReadingIn++;
+        noReadingIn ++;
       }
 
       debugDirector(" CAD: " + String(userConfig.getSimulatedCad()), false);
@@ -172,8 +172,8 @@ class MyClientCallback : public BLEClientCallbacks
 {
   void onConnect(BLEClient *pclient)
   {
+  
   }
-
   void onDisconnect(BLEClient *pclient)
   {
     if ((pclient->getService(HEARTSERVICE_UUID)) && (!(pclient->isConnected())))
