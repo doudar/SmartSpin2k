@@ -13,17 +13,17 @@ The power meter pedals send cycling power and cadence to Zwift (or any other cyc
 
 Configuration is accomplished via a web interface hosted by the SmartSpin2k. If you connect the unit to WiFi with an internet connection, it will also preform automatic software updates whenever they become availiable!  
 
-### Hardware:
+### Recomended Hardware:
 
 You'll need the quantity listed below of each item excep the driver board. An optional PCB is in process which will make the wiring much simpler! 
 
 |qty   |         Part             |              Link                      |
 |:-----:|--------------------------|---------------------------------------:|
 |1      | ESP32 Dev Board          | https://amzn.to/2ZNyjQX  |
-|1      | NEMA 17 Pancake Stepper  | https://amzn.to/35tNiCW |
+|1      | NEMA 17 Pancake Stepper  | https://amzn.to/37mKKHh |
 |1      | TMC2225                  | https://amzn.to/3kctdEQ |
 |1      | LM2596 Buck Converter    | https://amzn.to/33ofggY  |
-|1      | 12V Power Supply         | https://amzn.to/3hqrTNw  |
+|1      | 24V Power Supply         | https://amzn.to/3r4e1i0 |
 |2      | Tactile Switches         | https://amzn.to/33ezmKx |
 |2      | 608 Skate Bearings       | https://amzn.to/3isBzrW  |
 
@@ -54,6 +54,7 @@ But if you're adventerious and handy you can probably take a look at my pictures
 12. Attach the stepper crossbar to the stepper motor.
 13. Install the stepper motor. 
 14. Put the cover on. 
+15. Connect to the SmartSpin2k Wifi network for initial configuration. Default password is "password"
 
 ummm that was easy...right? :)
 
@@ -63,9 +64,7 @@ ummm that was easy...right? :)
 ### TMC2225 Connection Diagram
 <img src="Pictures/SmartSpin2k_TMC_Connections.jpg" alt="esp32 connections" style="height: 200px; width: 100"/> 
 
-*note, if you're using a TMC2225 (which you should), the connections will be the same but you do not need to bridge the rst&slp because...well...they don't exist. 
-
-The hardware mentioned above mounts into a 3d printed enclosure which then easily attaches to a spin bike.
+*note, you can use an A4988 stepper driver also but you'll need to manually set the driver current with a screwdriver as well as possibly modify the output pin settings in /include/settings.h . If you do so, you'll aslo want to turn off automatic firmware updates. 
 
 
 <img src="Pictures/CadPreview.JPG" alt="Cad Preview" style="height: 200px; width: 100"/>
@@ -88,8 +87,7 @@ Here is the earliest prototype mounted on a spin bike. (Cardboard wrapped in duc
 
 <img src="Pictures/prototype_on_spin_bike.jpg" alt="Assembled SideView" style="height: 200px; width: 100"/>
 
-
-This is my first GitHub project and one of my first (recent) large coding projects, so any help or feedback is greatly appreciated.
+Any help or feedback is greatly appreciated.
 
 
 
