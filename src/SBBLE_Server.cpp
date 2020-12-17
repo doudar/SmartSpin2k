@@ -288,19 +288,22 @@ bool connectToServer()
         return false;
       }
       Serial.println("Reconnected client");
-      pClient->setClientCallbacks(new MyClientCallback(), true);
+      // pClient->setClientCallbacks(new MyClientCallback(), true); commented out per @h2zero suggestion
       BLERemoteService *pRemoteService = pClient->getService(serviceUUID);
-      pRemoteCharacteristic = pRemoteService->getCharacteristic(charUUID);
-      if (pRemoteCharacteristic == nullptr)
+      
+      if (pRemoteService == nullptr)
       {
-        debugDirector("Couldn't find Characteristic");
+        debugDirector("Couldn't find Service");
         reconnectTries--;
         return false;
       }
+
+      pRemoteCharacteristic = pRemoteService->getCharacteristic(charUUID);
+
       if (pRemoteCharacteristic->canNotify())
       {
 
-        pRemoteCharacteristic->subscribe(true, notifyCallback);
+       // pRemoteCharacteristic->subscribe(true, notifyCallback); commented out per @h2zero suggestion
         if (pRemoteService->getUUID() == CYCLINGPOWERSERVICE_UUID)
         {
           debugDirector("Found PM on reconnect");
