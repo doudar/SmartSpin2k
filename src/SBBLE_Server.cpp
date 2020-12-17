@@ -300,6 +300,13 @@ bool connectToServer()
 
       pRemoteCharacteristic = pRemoteService->getCharacteristic(charUUID);
 
+      if(pRemoteCharacteristic == nullptr){
+        debugDirector("Couldn't find Characteristic");
+        reconnectTries--;
+        return false;
+      }
+
+
       if (pRemoteCharacteristic->canNotify())
       {
 
