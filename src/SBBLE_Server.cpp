@@ -310,7 +310,7 @@ bool connectToServer()
       if (pRemoteCharacteristic->canNotify())
       {
 
-       // pRemoteCharacteristic->subscribe(true, notifyCallback); commented out per @h2zero suggestion
+       pRemoteCharacteristic->subscribe(true, notifyCallback); 
         if (pRemoteService->getUUID() == CYCLINGPOWERSERVICE_UUID)
         {
           debugDirector("Found PM on reconnect");
