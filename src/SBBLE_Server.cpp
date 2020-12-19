@@ -148,8 +148,16 @@ static void notifyCallback(
 
       if ((crankRev[0] > crankRev[1]) && (crankEventTime[0] - crankEventTime[1] != 0))
       {
-        userConfig.setSimulatedCad(((abs(crankRev[0] - crankRev[1]) * 1024) / abs(crankEventTime[0] - crankEventTime[1])) * 60);
-        noReadingIn = 0;
+        int tCAD = (((abs(crankRev[0] - crankRev[1]) * 1024) / abs(crankEventTime[0] - crankEventTime[1])) * 60);
+        if (tCAD > 1)
+        {
+          userConfig.setSimulatedCad(tCAD);
+          noReadingIn = 0;
+        }
+        else
+        {
+          noReadingIn++;
+        }
       }
       else //the crank rev probably didn't update
       {
@@ -157,7 +165,7 @@ static void notifyCallback(
         {
           userConfig.setSimulatedCad(0);
         }
-        noReadingIn ++;
+        noReadingIn++;
       }
 
       debugDirector(" CAD: " + String(userConfig.getSimulatedCad()), false);
@@ -172,7 +180,6 @@ class MyClientCallback : public BLEClientCallbacks
 {
   void onConnect(BLEClient *pclient)
   {
-  
   }
   void onDisconnect(BLEClient *pclient)
   {
@@ -290,7 +297,7 @@ bool connectToServer()
       Serial.println("Reconnected client");
       // pClient->setClientCallbacks(new MyClientCallback(), true); commented out per @h2zero suggestion
       BLERemoteService *pRemoteService = pClient->getService(serviceUUID);
-      
+
       if (pRemoteService == nullptr)
       {
         debugDirector("Couldn't find Service");
@@ -300,17 +307,17 @@ bool connectToServer()
 
       pRemoteCharacteristic = pRemoteService->getCharacteristic(charUUID);
 
-      if(pRemoteCharacteristic == nullptr){
+      if (pRemoteCharacteristic == nullptr)
+      {
         debugDirector("Couldn't find Characteristic");
         reconnectTries--;
         return false;
       }
 
-
       if (pRemoteCharacteristic->canNotify())
       {
 
-       pRemoteCharacteristic->subscribe(true, notifyCallback); 
+        pRemoteCharacteristic->subscribe(true, notifyCallback);
         if (pRemoteService->getUUID() == CYCLINGPOWERSERVICE_UUID)
         {
           debugDirector("Found PM on reconnect");
@@ -483,7 +490,6 @@ void bleClient(void *pvParameters)
       }
       else
       {
-      
       }
     }
 
