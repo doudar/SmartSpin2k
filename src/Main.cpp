@@ -89,7 +89,10 @@ void setup()
   setupBLE();
   digitalWrite(LED_PIN, HIGH);
   startBLEServer();
-  BLEServerScan(true);
+  if (String(userConfig.getconnectedPowerMeter()) != "none")
+  {
+    BLEServerScan(true);
+  }
   startWifi();
   startHttpServer();
   if (userConfig.getautoUpdate())
@@ -102,6 +105,11 @@ void setup()
   attachInterrupt(digitalPinToInterrupt(SHIFT_UP_PIN), shiftUp, CHANGE);
   attachInterrupt(digitalPinToInterrupt(SHIFT_DOWN_PIN), shiftDown, CHANGE);
   digitalWrite(LED_PIN, HIGH);
+  //theres a better way to handle this, but sometimes the first scan doesn't connect both devices even though it should.
+  //if (String(userConfig.getconnectedHeartMonitor()) != "none")
+  //{
+  //  BLEServerScan(true);
+  //}
 }
 
 void loop()
@@ -109,7 +117,7 @@ void loop()
   //BLENotify();
   vTaskDelay(500 / portTICK_RATE_MS); //guessing it's good to have task delays seperating client & Server?
   //bleClient(); // reconnect to BLE servers if disconnected
-  
+
   vTaskDelay(500 / portTICK_RATE_MS);
 
   if (debugToHTML.length() > 500)
@@ -230,11 +238,12 @@ void resetIfShiftersHeld()
       vTaskDelay(200 / portTICK_PERIOD_MS);
       digitalWrite(LED_PIN, LOW);
     }
-    for(int i=0;i<20;i++){
-    userConfig.setDefaults();
-    vTaskDelay(200 / portTICK_PERIOD_MS);
-    userConfig.saveToSPIFFS();
-    vTaskDelay(200 / portTICK_PERIOD_MS);
+    for (int i = 0; i < 20; i++)
+    {
+      userConfig.setDefaults();
+      vTaskDelay(200 / portTICK_PERIOD_MS);
+      userConfig.saveToSPIFFS();
+      vTaskDelay(200 / portTICK_PERIOD_MS);
     }
     ESP.restart();
   }
@@ -256,27 +265,27 @@ void debugDirector(String textToPrint, bool newline)
 
 void setupTMCStepperDriver()
 {
- //need to add some of these to user_config and the web pages. 
- 
+  //need to add some of these to user_config and the web pages.
+
   driver.begin();
   driver.pdn_disable(true);
   driver.mstep_reg_select(true);
 
-  uint16_t msread=driver.microsteps();
-  debugDirector(" read:ms=" + msread); 
-  
+  uint16_t msread = driver.microsteps();
+  debugDirector(" read:ms=" + msread);
+
   driver.rms_current(userConfig.getStepperPower()); // Set motor RMS current
-  driver.microsteps(4);   // Set microsteps to 1/8th
+  driver.microsteps(4);                             // Set microsteps to 1/8th
   driver.irun(255);
-  driver.ihold(200);  //hold current % 0-255
+  driver.ihold(200);     //hold current % 0-255
   driver.iholddelay(10); //Controls the number of clock cycles for motor power down after standstill is detected
   driver.TPOWERDOWN(128);
-  msread=driver.microsteps();
+  msread = driver.microsteps();
   uint16_t currentread = driver.cs_actual();
 
   debugDirector(" read:current=" + currentread);
-  debugDirector(" read:ms=" + msread); 
-  
+  debugDirector(" read:ms=" + msread);
+
   driver.toff(5);
   driver.en_spreadCycle(true);
   driver.pwm_autoscale(false); // Needed for stealthChop

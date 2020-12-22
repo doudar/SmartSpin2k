@@ -190,7 +190,14 @@ void userParameters::loadFromSPIFFS()
   {
     stepperPower = STEPPER_POWER;
   }
-
+  if (doc["connectedPowerMeter"] == "null")
+  {
+    connectedPowerMeter = CONNECTED_POWER_METER;
+  }
+  if (doc["connectedHeartMonitor"] == "null")
+  {
+    connectedHeartMonitor = CONNECTED_HEART_MONITOR;
+  }
 
   debugDirector("Config File Loaded: " + String(configFILENAME));
   file.close();

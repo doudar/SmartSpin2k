@@ -41,6 +41,7 @@ BLECharacteristic *fitnessMachineFeature;
 BLECharacteristic *fitnessMachineIndoorBikeData;
 
 int reconnectTries = MAX_RECONNECT_TRIES;
+int scanRetries = MAX_SCAN_RETRIES;
 
 //New Remote Charistics to get rid of notify callbacks
 NimBLERemoteCharacteristic *remoteCyclingPowerCharacteristic;
@@ -186,7 +187,6 @@ class MyClientCallback : public BLEClientCallbacks
     if ((pclient->getService(HEARTSERVICE_UUID)) && (!(pclient->isConnected())))
     {
       debugDirector("Detected HR Disconnect. Trying rapid reconnect");
-      connectedHR = false;
       doConnectHR = true; //try rapid reconnect
       return;
     }
@@ -194,7 +194,6 @@ class MyClientCallback : public BLEClientCallbacks
     {
 
       debugDirector("Detected PM Disconnect. Trying rapid reconnect");
-      connectedPM = false;
       doConnectPM = true; //try rapid reconnect
       return;
     }
@@ -283,13 +282,13 @@ bool connectToServer()
           {
             myPowerMeter = nullptr;
             doConnectPM = false;
-            connectedPM = false;
+            doScan = true;
           }
           if (myDevice == myHeartMonitor)
           {
             myHeartMonitor = nullptr;
             doConnectHR = false;
-            connectedHR = false;
+            doScan = true;
           }
         }
         return false;
@@ -398,6 +397,8 @@ bool connectToServer()
     {
       debugDirector("Subscribed to notifications");
       pRemoteCharacteristic->subscribe(true, notifyCallback);
+      reconnectTries = MAX_RECONNECT_TRIES;
+      scanRetries = MAX_SCAN_RETRIES;
     }
     else
     {
@@ -438,23 +439,24 @@ class MyAdvertisedDeviceCallbacks : public BLEAdvertisedDeviceCallbacks
   void onResult(BLEAdvertisedDevice *advertisedDevice)
   {
     debugDirector("BLE Advertised Device found: " + String(advertisedDevice->toString().c_str()));
-
+    const char * c_PM = userConfig.getconnectedPowerMeter();
+    const char * c_HR = userConfig.getconnectedHeartMonitor();
     if ((advertisedDevice->haveServiceUUID()) && (advertisedDevice->isAdvertisingService(CYCLINGPOWERSERVICE_UUID)))
     {
-      if ((advertisedDevice->getName() == userConfig.getconnectedPowerMeter()) || (advertisedDevice->getAddress().toString().c_str() == userConfig.getconnectedPowerMeter()) || (String(userConfig.getconnectedPowerMeter()) == ("any")))
+      if ((advertisedDevice->getName() == c_PM) || (advertisedDevice->getAddress().toString().c_str() == c_PM) || (String(c_PM) == ("any")))
       {
         myPowerMeter = advertisedDevice;
         doConnectPM = true;
-        doScan = true;
+        doScan = false;
       }
     }
     if ((advertisedDevice->haveServiceUUID()) && (advertisedDevice->isAdvertisingService(HEARTSERVICE_UUID)))
     {
-      if ((advertisedDevice->getName() == userConfig.getconnectedHeartMonitor()) || (advertisedDevice->getAddress().toString().c_str() == userConfig.getconnectedHeartMonitor()) || (String(userConfig.getconnectedHeartMonitor()) == ("any")))
+      if ((advertisedDevice->getName() == c_HR) || (advertisedDevice->getAddress().toString().c_str() == c_HR) || (String(c_HR) == ("any")))
       {
         myHeartMonitor = advertisedDevice;
         doConnectHR = true;
-        doScan = true;
+        doScan = false;
       }
     }
   }
@@ -495,9 +497,11 @@ void bleClient(void *pvParameters)
 
     if ((connectedPM) || (connectedHR))
     {
-    }
-    else if (doScan)
-    {
+      if(doScan && (scanRetries>0))
+      {
+        scanRetries--;
+        BLEServerScan(true);
+      }
     }
 
     vTaskDelay(BLE_CLIENT_DELAY / portTICK_PERIOD_MS); // Delay a second between loops.

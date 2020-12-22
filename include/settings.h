@@ -10,7 +10,7 @@
 #define SETTINGS_H
 
 //Current program version info. Used for auto updates
-#define FIRMWARE_VERSION "0.0.12.19"
+#define FIRMWARE_VERSION "0.0.12.21"
 
 //Update firmware on boot?
 #define AUTO_FIRMWARE_UPDATE true
@@ -79,13 +79,22 @@
 //Max tries that BLE client will perform on reconnect
 #define MAX_RECONNECT_TRIES 10
 
+//When quick reconnect fails ^^, we try to scan for the disconnected server. 
+//Scans slow BLE & WiFi traffic so we don't want to do this forever. 
+//Give up scanning for the lost connection after this many tries: 
+#define MAX_SCAN_RETRIES 1
+
 //loop speed for the SmartSpin2k BLE Server
 #define BLE_NOTIFY_DELAY 500
 
 //loop speed for the SmartSpin2k BLE Client reconnect 
 #define BLE_CLIENT_DELAY 1000
 
+//Name of default Power Meter. any connects to anything, none connects to nothing.
+#define CONNECTED_POWER_METER "any"
 
+//Name of default heart monitor. any connects to anything, none connects to nothing.
+#define CONNECTED_HEART_MONITOR "any"
 
 
 #endif

@@ -18,7 +18,6 @@
 #include <Update.h>
 #include <DNSServer.h>
 
-
 File fsUploadFile;
 
 TaskHandle_t webClientTask;
@@ -75,7 +74,7 @@ void startWifi()
     dnsServer.setErrorReplyCode(DNSReplyCode::NoError);
     dnsServer.start(DNS_PORT, "*", myIP);
   }
-  MDNS.begin(userConfig.getDeviceName()); 
+  MDNS.begin(userConfig.getDeviceName());
   MDNS.addService("http", "tcp", 80);
   debugDirector(String("Open http://") + userConfig.getDeviceName() + ".local/");
 }
@@ -87,7 +86,7 @@ void startHttpServer()
   server.on("/", handleIndexFile);
   server.on("/index.html", handleIndexFile);
   server.on("/generate_204", handleIndexFile);        //Android captive portal
-  server.on("/fwlink", handleIndexFile);              //Microsoft captive portal 
+  server.on("/fwlink", handleIndexFile);              //Microsoft captive portal
   server.on("/hotspot-detect.html", handleIndexFile); //Apple captive portal
   server.on("/style.css", handleSpiffsFile);
   server.on("/btsimulator.html", handleSpiffsFile);
@@ -130,23 +129,30 @@ void startHttpServer()
     }
     if (!server.arg("blePMDropdown").isEmpty())
     {
-      tString = server.arg("blePMDropdown");
-      if(!(tString.substring(0,6) == "Choose")){
-      userConfig.setConnectedPowerMeter(server.arg("blePMDropdown"));
+      if (server.arg("blePMDropdown"))
+      {
+        tString = server.arg("blePMDropdown");
+        userConfig.setConnectedPowerMeter(server.arg("blePMDropdown"));
       }
-      else {userConfig.setConnectedPowerMeter("");}
-
+      else
+      {
+        userConfig.setConnectedPowerMeter("any");
+      }
     }
-        if (!server.arg("bleHRDropdown").isEmpty())
+    if (!server.arg("bleHRDropdown").isEmpty())
     {
-            tString = server.arg("bleHRDropdown");
-      if(!(tString.substring(0,6) == "Choose")){
-      userConfig.setConnectedHeartMonitor(server.arg("bleHRDropdown"));
+      if (server.arg("bleHRDropdown"))
+      {
+        tString = server.arg("bleHRDropdown");
+        userConfig.setConnectedHeartMonitor(server.arg("bleHRDropdown"));
       }
-      else {userConfig.setConnectedHeartMonitor("");}
+      else
+      {
+        userConfig.setConnectedHeartMonitor("any");
+      }
     }
-    
-    String response = "<!DOCTYPE html><html><body><h2>Settings will be applied at next reboot....</h2></body><script> setTimeout(\"location.href = 'http://" + String(userConfig.getDeviceName()) +  ".local/index.html';\",1000);</script></html>";
+
+    String response = "<!DOCTYPE html><html><body><h2>Settings will be applied at next reboot....</h2></body><script> setTimeout(\"location.href = 'http://" + String(userConfig.getDeviceName()) + ".local/index.html';\",1000);</script></html>";
     server.send(200, "text/html", response);
     debugDirector("Config Updated From Web");
     userConfig.saveToSPIFFS();
@@ -156,22 +162,25 @@ void startHttpServer()
   server.on("/BLEServers", []() {
     debugDirector("Sending BLE device list to HTTP Client");
     String tString = "";
-    if (String(userConfig.getFoundDevices())=="null"){
-      tString += "{";  
-    } else{
-     tString += String(userConfig.getFoundDevices());
-     tString.remove(tString.length() - 1, 1);
-     tString += ",";
+    if (String(userConfig.getFoundDevices()) == "null")
+    {
+      tString += "{";
     }
-    
+    else
+    {
+      tString += String(userConfig.getFoundDevices());
+      tString.remove(tString.length() - 1, 1);
+      tString += ",";
+    }
+
     tString += String("\"connectedHeartMonitor\":\"") + userConfig.getconnectedHeartMonitor() + "\",\"connectedPowerMeter\":\"" + userConfig.getconnectedPowerMeter() + "\"}";
     server.send(200, "text/plain", tString);
   });
 
   server.on("/BLEScan", []() {
     debugDirector("Scanning for BLE Devices");
-    BLEServerScan(false);
     String response = "<!DOCTYPE html><html><body>Scanning for BLE Devices. Please wait.</body><script> setTimeout(\"location.href = 'http://" + String(userConfig.getDeviceName()) + ".local/bluetoothscanner.html';\",5000);</script></html>";
+    BLEServerScan(true);
     server.send(200, "text/html", response);
   });
 
@@ -189,7 +198,7 @@ void startHttpServer()
     debugDirector("Rebooting from Web Request");
     String response = "Rebooting....<script> setTimeout(\"location.href = 'http://" + String(userConfig.getDeviceName()) + ".local/index.html';\",500); </script>";
     server.send(200, "text/html", response);
-    vTaskDelay(100/portTICK_PERIOD_MS);
+    vTaskDelay(100 / portTICK_PERIOD_MS);
     ESP.restart();
   });
 
@@ -347,7 +356,7 @@ void webClientUpdate(void *pvParameters)
 
 void handleIndexFile()
 {
-  String filename="/index.html";
+  String filename = "/index.html";
   if (SPIFFS.exists(filename))
   {
     File file = SPIFFS.open(filename, "r");
@@ -363,7 +372,7 @@ void handleIndexFile()
 
 void handleSpiffsFile()
 {
-  String filename=server.uri();
+  String filename = server.uri();
   int dotPosition = filename.lastIndexOf(".");
   String fileType = filename.substring((dotPosition + 1), filename.length());
   if (SPIFFS.exists(filename))
@@ -379,7 +388,6 @@ void handleSpiffsFile()
     server.send(404, "text/html", "<html><body><h1>ERROR 404 <br> FILE NOT FOUND!</h1></body></html>");
   }
 }
-
 
 void FirmwareUpdate()
 {
@@ -441,10 +449,10 @@ void FirmwareUpdate()
           break;
         }
       }
-    }else //don't update
+    }
+    else //don't update
     {
       debugDirector("  -Current ver " + String(FIRMWARE_VERSION));
     }
-    
   }
 }
