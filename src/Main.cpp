@@ -89,7 +89,7 @@ void setup()
   setupBLE();
   digitalWrite(LED_PIN, HIGH);
   startBLEServer();
-  if (String(userConfig.getconnectedPowerMeter()) != "none")
+  if ((String(userConfig.getconnectedPowerMeter()) != "none") && (String(userConfig.getconnectedHeartMonitor()) != "none"))
   {
     BLEServerScan(true);
   }
