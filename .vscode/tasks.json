@@ -8,6 +8,14 @@
 				"$platformio"
 			],
 			"label": "PlatformIO: Upload Filesystem Image (esp32doit)"
+		},
+		{
+			"type": "PlatformIO",
+			"task": "Erase Flash (esp32doit)",
+			"problemMatcher": [
+				"$platformio"
+			],
+			"label": "PlatformIO: Erase Flash (esp32doit)"
 		}
 	]
 }

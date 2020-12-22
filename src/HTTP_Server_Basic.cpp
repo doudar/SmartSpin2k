@@ -264,7 +264,8 @@ void startHttpServer()
     String tString;
     tString = userConfig.returnJSON();
     tString.remove(tString.length() - 1, 1);
-    tString += String(",\"debug\":") + "\"" + debugToHTML + "\"}";
+    //tString += String(",\"debug\":") + "\"" + debugToHTML + "\"}";
+    tString += String(",\"debug\":\"") + debugToHTML + "\",\"firmwareVersion\":\"" + String(FIRMWARE_VERSION) + "\"}";
     server.send(200, "text/plain", tString);
     debugToHTML = " ";
   });
