@@ -86,30 +86,32 @@ void setup()
       &moveStepperTask,      /* Task handle to keep track of created task */
       0);                    /* pin task to core 0 */
 
-  setupBLE();
+  
   digitalWrite(LED_PIN, HIGH);
+
+  startWifi();
+  
+  //Check for firmware update. It's important that this stays before BLE & HTTP setup
+  //because otherwise they use too much traffic and the device fails to update
+  //which really sucks when it corrupts your settings. 
+  if (userConfig.getautoUpdate())
+  {
+    FirmwareUpdate();
+  }
+  
+  setupBLE();
   startBLEServer();
   if ((String(userConfig.getconnectedPowerMeter()) != "none") && (String(userConfig.getconnectedHeartMonitor()) != "none"))
   {
     BLEServerScan(true);
   }
-  startWifi();
   startHttpServer();
-  if (userConfig.getautoUpdate())
-  {
-    FirmwareUpdate();
-  }
   resetIfShiftersHeld();
   debugDirector("Creating Shifter Interrupts");
   //Setup Interrups so shifters work anytime
   attachInterrupt(digitalPinToInterrupt(SHIFT_UP_PIN), shiftUp, CHANGE);
   attachInterrupt(digitalPinToInterrupt(SHIFT_DOWN_PIN), shiftDown, CHANGE);
   digitalWrite(LED_PIN, HIGH);
-  //theres a better way to handle this, but sometimes the first scan doesn't connect both devices even though it should.
-  //if (String(userConfig.getconnectedHeartMonitor()) != "none")
-  //{
-  //  BLEServerScan(true);
-  //}
 }
 
 void loop()
