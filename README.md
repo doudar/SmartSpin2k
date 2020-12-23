@@ -54,7 +54,8 @@ But if you're adventerious and handy you can probably take a look at my pictures
 12. Attach the stepper crossbar to the stepper motor.
 13. Install the stepper motor. 
 14. Put the cover on. 
-15. Connect to the SmartSpin2k Wifi network for initial configuration. Default password is "password"
+15. Connect to the SmartSpin2k Wifi network for initial configuration. Default password is "password". If connecting via mobile, the configuration page should automatically pop up. 
+16. Once configured on your local network, you can easily find the Smartspin2k by going to http://SmartSpin2K.local/
 
 ummm that was easy...right? :)
 
