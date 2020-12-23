@@ -135,18 +135,42 @@ static void notifyCallback(
 
   if (pBLERemoteCharacteristic->getUUID() == CYCLINGPOWERMEASUREMENT_UUID)
   {
-
-    userConfig.setSimulatedWatts(bytes_to_u16(pData[3], pData[2]));
-    //This needs to be changed to read the bit field because this data could potentially shift positions in the characteristic
-    //depending on what other fields are activated.
-
-    if ((int)pData[0] == 35) //Don't let the hex to decimal confuse you.
-    {                        //last crank time is present in power Measurement data, lets extract it
+    //first calculate which fields are present. Power is always 2 & 3, cadence can move depending on the flags.
+    byte flags = pData[0];
+    int cPos = 4; //lowest position cadence could ever be
+    if (bitRead(flags, 0))
+    {
+      //pedal balance field present
+      cPos++;
+    }
+    if (bitRead(flags, 1))
+    {
+      //pedal power balance reference
+      //no field associated with this.
+    }
+    if (bitRead(flags, 2))
+    {
+      //accumulated torque field present
+      cPos++;
+    }
+    if (bitRead(flags, 3))
+    {
+      //accumulated torque field source
+      //no field associated with this.
+    }
+    if (bitRead(flags, 4))
+    {
+      //Wheel Revolution field PAIR Data present. 32-bits for wheel revs, 16 bits for wheel event time.
+      //Why is that so hard to find in the specs?
+      cPos += 6;
+    }
+    if (bitRead(flags, 5))
+    {
+      //Crank Revolution data present, lets process it. 
       crankRev[1] = crankRev[0];
-      crankRev[0] = bytes_to_int(pData[6], pData[5]);
+      crankRev[0] = bytes_to_int(pData[cPos + 1], pData[cPos]);
       crankEventTime[1] = crankEventTime[0];
-      crankEventTime[0] = bytes_to_int(pData[8], pData[7]);
-
+      crankEventTime[0] = bytes_to_int(pData[cPos + 3], pData[cPos + 2]);
       if ((crankRev[0] > crankRev[1]) && (crankEventTime[0] - crankEventTime[1] != 0))
       {
         int tCAD = (((abs(crankRev[0] - crankRev[1]) * 1024) / abs(crankEventTime[0] - crankEventTime[1])) * 60);
@@ -172,6 +196,9 @@ static void notifyCallback(
       debugDirector(" CAD: " + String(userConfig.getSimulatedCad()), false);
       debugDirector("");
     }
+
+    //Watts are so much easier......
+    userConfig.setSimulatedWatts(bytes_to_u16(pData[3], pData[2]));
   }
 }
 
@@ -439,8 +466,8 @@ class MyAdvertisedDeviceCallbacks : public BLEAdvertisedDeviceCallbacks
   void onResult(BLEAdvertisedDevice *advertisedDevice)
   {
     debugDirector("BLE Advertised Device found: " + String(advertisedDevice->toString().c_str()));
-    const char * c_PM = userConfig.getconnectedPowerMeter();
-    const char * c_HR = userConfig.getconnectedHeartMonitor();
+    const char *c_PM = userConfig.getconnectedPowerMeter();
+    const char *c_HR = userConfig.getconnectedHeartMonitor();
     if ((advertisedDevice->haveServiceUUID()) && (advertisedDevice->isAdvertisingService(CYCLINGPOWERSERVICE_UUID)))
     {
       if ((advertisedDevice->getName() == c_PM) || (advertisedDevice->getAddress().toString().c_str() == c_PM) || (String(c_PM) == ("any")))
@@ -499,7 +526,7 @@ void bleClient(void *pvParameters)
 
     if ((connectedPM) || (connectedHR))
     {
-      if(doScan && (scanRetries>0))
+      if (doScan && (scanRetries > 0))
       {
         scanRetries--;
         BLEServerScan(true);
