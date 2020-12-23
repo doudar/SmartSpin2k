@@ -347,7 +347,7 @@ void webClientUpdate(void *pvParameters)
   for (;;)
   {
     server.handleClient();
-    vTaskDelay(50 / portTICK_RATE_MS);
+    vTaskDelay(WEBSERVER_DELAY / portTICK_RATE_MS);
     if (WiFi.getMode() == WIFI_AP)
     {
       dnsServer.processNextRequest();

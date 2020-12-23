@@ -90,6 +90,9 @@
 //loop speed for the SmartSpin2k BLE Client reconnect 
 #define BLE_CLIENT_DELAY 1000
 
+//loop speed for the Webserver
+#define WEBSERVER_DELAY 50
+
 //Name of default Power Meter. any connects to anything, none connects to nothing.
 #define CONNECTED_POWER_METER "any"
 
