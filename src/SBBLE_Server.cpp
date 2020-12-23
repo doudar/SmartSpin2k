@@ -346,7 +346,7 @@ bool connectToServer()
 
     else
     {
-      debugDirector("Reconnect failed in a way I don't understand");
+      debugDirector("No Previous client found");
       //pClient = NimBLEDevice::getDisconnectedClient();
     }
   }
@@ -448,6 +448,7 @@ class MyAdvertisedDeviceCallbacks : public BLEAdvertisedDeviceCallbacks
         myPowerMeter = advertisedDevice;
         doConnectPM = true;
         doScan = false;
+        return;
       }
     }
     if ((advertisedDevice->haveServiceUUID()) && (advertisedDevice->isAdvertisingService(HEARTSERVICE_UUID)))
@@ -457,6 +458,7 @@ class MyAdvertisedDeviceCallbacks : public BLEAdvertisedDeviceCallbacks
         myHeartMonitor = advertisedDevice;
         doConnectHR = true;
         doScan = false;
+        return;
       }
     }
   }
