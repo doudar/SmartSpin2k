@@ -36,7 +36,7 @@ static BLEAdvertisedDevice *myHeartMonitor = nullptr;
 
 void startBLEClient()
 {
-
+    //Create the task for the BLE Client loop
     xTaskCreatePinnedToCore(
         bleClient,       /* Task function. */
         "BLEClientTask", /* name of task. */
