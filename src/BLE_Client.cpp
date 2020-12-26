@@ -42,7 +42,7 @@ void startBLEClient()
         "BLEClientTask", /* name of task. */
         3500,            /* Stack size of task */
         NULL,            /* parameter of the task */
-        18,              /* priority of the task  - 29 worked  at 1 I get stuttering */
+        18,              /* priority of the task  */
         &BLEClientTask,  /* Task handle to keep track of created task */
         1);
 }
