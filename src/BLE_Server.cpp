@@ -17,7 +17,6 @@ TaskHandle_t BLENotifyTask;
 //BLE Server Settings
 bool _BLEClientConnected = false;
 
-//BLEAdvertisementData advertisementData = BLEAdvertisementData();
 BLECharacteristic *heartRateMeasurementCharacteristic;
 BLECharacteristic *cyclingPowerMeasurementCharacteristic;
 BLECharacteristic *fitnessMachineFeature;
@@ -55,74 +54,6 @@ uint8_t ftmsFeature[8] = {0x86, 0x50, 0x00, 0x00, 0x0C, 0xE0, 0x00, 0x00};      
 uint8_t ftmsIndoorBikeData[13] = {0x54, 0x08, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0}; //00000000100001010100 ISpeed, ICAD, TDistance, IPower, ETime
 uint8_t ftmsResistanceLevelRange[6] = {0x00, 0x00, 0x3A, 0x98, 0xC5, 0x68};                           //+-15000
 uint8_t ftmsPowerRange[6] = {0x00, 0x00, 0xA0, 0x0F, 0x01, 0x00};                                     //1-4000
-
-
-
-//Creating Server Callbacks
-
-  void MyServerCallbacks::onConnect(BLEServer *pServer)
-  {
-    _BLEClientConnected = true;
-    debugDirector("Bluetooth Client Connected!");
-    // vTaskDelay(5000);
-  };
-
-  void MyServerCallbacks::onDisconnect(BLEServer *pServer)
-  {
-    _BLEClientConnected = false;
-    debugDirector("Bluetooth Client Disconnected!");
-    // vTaskDelay(5000);
-  }
-
-/**************BLE Server Callbacks *************************/
-
-  void MyCallbacks::onWrite(BLECharacteristic *pCharacteristic)
-  {
-    std::string rxValue = pCharacteristic->getValue();
-
-    if (rxValue.length() > 1)
-    {
-      for (const auto &text : rxValue)
-      { // Range-for!
-        debugDirector(String(text, HEX) + " ", false);
-      }
-      debugDirector("<-- From APP ", false);
-      /* 17 means FTMS Incline Control Mode  (aka SIM mode)*/
-
-      if ((int)rxValue[0] == 17)
-      {
-        signed char buf[2];
-        buf[0] = rxValue[3]; // (Least significant byte)
-        buf[1] = rxValue[4]; // (Most significant byte)
-
-        int port = bytes_to_u16(buf[1], buf[0]);
-        userConfig.setIncline(port);
-        if (userConfig.getERGMode())
-        {
-          userConfig.setERGMode(false);
-        }
-        debugDirector(" Target Incline: " + String((userConfig.getIncline() / 100)), false);
-      }
-      debugDirector("");
-      /* 5 means FTMS Watts Control Mode (aka ERG mode) */
-
-      if ((int)rxValue[0] == 5)
-      {
-        int targetWatts = bytes_to_int(rxValue[2], rxValue[1]);
-        if (!userConfig.getERGMode())
-        {
-          userConfig.setERGMode(true);
-        }
-        computeERG(userConfig.getSimulatedWatts(), targetWatts);
-        //userConfig.setIncline(computePID(userConfig.getSimulatedWatts(), targetWatts)); //Updating incline via PID...This should be interesting.....
-        debugDirector("ERG MODE", false);
-        debugDirector(" Target: " + String(targetWatts), false);
-        debugDirector(" Current: " + String(userConfig.getSimulatedWatts()), false); //not displaying numbers less than 256 correctly but they do get sent to Zwift correctly.
-        debugDirector(" Incline: " + String(userConfig.getIncline() / 100), false);
-        debugDirector("");
-      }
-    }
-  }
 
 void startBLEServer()
 {
@@ -299,15 +230,15 @@ void computeERG(int currentWatts, int setPoint)
     amountToChangeIncline = amountToChangeIncline / ((currentWatts / 100) + 1);
   }
 
-  if (abs(amountToChangeIncline) > 2000)
+  if (abs(amountToChangeIncline) > userConfig.getShiftStep()*3)
   {
     if (amountToChangeIncline > 0)
     {
-      amountToChangeIncline = 200;
+      amountToChangeIncline = userConfig.getShiftStep()*3;
     }
     if (amountToChangeIncline < 0)
     {
-      amountToChangeIncline = -200;
+      amountToChangeIncline = -(userConfig.getShiftStep()*3);
     }
   }
 
@@ -371,3 +302,64 @@ void updateCyclingPowerMesurementChar()
   debugDirector("<-- CPMC sent ", false);
   debugDirector("");
 }
+
+//Creating Server Connection Callbacks
+
+  void MyServerCallbacks::onConnect(BLEServer *pServer)
+  {
+    _BLEClientConnected = true;
+    debugDirector("Bluetooth Client Connected!");
+  };
+
+  void MyServerCallbacks::onDisconnect(BLEServer *pServer)
+  {
+    _BLEClientConnected = false;
+    debugDirector("Bluetooth Client Disconnected!");
+  }
+
+  void MyCallbacks::onWrite(BLECharacteristic *pCharacteristic)
+  {
+    std::string rxValue = pCharacteristic->getValue();
+
+    if (rxValue.length() > 1)
+    {
+      for (const auto &text : rxValue)
+      { // Range-for!
+        debugDirector(String(text, HEX) + " ", false);
+      }
+      debugDirector("<-- From APP ", false);
+      /* 17 means FTMS Incline Control Mode  (aka SIM mode)*/
+
+      if ((int)rxValue[0] == 17)
+      {
+        signed char buf[2];
+        buf[0] = rxValue[3]; // (Least significant byte)
+        buf[1] = rxValue[4]; // (Most significant byte)
+
+        int port = bytes_to_u16(buf[1], buf[0]);
+        userConfig.setIncline(port);
+        if (userConfig.getERGMode())
+        {
+          userConfig.setERGMode(false);
+        }
+        debugDirector(" Target Incline: " + String((userConfig.getIncline() / 100)), false);
+      }
+      debugDirector("");
+
+      /* 5 means FTMS Watts Control Mode (aka ERG mode) */
+      if ((int)rxValue[0] == 5)
+      {
+        int targetWatts = bytes_to_int(rxValue[2], rxValue[1]);
+        if (!userConfig.getERGMode())
+        {
+          userConfig.setERGMode(true);
+        }
+        computeERG(userConfig.getSimulatedWatts(), targetWatts);
+        debugDirector("ERG MODE", false);
+        debugDirector(" Target: " + String(targetWatts), false);
+        debugDirector(" Current: " + String(userConfig.getSimulatedWatts()), false); //not displaying numbers less than 256 correctly but they do get sent to Zwift correctly.
+        debugDirector(" Incline: " + String(userConfig.getIncline() / 100), false);
+        debugDirector("");
+      }
+    }
+  }

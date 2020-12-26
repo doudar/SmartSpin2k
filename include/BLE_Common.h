@@ -9,6 +9,8 @@
 #ifndef SS2KBLE_H
 #define SS2KBLE_H
 
+#include <NimBLEDevice.h>
+
 //Heart Service
 #define HEARTSERVICE_UUID BLEUUID((uint16_t)0x180D)
 #define HEARTCHARACTERISTIC_UUID BLEUUID((uint16_t)0x2A37)
@@ -29,8 +31,6 @@
 #define FITNESSMACHINEINDOORBIKEDATA_UUID BLEUUID((uint16_t)0x2AD2)
 #define FITNESSMACHINERESISTANCELEVELRANGE_UUID BLEUUID((uint16_t)0x2AD6)
 #define FITNESSMACHINEPOWERRANGE_UUID BLEUUID((uint16_t)0x2AD8)
-
-#include <NimBLEDevice.h>
 
 //Setup
 void setupBLE();

@@ -492,9 +492,4 @@ void BLEServerScan(bool connectRequest)
     serializeJson(devices, output);
     debugDirector("Bluetooth Client Found Devices: " + output);
     userConfig.setFoundDevices(output);
-
-    // if (doConnect)
-    // {
-    //   connectToServer("0x1818");
-    // }
 }
