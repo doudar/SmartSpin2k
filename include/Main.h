@@ -11,7 +11,7 @@
 #include "settings.h"
 #include "HTTP_Server_Basic.h"
 #include "SmartSpin_parameters.h"
-#include "SBBLE_Server.h"
+#include "BLE_Common.h"
 
 //Function Prototypes
 bool IRAM_ATTR deBounce();

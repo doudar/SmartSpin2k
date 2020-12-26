@@ -100,11 +100,6 @@ void setup()
   }
   
   setupBLE();
-  startBLEServer();
-  if ((String(userConfig.getconnectedPowerMeter()) != "none") && (String(userConfig.getconnectedHeartMonitor()) != "none"))
-  {
-    BLEServerScan(true);
-  }
   startHttpServer();
   resetIfShiftersHeld();
   debugDirector("Creating Shifter Interrupts");
