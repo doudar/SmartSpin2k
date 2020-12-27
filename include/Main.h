@@ -29,8 +29,6 @@ extern userParameters userConfig;
 //Variable that will store debugging information that will get appended and then cleared once posted to HTML or a timer expires.
 extern String debugToHTML; 
 
-extern bool GlobalBLEClientConnected;
-
 #endif
 
 

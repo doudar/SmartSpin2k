@@ -6,10 +6,11 @@
 // Prototype hardware build from plans in the SmartSpin2k repository are licensed under Cern Open Hardware Licence version 2 Permissive
 //
 
-#ifndef SS2KBLE_H
-#define SS2KBLE_H
+#ifndef BLE_COMMON_H
+#define BLE_COMMON_H
 
 #include <NimBLEDevice.h>
+#include <Arduino.h>
 
 //Heart Service
 #define HEARTSERVICE_UUID BLEUUID((uint16_t)0x180D)
@@ -32,60 +33,81 @@
 #define FITNESSMACHINERESISTANCELEVELRANGE_UUID BLEUUID((uint16_t)0x2AD6)
 #define FITNESSMACHINEPOWERRANGE_UUID BLEUUID((uint16_t)0x2AD8)
 
-//Setup
-void setupBLE();
-
-//Server
-void startBLEServer();
-void BLENotify(void *pvParameters);
-void computeERG(int, int);
-void computeCSC();
-void updateIndoorBikeDataChar();
-void updateCyclingPowerMesurementChar();
-class MyServerCallbacks : public BLEServerCallbacks
-{
-    void onConnect(BLEServer *);
-    void onDisconnect(BLEServer *);
-};
-class MyCallbacks : public BLECharacteristicCallbacks
-{
-    void onWrite(BLECharacteristic *);
-};
-
-
-//Client
-void startBLEClient();
-void bleClient(void *pvParameters);
-void BLEServerScan(bool connectRequest);
-bool connectToServer();
-
-class MyAdvertisedDeviceCallback : public NimBLEAdvertisedDeviceCallbacks
-{
-    public:
-    void onResult(NimBLEAdvertisedDevice *);
-};
-
-class MyClientCallback : public NimBLEClientCallbacks
-{
-    public:
-    void        onConnect(BLEClient *);
-    void        onDisconnect(BLEClient *);
-    uint32_t    onPassKeyRequest();
-    bool        onConfirmPIN(uint32_t);
-    void        onAuthenticationComplete(ble_gap_conn_desc);
-};
-
 // macros to convert different types of bytes into int The naming here sucks and should be fixed.
 #define bytes_to_s16(MSB, LSB) (((signed int)((signed char)MSB))) << 8 | (((signed char)LSB))
 #define bytes_to_u16(MSB, LSB) (((signed int)((signed char)MSB))) << 8 | (((unsigned char)LSB))
 #define bytes_to_int(MSB, LSB) (((int)((unsigned char)MSB))) << 8 | (((unsigned char)LSB))
 // Potentially, something like this is a better way of doing this ^^  data.getUint16(1, true)
 
-//Shared Cadence computation Variables
-extern float crankRev[2];
-extern float crankEventTime[2];
-extern int noReadingIn;
-extern int cscCumulativeCrankRev;
-extern int cscLastCrankEvtTime;
+//Setup
+void setupBLE();
 
+//*****************************Server*****************************
+extern bool GlobalBLEClientConnected;
+void startBLEServer();
+void BLENotify(void *pvParameters);
+void computeERG(int, int);
+void computeCSC();
+void updateIndoorBikeDataChar();
+void updateCyclingPowerMesurementChar();
+
+class MyServerCallbacks : public BLEServerCallbacks
+{
+    void onConnect(BLEServer *);
+    void onDisconnect(BLEServer *);
+};
+
+class MyCallbacks : public BLECharacteristicCallbacks
+{
+    void onWrite(BLECharacteristic *);
+};
+
+//*****************************Client*****************************
+
+//Keeping the task outside the class so we don't need a mask. 
+//We're only going to run one anyway.
+void bleClientTask(void *pvParameters);  
+
+class SpinBLEClient{ 
+    
+    public: //Not all of these need to be public. This should be cleaned up later.
+    boolean doConnectPM         = false;
+    boolean doConnectHR         = false;
+    boolean connectedPM         = false;
+    boolean connectedHR         = false;
+    boolean doScan              = false;
+    float crankRev[2]           = {0, 0};
+    float crankEventTime[2]     = {0, 0};
+    int noReadingIn             = 0;
+    int cscCumulativeCrankRev   = 0;
+    int cscLastCrankEvtTime     = 0;
+
+    BLERemoteCharacteristic *pRemoteCharacteristic  = nullptr;
+    BLEAdvertisedDevice     *myPowerMeter           = nullptr;
+    BLEAdvertisedDevice     *myHeartMonitor         = nullptr;
+
+    void start();
+    void serverScan(bool connectRequest);
+    bool connectToServer();
+
+private:
+   
+    class MyAdvertisedDeviceCallback : public NimBLEAdvertisedDeviceCallbacks
+    {
+       public:
+       void onResult(NimBLEAdvertisedDevice *);
+    };
+
+    class MyClientCallback : public NimBLEClientCallbacks
+    {
+        public:
+        void        onConnect(BLEClient *);
+        void        onDisconnect(BLEClient *);
+        uint32_t    onPassKeyRequest();
+        bool        onConfirmPIN(uint32_t);
+        void        onAuthenticationComplete(ble_gap_conn_desc);
+    };
+};
+
+extern SpinBLEClient spinBLEClient;
 #endif

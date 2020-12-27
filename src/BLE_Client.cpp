@@ -18,27 +18,15 @@ BLE Advertised Device found: Name: ASSIOMA17287L, Address: e8:fe:6e:91:9f:16, ap
 int reconnectTries = MAX_RECONNECT_TRIES;
 int scanRetries = MAX_SCAN_RETRIES;
 
-//New Remote Charistics to get rid of notify callbacks
-//NimBLERemoteCharacteristic *remoteCyclingPowerCharacteristic;
-//NimBLERemoteCharacteristic *remoteHeartRateMearurementCharacteristic;
-
 TaskHandle_t BLEClientTask;
 
-static boolean doConnectPM = false;
-static boolean doConnectHR = false;
-static boolean connectedPM = false;
-static boolean connectedHR = false;
+SpinBLEClient spinBLEClient;
 
-static boolean doScan = false;
-static BLERemoteCharacteristic *pRemoteCharacteristic;
-static BLEAdvertisedDevice *myPowerMeter = nullptr;
-static BLEAdvertisedDevice *myHeartMonitor = nullptr;
-
-void startBLEClient()
+void SpinBLEClient::start()
 {
     //Create the task for the BLE Client loop
     xTaskCreatePinnedToCore(
-        bleClient,       /* Task function. */
+        bleClientTask,       /* Task function. */
         "BLEClientTask", /* name of task. */
         3500,            /* Stack size of task */
         NULL,            /* parameter of the task */
@@ -48,13 +36,13 @@ void startBLEClient()
 }
 
 // BLE Client loop task
-void bleClient(void *pvParameters)
+void bleClientTask(void *pvParameters)
 {
     for (;;)
     {
-        if ((doConnectPM == true) || (doConnectHR == true))
+        if ((spinBLEClient.doConnectPM == true) || (spinBLEClient.doConnectHR == true))
         {
-            if (connectToServer())
+            if (spinBLEClient.connectToServer())
             {
                 debugDirector("We are now connected to the BLE Server.");
             }
@@ -62,12 +50,12 @@ void bleClient(void *pvParameters)
             {
             }
         }
-        if ((connectedPM) || (connectedHR))
+        if ((spinBLEClient.connectedPM) || (spinBLEClient.connectedHR))
         {
-            if (doScan && (scanRetries > 0))
+            if (spinBLEClient.doScan && (scanRetries > 0))
             {
                 scanRetries--;
-                BLEServerScan(true);
+                spinBLEClient.serverScan(true);
             }
         }
         vTaskDelay(BLE_CLIENT_DELAY / portTICK_PERIOD_MS); // Delay a second between loops.
@@ -129,30 +117,30 @@ static void notifyCallback(
         if (bitRead(flags, 5))
         {
             //Crank Revolution data present, lets process it.
-            crankRev[1] = crankRev[0];
-            crankRev[0] = bytes_to_int(pData[cPos + 1], pData[cPos]);
-            crankEventTime[1] = crankEventTime[0];
-            crankEventTime[0] = bytes_to_int(pData[cPos + 3], pData[cPos + 2]);
-            if ((crankRev[0] > crankRev[1]) && (crankEventTime[0] - crankEventTime[1] != 0))
+            spinBLEClient.crankRev[1] = spinBLEClient.crankRev[0];
+            spinBLEClient.crankRev[0] = bytes_to_int(pData[cPos + 1], pData[cPos]);
+            spinBLEClient.crankEventTime[1] = spinBLEClient.crankEventTime[0];
+            spinBLEClient.crankEventTime[0] = bytes_to_int(pData[cPos + 3], pData[cPos + 2]);
+            if ((spinBLEClient.crankRev[0] > spinBLEClient.crankRev[1]) && (spinBLEClient.crankEventTime[0] - spinBLEClient.crankEventTime[1] != 0))
             {
-                int tCAD = (((abs(crankRev[0] - crankRev[1]) * 1024) / abs(crankEventTime[0] - crankEventTime[1])) * 60);
+                int tCAD = (((abs(spinBLEClient.crankRev[0] - spinBLEClient.crankRev[1]) * 1024) / abs(spinBLEClient.crankEventTime[0] - spinBLEClient.crankEventTime[1])) * 60);
                 if (tCAD > 1)
                 {
                     userConfig.setSimulatedCad(tCAD);
-                    noReadingIn = 0;
+                    spinBLEClient.noReadingIn = 0;
                 }
                 else
                 {
-                    noReadingIn++;
+                    spinBLEClient.noReadingIn++;
                 }
             }
             else //the crank rev probably didn't update
             {
-                if (noReadingIn > 2) //Require three consecutive readings before setting 0 cadence
+                if (spinBLEClient.noReadingIn > 2) //Require three consecutive readings before setting 0 cadence
                 {
                     userConfig.setSimulatedCad(0);
                 }
-                noReadingIn++;
+                spinBLEClient.noReadingIn++;
             }
 
             debugDirector(" CAD: " + String(userConfig.getSimulatedCad()), false);
@@ -164,7 +152,7 @@ static void notifyCallback(
     }
 }
 
-bool connectToServer()
+bool SpinBLEClient::connectToServer()
 {
     debugDirector("Initiating Server Connection");
     NimBLEUUID serviceUUID;
@@ -377,40 +365,40 @@ bool connectToServer()
 /**  None of these are required as they will be handled by the library with defaults. **
  **                       Remove as you see fit for your needs                        */
 
-void MyClientCallback::onConnect(BLEClient *pclient)
+void SpinBLEClient::MyClientCallback::onConnect(BLEClient *pclient)
 {
 }
-void MyClientCallback::onDisconnect(BLEClient *pclient)
+void SpinBLEClient::MyClientCallback::onDisconnect(BLEClient *pclient)
 {
     if ((pclient->getService(HEARTSERVICE_UUID)) && (!(pclient->isConnected())))
     {
         debugDirector("Detected HR Disconnect. Trying rapid reconnect");
-        doConnectHR = true; //try rapid reconnect
+        spinBLEClient.doConnectHR = true; //try rapid reconnect
         return;
     }
     if ((pclient->getService(CYCLINGPOWERSERVICE_UUID)) && (!(pclient->isConnected())))
     {
 
         debugDirector("Detected PM Disconnect. Trying rapid reconnect");
-        doConnectPM = true; //try rapid reconnect
+        spinBLEClient.doConnectPM = true; //try rapid reconnect
         return;
     }
 }
 
 /***************** New - Security handled here ********************
 ****** Note: these are the same return values as defaults ********/
-uint32_t MyClientCallback::onPassKeyRequest()
+uint32_t SpinBLEClient::MyClientCallback::onPassKeyRequest()
 {
     debugDirector("Client PassKeyRequest");
     return 123456;
 }
-bool MyClientCallback::onConfirmPIN(uint32_t pass_key)
+bool SpinBLEClient::MyClientCallback::onConfirmPIN(uint32_t pass_key)
 {
     debugDirector("The passkey YES/NO number: " + String(pass_key));
     return true;
 }
 
-void MyClientCallback::onAuthenticationComplete(ble_gap_conn_desc desc)
+void SpinBLEClient::MyClientCallback::onAuthenticationComplete(ble_gap_conn_desc desc)
 {
     debugDirector("Starting BLE work!");
 }
@@ -420,7 +408,7 @@ void MyClientCallback::onAuthenticationComplete(ble_gap_conn_desc desc)
  * Scan for BLE servers and find the first one that advertises the service we are looking for.
  */
 
-void MyAdvertisedDeviceCallback::onResult(BLEAdvertisedDevice *advertisedDevice)
+void SpinBLEClient::MyAdvertisedDeviceCallback::onResult(BLEAdvertisedDevice *advertisedDevice)
 {
     debugDirector("BLE Advertised Device found: " + String(advertisedDevice->toString().c_str()));
     const char *c_PM = userConfig.getconnectedPowerMeter();
@@ -429,9 +417,9 @@ void MyAdvertisedDeviceCallback::onResult(BLEAdvertisedDevice *advertisedDevice)
     {
         if ((advertisedDevice->getName() == c_PM) || (advertisedDevice->getAddress().toString().c_str() == c_PM) || (String(c_PM) == ("any")))
         {
-            myPowerMeter = advertisedDevice;
-            doConnectPM = true;
-            doScan = false;
+            spinBLEClient.myPowerMeter = advertisedDevice;
+            spinBLEClient.doConnectPM = true;
+            spinBLEClient.doScan = false;
             return;
         }
     }
@@ -439,15 +427,15 @@ void MyAdvertisedDeviceCallback::onResult(BLEAdvertisedDevice *advertisedDevice)
     {
         if ((advertisedDevice->getName() == c_HR) || (advertisedDevice->getAddress().toString().c_str() == c_HR) || (String(c_HR) == ("any")))
         {
-            myHeartMonitor = advertisedDevice;
-            doConnectHR = true;
-            doScan = false;
+            spinBLEClient.myHeartMonitor = advertisedDevice;
+            spinBLEClient.doConnectHR = true;
+            spinBLEClient.doScan = false;
             return;
         }
     }
 }
 
-void BLEServerScan(bool connectRequest)
+void SpinBLEClient::serverScan(bool connectRequest)
 {
     //doConnect = connectRequest;
     debugDirector("Scanning for BLE servers and putting them into a list...");
