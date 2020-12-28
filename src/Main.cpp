@@ -12,8 +12,6 @@
 #include <HardwareSerial.h>
 
 String debugToHTML = "<br>Firmware Version " + String(FIRMWARE_VERSION);
-bool GlobalBLEClientConnected = false;
-byte testbitField = 0b1000;
 bool lastDir = true; //Stepper Last Direction
 
 // Debounce Setup
@@ -40,7 +38,6 @@ void setup()
   // Serial port for debugging purposes
   Serial.begin(512000);
   stepperSerial.begin(57600, SERIAL_8N2, STEPPERSERIAL_RX, STEPPERSERIAL_TX);
-
   debugDirector("Compiled " + String(__DATE__) + String(__TIME__));
 
   // Initialize SPIFFS
@@ -61,9 +58,9 @@ void setup()
   pinMode(SHIFT_DOWN_PIN, INPUT_PULLUP); // Push-Button with input Pullup
   pinMode(LED_PIN, OUTPUT);
   pinMode(ENABLE_PIN, OUTPUT);
-  pinMode(DIR_PIN, OUTPUT);       // Stepper Direction Pin
-  pinMode(STEP_PIN, OUTPUT);      // Stepper Step Pin
-  digitalWrite(ENABLE_PIN, HIGH); //Should be called a disable Pin - High Disables FETs
+  pinMode(DIR_PIN, OUTPUT);              // Stepper Direction Pin
+  pinMode(STEP_PIN, OUTPUT);             // Stepper Step Pin
+  digitalWrite(ENABLE_PIN, HIGH);        //Should be called a disable Pin - High Disables FETs
   digitalWrite(DIR_PIN, LOW);
   digitalWrite(STEP_PIN, LOW);
   digitalWrite(LED_PIN, LOW);
@@ -71,11 +68,7 @@ void setup()
   setupTMCStepperDriver();
 
   debugDirector("Setting up cpu Tasks");
-  //create a task that will be executed in the moveStepper function, with priority 1 and executed on core 0
-  //the main loop function always runs on core 1 by default
-
   disableCore0WDT(); //Disable the watchdog timer on core 0 (so long stepper moves don't cause problems)
-  //disableCore1WDT();
 
   xTaskCreatePinnedToCore(
       moveStepper,           /* Task function. */
@@ -86,7 +79,6 @@ void setup()
       &moveStepperTask,      /* Task handle to keep track of created task */
       0);                    /* pin task to core 0 */
 
-  
   digitalWrite(LED_PIN, HIGH);
 
   startWifi();
@@ -100,11 +92,6 @@ void setup()
   }
   
   setupBLE();
-  startBLEServer();
-  if ((String(userConfig.getconnectedPowerMeter()) != "none") && (String(userConfig.getconnectedHeartMonitor()) != "none"))
-  {
-    BLEServerScan(true);
-  }
   startHttpServer();
   resetIfShiftersHeld();
   debugDirector("Creating Shifter Interrupts");
