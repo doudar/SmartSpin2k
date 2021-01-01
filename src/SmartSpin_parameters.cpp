@@ -22,6 +22,7 @@ void userParameters::setDefaults() //Move these to set the values as #define in 
   deviceName = DEVICE_NAME;
   shiftStep = 400;
   stepperPower = STEPPER_POWER;
+  stealthchop = STEALTHCHOP;
   inclineMultiplier = 2.0;
   simulatePower = false;
   simulateHr = true;
@@ -52,6 +53,7 @@ String userParameters::returnJSON()
   doc["deviceName"] = deviceName;
   doc["shiftStep"] = shiftStep;
   doc["stepperPower"] = stepperPower;
+  doc["stealthchop"] = stealthchop;
   doc["inclineMultiplier"] = inclineMultiplier;
   doc["simulatePower"] = simulatePower;
   doc["simulateHr"] = simulateHr;
@@ -97,6 +99,7 @@ void userParameters::saveToSPIFFS()
   doc["deviceName"] = deviceName;
   doc["shiftStep"] = shiftStep;
   doc["stepperPower"] = stepperPower;
+  doc["stealthchop"] = stealthchop;
   doc["inclineMultiplier"] = inclineMultiplier;
   doc["simulatePower"] = simulatePower;
   doc["simulateHr"] = simulateHr;
@@ -154,6 +157,7 @@ void userParameters::loadFromSPIFFS()
   setDeviceName(doc["deviceName"]);
   setShiftStep(doc["shiftStep"]);
   setStepperPower(doc["stepperPower"]);
+  setStealthChop(doc["stealthchop"]);
   setInclineMultiplier(doc["inclineMultiplier"]);
   setSimulatePower(doc["simulatePower"]);
   setSimulateHr(doc["simulateHr"]);
@@ -189,6 +193,10 @@ void userParameters::loadFromSPIFFS()
   if (doc["stepperPower"] == "null")
   {
     stepperPower = STEPPER_POWER;
+  }
+  if (doc["stealthchop"] == "null")
+  {
+    stealthchop = STEALTHCHOP;
   }
   if (doc["connectedPowerMeter"] == "null")
   {

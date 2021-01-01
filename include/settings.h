@@ -99,5 +99,10 @@
 //Name of default heart monitor. any connects to anything, none connects to nothing.
 #define CONNECTED_HEART_MONITOR "any"
 
+//number of main loops the shifters need to be held before a BLE scan is initiated. 
+#define SHIFTERS_HOLD_FOR_SCAN 2
+
+//stealthchop enabled by default
+#define STEALTHCHOP true
 
 #endif

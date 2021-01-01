@@ -25,6 +25,12 @@ int stepperPosition = 0;
 HardwareSerial stepperSerial(2);
 TMC2208Stepper driver(&SERIAL_PORT, R_SENSE); // Hardware Serial
 
+//Setup for BLEScan via shifters.
+int shiftersHoldForScan = SHIFTERS_HOLD_FOR_SCAN;
+unsigned long scanDelayTime = 10000;
+unsigned long scanDelayStart = 0;
+bool scanDelayRunning = false;
+
 //Setup a task so the stepper will run on a different core than the main code to prevent stuttering
 TaskHandle_t moveStepperTask;
 
@@ -58,9 +64,9 @@ void setup()
   pinMode(SHIFT_DOWN_PIN, INPUT_PULLUP); // Push-Button with input Pullup
   pinMode(LED_PIN, OUTPUT);
   pinMode(ENABLE_PIN, OUTPUT);
-  pinMode(DIR_PIN, OUTPUT);              // Stepper Direction Pin
-  pinMode(STEP_PIN, OUTPUT);             // Stepper Step Pin
-  digitalWrite(ENABLE_PIN, HIGH);        //Should be called a disable Pin - High Disables FETs
+  pinMode(DIR_PIN, OUTPUT);       // Stepper Direction Pin
+  pinMode(STEP_PIN, OUTPUT);      // Stepper Step Pin
+  digitalWrite(ENABLE_PIN, HIGH); //Should be called a disable Pin - High Disables FETs
   digitalWrite(DIR_PIN, LOW);
   digitalWrite(STEP_PIN, LOW);
   digitalWrite(LED_PIN, LOW);
@@ -82,15 +88,15 @@ void setup()
   digitalWrite(LED_PIN, HIGH);
 
   startWifi();
-  
+
   //Check for firmware update. It's important that this stays before BLE & HTTP setup
   //because otherwise they use too much traffic and the device fails to update
-  //which really sucks when it corrupts your settings. 
+  //which really sucks when it corrupts your settings.
   if (userConfig.getautoUpdate())
   {
     FirmwareUpdate();
   }
-  
+
   setupBLE();
   startHttpServer();
   resetIfShiftersHeld();
@@ -103,16 +109,15 @@ void setup()
 
 void loop()
 {
-  //BLENotify();
-  vTaskDelay(500 / portTICK_RATE_MS); //guessing it's good to have task delays seperating client & Server?
-  //bleClient(); // reconnect to BLE servers if disconnected
-
-  vTaskDelay(500 / portTICK_RATE_MS);
+  vTaskDelay(1000 / portTICK_RATE_MS);
 
   if (debugToHTML.length() > 500)
   { //Clear up memory
     debugToHTML = "<br>HTML Debug Truncated. Increase buffer if required.";
   }
+
+  void scanIfShiftersHeld();
+
 }
 
 void moveStepper(void *pvParameters)
@@ -238,6 +243,32 @@ void resetIfShiftersHeld()
   }
 }
 
+void scanIfShiftersHeld()
+{
+  if ((digitalRead(SHIFT_UP_PIN) == LOW) && (digitalRead(SHIFT_DOWN_PIN) == LOW)) //are both shifters held?
+  {
+    if (shiftersHoldForScan < 1)                                                   //have they been held for enough loops?
+    {
+      if (scanDelayRunning && ((millis() - scanDelayStart) >= scanDelayTime))     // Has this already been done within 10 seconds?
+      {
+        scanDelayStart += scanDelayTime;
+        spinBLEClient.serverScan(true);
+        shiftersHoldForScan = SHIFTERS_HOLD_FOR_SCAN;
+        digitalWrite(LED_PIN, LOW);
+      }
+      else
+      {
+        shiftersHoldForScan = SHIFTERS_HOLD_FOR_SCAN;
+        return;
+      }
+    }
+    else
+    {
+      shiftersHoldForScan--;
+    }
+  }
+}
+
 void debugDirector(String textToPrint, bool newline)
 {
   if (newline)
@@ -276,13 +307,23 @@ void setupTMCStepperDriver()
   debugDirector(" read:ms=" + msread);
 
   driver.toff(5);
-  driver.en_spreadCycle(true);
-  driver.pwm_autoscale(false); // Needed for stealthChop
-  driver.pwm_autograd(false);
+  bool t_bool = userConfig.getStealthchop();
+  driver.en_spreadCycle(!t_bool);
+  driver.pwm_autoscale(t_bool);
+  driver.pwm_autograd(t_bool);
 }
 
 void updateStepperPower()
 {
   debugDirector("Stepper power is now " + String(userConfig.getStepperPower()));
   driver.rms_current(userConfig.getStepperPower());
+}
+
+void updateStealthchop()
+{
+  bool t_bool = userConfig.getStealthchop();
+  driver.en_spreadCycle(!t_bool);
+  driver.pwm_autoscale(t_bool);
+  driver.pwm_autograd(t_bool);
+  debugDirector("Stealthchop is now " + String(t_bool));
 }

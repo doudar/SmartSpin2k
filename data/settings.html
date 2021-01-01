@@ -11,9 +11,6 @@
   <title>SmartSpin2K Web Server</title>
   <meta name="viewport" content="width=device-width, initial-scale=1">
 </head>
-
-
-
 <body>
   <fieldset><legend><a href="http://github.com/doudar/SmartSpin2k">http://github.com/doudar/SmartSpin2k</a></legend>
   <p style="text-align: left;"><strong><a href="index.html">Main Index</a></strong></p>
@@ -75,6 +72,14 @@
           </tr>
           <tr>
             <td>
+              <p class="tooltip">Stepper Stealthchop<span class="tooltiptext">Make stepper silent at expense of torque</span></p>
+            </td>
+            <td>           
+              <p><label class="switch"><input type="checkbox" id="stealthchop"><span class="slider"></span></label></p>
+              </td>
+          </tr>
+          <tr>
+            <td>
               <p class="tooltip">Automatic Updates<span class="tooltiptext">Check for new firmware on boot?</span></p>
             </td>
             <td>           
@@ -118,6 +123,7 @@
         document.getElementById("shiftStep").value = obj.shiftStep;
         document.getElementById("inclineMultiplier").value = obj.inclineMultiplier;
         document.getElementById("stepperPower").value = obj.stepperPower;
+        document.getElementById("stealthchop").checked = obj.stealthchop;
         document.getElementById("autoUpdate").checked = obj.autoUpdate;
         updateSlider(document.getElementById("shiftStep"),document.getElementById("shiftStepValue"));
         updateSlider(document.getElementById("inclineMultiplier"),document.getElementById("inclineMultiplierValue"));

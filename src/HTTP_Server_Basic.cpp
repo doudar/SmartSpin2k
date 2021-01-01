@@ -96,6 +96,7 @@ void startHttpServer()
 
   server.on("/send_settings", []() {
     String tString;
+    bool wasBTUpdate = false;
     if (!server.arg("ssid").isEmpty())
     {
       tString = server.arg("ssid");
@@ -123,6 +124,28 @@ void startHttpServer()
       userConfig.setStepperPower(server.arg("stepperPower").toInt());
       updateStepperPower();
     }
+    //checkboxes don't report off, so need to check using another parameter that's always present on that page
+    if (!server.arg("stepperPower").isEmpty()) 
+    {
+      if (!server.arg("autoUpdate").isEmpty())
+      {
+        userConfig.setAutoUpdate(true);
+      }
+      else
+      {
+        userConfig.setAutoUpdate(false);
+      }
+      if (!server.arg("stealthchop").isEmpty())
+      {
+        userConfig.setStealthChop(true);
+        updateStealthchop();
+      }
+      else
+      {
+        userConfig.setStealthChop(false);
+        updateStealthchop();
+      }
+    }
     if (!server.arg("inclineMultiplier").isEmpty())
     {
       userConfig.setInclineMultiplier(server.arg("inclineMultiplier").toFloat());
@@ -133,6 +156,7 @@ void startHttpServer()
       {
         tString = server.arg("blePMDropdown");
         userConfig.setConnectedPowerMeter(server.arg("blePMDropdown"));
+        wasBTUpdate = true;
       }
       else
       {
@@ -145,14 +169,22 @@ void startHttpServer()
       {
         tString = server.arg("bleHRDropdown");
         userConfig.setConnectedHeartMonitor(server.arg("bleHRDropdown"));
+        wasBTUpdate = true;
       }
       else
       {
         userConfig.setConnectedHeartMonitor("any");
       }
     }
-
-    String response = "<!DOCTYPE html><html><body><h2>Settings will be applied at next reboot....</h2></body><script> setTimeout(\"location.href = 'http://" + String(userConfig.getDeviceName()) + ".local/index.html';\",1000);</script></html>";
+    String response = "";
+    if (wasBTUpdate) //Special BT update response
+    {
+      String response = "<!DOCTYPE html><html><body><h2>Selections Saved!</h2></body><script> setTimeout(\"location.href = 'http://" + String(userConfig.getDeviceName()) + ".local/bluetoothscanner.html';\",1000);</script></html>";
+    }
+    else
+    { //Normal response
+      String response = "<!DOCTYPE html><html><body><h2>Network settings will be applied at next reboot. <br> Everything else is availiable immediatly.</h2></body><script> setTimeout(\"location.href = 'http://" + String(userConfig.getDeviceName()) + ".local/index.html';\",1000);</script></html>";
+    }
     server.send(200, "text/html", response);
     debugDirector("Config Updated From Web");
     userConfig.saveToSPIFFS();
@@ -179,7 +211,7 @@ void startHttpServer()
 
   server.on("/BLEScan", []() {
     debugDirector("Scanning for BLE Devices");
-    String response = "<!DOCTYPE html><html><body>Scanning for BLE Devices. Please wait.</body><script> setTimeout(\"location.href = 'http://" + String(userConfig.getDeviceName()) + ".local/bluetoothscanner.html';\",5000);</script></html>";
+    String response = "<!DOCTYPE html><html><body>Scanning for BLE Devices. Please wait 5 seconds.</body><script> setTimeout(\"location.href = 'http://" + String(userConfig.getDeviceName()) + ".local/bluetoothscanner.html';\",5000);</script></html>";
     spinBLEClient.serverScan(true);
     server.send(200, "text/html", response);
   });
