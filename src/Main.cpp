@@ -116,7 +116,7 @@ void loop()
     debugToHTML = "<br>HTML Debug Truncated. Increase buffer if required.";
   }
 
-  void scanIfShiftersHeld();
+  scanIfShiftersHeld();
 
 }
 
@@ -247,17 +247,21 @@ void scanIfShiftersHeld()
 {
   if ((digitalRead(SHIFT_UP_PIN) == LOW) && (digitalRead(SHIFT_DOWN_PIN) == LOW)) //are both shifters held?
   {
+    debugDirector("Shifters Held " + String(shiftersHoldForScan));
     if (shiftersHoldForScan < 1)                                                   //have they been held for enough loops?
     {
-      if (scanDelayRunning && ((millis() - scanDelayStart) >= scanDelayTime))     // Has this already been done within 10 seconds?
+      debugDirector("Shifters Held < 1 " + String(shiftersHoldForScan));
+      if ((millis() - scanDelayStart) >= scanDelayTime)     // Has this already been done within 10 seconds?
       {
         scanDelayStart += scanDelayTime;
         spinBLEClient.serverScan(true);
         shiftersHoldForScan = SHIFTERS_HOLD_FOR_SCAN;
         digitalWrite(LED_PIN, LOW);
+        debugDirector("Scan From Buttons");
       }
       else
       {
+        debugDirector("Shifters Held but timer not up " + String((millis() - scanDelayStart) >= scanDelayTime));
         shiftersHoldForScan = SHIFTERS_HOLD_FOR_SCAN;
         return;
       }
