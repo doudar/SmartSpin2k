@@ -19,19 +19,19 @@ You'll need the quantity listed below of each item excep the driver board. An op
 
 |qty   |         Part             |              Link                      |
 |:-----:|--------------------------|---------------------------------------:|
-|1      | ESP32 Dev Board          | https://amzn.to/2ZNyjQX  |
-|1      | NEMA 17 Pancake Stepper  | https://amzn.to/37mKKHh |
-|1      | TMC2225                  | https://amzn.to/3kctdEQ |
-|1      | LM2596 Buck Converter    | https://amzn.to/33ofggY  |
-|1      | 24V Power Supply         | https://amzn.to/3r4e1i0 |
-|2      | Tactile Switches         | https://amzn.to/33ezmKx |
-|2      | 608 Skate Bearings       | https://amzn.to/3isBzrW  |
+|1      | ESP32 Dev Board          | https://amzn.to/2ZNyjQX                |
+|1      | NEMA 17 Pancake Stepper  | https://amzn.to/37mKKHh                |
+|1      | TMC2225                  | https://amzn.to/3kctdEQ                |
+|1      | LM2596 Buck Converter    | https://amzn.to/33ofggY                |
+|1      | 24V Power Supply         | https://amzn.to/3r4e1i0                |
+|2      | Tactile Switches         | https://amzn.to/33ezmKx                |
+|2      | 608 Skate Bearings       | https://amzn.to/3isBzrW                |
 
 Optional equipment so you can actually use it for fitness:
 |qty    |         Part             |              Link                      |
 |:-----:|--------------------------|---------------------------------------:|
-|1      |Assioma Pedals(or similar)| https://amzn.to/3ioSjk7|                   
-|1      |Cheap Spin Bike Check Ebay| https://amzn.to/33mPmKj |
+|1      |Assioma Pedals(or similar)| https://amzn.to/3ioSjk7                |                   
+|1      |Cheap Spin Bike Check Ebay| https://amzn.to/33mPmKj                |
 
 
 So for $700-$1000 you can build a fully functional smart bike! If you already have a Peloton bike collecting dust in the corner, this will work on that too!
