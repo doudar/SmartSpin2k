@@ -49,7 +49,7 @@ void startWifi()
     vTaskDelay(1000 / portTICK_RATE_MS);
     debugDirector(".", false);
     i++;
-    if (i > 5)
+    if (i > WIFI_CONNECT_TIMEOUT)
     {
       i = 0;
       debugDirector("Couldn't Connect. Switching to AP mode");
@@ -66,7 +66,7 @@ void startWifi()
   // Couldn't connect to existing network, Create SoftAP
   if (WiFi.status() != WL_CONNECTED)
   {
-    WiFi.softAP(userConfig.getSsid(), userConfig.getPassword());
+    WiFi.softAP(userConfig.getDeviceName(), userConfig.getPassword());
     vTaskDelay(50);
     IPAddress myIP = WiFi.softAPIP();
     debugDirector("AP IP address: " + myIP.toString());

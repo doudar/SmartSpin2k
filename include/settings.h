@@ -105,4 +105,6 @@
 //stealthchop enabled by default
 #define STEALTHCHOP true
 
+#define WIFI_CONNECT_TIMEOUT 10
+
 #endif
