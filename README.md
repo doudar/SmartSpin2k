@@ -15,7 +15,7 @@ Configuration is accomplished via a web interface hosted by the SmartSpin2k. If 
 
 ### Recomended Hardware:
 
-You'll need the quantity listed below of each item excep the driver board. An optional PCB is in process which will make the wiring much simpler! 
+You'll need the quantity listed below of each item excep the driver board. An optional PCB is in the hardware library which makes the wiring much simpler! 
 
 |qty   |         Part             |              Link                      |
 |:-----:|--------------------------|---------------------------------------:|
