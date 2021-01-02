@@ -3,15 +3,18 @@
 # SmartSpin2K
 
 Hardware (3d Printed) and Software Project that uses an ESP32 and stepper motor to control spin bikes that have a resistance knob. 
-The initial target was to use it with Zwift: stationary bike up hills and feel the burn.
+The initial target was to use it with Zwift: stationary bike up hills and feel the burn. 
+
+# NEW! - Small quantity of kits availiable!
+If you would like a kit with a PCB, send a request to SmartSpin2K@gmail.com . Depending on how "ready to use" you'd like it, cost is going to start at $75 + shipping for all the printed parts + electronics, with a "almost ready to use unit" (soldered and the more difficult parts assembeled) at $150. Note that if you go this route, this is still an open source hardware project and responsibility lies with *you* as to the proper construction and use. I'll be putting these togather on an as ordered basis, so expect 3-5 days prior to shipping.  
 
 ## Background
 I travel for a living and some hotels I stay at have spin bikes. I started carrying my own power meter pedals for the spin bikes so I could ride Zwift, but the experience just isn't the same without automatic resistance on the hills. Then one day I was looking down at that simple to turn knob and I had a thought - With the power meter pedals attached, almost everything is already in place on this $300 spin bike to turn it into the equivalent of a $3,000 computer controlled smart bike! And so here we are....
 
 ## Summary of function
-The power meter pedals send cycling power and cadence to Zwift (or any other cycling app). SmartSpin2k then connects to the APP as a controllable trainer which simulates gradient by automatically turning the knob a set amount for each percent grade change on your virtual road. If you choose to pair your pedals directly to SmartSpin2k, ERG mode is also availiable which lets an app directly control your watt output reguardless of your cadence. In addition to adjusting the knob, SmartSpin2k also has shifter buttons to simulate virtual shifting. 
+Your power meter (HR2VP works too!) sends power and cadence to Zwift (or any other cycling app). SmartSpin2k then connects to the APP as a controllable trainer which simulates gradient by automatically turning the knob a set amount for each percent grade change on your virtual road. You can also pair your power meter directly to SmartSpin2k and use ERG mode which lets SmartSpin2k directly control your resistance to match a specified watt target. In addition to adjusting the knob, SmartSpin2k also has shifter buttons to simulate virtual shifting. 
 
-Configuration is accomplished via a web interface hosted by the SmartSpin2k. If you connect the unit to WiFi with an internet connection, it will also preform automatic software updates whenever they become availiable!  
+There are a multitude of configuration options availiable via a web interface on the SmartSpin2k. Automatic updates are also preformed on a regular basis if you choose to connect SmartSpin2k to your home network.  
 
 ### Recomended Hardware:
 
@@ -31,14 +34,14 @@ Optional equipment so you can actually use it for fitness:
 |qty    |         Part             |              Link                      |
 |:-----:|--------------------------|---------------------------------------:|
 |1      |Assioma Pedals(or similar)| https://amzn.to/3ioSjk7                |                   
-|1      |Cheap Spin Bike Check Ebay| https://amzn.to/33mPmKj                |
+|1      |Cheap Spin Bike Check Ebay| https://amzn.to/33mPmKj                |  
 
+So for $700-$1000 (or much less if you use HR2VP) you can build a fully functional smart bike! If you already have a Peloton bike collecting dust in the corner, this will work on that too! 
 
-So for $700-$1000 you can build a fully functional smart bike! If you already have a Peloton bike collecting dust in the corner, this will work on that too!
+Surprisingly, my spin bike with the SmartSpin2K actually has better "road feel" than my expensive bike trainer, and since it's a belt drive bike, it's virtually silent. That's somthing you cannot achieve with a chain driven bike on any smart trainer. 
 
-
-### Full Documentation Soon
-But if you're adventerious and handy you can probably take a look at my pictures below or the assembly video and start tinkering. Feel free to reach out in the meantime as I'd love to help someone get this working for themselves. There's also a brand new wiki at https://github.com/doudar/SmartSpin2k/wiki 
+### We're working really hard on full documentaion
+If you're adventerious and handy you can probably take a look at my pictures below or the assembly video and start tinkering. This is a growing community and we now have a few members that would love to help you to get your SmartSpin2k working. There's also a brand new wiki at https://github.com/doudar/SmartSpin2k/wiki 
 
 In short, the process is:
 
@@ -46,7 +49,7 @@ In short, the process is:
 2. Install PlatformIO into Visual Code. https://platformio.org/platformio-ide
 3. Open this project in PlatformIO.  
 4. Compile the project and upload to an ESP32
-5. Print all the hardware. You'll need 1 Bottom Case, 1 Knob Cup, Both Spur Gears, 1 Stepper Crossbar, 1 Top Cover and a knob insert that fits your spin bike. PETG works well.
+5. Print all the hardware. You'll need 1 Bottom Case, 1 Knob Cup, Both Spur Gears, 1 Stepper Crossbar, 1 Top Cover and a knob insert that fits your spin bike. PETG works well for printing all hardware.
 6. If you're using the same switches for the shifters, you can optionally print the provided files. Previously I was using tape as a protective enclosure and it worked fine (if ugly).
 7. Wire all of the connections outside the case. Use push on connectors if possible. 
 8. Press both bearings into the recess.
