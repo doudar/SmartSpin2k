@@ -152,11 +152,11 @@ void startHttpServer()
     }
     if (!server.arg("blePMDropdown").isEmpty())
     {
+      wasBTUpdate = true;
       if (server.arg("blePMDropdown"))
       {
         tString = server.arg("blePMDropdown");
         userConfig.setConnectedPowerMeter(server.arg("blePMDropdown"));
-        wasBTUpdate = true;
       }
       else
       {
@@ -165,25 +165,25 @@ void startHttpServer()
     }
     if (!server.arg("bleHRDropdown").isEmpty())
     {
+      wasBTUpdate = true;
       if (server.arg("bleHRDropdown"))
       {
         tString = server.arg("bleHRDropdown");
         userConfig.setConnectedHeartMonitor(server.arg("bleHRDropdown"));
-        wasBTUpdate = true;
       }
       else
       {
         userConfig.setConnectedHeartMonitor("any");
       }
     }
-    String response = "";
+    String response = "<!DOCTYPE html><html><body><h2>";
     if (wasBTUpdate) //Special BT update response
     {
-      String response = "<!DOCTYPE html><html><body><h2>Selections Saved!</h2></body><script> setTimeout(\"location.href = 'http://" + String(userConfig.getDeviceName()) + ".local/bluetoothscanner.html';\",1000);</script></html>";
+      response += "Selections Saved!</h2></body><script> setTimeout(\"location.href = 'http://" + String(userConfig.getDeviceName()) + ".local/bluetoothscanner.html';\",1000);</script></html>";
     }
     else
     { //Normal response
-      String response = "<!DOCTYPE html><html><body><h2>Network settings will be applied at next reboot. <br> Everything else is availiable immediatly.</h2></body><script> setTimeout(\"location.href = 'http://" + String(userConfig.getDeviceName()) + ".local/index.html';\",1000);</script></html>";
+      response += "Network settings will be applied at next reboot. <br> Everything else is availiable immediatly.</h2></body><script> setTimeout(\"location.href = 'http://" + String(userConfig.getDeviceName()) + ".local/index.html';\",1000);</script></html>";
     }
     server.send(200, "text/html", response);
     debugDirector("Config Updated From Web");

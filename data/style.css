@@ -16,6 +16,7 @@ a:visited{
   h1{
     color: #03245c;
     padding: .5rem;
+    line-height: 1em;
   }
   h2{
     color: #000000;

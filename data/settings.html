@@ -6,108 +6,129 @@
   <style type="text/css">
     html {
       background-color: #03245c;
-    } 
-        </style>
+    }
+  </style>
   <title>SmartSpin2K Web Server</title>
   <meta name="viewport" content="width=device-width, initial-scale=1">
 </head>
+
 <body>
-  <fieldset><legend><a href="http://github.com/doudar/SmartSpin2k">http://github.com/doudar/SmartSpin2k</a></legend>
-  <p style="text-align: left;"><strong><a href="index.html">Main Index</a></strong></p>
-  <h1><div class="watermark" id="loadingWatermark">Loading</div></h1>
-  <h1><strong>Settings</strong></h1>
-  <h2>
-    <p></p>
-    <form action="/send_settings">
-      <table class="center" height="182" cellspacing="1">
-        <tbody>
-          <tr>
-            <td>
-              <p class="tooltip">SSID<span class="tooltiptext">WiFi network name. <br><br>If it doesn't exist I will create a network with this name.</span></p>
-            </td>
-            <td><input type="text" id="ssid" name="ssid" value="loading" /></td>
-          </tr>
-          <tr>
-            <td>
-              <p class="tooltip">Password<span class="tooltiptext">Password for the WiFi network.</span></p>
-            </td>
-            <td><input type="text" id="password" name="password" value="loading" />
-            </td>
-          </tr>
-          <tr>
-            <td>
-              <p class="tooltip">MDNS Name<span class="tooltiptext">DNS Name the device will use on the network.</span></p>
-            </td>
-            <td><input type="text" id="deviceName" name="deviceName" value="loading" />
-            </td>
-          </tr>
-          <tr>
-            <td>
-              <p class="tooltip">Shift Step<span class="tooltiptext">Amount to move stepper per gear shift. <br><br>Try to target ~50watt changes.</span></p>
-            </td>
-            <td>
-              <p style="padding: 0px; width: 10px; position: relative; top: -12px; left: 100px; color: rgb(250, 250, 250);"><span id="shiftStepValue">0</span></p>
-              <input style="position: relative; top: -25px; left: 7px;" type="range" id="shiftStep" name="shiftStep" min="50" max="1000" value="0" step="50" class="slider1" onchange="updateSlider(this, document.getElementById('shiftStepValue'))"/>
+  <fieldset>
+    <legend><a href="http://github.com/doudar/SmartSpin2k">http://github.com/doudar/SmartSpin2k</a></legend>
+    <p style="text-align: left;"><strong><a href="index.html">Main Index</a></strong></p>
+    <h1>
+      <div class="watermark" id="loadingWatermark">Loading</div>
+    </h1>
+    <h1><strong>Settings</strong></h1>
+    <h2>
+      <p></p>
+      <form action="/send_settings">
+        <table class="center" height="182" cellspacing="1">
+          <tbody>
+            <tr>
+              <td>
+                <p class="tooltip">SSID<span class="tooltiptext">WiFi network name. <br><br>If it doesn't exist I will
+                    create a network with this name.</span></p>
               </td>
-          </tr>
-          <tr>
-            <td>
-              <p class="tooltip">Incline Multiplier<span class="tooltiptext">Increase to make incline changes more noticable. <br><br>Adjust until hills feel realistic.</span></p>
-            </td>
-            <td>
-              <p style="padding: 0px; width: 10px; position: relative; top: -12px; left: 100px; color: rgb(250, 250, 250);"><span id="inclineMultiplierValue">0</span></p>            
-              <input style="position: relative; top: -25px; left: 7px;" type="range" id="inclineMultiplier" name="inclineMultiplier"
-                value="0" min="1" max="5" step="1" class="slider1" onchange="updateSlider(this, document.getElementById('inclineMultiplierValue'))"/>    
+              <td><input type="text" id="ssid" name="ssid" value="loading" /></td>
+            </tr>
+            <tr>
+              <td>
+                <p class="tooltip">Password<span class="tooltiptext">Password for the WiFi network.</span></p>
               </td>
-          </tr>
-          <tr>
-            <td>
-              <p class="tooltip">Stepper Power<span class="tooltiptext">Amount in milli amps for stepper motor<br><br>Set to the minimun required to move knob smoothly</span></p>
-            </td>
-            <td>
-              <p style="padding: 0px; width: 10px; position: relative; top: -12px; left: 100px; color: rgb(250, 250, 250);"><span id="stepperPowerValue">0</span></p>
-              <input style="position: relative; top: -25px; left: 7px;" type="range" id="stepperPower" name="stepperPower" 
-                min="500" max="2000" value="0" step="100" class="slider1" onchange="updateSlider(this, document.getElementById('stepperPowerValue'))"/>
+              <td><input type="text" id="password" name="password" value="loading" />
               </td>
-          </tr>
-          <tr>
-            <td>
-              <p class="tooltip">Stepper Stealthchop<span class="tooltiptext">Make stepper silent at expense of torque</span></p>
-            </td>
-            <td>           
-              <p><label class="switch"><input type="checkbox" id="stealthchop"><span class="slider"></span></label></p>
+            </tr>
+            <tr>
+              <td>
+                <p class="tooltip">MDNS Name<span class="tooltiptext">DNS Name the device will use on the
+                    network.</span></p>
               </td>
-          </tr>
-          <tr>
-            <td>
-              <p class="tooltip">Automatic Updates<span class="tooltiptext">Check for new firmware on boot?</span></p>
-            </td>
-            <td>           
-              <p><label class="switch"><input type="checkbox" id="autoUpdate"><span class="slider"></span></label></p>
+              <td><input type="text" id="deviceName" name="deviceName" value="loading" />
               </td>
-          </tr>
-        </tbody>
+            </tr>
+            <tr>
+              <td>
+                <p class="tooltip">Shift Step<span class="tooltiptext">Amount to move stepper per gear shift.
+                    <br><br>Try to target ~50watt changes.</span></p>
+              </td>
+              <td>
+                <p
+                  style="padding: 0px; width: 10px; position: relative; top: -12px; left: 100px; color: rgb(250, 250, 250);">
+                  <span id="shiftStepValue">0</span></p>
+                <input style="position: relative; top: -25px; left: 7px;" type="range" id="shiftStep" name="shiftStep"
+                  min="50" max="1000" value="0" step="50" class="slider1"
+                  onchange="updateSlider(this, document.getElementById('shiftStepValue'))" />
+              </td>
+            </tr>
+            <tr>
+              <td>
+                <p class="tooltip">Incline Multiplier<span class="tooltiptext">Increase to make incline changes more
+                    noticable. <br><br>Adjust until hills feel realistic.</span></p>
+              </td>
+              <td>
+                <p
+                  style="padding: 0px; width: 10px; position: relative; top: -12px; left: 100px; color: rgb(250, 250, 250);">
+                  <span id="inclineMultiplierValue">0</span></p>
+                <input style="position: relative; top: -25px; left: 7px;" type="range" id="inclineMultiplier"
+                  name="inclineMultiplier" value="0" min="1" max="5" step="1" class="slider1"
+                  onchange="updateSlider(this, document.getElementById('inclineMultiplierValue'))" />
+              </td>
+            </tr>
+            <tr>
+              <td>
+                <p class="tooltip">Stepper Power<span class="tooltiptext">Amount in milli amps for stepper
+                    motor<br><br>Set to the minimun required to move knob smoothly</span></p>
+              </td>
+              <td>
+                <p
+                  style="padding: 0px; width: 10px; position: relative; top: -12px; left: 100px; color: rgb(250, 250, 250);">
+                  <span id="stepperPowerValue">0</span></p>
+                <input style="position: relative; top: -25px; left: 7px;" type="range" id="stepperPower"
+                  name="stepperPower" min="500" max="2000" value="0" step="100" class="slider1"
+                  onchange="updateSlider(this, document.getElementById('stepperPowerValue'))" />
+              </td>
+            </tr>
+            <tr>
+              <td>
+                <p class="tooltip">Stepper Stealthchop<span class="tooltiptext">Make stepper silent at expense of
+                    torque</span></p>
+              </td>
+              <td>
+              <label class="switch"><input type="checkbox" name = "stealthchop" id="stealthchop"><span class="slider"></span></label>
+              </td>
+            </tr>
+            <tr>
+              <td>
+                <p class="tooltip">Automatic Updates<span class="tooltiptext">Check for new firmware on boot?</span></p>
+              </td>
+              <td>
+                <label class="switch"><input type="checkbox" name="autoupdate" id="autoUpdate"><span class="slider"></span></label>
+              </td>
+            </tr>
+      </tbody>
       </table>
       <input type="submit" value="Submit" />
     </form>
-    <p></p>
-    <form action="/load_defaults.html">
-      <input type="submit" value="Reset to Defaults">
-    </form>
-    <p></p>
-    <form action="/reboot.html">
-      <input type="submit" value="Reboot!">
-    </form>
-  </h2>
+
+      <p></p>
+      <form action="/load_defaults.html">
+        <input type="submit" value="Reset to Defaults">
+      </form>
+      <p></p>
+      <form action="/reboot.html">
+        <input type="submit" value="Reboot!">
+      </form>
+    </h2>
 </body>
 
 <script>
 
 
   //Update values on specified interval loading late because this tiny webserver hates frequent requests
-   setInterval(function () {
-    if (document.getElementById("ssid").value == "loading"){
-    requestConfigValues();
+  setInterval(function () {
+    if (document.getElementById("ssid").value == "loading") {
+      requestConfigValues();
     }
 
   }, 1000);
@@ -125,32 +146,32 @@
         document.getElementById("stepperPower").value = obj.stepperPower;
         document.getElementById("stealthchop").checked = obj.stealthchop;
         document.getElementById("autoUpdate").checked = obj.autoUpdate;
-        updateSlider(document.getElementById("shiftStep"),document.getElementById("shiftStepValue"));
-        updateSlider(document.getElementById("inclineMultiplier"),document.getElementById("inclineMultiplierValue"));
-        updateSlider(document.getElementById("stepperPower"),document.getElementById("stepperPowerValue"));
+        updateSlider(document.getElementById("shiftStep"), document.getElementById("shiftStepValue"));
+        updateSlider(document.getElementById("inclineMultiplier"), document.getElementById("inclineMultiplierValue"));
+        updateSlider(document.getElementById("stepperPower"), document.getElementById("stepperPowerValue"));
         document.getElementById("loadingWatermark").opacity = 0;
-        setTimeout(function(){document.getElementById("loadingWatermark").remove();}, 1000);
+        setTimeout(function () { document.getElementById("loadingWatermark").remove(); }, 1000);
       }
     };
     xhttp.open("GET", "/configJSON", true);
     xhttp.send();
   }
 
-//define function to load css
-var loadCss = function(){
+  //define function to load css
+  var loadCss = function () {
     var cssLink = document.createElement('link');
     cssLink.rel = 'stylesheet';
     cssLink.href = 'style.css';
     var head = document.getElementsByTagName('head')[0];
     head.parentNode.insertBefore(cssLink, head);
-};
- 
-//Delay loading css to not swamp webserver
-window.addEventListener('load', function (){
-  setTimeout(loadCss, 100);
-}, false);
+  };
 
-function updateSlider(element, valueElement) {
+  //Delay loading css to not swamp webserver
+  window.addEventListener('load', function () {
+    setTimeout(loadCss, 100);
+  }, false);
+
+  function updateSlider(element, valueElement) {
     var sliderValue = element.value;
     valueElement.innerHTML = sliderValue;
   }
