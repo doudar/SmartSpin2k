@@ -38,7 +38,9 @@ So for $700-$1000 you can build a fully functional smart bike! If you already ha
 
 
 ### Full Documentation Soon
-But if you're adventerious and handy you can probably take a look at my pictures below or the assembly video and start tinkering. Feel free to reach out in the meantime as I'd love to help someone get this working for themselves. In short, the process is:
+But if you're adventerious and handy you can probably take a look at my pictures below or the assembly video and start tinkering. Feel free to reach out in the meantime as I'd love to help someone get this working for themselves. There's also a brand new wiki at https://github.com/doudar/SmartSpin2k/wiki 
+
+In short, the process is:
 
 1. Install Microsoft Visual Code. https://code.visualstudio.com/
 2. Install PlatformIO into Visual Code. https://platformio.org/platformio-ide
