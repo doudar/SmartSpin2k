@@ -5,9 +5,6 @@
 Hardware (3d Printed) and Software Project that uses an ESP32 and stepper motor to control spin bikes that have a resistance knob. 
 The initial target was to use it with Zwift: stationary bike up hills and feel the burn. 
 
-# NEW! - Small quantity of kits availiable!
-If you would like a kit with a PCB, send a request to SmartSpin2K@gmail.com . Depending on how "ready to use" you'd like it, cost is going to start at $75 + shipping for all the printed parts + electronics, with a "almost ready to use unit" (soldered and the more difficult parts assembeled) at $150. Note that if you go this route, this is still an open source hardware project and responsibility lies with **you** as to the proper construction and use. I'll be putting these togather on an as ordered basis, so expect 3-5 days prior to shipping.  
-
 ## Background
 I travel for a living and some hotels I stay at have spin bikes. I started carrying my own power meter pedals for the spin bikes so I could ride Zwift, but the experience just isn't the same without automatic resistance on the hills. Then one day I was looking down at that simple to turn knob and I had a thought - With the power meter pedals attached, almost everything is already in place on this $300 spin bike to turn it into the equivalent of a $3,000 computer controlled smart bike! And so here we are....
 
@@ -39,6 +36,9 @@ Optional equipment so you can actually use it for fitness:
 So for $700-$1000 (or much less if you use HR2VP) you can build a fully functional smart bike! If you already have a Peloton bike collecting dust in the corner, this will work on that too! 
 
 Surprisingly, my spin bike with the SmartSpin2K actually has better "road feel" than my expensive bike trainer, and since it's a belt drive bike, it's virtually silent. That's somthing you cannot achieve with a chain driven bike on any smart trainer. 
+
+# NEW! - Small quantity of kits availiable!
+If you would like a kit with a PCB, send a request to SmartSpin2K@gmail.com . Depending on how "ready to use" you'd like it, cost is going to start at $75 + shipping for all the printed parts + electronics, with a "almost ready to use unit" (soldered and the more difficult parts assembeled) at $150. Note that if you go this route, this is still an open source hardware project and responsibility lies with **you** as to the proper construction and use. I'll be putting these togather on an as ordered basis, so expect 3-5 days prior to shipping.  
 
 ### We're working really hard on full documentaion
 If you're adventerious and handy you can probably take a look at my pictures below or the assembly video and start tinkering. This is a growing community and we now have a few members that would love to help you to get your SmartSpin2k working. There's also a brand new wiki at https://github.com/doudar/SmartSpin2k/wiki 
