@@ -384,6 +384,6 @@ if (userConfig.getSimulatedHr()>170)
     userConfig.setSimulatedWatts(avgP);
     userConfig.setSimulatedCad(90);
 
-    debugDirector("instantanious power was: " + String(avgP));
+    debugDirector("Power From HR: " + String(avgP));
 
   }
