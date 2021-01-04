@@ -194,7 +194,8 @@ void startHttpServer()
   server.on("/BLEServers", []() {
     debugDirector("Sending BLE device list to HTTP Client");
     String tString = "";
-    if (String(userConfig.getFoundDevices()) == "null")
+    const char * bracket = "{";
+    if (!(String(userConfig.getFoundDevices()).startsWith(bracket)))
     {
       tString += "{";
     }
@@ -401,6 +402,11 @@ void handleIndexFile()
     debugDirector(filename + " not found. Sending builtin Index.html");
     server.send(200, "text/html", noIndexHTML);
   }
+}
+
+void btScannerHTML()
+{
+  spinBLEClient.serverScan(true);
 }
 
 void handleSpiffsFile()

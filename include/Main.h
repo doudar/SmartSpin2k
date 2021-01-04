@@ -28,6 +28,9 @@ void updateStealthchop();
 //Main program variable that stores most everything
 extern userParameters userConfig;
 
+//Users Physical Working Capacity Calculation Parameters (heartrate to Power calculation)
+extern physicalWorkingCapacity userPWC;
+
 //Variable that will store debugging information that will get appended and then cleared once posted to HTML or a timer expires.
 extern String debugToHTML; 
 

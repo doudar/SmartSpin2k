@@ -214,12 +214,14 @@ bool SpinBLEClient::connectToServer()
                     {
                         myPowerMeter = nullptr;
                         doConnectPM = false;
+                        connectedPM = false;
                         doScan = true;
                     }
                     if (myDevice == myHeartMonitor)
                     {
                         myHeartMonitor = nullptr;
                         doConnectHR = false;
+                        connectedHR = false;
                         doScan = true;
                     }
                 }

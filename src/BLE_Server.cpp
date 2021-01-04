@@ -169,6 +169,11 @@ void BLENotify(void *pvParameters)
 {
   for (;;)
   {
+    if(spinBLEClient.connectedHR && !spinBLEClient.connectedPM && (userConfig.getSimulatedHr()>0))
+    {
+      calculateInstPwrFromHR();
+    }
+
     if (_BLEClientConnected)
     {
       //update the BLE information on the server
@@ -352,4 +357,33 @@ void updateCyclingPowerMesurementChar()
         debugDirector("");
       }
     }
+  }
+
+  void calculateInstPwrFromHR()
+  {
+
+    //userConfig.setSimulatedWatts((s1Pwr*s2HR)-(s2Pwr*S1HR))/(S2HR-s1HR)+(userConfig.getSimulatedHr(*((s1Pwr-s2Pwr)/(s1HR-s2HR)));
+ int avgP = ((userPWC.session1Pwr*userPWC.session2HR)-(userPWC.session2Pwr*userPWC.session1HR))/(userPWC.session2HR-userPWC.session1HR)+(userConfig.getSimulatedHr()*((userPWC.session1Pwr-userPWC.session2Pwr)/(userPWC.session1HR-userPWC.session2HR)));
+
+if (avgP < 50)
+{
+  avgP = 50;
+}
+
+if (userConfig.getSimulatedHr()<90)
+{
+  //magic math here for inst power
+}
+
+if (userConfig.getSimulatedHr()>170)
+{
+  //magic math here for inst power
+}
+  
+
+    userConfig.setSimulatedWatts(avgP);
+    userConfig.setSimulatedCad(90);
+
+    debugDirector("instantanious power was: " + String(avgP));
+
   }

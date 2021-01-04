@@ -22,7 +22,7 @@ class userParameters
     int     stepperPower;
     bool    stealthchop;             
     float   inclineMultiplier;              
-    bool    simulatePower;                  
+    bool    simulatePower;  //didn't really have a good purpose before, going to be used for HR2VP like calculation              
     bool    simulateHr;                     
     bool    ERGMode;                      
     bool    autoUpdate;                 
@@ -79,6 +79,23 @@ class userParameters
     void    loadFromSPIFFS();
     void    printFile();
 
+
+};
+
+class physicalWorkingCapacity
+{
+public:
+
+int     session1HR;
+int     session1Pwr;
+int     session2HR;
+int     session2Pwr;
+
+void    setDefaults();
+String  returnJSON();
+void    saveToSPIFFS();
+void    loadFromSPIFFS();
+void    printFile();
 
 };
 

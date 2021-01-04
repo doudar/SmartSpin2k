@@ -50,6 +50,7 @@ void computeERG(int, int);
 void computeCSC();
 void updateIndoorBikeDataChar();
 void updateCyclingPowerMesurementChar();
+void calculateInstPwrFromHR();
 
 class MyServerCallbacks : public BLEServerCallbacks
 {

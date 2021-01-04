@@ -34,8 +34,9 @@ bool scanDelayRunning = false;
 //Setup a task so the stepper will run on a different core than the main code to prevent stuttering
 TaskHandle_t moveStepperTask;
 
-//*************************Load The Config*********************************
+//*************************Initialize the Config*********************************
 userParameters userConfig;
+physicalWorkingCapacity userPWC;
 
 ///////////////////////////////////////////////////////BEGIN SETUP/////////////////////////////////////
 void setup()
@@ -58,6 +59,11 @@ void setup()
   userConfig.loadFromSPIFFS();
   userConfig.printFile(); //Print userConfig.contents to serial
   userConfig.saveToSPIFFS();
+
+  //load PWC for HR to Pwr Calculation
+  userPWC.loadFromSPIFFS();
+  userPWC.printFile();
+  userPWC.saveToSPIFFS();
 
   pinMode(RADIO_PIN, INPUT_PULLUP);
   pinMode(SHIFT_UP_PIN, INPUT_PULLUP);   // Push-Button with input Pullup

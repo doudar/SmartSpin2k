@@ -36,6 +36,9 @@
 //name of local file to save configuration in SPIFFS
 #define configFILENAME "/config.txt"
 
+//name of local file to save Physical Working Capacity in Spiffs
+#define userPWCFILENAME "/userPWC.txt"
+
 //Default Stepper Power
 #define STEPPER_POWER 1000
 

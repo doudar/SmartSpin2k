@@ -14,24 +14,24 @@
 // Default Values
 void userParameters::setDefaults() //Move these to set the values as #define in main.h
 {
-  firmwareUpdateURL = FW_UPDATEURL;
-  incline = 0.0;
-  simulatedWatts = 100;
-  simulatedHr = 60;
-  simulatedCad = 90;
-  deviceName = DEVICE_NAME;
-  shiftStep = 400;
-  stepperPower = STEPPER_POWER;
-  stealthchop = STEALTHCHOP;
-  inclineMultiplier = 2.0;
-  simulatePower = false;
-  simulateHr = true;
-  ERGMode = false;
-  autoUpdate = AUTO_FIRMWARE_UPDATE;
-  ssid = DEVICE_NAME;
-  password = DEFAULT_PASSWORD;
-  foundDevices = "";
-  connectedPowerMeter = "any";
+  firmwareUpdateURL     = FW_UPDATEURL;
+  incline               = 0.0;
+  simulatedWatts        = 100;
+  simulatedHr           = 60;
+  simulatedCad          = 90;
+  deviceName            = DEVICE_NAME;
+  shiftStep             = 400;
+  stepperPower          = STEPPER_POWER;
+  stealthchop           = STEALTHCHOP;
+  inclineMultiplier     = 2.0;
+  simulatePower         = false;
+  simulateHr            = true;
+  ERGMode               = false;
+  autoUpdate            = AUTO_FIRMWARE_UPDATE;
+  ssid                  = DEVICE_NAME;
+  password              = DEFAULT_PASSWORD;
+  foundDevices          = "";
+  connectedPowerMeter   = "any";
   connectedHeartMonitor = "any";
 }
 
@@ -42,28 +42,28 @@ String userParameters::returnJSON()
   // Allocate a temporary JsonDocument
   // Don't forget to change the capacity to match your requirements.
   // Use arduinojson.org/assistant to compute the capacity.
-  StaticJsonDocument<512> doc;
+  StaticJsonDocument<700> doc;
   // Set the values in the document
 
-  doc["firmwareUpdateURL"] = firmwareUpdateURL;
-  doc["incline"] = incline;
-  doc["simulatedWatts"] = simulatedWatts;
-  doc["simulatedHr"] = simulatedHr;
-  doc["simulatedCad"] = simulatedCad;
-  doc["deviceName"] = deviceName;
-  doc["shiftStep"] = shiftStep;
-  doc["stepperPower"] = stepperPower;
-  doc["stealthchop"] = stealthchop;
-  doc["inclineMultiplier"] = inclineMultiplier;
-  doc["simulatePower"] = simulatePower;
-  doc["simulateHr"] = simulateHr;
-  doc["ERGMode"] = ERGMode;
-  doc["autoUpdate"] = autoUpdate;
-  doc["ssid"] = ssid;
-  doc["password"] = password;
-  doc["foundDevices"]       = foundDevices;  
-  doc["connectedPowerMeter"] = connectedPowerMeter;
-  doc["connectedHeartMonitor"] = connectedHeartMonitor;
+  doc["firmwareUpdateURL"]      = firmwareUpdateURL;
+  doc["incline"]                = incline;
+  doc["simulatedWatts"]         = simulatedWatts;
+  doc["simulatedHr"]            = simulatedHr;
+  doc["simulatedCad"]           = simulatedCad;
+  doc["deviceName"]             = deviceName;
+  doc["shiftStep"]              = shiftStep;
+  doc["stepperPower"]           = stepperPower;
+  doc["stealthchop"]            = stealthchop;
+  doc["inclineMultiplier"]      = inclineMultiplier;
+  doc["simulatePower"]          = simulatePower;
+  doc["simulateHr"]             = simulateHr;
+  doc["ERGMode"]                = ERGMode;
+  doc["autoUpdate"]             = autoUpdate;
+  doc["ssid"]                   = ssid;
+  doc["password"]               = password;
+  doc["foundDevices"]           = foundDevices;  
+  doc["connectedPowerMeter"]    = connectedPowerMeter;
+  doc["connectedHeartMonitor"]  = connectedHeartMonitor;
   String output;
   serializeJson(doc, output);
   return output;
@@ -87,29 +87,29 @@ void userParameters::saveToSPIFFS()
   // Allocate a temporary JsonDocument
   // Don't forget to change the capacity to match your requirements.
   // Use arduinojson.org/assistant to compute the capacity.
-  StaticJsonDocument<512> doc;
+  StaticJsonDocument<700> doc;
 
   // Set the values in the document
 
-  doc["firmwareUpdateURL"] = firmwareUpdateURL;
-  doc["incline"] = incline;
-  doc["simulatedWatts"] = simulatedWatts;
-  doc["simulatedHr"] = simulatedHr;
-  doc["simulatedCad"] = simulatedCad;
-  doc["deviceName"] = deviceName;
-  doc["shiftStep"] = shiftStep;
-  doc["stepperPower"] = stepperPower;
-  doc["stealthchop"] = stealthchop;
-  doc["inclineMultiplier"] = inclineMultiplier;
-  doc["simulatePower"] = simulatePower;
-  doc["simulateHr"] = simulateHr;
-  doc["ERGMode"] = ERGMode;
-  doc["autoUpdate"] = autoUpdate;
-  doc["ssid"] = ssid;
-  doc["password"] = password;
-  //doc["foundDevices"]       = foundDevices; //I don't see a need currently in keeping this boot to boot
-  doc["connectedPowerMeter"] = connectedPowerMeter;
-  doc["connectedHeartMonitor"] = connectedHeartMonitor;
+  doc["firmwareUpdateURL"]      = firmwareUpdateURL;
+  doc["incline"]                = incline;
+  doc["simulatedWatts"]         = simulatedWatts;
+  doc["simulatedHr"]            = simulatedHr;
+  doc["simulatedCad"]           = simulatedCad;
+  doc["deviceName"]             = deviceName;
+  doc["shiftStep"]              = shiftStep;
+  doc["stepperPower"]           = stepperPower;
+  doc["stealthchop"]            = stealthchop;
+  doc["inclineMultiplier"]      = inclineMultiplier;
+  doc["simulatePower"]          = simulatePower;
+  doc["simulateHr"]             = simulateHr;
+  doc["ERGMode"]                = ERGMode;
+  doc["autoUpdate"]             = autoUpdate;
+  doc["ssid"]                   = ssid;
+  doc["password"]               = password;
+  //doc["foundDevices"]         = foundDevices; //I don't see a need currently in keeping this boot to boot
+  doc["connectedPowerMeter"]    = connectedPowerMeter;
+  doc["connectedHeartMonitor"]  = connectedHeartMonitor;
 
   // Serialize JSON to file
   if (serializeJson(doc, file) == 0)
@@ -149,24 +149,24 @@ void userParameters::loadFromSPIFFS()
   }
 
   // Copy values from the JsonDocument to the Config
-  setFirmwareUpdateURL(doc["firmwareUpdateURL"]);
-  setIncline(doc["incline"]);
-  setSimulatedWatts(doc["simulatedWatts"]);
-  setSimulatedHr(doc["simulatedHr"]);
-  setSimulatedCad(doc["simulatedCad"]);
-  setDeviceName(doc["deviceName"]);
-  setShiftStep(doc["shiftStep"]);
-  setStepperPower(doc["stepperPower"]);
-  setStealthChop(doc["stealthchop"]);
-  setInclineMultiplier(doc["inclineMultiplier"]);
-  setSimulatePower(doc["simulatePower"]);
-  setSimulateHr(doc["simulateHr"]);
-  setERGMode(doc["ERGMode"]);
-  setAutoUpdate(doc["autoUpdate"]);
-  setSsid(doc["ssid"]);
-  setPassword(doc["password"]);
-  //setfoundDevices     (doc["foundDevices"]);
-  setConnectedPowerMeter(doc["connectedPowerMeter"]);
+  setFirmwareUpdateURL    (doc["firmwareUpdateURL"]);
+  setIncline              (doc["incline"]);
+  setSimulatedWatts       (doc["simulatedWatts"]);
+  setSimulatedHr          (doc["simulatedHr"]);
+  setSimulatedCad         (doc["simulatedCad"]);
+  setDeviceName           (doc["deviceName"]);
+  setShiftStep            (doc["shiftStep"]);
+  setStepperPower         (doc["stepperPower"]);
+  setStealthChop          (doc["stealthchop"]);
+  setInclineMultiplier    (doc["inclineMultiplier"]);
+  setSimulatePower        (doc["simulatePower"]);
+  setSimulateHr           (doc["simulateHr"]);
+  setERGMode              (doc["ERGMode"]);
+  setAutoUpdate           (doc["autoUpdate"]);
+  setSsid                 (doc["ssid"]);
+  setPassword             (doc["password"]);
+  //setfoundDevices       (doc["foundDevices"]);
+  setConnectedPowerMeter  (doc["connectedPowerMeter"]);
   setConnectedHeartMonitor(doc["connectedHeartMonitor"]);
 
   // Incase these important variables were not in the document, set them to defaults. 
@@ -232,3 +232,121 @@ void userParameters::printFile()
   // Close the file
   file.close();
 }
+
+/*****************************************USERPWC*****************************************/
+
+void physicalWorkingCapacity::setDefaults() 
+{
+session1HR    = 129; //examples from https://www.cyclinganalytics.com/
+session1Pwr   = 100;
+session2HR    = 154; 
+session2Pwr   = 150;
+}
+
+//-- return all config as one a single JSON string
+String physicalWorkingCapacity::returnJSON()
+{
+
+  StaticJsonDocument<500> doc;
+
+  doc["session1HR"]   = session1HR;
+  doc["session1Pwr"]  = session1Pwr;
+  doc["session2HR"]   = session2HR;
+  doc["session2Pwr"]  = session2Pwr;
+
+  String output;
+  serializeJson(doc, output);
+  return output;
+}
+
+//-- Saves all parameters to SPIFFS
+void physicalWorkingCapacity::saveToSPIFFS()
+{
+  // Delete existing file, otherwise the configuration is appended to the file
+  SPIFFS.remove(userPWCFILENAME);
+
+  // Open file for writing
+  debugDirector("Writing File: " + String(userPWCFILENAME));
+  File file = SPIFFS.open(userPWCFILENAME, FILE_WRITE);
+  if (!file)
+  {
+    debugDirector(F("Failed to create file"));
+    return;
+  }
+
+  StaticJsonDocument<500> doc;
+
+  doc["session1HR"]   = session1HR;
+  doc["session1Pwr"]  = session1Pwr;
+  doc["session2HR"]   = session2HR;
+  doc["session2Pwr"]  = session2Pwr;
+
+  // Serialize JSON to file
+  if (serializeJson(doc, file) == 0)
+  {
+    debugDirector(F("Failed to write to file"));
+  }
+  // Close the file
+  file.close();
+}
+
+// Loads the JSON configuration from a file
+void physicalWorkingCapacity::loadFromSPIFFS()
+{
+  // Open file for reading
+  debugDirector("Reading File: " + String(userPWCFILENAME));
+  File file = SPIFFS.open(userPWCFILENAME);
+
+  //load defaults if filename doesn't exist
+  if (!file)
+  {
+    debugDirector("Couldn't find configuration file. Loading Defaults");
+    setDefaults();
+    return;
+  }
+
+  StaticJsonDocument<500> doc;
+
+  // Deserialize the JSON document
+  DeserializationError error = deserializeJson(doc, file);
+  if (error)
+  {
+    debugDirector(F("Failed to read file, using default configuration"));
+    setDefaults();
+    return;
+  }
+
+  // Copy values from the JsonDocument to the Config
+  session1HR  = doc["session1HR"];
+  session1Pwr = doc["session1Pwr"];
+  session2HR  = doc["session2HR"];
+  session2Pwr = doc["session2Pwr"];
+
+  debugDirector("Config File Loaded: " + String(userPWCFILENAME));
+  file.close();
+}
+
+// Prints the content of a file to the Serial
+void physicalWorkingCapacity::printFile()
+{
+  // Open file for reading
+  debugDirector("Contents of file: " + String(userPWCFILENAME));
+  File file = SPIFFS.open(userPWCFILENAME);
+  if (!file)
+  {
+    debugDirector(F("Failed to read file"));
+    return;
+  }
+
+  // Extract each characters by one by one
+  while (file.available())
+  {
+    debugDirector(String(char(file.read())), false);
+  }
+  debugDirector(String(" "));
+  // Close the file
+  file.close();
+}
+
+
+
