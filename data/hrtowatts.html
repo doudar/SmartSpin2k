@@ -1,0 +1,114 @@
+<!DOCTYPE html>
+<html>
+
+
+<head>
+  <style type="text/css">
+    html {
+      background-color: #03245c;
+    }
+  </style>
+  <title>SmartSpin2K Web Server</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+</head>
+
+<body>
+  <fieldset>
+    <legend><a href="http://github.com/doudar/SmartSpin2k">http://github.com/doudar/SmartSpin2k</a></legend>
+    <p style="text-align: left;"><strong><a href="index.html">Main Index</a></strong></p>
+    <h1>
+      <div class="watermark" id="loadingWatermark">Loading</div>
+    </h1>
+    <h1><strong>Physical Working Capacity</strong></h1>
+    <h2>
+      <p>For the most accurate power estimation when not using a power meter, please submit the following information.
+          <br>Note: You can get estimated watts from any ride recorded in Strava with heart rate information. 
+      </p>
+      <form action="/send_settings">
+        <table class="center" height="182" cellspacing="1">
+          <tbody>
+            <tr>
+              <td>
+                <p class="tooltip">Easy Session Average HR<span class="tooltiptext">Session 1 HR<br><br>Average Heartrate over an easy 1 Hour course.</span></p>
+              </td>
+              <td><input type="number" id="session1HR" name="session1HR" value="loading" /></td>
+            </tr>
+            <tr>
+              <td>
+                <p class="tooltip">Easy Session Average Power<span class="tooltiptext">Average Power over an easy 1 hour course in watts.</span></p>
+              </td>
+              <td><input type="number" id="session1Pwr" name="session1Pwr" value="loading" />
+              </td>
+            </tr>
+            <tr>
+              <td>
+                <p class="tooltip">Hard Session Average HR<span class="tooltiptext">Average HR over a hard 1 hour course.</span></p>
+              </td>
+              <td><input type="number" id="session2HR" name="session2HR" value="loading" />
+              </td>
+            </tr>
+            <tr>
+              <td>
+                <p class="tooltip">Hard Session Average Power<span class="tooltiptext">Average Power over a hard 1 hour course in watts.</span></p>
+              </td>
+              <td><input type="number" id="session2Pwr" name="session2Pwr" value="loading" />
+              </td>
+            </tr>
+            
+            </tr>
+      </tbody>
+      </table><br>
+      <input type="submit" value="Submit" />
+    </form>
+    </h2>
+</body>
+
+<script>
+
+
+  //Update values on specified interval loading late because this tiny webserver hates frequent requests
+  setInterval(function () {
+    if (document.getElementById("session1HR").value == "loading") {
+      requestConfigValues();
+    }
+
+  }, 1000);
+
+  function requestConfigValues() {
+    var xhttp = new XMLHttpRequest();
+    xhttp.onreadystatechange = function () {
+      if (this.readyState == 4 && this.status == 200) {
+        var obj = JSON.parse(this.responseText);
+        document.getElementById("session1HR").value = obj.session1HR;
+        document.getElementById("session1Pwr").value = obj.session1Pwr;
+        document.getElementById("session2HR").value = obj.session2HR;
+        document.getElementById("session2Pwr").value = obj.session2Pwr;
+        setTimeout(function () { document.getElementById("loadingWatermark").remove(); }, 1000);
+      }
+    };
+    xhttp.open("GET", "/PWCJSON", true);
+    xhttp.send();
+  }
+
+  //define function to load css
+  var loadCss = function () {
+    var cssLink = document.createElement('link');
+    cssLink.rel = 'stylesheet';
+    cssLink.href = 'style.css';
+    var head = document.getElementsByTagName('head')[0];
+    head.parentNode.insertBefore(cssLink, head);
+  };
+
+  //Delay loading css to not swamp webserver
+  window.addEventListener('load', function () {
+    setTimeout(loadCss, 100);
+  }, false);
+
+  function updateSlider(element, valueElement) {
+    var sliderValue = element.value;
+    valueElement.innerHTML = sliderValue;
+  }
+
+</script>
+
+</html>

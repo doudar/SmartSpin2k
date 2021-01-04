@@ -125,7 +125,7 @@ void startHttpServer()
       updateStepperPower();
     }
     //checkboxes don't report off, so need to check using another parameter that's always present on that page
-    if (!server.arg("stepperPower").isEmpty()) 
+    if (!server.arg("stepperPower").isEmpty())
     {
       if (!server.arg("autoUpdate").isEmpty())
       {
@@ -175,6 +175,22 @@ void startHttpServer()
       {
         userConfig.setConnectedHeartMonitor("any");
       }
+      if (!server.arg("session1HR").isEmpty())
+      {
+        userPWC.session1HR = server.arg("session1HR").toInt();
+      }
+      if (!server.arg("session1Pwr").isEmpty())
+      {
+        userPWC.session1HR = server.arg("session1Pwr").toInt();
+      }
+      if (!server.arg("session2HR").isEmpty())
+      {
+        userPWC.session1HR = server.arg("session2HR").toInt();
+      }
+      if (!server.arg("session2Pwr").isEmpty())
+      {
+        userPWC.session1HR = server.arg("session2Pwr").toInt();
+      }
     }
     String response = "<!DOCTYPE html><html><body><h2>";
     if (wasBTUpdate) //Special BT update response
@@ -194,7 +210,7 @@ void startHttpServer()
   server.on("/BLEServers", []() {
     debugDirector("Sending BLE device list to HTTP Client");
     String tString = "";
-    const char * bracket = "{";
+    const char *bracket = "{";
     if (!(String(userConfig.getFoundDevices()).startsWith(bracket)))
     {
       tString += "{";
@@ -297,8 +313,14 @@ void startHttpServer()
     String tString;
     tString = userConfig.returnJSON();
     tString.remove(tString.length() - 1, 1);
-    //tString += String(",\"debug\":") + "\"" + debugToHTML + "\"}";
     tString += String(",\"debug\":\"") + debugToHTML + "\",\"firmwareVersion\":\"" + String(FIRMWARE_VERSION) + "\"}";
+    server.send(200, "text/plain", tString);
+    debugToHTML = " ";
+  });
+
+  server.on("/PWCJSON", []() {
+    String tString;
+    tString = userPWC.returnJSON();
     server.send(200, "text/plain", tString);
     debugToHTML = " ";
   });
