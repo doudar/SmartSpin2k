@@ -31,27 +31,27 @@
               <td>
                 <p class="tooltip">Easy Session Average HR<span class="tooltiptext">Session 1 HR<br><br>Average Heartrate over an easy 1 Hour course.</span></p>
               </td>
-              <td><input type="number" id="session1HR" name="session1HR" value="loading" /></td>
+              <td><input type="number" id="session1HR" name="session1HR" value="0" /></td>
             </tr>
             <tr>
               <td>
                 <p class="tooltip">Easy Session Average Power<span class="tooltiptext">Average Power over an easy 1 hour course in watts.</span></p>
               </td>
-              <td><input type="number" id="session1Pwr" name="session1Pwr" value="loading" />
+              <td><input type="number" id="session1Pwr" name="session1Pwr" value="0" />
               </td>
             </tr>
             <tr>
               <td>
                 <p class="tooltip">Hard Session Average HR<span class="tooltiptext">Average HR over a hard 1 hour course.</span></p>
               </td>
-              <td><input type="number" id="session2HR" name="session2HR" value="loading" />
+              <td><input type="number" id="session2HR" name="session2HR" value="0" />
               </td>
             </tr>
             <tr>
               <td>
                 <p class="tooltip">Hard Session Average Power<span class="tooltiptext">Average Power over a hard 1 hour course in watts.</span></p>
               </td>
-              <td><input type="number" id="session2Pwr" name="session2Pwr" value="loading" />
+              <td><input type="number" id="session2Pwr" name="session2Pwr" value="0" />
               </td>
             </tr>
             
@@ -68,7 +68,7 @@
 
   //Update values on specified interval loading late because this tiny webserver hates frequent requests
   setInterval(function () {
-    if (document.getElementById("session1HR").value == "loading") {
+    if (document.getElementById("session1HR").value == "0") {
       requestConfigValues();
     }
 

@@ -93,6 +93,8 @@ void startHttpServer()
   server.on("/settings.html", handleSpiffsFile);
   server.on("/status.html", handleSpiffsFile);
   server.on("/bluetoothscanner.html", handleSpiffsFile);
+  server.on("/hrtowatts.html", handleSpiffsFile);
+
 
   server.on("/send_settings", []() {
     String tString;
