@@ -95,7 +95,6 @@ void startHttpServer()
   server.on("/bluetoothscanner.html", handleSpiffsFile);
   server.on("/hrtowatts.html", handleSpiffsFile);
 
-
   server.on("/send_settings", []() {
     String tString;
     bool wasBTUpdate = false;
@@ -177,23 +176,25 @@ void startHttpServer()
       {
         userConfig.setConnectedHeartMonitor("any");
       }
-      if (!server.arg("session1HR").isEmpty())
-      {
-        userPWC.session1HR = server.arg("session1HR").toInt();
-      }
-      if (!server.arg("session1Pwr").isEmpty())
-      {
-        userPWC.session1HR = server.arg("session1Pwr").toInt();
-      }
-      if (!server.arg("session2HR").isEmpty())
-      {
-        userPWC.session1HR = server.arg("session2HR").toInt();
-      }
-      if (!server.arg("session2Pwr").isEmpty())
-      {
-        userPWC.session1HR = server.arg("session2Pwr").toInt();
-      }
     }
+
+    if (!server.arg("session1HR").isEmpty()) //Needs checking for unrealistic numbers. 
+    {
+      userPWC.session1HR = server.arg("session1HR").toInt();
+    }
+    if (!server.arg("session1Pwr").isEmpty())
+    {
+      userPWC.session1Pwr = server.arg("session1Pwr").toInt();
+    }
+    if (!server.arg("session2HR").isEmpty())
+    {
+      userPWC.session2HR = server.arg("session2HR").toInt();
+    }
+    if (!server.arg("session2Pwr").isEmpty())
+    {
+      userPWC.session2Pwr = server.arg("session2Pwr").toInt();
+    }
+
     String response = "<!DOCTYPE html><html><body><h2>";
     if (wasBTUpdate) //Special BT update response
     {
@@ -207,6 +208,8 @@ void startHttpServer()
     debugDirector("Config Updated From Web");
     userConfig.saveToSPIFFS();
     userConfig.printFile();
+    userPWC.saveToSPIFFS();
+    userPWC.printFile();
   });
 
   server.on("/BLEServers", []() {
@@ -428,11 +431,6 @@ void handleIndexFile()
   }
 }
 
-void btScannerHTML()
-{
-  spinBLEClient.serverScan(true);
-}
-
 void handleSpiffsFile()
 {
   String filename = server.uri();
@@ -495,6 +493,7 @@ void FirmwareUpdate()
       {
         debugDirector("Saving Config.txt");
         userConfig.saveToSPIFFS();
+        userPWC.saveToSPIFFS();
         debugDirector("Updating Program");
         ret = httpUpdate.update(client, userConfig.getFirmwareUpdateURL() + String(FW_BINFILE));
         switch (ret)
