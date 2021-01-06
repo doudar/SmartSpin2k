@@ -94,7 +94,7 @@
 #define BLE_CLIENT_DELAY 998
 
 //loop speed for the Webserver
-#define WEBSERVER_DELAY 100
+#define WEBSERVER_DELAY 30
 
 //Name of default Power Meter. any connects to anything, none connects to nothing.
 #define CONNECTED_POWER_METER "any"
