@@ -305,7 +305,7 @@ void updateCyclingPowerMesurementChar()
   {
     _BLEClientConnected = true;
     debugDirector("Bluetooth Client Connected!");
-    pServer->updateConnParams(desc->conn_handle, 40, 50, 0, 70);
+    pServer->updateConnParams(desc->conn_handle, 40, 50, 0, 100);
   };
 
   void MyServerCallbacks::onDisconnect(BLEServer *pServer)
