@@ -56,7 +56,7 @@ void calculateInstPwrFromHR();
 
 class MyServerCallbacks : public BLEServerCallbacks
 {
-    void onConnect(BLEServer *);
+    void onConnect(BLEServer *, ble_gap_conn_desc* desc);
     void onDisconnect(BLEServer *);
 };
 

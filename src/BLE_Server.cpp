@@ -148,7 +148,8 @@ void startBLEServer()
   pAdvertising->addServiceUUID(CYCLINGPOWERSERVICE_UUID);
   pAdvertising->addServiceUUID(FITNESSMACHINESERVICE_UUID);
   pAdvertising->addServiceUUID(HEARTSERVICE_UUID);
-
+  pAdvertising->setMaxInterval(250);
+  pAdvertising->setMinInterval(160);
   pAdvertising->setScanResponse(true);
   BLEDevice::startAdvertising();
 
@@ -300,10 +301,11 @@ void updateCyclingPowerMesurementChar()
 
 //Creating Server Connection Callbacks
 
-  void MyServerCallbacks::onConnect(BLEServer *pServer)
+  void MyServerCallbacks::onConnect(BLEServer *pServer, ble_gap_conn_desc* desc)
   {
     _BLEClientConnected = true;
     debugDirector("Bluetooth Client Connected!");
+    pServer->updateConnParams(desc->conn_handle, 40, 50, 0, 70);
   };
 
   void MyServerCallbacks::onDisconnect(BLEServer *pServer)
