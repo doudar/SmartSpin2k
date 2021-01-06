@@ -41,6 +41,7 @@ void startWifi()
   if (String(WiFi.SSID()) != userConfig.getSsid())
   {
     WiFi.mode(WIFI_STA);
+    WiFi.setTxPower(WIFI_POWER_19_5dBm);
     WiFi.begin(userConfig.getSsid(), userConfig.getPassword());
   }
 
@@ -66,7 +67,12 @@ void startWifi()
   // Couldn't connect to existing network, Create SoftAP
   if (WiFi.status() != WL_CONNECTED)
   {
-    WiFi.softAP(userConfig.getDeviceName(), userConfig.getPassword());
+    String t_pass = DEFAULT_PASSWORD; 
+    if(String(userConfig.getSsid()) == DEVICE_NAME) //If default SSID is still in use, let the user select a new password.
+    {                                               //Else Fall Back to the default password (probably "password")
+      String t_pass = String(userConfig.getPassword());
+    }
+    WiFi.softAP(userConfig.getDeviceName(), t_pass.c_str());
     vTaskDelay(50);
     IPAddress myIP = WiFi.softAPIP();
     debugDirector("AP IP address: " + myIP.toString());
@@ -77,6 +83,7 @@ void startWifi()
   MDNS.begin(userConfig.getDeviceName());
   MDNS.addService("http", "tcp", 80);
   debugDirector(String("Open http://") + userConfig.getDeviceName() + ".local/");
+  WiFi.setTxPower(WIFI_POWER_19_5dBm);
 }
 
 WebServer server(80);
