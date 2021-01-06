@@ -9,6 +9,8 @@
 #ifndef BLE_COMMON_H
 #define BLE_COMMON_H
 
+#define CONFIG_SW_COEXIST_ENABLE 1
+
 #include <NimBLEDevice.h>
 #include <Arduino.h>
 
