@@ -5,19 +5,21 @@
 // This work is licensed under the GNU General Public License v2
 // Prototype hardware build from plans in the SmartSpin2k repository are licensed under Cern Open Hardware Licence version 2 Permissive
 
-
 #include "Main.h"
 #include "BLE_Common.h"
 
 #include <ArduinoJson.h>
 #include <NimBLEDevice.h>
 
-TaskHandle_t BLENotifyTask; 
+TaskHandle_t BLENotifyTask;
 
 //BLE Server Settings
 bool _BLEClientConnected = false;
+bool updateConnParametersFlag = false;
+bool GlobalBLEClientConnected = false; //needs to be moved to BLE_Server
 
-bool GlobalBLEClientConnected = false; //needs to be moveed to BLE_Server
+NimBLEServer *pServer = nullptr;
+int bleConnDesc = 1;
 
 BLECharacteristic *heartRateMeasurementCharacteristic;
 BLECharacteristic *cyclingPowerMeasurementCharacteristic;
@@ -62,7 +64,7 @@ void startBLEServer()
 
   //Server Setup
   debugDirector("Starting BLE Server");
-  NimBLEServer *pServer = BLEDevice::createServer();
+  pServer = BLEDevice::createServer();
 
   //HEART RATE MONITOR SERVICE SETUP
   BLEService *pHeartService = pServer->createService(HEARTSERVICE_UUID);
@@ -123,7 +125,7 @@ void startBLEServer()
       NIMBLE_PROPERTY::READ);
 
   pServer->setCallbacks(new MyServerCallbacks());
-  
+
   //Creating Characteristics
   heartRateMeasurementCharacteristic->setValue(heartRateMeasurement, 5);
 
@@ -170,7 +172,7 @@ void BLENotify(void *pvParameters)
 {
   for (;;)
   {
-    if(spinBLEClient.connectedHR && !spinBLEClient.connectedPM && (userConfig.getSimulatedHr()>0))
+    if (spinBLEClient.connectedHR && !spinBLEClient.connectedPM && (userConfig.getSimulatedHr() > 0))
     {
       calculateInstPwrFromHR();
     }
@@ -188,6 +190,13 @@ void BLENotify(void *pvParameters)
       fitnessMachineIndoorBikeData->notify();
       heartRateMeasurementCharacteristic->notify();
       GlobalBLEClientConnected = true;
+      
+      if (updateConnParametersFlag)
+      {
+        vTaskDelay(100/portTICK_PERIOD_MS);
+        pServer->updateConnParams(bleConnDesc, 40, 50, 0, 100);
+        updateConnParametersFlag = false;
+      }
     }
     else
     {
@@ -226,15 +235,15 @@ void computeERG(int currentWatts, int setPoint)
     amountToChangeIncline = amountToChangeIncline / ((currentWatts / 100) + 1);
   }
 
-  if (abs(amountToChangeIncline) > userConfig.getShiftStep()*3)
+  if (abs(amountToChangeIncline) > userConfig.getShiftStep() * 3)
   {
     if (amountToChangeIncline > 0)
     {
-      amountToChangeIncline = userConfig.getShiftStep()*3;
+      amountToChangeIncline = userConfig.getShiftStep() * 3;
     }
     if (amountToChangeIncline < 0)
     {
-      amountToChangeIncline = -(userConfig.getShiftStep()*3);
+      amountToChangeIncline = -(userConfig.getShiftStep() * 3);
     }
   }
 
@@ -258,7 +267,7 @@ void computeCSC() //What was SIG smoking when they came up with the Cycling Spee
     remainder = spinBLEClient.cscLastCrankEvtTime % 256;
     cyclingPowerMeasurement[7] = remainder;
     cyclingPowerMeasurement[8] = quotient;
-  } //^^Using the Old Way of setting Bytes. 
+  } //^^Using the Old Way of setting Bytes.
 }
 
 void updateIndoorBikeDataChar()
@@ -301,91 +310,90 @@ void updateCyclingPowerMesurementChar()
 
 //Creating Server Connection Callbacks
 
-  void MyServerCallbacks::onConnect(BLEServer *pServer, ble_gap_conn_desc* desc)
-  {
-    _BLEClientConnected = true;
-    debugDirector("Bluetooth Client Connected!");
-    pServer->updateConnParams(desc->conn_handle, 40, 50, 0, 100);
-  };
+void MyServerCallbacks::onConnect(BLEServer *pServer, ble_gap_conn_desc *desc)
+{
+  _BLEClientConnected = true;
+  debugDirector("Bluetooth Client Connected! " + String(desc->conn_handle));
+  updateConnParametersFlag = true;
+  bleConnDesc = desc->conn_handle;
+};
 
-  void MyServerCallbacks::onDisconnect(BLEServer *pServer)
-  {
-    _BLEClientConnected = false;
-    debugDirector("Bluetooth Client Disconnected!");
-  }
+void MyServerCallbacks::onDisconnect(BLEServer *pServer)
+{
+  _BLEClientConnected = false;
+  debugDirector("Bluetooth Client Disconnected!");
+}
 
-  void MyCallbacks::onWrite(BLECharacteristic *pCharacteristic)
-  {
-    std::string rxValue = pCharacteristic->getValue();
+void MyCallbacks::onWrite(BLECharacteristic *pCharacteristic)
+{
+  std::string rxValue = pCharacteristic->getValue();
 
-    if (rxValue.length() > 1)
+  if (rxValue.length() > 1)
+  {
+    for (const auto &text : rxValue)
+    { // Range-for!
+      debugDirector(String(text, HEX) + " ", false);
+    }
+    debugDirector("<-- From APP ", false);
+    /* 17 means FTMS Incline Control Mode  (aka SIM mode)*/
+
+    if ((int)rxValue[0] == 17)
     {
-      for (const auto &text : rxValue)
-      { // Range-for!
-        debugDirector(String(text, HEX) + " ", false);
-      }
-      debugDirector("<-- From APP ", false);
-      /* 17 means FTMS Incline Control Mode  (aka SIM mode)*/
+      signed char buf[2];
+      buf[0] = rxValue[3]; // (Least significant byte)
+      buf[1] = rxValue[4]; // (Most significant byte)
 
-      if ((int)rxValue[0] == 17)
+      int port = bytes_to_u16(buf[1], buf[0]);
+      userConfig.setIncline(port);
+      if (userConfig.getERGMode())
       {
-        signed char buf[2];
-        buf[0] = rxValue[3]; // (Least significant byte)
-        buf[1] = rxValue[4]; // (Most significant byte)
-
-        int port = bytes_to_u16(buf[1], buf[0]);
-        userConfig.setIncline(port);
-        if (userConfig.getERGMode())
-        {
-          userConfig.setERGMode(false);
-        }
-        debugDirector(" Target Incline: " + String((userConfig.getIncline() / 100)), false);
+        userConfig.setERGMode(false);
       }
+      debugDirector(" Target Incline: " + String((userConfig.getIncline() / 100)), false);
+    }
+    debugDirector("");
+
+    /* 5 means FTMS Watts Control Mode (aka ERG mode) */
+    if (((int)rxValue[0] == 5) && (spinBLEClient.connectedPM))
+    {
+      int targetWatts = bytes_to_int(rxValue[2], rxValue[1]);
+      if (!userConfig.getERGMode())
+      {
+        userConfig.setERGMode(true);
+      }
+      computeERG(userConfig.getSimulatedWatts(), targetWatts);
+      debugDirector("ERG MODE", false);
+      debugDirector(" Target: " + String(targetWatts), false);
+      debugDirector(" Current: " + String(userConfig.getSimulatedWatts()), false); //not displaying numbers less than 256 correctly but they do get sent to Zwift correctly.
+      debugDirector(" Incline: " + String(userConfig.getIncline() / 100), false);
       debugDirector("");
-
-      /* 5 means FTMS Watts Control Mode (aka ERG mode) */
-      if (((int)rxValue[0] == 5) && (spinBLEClient.connectedPM))
-      {
-        int targetWatts = bytes_to_int(rxValue[2], rxValue[1]);
-        if (!userConfig.getERGMode())
-        {
-          userConfig.setERGMode(true);
-        }
-        computeERG(userConfig.getSimulatedWatts(), targetWatts);
-        debugDirector("ERG MODE", false);
-        debugDirector(" Target: " + String(targetWatts), false);
-        debugDirector(" Current: " + String(userConfig.getSimulatedWatts()), false); //not displaying numbers less than 256 correctly but they do get sent to Zwift correctly.
-        debugDirector(" Incline: " + String(userConfig.getIncline() / 100), false);
-        debugDirector("");
-      }
     }
   }
+}
 
-  void calculateInstPwrFromHR()
+void calculateInstPwrFromHR()
+{
+
+  //userConfig.setSimulatedWatts((s1Pwr*s2HR)-(s2Pwr*S1HR))/(S2HR-s1HR)+(userConfig.getSimulatedHr(*((s1Pwr-s2Pwr)/(s1HR-s2HR)));
+  int avgP = ((userPWC.session1Pwr * userPWC.session2HR) - (userPWC.session2Pwr * userPWC.session1HR)) / (userPWC.session2HR - userPWC.session1HR) + (userConfig.getSimulatedHr() * ((userPWC.session1Pwr - userPWC.session2Pwr) / (userPWC.session1HR - userPWC.session2HR)));
+
+  if (avgP < 50)
   {
-
-    //userConfig.setSimulatedWatts((s1Pwr*s2HR)-(s2Pwr*S1HR))/(S2HR-s1HR)+(userConfig.getSimulatedHr(*((s1Pwr-s2Pwr)/(s1HR-s2HR)));
- int avgP = ((userPWC.session1Pwr*userPWC.session2HR)-(userPWC.session2Pwr*userPWC.session1HR))/(userPWC.session2HR-userPWC.session1HR)+(userConfig.getSimulatedHr()*((userPWC.session1Pwr-userPWC.session2Pwr)/(userPWC.session1HR-userPWC.session2HR)));
-
-if (avgP < 50)
-{
-  avgP = 50;
-}
-
-if (userConfig.getSimulatedHr()<90)
-{
-  //magic math here for inst power
-}
-
-if (userConfig.getSimulatedHr()>170)
-{
-  //magic math here for inst power
-}
-  
-
-    userConfig.setSimulatedWatts(avgP);
-    userConfig.setSimulatedCad(90);
-
-    debugDirector("Power From HR: " + String(avgP));
-
+    avgP = 50;
   }
+
+  if (userConfig.getSimulatedHr() < 90)
+  {
+    //magic math here for inst power
+  }
+
+  if (userConfig.getSimulatedHr() > 170)
+  {
+    //magic math here for inst power
+  }
+
+  userConfig.setSimulatedWatts(avgP);
+  userConfig.setSimulatedCad(90);
+
+  debugDirector("Power From HR: " + String(avgP));
+}
