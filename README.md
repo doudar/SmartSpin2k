@@ -1,5 +1,5 @@
 [![Watch the video](Pictures/youtube.png)](https://youtu.be/cPiIlZ2P5Ac)
-
+Http://GitHub.com/doudar/SmartSpin2K
 # SmartSpin2K
 
 Hardware (3d Printed) and Software Project that uses an ESP32 and stepper motor to control spin bikes that have a resistance knob. 
