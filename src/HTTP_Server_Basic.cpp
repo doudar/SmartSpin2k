@@ -9,6 +9,7 @@
 #include "Version_Converter.h"
 #include "Builtin_Pages.h"
 #include "HTTP_Server_Basic.h"
+#include "cert.h"
 #include <WebServer.h>
 #include <HTTPClient.h>
 #include <HTTPUpdate.h>
@@ -457,6 +458,8 @@ void handleSpiffsFile()
   }
 }
 
+//github fingerprint 70:94:DE:DD:E6:C4:69:48:3A:92:70:A1:48:56:78:2D:18:64:E0:B7
+
 void FirmwareUpdate()
 {
   debugDirector("Checking for newer firmware:");
@@ -492,6 +495,7 @@ void FirmwareUpdate()
       debugDirector("New firmware detected!");
       debugDirector("Upgrading from " + String(FIRMWARE_VERSION) + " to " + payload);
       WiFiClientSecure client;
+      client.setCACert(rootCACertificate);
       httpUpdate.setLedPin(LED_BUILTIN, LOW);
       debugDirector("Updating FileSystem");
       t_httpUpdate_return ret = httpUpdate.updateSpiffs(client, userConfig.getFirmwareUpdateURL() + String(FW_SPIFFSFILE));
