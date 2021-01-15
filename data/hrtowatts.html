@@ -22,44 +22,54 @@
     <h1><strong>Physical Working Capacity</strong></h1>
     <h2>
       <p>For the most accurate power estimation when not using a power meter, please submit the following information.
-          <br>Note: You can get estimated watts from any outdoor ride recorded in Strava with heart rate information. 
+        <br>Note: You can get estimated watts from any outdoor ride recorded in Strava with heart rate information.
       </p>
       <form action="/send_settings">
         <table class="center" height="182" cellspacing="1">
           <tbody>
             <tr>
               <td>
-                <p class="tooltip">Easy Session Average HR<span class="tooltiptext">Session 1 HR<br><br>Average Heartrate over an easy 1 Hour course.</span></p>
+                <p class="tooltip">Easy Session Average HR<span class="tooltiptext">Session 1 HR<br><br>Average
+                    Heartrate over an easy 1 Hour course.</span></p>
               </td>
               <td><input type="number" id="session1HR" name="session1HR" value="0" /></td>
             </tr>
             <tr>
               <td>
-                <p class="tooltip">Easy Session Average Power<span class="tooltiptext">Average Power over an easy 1 hour course in watts.</span></p>
+                <p class="tooltip">Easy Session Average Power<span class="tooltiptext">Average Power over an easy 1 hour
+                    course in watts.</span></p>
               </td>
               <td><input type="number" id="session1Pwr" name="session1Pwr" value="0" />
               </td>
             </tr>
             <tr>
               <td>
-                <p class="tooltip">Hard Session Average HR<span class="tooltiptext">Average HR over a hard 1 hour course.</span></p>
+                <p class="tooltip">Hard Session Average HR<span class="tooltiptext">Average HR over a hard 1 hour
+                    course.</span></p>
               </td>
               <td><input type="number" id="session2HR" name="session2HR" value="0" />
               </td>
-            </tr>
             <tr>
               <td>
-                <p class="tooltip">Hard Session Average Power<span class="tooltiptext">Average Power over a hard 1 hour course in watts.</span></p>
+                <p class="tooltip">Hard Session Average Power<span class="tooltiptext">Average Power over a hard 1 hour
+                    course in watts.</span></p>
               </td>
               <td><input type="number" id="session2Pwr" name="session2Pwr" value="0" />
               </td>
             </tr>
-            
+            <tr>
+              <td>
+                <p class="tooltip">HR->PWR<span class="tooltiptext">Automatically calculate watts using
+                    heartrate when powermeter not connected</span></p>
+              </td>
+              <td><label class="switch"><input type="checkbox" name="stealthchop" id="stealthchop"><span
+                    class="slider"></span></label>
+              </td>
             </tr>
-      </tbody>
-      </table><br>
-      <input type="submit" value="Submit" />
-    </form>
+          </tbody>
+        </table><br>
+        <input type="submit" value="Submit" />
+      </form>
     </h2>
 </body>
 
@@ -83,6 +93,7 @@
         document.getElementById("session1Pwr").value = obj.session1Pwr;
         document.getElementById("session2HR").value = obj.session2HR;
         document.getElementById("session2Pwr").value = obj.session2Pwr;
+        document.getElementById("hr2Pwr").checked = obj.hr2Pwr;
         setTimeout(function () { document.getElementById("loadingWatermark").remove(); }, 1000);
       }
     };

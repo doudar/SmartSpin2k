@@ -202,6 +202,10 @@ void startHttpServer()
     {
       userPWC.session2Pwr = server.arg("session2Pwr").toInt();
     }
+    if (!server.arg("hr2Pwr").isEmpty())
+    {
+      userPWC.hr2Pwr = server.arg("hr2Pwr");
+    }
 
     String response = "<!DOCTYPE html><html><body><h2>";
     if (wasBTUpdate) //Special BT update response
