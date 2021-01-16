@@ -16,7 +16,7 @@ void userParameters::setDefaults() //Move these to set the values as #define in 
 {
   firmwareUpdateURL     = FW_UPDATEURL;
   incline               = 0.0;
-  simulatedWatts        = 100;
+  simulatedWatts        = 40;
   simulatedHr           = 60;
   simulatedCad          = 90;
   deviceName            = DEVICE_NAME;
