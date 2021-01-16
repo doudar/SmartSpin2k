@@ -16,7 +16,7 @@ void userParameters::setDefaults() //Move these to set the values as #define in 
 {
   firmwareUpdateURL     = FW_UPDATEURL;
   incline               = 0.0;
-  simulatedWatts        = 100;
+  simulatedWatts        = 30;
   simulatedHr           = 60;
   simulatedCad          = 90;
   deviceName            = DEVICE_NAME;
@@ -241,6 +241,7 @@ session1HR    = 129; //examples from https://www.cyclinganalytics.com/
 session1Pwr   = 100;
 session2HR    = 154; 
 session2Pwr   = 150;
+hr2Pwr        = true;
 }
 
 //-- return all config as one a single JSON string
@@ -253,6 +254,7 @@ String physicalWorkingCapacity::returnJSON()
   doc["session1Pwr"]  = session1Pwr;
   doc["session2HR"]   = session2HR;
   doc["session2Pwr"]  = session2Pwr;
+  doc["hr2Pwr"]       = hr2Pwr;
 
   String output;
   serializeJson(doc, output);
@@ -280,6 +282,8 @@ void physicalWorkingCapacity::saveToSPIFFS()
   doc["session1Pwr"]  = session1Pwr;
   doc["session2HR"]   = session2HR;
   doc["session2Pwr"]  = session2Pwr;
+  doc["hr2Pwr"]       = hr2Pwr;
+
 
   // Serialize JSON to file
   if (serializeJson(doc, file) == 0)
@@ -321,6 +325,7 @@ void physicalWorkingCapacity::loadFromSPIFFS()
   session1Pwr = doc["session1Pwr"];
   session2HR  = doc["session2HR"];
   session2Pwr = doc["session2Pwr"];
+  hr2Pwr      = doc["hr2Pwr"];
 
   debugDirector("Config File Loaded: " + String(userPWCFILENAME));
   file.close();

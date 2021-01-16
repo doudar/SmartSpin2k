@@ -172,7 +172,7 @@ void BLENotify(void *pvParameters)
 {
   for (;;)
   {
-    if (spinBLEClient.connectedHR && !spinBLEClient.connectedPM && (userConfig.getSimulatedHr() > 0))
+    if (spinBLEClient.connectedHR && !spinBLEClient.connectedPM && (userConfig.getSimulatedHr() > 0) && userPWC.hr2Pwr)
     {
       calculateInstPwrFromHR();
     }
