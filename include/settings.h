@@ -110,4 +110,6 @@
 
 #define WIFI_CONNECT_TIMEOUT 10
 
+#define USERCONFIG_JSON_SIZE 768
+
 #endif

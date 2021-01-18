@@ -51,7 +51,7 @@ void startWifi()
     vTaskDelay(1000 / portTICK_RATE_MS);
     debugDirector(".", false);
     i++;
-    if (i > WIFI_CONNECT_TIMEOUT)
+    if (i > WIFI_CONNECT_TIMEOUT || (String(userConfig.getSsid()) == DEVICE_NAME))
     {
       i = 0;
       debugDirector("Couldn't Connect. Switching to AP mode");

@@ -42,7 +42,7 @@ String userParameters::returnJSON()
   // Allocate a temporary JsonDocument
   // Don't forget to change the capacity to match your requirements.
   // Use arduinojson.org/assistant to compute the capacity.
-  StaticJsonDocument<700> doc;
+  StaticJsonDocument<USERCONFIG_JSON_SIZE> doc;
   // Set the values in the document
 
   doc["firmwareUpdateURL"]      = firmwareUpdateURL;
@@ -87,7 +87,7 @@ void userParameters::saveToSPIFFS()
   // Allocate a temporary JsonDocument
   // Don't forget to change the capacity to match your requirements.
   // Use arduinojson.org/assistant to compute the capacity.
-  StaticJsonDocument<700> doc;
+  StaticJsonDocument<USERCONFIG_JSON_SIZE> doc;
 
   // Set the values in the document
 
@@ -137,7 +137,7 @@ void userParameters::loadFromSPIFFS()
   // Allocate a temporary JsonDocument
   // Don't forget to change the capacity to match your requirements.
   // Use arduinojson.org/v6/assistant to compute the capacity.
-  StaticJsonDocument<700> doc;
+  StaticJsonDocument<USERCONFIG_JSON_SIZE> doc;
 
   // Deserialize the JSON document
   DeserializationError error = deserializeJson(doc, file);
