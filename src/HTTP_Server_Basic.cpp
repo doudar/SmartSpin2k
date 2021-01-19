@@ -82,7 +82,7 @@ void startWifi()
     dnsServer.start(DNS_PORT, "*", myIP);
   }
   MDNS.begin(userConfig.getDeviceName());
-  MDNS.addService("http", "tcp", 80);
+  MDNS.addService("http", "_tcp", 80);
   debugDirector(String("Open http://") + userConfig.getDeviceName() + ".local/");
   WiFi.setTxPower(WIFI_POWER_19_5dBm);
 }
