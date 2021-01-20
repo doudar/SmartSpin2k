@@ -447,8 +447,8 @@ void SpinBLEClient::serverScan(bool connectRequest)
     // scan to run for 5 seconds.
     BLEScan *pBLEScan = BLEDevice::getScan();
     pBLEScan->setAdvertisedDeviceCallbacks(new MyAdvertisedDeviceCallback());
-    //pBLEScan->setInterval(160);
-    //pBLEScan->setWindow(449);
+    pBLEScan->setInterval(550);
+    pBLEScan->setWindow(500);
     pBLEScan->setActiveScan(true);
     BLEScanResults foundDevices = pBLEScan->start(10, false);
 
