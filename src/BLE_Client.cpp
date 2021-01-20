@@ -455,7 +455,7 @@ void SpinBLEClient::serverScan(bool connectRequest)
     // Load the scan into a Json String
     int count = foundDevices.getCount();
 
-    StaticJsonDocument<500> devices;
+    StaticJsonDocument<1000> devices;
 
     String device = "";
 

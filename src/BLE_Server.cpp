@@ -176,6 +176,15 @@ void BLENotify(void *pvParameters)
     {
       calculateInstPwrFromHR();
     }
+    if (!spinBLEClient.connectedPM && !userPWC.hr2Pwr)
+    {
+      userConfig.setSimulatedCad(0);
+      userConfig.setSimulatedWatts(0);
+    }
+    if (!spinBLEClient.connectedHR)
+    {
+      userConfig.setSimulatedHr(0);
+    }
 
     if (_BLEClientConnected)
     {
