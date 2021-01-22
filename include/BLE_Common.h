@@ -91,11 +91,12 @@ class SpinBLEClient{
     BLEAdvertisedDevice     *myHeartMonitor         = nullptr;
 
     void start();
-    void serverScan(bool connectRequest);
+    void serverScan(bool connectRequest);   
     bool connectToServer();
+    void scanProcess();
 
 private:
-   
+    
     class MyAdvertisedDeviceCallback : public NimBLEAdvertisedDeviceCallbacks
     {
        public:

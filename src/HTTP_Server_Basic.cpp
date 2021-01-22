@@ -184,6 +184,14 @@ void startHttpServer()
       {
         userConfig.setConnectedHeartMonitor("any");
       }
+      if (!server.arg("doublePower").isEmpty())
+      {
+        userConfig.setDoublePower(true);
+      }
+      else
+      {
+        userConfig.setDoublePower(false);
+      }
     }
 
     if (!server.arg("session1HR").isEmpty()) //Needs checking for unrealistic numbers. 
@@ -214,6 +222,7 @@ void startHttpServer()
   
 
     String response = "<!DOCTYPE html><html><body><h2>";
+
     if (wasBTUpdate) //Special BT update response
     {
       response += "Selections Saved!</h2></body><script> setTimeout(\"location.href = 'http://" + String(userConfig.getDeviceName()) + ".local/bluetoothscanner.html';\",1000);</script></html>";
@@ -231,29 +240,11 @@ void startHttpServer()
     userPWC.printFile();
   });
 
-  server.on("/BLEServers", []() {
-    debugDirector("Sending BLE device list to HTTP Client");
-    String tString = "";
-    const char *bracket = "{";
-    if (!(String(userConfig.getFoundDevices()).startsWith(bracket)))
-    {
-      tString += "{";
-    }
-    else
-    {
-      tString += String(userConfig.getFoundDevices());
-      tString.remove(tString.length() - 1, 1);
-      tString += ",";
-    }
-
-    tString += String("\"connectedHeartMonitor\":\"") + userConfig.getconnectedHeartMonitor() + "\",\"connectedPowerMeter\":\"" + userConfig.getconnectedPowerMeter() + "\"}";
-    server.send(200, "text/plain", tString);
-  });
-
   server.on("/BLEScan", []() {
-    debugDirector("Scanning for BLE Devices");
-    String response = "<!DOCTYPE html><html><body>Scanning for BLE Devices. Please wait 5 seconds.</body><script> setTimeout(\"location.href = 'http://" + String(userConfig.getDeviceName()) + ".local/bluetoothscanner.html';\",5000);</script></html>";
+    debugDirector("Scanning from web request");
+    String response = "<!DOCTYPE html><html><body>Scanning for BLE Devices. Please wait 10 seconds.</body><script> setTimeout(\"location.href = 'http://" + String(userConfig.getDeviceName()) + ".local/bluetoothscanner.html';\",10000);</script></html>";
     spinBLEClient.serverScan(true);
+    //spinBLEClient.serverScan(true);
     server.send(200, "text/html", response);
   });
 
@@ -302,13 +293,13 @@ void startHttpServer()
     String value = server.arg("value");
     if (value == "enable")
     {
-      userConfig.setSimulatePower(true);
+      userConfig.setDoublePower(true);
       server.send(200, "text/plain", "OK");
       debugDirector("Watt Simulator turned on");
     }
     else if (value == "disable")
     {
-      userConfig.setSimulatePower(false);
+      userConfig.setDoublePower(false);
       server.send(200, "text/plain", "OK");
       debugDirector("Watt Simulator turned off");
     }
