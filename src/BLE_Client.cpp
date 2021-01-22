@@ -472,7 +472,7 @@ void SpinBLEClient::scanProcess()
     pBLEScan->setInterval(550);
     pBLEScan->setWindow(500);
     pBLEScan->setActiveScan(true);
-    BLEScanResults foundDevices = pBLEScan->start(10, false);
+    BLEScanResults foundDevices = pBLEScan->start(10, true);
 
     // Load the scan into a Json String
     int count = foundDevices.getCount();
@@ -500,6 +500,7 @@ void SpinBLEClient::scanProcess()
             }
         }
     }
+
     String output;
     serializeJson(devices, output);
     debugDirector("Bluetooth Client Found Devices: " + output);

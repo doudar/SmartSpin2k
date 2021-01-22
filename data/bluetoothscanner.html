@@ -1,68 +1,77 @@
 <!DOCTYPE html>
 <html>
+
 <head>
     <style type="text/css">
         html {
-          background-color: #03245c;
-        } 
-            </style>
+            background-color: #03245c;
+        }
+    </style>
     <title>SmartSpin2K Bluetooth Scanner</title>
     <meta name="viewport" content="width=device-width, initial-scale=1">
 
 </head>
+
 <body>
-    <fieldset><legend><a href="http://github.com/doudar/SmartSpin2k">http://github.com/doudar/SmartSpin2k</a></legend>
+    <fieldset>
+        <legend><a href="http://github.com/doudar/SmartSpin2k">http://github.com/doudar/SmartSpin2k</a></legend>
         <p style="text-align: left;"><strong><a href="index.html">Main Index</a></strong></p>
-        <h1><div class="watermark" name = "loadingWatermark" id="loadingWatermark">Loading</div></h1>
-    <h1><strong>Select Bluetooth Devices</strong></h1>
-    <form action="/send_settings">
-        <h2>
-        <table>
-            <tbody>
-                <tr style="height: 20px;">
-                    <td style="width: 14%; height: 20px;">
-                        <p><label for="connectedPM">Power Meter:</label></p>
-                    </td>
-                    <td style="width: 14%; height: 20px;"><label id="connectedPowerMeter">loading</label></td>
-                </tr>
-                <tr style="height: 20px;">
-                    <td style="width: 14%; height: 20px;">
-                        <p><label for="connectedHM">Heart Monitor:</label></p>
-                    </td>
-                    <td style="width: 14%; height: 20px;"><label id="connectedHeartMonitor">loading</label></td>
-                </tr>
-                <tr style="height: 20px;">
-                    <td style="width: 14%; height: 20px;">
-                        <p><label for="BluetoothPMDevices">Select New Power Meter:</label></p>
-                    </td>
-                    <td style="width: 14%; height: 20px;"><select id="blePMDropdown" name="blePMDropdown"
-                            value="loading"></td>
-                </tr>
-                <tr style="height: 20px;">
-                    <td style="width: 14%; height: 20px;">
-                        <p><label for="BluetoothHRDevices">Select New Heart Monitor:</label></p>
-                    </td>
-                    <td style="width: 14%; height: 20px;"><select id="bleHRDropdown" name="bleHRDropdown"
-                            value="loading"></td>
-                </tr>
-                <tr>
-                    <td>
-                      <p class="tooltip">Double Powermeter Output<span class="tooltiptext">Double Power Output For Certain Pedals</span></p>
-                    </td>
-                    <td>
-                    <label class="switch"><input type="checkbox" name = "doublePower" id="doublePower"><span class="slider"></span></label>
-                    </td>
-                  </tr>
-            </tbody>
-        </table>
-        <input type="submit" value="Save dropdowns for next reboot" />
-    </form>
-    <p><br></p>
-    <form action="/BLEScan">
-        <input type="submit" value="Scan/Reconnect Devices">
-        <label style="font-size: .75rem; font-style: italic; font-weight: lighter; line-height: .5em;"><br> Hint: you can hold both shifters for 3 seconds <br> to scan/reconnect at anytime without using this page.</label>
-    </form>
-    </h2>
+        <h1>
+            <div class="watermark" name="loadingWatermark" id="loadingWatermark">Loading</div>
+        </h1>
+        <h1><strong>Select Bluetooth Devices</strong></h1>
+        <form action="/send_settings">
+            <h2>
+                <table>
+                    <tbody>
+                        <tr style="height: 20px;">
+                            <td style="width: 14%; height: 20px;">
+                                <p><label for="connectedPM">Power Meter:</label></p>
+                            </td>
+                            <td style="width: 14%; height: 20px;"><label id="connectedPowerMeter">loading</label></td>
+                        </tr>
+                        <tr style="height: 20px;">
+                            <td style="width: 14%; height: 20px;">
+                                <p><label for="connectedHM">Heart Monitor:</label></p>
+                            </td>
+                            <td style="width: 14%; height: 20px;"><label id="connectedHeartMonitor">loading</label></td>
+                        </tr>
+                        <tr style="height: 20px;">
+                            <td style="width: 14%; height: 20px;">
+                                <p><label for="BluetoothPMDevices">Select New Power Meter:</label></p>
+                            </td>
+                            <td style="width: 14%; height: 20px;"><select id="blePMDropdown" name="blePMDropdown"
+                                    value="loading"></td>
+                        </tr>
+                        <tr style="height: 20px;">
+                            <td style="width: 14%; height: 20px;">
+                                <p><label for="BluetoothHRDevices">Select New Heart Monitor:</label></p>
+                            </td>
+                            <td style="width: 14%; height: 20px;"><select id="bleHRDropdown" name="bleHRDropdown"
+                                    value="loading"></td>
+                        </tr>
+                        <tr>
+                            <td>
+                                <p class="tooltip">Double Powermeter Output<span class="tooltiptext">Double Power Output
+                                        For Certain Pedals</span></p>
+                            </td>
+                            <td>
+                                <label class="switch"><input type="checkbox" name="doublePower" id="doublePower"><span
+                                        class="slider"></span></label>
+                            </td>
+                        </tr>
+                    </tbody>
+                </table>
+                <input type="submit" value="Save dropdowns for next reboot" />
+        </form>
+        <p><br></p>
+        <form action="/BLEScan">
+            <input type="submit" value="Scan/Reconnect Devices">
+            <label style="font-size: .75rem; font-style: italic; font-weight: lighter; line-height: .5em;"><br> Hint:
+                you can hold both shifters for 3 seconds <br> to scan/reconnect at anytime without using this
+                page.</label>
+        </form>
+        </h2>
 </body>
 
 <script>
@@ -102,19 +111,25 @@
                         PMDropdown.add(optionPM);
                     }
                 }
-                var t_obj = JSON.parse(data.foundDevices)
-                for (var key in t_obj) {
-                    if (t_obj[key].UUID == '0x1818') {
-                        optionPM = document.createElement('option');
-                        if (t_obj[key].name) {
-                            optionPM.text = t_obj[key].name;
+                try {
+                    var t_obj = JSON.parse(data.foundDevices)
+                    {
+                        for (var key in t_obj) {
+                            if (t_obj[key].UUID == '0x1818') {
+                                optionPM = document.createElement('option');
+                                if (t_obj[key].name) {
+                                    optionPM.text = t_obj[key].name;
+                                }
+                                else {
+                                    optionPM.text = t_obj[key].address;
+                                }
+                                PMDropdown.add(optionPM);
+                            }
                         }
-                        else {
-                            optionPM.text = t_obj[key].address;
-                        }
-                        PMDropdown.add(optionPM);
                     }
                 }
+                catch (e) { }
+
                 optionPM = document.createElement('option');
                 optionPM.text = 'none';
                 PMDropdown.add(optionPM);
@@ -134,6 +149,7 @@
                         HRDropdown.add(optionHR);
                     }
                 }
+
                 for (var key in t_obj) {
                     if (t_obj[key].UUID == '0x180d') {
                         optionPM = document.createElement('option');
