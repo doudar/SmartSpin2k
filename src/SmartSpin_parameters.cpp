@@ -24,7 +24,7 @@ void userParameters::setDefaults() //Move these to set the values as #define in 
   stepperPower          = STEPPER_POWER;
   stealthchop           = STEALTHCHOP;
   inclineMultiplier     = 2.0;
-  simulatePower         = false;
+  doublePower           = false;
   simulateHr            = true;
   ERGMode               = false;
   autoUpdate            = AUTO_FIRMWARE_UPDATE;
@@ -55,7 +55,7 @@ String userParameters::returnJSON()
   doc["stepperPower"]           = stepperPower;
   doc["stealthchop"]            = stealthchop;
   doc["inclineMultiplier"]      = inclineMultiplier;
-  doc["simulatePower"]          = simulatePower;
+  doc["doublePower"]            = doublePower;
   doc["simulateHr"]             = simulateHr;
   doc["ERGMode"]                = ERGMode;
   doc["autoUpdate"]             = autoUpdate;
@@ -101,7 +101,7 @@ void userParameters::saveToSPIFFS()
   doc["stepperPower"]           = stepperPower;
   doc["stealthchop"]            = stealthchop;
   doc["inclineMultiplier"]      = inclineMultiplier;
-  doc["simulatePower"]          = simulatePower;
+  doc["doublePower"]            = doublePower;
   doc["simulateHr"]             = simulateHr;
   doc["ERGMode"]                = ERGMode;
   doc["autoUpdate"]             = autoUpdate;
@@ -159,7 +159,7 @@ void userParameters::loadFromSPIFFS()
   setStepperPower         (doc["stepperPower"]);
   setStealthChop          (doc["stealthchop"]);
   setInclineMultiplier    (doc["inclineMultiplier"]);
-  setSimulatePower        (doc["simulatePower"]);
+  setDoublePower          (doc["doublePower"]);
   setSimulateHr           (doc["simulateHr"]);
   setERGMode              (doc["ERGMode"]);
   setAutoUpdate           (doc["autoUpdate"]);

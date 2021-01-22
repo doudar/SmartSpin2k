@@ -22,7 +22,7 @@ class userParameters
     int     stepperPower;
     bool    stealthchop;             
     float   inclineMultiplier;              
-    bool    simulatePower;  //didn't really have a good purpose before, going to be used for HR2VP like calculation              
+    bool    doublePower;  //didn't really have a good purpose before, going to be used for HR2VP like calculation            
     bool    simulateHr;                     
     bool    ERGMode;                      
     bool    autoUpdate;                 
@@ -43,7 +43,7 @@ class userParameters
     int         getStepperPower()            {return stepperPower;}
     bool        getStealthchop()             {return stealthchop;}
     float       getInclineMultiplier()       {return inclineMultiplier;}
-    bool        getSimulatePower()           {return simulatePower;}
+    bool        getDoublePower()             {return doublePower;}
     bool        getSimulateHr()              {return simulateHr;}
     bool        getERGMode()                 {return ERGMode;}
     bool        getautoUpdate()              {return autoUpdate;}
@@ -64,7 +64,7 @@ class userParameters
     void    setStepperPower(int sp)             {stepperPower = sp;}
     void    setStealthChop(bool sc)             {stealthchop = sc;}
     void    setInclineMultiplier(float im)      {inclineMultiplier = im;}
-    void    setSimulatePower(bool sp)           {simulatePower = sp;}
+    void    setDoublePower(bool sp)             {doublePower = sp;}
     void    setSimulateHr(bool shr)             {simulateHr = shr;}
     void    setERGMode(bool erg)                {ERGMode = erg;}
     void    setAutoUpdate(bool atupd)           {autoUpdate = atupd;}
