@@ -162,7 +162,7 @@ static void notifyCallback(
             debugDirector("Disconnecting secondary PM");
             intentionalDisconnect = true;
             pBLERemoteCharacteristic->getRemoteService()->getClient()->disconnect();
-            NimBLEDevice::deleteClient(pBLERemoteCharacteristic->getRemoteService()->getClient()); //this was an old client, disconnect it.
+            //NimBLEDevice::deleteClient(pBLERemoteCharacteristic->getRemoteService()->getClient()); //this was an old client, disconnect it.
         }
     }
 }
@@ -272,6 +272,7 @@ bool SpinBLEClient::connectToServer()
                     connectedPM = true;
                     doConnectPM = false;
                     reconnectTries = MAX_RECONNECT_TRIES;
+                    lastConnectedPMID = pClient->getConnId();
                 }
 
                 if (pRemoteService->getUUID() == HEARTSERVICE_UUID)

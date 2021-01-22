@@ -242,7 +242,7 @@ void startHttpServer()
 
   server.on("/BLEScan", []() {
     debugDirector("Scanning from web request");
-    String response = "<!DOCTYPE html><html><body>Scanning for BLE Devices. Please wait 10 seconds.</body><script> setTimeout(\"location.href = 'http://" + String(userConfig.getDeviceName()) + ".local/bluetoothscanner.html';\",10000);</script></html>";
+    String response = "<!DOCTYPE html><html><body>Scanning for BLE Devices. Please wait 15 seconds.</body><script> setTimeout(\"location.href = 'http://" + String(userConfig.getDeviceName()) + ".local/bluetoothscanner.html';\",15000);</script></html>";
     spinBLEClient.serverScan(true);
     //spinBLEClient.serverScan(true);
     server.send(200, "text/html", response);
