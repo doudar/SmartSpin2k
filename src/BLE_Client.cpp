@@ -472,7 +472,7 @@ void SpinBLEClient::scanProcess()
     pBLEScan->setInterval(550);
     pBLEScan->setWindow(500);
     pBLEScan->setActiveScan(true);
-    BLEScanResults foundDevices = pBLEScan->start(10, true);
+    BLEScanResults foundDevices = pBLEScan->start(10, false);
 
     // Load the scan into a Json String
     int count = foundDevices.getCount();
