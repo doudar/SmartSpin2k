@@ -69,7 +69,8 @@ static void notifyCallback(
     size_t length,
     bool isNotify)
 {
-
+    if(pBLERemoteCharacteristic->getRemoteService()->getClient()->getConnId() == spinBLEClient.lastConnectedPMID) //disregarding other pm's that may still be connected
+    {
     for (int i = 0; i < length; i++)
     {
         debugDirector(String(pData[i], HEX) + " ", false);
@@ -149,6 +150,12 @@ static void notifyCallback(
 
         //Watts are so much easier......
         userConfig.setSimulatedWatts(bytes_to_u16(pData[3], pData[2]));
+    }
+    }
+    else
+    {
+        debugDirector("Disconnecting secondary PM");
+        NimBLEDevice::deleteClient(pBLERemoteCharacteristic->getRemoteService()->getClient()); //this was an old client, disconnect it. 
     }
 }
 
@@ -347,6 +354,7 @@ bool SpinBLEClient::connectToServer()
             connectedPM = true;
             doConnectPM = false;
             debugDirector("Sucessful PM");
+            lastConnectedPMID = pClient->getConnId();
         }
 
         if (pRemoteService->getUUID() == HEARTSERVICE_UUID)

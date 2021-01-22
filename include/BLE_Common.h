@@ -84,6 +84,7 @@ class SpinBLEClient{
     int noReadingIn             = 0;
     int cscCumulativeCrankRev   = 0;
     int cscLastCrankEvtTime     = 0;
+    int lastConnectedPMID       = 0;
 
     BLERemoteCharacteristic *pRemoteCharacteristic  = nullptr;
     BLEAdvertisedDevice     *myPowerMeter           = nullptr;
