@@ -20,7 +20,7 @@ There are a multitude of configuration options availiable via a web interface on
 
 ### Recomended Hardware:
 
-You'll need the quantity listed below of each item excep the driver board. An optional PCB is in the hardware library which makes the wiring much simpler! 
+You'll need the quantity listed below of each item except the driver board. An optional PCB is in the hardware library which makes the wiring much simpler! 
 
 |qty   |         Part             |              Link                      |
 |:-----:|--------------------------|---------------------------------------:|
