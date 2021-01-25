@@ -20,7 +20,7 @@ There are a multitude of configuration options availiable via a web interface on
 
 ### Recomended Hardware:
 
-You'll need the quantity listed below of each item excep the driver board. An optional PCB is in the hardware library which makes the wiring much simpler! 
+You'll need the quantity listed below of each item except the driver board. An optional PCB is in the hardware library which makes the wiring much simpler! 
 
 |qty   |         Part             |              Link                      |
 |:-----:|--------------------------|---------------------------------------:|
@@ -50,10 +50,19 @@ If you're adventerious and handy you can probably take a look at my pictures bel
 
 In short, the process is:
 
+### If you aren't a software developer:
+1. Download https://github.com/doudar/SmartSpin2k/releases/download/0.1.1.11/firmware.bin
+2. Download the esphome flash tool https://github.com/esphome/esphome-flasher/releases/tag/v1.3.0
+3. Plug in your ESP32, open the esphome flash tool and flash the firmware.bin.
+4. Connect to the new wireless network SmartSpin2K (password is password) and enter your home network information, then the ESP32 will finish the installation automatically. 
+
+### If you are a developer: 
 1. Install Microsoft Visual Code. https://code.visualstudio.com/
 2. Install PlatformIO into Visual Code. https://platformio.org/platformio-ide
 3. Open this project in PlatformIO.  
 4. Compile the project and upload to an ESP32
+
+### Continue from either method above:
 5. Print all the hardware. You'll need 1 Bottom Case, 1 Knob Cup, Both Spur Gears, 1 Stepper Crossbar, 1 Top Cover and a knob insert that fits your spin bike. PETG works well for printing all hardware.
 6. If you're using the same switches for the shifters, you can optionally print the provided files. Previously I was using tape as a protective enclosure and it worked fine (if ugly).
 7. Wire all of the connections outside the case. Use push on connectors if possible. 
@@ -66,6 +75,8 @@ In short, the process is:
 14. Put the cover on. 
 15. Connect to the SmartSpin2k Wifi network for initial configuration. Default password is "password". If connecting via mobile, the configuration page should automatically pop up. 
 16. Once configured on your local network, you can easily find the Smartspin2k by going to http://SmartSpin2K.local/
+
+For some additional help, there are assembly pictures here that will be going into an instructable. https://github.com/doudar/SmartSpin2k/tree/master/Pictures/Assembly
 
 ummm that was easy...right? :)
 
