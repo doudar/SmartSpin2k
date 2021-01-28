@@ -27,19 +27,19 @@ BLECharacteristic *fitnessMachineFeature;
 BLECharacteristic *fitnessMachineIndoorBikeData;
 
 /********************************Bit field Flag Example***********************************/
-// 0000000000001 - 1   - 0x001 - Pedal Power Balance Present
-// 0000000000010 - 2   - 0x002 - Pedal Power Balance Reference
-// 0000000000100 - 4   - 0x004 - Accumulated Torque Present
-// 0000000001000 - 8   - 0x008 - Accumulated Torque Source
-// 0000000010000 - 16  - 0x010 - Wheel Revolution Data Present
-// 0000000100000 - 32  - 0x020 - Crank Revolution Data Present
-// 0000001000000 - 64  - 0x040 - Extreme Force Magnitudes Present
-// 0000010000000 - 128 - 0x080 - Extreme Torque Magnitudes Present
-// 0000100000000 - Extreme Angles Present (bit8)
-// 0001000000000 - Top Dead Spot Angle Present (bit 9)
-// 0010000000000 - Bottom Dead Spot Angle Present (bit 10)
-// 0100000000000 - Accumulated Energy Present (bit 11)
-// 1000000000000 - Offset Compensation Indicator (bit 12)
+// 00000000000000000001 - 1   - 0x001 - Pedal Power Balance Present
+// 00000000000000000010 - 2   - 0x002 - Pedal Power Balance Reference
+// 00000000000000000100 - 4   - 0x004 - Accumulated Torque Present
+// 00000000000000001000 - 8   - 0x008 - Accumulated Torque Source
+// 00000000000000010000 - 16  - 0x010 - Wheel Revolution Data Present
+// 00000000000000100000 - 32  - 0x020 - Crank Revolution Data Present
+// 00000000000001000000 - 64  - 0x040 - Extreme Force Magnitudes Present
+// 00000000000010000000 - 128 - 0x080 - Extreme Torque Magnitudes Present
+// 00000000000100000000 - Extreme Angles Present (bit8)
+// 00000000001000000000 - Top Dead Spot Angle Present (bit 9)
+// 00000000010000000000 - Bottom Dead Spot Angle Present (bit 10)
+// 00000000100000000000 - Accumulated Energy Present (bit 11)
+// 00000001000000000000 - Offset Compensation Indicator (bit 12)
 // 98765432109876543210 - bit placement helper :)
 // 00001110000000001100
 // 00000101000010000110
