@@ -18,6 +18,7 @@
 #include <WiFiClientSecure.h>
 #include <Update.h>
 #include <DNSServer.h>
+#include <UniversalTelegramBot.h>
 
 File fsUploadFile;
 
