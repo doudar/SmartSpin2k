@@ -108,8 +108,13 @@
 //stealthchop enabled by default
 #define STEALTHCHOP true
 
+//how long to try STA mode before falling back to AP mode
 #define WIFI_CONNECT_TIMEOUT 10
 
+//Max size of userconfig
 #define USERCONFIG_JSON_SIZE 768
+
+//Max number of telegram messages to send per session
+#define MAX_TELEGRAM_MESSAGES 5
 
 #endif
