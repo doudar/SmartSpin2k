@@ -72,20 +72,20 @@ void startWifi()
     configTime(0, 0, "pool.ntp.org"); // get UTC time via NTP
     time_t now = time(nullptr);
     while (now < 5 * 3600)
-  {
-    Serial.print(".");
-    delay(100);
-    now = time(nullptr);
-  }
-  Serial.println(now);
+    {
+      Serial.print(".");
+      delay(100);
+      now = time(nullptr);
+    }
+    Serial.println(now);
   }
 
   // Couldn't connect to existing network, Create SoftAP
   if (WiFi.status() != WL_CONNECTED)
   {
-    String t_pass = DEFAULT_PASSWORD; 
-    if(String(userConfig.getSsid()) == DEVICE_NAME) //If default SSID is still in use, let the user select a new password.
-    {                                               //Else Fall Back to the default password (probably "password")
+    String t_pass = DEFAULT_PASSWORD;
+    if (String(userConfig.getSsid()) == DEVICE_NAME) //If default SSID is still in use, let the user select a new password.
+    {                                                //Else Fall Back to the default password (probably "password")
       String t_pass = String(userConfig.getPassword());
     }
     WiFi.softAP(userConfig.getDeviceName(), t_pass.c_str());
@@ -95,7 +95,6 @@ void startWifi()
     /* Setup the DNS server redirecting all the domains to the apIP */
     dnsServer.setErrorReplyCode(DNSReplyCode::NoError);
     dnsServer.start(DNS_PORT, "*", myIP);
-    
   }
   MDNS.begin(userConfig.getDeviceName());
   MDNS.addService("http", "_tcp", 80);
@@ -106,6 +105,11 @@ void startWifi()
 WebServer server(80);
 void startHttpServer()
 {
+
+  server.onNotFound([]() {
+  debugDirector("Link Not Found: " + server.uri());
+  });
+
   /********************************************Begin Handlers***********************************/
   server.on("/", handleIndexFile);
   server.on("/index.html", handleIndexFile);
@@ -210,7 +214,7 @@ void startHttpServer()
       }
     }
 
-    if (!server.arg("session1HR").isEmpty()) //Needs checking for unrealistic numbers. 
+    if (!server.arg("session1HR").isEmpty()) //Needs checking for unrealistic numbers.
     {
       userPWC.session1HR = server.arg("session1HR").toInt();
     }
@@ -235,7 +239,6 @@ void startHttpServer()
         userPWC.hr2Pwr = false;
       }
     }
-  
 
     String response = "<!DOCTYPE html><html><body><h2>";
 
@@ -360,10 +363,12 @@ void startHttpServer()
     server.sendHeader("Connection", "close");
     server.send(200, "text/html", OTALoginIndex);
   });
+
   server.on("/OTAIndex", HTTP_GET, []() {
     server.sendHeader("Connection", "close");
     server.send(200, "text/html", OTAServerIndex);
   });
+  
   /*handling uploading firmware file */
   server.on(
       "/update", HTTP_POST, []() {
@@ -427,15 +432,14 @@ void startHttpServer()
   server.begin();
   debugDirector("HTTP server started");
 
-    xTaskCreatePinnedToCore(
+  xTaskCreatePinnedToCore(
       telegramUpdate,   /* Task function. */
       "telegramUpdate", /* name of task. */
-      5500,              /* Stack size of task Used to be 3000*/
-      NULL,              /* parameter of the task */
-      15,                /* priority of the task  - 29 worked*/
+      5500,             /* Stack size of task Used to be 3000*/
+      NULL,             /* parameter of the task */
+      15,               /* priority of the task  - 29 worked*/
       &telegramTask,    /* Task handle to keep track of created task */
-      tskNO_AFFINITY);   /* pin task to core 0 */
-
+      tskNO_AFFINITY);  /* pin task to core 0 */
 }
 
 void webClientUpdate(void *pvParameters)
@@ -491,8 +495,11 @@ void handleSpiffsFile()
 void FirmwareUpdate()
 {
   HTTPClient http;
+  WiFiClientSecure client;
+  
+  client.setCACert(rootCACertificate);
   debugDirector("Checking for newer firmware:");
-  http.begin(userConfig.getFirmwareUpdateURL() + String(FW_VERSIONFILE)); // check version URL
+  http.begin(userConfig.getFirmwareUpdateURL() + String(FW_VERSIONFILE), rootCACertificate); // check version URL
   delay(100);
   int httpCode = http.GET(); // get data from version file
   delay(100);
@@ -519,37 +526,50 @@ void FirmwareUpdate()
     }
     Version availiableVer(payload.c_str());
     Version currentVer(FIRMWARE_VERSION);
-    WiFiClientSecure client;
+
     if ((availiableVer > currentVer) || (updateAnyway))
     {
       debugDirector("New firmware detected!");
       debugDirector("Upgrading from " + String(FIRMWARE_VERSION) + " to " + payload);
-      client.setCACert(rootCACertificate);
+
+      //Update Spiffs
       httpUpdate.setLedPin(LED_BUILTIN, LOW);
       debugDirector("Updating FileSystem");
       t_httpUpdate_return ret = httpUpdate.updateSpiffs(client, userConfig.getFirmwareUpdateURL() + String(FW_SPIFFSFILE));
       vTaskDelay(100 / portTICK_PERIOD_MS);
-      if (ret == HTTP_UPDATE_OK)
+      switch(ret) 
       {
+        case HTTP_UPDATE_OK:
         debugDirector("Saving Config.txt");
         userConfig.saveToSPIFFS();
         userPWC.saveToSPIFFS();
         debugDirector("Updating Program");
-        ret = httpUpdate.update(client, userConfig.getFirmwareUpdateURL() + String(FW_BINFILE));
-        switch (ret)
-        {
-        case HTTP_UPDATE_FAILED:
-          debugDirector("HTTP_UPDATE_FAILD Error " + String(httpUpdate.getLastError()) + " : " + httpUpdate.getLastErrorString());
-          break;
+        break;
 
         case HTTP_UPDATE_NO_UPDATES:
-          debugDirector("HTTP_UPDATE_NO_UPDATES");
-          break;
+        debugDirector("HTTP_UPDATE_NO_UPDATES");
+        break;
 
-        case HTTP_UPDATE_OK:
-          debugDirector("HTTP_UPDATE_OK");
-          break;
-        }
+        case HTTP_UPDATE_FAILED:
+        debugDirector("SPIFFS Update Failed: " + String(httpUpdate.getLastError()) + " : " + httpUpdate.getLastErrorString());
+        break;
+      }
+
+      //Update Firmware
+      ret = httpUpdate.update(client, userConfig.getFirmwareUpdateURL() + String(FW_BINFILE));
+      switch (ret)
+      {
+      case HTTP_UPDATE_FAILED:
+        debugDirector("HTTP_UPDATE_FAILD Error " + String(httpUpdate.getLastError()) + " : " + httpUpdate.getLastErrorString());
+        break;
+
+      case HTTP_UPDATE_NO_UPDATES:
+        debugDirector("HTTP_UPDATE_NO_UPDATES");
+        break;
+
+      case HTTP_UPDATE_OK:
+        debugDirector("HTTP_UPDATE_OK");
+        break;
       }
     }
     else //don't update
@@ -568,17 +588,17 @@ void sendTelegram(String textToSend)
 
   if (millis() - startTime > timeout) //Let one message send every two minutes
   {
-    numberOfMessages = MAX_TELEGRAM_MESSAGES-1;
+    numberOfMessages = MAX_TELEGRAM_MESSAGES - 1;
     telegramMessage += " " + String(userConfig.getSsid()) + " ";
     startTime = millis();
   }
 
-if(numberOfMessages < MAX_TELEGRAM_MESSAGES)
-{
-  telegramMessage += textToSend;
-  telegramMessageWaiting = true;
-  numberOfMessages ++;
-}
+  if (numberOfMessages < MAX_TELEGRAM_MESSAGES)
+  {
+    telegramMessage += textToSend;
+    telegramMessageWaiting = true;
+    numberOfMessages++;
+  }
 }
 
 //Non blocking task to send telegram message
@@ -590,15 +610,13 @@ void telegramUpdate(void *pvParameters)
   for (;;)
   {
     vTaskDelay(1000 / portTICK_RATE_MS);
-    if(telegramMessageWaiting && WiFi.getMode() == WIFI_STA)
+    if (telegramMessageWaiting && WiFi.getMode() == WIFI_STA)
     {
-        telegramMessageWaiting = false;
-        bot.sendMessage(TELEGRAM_CHAT_ID, telegramMessage, "");
-        //Serial.println(uxTaskGetStackHighWaterMark(telegramTask));
-        client.stop();
-        telegramMessage = "";
+      telegramMessageWaiting = false;
+      bot.sendMessage(TELEGRAM_CHAT_ID, telegramMessage, "");
+      //Serial.println(uxTaskGetStackHighWaterMark(telegramTask));
+      client.stop();
+      telegramMessage = "";
     }
   }
 }
-
-
