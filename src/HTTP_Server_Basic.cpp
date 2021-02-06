@@ -483,7 +483,6 @@ void handleIndexFile()
     debugDirector(filename + " not found. Sending builtin Index.html");
     server.send(200, "text/html", noIndexHTML);
   }
-
 }
 
 void handleSpiffsFile()
@@ -612,7 +611,7 @@ void sendTelegram(String textToSend)
 
   if ((numberOfMessages < MAX_TELEGRAM_MESSAGES) && (WiFi.getMode() == WIFI_STA))
   {
-    telegramMessage += textToSend;
+    telegramMessage += "\n" + textToSend;
     telegramMessageWaiting = true;
     numberOfMessages++;
   }
@@ -623,26 +622,35 @@ void telegramUpdate(void *pvParameters)
 {
   //WiFiClientSecure client;
   client.setInsecure();
-  //easy way to test if NTP time has been sucessfully updated (internet connection)
 
   //UniversalTelegramBot bot(TELEGRAM_TOKEN, client);
   for (;;)
   {
-
+    static int telegramFailures = 0;
     if (telegramMessageWaiting && internetConnection)
     {
       telegramMessageWaiting = false;
       bool rm = (bot.sendMessage(TELEGRAM_CHAT_ID, telegramMessage, ""));
       if (!rm)
       {
-        internetConnection = false;
+        telegramFailures++;
+        debugDirector("Telegram failed to send!");
+        if (telegramFailures > 2)
+        {
+          internetConnection = false;
+        }
       }
+      else
+      { //Success - reset Telegram Failures
+        telegramFailures = 0;
+      }
+
       client.stop();
       telegramMessage = "";
     }
     //Serial.println(uxTaskGetStackHighWaterMark(telegramTask));
     //Serial.println(uxTaskGetStackHighWaterMark(webClientTask));
     //Serial.println(ESP.getFreeHeap());
-    vTaskDelay(2000 / portTICK_RATE_MS);
+    vTaskDelay(4000 / portTICK_RATE_MS);
   }
 }
