@@ -16,6 +16,8 @@ void handleSpiffsFile();
 void handleIndexFile();
 void handleHrSlider();
 void FirmwareUpdate();
+void sendTelegram(String textToSend);
+void telegramUpdate(void *pvParameters);
 
 //wifi Function
 void startWifi();

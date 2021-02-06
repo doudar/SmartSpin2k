@@ -218,7 +218,7 @@ void BLENotify(void *pvParameters)
     vTaskDelay((BLE_NOTIFY_DELAY / 2) / portTICK_PERIOD_MS);
     digitalWrite(LED_PIN, HIGH);
     vTaskDelay((BLE_NOTIFY_DELAY / 2) / portTICK_PERIOD_MS);
-    //debugDirector("BLENotify High Water Mark: " + String(uxTaskGetStackHighWaterMark(BLENotifyTask)));
+    //debugDirector("BLEServer High Water Mark: " + String(uxTaskGetStackHighWaterMark(BLENotifyTask)));
   }
 }
 
