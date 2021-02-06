@@ -7,3 +7,4 @@ data/config.txt
 data/config.txt
 Errors
 SmartSpin_logfile.txt
+include/telegram_token.h
