@@ -29,12 +29,16 @@ String telegramMessage = "";
 bool telegramMessageWaiting = false;
 #define MAX_BUFFER_SIZE 20
 
+IPAddress myIP;
+bool internetConnection = false;
+
 // DNS server
 const byte DNS_PORT = 53;
 DNSServer dnsServer;
 
 WiFiClientSecure client;
 UniversalTelegramBot bot(TELEGRAM_TOKEN, client);
+WebServer server(80);
 
 //********************************WIFI Setup*************************//
 void startWifi()
@@ -67,17 +71,7 @@ void startWifi()
   }
   if (WiFi.status() == WL_CONNECTED)
   {
-    debugDirector("Connected to " + String(userConfig.getSsid()) + " IP address: " + WiFi.localIP().toString(), true, true);
-    Serial.print("Retrieving time: ");
-    configTime(0, 0, "pool.ntp.org"); // get UTC time via NTP
-    time_t now = time(nullptr);
-    while (now < 5 * 3600)
-    {
-      Serial.print(".");
-      delay(100);
-      now = time(nullptr);
-    }
-    Serial.println(now);
+    myIP = WiFi.localIP();
   }
 
   // Couldn't connect to existing network, Create SoftAP
@@ -90,24 +84,42 @@ void startWifi()
     }
     WiFi.softAP(userConfig.getDeviceName(), t_pass.c_str());
     vTaskDelay(50);
-    IPAddress myIP = WiFi.softAPIP();
-    debugDirector("AP IP address: " + myIP.toString());
+    myIP = WiFi.softAPIP();
     /* Setup the DNS server redirecting all the domains to the apIP */
     dnsServer.setErrorReplyCode(DNSReplyCode::NoError);
     dnsServer.start(DNS_PORT, "*", myIP);
   }
-  MDNS.begin(userConfig.getDeviceName());
+
+  if (!MDNS.begin(userConfig.getDeviceName()))
+  {
+    debugDirector("Error setting up MDNS responder!");
+  }
+
   MDNS.addService("http", "_tcp", 80);
+  debugDirector("Connected to " + String(userConfig.getSsid()) + " IP address: " + myIP.toString(), true, true);
   debugDirector(String("Open http://") + userConfig.getDeviceName() + ".local/");
   WiFi.setTxPower(WIFI_POWER_19_5dBm);
+
+  if (WiFi.getMode() == WIFI_STA)
+  {
+    Serial.print("Retrieving time: ");
+    configTime(0, 0, "pool.ntp.org"); // get UTC time via NTP
+    time_t now = time(nullptr);
+    while (now < 5 * 3600)
+    {
+      Serial.print(".");
+      delay(100);
+      now = time(nullptr);
+    }
+    Serial.println(now);
+  }
 }
 
-WebServer server(80);
 void startHttpServer()
 {
 
   server.onNotFound([]() {
-  debugDirector("Link Not Found: " + server.uri());
+    debugDirector("Link Not Found: " + server.uri());
   });
 
   /********************************************Begin Handlers***********************************/
@@ -122,6 +134,7 @@ void startHttpServer()
   server.on("/status.html", handleSpiffsFile);
   server.on("/bluetoothscanner.html", handleSpiffsFile);
   server.on("/hrtowatts.html", handleSpiffsFile);
+  server.on("/favicon.ico", handleSpiffsFile);
 
   server.on("/send_settings", []() {
     String tString;
@@ -244,12 +257,12 @@ void startHttpServer()
 
     if (wasBTUpdate) //Special BT update response
     {
-      response += "Selections Saved!</h2></body><script> setTimeout(\"location.href = 'http://" + String(userConfig.getDeviceName()) + ".local/bluetoothscanner.html';\",1000);</script></html>";
+      response += "Selections Saved!</h2></body><script> setTimeout(\"location.href = 'http://" + myIP.toString() + "/bluetoothscanner.html';\",1000);</script></html>";
       spinBLEClient.serverScan(true);
     }
     else
     { //Normal response
-      response += "Network settings will be applied at next reboot. <br> Everything else is availiable immediatly.</h2></body><script> setTimeout(\"location.href = 'http://" + String(userConfig.getDeviceName()) + ".local/index.html';\",1000);</script></html>";
+      response += "Network settings will be applied at next reboot. <br> Everything else is availiable immediatly.</h2></body><script> setTimeout(\"location.href = 'http://" + myIP.toString() + "/index.html';\",1000);</script></html>";
     }
     server.send(200, "text/html", response);
     debugDirector("Config Updated From Web");
@@ -261,7 +274,7 @@ void startHttpServer()
 
   server.on("/BLEScan", []() {
     debugDirector("Scanning from web request");
-    String response = "<!DOCTYPE html><html><body>Scanning for BLE Devices. Please wait 15 seconds.</body><script> setTimeout(\"location.href = 'http://" + String(userConfig.getDeviceName()) + ".local/bluetoothscanner.html';\",15000);</script></html>";
+    String response = "<!DOCTYPE html><html><body>Scanning for BLE Devices. Please wait 15 seconds.</body><script> setTimeout(\"location.href = 'http://" + myIP.toString() + "/bluetoothscanner.html';\",15000);</script></html>";
     spinBLEClient.serverScan(true);
     //spinBLEClient.serverScan(true);
     server.send(200, "text/html", response);
@@ -272,14 +285,14 @@ void startHttpServer()
     SPIFFS.format();
     userConfig.setDefaults();
     userConfig.saveToSPIFFS();
-    String response = "<!DOCTYPE html><html><body><h1>Defaults have been loaded.</h1><p><br><br> Please reconnect to the device on WiFi network: " + String(userConfig.getSsid()) + "</p></body></html>";
+    String response = "<!DOCTYPE html><html><body><h1>Defaults have been loaded.</h1><p><br><br> Please reconnect to the device on WiFi network: " + myIP.toString() + "</p></body></html>";
     server.send(200, "text/html", response);
     ESP.restart();
   });
 
   server.on("/reboot.html", []() {
     debugDirector("Rebooting from Web Request");
-    String response = "Rebooting....<script> setTimeout(\"location.href = 'http://" + String(userConfig.getDeviceName()) + ".local/index.html';\",500); </script>";
+    String response = "Rebooting....<script> setTimeout(\"location.href = 'http://" + myIP.toString() + "/index.html';\",500); </script>";
     server.send(200, "text/html", response);
     vTaskDelay(100 / portTICK_PERIOD_MS);
     ESP.restart();
@@ -365,10 +378,11 @@ void startHttpServer()
   });
 
   server.on("/OTAIndex", HTTP_GET, []() {
+    spinBLEClient.disconnect();
     server.sendHeader("Connection", "close");
     server.send(200, "text/html", OTAServerIndex);
   });
-  
+
   /*handling uploading firmware file */
   server.on(
       "/update", HTTP_POST, []() {
@@ -406,7 +420,6 @@ void startHttpServer()
     fsUploadFile = SPIFFS.open(filename, "w");
     filename = String();
   } else if (upload.status == UPLOAD_FILE_WRITE) {
-    //DBG_OUTPUT_PORT.print("handleFileUpload Data: "); DBG_OUTPUT_PORT.println(upload.currentSize);
     if (fsUploadFile) {
       fsUploadFile.write(upload.buf, upload.currentSize);
     }
@@ -425,21 +438,21 @@ void startHttpServer()
       "webClientUpdate", /* name of task. */
       4000,              /* Stack size of task Used to be 3000*/
       NULL,              /* parameter of the task */
-      10,                /* priority of the task  - 29 worked*/
+      1,                 /* priority of the task  - 29 worked*/
       &webClientTask,    /* Task handle to keep track of created task */
       tskNO_AFFINITY);   /* pin task to core 0 */
-
-  server.begin();
-  debugDirector("HTTP server started");
 
   xTaskCreatePinnedToCore(
       telegramUpdate,   /* Task function. */
       "telegramUpdate", /* name of task. */
-      5500,             /* Stack size of task Used to be 3000*/
+      4900,             /* Stack size of task*/
       NULL,             /* parameter of the task */
-      15,               /* priority of the task  - 29 worked*/
+      1,                /* priority of the task  - higher number is higher priority*/
       &telegramTask,    /* Task handle to keep track of created task */
       tskNO_AFFINITY);  /* pin task to core 0 */
+
+  server.begin();
+  debugDirector("HTTP server started");
 }
 
 void webClientUpdate(void *pvParameters)
@@ -460,7 +473,7 @@ void handleIndexFile()
   String filename = "/index.html";
   if (SPIFFS.exists(filename))
   {
-    File file = SPIFFS.open(filename, "r");
+    File file = SPIFFS.open(filename, FILE_READ);
     server.streamFile(file, "text/html");
     file.close();
   }
@@ -469,6 +482,7 @@ void handleIndexFile()
     debugDirector(filename + " not found. Sending builtin Index.html");
     server.send(200, "text/html", noIndexHTML);
   }
+
 }
 
 void handleSpiffsFile()
@@ -478,7 +492,7 @@ void handleSpiffsFile()
   String fileType = filename.substring((dotPosition + 1), filename.length());
   if (SPIFFS.exists(filename))
   {
-    File file = SPIFFS.open(filename, "r");
+    File file = SPIFFS.open(filename, FILE_READ);
     server.streamFile(file, "text/" + fileType);
     file.close();
     debugDirector("Served " + filename);
@@ -495,8 +509,8 @@ void handleSpiffsFile()
 void FirmwareUpdate()
 {
   HTTPClient http;
-  WiFiClientSecure client;
-  
+  //WiFiClientSecure client;
+
   client.setCACert(rootCACertificate);
   debugDirector("Checking for newer firmware:");
   http.begin(userConfig.getFirmwareUpdateURL() + String(FW_VERSIONFILE), rootCACertificate); // check version URL
@@ -509,10 +523,12 @@ void FirmwareUpdate()
     payload = http.getString(); // save received version
     payload.trim();
     debugDirector("  -Server Ver " + payload);
+    internetConnection = true;
   }
   else
   {
     debugDirector("error downloading " + String(FW_VERSIONFILE) + " " + String(httpCode));
+    internetConnection = false;
   }
 
   http.end();
@@ -537,20 +553,20 @@ void FirmwareUpdate()
       debugDirector("Updating FileSystem");
       t_httpUpdate_return ret = httpUpdate.updateSpiffs(client, userConfig.getFirmwareUpdateURL() + String(FW_SPIFFSFILE));
       vTaskDelay(100 / portTICK_PERIOD_MS);
-      switch(ret) 
+      switch (ret)
       {
-        case HTTP_UPDATE_OK:
+      case HTTP_UPDATE_OK:
         debugDirector("Saving Config.txt");
         userConfig.saveToSPIFFS();
         userPWC.saveToSPIFFS();
         debugDirector("Updating Program");
         break;
 
-        case HTTP_UPDATE_NO_UPDATES:
+      case HTTP_UPDATE_NO_UPDATES:
         debugDirector("HTTP_UPDATE_NO_UPDATES");
         break;
 
-        case HTTP_UPDATE_FAILED:
+      case HTTP_UPDATE_FAILED:
         debugDirector("SPIFFS Update Failed: " + String(httpUpdate.getLastError()) + " : " + httpUpdate.getLastErrorString());
         break;
       }
@@ -593,7 +609,7 @@ void sendTelegram(String textToSend)
     startTime = millis();
   }
 
-  if (numberOfMessages < MAX_TELEGRAM_MESSAGES)
+  if (numberOfMessages < MAX_TELEGRAM_MESSAGES && WiFi.getMode() == WIFI_STA)
   {
     telegramMessage += textToSend;
     telegramMessageWaiting = true;
@@ -604,19 +620,28 @@ void sendTelegram(String textToSend)
 //Non blocking task to send telegram message
 void telegramUpdate(void *pvParameters)
 {
-  WiFiClientSecure client;
+  //WiFiClientSecure client;
   client.setInsecure();
-  UniversalTelegramBot bot(TELEGRAM_TOKEN, client);
+  //easy way to test if NTP time has been sucessfully updated (internet connection)
+
+  //UniversalTelegramBot bot(TELEGRAM_TOKEN, client);
   for (;;)
   {
-    vTaskDelay(1000 / portTICK_RATE_MS);
-    if (telegramMessageWaiting && WiFi.getMode() == WIFI_STA)
+
+    if (telegramMessageWaiting && internetConnection)
     {
       telegramMessageWaiting = false;
-      bot.sendMessage(TELEGRAM_CHAT_ID, telegramMessage, "");
-      //Serial.println(uxTaskGetStackHighWaterMark(telegramTask));
+      bool rm = (bot.sendMessage(TELEGRAM_CHAT_ID, telegramMessage, ""));
+      if (!rm)
+      {
+        internetConnection = false;
+      }
       client.stop();
       telegramMessage = "";
     }
+    //Serial.println(uxTaskGetStackHighWaterMark(telegramTask));
+    //Serial.println(uxTaskGetStackHighWaterMark(webClientTask));
+    //Serial.println(ESP.getFreeHeap());
+    vTaskDelay(2000 / portTICK_RATE_MS);
   }
 }
