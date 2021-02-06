@@ -18,7 +18,7 @@ bool IRAM_ATTR deBounce();
 void IRAM_ATTR moveStepper(void * pvParameters);
 void IRAM_ATTR shiftUp();
 void IRAM_ATTR shiftDown(); 
-void debugDirector(String, bool = true);
+void debugDirector(String, bool = true, bool = false);
 void resetIfShiftersHeld();
 void scanIfShiftersHeld();
 void setupTMCStepperDriver();

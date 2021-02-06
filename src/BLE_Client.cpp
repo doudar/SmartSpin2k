@@ -30,9 +30,9 @@ void SpinBLEClient::start()
     xTaskCreatePinnedToCore(
         bleClientTask,   /* Task function. */
         "BLEClientTask", /* name of task. */
-        3500,            /* Stack size of task */
+        4000,            /* Stack size of task */
         NULL,            /* parameter of the task */
-        18,              /* priority of the task  */
+        1,               /* priority of the task  */
         &BLEClientTask,  /* Task handle to keep track of created task */
         1);
 }
@@ -60,7 +60,7 @@ void bleClientTask(void *pvParameters)
         }
 
         vTaskDelay(BLE_CLIENT_DELAY / portTICK_PERIOD_MS); // Delay a second between loops.
-                                                           //debugDirector("BLEclient High Water Mark: " + String(uxTaskGetStackHighWaterMark(BLEClientTask)));
+        //debugDirector("BLEclient High Water Mark: " + String(uxTaskGetStackHighWaterMark(BLEClientTask)));
     }
 }
 
@@ -70,11 +70,12 @@ static void notifyCallback(
     size_t length,
     bool isNotify)
 {
+    String debugOutput = "";
     for (int i = 0; i < length; i++)
     {
-        debugDirector(String(pData[i], HEX) + " ", false);
+        debugOutput += String(pData[i], HEX) + " ";
     }
-    debugDirector("<-- " + String(pBLERemoteCharacteristic->getUUID().toString().c_str()), false);
+    debugDirector(debugOutput + "<-- " + String(pBLERemoteCharacteristic->getUUID().toString().c_str()), false, true);
 
     if (pBLERemoteCharacteristic->getUUID() == HEARTCHARACTERISTIC_UUID)
     {
@@ -128,6 +129,10 @@ static void notifyCallback(
                     int tCAD = (((abs(spinBLEClient.crankRev[0] - spinBLEClient.crankRev[1]) * 1024) / abs(spinBLEClient.crankEventTime[0] - spinBLEClient.crankEventTime[1])) * 60);
                     if (tCAD > 1)
                     {
+                        if (tCAD > 200) //Cadence Error
+                        {
+                            tCAD = 0;
+                        }
                         userConfig.setSimulatedCad(tCAD);
                         spinBLEClient.noReadingIn = 0;
                     }
@@ -242,7 +247,7 @@ bool SpinBLEClient::connectToServer()
                 }
                 return false;
             }
-            Serial.println("Reconnected client");
+            Serial.println("Reconnecting client");
             // pClient->setClientCallbacks(new MyClientCallback(), true); commented out per @h2zero suggestion
             BLERemoteService *pRemoteService = pClient->getService(serviceUUID);
 
@@ -297,11 +302,15 @@ bool SpinBLEClient::connectToServer()
         else
         {
             debugDirector("No Previous client found");
-            //pClient = NimBLEDevice::getDisconnectedClient();
+            pClient = NimBLEDevice::getDisconnectedClient();
         }
     }
-
-    debugDirector("Forming a connection to: " + String(myDevice->getAddress().toString().c_str()));
+    String t_name = "";
+    if (myDevice->haveName())
+    {
+        String t_name = myDevice->getName().c_str();
+    }
+    debugDirector("Forming a connection to: " + t_name + " " + String(myDevice->getAddress().toString().c_str()));
     pClient = NimBLEDevice::createClient();
     debugDirector(" - Created client", false);
     pClient->setClientCallbacks(new MyClientCallback(), true);
@@ -503,7 +512,7 @@ void SpinBLEClient::scanProcess()
 
     String output;
     serializeJson(devices, output);
-    debugDirector("Bluetooth Client Found Devices: " + output);
+    debugDirector("Bluetooth Client Found Devices: " + output, true, true);
     userConfig.setFoundDevices(output);
 }
 
@@ -514,4 +523,17 @@ void SpinBLEClient::serverScan(bool connectRequest)
         scanRetries = MAX_SCAN_RETRIES;
     }
     spinBLEClient.doScan = true;
+}
+
+void SpinBLEClient::disconnect()
+{
+    scanRetries = 0;
+    reconnectTries = 0;
+    intentionalDisconnect = true;
+    debugDirector("Shutting Down all BLE services");
+    if (NimBLEDevice::getInitialized())
+    {
+        NimBLEDevice::deinit();
+        vTaskDelay(100 / portTICK_RATE_MS);
+    }
 }

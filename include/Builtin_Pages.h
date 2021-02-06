@@ -12,8 +12,6 @@
 #ifndef BUILTIN_PAGES_H
 #define BUILTIN_PAGES_H
 
-
-
 #include <Arduino.h>
 
 String OTAStyle =
@@ -68,7 +66,7 @@ String noIndexHTML =
 
 /* Server Index Page */
 String OTAServerIndex =
-    "<script src='https://ajax.googleapis.com/ajax/libs/jquery/3.2.1/jquery.min.js'></script>"
+    "<script src='https://code.jquery.com/jquery-3.3.1.min.js'></script>"
     "<form method='POST' action='#' enctype='multipart/form-data' id='upload_form'>"
     "<input type='file' name='update' id='file' onchange='sub(this)' style=display:none>"
     "<label id='file-input' for='file'>   Choose file...</label>"
@@ -111,5 +109,7 @@ String OTAServerIndex =
     "});"
     "</script>" +
     OTAStyle;
+
+
 
     #endif

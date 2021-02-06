@@ -94,6 +94,7 @@ class SpinBLEClient{
     void serverScan(bool connectRequest);   
     bool connectToServer();
     void scanProcess();
+    void disconnect();
 
 private:
     

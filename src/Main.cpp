@@ -279,7 +279,8 @@ void scanIfShiftersHeld()
   }
 }
 
-void debugDirector(String textToPrint, bool newline)
+// String Text to print, Optional Make newline, Optional Send to Telegram 
+void debugDirector(String textToPrint, bool newline, bool telegram)
 {
   if (newline)
   {
@@ -291,11 +292,14 @@ void debugDirector(String textToPrint, bool newline)
     Serial.print(textToPrint);
     debugToHTML += textToPrint;
   }
+  if(telegram)
+  {
+    sendTelegram(textToPrint);
+  }
 }
 
 void setupTMCStepperDriver()
 {
-  //need to add some of these to user_config and the web pages.
 
   driver.begin();
   driver.pdn_disable(true);
