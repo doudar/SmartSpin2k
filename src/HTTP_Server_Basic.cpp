@@ -72,6 +72,7 @@ void startWifi()
   if (WiFi.status() == WL_CONNECTED)
   {
     myIP = WiFi.localIP();
+    internetConnection = true;
   }
 
   // Couldn't connect to existing network, Create SoftAP
@@ -609,7 +610,7 @@ void sendTelegram(String textToSend)
     startTime = millis();
   }
 
-  if (numberOfMessages < MAX_TELEGRAM_MESSAGES && WiFi.getMode() == WIFI_STA)
+  if ((numberOfMessages < MAX_TELEGRAM_MESSAGES) && (WiFi.getMode() == WIFI_STA))
   {
     telegramMessage += textToSend;
     telegramMessageWaiting = true;
