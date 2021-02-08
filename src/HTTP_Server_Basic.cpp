@@ -8,6 +8,7 @@
 //Skip telegram_token.h if it is not included (cannot be on Github because it has sensitive information). 
 #if __has_include("telegram_token.h")
 #include "telegram_token.h"
+#define TELEGRAM_SECRETS
 #endif
 
 #include "Main.h"
