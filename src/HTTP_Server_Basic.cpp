@@ -5,12 +5,17 @@
 // This work is licensed under the GNU General Public License v2
 // Prototype hardware build from plans in the SmartSpin2k repository are licensed under Cern Open Hardware Licence version 2 Permissive
 
+//Skip telegram_token.h if it is not included (cannot be on Github because it has sensitive information). 
+#if __has_include("telegram_token.h")
+#include "telegram_token.h"
+#define TELEGRAM_SECRETS
+#endif
+
 #include "Main.h"
 #include "Version_Converter.h"
 #include "Builtin_Pages.h"
 #include "HTTP_Server_Basic.h"
 #include "cert.h"
-#include "telegram_token.h"
 #include <WebServer.h>
 #include <HTTPClient.h>
 #include <HTTPUpdate.h>

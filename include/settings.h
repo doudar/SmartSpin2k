@@ -117,4 +117,10 @@
 //Max number of telegram messages to send per session
 #define MAX_TELEGRAM_MESSAGES 5
 
+//Filler definitions for if telegram_token.h is not included (because it has sensitive information). 
+#ifndef TELEGRAM_SECRETS
+#define TELEGRAM_TOKEN "1234567890:ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghi"
+#define TELEGRAM_CHAT_ID "1234567890"                  
+#endif
+
 #endif
