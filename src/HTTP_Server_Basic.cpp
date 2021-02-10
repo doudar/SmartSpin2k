@@ -5,8 +5,9 @@
 // This work is licensed under the GNU General Public License v2
 // Prototype hardware build from plans in the SmartSpin2k repository are licensed under Cern Open Hardware Licence version 2 Permissive
 
-//Skip telegram_token.h if it is not included (cannot be on Github because it has sensitive information). 
-#if __has_include("telegram_token.h")
+//Skip telegram_token.h if it is not included (cannot be on Github because it has sensitive information).
+#ifdef USE_TELEGRAM
+// #if __has_include("telegram_token.h")
 #include "telegram_token.h"
 #define TELEGRAM_SECRETS
 #endif
@@ -29,9 +30,7 @@
 File fsUploadFile;
 
 TaskHandle_t webClientTask;
-TaskHandle_t telegramTask;
 String telegramMessage = "";
-bool telegramMessageWaiting = false;
 #define MAX_BUFFER_SIZE 20
 
 IPAddress myIP;
@@ -45,6 +44,8 @@ WiFiClientSecure client;
 WebServer server(80);
 
 #ifdef USE_TELEGRAM
+TaskHandle_t telegramTask;
+bool telegramMessageWaiting = false;
 UniversalTelegramBot bot(TELEGRAM_TOKEN, client);
 #endif
 
