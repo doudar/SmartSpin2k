@@ -37,8 +37,11 @@ const byte DNS_PORT = 53;
 DNSServer dnsServer;
 
 WiFiClientSecure client;
-UniversalTelegramBot bot(TELEGRAM_TOKEN, client);
 WebServer server(80);
+
+#ifdef USE_TELEGRAM
+UniversalTelegramBot bot(TELEGRAM_TOKEN, client);
+#endif
 
 //********************************WIFI Setup*************************//
 void startWifi()
@@ -443,6 +446,7 @@ void startHttpServer()
       &webClientTask,    /* Task handle to keep track of created task */
       tskNO_AFFINITY);   /* pin task to core 0 */
 
+#ifdef USE_TELGRAM
   xTaskCreatePinnedToCore(
       telegramUpdate,   /* Task function. */
       "telegramUpdate", /* name of task. */
@@ -451,6 +455,7 @@ void startHttpServer()
       1,                /* priority of the task  - higher number is higher priority*/
       &telegramTask,    /* Task handle to keep track of created task */
       tskNO_AFFINITY);  /* pin task to core 0 */
+#endif
 
   server.begin();
   debugDirector("HTTP server started");
@@ -595,6 +600,7 @@ void FirmwareUpdate()
   }
 }
 
+#ifdef USE_TELEGRAM
 //Function to handle sending telegram text to the non blocking task
 void sendTelegram(String textToSend)
 {
@@ -654,3 +660,4 @@ void telegramUpdate(void *pvParameters)
     vTaskDelay(4000 / portTICK_RATE_MS);
   }
 }
+#endif

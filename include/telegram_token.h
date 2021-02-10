@@ -2,4 +2,4 @@
 //See more about making a telegram bot at https://randomnerdtutorials.com/telegram-control-esp32-esp8266-nodemcu-outputs/
 
 #define TELEGRAM_TOKEN "XXXXXX"
-#define CHAT_ID "XXXXXX"
+#define TELEGRAM_CHAT_ID "XXXXXX"

@@ -123,7 +123,6 @@ void loop()
   }
 
   scanIfShiftersHeld();
-
 }
 
 void moveStepper(void *pvParameters)
@@ -254,10 +253,10 @@ void scanIfShiftersHeld()
   if ((digitalRead(SHIFT_UP_PIN) == LOW) && (digitalRead(SHIFT_DOWN_PIN) == LOW)) //are both shifters held?
   {
     debugDirector("Shifters Held " + String(shiftersHoldForScan));
-    if (shiftersHoldForScan < 1)                                                   //have they been held for enough loops?
+    if (shiftersHoldForScan < 1) //have they been held for enough loops?
     {
       debugDirector("Shifters Held < 1 " + String(shiftersHoldForScan));
-      if ((millis() - scanDelayStart) >= scanDelayTime)     // Has this already been done within 10 seconds?
+      if ((millis() - scanDelayStart) >= scanDelayTime) // Has this already been done within 10 seconds?
       {
         scanDelayStart += scanDelayTime;
         spinBLEClient.serverScan(true);
@@ -279,7 +278,7 @@ void scanIfShiftersHeld()
   }
 }
 
-// String Text to print, Optional Make newline, Optional Send to Telegram 
+// String Text to print, Optional Make newline, Optional Send to Telegram
 void debugDirector(String textToPrint, bool newline, bool telegram)
 {
   if (newline)
@@ -292,10 +291,12 @@ void debugDirector(String textToPrint, bool newline, bool telegram)
     Serial.print(textToPrint);
     debugToHTML += textToPrint;
   }
-  if(telegram)
+#ifdef USE_TELGRAM
+  if (telegram)
   {
     sendTelegram(textToPrint);
   }
+#endif
 }
 
 void setupTMCStepperDriver()
