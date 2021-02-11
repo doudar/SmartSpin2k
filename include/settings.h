@@ -120,7 +120,7 @@
 //Filler definitions for if telegram_token.h is not included (because it has sensitive information). 
 #ifndef TELEGRAM_SECRETS
 #define TELEGRAM_TOKEN "1234567890:ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghi"
-#define TELEGRAM_CHAT_ID "1234567890"                  
+#define TELEGRAM_CHAT_ID "1234567890"               
 #endif
 
 #endif
