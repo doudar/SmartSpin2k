@@ -16,7 +16,7 @@ void handleIndexFile();
 void handleHrSlider();
 void FirmwareUpdate();
 
-#ifdef USE_TELGRAM
+#ifdef USE_TELEGRAM
 void sendTelegram(String textToSend);
 void telegramUpdate(void *pvParameters);
 #endif

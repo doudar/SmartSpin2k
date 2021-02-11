@@ -6,8 +6,7 @@
 // Prototype hardware build from plans in the SmartSpin2k repository are licensed under Cern Open Hardware Licence version 2 Permissive
 // 
 
-#ifndef SETTING_H
-#define SETTINGS_H
+#pragma once
 
 //Current program version info. Used for auto updates
 #define FIRMWARE_VERSION "1.2.6"
@@ -114,14 +113,17 @@
 //Max size of userconfig
 #define USERCONFIG_JSON_SIZE 768
 
+//Uncomment to enable sending Telegram debug messages back to the chat specified in telegram_token.h
+#define USE_TELEGRAM
+
 #ifdef USE_TELEGRAM
     //Max number of telegram messages to send per session
     #define MAX_TELEGRAM_MESSAGES 5
 
     //Filler definitions for if telegram_token.h is not included (because it has sensitive information). 
+    //Do not change these as this file is tracked and therefore public. Enter your own Telegram info into telegram_token.h   
     #ifndef TELEGRAM_SECRETS
         #define TELEGRAM_TOKEN "1234567890:ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghi"
         #define TELEGRAM_CHAT_ID "1234567890"                  
     #endif
-#endif
 #endif

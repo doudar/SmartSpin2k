@@ -7,9 +7,10 @@
 
 //Skip telegram_token.h if it is not included (cannot be on Github because it has sensitive information).
 #ifdef USE_TELEGRAM
-// #if __has_include("telegram_token.h")
-#include "telegram_token.h"
-#define TELEGRAM_SECRETS
+    #if __has_include("telegram_token.h") //Non-tracked file that has a possibility of being missing
+      #include "telegram_token.h"
+      #define TELEGRAM_SECRETS
+    #endif
 #endif
 
 #include "Main.h"
@@ -25,12 +26,11 @@
 #include <WiFiClientSecure.h>
 #include <Update.h>
 #include <DNSServer.h>
-#include <UniversalTelegramBot.h>
+
 
 File fsUploadFile;
 
 TaskHandle_t webClientTask;
-String telegramMessage = "";
 #define MAX_BUFFER_SIZE 20
 
 IPAddress myIP;
@@ -44,9 +44,11 @@ WiFiClientSecure client;
 WebServer server(80);
 
 #ifdef USE_TELEGRAM
-TaskHandle_t telegramTask;
-bool telegramMessageWaiting = false;
-UniversalTelegramBot bot(TELEGRAM_TOKEN, client);
+  #include <UniversalTelegramBot.h>
+  TaskHandle_t telegramTask;
+  bool telegramMessageWaiting = false;
+  UniversalTelegramBot bot(TELEGRAM_TOKEN, client);
+  String telegramMessage = "";
 #endif
 
 //********************************WIFI Setup*************************//
