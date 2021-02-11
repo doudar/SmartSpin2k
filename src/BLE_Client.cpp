@@ -96,6 +96,13 @@ static void notifyCallback(
             userConfig.setSimulatedWatts(bytes_to_u16(pData[4], pData[3]));
             userConfig.setSimulatedCad(pData[12]);
             debugDirector(String(userConfig.getSimulatedWatts()) + "W " + String(userConfig.getSimulatedCad()) + " CAD");
+
+            //May need to update the connection params here as below but I'll see if Flywheel likes our current settings first
+            // static bool firstloop = true;
+            // if(firstloop){
+            // pBLERemoteCharacteristic->getRemoteService()->getClient()->updateConnParams(16,60,0,400); 
+            // firstloop = false;
+            // }
         }
     }
 
