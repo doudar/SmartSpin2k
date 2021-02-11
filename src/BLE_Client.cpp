@@ -89,7 +89,9 @@ static void notifyCallback(
     //Set data from Flywheel Bike
     if (pBLERemoteCharacteristic->getUUID() == FLYWHEEL_UART_SERVICE_UUID)
     {
-        if (pData[0] = 0xFF)
+        debugDirector("Found Flywheel Data!");
+        
+        if (pData[0] == 0xFF)
         {
             userConfig.setSimulatedWatts(bytes_to_u16(pData[4], pData[3]));
             userConfig.setSimulatedCad(pData[12]);
