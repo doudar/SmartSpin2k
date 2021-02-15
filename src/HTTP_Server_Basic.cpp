@@ -5,14 +5,6 @@
 // This work is licensed under the GNU General Public License v2
 // Prototype hardware build from plans in the SmartSpin2k repository are licensed under Cern Open Hardware Licence version 2 Permissive
 
-//Skip telegram_token.h if it is not included (cannot be on Github because it has sensitive information).
-#ifdef USE_TELEGRAM
-    #if __has_include("telegram_token.h") //Non-tracked file that has a possibility of being missing
-      #include "telegram_token.h"
-      #define TELEGRAM_SECRETS
-    #endif
-#endif
-
 #include "Main.h"
 #include "Version_Converter.h"
 #include "Builtin_Pages.h"
@@ -454,7 +446,7 @@ void startHttpServer()
       &webClientTask,    /* Task handle to keep track of created task */
       tskNO_AFFINITY);   /* pin task to core 0 */
 
-#ifdef USE_TELGRAM
+#ifdef USE_TELEGRAM
   xTaskCreatePinnedToCore(
       telegramUpdate,   /* Task function. */
       "telegramUpdate", /* name of task. */
@@ -634,10 +626,8 @@ void sendTelegram(String textToSend)
 //Non blocking task to send telegram message
 void telegramUpdate(void *pvParameters)
 {
-  //WiFiClientSecure client;
-  client.setInsecure();
 
-  //UniversalTelegramBot bot(TELEGRAM_TOKEN, client);
+  client.setInsecure();
   for (;;)
   {
     static int telegramFailures = 0;
@@ -648,7 +638,7 @@ void telegramUpdate(void *pvParameters)
       if (!rm)
       {
         telegramFailures++;
-        debugDirector("Telegram failed to send!");
+        debugDirector("Telegram failed to send!", + TELEGRAM_CHAT_ID);
         if (telegramFailures > 2)
         {
           internetConnection = false;

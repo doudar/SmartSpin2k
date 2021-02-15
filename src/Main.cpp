@@ -291,7 +291,7 @@ void debugDirector(String textToPrint, bool newline, bool telegram)
     Serial.print(textToPrint);
     debugToHTML += textToPrint;
   }
-#ifdef USE_TELGRAM
+#ifdef USE_TELEGRAM
   if (telegram)
   {
     sendTelegram(textToPrint);
