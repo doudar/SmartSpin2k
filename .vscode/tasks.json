@@ -16,6 +16,15 @@
 				"$platformio"
 			],
 			"label": "PlatformIO: Erase Flash (esp32doit)"
+		},
+		{
+			"type": "PlatformIO",
+			"task": "Build",
+			"problemMatcher": [
+				"$platformio"
+			],
+			"group": "build",
+			"label": "PlatformIO: Build"
 		}
 	]
 }

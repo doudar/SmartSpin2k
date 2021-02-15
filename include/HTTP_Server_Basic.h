@@ -5,21 +5,21 @@
 // This work is licensed under the GNU General Public License v2
 // Prototype hardware build from plans in the SmartSpin2k repository are licensed under Cern Open Hardware Licence version 2 Permissive
 
-#ifndef HTTP_SERVER_BASIC_H
-#define HTTP_SERVER_BASIC_H
+#pragma once
 
 #include <Arduino.h>
 
 void startHttpServer();
-void webClientUpdate(void * pvParameters);
+void webClientUpdate(void *pvParameters);
 void handleSpiffsFile();
 void handleIndexFile();
 void handleHrSlider();
 void FirmwareUpdate();
+
+#ifdef USE_TELEGRAM
 void sendTelegram(String textToSend);
 void telegramUpdate(void *pvParameters);
+#endif
 
 //wifi Function
 void startWifi();
-
-#endif
