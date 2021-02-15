@@ -104,7 +104,7 @@ static void notifyCallback(
             if (bitRead(flags, 2))
             {
                 //accumulated torque field present
-                cPos++;
+                cPos+=2;
             }
             if (bitRead(flags, 3))
             {

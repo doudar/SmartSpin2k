@@ -9,7 +9,7 @@
 #pragma once
 
 //Current program version info. Used for auto updates
-#define FIRMWARE_VERSION "1.2.6"
+#define FIRMWARE_VERSION "1.2.12"
 
 //Update firmware on boot?
 #define AUTO_FIRMWARE_UPDATE true
@@ -119,7 +119,6 @@
 #ifdef USE_TELEGRAM
     //Max number of telegram messages to send per session
     #define MAX_TELEGRAM_MESSAGES 5
-
     //Filler definitions for if telegram_token.h is not included (because it has sensitive information). 
     //Do not change these as this file is tracked and therefore public. Enter your own Telegram info into telegram_token.h   
     #ifndef TELEGRAM_SECRETS
