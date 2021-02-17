@@ -20,7 +20,9 @@
 //Default WiFi Password
 #define DEFAULT_PASSWORD "password"
 
-//default URL To get Updates From
+//default URL To get Updates From.
+//If changed you'll also need to get a root certificate from the new server
+//and put it in /include/cert.h
 #define FW_UPDATEURL "https://raw.githubusercontent.com/doudar/OTAUpdates/main/"
 
 //File that contains Version info
