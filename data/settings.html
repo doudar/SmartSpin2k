@@ -36,7 +36,9 @@
               <td>
                 <p class="tooltip">Password<span class="tooltiptext">Password for the WiFi network.</span></p>
               </td>
-              <td><input type="text" id="password" name="password" value="loading" />
+              <td><input type="password" id="password" name="password" value="loading" />
+                <input type="checkbox" id="showpassword" name="showpassword" onclick="toggleShowPassword()">
+                <p class="tooltip">Show<span class="tooltiptext">Show the password for the WiFi network.</span></p>
               </td>
             </tr>
             <tr>
@@ -175,6 +177,15 @@
     var sliderValue = element.value;
     valueElement.innerHTML = sliderValue;
   }
+
+  function toggleShowPassword() {
+    var x = document.getElementById("password");
+    if (x.type === "password") {
+      x.type = "text";
+    } else {
+      x.type = "password";
+    }
+  } 
 
 </script>
 
