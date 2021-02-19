@@ -52,8 +52,8 @@ In short, the process is:
 
 ### If you aren't a software developer:
 1. Download https://github.com/doudar/SmartSpin2k/releases/download/0.1.1.11/firmware.bin
-2. Download the esphome flash tool https://github.com/esphome/esphome-flasher/releases/tag/v1.3.0
-3. Plug in your ESP32, open the esphome flash tool and flash the firmware.bin.
+2. Download the SmartSpin2K flash tool https://github.com/doudar/SmartSpin2K-flasher/releases/tag/0.0.1
+3. Plug in your ESP32, open the SmartSpin2K flash tool and flash the firmware.bin.
 4. Connect to the new wireless network SmartSpin2K (password is password) and enter your home network information, then the ESP32 will finish the installation automatically. 
 
 ### If you are a developer: 
