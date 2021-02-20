@@ -106,6 +106,19 @@ static void notifyCallback(
         }
     }
 
+        //Set data from Fitness Machine Service 
+    if (pBLERemoteCharacteristic->getUUID() == FITNESSMACHINEINDOORBIKEDATA_UUID)
+    {
+        debugDirector("Indoor Bike Data: ", false);
+
+        if (pData[0] == 0xFF)
+        {
+            userConfig.setSimulatedWatts(bytes_to_u16(pData[10], pData[9]));
+            userConfig.setSimulatedCad(bytes_to_u16(pData[5], pData[4]));
+            debugDirector(String(userConfig.getSimulatedWatts()) + "W " + String(userConfig.getSimulatedCad()) + " CAD");
+        }
+    }
+
     //Calculate Cadence and power from Cycling Power Measurement
     if (pBLERemoteCharacteristic->getUUID() == CYCLINGPOWERMEASUREMENT_UUID)
     {
@@ -212,11 +225,17 @@ bool SpinBLEClient::connectToServer()
             charUUID = FLYWHEEL_UART_TX_UUID;
             debugDirector("trying to connect to Flywheel Bike");
         }
-        else
+        else if (myDevice->isAdvertisingService(CYCLINGPOWERSERVICE_UUID))
         {
             serviceUUID = CYCLINGPOWERSERVICE_UUID;
             charUUID = CYCLINGPOWERMEASUREMENT_UUID;
             debugDirector("trying to connect to PM");
+        }
+        else if (myDevice->isAdvertisingService(FITNESSMACHINESERVICE_UUID))
+        {
+            serviceUUID = FITNESSMACHINESERVICE_UUID;
+            charUUID = FITNESSMACHINEINDOORBIKEDATA_UUID;
+            debugDirector("trying to connect to Fitness machine service");
         }
     }
     else if (doConnectHR)
@@ -303,7 +322,7 @@ bool SpinBLEClient::connectToServer()
             {
 
                 pRemoteCharacteristic->subscribe(true, notifyCallback);
-                if (pRemoteService->getUUID() == CYCLINGPOWERSERVICE_UUID)
+                if (pRemoteService->getUUID() == CYCLINGPOWERSERVICE_UUID || pRemoteService->getUUID() == FLYWHEEL_UART_SERVICE_UUID || pRemoteService->getUUID() == FITNESSMACHINESERVICE_UUID)
                 {
                     debugDirector("Found PM on reconnect");
                     connectedPM = true;
@@ -399,7 +418,7 @@ bool SpinBLEClient::connectToServer()
     if (sucessful > 0)
     {
 
-        if (pRemoteService->getUUID() == CYCLINGPOWERSERVICE_UUID)
+        if (pRemoteService->getUUID() == CYCLINGPOWERSERVICE_UUID || pRemoteService->getUUID() == FLYWHEEL_UART_SERVICE_UUID || pRemoteService->getUUID() == FITNESSMACHINESERVICE_UUID)
         {
             connectedPM = true;
             doConnectPM = false;
@@ -441,7 +460,7 @@ void SpinBLEClient::MyClientCallback::onDisconnect(BLEClient *pclient)
         spinBLEClient.doConnectHR = true; //try rapid reconnect
         return;
     }
-    if ((pclient->getService(CYCLINGPOWERSERVICE_UUID) || pclient->getService(FLYWHEEL_UART_SERVICE_UUID)) && (!(pclient->isConnected())))
+    if ((pclient->getService(CYCLINGPOWERSERVICE_UUID) || pclient->getService(FLYWHEEL_UART_SERVICE_UUID) || pclient->getService(FITNESSMACHINESERVICE_UUID)) && (!(pclient->isConnected())))
     {
 
         debugDirector("Detected PM Disconnect. Trying rapid reconnect");
@@ -478,7 +497,7 @@ void SpinBLEClient::MyAdvertisedDeviceCallback::onResult(BLEAdvertisedDevice *ad
     debugDirector("BLE Advertised Device found: " + String(advertisedDevice->toString().c_str()));
     const char *c_PM = userConfig.getconnectedPowerMeter();
     const char *c_HR = userConfig.getconnectedHeartMonitor();
-    if ((advertisedDevice->haveServiceUUID()) && (advertisedDevice->isAdvertisingService(CYCLINGPOWERSERVICE_UUID) || advertisedDevice->isAdvertisingService(FLYWHEEL_UART_SERVICE_UUID)))
+    if ((advertisedDevice->haveServiceUUID()) && (advertisedDevice->isAdvertisingService(CYCLINGPOWERSERVICE_UUID) || advertisedDevice->isAdvertisingService(FLYWHEEL_UART_SERVICE_UUID) || advertisedDevice->isAdvertisingService(FITNESSMACHINESERVICE_UUID)))
     {
         if ((advertisedDevice->getName() == c_PM) || (advertisedDevice->getAddress().toString().c_str() == c_PM) || (String(c_PM) == ("any")))
         {
@@ -525,7 +544,7 @@ void SpinBLEClient::scanProcess()
     for (int i = 0; i < count; i++)
     {
         BLEAdvertisedDevice d = foundDevices.getDevice(i);
-        if (d.isAdvertisingService(CYCLINGPOWERSERVICE_UUID) || d.isAdvertisingService(HEARTSERVICE_UUID) || d.isAdvertisingService(FLYWHEEL_UART_SERVICE_UUID))
+        if (d.isAdvertisingService(CYCLINGPOWERSERVICE_UUID) || d.isAdvertisingService(HEARTSERVICE_UUID) || d.isAdvertisingService(FLYWHEEL_UART_SERVICE_UUID) || d.isAdvertisingService(FITNESSMACHINESERVICE_UUID))
         {
             device = "device " + String(i);
             devices[device]["address"] = d.getAddress().toString();
