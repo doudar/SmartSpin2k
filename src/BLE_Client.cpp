@@ -109,14 +109,10 @@ static void notifyCallback(
         //Set data from Fitness Machine Service 
     if (pBLERemoteCharacteristic->getUUID() == FITNESSMACHINEINDOORBIKEDATA_UUID)
     {
-        debugDirector("Indoor Bike Data: ", false);
-
-        if (pData[0] == 0xFF) //This may work with the Schwinn IC4 but needs flag reading to get working properly. 
-        {
+        debugDirector("Indoor Bike Data: ", true);
             userConfig.setSimulatedWatts(bytes_to_u16(pData[7], pData[6]));
             userConfig.setSimulatedCad(bytes_to_u16(pData[5], pData[4]));
             debugDirector(String(userConfig.getSimulatedWatts()) + "W " + String(userConfig.getSimulatedCad()) + " CAD");
-        }
     }
 
     //Calculate Cadence and power from Cycling Power Measurement
@@ -532,7 +528,6 @@ void SpinBLEClient::scanProcess()
     pBLEScan->setWindow(500);
     pBLEScan->setActiveScan(true);
     BLEScanResults foundDevices = pBLEScan->start(10, false);
-
     // Load the scan into a Json String
     int count = foundDevices.getCount();
 

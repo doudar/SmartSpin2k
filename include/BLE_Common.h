@@ -6,8 +6,7 @@
 // Prototype hardware build from plans in the SmartSpin2k repository are licensed under Cern Open Hardware Licence version 2 Permissive
 //
 
-#ifndef BLE_COMMON_H
-#define BLE_COMMON_H
+#pragma
 
 //#define CONFIG_SW_COEXIST_ENABLE 1
 
@@ -124,4 +123,3 @@ private:
 };
 
 extern SpinBLEClient spinBLEClient;
-#endif
