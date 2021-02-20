@@ -109,6 +109,11 @@ static void notifyCallback(
         //Set data from Fitness Machine Service 
     if (pBLERemoteCharacteristic->getUUID() == FITNESSMACHINEINDOORBIKEDATA_UUID)
     {
+            if(pData[2]>0)
+            {
+                userConfig.setSimulatedHr(pData[2]);
+                debugDirector("Bike HR: " + String(pData[2]));
+            }
             userConfig.setSimulatedWatts(bytes_to_u16(pData[7], pData[6]));
             userConfig.setSimulatedCad((bytes_to_u16(pData[5], pData[4]))/2);
             debugDirector(" Indoor Bike Data: " + String(userConfig.getSimulatedWatts()) + "W " + String(userConfig.getSimulatedCad()) + " CAD");
