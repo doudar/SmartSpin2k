@@ -111,9 +111,9 @@ static void notifyCallback(
     {
         debugDirector("Indoor Bike Data: ", false);
 
-        if (pData[0] == 0xFF)
+        if (pData[0] == 0xFF) //This may work with the Schwinn IC4 but needs flag reading to get working properly. 
         {
-            userConfig.setSimulatedWatts(bytes_to_u16(pData[10], pData[9]));
+            userConfig.setSimulatedWatts(bytes_to_u16(pData[7], pData[6]));
             userConfig.setSimulatedCad(bytes_to_u16(pData[5], pData[4]));
             debugDirector(String(userConfig.getSimulatedWatts()) + "W " + String(userConfig.getSimulatedCad()) + " CAD");
         }
@@ -322,7 +322,7 @@ bool SpinBLEClient::connectToServer()
             {
 
                 pRemoteCharacteristic->subscribe(true, notifyCallback);
-                if (pRemoteService->getUUID() == CYCLINGPOWERSERVICE_UUID || pRemoteService->getUUID() == FLYWHEEL_UART_SERVICE_UUID || pRemoteService->getUUID() == FITNESSMACHINESERVICE_UUID)
+                if (myDevice == myPowerMeter)
                 {
                     debugDirector("Found PM on reconnect");
                     connectedPM = true;
@@ -331,7 +331,7 @@ bool SpinBLEClient::connectToServer()
                     lastConnectedPMID = pClient->getConnId();
                 }
 
-                if (pRemoteService->getUUID() == HEARTSERVICE_UUID)
+                if (myDevice == myHeartMonitor)
                 {
                     debugDirector("Found HRM on reconnect");
                     connectedHR = true;
@@ -418,7 +418,7 @@ bool SpinBLEClient::connectToServer()
     if (sucessful > 0)
     {
 
-        if (pRemoteService->getUUID() == CYCLINGPOWERSERVICE_UUID || pRemoteService->getUUID() == FLYWHEEL_UART_SERVICE_UUID || pRemoteService->getUUID() == FITNESSMACHINESERVICE_UUID)
+        if (myDevice == myPowerMeter)
         {
             connectedPM = true;
             doConnectPM = false;
@@ -426,13 +426,12 @@ bool SpinBLEClient::connectToServer()
             lastConnectedPMID = pClient->getConnId();
         }
 
-        if (pRemoteService->getUUID() == HEARTSERVICE_UUID)
+        if (myDevice == myHeartMonitor)
         {
             connectedHR = true;
             doConnectHR = false;
             debugDirector("Sucessful HRM");
         }
-        debugDirector("Returning True");
         reconnectTries = MAX_RECONNECT_TRIES;
         return true;
     }
