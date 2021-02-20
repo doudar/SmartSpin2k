@@ -89,13 +89,13 @@ static void notifyCallback(
     //Set data from Flywheel Bike
     if (pBLERemoteCharacteristic->getUUID() == FLYWHEEL_UART_SERVICE_UUID)
     {
-        debugDirector("Flywheel Data: ", false);
+        
 
         if (pData[0] == 0xFF)
         {
             userConfig.setSimulatedWatts(bytes_to_u16(pData[4], pData[3]));
             userConfig.setSimulatedCad(pData[12]);
-            debugDirector(String(userConfig.getSimulatedWatts()) + "W " + String(userConfig.getSimulatedCad()) + " CAD");
+            debugDirector(" Flywheel Data: " + String(userConfig.getSimulatedWatts()) + "W " + String(userConfig.getSimulatedCad()) + " CAD");
 
             //May need to update the connection params here as below but I'll see if Flywheel likes our current settings first
             // static bool firstloop = true;
@@ -109,10 +109,9 @@ static void notifyCallback(
         //Set data from Fitness Machine Service 
     if (pBLERemoteCharacteristic->getUUID() == FITNESSMACHINEINDOORBIKEDATA_UUID)
     {
-            debugDirector("Indoor Bike Data: ", false);
             userConfig.setSimulatedWatts(bytes_to_u16(pData[7], pData[6]));
             userConfig.setSimulatedCad(bytes_to_u16(pData[5], pData[4]));
-            debugDirector(String(userConfig.getSimulatedWatts()) + "W " + String(userConfig.getSimulatedCad()) + " CAD");
+            debugDirector(" Indoor Bike Data: " + String(userConfig.getSimulatedWatts()) + "W " + String(userConfig.getSimulatedCad()) + " CAD");
     }
 
     //Calculate Cadence and power from Cycling Power Measurement

@@ -6,7 +6,7 @@
 // Prototype hardware build from plans in the SmartSpin2k repository are licensed under Cern Open Hardware Licence version 2 Permissive
 //
 
-#pragma
+#pragma once
 
 //#define CONFIG_SW_COEXIST_ENABLE 1
 
