@@ -135,7 +135,7 @@ void startBLEServer()
 
   fitnessMachineFeature->setValue(ftmsFeature, 8);
   fitnessMachineControlPoint->setValue(ftmsControlPoint, 8);
-  fitnessMachineIndoorBikeData->setValue(ftmsIndoorBikeData, 13); //Maybe enable this later. Now just exposing the char and basically saying get it from the power service.
+  fitnessMachineIndoorBikeData->setValue(ftmsIndoorBikeData, 13);
   fitnessMachineStatus->setValue(ftmsMachineStatus, 8);
   fitnessMachineResistanceLevelRange->setValue(ftmsResistanceLevelRange, 6);
   fitnessMachinePowerRange->setValue(ftmsPowerRange, 6);
@@ -276,7 +276,7 @@ void computeCSC() //What was SIG smoking when they came up with the Cycling Spee
     remainder = spinBLEClient.cscLastCrankEvtTime % 256;
     cyclingPowerMeasurement[7] = remainder;
     cyclingPowerMeasurement[8] = quotient;
-  } //^^Using the Old Way of setting Bytes.
+  } //^^Using the old way of setting bytes because I like it and it makes more sense to me looking at it.
 }
 
 void updateIndoorBikeDataChar()

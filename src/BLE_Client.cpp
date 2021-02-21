@@ -89,8 +89,7 @@ static void notifyCallback(
     //Set data from Flywheel Bike
     if (pBLERemoteCharacteristic->getUUID() == FLYWHEEL_UART_SERVICE_UUID)
     {
-        
-
+        debugDirector("Flywheel Data: ", false);
         if (pData[0] == 0xFF)
         {
             userConfig.setSimulatedWatts(bytes_to_u16(pData[4], pData[3]));
@@ -100,26 +99,78 @@ static void notifyCallback(
             //May need to update the connection params here as below but I'll see if Flywheel likes our current settings first
             // static bool firstloop = true;
             // if(firstloop){
-            // pBLERemoteCharacteristic->getRemoteService()->getClient()->updateConnParams(16,60,0,400); 
+            // pBLERemoteCharacteristic->getRemoteService()->getClient()->updateConnParams(16,60,0,400);
             // firstloop = false;
             // }
         }
     }
 
-        //Set data from Fitness Machine Service 
+    //Set data from Fitness Machine Service
     if (pBLERemoteCharacteristic->getUUID() == FITNESSMACHINEINDOORBIKEDATA_UUID)
     {
-           // byte flags = pData[0];
-           // if (bitRead(flags, 9)){
-            if(pData[8]>0)
+        byte flags = bytes_to_u16(pData[1], pData[0]); //two bytes in this bit field
+        int dPos = 2;                                  //lowest position any data could be
+
+        if (bitRead(flags, 0)) //Instantaneous Speed field
+        {
+            dPos += 2;
+        }
+        if (bitRead(flags, 1)) //Average Speed present
+        {
+            dPos += 2;
+        }
+        if (bitRead(flags, 2)) //Instantaneous Cadence
+        {
+            userConfig.setSimulatedCad((bytes_to_u16(pData[dPos + 1], pData[dPos])) / 2);
+            dPos += 2;
+        }
+        if (bitRead(flags, 3)) //Average Cadence present
+        {
+            dPos += 2;
+        }
+        if (bitRead(flags, 4)) //Total Distance Present
+        {
+            dPos += 3;
+        }
+        if (bitRead(flags, 5)) //Resistance Level Present
+        {
+            dPos += 2;
+        }
+        if (bitRead(flags, 6)) //Instantaneous Power Present
+        {
+            userConfig.setSimulatedWatts(bytes_to_u16(pData[dPos + 1], pData[dPos]));
+            dPos += 2;
+        }
+        if (bitRead(flags, 7)) //Average Power Present
+        {
+            dPos += 2;
+        }
+        if (bitRead(flags, 8)) //Expended Energy Present
+        {
+            dPos += 5;
+        }
+        if (bitRead(flags, 9)) //Heart Rate Present
+        {
+            if (pData[8] > 0) //Throwing out zero's
             {
                 userConfig.setSimulatedHr(pData[8]);
-                debugDirector("Bike HR: " + String(pData[8]));
             }
-           // }
-            userConfig.setSimulatedWatts(bytes_to_u16(pData[7], pData[6]));
-            userConfig.setSimulatedCad((bytes_to_u16(pData[5], pData[4]))/2);
-            debugDirector(" Indoor Bike Data: " + String(userConfig.getSimulatedWatts()) + "W " + String(userConfig.getSimulatedCad()) + " CAD");
+            dPos += 1;
+        }
+
+        if (bitRead(flags, 10)) //Metabolic Equivalent Present
+        {
+            dPos += 1;
+        }
+        if (bitRead(flags, 11)) //Elapsed Time Present
+        {
+            dPos += 2;
+        }
+        if (bitRead(flags, 12)) //Remaining Time Present
+        {
+            dPos += 2;
+        }
+        //debugDirector(" Indoor Bike Data: " + String(userConfig.getSimulatedWatts()) + "W " + String(userConfig.getSimulatedCad()) + " CAD");
     }
 
     //Calculate Cadence and power from Cycling Power Measurement
@@ -143,7 +194,7 @@ static void notifyCallback(
             if (bitRead(flags, 2))
             {
                 //accumulated torque field present
-                cPos+=2;
+                cPos += 2;
             }
             if (bitRead(flags, 3))
             {
