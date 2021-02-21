@@ -109,8 +109,9 @@ static void notifyCallback(
     if (pBLERemoteCharacteristic->getUUID() == FITNESSMACHINEINDOORBIKEDATA_UUID)
     {
         byte flags = bytes_to_u16(pData[1], pData[0]); //two bytes in this bit field
-        int dPos = 2;                                  //lowest position any data could be
-
+        int dPos = 4;                                  //lowest position any data could be
+                                        //IC4 Bit field is probably 1001000100
+                                                        //98765432109876543210 - bit placement helper :)
         if (bitRead(flags, 0)) //Instantaneous Speed field
         {
             dPos += 2;
@@ -120,9 +121,9 @@ static void notifyCallback(
             dPos += 2;
         }
         if (bitRead(flags, 2)) //Instantaneous Cadence
-        {
+        {                      //IC4 Offset was 4
             userConfig.setSimulatedCad((bytes_to_u16(pData[dPos + 1], pData[dPos])) / 2);
-            dPos += 2;
+            dPos += 2;      
         }
         if (bitRead(flags, 3)) //Average Cadence present
         {
@@ -137,7 +138,7 @@ static void notifyCallback(
             dPos += 2;
         }
         if (bitRead(flags, 6)) //Instantaneous Power Present
-        {
+        {                      //IC4 offsett was 6
             userConfig.setSimulatedWatts(bytes_to_u16(pData[dPos + 1], pData[dPos]));
             dPos += 2;
         }
