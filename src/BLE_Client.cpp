@@ -79,32 +79,6 @@ static void notifyCallback(
     }
     debugDirector(debugOutput + "<-- " + String(pBLERemoteCharacteristic->getUUID().toString().c_str()), false, true);
 
-    // //Set HR Data
-    // if (pBLERemoteCharacteristic->getUUID() == HEARTCHARACTERISTIC_UUID)
-    // {
-    //     userConfig.setSimulatedHr((int)pData[1]);
-    //     debugDirector(" HRM: " + String(userConfig.getSimulatedHr()), false);
-    //     debugDirector("");
-    // }
-
-    // //Set data from Flywheel Bike
-    // if (pBLERemoteCharacteristic->getUUID() == FLYWHEEL_UART_SERVICE_UUID) {
-    //     debugDirector("Flywheel Data: ", false);
-    //     if (pData[0] == 0xFF)
-    //     {
-    //         userConfig.setSimulatedWatts(bytes_to_u16(pData[4], pData[3]));
-    //         userConfig.setSimulatedCad(pData[12]);
-    //         debugDirector(" Flywheel Data: " + String(userConfig.getSimulatedWatts()) + "W " + String(userConfig.getSimulatedCad()) + " CAD");
-
-    //         //May need to update the connection params here as below but I'll see if Flywheel likes our current settings first
-    //         // static bool firstloop = true;
-    //         // if(firstloop){
-    //         // pBLERemoteCharacteristic->getRemoteService()->getClient()->updateConnParams(16,60,0,400);
-    //         // firstloop = false;
-    //         // }
-    //     }
-    // }
-
     {
         std::unique_ptr<SensorData> sensorData = SensorDataFactory::getSensorData(pBLERemoteCharacteristic, pData, length);
         debugDirector(" SensorData(" + sensorData->getId() + "):[", false);
