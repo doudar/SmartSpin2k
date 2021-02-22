@@ -10,15 +10,19 @@
 #include "BLE_Common.h"
 
 std::unique_ptr<SensorData> SensorDataFactory::getSensorData(BLERemoteCharacteristic *characteristic, uint8_t *data, size_t length) {
+
     if (characteristic->getUUID() == HEARTCHARACTERISTIC_UUID) {
         return std::unique_ptr<SensorData>(new HeartRateData(characteristic, data, length));
     }
+
     if (characteristic->getUUID() == FLYWHEEL_UART_SERVICE_UUID) {
         return std::unique_ptr<SensorData>(new FlywheelData(characteristic, data, length));
     }
+
     if (characteristic->getUUID() == FITNESSMACHINEINDOORBIKEDATA_UUID) {
         return std::unique_ptr<SensorData>(new FitnessMachineIndoorBikeData(characteristic, data, length));
     }
+    
     return std::unique_ptr<SensorData>(new NullData(characteristic, data, length));
 }
 
@@ -26,31 +30,33 @@ String SensorData::getId() {
     return id;
 }
 
-bool NullData::hasHeartRate() { return false; }
-bool NullData::hasCadence() { return false; }
-bool NullData::hasPower() { return false; }
-int NullData::getHeartRate() { return INT_MIN; }
-float NullData::getCadence() { return NAN; }
-int NullData::getPower() { return INT_MIN; }
+bool    NullData::hasHeartRate()        { return false; }
+bool    NullData::hasCadence()          { return false; }
+bool    NullData::hasPower()            { return false; }
+int     NullData::getHeartRate()        { return INT_MIN; }
+float   NullData::getCadence()          { return NAN; }
+int     NullData::getPower()            { return INT_MIN; }
 
-bool HeartRateData::hasHeartRate() { return true; }
-bool HeartRateData::hasCadence() { return false; }
-bool HeartRateData::hasPower() { return false; }
-int HeartRateData::getHeartRate() { return (int)data[1]; }
-float HeartRateData::getCadence() { return NAN; }
-int HeartRateData::getPower() { return INT_MIN; }
+bool    HeartRateData::hasHeartRate()   { return true; }
+bool    HeartRateData::hasCadence()     { return false; }
+bool    HeartRateData::hasPower()       { return false; }
+int     HeartRateData::getHeartRate()   { return (int)data[1]; }
+float   HeartRateData::getCadence()     { return NAN; }
+int     HeartRateData::getPower()       { return INT_MIN; }
 
-bool FlywheelData::hasHeartRate() { return false; }
-bool FlywheelData::hasCadence() { return data[0] == 0xFF; }
-bool FlywheelData::hasPower() { return data[0] == 0xFF; }
-int FlywheelData::getHeartRate() { return INT_MIN; }
-float FlywheelData::getCadence() {
+bool    FlywheelData::hasHeartRate()    { return false; }
+bool    FlywheelData::hasCadence()      { return data[0] == 0xFF; }
+bool    FlywheelData::hasPower()        { return data[0] == 0xFF; }
+int     FlywheelData::getHeartRate()    { return INT_MIN; }
+
+float   FlywheelData::getCadence() {
     if (!hasCadence()) {
         return NAN;
     }
     return float(bytes_to_u16(data[4], data[3]));
 }
-int FlywheelData::getPower() { 
+
+int     FlywheelData::getPower() { 
     if (!hasPower()) {
         return INT_MIN; 
     }
@@ -58,11 +64,11 @@ int FlywheelData::getPower() {
 }
 
 // See: https://github.com/oesmith/gatt-xml/blob/master/org.bluetooth.characteristic.indoor_bike_data.xml
-uint8_t const FitnessMachineIndoorBikeData::flagBitIndices[FieldCount] =    {    0,    1,   2,   3,   4,   5,   6,   7,   8,   8,   8,   9,  10,  11,   12 };
-uint8_t const FitnessMachineIndoorBikeData::flagEnabledValues[FieldCount] = {    0,    1,   1,   1,   1,   1,   1,   1,   1,   1,   1,   1,   1,   1,    1 };
-size_t const FitnessMachineIndoorBikeData::byteSizes[FieldCount] =          {    2,    2,   2,   2,   3,   2,   2,   2,   2,   2,   1,   1,   1,   2,    2 };
-uint8_t const FitnessMachineIndoorBikeData::signedFlags[FieldCount] =       {    0,    0,   0,   0,   0,   1,   1,   1,   0,   0,   0,   0,   0,   0,    0 };
-double_t const FitnessMachineIndoorBikeData::resolutions[FieldCount] =      { 0.01, 0.01, 0.5, 0.5, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 0.1, 1.0,  1.0 };
+uint8_t     const FitnessMachineIndoorBikeData::flagBitIndices[FieldCount] =    {    0,    1,   2,   3,   4,   5,   6,   7,   8,   8,   8,   9,  10,  11,   12 };
+uint8_t     const FitnessMachineIndoorBikeData::flagEnabledValues[FieldCount] = {    0,    1,   1,   1,   1,   1,   1,   1,   1,   1,   1,   1,   1,   1,    1 };
+size_t      const FitnessMachineIndoorBikeData::byteSizes[FieldCount] =         {    2,    2,   2,   2,   3,   2,   2,   2,   2,   2,   1,   1,   1,   2,    2 };
+uint8_t     const FitnessMachineIndoorBikeData::signedFlags[FieldCount] =       {    0,    0,   0,   0,   0,   1,   1,   1,   0,   0,   0,   0,   0,   0,    0 };
+double_t    const FitnessMachineIndoorBikeData::resolutions[FieldCount] =       { 0.01, 0.01, 0.5, 0.5, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 0.1, 1.0,  1.0 };
 
 bool FitnessMachineIndoorBikeData::hasHeartRate() {
     return values[Types::HeartRate] != NAN;
