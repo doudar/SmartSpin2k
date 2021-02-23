@@ -156,36 +156,36 @@ class NullData : public SensorData {
 public:
     NullData(BLERemoteCharacteristic *characteristic, uint8_t *data, size_t length) : SensorData("Null", characteristic, data, length) {};
 
-    virtual bool hasHeartRate();
-    virtual bool hasCadence();
-    virtual bool hasPower();
-    virtual int getHeartRate();
+    virtual bool  hasHeartRate();
+    virtual bool  hasCadence();
+    virtual bool  hasPower();
+    virtual int   getHeartRate();
     virtual float getCadence();
-    virtual int getPower();
+    virtual int   getPower();
 };
 
 class HeartRateData : public SensorData {
 public:
     HeartRateData(BLERemoteCharacteristic *characteristic, uint8_t *data, size_t length) : SensorData("HRM", characteristic, data, length) {};
 
-    virtual bool hasHeartRate();
-    virtual bool hasCadence();
-    virtual bool hasPower();
-    virtual int getHeartRate();
+    virtual bool  hasHeartRate();
+    virtual bool  hasCadence();
+    virtual bool  hasPower();
+    virtual int   getHeartRate();
     virtual float getCadence();
-    virtual int getPower();
+    virtual int   getPower();
 };
 
 class FlywheelData : public SensorData {
 public:
     FlywheelData(BLERemoteCharacteristic *characteristic, uint8_t *data, size_t length) : SensorData("FLYW", characteristic, data, length) {};
 
-    virtual bool hasHeartRate();
-    virtual bool hasCadence();
-    virtual bool hasPower();
-    virtual int getHeartRate();
+    virtual bool  hasHeartRate();
+    virtual bool  hasCadence();
+    virtual bool  hasPower();
+    virtual int   getHeartRate();
     virtual float getCadence();
-    virtual int getPower();
+    virtual int   getPower();
 };
 
 class FitnessMachineIndoorBikeData : public SensorData {
@@ -213,12 +213,12 @@ public:
 
     static constexpr uint8_t FieldCount = Types::RemainingTime + 1;
 
-    virtual bool hasHeartRate();
-    virtual bool hasCadence();
-    virtual bool hasPower();
-    virtual int getHeartRate();
+    virtual bool  hasHeartRate();
+    virtual bool  hasCadence();
+    virtual bool  hasPower();
+    virtual int   getHeartRate();
     virtual float getCadence();
-    virtual int getPower();
+    virtual int   getPower();
 
 private:
     int flags;

@@ -22,7 +22,7 @@ std::unique_ptr<SensorData> SensorDataFactory::getSensorData(BLERemoteCharacteri
     if (characteristic->getUUID() == FITNESSMACHINEINDOORBIKEDATA_UUID) {
         return std::unique_ptr<SensorData>(new FitnessMachineIndoorBikeData(characteristic, data, length));
     }
-    
+
     return std::unique_ptr<SensorData>(new NullData(characteristic, data, length));
 }
 
@@ -64,11 +64,11 @@ int     FlywheelData::getPower() {
 }
 
 // See: https://github.com/oesmith/gatt-xml/blob/master/org.bluetooth.characteristic.indoor_bike_data.xml
-uint8_t     const FitnessMachineIndoorBikeData::flagBitIndices[FieldCount] =    {    0,    1,   2,   3,   4,   5,   6,   7,   8,   8,   8,   9,  10,  11,   12 };
+uint8_t     const FitnessMachineIndoorBikeData::flagBitIndices[FieldCount]    = {    0,    1,   2,   3,   4,   5,   6,   7,   8,   8,   8,   9,  10,  11,   12 };
 uint8_t     const FitnessMachineIndoorBikeData::flagEnabledValues[FieldCount] = {    0,    1,   1,   1,   1,   1,   1,   1,   1,   1,   1,   1,   1,   1,    1 };
-size_t      const FitnessMachineIndoorBikeData::byteSizes[FieldCount] =         {    2,    2,   2,   2,   3,   2,   2,   2,   2,   2,   1,   1,   1,   2,    2 };
-uint8_t     const FitnessMachineIndoorBikeData::signedFlags[FieldCount] =       {    0,    0,   0,   0,   0,   1,   1,   1,   0,   0,   0,   0,   0,   0,    0 };
-double_t    const FitnessMachineIndoorBikeData::resolutions[FieldCount] =       { 0.01, 0.01, 0.5, 0.5, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 0.1, 1.0,  1.0 };
+size_t      const FitnessMachineIndoorBikeData::byteSizes[FieldCount]         = {    2,    2,   2,   2,   3,   2,   2,   2,   2,   2,   1,   1,   1,   2,    2 };
+uint8_t     const FitnessMachineIndoorBikeData::signedFlags[FieldCount]       = {    0,    0,   0,   0,   0,   1,   1,   1,   0,   0,   0,   0,   0,   0,    0 };
+double_t    const FitnessMachineIndoorBikeData::resolutions[FieldCount]       = { 0.01, 0.01, 0.5, 0.5, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 0.1, 1.0,  1.0 };
 
 bool FitnessMachineIndoorBikeData::hasHeartRate() {
     return values[Types::HeartRate] != NAN;
