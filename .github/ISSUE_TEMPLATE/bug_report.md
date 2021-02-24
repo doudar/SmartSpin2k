@@ -8,6 +8,8 @@ assignees: ''
 ---
 <!--
 Do you want to ask a question? Are you looking for support? Please don't post here. Instead please use the discussion page instead at https://github.com/doudar/SmartSpin2k/discussions
+
+Type your responses after the bolded description, steps to reproduce and behavior tags. 
 -->
 ### Description
 
@@ -26,5 +28,5 @@ Do you want to ask a question? Are you looking for support? Please don't post he
 <!-- What actually happens -->
 
 ### Additional Information
-* Include a ZIP file containing your `Configuration.h` or use [Pastebin](https://pastebin.com/) and paste a link in this issue.
+* If you provide debug output and it is long, consider using [Pastebin](https://pastebin.com/) and paste a link in this issue to keep the issue easier to read. 
 * Provide pictures or links to videos that clearly demonstrate the issue.
