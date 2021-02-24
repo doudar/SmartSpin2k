@@ -5,6 +5,8 @@ Http://GitHub.com/doudar/SmartSpin2K
 Hardware (3d Printed) and Software Project that uses an ESP32 and stepper motor to control spin bikes that have a resistance knob. 
 The initial target was to use it with Zwift: stationary bike up hills and feel the burn. 
 
+Optionally, the SmartSpin2K project has also progressed to the point of where it's useful without the hardware as a BLE device multiplexer, heart rate to watt converter (estimator), and proprietary BLE device to normal FTMS protocol converter using only the redily availiable ~$6 ESP32 devkit.   
+
 ## Background
 I travel for a living and some hotels I stay at have spin bikes. I started carrying my own power meter pedals for the spin bikes so I could ride Zwift, but the experience just isn't the same without automatic resistance on the hills. Then one day I was looking down at that simple to turn knob and I had a thought - With the power meter pedals attached, almost everything is already in place on this $300 spin bike to turn it into the equivalent of a $3,000 computer controlled smart bike! And so here we are....
 
