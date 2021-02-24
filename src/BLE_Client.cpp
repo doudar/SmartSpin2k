@@ -12,6 +12,7 @@ BLE Advertised Device found: Name: ASSIOMA17287L, Address: e8:fe:6e:91:9f:16, ap
 #include "Main.h"
 #include "BLE_Common.h"
 
+#include <memory>
 #include <ArduinoJson.h>
 #include <NimBLEDevice.h>
 
@@ -78,32 +79,25 @@ static void notifyCallback(
     }
     debugDirector(debugOutput + "<-- " + String(pBLERemoteCharacteristic->getUUID().toString().c_str()), false, true);
 
-    //Set HR Data
-    if (pBLERemoteCharacteristic->getUUID() == HEARTCHARACTERISTIC_UUID)
     {
-        userConfig.setSimulatedHr((int)pData[1]);
-        debugDirector(" HRM: " + String(userConfig.getSimulatedHr()), false);
-        debugDirector("");
-    }
-
-    //Set data from Flywheel Bike
-    if (pBLERemoteCharacteristic->getUUID() == FLYWHEEL_UART_SERVICE_UUID)
-    {
-        debugDirector("Flywheel Data: ", false);
-
-        if (pData[0] == 0xFF)
-        {
-            userConfig.setSimulatedWatts(bytes_to_u16(pData[4], pData[3]));
-            userConfig.setSimulatedCad(pData[12]);
-            debugDirector(String(userConfig.getSimulatedWatts()) + "W " + String(userConfig.getSimulatedCad()) + " CAD");
-
-            //May need to update the connection params here as below but I'll see if Flywheel likes our current settings first
-            // static bool firstloop = true;
-            // if(firstloop){
-            // pBLERemoteCharacteristic->getRemoteService()->getClient()->updateConnParams(16,60,0,400); 
-            // firstloop = false;
-            // }
+        std::unique_ptr<SensorData> sensorData = SensorDataFactory::getSensorData(pBLERemoteCharacteristic, pData, length);
+        debugDirector(" SensorData(" + sensorData->getId() + "):[", false);
+        if (sensorData->hasHeartRate()) {
+            int heartRate = sensorData->getHeartRate();
+            userConfig.setSimulatedHr(heartRate);
+            debugDirector(" HR(" + String(heartRate) + ")", false);
         }
+        if (sensorData->hasCadence()) {
+            float cadence = sensorData->getCadence();
+            userConfig.setSimulatedCad(cadence);
+            debugDirector(" CD(" + String(cadence) + ")", false);
+        }
+        if (sensorData->hasPower()) {
+            int power = sensorData->getPower();
+            userConfig.setSimulatedWatts(power);
+            debugDirector(" PW(" + String(power) + ")", false);
+        }
+        debugDirector(" ]");
     }
 
     //Calculate Cadence and power from Cycling Power Measurement
@@ -127,7 +121,7 @@ static void notifyCallback(
             if (bitRead(flags, 2))
             {
                 //accumulated torque field present
-                cPos+=2;
+                cPos += 2;
             }
             if (bitRead(flags, 3))
             {
@@ -212,11 +206,17 @@ bool SpinBLEClient::connectToServer()
             charUUID = FLYWHEEL_UART_TX_UUID;
             debugDirector("trying to connect to Flywheel Bike");
         }
-        else
+        else if (myDevice->isAdvertisingService(CYCLINGPOWERSERVICE_UUID))
         {
             serviceUUID = CYCLINGPOWERSERVICE_UUID;
             charUUID = CYCLINGPOWERMEASUREMENT_UUID;
             debugDirector("trying to connect to PM");
+        }
+        else if (myDevice->isAdvertisingService(FITNESSMACHINESERVICE_UUID))
+        {
+            serviceUUID = FITNESSMACHINESERVICE_UUID;
+            charUUID = FITNESSMACHINEINDOORBIKEDATA_UUID;
+            debugDirector("trying to connect to Fitness machine service");
         }
     }
     else if (doConnectHR)
@@ -303,7 +303,7 @@ bool SpinBLEClient::connectToServer()
             {
 
                 pRemoteCharacteristic->subscribe(true, notifyCallback);
-                if (pRemoteService->getUUID() == CYCLINGPOWERSERVICE_UUID)
+                if (myDevice == myPowerMeter)
                 {
                     debugDirector("Found PM on reconnect");
                     connectedPM = true;
@@ -312,7 +312,7 @@ bool SpinBLEClient::connectToServer()
                     lastConnectedPMID = pClient->getConnId();
                 }
 
-                if (pRemoteService->getUUID() == HEARTSERVICE_UUID)
+                if (myDevice == myHeartMonitor)
                 {
                     debugDirector("Found HRM on reconnect");
                     connectedHR = true;
@@ -399,7 +399,7 @@ bool SpinBLEClient::connectToServer()
     if (sucessful > 0)
     {
 
-        if (pRemoteService->getUUID() == CYCLINGPOWERSERVICE_UUID)
+        if (myDevice == myPowerMeter)
         {
             connectedPM = true;
             doConnectPM = false;
@@ -407,13 +407,12 @@ bool SpinBLEClient::connectToServer()
             lastConnectedPMID = pClient->getConnId();
         }
 
-        if (pRemoteService->getUUID() == HEARTSERVICE_UUID)
+        if (myDevice == myHeartMonitor)
         {
             connectedHR = true;
             doConnectHR = false;
             debugDirector("Sucessful HRM");
         }
-        debugDirector("Returning True");
         reconnectTries = MAX_RECONNECT_TRIES;
         return true;
     }
@@ -441,7 +440,7 @@ void SpinBLEClient::MyClientCallback::onDisconnect(BLEClient *pclient)
         spinBLEClient.doConnectHR = true; //try rapid reconnect
         return;
     }
-    if ((pclient->getService(CYCLINGPOWERSERVICE_UUID) || pclient->getService(FLYWHEEL_UART_SERVICE_UUID)) && (!(pclient->isConnected())))
+    if ((pclient->getService(CYCLINGPOWERSERVICE_UUID) || pclient->getService(FLYWHEEL_UART_SERVICE_UUID) || pclient->getService(FITNESSMACHINESERVICE_UUID)) && (!(pclient->isConnected())))
     {
 
         debugDirector("Detected PM Disconnect. Trying rapid reconnect");
@@ -478,7 +477,7 @@ void SpinBLEClient::MyAdvertisedDeviceCallback::onResult(BLEAdvertisedDevice *ad
     debugDirector("BLE Advertised Device found: " + String(advertisedDevice->toString().c_str()));
     const char *c_PM = userConfig.getconnectedPowerMeter();
     const char *c_HR = userConfig.getconnectedHeartMonitor();
-    if ((advertisedDevice->haveServiceUUID()) && (advertisedDevice->isAdvertisingService(CYCLINGPOWERSERVICE_UUID) || advertisedDevice->isAdvertisingService(FLYWHEEL_UART_SERVICE_UUID)))
+    if ((advertisedDevice->haveServiceUUID()) && (advertisedDevice->isAdvertisingService(CYCLINGPOWERSERVICE_UUID) || advertisedDevice->isAdvertisingService(FLYWHEEL_UART_SERVICE_UUID) || advertisedDevice->isAdvertisingService(FITNESSMACHINESERVICE_UUID)))
     {
         if ((advertisedDevice->getName() == c_PM) || (advertisedDevice->getAddress().toString().c_str() == c_PM) || (String(c_PM) == ("any")))
         {
@@ -514,7 +513,6 @@ void SpinBLEClient::scanProcess()
     pBLEScan->setWindow(500);
     pBLEScan->setActiveScan(true);
     BLEScanResults foundDevices = pBLEScan->start(10, false);
-
     // Load the scan into a Json String
     int count = foundDevices.getCount();
 
@@ -525,7 +523,7 @@ void SpinBLEClient::scanProcess()
     for (int i = 0; i < count; i++)
     {
         BLEAdvertisedDevice d = foundDevices.getDevice(i);
-        if (d.isAdvertisingService(CYCLINGPOWERSERVICE_UUID) || d.isAdvertisingService(HEARTSERVICE_UUID) || d.isAdvertisingService(FLYWHEEL_UART_SERVICE_UUID))
+        if (d.isAdvertisingService(CYCLINGPOWERSERVICE_UUID) || d.isAdvertisingService(HEARTSERVICE_UUID) || d.isAdvertisingService(FLYWHEEL_UART_SERVICE_UUID) || d.isAdvertisingService(FITNESSMACHINESERVICE_UUID))
         {
             device = "device " + String(i);
             devices[device]["address"] = d.getAddress().toString();

@@ -6,11 +6,11 @@
 // Prototype hardware build from plans in the SmartSpin2k repository are licensed under Cern Open Hardware Licence version 2 Permissive
 //
 
-#ifndef BLE_COMMON_H
-#define BLE_COMMON_H
+#pragma once
 
 //#define CONFIG_SW_COEXIST_ENABLE 1
 
+#include <memory>
 #include <NimBLEDevice.h>
 #include <Arduino.h>
 
@@ -121,4 +121,110 @@ private:
 };
 
 extern SpinBLEClient spinBLEClient;
-#endif
+
+class SensorData {
+public:
+    SensorData(String id, BLERemoteCharacteristic *characteristic, uint8_t *data, size_t length) : id(id), characteristic(characteristic), data(data), length(length) {};
+
+    String getId();
+    virtual bool hasHeartRate() = 0;
+    virtual bool hasCadence() = 0;
+    virtual bool hasPower() = 0;
+    virtual int getHeartRate() = 0;
+    virtual float getCadence() = 0;
+    virtual int getPower() = 0;
+
+protected:
+    String id;
+    BLERemoteCharacteristic *characteristic;
+    uint8_t *data;
+    size_t length;
+};
+
+class SensorDataFactory {
+public:
+    static std::unique_ptr<SensorData> getSensorData(BLERemoteCharacteristic *characteristic, uint8_t *data, size_t length);
+
+private:
+    SensorDataFactory() {};
+};
+
+class NullData : public SensorData {
+public:
+    NullData(BLERemoteCharacteristic *characteristic, uint8_t *data, size_t length) : SensorData("Null", characteristic, data, length) {};
+
+    virtual bool  hasHeartRate();
+    virtual bool  hasCadence();
+    virtual bool  hasPower();
+    virtual int   getHeartRate();
+    virtual float getCadence();
+    virtual int   getPower();
+};
+
+class HeartRateData : public SensorData {
+public:
+    HeartRateData(BLERemoteCharacteristic *characteristic, uint8_t *data, size_t length) : SensorData("HRM", characteristic, data, length) {};
+
+    virtual bool  hasHeartRate();
+    virtual bool  hasCadence();
+    virtual bool  hasPower();
+    virtual int   getHeartRate();
+    virtual float getCadence();
+    virtual int   getPower();
+};
+
+class FlywheelData : public SensorData {
+public:
+    FlywheelData(BLERemoteCharacteristic *characteristic, uint8_t *data, size_t length) : SensorData("FLYW", characteristic, data, length) {};
+
+    virtual bool  hasHeartRate();
+    virtual bool  hasCadence();
+    virtual bool  hasPower();
+    virtual int   getHeartRate();
+    virtual float getCadence();
+    virtual int   getPower();
+};
+
+class FitnessMachineIndoorBikeData : public SensorData {
+public:
+    FitnessMachineIndoorBikeData(BLERemoteCharacteristic *characteristic, uint8_t *data, size_t length);
+    ~FitnessMachineIndoorBikeData();
+
+    enum Types : uint8_t {
+        InstantaneousSpeed   = 0,
+        AverageSpeed         = 1,
+        InstantaneousCadence = 2,
+        AverageCadence       = 3,
+        TotalDistance        = 4,
+        ResistanceLevel      = 5,
+        InstantaneousPower   = 6,
+        AveragePower         = 7,
+        TotalEnergy          = 8,
+        EnergyPerHour        = 9,
+        EnergyPerMinute      = 10,
+        HeartRate            = 11,
+        MetabolicEquivalent  = 12,
+        ElapsedTime          = 13,
+        RemainingTime        = 14
+    };
+
+    static constexpr uint8_t FieldCount = Types::RemainingTime + 1;
+
+    virtual bool  hasHeartRate();
+    virtual bool  hasCadence();
+    virtual bool  hasPower();
+    virtual int   getHeartRate();
+    virtual float getCadence();
+    virtual int   getPower();
+
+private:
+    int flags;
+    double_t *values;
+
+    static uint8_t const flagBitIndices[];
+    static uint8_t const flagEnabledValues[];
+    static size_t const byteSizes[];
+    static uint8_t const signedFlags[];
+    static double_t const resolutions[];
+    static int convert(int value, size_t length, uint8_t isSigned);
+};
