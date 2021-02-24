@@ -39,9 +39,6 @@
 #define FLYWHEEL_UART_SERVICE_UUID BLEUUID((uint16_t)0xCA9E)
 #define FLYWHEEL_UART_RX_UUID BLEUUID((uint16_t)0xCA9E)
 #define FLYWHEEL_UART_TX_UUID BLEUUID((uint16_t)0xCA9E)
-//#define FLYWHEEL_UART_SERVICE_UUID BLEUUID("6e400001b5a3f393e0a9e50e24dcca9e")
-//#define FLYWHEEL_UART_RX_UUID BLEUUID("6e400002b5a3f393e0a9e50e24dcca9e")
-//#define FLYWHEEL_UART_TX_UUID BLEUUID("6e400003b5a3f393e0a9e50e24dcca9e")
 
 // macros to convert different types of bytes into int The naming here sucks and should be fixed.
 #define bytes_to_s16(MSB, LSB) (((signed int)((signed char)MSB))) << 8 | (((signed char)LSB))
