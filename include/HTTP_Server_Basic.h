@@ -15,7 +15,6 @@ void handleSpiffsFile();
 void handleIndexFile();
 void handleHrSlider();
 void FirmwareUpdate();
-void resolve_mdns_host(const char * host_name);
 
 #ifdef USE_TELEGRAM
 void sendTelegram(String textToSend);

@@ -463,7 +463,6 @@ void startHttpServer()
 
 void webClientUpdate(void *pvParameters)
 {
-  static unsigned long mDnsTimer = millis();
   for (;;)
   {
     server.handleClient();
@@ -471,12 +470,6 @@ void webClientUpdate(void *pvParameters)
     if (WiFi.getMode() == WIFI_AP)
     {
       dnsServer.processNextRequest();
-    }
-    //Keep MDNS alive
-    if((millis()-mDnsTimer)>120000)
-    {
-      resolve_mdns_host(userConfig.getDeviceName());
-      mDnsTimer = millis(); 
     }
   }
 }
@@ -607,24 +600,6 @@ void FirmwareUpdate()
   }
 }
 
-void resolve_mdns_host(const char * host_name)
-{
-    debugDirector("Query A: %s.local", host_name);
-
-    struct ip4_addr addr;
-    addr.addr = 0;
-
-    esp_err_t err = mdns_query_a(host_name, 2000,  &addr);
-    if(err){
-        if(err == ESP_ERR_NOT_FOUND){
-            debugDirector("Host was not found!");
-            return;
-        }
-        debugDirector("Query Failed");
-        return;
-    }
-}
-
 #ifdef USE_TELEGRAM
 //Function to handle sending telegram text to the non blocking task
 void sendTelegram(String textToSend)
@@ -683,5 +658,4 @@ void telegramUpdate(void *pvParameters)
     vTaskDelay(4000 / portTICK_RATE_MS);
   }
 }
-
 #endif
