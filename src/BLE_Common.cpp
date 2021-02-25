@@ -17,12 +17,14 @@ uint8_t     const FitnessMachineIndoorBikeData::signedFlags[FieldCount]       = 
 double_t    const FitnessMachineIndoorBikeData::resolutions[FieldCount]       = { 0.01, 0.01, 0.5, 0.5, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 0.1, 1.0,  1.0 };
 
 //https://github.com/oesmith/gatt-xml/blob/master/org.bluetooth.characteristic.cycling_power_measurement.xml
-//                                                                               IPWR, PPB,  PPR,    AT, ATS,    WRD,    CRD, EFM,  ETM,  EA, TDS, BDS,   AE, OCI 
-uint8_t     const CyclingPowerMeasurement::flagBitIndices[FieldCount]         = {  37,    0,    1,     2,   3,      4,      5,   6,    7,   8,   9,  10,   11,  12};
-uint8_t     const CyclingPowerMeasurement::flagEnabledValues[FieldCount]      = {   0,    1,    1,     1,   1,      1,      1,   1,    1,   1,   1,   1,   1,   1};
-size_t      const CyclingPowerMeasurement::byteSizes[FieldCount]              = {   2,    1,    0,     2,   0,      6,      4,   4,    4,   6,   2,   2,   2,   0};
-uint8_t     const CyclingPowerMeasurement::signedFlags[FieldCount]            = {   1,    0,    0,     0,   0,      0,      0,   1,    1,   0,   0,   0,   0,   0};
-double_t    const CyclingPowerMeasurement::resolutions[FieldCount]            = {   1,  1.0,   .5,  1/32, 1.0, 1/2048, 1/1024, 1.0, 1/32, 1.0, 1.0, 1.0, 1.0, 1.0};
+//    
+//                                                                              IPWR, PPB,  PPR,    AT, ATS,    WRD,    CRD, EFM,  ETM,  EA, TDS, BDS,   AE,  OCI 
+int8_t      const CyclingPowerMeasurement::flagBitIndices[FieldCount]        = {  -1,    0,    1,     2,   3,      4,      5,   6,    7,   8,   9,  10,   11,  12};
+uint8_t     const CyclingPowerMeasurement::flagEnabledValues[FieldCount]      = {   0,    1,    1,     1,   1,      1,      1,   1,    1,   1,   1,   1,    1,   1};
+size_t      const CyclingPowerMeasurement::byteSizes[FieldCount]              = {   2,    1,    0,     2,   0,      6,      4,   4,    4,   6,   2,   2,    2,   0};
+uint8_t     const CyclingPowerMeasurement::signedFlags[FieldCount]            = {   1,    0,    0,     0,   0,      0,      0,   1,    1,   0,   0,   0,    0,   0};
+double_t    const CyclingPowerMeasurement::resolutions[FieldCount]            = { 1.0,  1.0,  1.0,   1.0, 1.0,    1.0,    .5, 1.0,  1.0, 1.0, 1.0, 1.0,  1.0, 1.0};
+//double_t    const CyclingPowerMeasurement::resolutions[FieldCount]            = {   1,  1.0,   .5,  1/32, 1.0, 1/2048, 1/1024, 1.0, 1/32, 1.0, 1.0, 1.0,  1.0, 1.0};
 
 std::unique_ptr<SensorData> SensorDataFactory::getSensorData(BLERemoteCharacteristic *characteristic, uint8_t *data, size_t length) {
 

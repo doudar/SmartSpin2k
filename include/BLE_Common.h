@@ -263,7 +263,7 @@ private:
     int flags;
     double_t *values;
 
-    static uint8_t const flagBitIndices[];
+    static int8_t const flagBitIndices[];
     static uint8_t const flagEnabledValues[];
     static size_t const byteSizes[];
     static uint8_t const signedFlags[];
