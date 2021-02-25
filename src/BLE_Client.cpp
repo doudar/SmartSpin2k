@@ -100,7 +100,7 @@ static void notifyCallback(
         debugDirector(" ]");
     }
 
-    //Calculate Cadence and power from Cycling Power Measurement
+    /*Calculate Cadence and power from Cycling Power Measurement
     if (pBLERemoteCharacteristic->getUUID() == CYCLINGPOWERMEASUREMENT_UUID)
     {
         if (pBLERemoteCharacteristic->getRemoteService()->getClient()->getConnId() == spinBLEClient.lastConnectedPMID) //disregarding other pm's that may still be connected
@@ -186,7 +186,7 @@ static void notifyCallback(
             pBLERemoteCharacteristic->getRemoteService()->getClient()->disconnect();
             //NimBLEDevice::deleteClient(pBLERemoteCharacteristic->getRemoteService()->getClient()); //this was an old client, disconnect it.
         }
-    }
+    }*/
 }
 
 bool SpinBLEClient::connectToServer()

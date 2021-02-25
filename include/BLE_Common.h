@@ -127,12 +127,12 @@ public:
     SensorData(String id, BLERemoteCharacteristic *characteristic, uint8_t *data, size_t length) : id(id), characteristic(characteristic), data(data), length(length) {};
 
     String getId();
-    virtual bool hasHeartRate() = 0;
-    virtual bool hasCadence() = 0;
-    virtual bool hasPower() = 0;
-    virtual int getHeartRate() = 0;
-    virtual float getCadence() = 0;
-    virtual int getPower() = 0;
+    virtual bool  hasHeartRate() = 0;
+    virtual bool  hasCadence() =   0;
+    virtual bool  hasPower() =     0;
+    virtual int   getHeartRate() = 0;
+    virtual float getCadence() =   0;
+    virtual int   getPower() =     0;
 
 protected:
     String id;
@@ -209,6 +209,48 @@ public:
     };
 
     static constexpr uint8_t FieldCount = Types::RemainingTime + 1;
+
+    virtual bool  hasHeartRate();
+    virtual bool  hasCadence();
+    virtual bool  hasPower();
+    virtual int   getHeartRate();
+    virtual float getCadence();
+    virtual int   getPower();
+
+private:
+    int flags;
+    double_t *values;
+
+    static uint8_t const flagBitIndices[];
+    static uint8_t const flagEnabledValues[];
+    static size_t const byteSizes[];
+    static uint8_t const signedFlags[];
+    static double_t const resolutions[];
+    static int convert(int value, size_t length, uint8_t isSigned);
+};
+
+class CyclingPowerMeasurement : public SensorData {
+public:
+    CyclingPowerMeasurement(BLERemoteCharacteristic *characteristic, uint8_t *data, size_t length);
+    ~CyclingPowerMeasurement();
+
+    enum Types : uint8_t {
+        InstantaneousPower   = 0,
+        PedalPowerBalance    = 1,
+        PedalBalanceRef      = 2,
+        AccumulatedTorque    = 3,
+        AccumulatedTorqueSrc = 4,
+        WheelRevolutionData  = 5,
+        CrankRevolutionData  = 6,
+        ExtremeForceMag      = 7,
+        ExtremeTorqueMag     = 8,
+        ExtremeAngles        = 9,
+        TopDeadSpot          = 10,
+        BottomDeadSpot       = 11,
+        AccumulatedEnergy    = 12,
+        OffsetCompensation   = 13
+    };
+    static constexpr uint8_t FieldCount = Types::OffsetCompensation + 1;
 
     virtual bool  hasHeartRate();
     virtual bool  hasCadence();
