@@ -17,7 +17,7 @@ void BLE_CPSDecode(NimBLERemoteCharacteristic *pBLERemoteCharacteristic)
     if (pBLERemoteCharacteristic->getUUID() == CYCLINGPOWERMEASUREMENT_UUID) //double checking this was 
     {
         std::string pData = pBLERemoteCharacteristic->getValue();
-        if (pBLERemoteCharacteristic->getRemoteService()->getClient()->getConnId() == spinBLEClient.lastConnectedPMID) //disregarding other pm's that may still be connected
+        if (pBLERemoteCharacteristic->getRemoteService()->getClient()->getConnId() == spinBLEClient.myBLEDevices.powerSourceOne.connectedClientID) //disregarding other pm's that may still be connected
         {
             byte flags = pData[0];
             int cPos = 2; //lowest position cadence could ever be

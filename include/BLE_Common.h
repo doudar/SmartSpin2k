@@ -76,6 +76,37 @@ class MyCallbacks : public BLECharacteristicCallbacks
 //We're only going to run one anyway.
 void bleClientTask(void *pvParameters);  
 
+class advertisedBLEDevice{
+    public:
+    BLEAdvertisedDevice *advertisedDevice = nullptr;
+    int connectedClientID                 = -1; 
+    BLEUUID serviceUUID = (uint16_t)0x0000;
+    BLEUUID charUUID = (uint16_t)0x0000;
+    
+    void set(BLEAdvertisedDevice *device, int id = -1, BLEUUID inserviceUUID = (uint16_t)0x0000, BLEUUID incharUUID = (uint16_t)0x0000){
+        advertisedDevice  = device;
+        connectedClientID = id; 
+        serviceUUID = BLEUUID(inserviceUUID);
+        charUUID    = BLEUUID(incharUUID);
+        Serial.println("help me " + String(serviceUUID.toString().c_str()));
+    }
+
+    void reset() {
+    advertisedDevice                      = nullptr;
+    connectedClientID                     = -1; 
+    serviceUUID                           = (uint16_t)0x0000;
+    charUUID                              = (uint16_t)0x0000;
+    } 
+};
+
+//Probably should just drop the names and handle them as a device by their AdvertisedBLEDevice properties^^
+struct BLEDevices{ 
+        advertisedBLEDevice powerSourceOne;
+        advertisedBLEDevice powerSourceTwo;
+        advertisedBLEDevice heartMonitor;
+        advertisedBLEDevice CSCSource;
+};
+
 class SpinBLEClient{ 
     
     public: //Not all of these need to be public. This should be cleaned up later.
@@ -90,11 +121,10 @@ class SpinBLEClient{
     int noReadingIn             = 0;
     int cscCumulativeCrankRev   = 0;
     int cscLastCrankEvtTime     = 0;
-    int lastConnectedPMID       = 0;
     
     BLERemoteCharacteristic *pRemoteCharacteristic  = nullptr;
-    BLEAdvertisedDevice     *myPowerMeter           = nullptr;
-    BLEAdvertisedDevice     *myHeartMonitor         = nullptr;
+
+    BLEDevices myBLEDevices;
 
     void start();
     void serverScan(bool connectRequest);   

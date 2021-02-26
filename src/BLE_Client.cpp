@@ -19,7 +19,6 @@ BLE Advertised Device found: Name: ASSIOMA17287L, Address: e8:fe:6e:91:9f:16, ap
 int reconnectTries = MAX_RECONNECT_TRIES;
 int scanRetries = MAX_SCAN_RETRIES;
 
-
 TaskHandle_t BLEClientTask;
 
 SpinBLEClient spinBLEClient;
@@ -61,42 +60,39 @@ void bleClientTask(void *pvParameters)
 
         vTaskDelay(BLE_CLIENT_DELAY / portTICK_PERIOD_MS); // Delay a second between loops.
         //debugDirector("BLEclient High Water Mark: " + String(uxTaskGetStackHighWaterMark(BLEClientTask)));
-        if (spinBLEClient.myPowerMeter)
+        debugDirector(".", false);
+        if (spinBLEClient.myBLEDevices.powerSourceOne.advertisedDevice)
         {
-            if (NimBLEDevice::getClientByPeerAddress(spinBLEClient.myPowerMeter->getAddress()))
+            debugDirector(" Power Meter Check Passed ", false);
+            if (spinBLEClient.myBLEDevices.powerSourceOne.connectedClientID > -1)
             {
-                if (NimBLEDevice::getClientByPeerAddress(spinBLEClient.myPowerMeter->getAddress())->isConnected())
+                debugDirector(" ID Check Passed ", false);
+                if (NimBLEDevice::getClientByID(spinBLEClient.myBLEDevices.powerSourceOne.connectedClientID))
                 {
-                    std::string pData = NimBLEDevice::getClientByPeerAddress(spinBLEClient.myPowerMeter->getAddress())->getService(CYCLINGPOWERSERVICE_UUID)->getCharacteristic(CYCLINGPOWERMEASUREMENT_UUID)->getValue();
-                    //Write the recieved data to the Debug Director
-                    int length = pData.length();
-                    String debugOutput = "";
-                    for (int i = 0; i < length; i++)
+                    debugDirector(" Client Exists ", false);
+                    if (NimBLEDevice::getClientByID(spinBLEClient.myBLEDevices.powerSourceOne.connectedClientID)->isConnected())
                     {
-                        debugOutput += String(pData[i], HEX) + " ";
+                        debugDirector(" Connected Check Passed ", false);
+                        debugDirector(String(spinBLEClient.myBLEDevices.powerSourceOne.serviceUUID.toString().c_str()) + " | " + String(spinBLEClient.myBLEDevices.powerSourceOne.charUUID.toString().c_str()));
+
+                        if ((spinBLEClient.myBLEDevices.powerSourceOne.serviceUUID != BLEUUID((uint16_t)0x0000)) && (NimBLEDevice::getClientByID(spinBLEClient.myBLEDevices.powerSourceOne.connectedClientID)->isConnected()))
+                        {
+                            std::string pData = NimBLEDevice::getClientByID(spinBLEClient.myBLEDevices.powerSourceOne.connectedClientID)->getService(spinBLEClient.myBLEDevices.powerSourceOne.serviceUUID)->getCharacteristic(spinBLEClient.myBLEDevices.powerSourceOne.charUUID)->getValue();
+                            //Write the recieved data to the Debug Director
+
+                            int length = pData.length();
+                            String debugOutput = "";
+                            for (int i = 0; i < length; i++)
+                            {
+                                debugOutput += String(pData[i], HEX) + " ";
+                            }
+                            debugDirector(debugOutput);
+                        }
                     }
-                    debugDirector(debugOutput);
                 }
             }
         }
     }
-}
-
-static void notifyCallback(
-    BLERemoteCharacteristic *pBLERemoteCharacteristic,
-    uint8_t *pData,
-    size_t length,
-    bool isNotify)
-{
-    //Write the recieved data to the Debug Director
-    String debugOutput = "";
-    for (int i = 0; i < length; i++)
-    {
-        debugOutput += String(pData[i], HEX) + " ";
-    }
-    debugDirector(debugOutput + "<-- " + String(pBLERemoteCharacteristic->getUUID().toString().c_str()), false, true);
-
-
 }
 
 bool SpinBLEClient::connectToServer()
@@ -109,7 +105,7 @@ bool SpinBLEClient::connectToServer()
     BLEAdvertisedDevice *myDevice;
     if (doConnectPM)
     {
-        myDevice = myPowerMeter;
+        myDevice = spinBLEClient.myBLEDevices.powerSourceOne.advertisedDevice;
         if (myDevice->isAdvertisingService(FLYWHEEL_UART_SERVICE_UUID))
         {
             serviceUUID = FLYWHEEL_UART_SERVICE_UUID;
@@ -131,7 +127,7 @@ bool SpinBLEClient::connectToServer()
     }
     else if (doConnectHR)
     {
-        myDevice = myHeartMonitor;
+        myDevice = spinBLEClient.myBLEDevices.heartMonitor.advertisedDevice;
         serviceUUID = HEARTSERVICE_UUID;
         charUUID = HEARTCHARACTERISTIC_UUID;
         debugDirector("Trying to connect to HRM");
@@ -172,16 +168,16 @@ bool SpinBLEClient::connectToServer()
                 debugDirector(String(reconnectTries) + " left.");
                 if (reconnectTries < 1)
                 {
-                    if (myDevice == myPowerMeter)
+                    if (myDevice == spinBLEClient.myBLEDevices.powerSourceOne.advertisedDevice)
                     {
-                        myPowerMeter = nullptr;
+                        spinBLEClient.myBLEDevices.powerSourceOne.reset();
                         doConnectPM = false;
                         connectedPM = false;
                         doScan = true;
                     }
-                    if (myDevice == myHeartMonitor)
+                    if (myDevice == spinBLEClient.myBLEDevices.heartMonitor.advertisedDevice)
                     {
-                        myHeartMonitor = nullptr;
+                        spinBLEClient.myBLEDevices.heartMonitor.reset();
                         doConnectHR = false;
                         connectedHR = false;
                         doScan = true;
@@ -212,22 +208,23 @@ bool SpinBLEClient::connectToServer()
             if (pRemoteCharacteristic->canNotify())
             {
 
-                pRemoteCharacteristic->subscribe(true, notifyCallback);
-                if (myDevice == myPowerMeter)
+                pRemoteCharacteristic->subscribe(true, nullptr, true);
+                if (myDevice == spinBLEClient.myBLEDevices.powerSourceOne.advertisedDevice)
                 {
                     debugDirector("Found PM on reconnect");
                     connectedPM = true;
                     doConnectPM = false;
                     reconnectTries = MAX_RECONNECT_TRIES;
-                    lastConnectedPMID = pClient->getConnId();
+                    spinBLEClient.myBLEDevices.powerSourceOne.set(myDevice, pClient->getConnId(), serviceUUID, charUUID);
                 }
 
-                if (myDevice == myHeartMonitor)
+                if (myDevice == spinBLEClient.myBLEDevices.heartMonitor.advertisedDevice)
                 {
                     debugDirector("Found HRM on reconnect");
                     connectedHR = true;
                     doConnectHR = false;
                     reconnectTries = MAX_RECONNECT_TRIES;
+                    spinBLEClient.myBLEDevices.heartMonitor.set(myDevice, pClient->getConnId(), serviceUUID, charUUID);
                 }
                 return true;
             }
@@ -297,7 +294,7 @@ bool SpinBLEClient::connectToServer()
         if (pRemoteCharacteristic->canNotify())
         {
             debugDirector("Subscribed to notifications");
-            pRemoteCharacteristic->subscribe(true, notifyCallback);
+            pRemoteCharacteristic->subscribe(true, nullptr, true);
             reconnectTries = MAX_RECONNECT_TRIES;
             scanRetries = MAX_SCAN_RETRIES;
         }
@@ -309,18 +306,19 @@ bool SpinBLEClient::connectToServer()
     if (sucessful > 0)
     {
 
-        if (myDevice == myPowerMeter)
+        if (myDevice == spinBLEClient.myBLEDevices.powerSourceOne.advertisedDevice)
         {
             connectedPM = true;
             doConnectPM = false;
             debugDirector("Sucessful PM");
-            lastConnectedPMID = pClient->getConnId();
+            spinBLEClient.myBLEDevices.powerSourceOne.set(myDevice, pClient->getConnId(), serviceUUID, charUUID);
         }
 
-        if (myDevice == myHeartMonitor)
+        if (myDevice == spinBLEClient.myBLEDevices.heartMonitor.advertisedDevice)
         {
             connectedHR = true;
             doConnectHR = false;
+            spinBLEClient.myBLEDevices.heartMonitor.set(myDevice, pClient->getConnId(), serviceUUID, charUUID);
             debugDirector("Sucessful HRM");
         }
         reconnectTries = MAX_RECONNECT_TRIES;
@@ -348,6 +346,7 @@ void SpinBLEClient::MyClientCallback::onDisconnect(BLEClient *pclient)
     {
         debugDirector("Detected HR Disconnect. Trying rapid reconnect");
         spinBLEClient.doConnectHR = true; //try rapid reconnect
+        spinBLEClient.myBLEDevices.heartMonitor.connectedClientID = -1;
         return;
     }
     if ((pclient->getService(CYCLINGPOWERSERVICE_UUID) || pclient->getService(FLYWHEEL_UART_SERVICE_UUID) || pclient->getService(FITNESSMACHINESERVICE_UUID)) && (!(pclient->isConnected())))
@@ -355,6 +354,7 @@ void SpinBLEClient::MyClientCallback::onDisconnect(BLEClient *pclient)
 
         debugDirector("Detected PM Disconnect. Trying rapid reconnect");
         spinBLEClient.doConnectPM = true; //try rapid reconnect
+        spinBLEClient.myBLEDevices.powerSourceOne.connectedClientID = -1;
         return;
     }
 }
@@ -391,7 +391,7 @@ void SpinBLEClient::MyAdvertisedDeviceCallback::onResult(BLEAdvertisedDevice *ad
     {
         if ((advertisedDevice->getName() == c_PM) || (advertisedDevice->getAddress().toString().c_str() == c_PM) || (String(c_PM) == ("any")))
         {
-            spinBLEClient.myPowerMeter = advertisedDevice;
+            spinBLEClient.myBLEDevices.powerSourceOne.set(advertisedDevice);
             spinBLEClient.doConnectPM = true;
             spinBLEClient.doScan = false;
             return;
@@ -401,7 +401,7 @@ void SpinBLEClient::MyAdvertisedDeviceCallback::onResult(BLEAdvertisedDevice *ad
     {
         if ((advertisedDevice->getName() == c_HR) || (advertisedDevice->getAddress().toString().c_str() == c_HR) || (String(c_HR) == ("any")))
         {
-            spinBLEClient.myHeartMonitor = advertisedDevice;
+            spinBLEClient.myBLEDevices.heartMonitor.set(advertisedDevice);
             spinBLEClient.doConnectHR = true;
             spinBLEClient.doScan = false;
             return;
