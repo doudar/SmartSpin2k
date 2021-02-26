@@ -19,7 +19,6 @@ BLE Advertised Device found: Name: ASSIOMA17287L, Address: e8:fe:6e:91:9f:16, ap
 int reconnectTries = MAX_RECONNECT_TRIES;
 int scanRetries = MAX_SCAN_RETRIES;
 
-bool intentionalDisconnect = false;
 
 TaskHandle_t BLEClientTask;
 
@@ -62,6 +61,24 @@ void bleClientTask(void *pvParameters)
 
         vTaskDelay(BLE_CLIENT_DELAY / portTICK_PERIOD_MS); // Delay a second between loops.
         //debugDirector("BLEclient High Water Mark: " + String(uxTaskGetStackHighWaterMark(BLEClientTask)));
+        if (spinBLEClient.myPowerMeter)
+        {
+            if (NimBLEDevice::getClientByPeerAddress(spinBLEClient.myPowerMeter->getAddress()))
+            {
+                if (NimBLEDevice::getClientByPeerAddress(spinBLEClient.myPowerMeter->getAddress())->isConnected())
+                {
+                    std::string pData = NimBLEDevice::getClientByPeerAddress(spinBLEClient.myPowerMeter->getAddress())->getService(CYCLINGPOWERSERVICE_UUID)->getCharacteristic(CYCLINGPOWERMEASUREMENT_UUID)->getValue();
+                    //Write the recieved data to the Debug Director
+                    int length = pData.length();
+                    String debugOutput = "";
+                    for (int i = 0; i < length; i++)
+                    {
+                        debugOutput += String(pData[i], HEX) + " ";
+                    }
+                    debugDirector(debugOutput);
+                }
+            }
+        }
     }
 }
 
@@ -79,114 +96,7 @@ static void notifyCallback(
     }
     debugDirector(debugOutput + "<-- " + String(pBLERemoteCharacteristic->getUUID().toString().c_str()), false, true);
 
-    {
-        std::unique_ptr<SensorData> sensorData = SensorDataFactory::getSensorData(pBLERemoteCharacteristic, pData, length);
-        debugDirector(" SensorData(" + sensorData->getId() + "):[", false);
-        if (sensorData->hasHeartRate()) {
-            int heartRate = sensorData->getHeartRate();
-            userConfig.setSimulatedHr(heartRate);
-            debugDirector(" HR(" + String(heartRate) + ")", false);
-        }
-        if (sensorData->hasCadence()) {
-            float cadence = sensorData->getCadence();
-            userConfig.setSimulatedCad(cadence);
-            debugDirector(" CD(" + String(cadence) + ")", false);
-        }
-        if (sensorData->hasPower()) {
-            int power = sensorData->getPower();
-            userConfig.setSimulatedWatts(power);
-            debugDirector(" PW(" + String(power) + ")", false);
-        }
-        debugDirector(" ]");
-    }
 
-    /*Calculate Cadence and power from Cycling Power Measurement
-    if (pBLERemoteCharacteristic->getUUID() == CYCLINGPOWERMEASUREMENT_UUID)
-    {
-        if (pBLERemoteCharacteristic->getRemoteService()->getClient()->getConnId() == spinBLEClient.lastConnectedPMID) //disregarding other pm's that may still be connected
-        {
-            //first calculate which fields are present. Power is always 2 & 3, cadence can move depending on the flags.
-            byte flags = pData[0];
-            int cPos = 4; //lowest position cadence could ever be
-            if (bitRead(flags, 0))
-            {
-                //pedal balance field present
-                cPos++;
-            }
-            if (bitRead(flags, 1))
-            {
-                //pedal power balance reference
-                //no field associated with this.
-            }
-            if (bitRead(flags, 2))
-            {
-                //accumulated torque field present
-                cPos += 2;
-            }
-            if (bitRead(flags, 3))
-            {
-                //accumulated torque field source
-                //no field associated with this.
-            }
-            if (bitRead(flags, 4))
-            {
-                //Wheel Revolution field PAIR Data present. 32-bits for wheel revs, 16 bits for wheel event time.
-                //Why is that so hard to find in the specs?
-                cPos += 6;
-            }
-            if (bitRead(flags, 5))
-            {
-                //Crank Revolution data present, lets process it.
-                spinBLEClient.crankRev[1] = spinBLEClient.crankRev[0];
-                spinBLEClient.crankRev[0] = bytes_to_int(pData[cPos + 1], pData[cPos]);
-                spinBLEClient.crankEventTime[1] = spinBLEClient.crankEventTime[0];
-                spinBLEClient.crankEventTime[0] = bytes_to_int(pData[cPos + 3], pData[cPos + 2]);
-                if ((spinBLEClient.crankRev[0] > spinBLEClient.crankRev[1]) && (spinBLEClient.crankEventTime[0] - spinBLEClient.crankEventTime[1] != 0))
-                {
-                    int tCAD = (((abs(spinBLEClient.crankRev[0] - spinBLEClient.crankRev[1]) * 1024) / abs(spinBLEClient.crankEventTime[0] - spinBLEClient.crankEventTime[1])) * 60);
-                    if (tCAD > 1)
-                    {
-                        if (tCAD > 200) //Cadence Error
-                        {
-                            tCAD = 0;
-                        }
-                        userConfig.setSimulatedCad(tCAD);
-                        spinBLEClient.noReadingIn = 0;
-                    }
-                    else
-                    {
-                        spinBLEClient.noReadingIn++;
-                    }
-                }
-                else //the crank rev probably didn't update
-                {
-                    if (spinBLEClient.noReadingIn > 2) //Require three consecutive readings before setting 0 cadence
-                    {
-                        userConfig.setSimulatedCad(0);
-                    }
-                    spinBLEClient.noReadingIn++;
-                }
-
-                debugDirector(" CAD: " + String(userConfig.getSimulatedCad()), false);
-                debugDirector("");
-            }
-
-            //Watts are so much easier......
-            userConfig.setSimulatedWatts(bytes_to_u16(pData[3], pData[2]));
-            if (userConfig.getDoublePower())
-            {
-                userConfig.setSimulatedWatts(userConfig.getSimulatedWatts() * 2);
-            }
-        }
-
-        else
-        {
-            debugDirector("Disconnecting secondary PM");
-            intentionalDisconnect = true;
-            pBLERemoteCharacteristic->getRemoteService()->getClient()->disconnect();
-            //NimBLEDevice::deleteClient(pBLERemoteCharacteristic->getRemoteService()->getClient()); //this was an old client, disconnect it.
-        }
-    }*/
 }
 
 bool SpinBLEClient::connectToServer()
@@ -429,9 +339,9 @@ void SpinBLEClient::MyClientCallback::onConnect(BLEClient *pclient)
 }
 void SpinBLEClient::MyClientCallback::onDisconnect(BLEClient *pclient)
 {
-    if (intentionalDisconnect)
+    if (spinBLEClient.intentionalDisconnect)
     {
-        intentionalDisconnect = false;
+        spinBLEClient.intentionalDisconnect = false;
         return;
     }
     if ((pclient->getService(HEARTSERVICE_UUID)) && (!(pclient->isConnected())))

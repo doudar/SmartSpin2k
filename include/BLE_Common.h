@@ -84,13 +84,14 @@ class SpinBLEClient{
     boolean connectedPM         = false;
     boolean connectedHR         = false;
     boolean doScan              = false;
+    bool intentionalDisconnect  = false; 
     float crankRev[2]           = {0, 0};
     float crankEventTime[2]     = {0, 0};
     int noReadingIn             = 0;
     int cscCumulativeCrankRev   = 0;
     int cscLastCrankEvtTime     = 0;
     int lastConnectedPMID       = 0;
-
+    
     BLERemoteCharacteristic *pRemoteCharacteristic  = nullptr;
     BLEAdvertisedDevice     *myPowerMeter           = nullptr;
     BLEAdvertisedDevice     *myHeartMonitor         = nullptr;
@@ -124,7 +125,7 @@ extern SpinBLEClient spinBLEClient;
 
 class SensorData {
 public:
-    SensorData(String id, BLERemoteCharacteristic *characteristic, uint8_t *data, size_t length) : id(id), characteristic(characteristic), data(data), length(length) {};
+    SensorData(String id, BLERemoteCharacteristic *characteristic, const uint8_t *data, size_t length) : id(id), characteristic(characteristic), data(data), length(length) {};
 
     String getId();
     virtual bool  hasHeartRate() = 0;
@@ -137,13 +138,13 @@ public:
 protected:
     String id;
     BLERemoteCharacteristic *characteristic;
-    uint8_t *data;
+    const uint8_t *data;
     size_t length;
 };
 
 class SensorDataFactory {
 public:
-    static std::unique_ptr<SensorData> getSensorData(BLERemoteCharacteristic *characteristic, uint8_t *data, size_t length);
+    static std::unique_ptr<SensorData> getSensorData(BLERemoteCharacteristic *characteristic, const uint8_t *data, size_t length);
 
 private:
     SensorDataFactory() {};
@@ -151,7 +152,7 @@ private:
 
 class NullData : public SensorData {
 public:
-    NullData(BLERemoteCharacteristic *characteristic, uint8_t *data, size_t length) : SensorData("Null", characteristic, data, length) {};
+    NullData(BLERemoteCharacteristic *characteristic, const uint8_t *data, size_t length) : SensorData("Null", characteristic, data, length) {};
 
     virtual bool  hasHeartRate();
     virtual bool  hasCadence();
@@ -163,7 +164,7 @@ public:
 
 class HeartRateData : public SensorData {
 public:
-    HeartRateData(BLERemoteCharacteristic *characteristic, uint8_t *data, size_t length) : SensorData("HRM", characteristic, data, length) {};
+    HeartRateData(BLERemoteCharacteristic *characteristic, const uint8_t *data, size_t length) : SensorData("HRM", characteristic, data, length) {};
 
     virtual bool  hasHeartRate();
     virtual bool  hasCadence();
@@ -175,7 +176,7 @@ public:
 
 class FlywheelData : public SensorData {
 public:
-    FlywheelData(BLERemoteCharacteristic *characteristic, uint8_t *data, size_t length) : SensorData("FLYW", characteristic, data, length) {};
+    FlywheelData(BLERemoteCharacteristic *characteristic, const uint8_t *data, size_t length) : SensorData("FLYW", characteristic, data, length) {};
 
     virtual bool  hasHeartRate();
     virtual bool  hasCadence();
@@ -187,7 +188,7 @@ public:
 
 class FitnessMachineIndoorBikeData : public SensorData {
 public:
-    FitnessMachineIndoorBikeData(BLERemoteCharacteristic *characteristic, uint8_t *data, size_t length);
+    FitnessMachineIndoorBikeData(BLERemoteCharacteristic *characteristic, const uint8_t *data, size_t length);
     ~FitnessMachineIndoorBikeData();
 
     enum Types : uint8_t {
@@ -229,44 +230,9 @@ private:
     static int convert(int value, size_t length, uint8_t isSigned);
 };
 
-class CyclingPowerMeasurement : public SensorData {
-public:
-    CyclingPowerMeasurement(BLERemoteCharacteristic *characteristic, uint8_t *data, size_t length);
-    ~CyclingPowerMeasurement();
+/******************CPS***************************/
 
-    enum Types : uint8_t {
-        InstantaneousPower   = 0,
-        PedalPowerBalance    = 1,
-        PedalBalanceRef      = 2,
-        AccumulatedTorque    = 3,
-        AccumulatedTorqueSrc = 4,
-        WheelRevolutionData  = 5,
-        CrankRevolutionData  = 6,
-        ExtremeForceMag      = 7,
-        ExtremeTorqueMag     = 8,
-        ExtremeAngles        = 9,
-        TopDeadSpot          = 10,
-        BottomDeadSpot       = 11,
-        AccumulatedEnergy    = 12,
-        OffsetCompensation   = 13
-    };
-    static constexpr uint8_t FieldCount = Types::OffsetCompensation + 1;
+void BLE_CPSDecode(NimBLERemoteCharacteristic);
 
-    virtual bool  hasHeartRate();
-    virtual bool  hasCadence();
-    virtual bool  hasPower();
-    virtual int   getHeartRate();
-    virtual float getCadence();
-    virtual int   getPower();
-
-private:
-    int flags;
-    double_t *values;
-
-    static int8_t const flagBitIndices[];
-    static uint8_t const flagEnabledValues[];
-    static size_t const byteSizes[];
-    static uint8_t const signedFlags[];
-    static double_t const resolutions[];
-    static int convert(int value, size_t length, uint8_t isSigned);
-};
+/******************FTMS**************************/
+void BLE_FTMSDecode(NimBLERemoteCharacteristic);
