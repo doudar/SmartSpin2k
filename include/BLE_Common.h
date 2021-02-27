@@ -49,6 +49,8 @@
 //Setup
 void setupBLE();
 
+
+
 //*****************************Server*****************************
 extern bool GlobalBLEClientConnected;
 void startBLEServer();
@@ -88,7 +90,7 @@ class advertisedBLEDevice{
         connectedClientID = id; 
         serviceUUID = BLEUUID(inserviceUUID);
         charUUID    = BLEUUID(incharUUID);
-        Serial.println("help me " + String(serviceUUID.toString().c_str()));
+        Serial.println("Set Service: " + String(serviceUUID.toString().c_str()));
     }
 
     void reset() {
@@ -261,8 +263,7 @@ private:
 };
 
 /******************CPS***************************/
-
-void BLE_CPSDecode(NimBLERemoteCharacteristic);
+void BLE_CPSDecode(BLERemoteCharacteristic  *pBLERemoteCharacteristic);
 
 /******************FTMS**************************/
-void BLE_FTMSDecode(NimBLERemoteCharacteristic);
+void BLE_FTMSDecode(BLERemoteCharacteristic  *pBLERemoteCharacteristic);

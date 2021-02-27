@@ -60,33 +60,42 @@ void bleClientTask(void *pvParameters)
 
         vTaskDelay(BLE_CLIENT_DELAY / portTICK_PERIOD_MS); // Delay a second between loops.
         //debugDirector("BLEclient High Water Mark: " + String(uxTaskGetStackHighWaterMark(BLEClientTask)));
-        debugDirector(".", false);
+        //debugDirector(".", false);
         if (spinBLEClient.myBLEDevices.powerSourceOne.advertisedDevice)
         {
-            debugDirector(" Power Meter Check Passed ", false);
+            //debugDirector(" Power Meter Check Passed ", false);
             if (spinBLEClient.myBLEDevices.powerSourceOne.connectedClientID > -1)
             {
-                debugDirector(" ID Check Passed ", false);
+                //debugDirector(" ID Check Passed ", false);
                 if (NimBLEDevice::getClientByID(spinBLEClient.myBLEDevices.powerSourceOne.connectedClientID))
                 {
-                    debugDirector(" Client Exists ", false);
+                   // debugDirector(" Client Exists ", false);
                     if (NimBLEDevice::getClientByID(spinBLEClient.myBLEDevices.powerSourceOne.connectedClientID)->isConnected())
                     {
-                        debugDirector(" Connected Check Passed ", false);
-                        debugDirector(String(spinBLEClient.myBLEDevices.powerSourceOne.serviceUUID.toString().c_str()) + " | " + String(spinBLEClient.myBLEDevices.powerSourceOne.charUUID.toString().c_str()));
-
+                       // debugDirector(" Connected Check Passed ", false);                        
                         if ((spinBLEClient.myBLEDevices.powerSourceOne.serviceUUID != BLEUUID((uint16_t)0x0000)) && (NimBLEDevice::getClientByID(spinBLEClient.myBLEDevices.powerSourceOne.connectedClientID)->isConnected()))
                         {
-                            std::string pData = NimBLEDevice::getClientByID(spinBLEClient.myBLEDevices.powerSourceOne.connectedClientID)->getService(spinBLEClient.myBLEDevices.powerSourceOne.serviceUUID)->getCharacteristic(spinBLEClient.myBLEDevices.powerSourceOne.charUUID)->getValue();
+                            //std::string pData = NimBLEDevice::getClientByID(spinBLEClient.myBLEDevices.powerSourceOne.connectedClientID)->getService(spinBLEClient.myBLEDevices.powerSourceOne.serviceUUID)->getCharacteristic(spinBLEClient.myBLEDevices.powerSourceOne.charUUID)->getValue();
                             //Write the recieved data to the Debug Director
-
+                            BLERemoteCharacteristic *pRemoteBLECharacteristic = NimBLEDevice::getClientByID(spinBLEClient.myBLEDevices.powerSourceOne.connectedClientID)->getService(spinBLEClient.myBLEDevices.powerSourceOne.serviceUUID)->getCharacteristic(spinBLEClient.myBLEDevices.powerSourceOne.charUUID);
+                            std::string pData = pRemoteBLECharacteristic->getValue();
                             int length = pData.length();
                             String debugOutput = "";
                             for (int i = 0; i < length; i++)
                             {
                                 debugOutput += String(pData[i], HEX) + " ";
                             }
-                            debugDirector(debugOutput);
+                            debugDirector(debugOutput + "<-" + String(spinBLEClient.myBLEDevices.powerSourceOne.serviceUUID.toString().c_str()) + " | " + String(spinBLEClient.myBLEDevices.powerSourceOne.charUUID.toString().c_str()), true, true);
+                            if (pRemoteBLECharacteristic->getUUID() == CYCLINGPOWERMEASUREMENT_UUID)
+                            {
+                                BLE_CPSDecode(pRemoteBLECharacteristic);
+                            }
+                            if ((pRemoteBLECharacteristic->getUUID() == FITNESSMACHINEINDOORBIKEDATA_UUID) || (pRemoteBLECharacteristic->getUUID() == FLYWHEEL_UART_SERVICE_UUID))
+                            {
+                                BLE_FTMSDecode(pRemoteBLECharacteristic);
+                            }
+                            
+                            
                         }
                     }
                 }

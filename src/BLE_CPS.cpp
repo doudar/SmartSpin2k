@@ -12,7 +12,7 @@
 #include <Arduino.h>
 
 //Takes a NimBLERemoteCharacteristic with CYCLINGPOWERMEASUREMENT_UUID and extracts the data. Also disconnects a secondary power meter. 
-void BLE_CPSDecode(NimBLERemoteCharacteristic *pBLERemoteCharacteristic)
+void BLE_CPSDecode(BLERemoteCharacteristic *pBLERemoteCharacteristic)
 {
     if (pBLERemoteCharacteristic->getUUID() == CYCLINGPOWERMEASUREMENT_UUID) //double checking this was 
     {
@@ -21,10 +21,9 @@ void BLE_CPSDecode(NimBLERemoteCharacteristic *pBLERemoteCharacteristic)
         {
             byte flags = pData[0];
             int cPos = 2; //lowest position cadence could ever be
-
             //Instanious power is always present. Do that first.
             //first calculate which fields are present. Power is always 2 & 3, cadence can move depending on the flags.
-            userConfig.setSimulatedWatts(bytes_to_u16(cPos + 1, cPos));
+            userConfig.setSimulatedWatts(bytes_to_u16(pData[cPos+1], pData[cPos]));
             cPos += 2;
             if (userConfig.getDoublePower())
             {
