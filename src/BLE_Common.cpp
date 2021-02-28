@@ -12,18 +12,18 @@
 std::unique_ptr<SensorData> SensorDataFactory::getSensorData(BLERemoteCharacteristic *characteristic, uint8_t *data, size_t length) {
 
     if (characteristic->getUUID() == HEARTCHARACTERISTIC_UUID) {
-        return std::unique_ptr<SensorData>(new HeartRateData(characteristic, data, length));
+        return std::unique_ptr<SensorData>(new HeartRateData(data, length));
     }
 
     if (characteristic->getUUID() == FLYWHEEL_UART_SERVICE_UUID) {
-        return std::unique_ptr<SensorData>(new FlywheelData(characteristic, data, length));
+        return std::unique_ptr<SensorData>(new FlywheelData(data, length));
     }
 
     if (characteristic->getUUID() == FITNESSMACHINEINDOORBIKEDATA_UUID) {
-        return std::unique_ptr<SensorData>(new FitnessMachineIndoorBikeData(characteristic, data, length));
+        return std::unique_ptr<SensorData>(new FitnessMachineIndoorBikeData(data, length));
     }
 
-    return std::unique_ptr<SensorData>(new NullData(characteristic, data, length));
+    return std::unique_ptr<SensorData>(new NullData(data, length));
 }
 
 String SensorData::getId() {
@@ -106,8 +106,8 @@ int FitnessMachineIndoorBikeData::getPower() {
     return int(value);
 }
 
-FitnessMachineIndoorBikeData::FitnessMachineIndoorBikeData(BLERemoteCharacteristic *characteristic, uint8_t *data, size_t length) : 
-        SensorData("FTMS", characteristic, data, length), flags(bytes_to_u16(data[1], data[0])) {
+FitnessMachineIndoorBikeData::FitnessMachineIndoorBikeData(uint8_t *data, size_t length) : 
+        SensorData("FTMS", data, length), flags(bytes_to_u16(data[1], data[0])) {
     uint8_t dataIndex = 2;
     values = new double_t[FieldCount];
     std::fill_n(values, FieldCount, NAN);
