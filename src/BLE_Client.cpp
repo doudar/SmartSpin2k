@@ -48,8 +48,7 @@ void bleClientTask(void *pvParameters)
         }
 
         vTaskDelay(BLE_CLIENT_DELAY / portTICK_PERIOD_MS); // Delay a second between loops.
-        //debugDirector("BLEclient High Water Mark: " + String(uxTaskGetStackHighWaterMark(BLEClientTask)));
-        //debugDirector(".", false);
+        debugDirector("BLE_client High Water Mark: " + String(uxTaskGetStackHighWaterMark(BLEClientTask)));
         for (size_t x = 0; x < NUM_BLE_DEVICES; x++)
         {
             if (spinBLEClient.myBLEDevices[x].doConnect == true)
@@ -60,38 +59,6 @@ void bleClientTask(void *pvParameters)
                 }
                 else
                 {
-                }
-            }
-            if (spinBLEClient.myBLEDevices[x].advertisedDevice)
-            {
-                myAdvertisedBLEDevice myAdvertisedDevice = spinBLEClient.myBLEDevices[x];
-                if ((myAdvertisedDevice.connectedClientID != -1) && (myAdvertisedDevice.doConnect == false)) //client must not be in connection process
-                {
-                    if (NimBLEDevice::getClientByPeerAddress(myAdvertisedDevice.peerAddress))
-                    {
-                        BLEClient *pClient = NimBLEDevice::getClientByPeerAddress(myAdvertisedDevice.peerAddress);
-                        if ((myAdvertisedDevice.serviceUUID != BLEUUID((uint16_t)0x0000)) && (pClient->isConnected()))
-                        {
-                            //Write the recieved data to the Debug Director
-                            BLERemoteCharacteristic *pRemoteBLECharacteristic = pClient->getService(myAdvertisedDevice.serviceUUID)->getCharacteristic(myAdvertisedDevice.charUUID);
-                            std::string pData = pRemoteBLECharacteristic->getValue();
-                            int length = pData.length();
-                            String debugOutput = "";
-                            for (int i = 0; i < length; i++)
-                            {
-                                debugOutput += String(pData[i], HEX) + " ";
-                            }
-                            debugDirector(debugOutput + "<-" + String(myAdvertisedDevice.serviceUUID.toString().c_str()) + " | " + String(myAdvertisedDevice.charUUID.toString().c_str()), true, true);
-                            if (pRemoteBLECharacteristic->getUUID() == CYCLINGPOWERMEASUREMENT_UUID)
-                            {
-                                BLE_CPSDecode(pRemoteBLECharacteristic);
-                            }
-                            if ((pRemoteBLECharacteristic->getUUID() == FITNESSMACHINEINDOORBIKEDATA_UUID) || (pRemoteBLECharacteristic->getUUID() == FLYWHEEL_UART_SERVICE_UUID) || (pRemoteBLECharacteristic->getUUID() == HEARTCHARACTERISTIC_UUID))
-                            {
-                                BLE_FTMSDecode(pRemoteBLECharacteristic);
-                            }
-                        }
-                    }
                 }
             }
         }
@@ -320,7 +287,15 @@ bool SpinBLEClient::connectToServer()
  **                       Remove as you see fit for your needs                        */
 
 void SpinBLEClient::MyClientCallback::onConnect(BLEClient *pclient)
-{
+{ 
+    if (pclient->getService(HEARTSERVICE_UUID))
+    {
+        spinBLEClient.connectedHR = true;
+    }
+    else
+    {
+        spinBLEClient.connectedPM = true;
+    }
 }
 void SpinBLEClient::MyClientCallback::onDisconnect(BLEClient *pclient)
 {
@@ -343,11 +318,18 @@ void SpinBLEClient::MyClientCallback::onDisconnect(BLEClient *pclient)
                 //spinBLEClient.myBLEDevices[i].connectedClientID = -1;
                 debugDirector("Detected " + String(spinBLEClient.myBLEDevices[i].serviceUUID.toString().c_str()) + " Disconnect");
                 spinBLEClient.myBLEDevices[i].doConnect = true;
+                if ((spinBLEClient.myBLEDevices[i].charUUID == CYCLINGPOWERMEASUREMENT_UUID) || (spinBLEClient.myBLEDevices[i].charUUID == FITNESSMACHINEINDOORBIKEDATA_UUID) || (spinBLEClient.myBLEDevices[i].charUUID == FLYWHEEL_UART_RX_UUID))
+                {
+                    spinBLEClient.connectedPM = false;
+                }
+                if ((spinBLEClient.myBLEDevices[i].charUUID == HEARTCHARACTERISTIC_UUID))
+                {
+                    spinBLEClient.connectedHR = false;
+                }
             }
         }
         return;
     }
-    debugDirector("Test Delets this 2");
 }
 
 /***************** New - Security handled here ********************

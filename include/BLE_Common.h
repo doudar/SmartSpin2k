@@ -49,18 +49,23 @@
 
 //Setup
 void setupBLE();
+extern TaskHandle_t BLECommunicationTask;
+//***********************Common**********************************/
+void BLECommunications(void *pvParameters);
 
-
-
-//*****************************Server*****************************
+//*****************************Server****************************/
+extern int bleConnDesc; //These all need re
+extern bool _BLEClientConnected;
+extern bool updateConnParametersFlag;
 extern bool GlobalBLEClientConnected;
+
 void startBLEServer();
-void BLENotify(void *pvParameters);
 void computeERG(int, int);
 void computeCSC();
 void updateIndoorBikeDataChar();
 void updateCyclingPowerMesurementChar();
 void calculateInstPwrFromHR();
+void updateHeartRateMeasurementChar();
 
 class MyServerCallbacks : public BLEServerCallbacks
 {

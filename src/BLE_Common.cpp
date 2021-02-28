@@ -10,17 +10,10 @@
 #include "BLE_Common.h"
 //#include <queue>
 
-struct bleRecievedData
-{
-    BLEUUID uuid;
-    char bleData[20];
-};
-QueueHandle_t bleQueue;
-
-void createQueue(){
-    bleQueue = xQueueCreate( 10, sizeof(bleRecievedData));
-}
-
+int bleConnDesc = 1;
+bool _BLEClientConnected = false;
+bool updateConnParametersFlag = false;
+TaskHandle_t BLECommunicationTask;
 
 // See: https://github.com/oesmith/gatt-xml/blob/master/org.bluetooth.characteristic.indoor_bike_data.xml
 uint8_t     const FitnessMachineIndoorBikeData::flagBitIndices[FieldCount]    = {    0,    1,   2,   3,   4,   5,   6,   7,   8,   8,   8,   9,  10,  11,   12 };
@@ -38,6 +31,94 @@ double_t    const FitnessMachineIndoorBikeData::resolutions[FieldCount]       = 
 //uint8_t     const CyclingPowerMeasurement::signedFlags[FieldCount]            = {   0,    0,    0,     0,   0,      0,      0,   1,    1,   0,   0,   0,    0,   0};
 //double_t    const CyclingPowerMeasurement::resolutions[FieldCount]            = { 1.0,  1.0,  1.0,   1.0, 1.0,    1.0,    1, 1.0,  1.0, 1.0, 1.0, 1.0,  1.0, 1.0};
 //double_t    const CyclingPowerMeasurement::resolutions[FieldCount]            = {   1,  1.0,   .5,  1/32, 1.0, 1/2048, 1/1024, 1.0, 1/32, 1.0, 1.0, 1.0,  1.0, 1.0};
+
+void BLECommunications(void *pvParameters)
+{
+  for (;;)
+  {
+      //**********************************Client***************************************/
+            //debugDirector("BLEclient High Water Mark: " + String(uxTaskGetStackHighWaterMark(BLEClientTask)));
+            //debugDirector(".", false);
+            for (size_t x = 0; x < NUM_BLE_DEVICES; x++)
+            {
+                if (spinBLEClient.myBLEDevices[x].advertisedDevice)
+                {
+                    myAdvertisedBLEDevice myAdvertisedDevice = spinBLEClient.myBLEDevices[x];
+                    if ((myAdvertisedDevice.connectedClientID != -1) && (myAdvertisedDevice.doConnect == false)) //client must not be in connection process
+                    {
+                        if (NimBLEDevice::getClientByPeerAddress(myAdvertisedDevice.peerAddress))
+                        {
+                        BLEClient *pClient = NimBLEDevice::getClientByPeerAddress(myAdvertisedDevice.peerAddress);
+                        if ((myAdvertisedDevice.serviceUUID != BLEUUID((uint16_t)0x0000)) && (pClient->isConnected()))
+                        {
+                        //Write the recieved data to the Debug Director
+                        BLERemoteCharacteristic *pRemoteBLECharacteristic = pClient->getService(myAdvertisedDevice.serviceUUID)->getCharacteristic(myAdvertisedDevice.charUUID);
+                        std::string pData = pRemoteBLECharacteristic->getValue();
+                        int length = pData.length();
+                        String debugOutput = "";
+                        for (int i = 0; i < length; i++)
+                        {
+                            debugOutput += String(pData[i], HEX) + " ";
+                        }
+                        debugDirector(debugOutput + "<-" + String(myAdvertisedDevice.serviceUUID.toString().c_str()) + " | " + String(myAdvertisedDevice.charUUID.toString().c_str()), true, true);
+                         if (pRemoteBLECharacteristic->getUUID() == CYCLINGPOWERMEASUREMENT_UUID)
+                         {
+                             BLE_CPSDecode(pRemoteBLECharacteristic);
+                         }
+                        if ((pRemoteBLECharacteristic->getUUID() == FITNESSMACHINEINDOORBIKEDATA_UUID) || (pRemoteBLECharacteristic->getUUID() == FLYWHEEL_UART_SERVICE_UUID) || (pRemoteBLECharacteristic->getUUID() == HEARTCHARACTERISTIC_UUID))
+                        {
+                            BLE_FTMSDecode(pRemoteBLECharacteristic);
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+      //***********************************SERVER**************************************/
+    if (spinBLEClient.connectedHR && !spinBLEClient.connectedPM && (userConfig.getSimulatedHr() > 0) && userPWC.hr2Pwr)
+    {
+      calculateInstPwrFromHR();
+    }
+    if (!spinBLEClient.connectedPM && !userPWC.hr2Pwr)
+    {
+      userConfig.setSimulatedCad(0);
+      userConfig.setSimulatedWatts(0);
+    }
+    if (!spinBLEClient.connectedHR)
+    {
+      userConfig.setSimulatedHr(0);
+    }
+
+    if (_BLEClientConnected)
+    {
+      //update the BLE information on the server
+      computeCSC();
+      updateIndoorBikeDataChar();
+      updateCyclingPowerMesurementChar();
+      GlobalBLEClientConnected = true;
+      
+      if (updateConnParametersFlag)
+      {
+        vTaskDelay(100/portTICK_PERIOD_MS);
+        BLEDevice::getServer()->updateConnParams(bleConnDesc, 40, 50, 0, 100);
+        updateConnParametersFlag = false;
+      }
+    }
+    else
+    {
+      GlobalBLEClientConnected = false;
+    }
+    if (!_BLEClientConnected)
+    {
+      digitalWrite(LED_PIN, LOW); //blink if no client connected
+    }
+    vTaskDelay((BLE_NOTIFY_DELAY / 2) / portTICK_PERIOD_MS);
+    digitalWrite(LED_PIN, HIGH);
+    vTaskDelay((BLE_NOTIFY_DELAY / 2) / portTICK_PERIOD_MS);
+    debugDirector("BLEServer High Water Mark: " + String(uxTaskGetStackHighWaterMark(BLECommunicationTask)));
+  }
+}
 
 std::unique_ptr<SensorData> SensorDataFactory::getSensorData(BLERemoteCharacteristic *characteristic, const uint8_t *data, size_t length) {
 
