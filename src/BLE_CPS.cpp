@@ -5,20 +5,21 @@
 // This work is licensed under the GNU General Public License v2
 // Prototype hardware build from plans in the SmartSpin2k repository are licensed under Cern Open Hardware Licence version 2 Permissive
 
-/*Calculate Cadence and power from Cycling Power Measurement*/
+
 
 #include "Main.h"
 #include "BLE_Common.h"
 #include <Arduino.h>
 
+/*Calculate Cadence and power from Cycling Power Measurement*/
 //Takes a NimBLERemoteCharacteristic with CYCLINGPOWERMEASUREMENT_UUID and extracts the data. Also disconnects a secondary power meter. 
 void BLE_CPSDecode(BLERemoteCharacteristic *pBLERemoteCharacteristic)
 {
     if (pBLERemoteCharacteristic->getUUID() == CYCLINGPOWERMEASUREMENT_UUID) //double checking this was 
     {
         std::string pData = pBLERemoteCharacteristic->getValue();
-        if (pBLERemoteCharacteristic->getRemoteService()->getClient()->getConnId() == spinBLEClient.myBLEDevices.powerSourceOne.connectedClientID) //disregarding other pm's that may still be connected
-        {
+        //if (pBLERemoteCharacteristic->getRemoteService()->getClient()->getConnId() == spinBLEClient.myBLEDevices[1].connectedClientID) //disregarding other pm's that may still be connected
+        //{
             byte flags = pData[0];
             int cPos = 2; //lowest position cadence could ever be
             //Instanious power is always present. Do that first.
@@ -92,13 +93,13 @@ void BLE_CPSDecode(BLERemoteCharacteristic *pBLERemoteCharacteristic)
                 debugDirector(" CAD: " + String(userConfig.getSimulatedCad()), false);
                 debugDirector("");
             }
-        }
+        //}
 
-        else
-        {
-            debugDirector("Disconnecting secondary PM");
-            spinBLEClient.intentionalDisconnect = true;
-            pBLERemoteCharacteristic->getRemoteService()->getClient()->disconnect();
-        }
+        //else
+        //{
+       //     debugDirector("Disconnecting secondary PM");
+       //     spinBLEClient.intentionalDisconnect = true;
+       //     pBLERemoteCharacteristic->getRemoteService()->getClient()->disconnect();
+       // }
     }
 }

@@ -13,6 +13,7 @@
 #include <memory>
 #include <NimBLEDevice.h>
 #include <Arduino.h>
+#include <Main.h>
 
 //Heart Service
 #define HEARTSERVICE_UUID BLEUUID((uint16_t)0x180D)
@@ -78,13 +79,30 @@ class MyCallbacks : public BLECharacteristicCallbacks
 //We're only going to run one anyway.
 void bleClientTask(void *pvParameters);  
 
-class advertisedBLEDevice{
-    public:
+//UUID's the client has methods for
+//BLEUUID serviceUUIDs[4] = {FITNESSMACHINESERVICE_UUID, CYCLINGPOWERSERVICE_UUID, HEARTSERVICE_UUID, FLYWHEEL_UART_SERVICE_UUID};
+//BLEUUID charUUIDs[4] = {FITNESSMACHINEINDOORBIKEDATA_UUID, CYCLINGPOWERMEASUREMENT_UUID, HEARTCHARACTERISTIC_UUID, FLYWHEEL_UART_TX_UUID};
+
+       enum userSelect : uint8_t {
+        HR  = 1,
+        PM  = 2,
+        CSC = 3,
+        CT  = 4     
+    };
+
+class myAdvertisedBLEDevice{
+    public: //eventually these shoul be made private
     BLEAdvertisedDevice *advertisedDevice = nullptr;
-    int connectedClientID                 = -1; 
-    BLEUUID serviceUUID = (uint16_t)0x0000;
-    BLEUUID charUUID = (uint16_t)0x0000;
-    
+    int     connectedClientID             = -1; 
+    BLEUUID serviceUUID     = (uint16_t)0x0000;
+    BLEUUID charUUID        = (uint16_t)0x0000;
+    bool    userSelectedHR  = false;
+    bool    userSelectedPM  = false;
+    bool    userSelectedCSC = false;
+    bool    userSelectedCT  = false;
+    bool    doConnect       = false;
+
+
     void set(BLEAdvertisedDevice *device, int id = -1, BLEUUID inserviceUUID = (uint16_t)0x0000, BLEUUID incharUUID = (uint16_t)0x0000){
         advertisedDevice  = device;
         connectedClientID = id; 
@@ -98,16 +116,39 @@ class advertisedBLEDevice{
     connectedClientID                     = -1; 
     serviceUUID                           = (uint16_t)0x0000;
     charUUID                              = (uint16_t)0x0000;
-    } 
+    userSelectedHR  = false;
+    userSelectedPM  = false;
+    userSelectedCSC = false;
+    userSelectedCT  = false;
+    doConnect       = false;
+    }
+
+    //userSelectHR  = 1,userSelectPM  = 2,userSelectCSC = 3,userSelectCT  = 4 
+    void setSelected (userSelect flags)
+    {
+    switch (flags)
+    {
+    case 1:
+        userSelectedHR  = true;
+        break;
+    case 2:
+        userSelectedPM  = true;
+        break;
+    case 3:
+        userSelectedCSC = true;
+        break;
+    case 4:
+        userSelectedCT  = true;
+        break;    
+    }
+
+}
+
+
+
 };
 
-//Probably should just drop the names and handle them as a device by their AdvertisedBLEDevice properties^^
-struct BLEDevices{ 
-        advertisedBLEDevice powerSourceOne;
-        advertisedBLEDevice powerSourceTwo;
-        advertisedBLEDevice heartMonitor;
-        advertisedBLEDevice CSCSource;
-};
+
 
 class SpinBLEClient{ 
     
@@ -126,7 +167,8 @@ class SpinBLEClient{
     
     BLERemoteCharacteristic *pRemoteCharacteristic  = nullptr;
 
-    BLEDevices myBLEDevices;
+    //BLEDevices myBLEDevices;
+    myAdvertisedBLEDevice myBLEDevices[NUM_BLE_DEVICES];
 
     void start();
     void serverScan(bool connectRequest);   
