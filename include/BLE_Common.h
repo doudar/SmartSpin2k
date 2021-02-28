@@ -124,7 +124,7 @@ extern SpinBLEClient spinBLEClient;
 
 class SensorData {
 public:
-    SensorData(String id, BLERemoteCharacteristic *characteristic, uint8_t *data, size_t length) : id(id), characteristic(characteristic), data(data), length(length) {};
+    SensorData(String id, uint8_t *data, size_t length) : id(id), data(data), length(length) {};
 
     String getId();
     virtual bool hasHeartRate() = 0;
@@ -136,7 +136,6 @@ public:
 
 protected:
     String id;
-    BLERemoteCharacteristic *characteristic;
     uint8_t *data;
     size_t length;
 };
@@ -151,7 +150,7 @@ private:
 
 class NullData : public SensorData {
 public:
-    NullData(BLERemoteCharacteristic *characteristic, uint8_t *data, size_t length) : SensorData("Null", characteristic, data, length) {};
+    NullData(uint8_t *data, size_t length) : SensorData("Null", data, length) {};
 
     virtual bool  hasHeartRate();
     virtual bool  hasCadence();
@@ -163,7 +162,7 @@ public:
 
 class HeartRateData : public SensorData {
 public:
-    HeartRateData(BLERemoteCharacteristic *characteristic, uint8_t *data, size_t length) : SensorData("HRM", characteristic, data, length) {};
+    HeartRateData(uint8_t *data, size_t length) : SensorData("HRM", data, length) {};
 
     virtual bool  hasHeartRate();
     virtual bool  hasCadence();
@@ -175,7 +174,7 @@ public:
 
 class FlywheelData : public SensorData {
 public:
-    FlywheelData(BLERemoteCharacteristic *characteristic, uint8_t *data, size_t length) : SensorData("FLYW", characteristic, data, length) {};
+    FlywheelData(uint8_t *data, size_t length) : SensorData("FLYW", data, length) {};
 
     virtual bool  hasHeartRate();
     virtual bool  hasCadence();
@@ -187,7 +186,7 @@ public:
 
 class FitnessMachineIndoorBikeData : public SensorData {
 public:
-    FitnessMachineIndoorBikeData(BLERemoteCharacteristic *characteristic, uint8_t *data, size_t length);
+    FitnessMachineIndoorBikeData(uint8_t *data, size_t length);
     ~FitnessMachineIndoorBikeData();
 
     enum Types : uint8_t {
