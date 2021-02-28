@@ -93,6 +93,7 @@ void bleClientTask(void *pvParameters);
 class myAdvertisedBLEDevice{
     public: //eventually these shoul be made private
     BLEAdvertisedDevice *advertisedDevice = nullptr;
+    NimBLEAddress peerAddress; 
     int     connectedClientID             = -1; 
     BLEUUID serviceUUID     = (uint16_t)0x0000;
     BLEUUID charUUID        = (uint16_t)0x0000;
@@ -105,6 +106,7 @@ class myAdvertisedBLEDevice{
 
     void set(BLEAdvertisedDevice *device, int id = -1, BLEUUID inserviceUUID = (uint16_t)0x0000, BLEUUID incharUUID = (uint16_t)0x0000){
         advertisedDevice  = device;
+        peerAddress = device->getAddress();
         connectedClientID = id; 
         serviceUUID = BLEUUID(inserviceUUID);
         charUUID    = BLEUUID(incharUUID);
@@ -113,6 +115,7 @@ class myAdvertisedBLEDevice{
 
     void reset() {
     advertisedDevice                      = nullptr;
+    NimBLEAddress peerAddress;
     connectedClientID                     = -1; 
     serviceUUID                           = (uint16_t)0x0000;
     charUUID                              = (uint16_t)0x0000;
