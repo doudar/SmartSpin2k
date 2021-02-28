@@ -96,6 +96,7 @@ void BLECommunications(void *pvParameters)
       computeCSC();
       updateIndoorBikeDataChar();
       updateCyclingPowerMesurementChar();
+      updateHeartRateMeasurementChar();
       GlobalBLEClientConnected = true;
       
       if (updateConnParametersFlag)
