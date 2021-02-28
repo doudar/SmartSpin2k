@@ -100,6 +100,7 @@ void startWifi()
   }
 
   MDNS.addService("http", "_tcp", 80);
+  MDNS.addServiceTxt("http", "_tcp", "lf", "0");
   debugDirector("Connected to " + String(userConfig.getSsid()) + " IP address: " + myIP.toString(), true, true);
   debugDirector(String("Open http://") + userConfig.getDeviceName() + ".local/");
   WiFi.setTxPower(WIFI_POWER_19_5dBm);
@@ -463,6 +464,7 @@ void startHttpServer()
 
 void webClientUpdate(void *pvParameters)
 {
+  static unsigned long mDnsTimer = millis();
   for (;;)
   {
     server.handleClient();
@@ -470,6 +472,12 @@ void webClientUpdate(void *pvParameters)
     if (WiFi.getMode() == WIFI_AP)
     {
       dnsServer.processNextRequest();
+    }
+    //Keep MDNS alive
+    if((millis()-mDnsTimer)>60000)
+    {
+      MDNS.addServiceTxt("http", "_tcp", "lf", String(mDnsTimer));
+      mDnsTimer = millis(); 
     }
   }
 }
