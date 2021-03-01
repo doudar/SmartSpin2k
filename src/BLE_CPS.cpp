@@ -90,7 +90,7 @@ void BLE_CPSDecode(BLERemoteCharacteristic *pBLERemoteCharacteristic)
                     spinBLEClient.noReadingIn++;
                 }
 
-                debugDirector(" CAD: " + String(userConfig.getSimulatedCad()), false);
+                debugDirector(" CAD: " + String(userConfig.getSimulatedCad()) + " PWR: " + String(userConfig.getSimulatedWatts()), false);
                 debugDirector("");
             }
         //}

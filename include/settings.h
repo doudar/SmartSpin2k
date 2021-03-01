@@ -121,6 +121,9 @@
 //Uncomment to enable sending Telegram debug messages back to the chat specified in telegram_token.h
 #define USE_TELEGRAM
 
+//Uncomment to enable stack size debugging info
+//#define DEBUG_STACK
+
 #ifdef USE_TELEGRAM
     //Max number of telegram messages to send per session
     #define MAX_TELEGRAM_MESSAGES 5

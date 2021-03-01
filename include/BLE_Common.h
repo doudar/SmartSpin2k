@@ -99,7 +99,7 @@ class myAdvertisedBLEDevice{
     public: //eventually these shoul be made private
     BLEAdvertisedDevice *advertisedDevice = nullptr;
     NimBLEAddress peerAddress; 
-    int     connectedClientID             = -1; 
+    int     connectedClientID             = BLE_HS_CONN_HANDLE_NONE;
     BLEUUID serviceUUID     = (uint16_t)0x0000;
     BLEUUID charUUID        = (uint16_t)0x0000;
     bool    userSelectedHR  = false;
@@ -109,19 +109,18 @@ class myAdvertisedBLEDevice{
     bool    doConnect       = false;
 
 
-    void set(BLEAdvertisedDevice *device, int id = -1, BLEUUID inserviceUUID = (uint16_t)0x0000, BLEUUID incharUUID = (uint16_t)0x0000){
+    void set(BLEAdvertisedDevice *device, int id = BLE_HS_CONN_HANDLE_NONE, BLEUUID inserviceUUID = (uint16_t)0x0000, BLEUUID incharUUID = (uint16_t)0x0000){
         advertisedDevice  = device;
         peerAddress = device->getAddress();
         connectedClientID = id; 
         serviceUUID = BLEUUID(inserviceUUID);
         charUUID    = BLEUUID(incharUUID);
-        Serial.println("Set Service: " + String(serviceUUID.toString().c_str()));
     }
 
     void reset() {
     advertisedDevice                      = nullptr;
     NimBLEAddress peerAddress;
-    connectedClientID                     = -1; 
+    connectedClientID                     = BLE_HS_CONN_HANDLE_NONE; 
     serviceUUID                           = (uint16_t)0x0000;
     charUUID                              = (uint16_t)0x0000;
     userSelectedHR  = false;

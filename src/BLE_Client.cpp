@@ -48,7 +48,9 @@ void bleClientTask(void *pvParameters)
         }
 
         vTaskDelay(BLE_CLIENT_DELAY / portTICK_PERIOD_MS); // Delay a second between loops.
+        #ifdef DEBUG_STACK
         debugDirector("BLE_client High Water Mark: " + String(uxTaskGetStackHighWaterMark(BLEClientTask)));
+        #endif
         for (size_t x = 0; x < NUM_BLE_DEVICES; x++)
         {
             if (spinBLEClient.myBLEDevices[x].doConnect == true)
@@ -76,18 +78,22 @@ bool SpinBLEClient::connectToServer()
     int device_number = -1;
     for (size_t i = 0; i < NUM_BLE_DEVICES; i++)
     {
-        if (spinBLEClient.myBLEDevices[i].advertisedDevice) //Client is assigned
+        if (spinBLEClient.myBLEDevices[i].doConnect == true) //Client wants to be connected
         {
-            if (spinBLEClient.myBLEDevices[i].doConnect == true) //Client wants to be connected
+            if (spinBLEClient.myBLEDevices[i].advertisedDevice) //Client is assigned
             {
                 myDevice = spinBLEClient.myBLEDevices[i].advertisedDevice;
                 device_number = i;
+            }
+            else{
+            debugDirector("doConnect and client out of alignment. Resetting device slot");
+            spinBLEClient.myBLEDevices[i].reset();
             }
         }
     }
     if (!myDevice)
     {
-        debugDirector("no doConnect");
+        debugDirector("No Device Found to Connect");
         return false;
     }
     //FUTURE - Iterate through an array of UUID's we support instead of all the if checks.
@@ -148,7 +154,6 @@ bool SpinBLEClient::connectToServer()
                 {
                     spinBLEClient.myBLEDevices[device_number].reset();
                     spinBLEClient.myBLEDevices[device_number].doConnect = false;
-                    doConnectPM = false;
                     connectedPM = false;
                     doScan = true;
                 }
@@ -198,7 +203,7 @@ bool SpinBLEClient::connectToServer()
         else
         {
             debugDirector("No Previous client found");
-            pClient = NimBLEDevice::getDisconnectedClient();
+            //pClient = NimBLEDevice::getDisconnectedClient();
         }
     }
     String t_name = "";
@@ -250,7 +255,6 @@ bool SpinBLEClient::connectToServer()
 
         if (pRemoteCharacteristic->canNotify())
         {
-            debugDirector("Subscribed to notifications");
             pRemoteCharacteristic->subscribe(true, nullptr, true);
             reconnectTries = MAX_RECONNECT_TRIES;
             scanRetries = MAX_SCAN_RETRIES;
@@ -323,7 +327,7 @@ void SpinBLEClient::MyClientCallback::onDisconnect(BLEClient *pclient)
 
             if (addr == spinBLEClient.myBLEDevices[i].peerAddress)
             {
-                //spinBLEClient.myBLEDevices[i].connectedClientID = -1;
+                //spinBLEClient.myBLEDevices[i].connectedClientID = BLE_HS_CONN_HANDLE_NONE;
                 debugDirector("Detected " + String(spinBLEClient.myBLEDevices[i].serviceUUID.toString().c_str()) + " Disconnect");
                 spinBLEClient.myBLEDevices[i].doConnect = true;
                 if ((spinBLEClient.myBLEDevices[i].charUUID == CYCLINGPOWERMEASUREMENT_UUID) || (spinBLEClient.myBLEDevices[i].charUUID == FITNESSMACHINEINDOORBIKEDATA_UUID) || (spinBLEClient.myBLEDevices[i].charUUID == FLYWHEEL_UART_RX_UUID))

@@ -322,7 +322,6 @@ void startHttpServer()
       debugDirector("HR is now: " + String(userConfig.getSimulatedHr()));
       server.send(200, "text/plain", "OK");
     }
-    debugDirector("Webclient High Water Mark: " + String(uxTaskGetStackHighWaterMark(webClientTask)));
   });
 
   server.on("/wattsslider", []() {
@@ -345,7 +344,7 @@ void startHttpServer()
       debugDirector("Watts are now: " + String(userConfig.getSimulatedWatts()));
       server.send(200, "text/plain", "OK");
     }
-    debugDirector("Webclient High Water Mark: " + String(uxTaskGetStackHighWaterMark(webClientTask)));
+
   });
 
   server.on("/hrValue", []() {
@@ -652,9 +651,11 @@ void telegramUpdate(void *pvParameters)
       client.stop();
       telegramMessage = "";
     }
-    //Serial.println(uxTaskGetStackHighWaterMark(telegramTask));
-    //Serial.println(uxTaskGetStackHighWaterMark(webClientTask));
-    //Serial.println(ESP.getFreeHeap());
+    #ifdef DEBUG_STACK
+    Serial.println(uxTaskGetStackHighWaterMark(telegramTask));
+    Serial.println(uxTaskGetStackHighWaterMark(webClientTask));
+    Serial.println(ESP.getFreeHeap());
+    #endif
     vTaskDelay(4000 / portTICK_RATE_MS);
   }
 }

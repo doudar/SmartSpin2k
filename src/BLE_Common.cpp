@@ -37,16 +37,14 @@ void BLECommunications(void *pvParameters)
   for (;;)
   {
       //**********************************Client***************************************/
-            //debugDirector("BLEclient High Water Mark: " + String(uxTaskGetStackHighWaterMark(BLEClientTask)));
-            //debugDirector(".", false);
             for (size_t x = 0; x < NUM_BLE_DEVICES; x++)
             {
                 if (spinBLEClient.myBLEDevices[x].advertisedDevice)
                 {
                     myAdvertisedBLEDevice myAdvertisedDevice = spinBLEClient.myBLEDevices[x];
-                    if ((myAdvertisedDevice.connectedClientID != -1) && (myAdvertisedDevice.doConnect == false)) //client must not be in connection process
+                    if ((myAdvertisedDevice.connectedClientID != BLE_HS_CONN_HANDLE_NONE) && (myAdvertisedDevice.doConnect == false)) //client must not be in connection process
                     {
-                        if (NimBLEDevice::getClientByPeerAddress(myAdvertisedDevice.peerAddress))
+                        if (NimBLEDevice::getClientByPeerAddress(myAdvertisedDevice.peerAddress)) //nullptr chack
                         {
                         BLEClient *pClient = NimBLEDevice::getClientByPeerAddress(myAdvertisedDevice.peerAddress);
                         if ((myAdvertisedDevice.serviceUUID != BLEUUID((uint16_t)0x0000)) && (pClient->isConnected()))
@@ -64,10 +62,27 @@ void BLECommunications(void *pvParameters)
                          if (pRemoteBLECharacteristic->getUUID() == CYCLINGPOWERMEASUREMENT_UUID)
                          {
                              BLE_CPSDecode(pRemoteBLECharacteristic);
+                             if(!spinBLEClient.connectedPM)
+                             {
+                                 spinBLEClient.connectedPM = true;
+                             }
+                             for (size_t y = 0; y < NUM_BLE_DEVICES; y++) //Disconnect oldest PM to avoid two connected. 
+                             {
+                                if((myAdvertisedDevice.connectedClientID != spinBLEClient.myBLEDevices[y].connectedClientID) && (spinBLEClient.myBLEDevices[y].connectedClientID != BLE_HS_CONN_HANDLE_NONE) && (spinBLEClient.myBLEDevices[y].charUUID == CYCLINGPOWERMEASUREMENT_UUID))
+                                {
+                                    spinBLEClient.intentionalDisconnect = true;
+                                    pRemoteBLECharacteristic->getRemoteService()->getClient()->disconnect();
+                                    debugDirector("Found Duplicate CPS, Disconnecting one.");
+                                }
+                             }          
                          }
                         if ((pRemoteBLECharacteristic->getUUID() == FITNESSMACHINEINDOORBIKEDATA_UUID) || (pRemoteBLECharacteristic->getUUID() == FLYWHEEL_UART_SERVICE_UUID) || (pRemoteBLECharacteristic->getUUID() == HEARTCHARACTERISTIC_UUID))
                         {
                             BLE_FTMSDecode(pRemoteBLECharacteristic);
+                             if(!spinBLEClient.connectedPM)
+                             {
+                                 spinBLEClient.connectedPM = true;
+                             }
                         }
                     }
                 }
@@ -76,7 +91,7 @@ void BLECommunications(void *pvParameters)
     }
 
       //***********************************SERVER**************************************/
-    if (spinBLEClient.connectedHR && !spinBLEClient.connectedPM && (userConfig.getSimulatedHr() > 0) && userPWC.hr2Pwr)
+    if ((spinBLEClient.connectedHR && !spinBLEClient.connectedPM) && (userConfig.getSimulatedHr() > 0) && userPWC.hr2Pwr)
     {
       calculateInstPwrFromHR();
     }
@@ -117,7 +132,9 @@ void BLECommunications(void *pvParameters)
     vTaskDelay((BLE_NOTIFY_DELAY / 2) / portTICK_PERIOD_MS);
     digitalWrite(LED_PIN, HIGH);
     vTaskDelay((BLE_NOTIFY_DELAY / 2) / portTICK_PERIOD_MS);
+    #ifdef DEBUG_STACK
     debugDirector("BLEServer High Water Mark: " + String(uxTaskGetStackHighWaterMark(BLECommunicationTask)));
+    #endif
   }
 }
 
