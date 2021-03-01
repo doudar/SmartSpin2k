@@ -259,6 +259,11 @@ void updateHeartRateMeasurementChar()
 {
   heartRateMeasurement[1] = userConfig.getSimulatedHr();
   heartRateMeasurementCharacteristic->setValue(heartRateMeasurement, 5);
+  for (const auto &text : heartRateMeasurement)
+  { // Range-for!
+    debugDirector(String(text, HEX) + " ", false);
+  }
+  debugDirector("<-- HR sent ", false);
   heartRateMeasurementCharacteristic->notify();
 }
 

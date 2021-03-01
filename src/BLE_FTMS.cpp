@@ -15,6 +15,11 @@
             int heartRate = sensorData->getHeartRate();
             userConfig.setSimulatedHr(heartRate);
             debugDirector(" HR(" + String(heartRate) + ")", false);
+            if(!spinBLEClient.connectedHR)
+            {
+            spinBLEClient.connectedHR = true;
+            debugDirector("Registered HRM in FTMS");
+            }
         }
         if (sensorData->hasCadence())
         {

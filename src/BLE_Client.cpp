@@ -179,8 +179,6 @@ bool SpinBLEClient::connectToServer()
 
                 pRemoteCharacteristic->subscribe(true, nullptr, true);
                 debugDirector("Found " + String(pRemoteCharacteristic->getUUID().toString().c_str()) + " on reconnect.");
-                connectedPM = true;
-                doConnectPM = false;
                 reconnectTries = MAX_RECONNECT_TRIES;
                 spinBLEClient.myBLEDevices[device_number].set(myDevice, pClient->getConnId(), serviceUUID, charUUID);
                 spinBLEClient.myBLEDevices[device_number].doConnect = false;
@@ -287,14 +285,24 @@ bool SpinBLEClient::connectToServer()
  **                       Remove as you see fit for your needs                        */
 
 void SpinBLEClient::MyClientCallback::onConnect(BLEClient *pclient)
-{ 
-    if (pclient->getService(HEARTSERVICE_UUID))
+{
+    auto addr = pclient->getPeerAddress();
+    for (size_t i = 0; i < NUM_BLE_DEVICES; i++)
     {
-        spinBLEClient.connectedHR = true;
-    }
-    else
-    {
-        spinBLEClient.connectedPM = true;
+        if (addr == spinBLEClient.myBLEDevices[i].peerAddress)
+        {
+            spinBLEClient.myBLEDevices[i].doConnect = true;
+            if ((spinBLEClient.myBLEDevices[i].charUUID == CYCLINGPOWERMEASUREMENT_UUID) || (spinBLEClient.myBLEDevices[i].charUUID == FITNESSMACHINEINDOORBIKEDATA_UUID) || (spinBLEClient.myBLEDevices[i].charUUID == FLYWHEEL_UART_RX_UUID))
+            {
+                spinBLEClient.connectedPM = true;
+                debugDirector("Registered PM on Connect");
+            }
+            if ((spinBLEClient.myBLEDevices[i].charUUID == HEARTCHARACTERISTIC_UUID))
+            {
+                spinBLEClient.connectedHR = true;
+                debugDirector("Registered HRM on Connect");
+            }
+        }
     }
 }
 void SpinBLEClient::MyClientCallback::onDisconnect(BLEClient *pclient)
