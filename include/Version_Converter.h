@@ -17,7 +17,7 @@ struct Version
    //
    // Use initializer list to assign version-tag variables
    // Assign it by zero, otherwise std::scanf() will assign
-   // garbage value to the versio-tag, if number of version-tag
+   // garbage value to the version-tag, if number of version-tag
    // will be less than four.
    Version(const std::string& version)
       : major(0), minor(0), revision(0), build(0), commitCount(0), branch((char*)"master"), commit((char*)"")
