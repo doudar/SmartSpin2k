@@ -31,8 +31,8 @@ html {
 
   //Update values on specified interval loading late because this tiny webserver hates frequent requests
   setInterval(function () {
-    if (document.getElementById("firmwareVersion").innerHTML == "loading"){
-    requestConfigValues();
+    if (document.getElementById("firmwareVersion").innerHTML == ""){
+      requestConfigValues();
     }
 
   }, 1000);
