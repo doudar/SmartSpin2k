@@ -535,7 +535,7 @@ void FirmwareUpdate()
   {
     payload = http.getString(); // save received version
     payload.trim();
-    debugDirector("  -Server Ver " + payload);
+    debugDirector("  - Server version: " + payload);
     internetConnection = true;
   }
   else
@@ -603,7 +603,7 @@ void FirmwareUpdate()
     }
     else //don't update
     {
-      debugDirector("  -Current ver " + String(FIRMWARE_VERSION));
+      debugDirector("  - Current Version: " + String(FIRMWARE_VERSION));
     }
   }
 }
