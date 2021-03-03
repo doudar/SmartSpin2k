@@ -48,9 +48,9 @@ void bleClientTask(void *pvParameters)
         }
 
         vTaskDelay(BLE_CLIENT_DELAY / portTICK_PERIOD_MS); // Delay a second between loops.
-        #ifdef DEBUG_STACK
+#ifdef DEBUG_STACK
         debugDirector("BLE_client High Water Mark: " + String(uxTaskGetStackHighWaterMark(BLEClientTask)));
-        #endif
+#endif
         for (size_t x = 0; x < NUM_BLE_DEVICES; x++)
         {
             if (spinBLEClient.myBLEDevices[x].doConnect == true)
@@ -85,9 +85,10 @@ bool SpinBLEClient::connectToServer()
                 myDevice = spinBLEClient.myBLEDevices[i].advertisedDevice;
                 device_number = i;
             }
-            else{
-            debugDirector("doConnect and client out of alignment. Resetting device slot");
-            spinBLEClient.myBLEDevices[i].reset();
+            else
+            {
+                debugDirector("doConnect and client out of alignment. Resetting device slot");
+                spinBLEClient.myBLEDevices[i].reset();
             }
         }
     }
@@ -160,7 +161,6 @@ bool SpinBLEClient::connectToServer()
                 return false;
             }
             Serial.println("Reconnecting client");
-            // pClient->setClientCallbacks(new MyClientCallback(), true); commented out per @h2zero suggestion
             BLERemoteService *pRemoteService = pClient->getService(serviceUUID);
 
             if (pRemoteService == nullptr)
@@ -383,18 +383,32 @@ void SpinBLEClient::MyAdvertisedDeviceCallback::onResult(BLEAdvertisedDevice *ad
     }
     if ((advertisedDevice->haveServiceUUID()) && (advertisedDevice->isAdvertisingService(CYCLINGPOWERSERVICE_UUID) || advertisedDevice->isAdvertisingService(FLYWHEEL_UART_SERVICE_UUID) || advertisedDevice->isAdvertisingService(FITNESSMACHINESERVICE_UUID) || advertisedDevice->isAdvertisingService(HEARTSERVICE_UUID)))
     {
-        if ((aDevName == c_PM) || (advertisedDevice->getAddress().toString().c_str() == c_PM) ||(aDevName == c_HR) || (advertisedDevice->getAddress().toString().c_str() == c_HR)|| (String(c_PM) == ("any")) || (String(c_HR) == ("any")))
-        {                       //notice the subtle difference. getServiceUUID(int) returns the index of the service in the list or the 0 slot if not specified. 
-         /*   if(advertisedDevice->getServiceUUID()==HEARTSERVICE_UUID && ((aDevName != c_HR)||((String(c_HR) == ("none")))))
+        if ((aDevName == c_PM) || (advertisedDevice->getAddress().toString().c_str() == c_PM) || (aDevName == c_HR) || (advertisedDevice->getAddress().toString().c_str() == c_HR) || (String(c_PM) == ("any")) || (String(c_HR) == ("any")))
+        { //notice the subtle difference vv getServiceUUID(int) returns the index of the service in the list or the 0 slot if not specified.
+            if (advertisedDevice->getServiceUUID() == HEARTSERVICE_UUID)
             {
-                debugDirector("Skipping non-selected HRM");
-                return;
+                if (String(c_HR) == "any")
+                {
+                    //continue
+                }
+                else if ((aDevName != c_HR) || ((String(c_HR) == ("none"))))
+                {
+                    debugDirector("Skipping non-selected HRM");
+                    return;
+                }
             }
-            if(((advertisedDevice->isAdvertisingService(CYCLINGPOWERSERVICE_UUID) || advertisedDevice->isAdvertisingService(FLYWHEEL_UART_SERVICE_UUID) || advertisedDevice->isAdvertisingService(FITNESSMACHINESERVICE_UUID))) && (((aDevName != c_PM) || (String(c_PM) == ("none")))))
+            if ((advertisedDevice->isAdvertisingService(CYCLINGPOWERSERVICE_UUID) || advertisedDevice->isAdvertisingService(FLYWHEEL_UART_SERVICE_UUID) || advertisedDevice->isAdvertisingService(FITNESSMACHINESERVICE_UUID)))
             {
-                debugDirector("Skipping non-selected PM");
-                return;
-            }*/
+                if (String(c_PM) == "any")
+                {
+                    //continue
+                }
+                else if ((aDevName != c_PM) || (String(c_PM) == ("none")))
+                {
+                    debugDirector("Skipping non-selected PM");
+                    return;
+                }
+            }
             for (size_t i = 0; i < NUM_BLE_DEVICES; i++)
             {
                 if (spinBLEClient.myBLEDevices[i].advertisedDevice == nullptr) //found empty device slot

@@ -17,109 +17,109 @@ TaskHandle_t BLECommunicationTask;
 
 void BLECommunications(void *pvParameters)
 {
-  for (;;)
-  {
-      //**********************************Client***************************************/
-            for (size_t x = 0; x < NUM_BLE_DEVICES; x++)
+    for (;;)
+    {
+        //**********************************Client***************************************/
+        for (size_t x = 0; x < NUM_BLE_DEVICES; x++)
+        {
+            if (spinBLEClient.myBLEDevices[x].advertisedDevice)
             {
-                if (spinBLEClient.myBLEDevices[x].advertisedDevice)
+                myAdvertisedBLEDevice myAdvertisedDevice = spinBLEClient.myBLEDevices[x];
+                if ((myAdvertisedDevice.connectedClientID != BLE_HS_CONN_HANDLE_NONE) && (myAdvertisedDevice.doConnect == false)) //client must not be in connection process
                 {
-                    myAdvertisedBLEDevice myAdvertisedDevice = spinBLEClient.myBLEDevices[x];
-                    if ((myAdvertisedDevice.connectedClientID != BLE_HS_CONN_HANDLE_NONE) && (myAdvertisedDevice.doConnect == false)) //client must not be in connection process
+                    if (NimBLEDevice::getClientByPeerAddress(myAdvertisedDevice.peerAddress)) //nullptr chack
                     {
-                        if (NimBLEDevice::getClientByPeerAddress(myAdvertisedDevice.peerAddress)) //nullptr chack
-                        {
                         BLEClient *pClient = NimBLEDevice::getClientByPeerAddress(myAdvertisedDevice.peerAddress);
                         if ((myAdvertisedDevice.serviceUUID != BLEUUID((uint16_t)0x0000)) && (pClient->isConnected()))
                         {
-                        //Write the recieved data to the Debug Director
-                        BLERemoteCharacteristic *pRemoteBLECharacteristic = pClient->getService(myAdvertisedDevice.serviceUUID)->getCharacteristic(myAdvertisedDevice.charUUID);
-                        std::string pData = pRemoteBLECharacteristic->getValue();
-                        int length = pData.length();
-                        String debugOutput = "";
-                        for (int i = 0; i < length; i++)
-                        {
-                            debugOutput += String(pData[i], HEX) + " ";
-                        }
-                        debugDirector(debugOutput + "<-" + String(myAdvertisedDevice.serviceUUID.toString().c_str()) + " | " + String(myAdvertisedDevice.charUUID.toString().c_str()), true, true);
-                         if (pRemoteBLECharacteristic->getUUID() == CYCLINGPOWERMEASUREMENT_UUID)
-                         {
-                             BLE_CPSDecode(pRemoteBLECharacteristic);
-                             if(!spinBLEClient.connectedPM)
-                             {
-                                 spinBLEClient.connectedPM = true;
-                             }
-                             for (size_t y = 0; y < NUM_BLE_DEVICES; y++) //Disconnect oldest PM to avoid two connected. 
-                             {
-                                if((myAdvertisedDevice.connectedClientID != spinBLEClient.myBLEDevices[y].connectedClientID) && (spinBLEClient.myBLEDevices[y].connectedClientID != BLE_HS_CONN_HANDLE_NONE) && (spinBLEClient.myBLEDevices[y].charUUID == CYCLINGPOWERMEASUREMENT_UUID))
+                            //Write the recieved data to the Debug Director
+                            BLERemoteCharacteristic *pRemoteBLECharacteristic = pClient->getService(myAdvertisedDevice.serviceUUID)->getCharacteristic(myAdvertisedDevice.charUUID);
+                            std::string pData = pRemoteBLECharacteristic->getValue();
+                            int length = pData.length();
+                            String debugOutput = "";
+                            for (int i = 0; i < length; i++)
+                            {
+                                debugOutput += String(pData[i], HEX) + " ";
+                            }
+                            debugDirector(debugOutput + "<-" + String(myAdvertisedDevice.serviceUUID.toString().c_str()) + " | " + String(myAdvertisedDevice.charUUID.toString().c_str()), true, true);
+                            
+                            if (pRemoteBLECharacteristic->getUUID() == CYCLINGPOWERMEASUREMENT_UUID)
+                            {
+                                BLE_CPSDecode(pRemoteBLECharacteristic);
+                                if (!spinBLEClient.connectedPM)
                                 {
-                                    spinBLEClient.intentionalDisconnect = true;
-                                    pRemoteBLECharacteristic->getRemoteService()->getClient()->disconnect();
-                                    debugDirector("Found Duplicate CPS, Disconnecting one.");
+                                    spinBLEClient.connectedPM = true;
                                 }
-                             }          
-                         }
-                        if ((pRemoteBLECharacteristic->getUUID() == FITNESSMACHINEINDOORBIKEDATA_UUID) || (pRemoteBLECharacteristic->getUUID() == FLYWHEEL_UART_SERVICE_UUID) || (pRemoteBLECharacteristic->getUUID() == HEARTCHARACTERISTIC_UUID))
-                        {
-                            BLE_FTMSDecode(pRemoteBLECharacteristic);
-                             if(!spinBLEClient.connectedPM)
-                             {
-                                 spinBLEClient.connectedPM = true;
-                             }
+                               /* for (size_t y = 0; y < NUM_BLE_DEVICES; y++) //Disconnect oldest PM to avoid two connected.
+                                {
+                                    if ((myAdvertisedDevice.connectedClientID != spinBLEClient.myBLEDevices[y].connectedClientID) && (spinBLEClient.myBLEDevices[y].charUUID == myAdvertisedDevice.charUUID) && (String(userConfig.getconnectedPowerMeter())=="any"))
+                                    {
+                                        debugDirector(String(spinBLEClient.myBLEDevices[y].peerAddress.toString().c_str()) + "Matched another CPS.  Disconnecting: " + String(myAdvertisedDevice.peerAddress.toString().c_str()));
+                                        BLEDevice::getClientByPeerAddress(myAdvertisedDevice.peerAddress)->disconnect();
+                                        myAdvertisedDevice.reset();
+                                        spinBLEClient.intentionalDisconnect = true;
+                                        vTaskDelay(1000/portTICK_PERIOD_MS); //Give disconnect time to happen. 
+                                    }
+                                }*/
+                            }
+                            if ((pRemoteBLECharacteristic->getUUID() == FITNESSMACHINEINDOORBIKEDATA_UUID) || (pRemoteBLECharacteristic->getUUID() == FLYWHEEL_UART_SERVICE_UUID) || (pRemoteBLECharacteristic->getUUID() == HEARTCHARACTERISTIC_UUID))
+                            {
+                                BLE_FTMSDecode(pRemoteBLECharacteristic);
+                                if (!spinBLEClient.connectedPM)
+                                {
+                                    spinBLEClient.connectedPM = true;
+                                }
+                            }
                         }
                     }
                 }
             }
         }
-    }
 
-      //***********************************SERVER**************************************/
-    if ((spinBLEClient.connectedHR && !spinBLEClient.connectedPM) && (userConfig.getSimulatedHr() > 0) && userPWC.hr2Pwr)
-    {
-      calculateInstPwrFromHR();
-    }
-    if (!spinBLEClient.connectedPM && !userPWC.hr2Pwr)
-    {
-      userConfig.setSimulatedCad(0);
-      userConfig.setSimulatedWatts(0);
-    }
-    if (!spinBLEClient.connectedHR)
-    {
-      userConfig.setSimulatedHr(0);
-    }
+        //***********************************SERVER**************************************/
+        if ((spinBLEClient.connectedHR && !spinBLEClient.connectedPM) && (userConfig.getSimulatedHr() > 0) && userPWC.hr2Pwr)
+        {
+            calculateInstPwrFromHR();
+        }
+        if (!spinBLEClient.connectedPM && !userPWC.hr2Pwr)
+        {
+            userConfig.setSimulatedCad(0);
+            userConfig.setSimulatedWatts(0);
+        }
+        if (!spinBLEClient.connectedHR)
+        {
+            userConfig.setSimulatedHr(0);
+        }
 
-    if (_BLEClientConnected)
-    {
-      //update the BLE information on the server
-      computeCSC();
-      updateIndoorBikeDataChar();
-      updateCyclingPowerMesurementChar();
-      updateHeartRateMeasurementChar();
-      GlobalBLEClientConnected = true;
-      
-      if (updateConnParametersFlag)
-      {
-        vTaskDelay(100/portTICK_PERIOD_MS);
-        BLEDevice::getServer()->updateConnParams(bleConnDesc, 40, 50, 0, 100);
-        updateConnParametersFlag = false;
-      }
+        if (_BLEClientConnected)
+        {
+            //update the BLE information on the server
+            computeCSC();
+            updateIndoorBikeDataChar();
+            updateCyclingPowerMesurementChar();
+            updateHeartRateMeasurementChar();
+            GlobalBLEClientConnected = true;
+
+            if (updateConnParametersFlag)
+            {
+                vTaskDelay(100 / portTICK_PERIOD_MS);
+                BLEDevice::getServer()->updateConnParams(bleConnDesc, 40, 50, 0, 100);
+                updateConnParametersFlag = false;
+            }
+        }
+        else
+        {
+            GlobalBLEClientConnected = false;
+        }
+        if (!_BLEClientConnected)
+        {
+            digitalWrite(LED_PIN, LOW); //blink if no client connected
+        }
+        vTaskDelay((BLE_NOTIFY_DELAY / 2) / portTICK_PERIOD_MS);
+        digitalWrite(LED_PIN, HIGH);
+        vTaskDelay((BLE_NOTIFY_DELAY / 2) / portTICK_PERIOD_MS);
+#ifdef DEBUG_STACK
+        debugDirector("BLEServer High Water Mark: " + String(uxTaskGetStackHighWaterMark(BLECommunicationTask)));
+#endif
     }
-    else
-    {
-      GlobalBLEClientConnected = false;
-    }
-    if (!_BLEClientConnected)
-    {
-      digitalWrite(LED_PIN, LOW); //blink if no client connected
-    }
-    vTaskDelay((BLE_NOTIFY_DELAY / 2) / portTICK_PERIOD_MS);
-    digitalWrite(LED_PIN, HIGH);
-    vTaskDelay((BLE_NOTIFY_DELAY / 2) / portTICK_PERIOD_MS);
-    #ifdef DEBUG_STACK
-    debugDirector("BLEServer High Water Mark: " + String(uxTaskGetStackHighWaterMark(BLECommunicationTask)));
-    #endif
-  }
 }
-
-
-

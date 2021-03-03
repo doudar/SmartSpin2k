@@ -20,7 +20,7 @@
 //double_t    const CyclingPowerMeasurement::resolutions[FieldCount]            = {   1,  1.0,   .5,  1/32, 1.0, 1/2048, 1/1024, 1.0, 1/32, 1.0, 1.0, 1.0,  1.0, 1.0};
 
 /*Calculate Cadence and power from Cycling Power Measurement*/
-//Takes a NimBLERemoteCharacteristic with CYCLINGPOWERMEASUREMENT_UUID and extracts the data. Also disconnects a secondary power meter.
+//Takes a NimBLERemoteCharacteristic with CYCLINGPOWERMEASUREMENT_UUID and extracts the data.
 void BLE_CPSDecode(BLERemoteCharacteristic *pBLERemoteCharacteristic)
 {
     if (pBLERemoteCharacteristic->getUUID() == CYCLINGPOWERMEASUREMENT_UUID) //double checking this was
