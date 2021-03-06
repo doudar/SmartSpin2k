@@ -50,17 +50,6 @@ void BLECommunications(void *pvParameters)
                                 {
                                     spinBLEClient.connectedPM = true;
                                 }
-                               /* for (size_t y = 0; y < NUM_BLE_DEVICES; y++) //Disconnect oldest PM to avoid two connected.
-                                {
-                                    if ((myAdvertisedDevice.connectedClientID != spinBLEClient.myBLEDevices[y].connectedClientID) && (spinBLEClient.myBLEDevices[y].charUUID == myAdvertisedDevice.charUUID) && (String(userConfig.getconnectedPowerMeter())=="any"))
-                                    {
-                                        debugDirector(String(spinBLEClient.myBLEDevices[y].peerAddress.toString().c_str()) + "Matched another CPS.  Disconnecting: " + String(myAdvertisedDevice.peerAddress.toString().c_str()));
-                                        BLEDevice::getClientByPeerAddress(myAdvertisedDevice.peerAddress)->disconnect();
-                                        myAdvertisedDevice.reset();
-                                        spinBLEClient.intentionalDisconnect = true;
-                                        vTaskDelay(1000/portTICK_PERIOD_MS); //Give disconnect time to happen. 
-                                    }
-                                }*/
                             }
                             if ((pRemoteBLECharacteristic->getUUID() == FITNESSMACHINEINDOORBIKEDATA_UUID) || (pRemoteBLECharacteristic->getUUID() == FLYWHEEL_UART_SERVICE_UUID) || (pRemoteBLECharacteristic->getUUID() == HEARTCHARACTERISTIC_UUID))
                             {

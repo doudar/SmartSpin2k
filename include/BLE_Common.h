@@ -182,6 +182,8 @@ class SpinBLEClient{
     bool connectToServer();
     void scanProcess();
     void disconnect();
+    //Check for duplicate services of BLEClient and remove the previoulsy connected one. 
+    void removeDuplicates(BLEClient *pClient);
 
 private:
     

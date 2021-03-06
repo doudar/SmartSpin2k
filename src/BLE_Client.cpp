@@ -290,6 +290,7 @@ bool SpinBLEClient::connectToServer()
 
 void SpinBLEClient::MyClientCallback::onConnect(BLEClient *pclient)
 {
+    
     auto addr = pclient->getPeerAddress();
     for (size_t i = 0; i < NUM_BLE_DEVICES; i++)
     {
@@ -300,15 +301,19 @@ void SpinBLEClient::MyClientCallback::onConnect(BLEClient *pclient)
             {
                 spinBLEClient.connectedPM = true;
                 debugDirector("Registered PM on Connect");
+                spinBLEClient.removeDuplicates(pclient);
+                return;
             }
             if ((spinBLEClient.myBLEDevices[i].charUUID == HEARTCHARACTERISTIC_UUID))
             {
                 spinBLEClient.connectedHR = true;
                 debugDirector("Registered HRM on Connect");
+                return;
             }
         }
     }
 }
+
 void SpinBLEClient::MyClientCallback::onDisconnect(BLEClient *pclient)
 {
 
@@ -383,46 +388,48 @@ void SpinBLEClient::MyAdvertisedDeviceCallback::onResult(BLEAdvertisedDevice *ad
     }
     if ((advertisedDevice->haveServiceUUID()) && (advertisedDevice->isAdvertisingService(CYCLINGPOWERSERVICE_UUID) || advertisedDevice->isAdvertisingService(FLYWHEEL_UART_SERVICE_UUID) || advertisedDevice->isAdvertisingService(FITNESSMACHINESERVICE_UUID) || advertisedDevice->isAdvertisingService(HEARTSERVICE_UUID)))
     {
-        if ((aDevName == c_PM) || (advertisedDevice->getAddress().toString().c_str() == c_PM) || (aDevName == c_HR) || (advertisedDevice->getAddress().toString().c_str() == c_HR) || (String(c_PM) == ("any")) || (String(c_HR) == ("any")))
-        { //notice the subtle difference vv getServiceUUID(int) returns the index of the service in the list or the 0 slot if not specified.
-            if (advertisedDevice->getServiceUUID() == HEARTSERVICE_UUID)
+        //if ((aDevName == c_PM) || (advertisedDevice->getAddress().toString().c_str() == c_PM) || (aDevName == c_HR) || (advertisedDevice->getAddress().toString().c_str() == c_HR) || (String(c_PM) == ("any")) || (String(c_HR) == ("any")))
+        //{ //notice the subtle difference vv getServiceUUID(int) returns the index of the service in the list or the 0 slot if not specified.
+        if (advertisedDevice->getServiceUUID() == HEARTSERVICE_UUID)
+        {
+            if (String(c_HR) == "any")
             {
-                if (String(c_HR) == "any")
-                {
-                    //continue
-                }
-                else if ((aDevName != c_HR) || ((String(c_HR) == ("none"))))
-                {
-                    debugDirector("Skipping non-selected HRM");
-                    return;
-                }
+                debugDirector("HR String Matched Any");
+                //continue
             }
-            if ((advertisedDevice->getServiceUUID()(CYCLINGPOWERSERVICE_UUID) || advertisedDevice->getServiceUUID()(FLYWHEEL_UART_SERVICE_UUID) || advertisedDevice->getServiceUUID()(FITNESSMACHINESERVICE_UUID)))
+            else if ((aDevName != c_HR) || ((String(c_HR) == ("none"))))
             {
-                if (String(c_PM) == "any")
-                {
-                    //continue
-                }
-                else if ((aDevName != c_PM) || (String(c_PM) == ("none")))
-                {
-                    debugDirector("Skipping non-selected PM");
-                    return;
-                }
+                debugDirector("Skipping non-selected HRM");
+                return;
             }
-            for (size_t i = 0; i < NUM_BLE_DEVICES; i++)
-            {
-                if (spinBLEClient.myBLEDevices[i].advertisedDevice == nullptr) //found empty device slot
-                {
-                    spinBLEClient.myBLEDevices[i].set(advertisedDevice);
-                    spinBLEClient.myBLEDevices[i].doConnect = true;
-                    debugDirector("doConnect set on device: " + String(i));
-                    spinBLEClient.doScan = false;
-                    return;
-                }
-                debugDirector("Checking Slot " + String(i));
-            }
-            return;
         }
+        else // Already tested -->((advertisedDevice->getServiceUUID()(CYCLINGPOWERSERVICE_UUID) || advertisedDevice->getServiceUUID()(FLYWHEEL_UART_SERVICE_UUID) || advertisedDevice->getServiceUUID()(FITNESSMACHINESERVICE_UUID)))
+        {
+            if (String(c_PM) == "any")
+            {
+                debugDirector("PM String Matched Any");
+                //continue
+            }
+            else if ((aDevName != c_PM) || (String(c_PM) == ("none")))
+            {
+                debugDirector("Skipping non-selected PM");
+                return;
+            }
+        }
+        for (size_t i = 0; i < NUM_BLE_DEVICES; i++)
+        {
+            if (spinBLEClient.myBLEDevices[i].advertisedDevice == nullptr) //found empty device slot
+            {
+                spinBLEClient.myBLEDevices[i].set(advertisedDevice);
+                spinBLEClient.myBLEDevices[i].doConnect = true;
+                debugDirector("doConnect set on device: " + String(i));
+                spinBLEClient.doScan = false;
+                return;
+            }
+            debugDirector("Checking Slot " + String(i));
+        }
+        return;
+        //}
     }
 }
 
@@ -492,5 +499,25 @@ void SpinBLEClient::disconnect()
     {
         NimBLEDevice::deinit();
         vTaskDelay(100 / portTICK_RATE_MS);
+    }
+}
+
+void SpinBLEClient::removeDuplicates(BLEClient *pClient)
+{
+    for (size_t i = 0; i < NUM_BLE_DEVICES; i++) //Disconnect oldest PM to avoid two connected.
+    {
+        myAdvertisedBLEDevice myBLEd = spinBLEClient.myBLEDevices[i];
+        if (myBLEd.advertisedDevice)
+        {
+            if ((pClient->getService(myBLEd.serviceUUID)) && (pClient->getPeerAddress() != myBLEd.peerAddress))
+            {
+            debugDirector(String(pClient->getPeerAddress().toString().c_str()) + " Matched another service.  Disconnecting: " + String(myBLEd.peerAddress.toString().c_str()));
+            //BLEDevice::getClientByPeerAddress(myBLEd.peerAddress)->getService(myBLEd.serviceUUID)->getCharacteristic(myBLEd.charUUID)->unsubscribe();
+            BLEDevice::getClientByPeerAddress(myBLEd.peerAddress)->disconnect();
+            myBLEd.reset();
+            spinBLEClient.intentionalDisconnect = true;
+            return;
+            }
+        }
     }
 }
