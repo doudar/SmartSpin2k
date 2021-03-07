@@ -3,6 +3,7 @@
 .vscode/c_cpp_properties.json
 .vscode/launch.json
 .vscode/ipch
+test/tmp_pio_test_transport.cpp
 data/config.txt
 include/telegram_token.h
 Errors

@@ -39,6 +39,7 @@ userParameters userConfig;
 physicalWorkingCapacity userPWC;
 
 ///////////////////////////////////////////////////////BEGIN SETUP/////////////////////////////////////
+#ifndef UNIT_TEST
 void setup()
 {
 
@@ -128,6 +129,7 @@ void loop()
   #endif
   
 }
+#endif
 
 void moveStepper(void *pvParameters)
 {

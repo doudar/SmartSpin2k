@@ -8,9 +8,6 @@
 
 #pragma once
 
-//Current program version info. Used for auto updates
-#define FIRMWARE_VERSION "1.2.15"
-
 //Update firmware on boot?
 #define AUTO_FIRMWARE_UPDATE true
 

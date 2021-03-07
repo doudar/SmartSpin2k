@@ -23,7 +23,7 @@ html {
   </h2>
 </fieldset>
 
-<p style="text-align: center; color: blanchedalmond;">version <label id="firmwareVersion">loading</label></p>
+<p style="text-align: center; color: blanchedalmond;"><label id="firmwareVersion">loading</label></p>
 </body>
 
 
@@ -32,7 +32,7 @@ html {
   //Update values on specified interval loading late because this tiny webserver hates frequent requests
   setInterval(function () {
     if (document.getElementById("firmwareVersion").innerHTML == "loading"){
-    requestConfigValues();
+      requestConfigValues();
     }
 
   }, 1000);
