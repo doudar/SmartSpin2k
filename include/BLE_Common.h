@@ -119,7 +119,7 @@ class myAdvertisedBLEDevice{
 
     void reset() {
     advertisedDevice                      = nullptr;
-    NimBLEAddress peerAddress;
+    //NimBLEAddress peerAddress;
     connectedClientID                     = BLE_HS_CONN_HANDLE_NONE; 
     serviceUUID                           = (uint16_t)0x0000;
     charUUID                              = (uint16_t)0x0000;
