@@ -117,13 +117,17 @@ void setup()
 void loop()
 {
   vTaskDelay(1000 / portTICK_RATE_MS);
+  scanIfShiftersHeld();
 
   if (debugToHTML.length() > 500)
   { //Clear up memory
     debugToHTML = "<br>HTML Debug Truncated. Increase buffer if required.";
   }
 
-  scanIfShiftersHeld();
+  #ifdef DEBUG_STACK
+  Serial.println(uxTaskGetStackHighWaterMark(moveStepperTask));
+  #endif
+  
 }
 #endif
 

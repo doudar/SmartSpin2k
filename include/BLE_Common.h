@@ -13,6 +13,7 @@
 #include <memory>
 #include <NimBLEDevice.h>
 #include <Arduino.h>
+#include <Main.h>
 
 //Heart Service
 #define HEARTSERVICE_UUID BLEUUID((uint16_t)0x180D)
@@ -48,16 +49,23 @@
 
 //Setup
 void setupBLE();
+extern TaskHandle_t BLECommunicationTask;
+//***********************Common**********************************/
+void BLECommunications(void *pvParameters);
 
-//*****************************Server*****************************
+//*****************************Server****************************/
+extern int bleConnDesc; //These all need re
+extern bool _BLEClientConnected;
+extern bool updateConnParametersFlag;
 extern bool GlobalBLEClientConnected;
+
 void startBLEServer();
-void BLENotify(void *pvParameters);
 void computeERG(int, int);
 void computeCSC();
 void updateIndoorBikeDataChar();
 void updateCyclingPowerMesurementChar();
 void calculateInstPwrFromHR();
+void updateHeartRateMeasurementChar();
 
 class MyServerCallbacks : public BLEServerCallbacks
 {
@@ -76,6 +84,79 @@ class MyCallbacks : public BLECharacteristicCallbacks
 //We're only going to run one anyway.
 void bleClientTask(void *pvParameters);  
 
+//UUID's the client has methods for
+//BLEUUID serviceUUIDs[4] = {FITNESSMACHINESERVICE_UUID, CYCLINGPOWERSERVICE_UUID, HEARTSERVICE_UUID, FLYWHEEL_UART_SERVICE_UUID};
+//BLEUUID charUUIDs[4] = {FITNESSMACHINEINDOORBIKEDATA_UUID, CYCLINGPOWERMEASUREMENT_UUID, HEARTCHARACTERISTIC_UUID, FLYWHEEL_UART_TX_UUID};
+
+       enum userSelect : uint8_t {
+        HR  = 1,
+        PM  = 2,
+        CSC = 3,
+        CT  = 4     
+    };
+
+class myAdvertisedBLEDevice{
+    public: //eventually these shoul be made private
+    BLEAdvertisedDevice *advertisedDevice = nullptr;
+    NimBLEAddress peerAddress; 
+    int     connectedClientID             = BLE_HS_CONN_HANDLE_NONE;
+    BLEUUID serviceUUID     = (uint16_t)0x0000;
+    BLEUUID charUUID        = (uint16_t)0x0000;
+    bool    userSelectedHR  = false;
+    bool    userSelectedPM  = false;
+    bool    userSelectedCSC = false;
+    bool    userSelectedCT  = false;
+    bool    doConnect       = false;
+
+
+    void set(BLEAdvertisedDevice *device, int id = BLE_HS_CONN_HANDLE_NONE, BLEUUID inserviceUUID = (uint16_t)0x0000, BLEUUID incharUUID = (uint16_t)0x0000){
+        advertisedDevice  = device;
+        peerAddress = device->getAddress();
+        connectedClientID = id; 
+        serviceUUID = BLEUUID(inserviceUUID);
+        charUUID    = BLEUUID(incharUUID);
+    }
+
+    void reset() {
+    advertisedDevice                      = nullptr;
+    //NimBLEAddress peerAddress;
+    connectedClientID                     = BLE_HS_CONN_HANDLE_NONE; 
+    serviceUUID                           = (uint16_t)0x0000;
+    charUUID                              = (uint16_t)0x0000;
+    userSelectedHR  = false;
+    userSelectedPM  = false;
+    userSelectedCSC = false;
+    userSelectedCT  = false;
+    doConnect       = false;
+    }
+
+    //userSelectHR  = 1,userSelectPM  = 2,userSelectCSC = 3,userSelectCT  = 4 
+    void setSelected (userSelect flags)
+    {
+    switch (flags)
+    {
+    case 1:
+        userSelectedHR  = true;
+        break;
+    case 2:
+        userSelectedPM  = true;
+        break;
+    case 3:
+        userSelectedCSC = true;
+        break;
+    case 4:
+        userSelectedCT  = true;
+        break;    
+    }
+
+}
+
+
+
+};
+
+
+
 class SpinBLEClient{ 
     
     public: //Not all of these need to be public. This should be cleaned up later.
@@ -84,22 +165,25 @@ class SpinBLEClient{
     boolean connectedPM         = false;
     boolean connectedHR         = false;
     boolean doScan              = false;
+    bool intentionalDisconnect  = false; 
     float crankRev[2]           = {0, 0};
     float crankEventTime[2]     = {0, 0};
     int noReadingIn             = 0;
     int cscCumulativeCrankRev   = 0;
     int cscLastCrankEvtTime     = 0;
-    int lastConnectedPMID       = 0;
-
+    
     BLERemoteCharacteristic *pRemoteCharacteristic  = nullptr;
-    BLEAdvertisedDevice     *myPowerMeter           = nullptr;
-    BLEAdvertisedDevice     *myHeartMonitor         = nullptr;
+
+    //BLEDevices myBLEDevices;
+    myAdvertisedBLEDevice myBLEDevices[NUM_BLE_DEVICES];
 
     void start();
     void serverScan(bool connectRequest);   
     bool connectToServer();
     void scanProcess();
     void disconnect();
+    //Check for duplicate services of BLEClient and remove the previoulsy connected one. 
+    void removeDuplicates(BLEClient *pClient);
 
 private:
     
@@ -127,12 +211,12 @@ public:
     SensorData(String id, uint8_t *data, size_t length) : id(id), data(data), length(length) {};
 
     String getId();
-    virtual bool hasHeartRate() = 0;
-    virtual bool hasCadence() = 0;
-    virtual bool hasPower() = 0;
-    virtual int getHeartRate() = 0;
-    virtual float getCadence() = 0;
-    virtual int getPower() = 0;
+    virtual bool  hasHeartRate() = 0;
+    virtual bool  hasCadence() =   0;
+    virtual bool  hasPower() =     0;
+    virtual int   getHeartRate() = 0;
+    virtual float getCadence() =   0;
+    virtual int   getPower() =     0;
 
 protected:
     String id;
@@ -142,7 +226,7 @@ protected:
 
 class SensorDataFactory {
 public:
-    static std::unique_ptr<SensorData> getSensorData(BLERemoteCharacteristic *characteristic, uint8_t *data, size_t length);
+    static std::unique_ptr<SensorData> getSensorData(BLERemoteCharacteristic *characteristic, const uint8_t *data, size_t length);
 
 private:
     SensorDataFactory() {};
@@ -151,6 +235,7 @@ private:
 class NullData : public SensorData {
 public:
     NullData(uint8_t *data, size_t length) : SensorData("Null", data, length) {};
+
 
     virtual bool  hasHeartRate();
     virtual bool  hasCadence();
@@ -164,6 +249,7 @@ class HeartRateData : public SensorData {
 public:
     HeartRateData(uint8_t *data, size_t length) : SensorData("HRM", data, length) {};
 
+
     virtual bool  hasHeartRate();
     virtual bool  hasCadence();
     virtual bool  hasPower();
@@ -176,6 +262,7 @@ class FlywheelData : public SensorData {
 public:
     FlywheelData(uint8_t *data, size_t length) : SensorData("FLYW", data, length) {};
 
+
     virtual bool  hasHeartRate();
     virtual bool  hasCadence();
     virtual bool  hasPower();
@@ -187,6 +274,7 @@ public:
 class FitnessMachineIndoorBikeData : public SensorData {
 public:
     FitnessMachineIndoorBikeData(uint8_t *data, size_t length);
+
     ~FitnessMachineIndoorBikeData();
 
     enum Types : uint8_t {
@@ -227,3 +315,9 @@ private:
     static double_t const resolutions[];
     static int convert(int value, size_t length, uint8_t isSigned);
 };
+
+/******************CPS***************************/
+void BLE_CPSDecode(BLERemoteCharacteristic  *pBLERemoteCharacteristic);
+
+/******************FTMS**************************/
+void BLE_FTMSDecode(BLERemoteCharacteristic  *pBLERemoteCharacteristic);

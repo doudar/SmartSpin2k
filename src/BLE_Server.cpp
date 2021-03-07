@@ -11,15 +11,11 @@
 #include <ArduinoJson.h>
 #include <NimBLEDevice.h>
 
-TaskHandle_t BLENotifyTask;
-
 //BLE Server Settings
-bool _BLEClientConnected = false;
-bool updateConnParametersFlag = false;
+
 bool GlobalBLEClientConnected = false; //needs to be moved to BLE_Server
 
 NimBLEServer *pServer = nullptr;
-int bleConnDesc = 1;
 
 BLECharacteristic *heartRateMeasurementCharacteristic;
 BLECharacteristic *cyclingPowerMeasurementCharacteristic;
@@ -54,10 +50,10 @@ byte ftmsService[6] = {0x00, 0x00, 0x00, 0b01, 0b0100000, 0x00};
 byte ftmsControlPoint[8] = {0, 0, 0, 0, 0, 0, 0, 0}; //0x08 we need to return a value of 1 for any sucessful change
 byte ftmsMachineStatus[8] = {0, 0, 0, 0, 0, 0, 0, 0};
 
-uint8_t ftmsFeature[8] = {0x86, 0x50, 0x00, 0x00, 0x0C, 0xE0, 0x00, 0x00};                            //101000010000110 1110000000001100
+uint8_t ftmsFeature[8] = {0x86, 0x50, 0x00, 0x00, 0x0C, 0xE0, 0x00, 0x00};                                 //101000010000110 1110000000001100
 uint8_t ftmsIndoorBikeData[14] = {0x54, 0x0A, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0}; //00000000100001010100 ISpeed, ICAD, TDistance, IPower, ETime
-uint8_t ftmsResistanceLevelRange[6] = {0x00, 0x00, 0x3A, 0x98, 0xC5, 0x68};                           //+-15000 not sure what units
-uint8_t ftmsPowerRange[6] = {0x00, 0x00, 0xA0, 0x0F, 0x01, 0x00};                                     //1-4000 watts
+uint8_t ftmsResistanceLevelRange[6] = {0x00, 0x00, 0x3A, 0x98, 0xC5, 0x68};                                //+-15000 not sure what units
+uint8_t ftmsPowerRange[6] = {0x00, 0x00, 0xA0, 0x0F, 0x01, 0x00};                                          //1-4000 watts
 
 void startBLEServer()
 {
@@ -158,70 +154,6 @@ void startBLEServer()
   BLEDevice::startAdvertising();
 
   debugDirector("Bluetooth Characteristic defined!");
-  xTaskCreatePinnedToCore(
-      BLENotify,       /* Task function. */
-      "BLENotifyTask", /* name of task. */
-      3000,            /* Stack size of task*/
-      NULL,            /* parameter of the task */
-      1,               /* priority of the task*/
-      &BLENotifyTask,  /* Task handle to keep track of created task */
-      1);              /* pin task to core 0 */
-
-  debugDirector("BLE Notify Task Started");
-}
-
-void BLENotify(void *pvParameters)
-{
-  for (;;)
-  {
-    if (spinBLEClient.connectedHR && !spinBLEClient.connectedPM && (userConfig.getSimulatedHr() > 0) && userPWC.hr2Pwr)
-    {
-      calculateInstPwrFromHR();
-    }
-    if (!spinBLEClient.connectedPM && !userPWC.hr2Pwr)
-    {
-      userConfig.setSimulatedCad(0);
-      userConfig.setSimulatedWatts(0);
-    }
-    if (!spinBLEClient.connectedHR)
-    {
-      userConfig.setSimulatedHr(0);
-    }
-
-    if (_BLEClientConnected)
-    {
-      //update the BLE information on the server
-      heartRateMeasurement[1] = userConfig.getSimulatedHr();
-      heartRateMeasurementCharacteristic->setValue(heartRateMeasurement, 5);
-      computeCSC();
-      updateIndoorBikeDataChar();
-      updateCyclingPowerMesurementChar();
-      cyclingPowerMeasurementCharacteristic->notify();
-      fitnessMachineFeature->notify();
-      fitnessMachineIndoorBikeData->notify();
-      heartRateMeasurementCharacteristic->notify();
-      GlobalBLEClientConnected = true;
-      
-      if (updateConnParametersFlag)
-      {
-        vTaskDelay(100/portTICK_PERIOD_MS);
-        pServer->updateConnParams(bleConnDesc, 40, 50, 0, 100);
-        updateConnParametersFlag = false;
-      }
-    }
-    else
-    {
-      GlobalBLEClientConnected = false;
-    }
-    if (!_BLEClientConnected)
-    {
-      digitalWrite(LED_PIN, LOW); //blink if no client connected
-    }
-    vTaskDelay((BLE_NOTIFY_DELAY / 2) / portTICK_PERIOD_MS);
-    digitalWrite(LED_PIN, HIGH);
-    vTaskDelay((BLE_NOTIFY_DELAY / 2) / portTICK_PERIOD_MS);
-    //debugDirector("BLEServer High Water Mark: " + String(uxTaskGetStackHighWaterMark(BLENotifyTask)));
-  }
 }
 
 void computeERG(int currentWatts, int setPoint)
@@ -297,10 +229,12 @@ void updateIndoorBikeDataChar()
   ftmsIndoorBikeData[8] = 0;                         //distance <
   ftmsIndoorBikeData[9] = (uint8_t)((watts)&0xff);
   ftmsIndoorBikeData[10] = (uint8_t)((watts) >> 8); // power value, constrained to avoid negative values, although the specification allows for a sint16
-  ftmsIndoorBikeData[11] = (uint8_t) hr;
-  ftmsIndoorBikeData[12] = 0;                       // Elapsed Time uint16 in seconds
-  ftmsIndoorBikeData[13] = 0;                       // Elapsed Time
+  ftmsIndoorBikeData[11] = (uint8_t)hr;
+  ftmsIndoorBikeData[12] = 0; // Elapsed Time uint16 in seconds
+  ftmsIndoorBikeData[13] = 0; // Elapsed Time
   fitnessMachineIndoorBikeData->setValue(ftmsIndoorBikeData, 14);
+  fitnessMachineFeature->notify();
+  fitnessMachineIndoorBikeData->notify();
 } //^^Using the New Way of setting Bytes.
 
 void updateCyclingPowerMesurementChar()
@@ -316,9 +250,21 @@ void updateCyclingPowerMesurementChar()
   { // Range-for!
     debugDirector(String(text, HEX) + " ", false);
   }
-
+  cyclingPowerMeasurementCharacteristic->notify();
   debugDirector("<-- CPMC sent ", false);
   debugDirector("");
+}
+
+void updateHeartRateMeasurementChar()
+{
+  heartRateMeasurement[1] = userConfig.getSimulatedHr();
+  heartRateMeasurementCharacteristic->setValue(heartRateMeasurement, 5);
+  for (const auto &text : heartRateMeasurement)
+  { // Range-for!
+    debugDirector(String(text, HEX) + " ", false);
+  }
+  debugDirector("<-- HR sent ", false);
+  heartRateMeasurementCharacteristic->notify();
 }
 
 //Creating Server Connection Callbacks
