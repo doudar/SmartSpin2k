@@ -226,7 +226,7 @@ protected:
 
 class SensorDataFactory {
 public:
-    static std::unique_ptr<SensorData> getSensorData(BLERemoteCharacteristic *characteristic, const uint8_t *data, size_t length);
+    static std::unique_ptr<SensorData> getSensorData(BLERemoteCharacteristic *characteristic, uint8_t *data, size_t length);
 
 private:
     SensorDataFactory() {};
