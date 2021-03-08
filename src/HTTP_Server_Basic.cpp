@@ -55,11 +55,7 @@ void startWifi()
   {
     WiFi.mode(WIFI_STA);
     WiFi.setTxPower(WIFI_POWER_19_5dBm);
-    // Setting the hostname for DNS requires this line before calling "Wifi.begin(...)"
-    // See: https://github.com/espressif/arduino-esp32/issues/2537#issuecomment-590029109
-    WiFi.config(INADDR_NONE, INADDR_NONE, INADDR_NONE);
     WiFi.begin(userConfig.getSsid(), userConfig.getPassword());
-    WiFi.setHostname(userConfig.getDeviceName());
   }
 
   while (WiFi.status() != WL_CONNECTED)
