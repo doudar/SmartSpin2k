@@ -10,6 +10,9 @@ Optionally, the SmartSpin2K project has also progressed to the point of where it
 ## Background
 I travel for a living and some hotels I stay at have spin bikes. I started carrying my own power meter pedals for the spin bikes so I could ride Zwift, but the experience just isn't the same without automatic resistance on the hills. Then one day I was looking down at that simple to turn knob and I had a thought - With the power meter pedals attached, almost everything is already in place on this $300 spin bike to turn it into the equivalent of a $3,000 computer controlled smart bike! And so here we are....
 
+## NEW Instrucable!
+Check it out at https://www.instructables.com/Spin-Bike-Controller/
+
 ## Summary of function
 
 
@@ -41,7 +44,7 @@ Surprisingly, my spin bike with the SmartSpin2K actually has better "road feel" 
 If you would like a kit with a PCB, send a request to SmartSpin2K@gmail.com . Cost is $175 + shipping for all the printed parts + electronics, for an "almost ready to use unit". Note that if you go this route, this is still an open source hardware project and responsibility lies with **you** as to the proper construction and use. As such, you'll want to at least pull the cover off before use and take a look to ensure it's built to your standards (I think it's pretty good:) I'll be putting these togather on an as ordered basis, so expect 3-5 days prior to shipping.  
 
 ### We're working really hard on full documentaion
-If you're adventerious and handy you can probably take a look at my pictures below or the assembly video and start tinkering. This is a growing community and we now have a few members that would love to help you to get your SmartSpin2k working. There's also a brand new wiki at https://github.com/doudar/SmartSpin2k/wiki 
+If you're adventerious and handy you can probably take a look at my pictures below or the assembly video and start tinkering. Please check out our new Instructable at https://www.instructables.com/Spin-Bike-Controller/ If there are any questions on the Instructable, please add info in the discussions and we will clarify there and on the new Instructable. This is a growing community and we now have a few members that would love to help you to get your SmartSpin2k working. There's also a wiki at https://github.com/doudar/SmartSpin2k/wiki 
 
 In short, the process is:
 
