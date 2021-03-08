@@ -90,7 +90,8 @@ bool SpinBLEClient::connectToServer()
             {
                 debugDirector("doConnect and client out of alignment. Resetting device slot");
                 spinBLEClient.myBLEDevices[i].reset();
-                break;
+                spinBLEClient.doScan = true;
+                return;
             }
         }
     }
@@ -129,12 +130,15 @@ bool SpinBLEClient::connectToServer()
         else
         {
             debugDirector("Error: No advertised UUID found");
+            spinBLEClient.myBLEDevices[device_number].reset();
             return false;     
         }
     }
     else
     {
-        debugDirector("Error: Device no Service UUID");
+        debugDirector("Error: Device has no Service UUID");
+        spinBLEClient.myBLEDevices[device_number].reset();
+        spinBLEClient.doScan = true;
         return false;
     }
 
