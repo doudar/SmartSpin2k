@@ -444,7 +444,7 @@ void startHttpServer()
   xTaskCreatePinnedToCore(
       webClientUpdate,   /* Task function. */
       "webClientUpdate", /* name of task. */
-      4000,              /* Stack size of task Used to be 3000*/
+      4500,              /* Stack size of task Used to be 3000*/
       NULL,              /* parameter of the task */
       1,                 /* priority of the task  - 29 worked*/
       &webClientTask,    /* Task handle to keep track of created task */
@@ -664,9 +664,9 @@ void telegramUpdate(void *pvParameters)
       telegramMessage = "";
     }
     #ifdef DEBUG_STACK
-    Serial.println(uxTaskGetStackHighWaterMark(telegramTask));
-    Serial.println(uxTaskGetStackHighWaterMark(webClientTask));
-    Serial.println(ESP.getFreeHeap());
+    Serial.printf("Telegram: %d \n", uxTaskGetStackHighWaterMark(telegramTask));
+    Serial.printf("Web: %d \n", uxTaskGetStackHighWaterMark(webClientTask));
+    Serial.printf("Free: %d \n", ESP.getFreeHeap());
     #endif
     vTaskDelay(4000 / portTICK_RATE_MS);
   }

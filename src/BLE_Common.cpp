@@ -108,7 +108,7 @@ void BLECommunications(void *pvParameters)
         digitalWrite(LED_PIN, HIGH);
         vTaskDelay((BLE_NOTIFY_DELAY / 2) / portTICK_PERIOD_MS);
 #ifdef DEBUG_STACK
-        debugDirector("BLEServer High Water Mark: " + String(uxTaskGetStackHighWaterMark(BLECommunicationTask)));
+        Serial.printf("BLEComm: %d \n", uxTaskGetStackHighWaterMark(BLECommunicationTask));
 #endif
     }
 }
