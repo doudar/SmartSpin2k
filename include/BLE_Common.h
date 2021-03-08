@@ -88,11 +88,11 @@ void bleClientTask(void *pvParameters);
 //BLEUUID serviceUUIDs[4] = {FITNESSMACHINESERVICE_UUID, CYCLINGPOWERSERVICE_UUID, HEARTSERVICE_UUID, FLYWHEEL_UART_SERVICE_UUID};
 //BLEUUID charUUIDs[4] = {FITNESSMACHINEINDOORBIKEDATA_UUID, CYCLINGPOWERMEASUREMENT_UUID, HEARTCHARACTERISTIC_UUID, FLYWHEEL_UART_TX_UUID};
 
-       enum userSelect : uint8_t {
-        HR  = 1,
-        PM  = 2,
-        CSC = 3,
-        CT  = 4     
+enum userSelect : uint8_t {
+    HR  = 1,
+    PM  = 2,
+    CSC = 3,
+    CT  = 4     
     };
 
 class myAdvertisedBLEDevice{
