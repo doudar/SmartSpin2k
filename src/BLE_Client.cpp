@@ -128,11 +128,13 @@ bool SpinBLEClient::connectToServer()
         }
         else
         {
-            return false;
+            debugDirector("Error: No advertised UUID found");
+            return false;     
         }
     }
     else
     {
+        debugDirector("Error: Device no Service UUID");
         return false;
     }
 
