@@ -20,24 +20,24 @@ void BLECommunications(void *pvParameters)
     for (;;)
     {
         //**********************************Client***************************************/
-        for (size_t x = 0; x < NUM_BLE_DEVICES; x++)
+        for (size_t x = 0; x < NUM_BLE_DEVICES; x++) //loop through discovered devices
         {
-            if (spinBLEClient.myBLEDevices[x].advertisedDevice)
+            if (spinBLEClient.myBLEDevices[x].advertisedDevice) //is device registered?
             {
                 myAdvertisedBLEDevice myAdvertisedDevice = spinBLEClient.myBLEDevices[x];
                 if ((myAdvertisedDevice.connectedClientID != BLE_HS_CONN_HANDLE_NONE) && (myAdvertisedDevice.doConnect == false)) //client must not be in connection process
                 {
-                    if (NimBLEDevice::getClientByPeerAddress(myAdvertisedDevice.peerAddress)) //nullptr chack
+                    if (NimBLEDevice::getClientByPeerAddress(myAdvertisedDevice.peerAddress)) //nullptr check
                     {
                         BLEClient *pClient = NimBLEDevice::getClientByPeerAddress(myAdvertisedDevice.peerAddress);
-                        if ((myAdvertisedDevice.serviceUUID != BLEUUID((uint16_t)0x0000)) && (pClient->isConnected()))
+                        if ((myAdvertisedDevice.serviceUUID != BLEUUID((uint16_t)0x0000)) && (pClient->isConnected())) //Client connected with a valid UUID registered
                         {
                             //Write the recieved data to the Debug Director
-                            BLERemoteCharacteristic *pRemoteBLECharacteristic = pClient->getService(myAdvertisedDevice.serviceUUID)->getCharacteristic(myAdvertisedDevice.charUUID);
-                            std::string pData = pRemoteBLECharacteristic->getValue();
+                            BLERemoteCharacteristic *pRemoteBLECharacteristic = pClient->getService(myAdvertisedDevice.serviceUUID)->getCharacteristic(myAdvertisedDevice.charUUID); //get the registered services
+                            std::string pData = pRemoteBLECharacteristic->getValue(); //read the data
                             int length = pData.length();
                             String debugOutput = "";
-                            for (int i = 0; i < length; i++)
+                            for (int i = 0; i < length; i++) //loop and print data
                             {
                                 debugOutput += String(pData[i], HEX) + " ";
                             }
@@ -54,7 +54,7 @@ void BLECommunications(void *pvParameters)
                             if ((pRemoteBLECharacteristic->getUUID() == FITNESSMACHINEINDOORBIKEDATA_UUID) || (pRemoteBLECharacteristic->getUUID() == FLYWHEEL_UART_SERVICE_UUID) || (pRemoteBLECharacteristic->getUUID() == HEARTCHARACTERISTIC_UUID))
                             {
                                 BLE_FTMSDecode(pRemoteBLECharacteristic);
-                                if (!spinBLEClient.connectedPM)
+                                if ((!spinBLEClient.connectedPM) &&(pRemoteBLECharacteristic->getUUID()!= HEARTCHARACTERISTIC_UUID)) //PM flag for HR-->PWR
                                 {
                                     spinBLEClient.connectedPM = true;
                                 }
