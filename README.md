@@ -23,21 +23,15 @@ There are a multitude of configuration options availiable via a web interface on
 
 You'll need the quantity listed below of each item except the driver board. An optional PCB is in the hardware library which makes the wiring much simpler! 
 
-|qty   |         Part             |              Link                      |
-|:-----:|--------------------------|---------------------------------------:|
-|1      | ESP32 Dev Board          | https://amzn.to/2ZNyjQX                |
-|1      | NEMA 17 Pancake Stepper  | https://amzn.to/37mKKHh                |
-|1      | TMC2225                  | https://amzn.to/3kctdEQ                |
-|1      | LM2596 Buck Converter    | https://amzn.to/33ofggY                |
-|1      | 24V Power Supply         | https://amzn.to/3r4e1i0                |
-|2      | Tactile Switches         | https://amzn.to/33ezmKx                |
-|2      | 608 Skate Bearings       | https://amzn.to/3isBzrW                |
-
-Optional equipment so you can actually use it for fitness:
-|qty    |         Part             |              Link                      |
-|:-----:|--------------------------|---------------------------------------:|
-|1      |Assioma Pedals(or similar)| https://amzn.to/3ioSjk7                |                   
-|1      |Cheap Spin Bike Check Ebay| https://amzn.to/33mPmKj                |  
+| qty |           Part          | Amazon                  | Aliexpress                                            |
+|-----|:-----------------------:|-------------------------|-------------------------------------------------------|
+| 1   | ESP32 Dev Board         | https://amzn.to/2ZNyjQX | https://www.aliexpress.com/item/1005001267643044.html |
+| 1   | NEMA 17 Pancake Stepper | https://amzn.to/37mKKHh | https://www.aliexpress.com/item/4000120288783.html    |
+| 1   | TMC2225                 | https://amzn.to/3kctdEQ | https://www.aliexpress.com/item/4000296898203.html    |
+| 1   | LM2596 Buck Converter   | https://amzn.to/33ofggY | https://www.aliexpress.com/item/33014890815.html      |
+| 1   | 24V Power Supply        | https://amzn.to/3r4e1i0 | https://www.aliexpress.com/item/32975192317.html      |
+| 2   | Tactile Switches        | https://amzn.to/33ezmKx | https://www.aliexpress.com/item/32958087576.html      |
+| 2   | 608 Skate Bearings      | https://amzn.to/3isBzrW | https://www.aliexpress.com/item/32700232097.html      | 
 
 So for $700-$1000 (or much less if you use HR2VP) you can build a fully functional smart bike! If you already have a Peloton bike collecting dust in the corner, this will work on that too! 
 
@@ -53,7 +47,7 @@ In short, the process is:
 
 ### If you aren't a software developer:
 1. Download https://github.com/doudar/SmartSpin2k/releases/download/0.1.1.11/firmware.bin
-2. Download the SmartSpin2K flash tool https://github.com/SmartSpin2K/SmartSpin2kFlasher/releases/tag/v0.0.1
+2. Download the SmartSpin2K flash tool https://github.com/SmartSpin2K/SmartSpin2kFlasher/releases/tag/v.0.0.2
 3. Plug in your ESP32, open the SmartSpin2K flash tool and flash the firmware.bin.
 4. Connect to the new wireless network SmartSpin2K (password is password) and enter your home network information, then the ESP32 will finish the installation automatically. 
 
