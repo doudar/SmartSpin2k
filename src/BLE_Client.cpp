@@ -91,7 +91,7 @@ bool SpinBLEClient::connectToServer()
                 debugDirector("doConnect and client out of alignment. Resetting device slot");
                 spinBLEClient.myBLEDevices[i].reset();
                 spinBLEClient.doScan = true;
-                return;
+                return false;
             }
         }
     }
