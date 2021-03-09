@@ -8,6 +8,8 @@
 #include "Main.h"
 #include <math.h>
 #include "BLE_Common.h"
+#include "sensors/SensorData.h"
+#include "sensors/SensorDataFactory.h"
 //#include <queue>
 
 int bleConnDesc = 1;
