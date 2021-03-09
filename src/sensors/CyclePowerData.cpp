@@ -75,14 +75,13 @@ void CyclePowerData::decode(uint8_t *data, size_t length)
         this->crankEventTime = bytes_to_int(data[cPos + 3], data[cPos + 2]);
         if (this->crankRev > this->lastCrankRev && this->crankEventTime - this->lastCrankEventTime != 0)
         {
-            int cadence = abs(this->crankRev - this->lastCrankRev * 1024) / abs(this->crankEventTime - this->lastCrankEventTime) * 60;
+            int cadence = ((abs(this->crankRev - this->lastCrankRev) * 1024) / abs(this->crankEventTime - this->lastCrankEventTime)) * 60;
             if (cadence > 1)
             {
                 if (cadence > 200) //Cadence Error
                 {
                     cadence = 0;
                 }
-
                 this->cadence = cadence;
                 this->missedReadingCount = 0;
             }
