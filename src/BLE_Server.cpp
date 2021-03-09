@@ -237,7 +237,6 @@ void updateIndoorBikeDataChar()
   ftmsIndoorBikeData[7] = (uint8_t)(watts >> 8); // power value, constrained to avoid negative values, although the specification allows for a sint16
   ftmsIndoorBikeData[8] = (uint8_t)hr;
   fitnessMachineIndoorBikeData->setValue(ftmsIndoorBikeData, 9);
-
   fitnessMachineFeature->notify();
   fitnessMachineIndoorBikeData->notify();
 } //^^Using the New Way of setting Bytes.

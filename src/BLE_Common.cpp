@@ -30,9 +30,9 @@ void BLECommunications(void *pvParameters)
                 myAdvertisedBLEDevice myAdvertisedDevice = spinBLEClient.myBLEDevices[x];
                 if ((myAdvertisedDevice.connectedClientID != BLE_HS_CONN_HANDLE_NONE) && (myAdvertisedDevice.doConnect == false)) //client must not be in connection process
                 {
-                    if (NimBLEDevice::getClientByPeerAddress(myAdvertisedDevice.peerAddress)) //nullptr check
+                    if (NimBLEDevice::getClientByPeerAddress(myAdvertisedDevice.advertisedDevice->getAddress())) //nullptr check
                     {
-                        BLEClient *pClient = NimBLEDevice::getClientByPeerAddress(myAdvertisedDevice.peerAddress);
+                        BLEClient *pClient = NimBLEDevice::getClientByPeerAddress(myAdvertisedDevice.advertisedDevice->getAddress());
                         if ((myAdvertisedDevice.serviceUUID != BLEUUID((uint16_t)0x0000)) && (pClient->isConnected())) //Client connected with a valid UUID registered
                         {
                             //Write the recieved data to the Debug Director

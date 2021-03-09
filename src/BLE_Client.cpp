@@ -205,6 +205,7 @@ bool SpinBLEClient::connectToServer()
                 pRemoteCharacteristic->subscribe(true, nullptr, true);
                 debugDirector("Found " + String(pRemoteCharacteristic->getUUID().toString().c_str()) + " on reconnect.");
                 reconnectTries = MAX_RECONNECT_TRIES;
+                //VV Is this really needed? Shouldn't it just carry over from the previous connection? VV
                 spinBLEClient.myBLEDevices[device_number].set(myDevice, pClient->getConnId(), serviceUUID, charUUID);
                 spinBLEClient.myBLEDevices[device_number].doConnect = false;
 
