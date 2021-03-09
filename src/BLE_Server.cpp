@@ -51,7 +51,7 @@ byte ftmsControlPoint[8] = {0, 0, 0, 0, 0, 0, 0, 0}; //0x08 we need to return a 
 byte ftmsMachineStatus[8] = {0, 0, 0, 0, 0, 0, 0, 0};
 
 uint8_t ftmsFeature[8] = {0x86, 0x50, 0x00, 0x00, 0x0C, 0xE0, 0x00, 0x00};                                 //101000010000110 1110000000001100
-uint8_t ftmsIndoorBikeData[14] = {0x54, 0x0A, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0}; //00000000100001010100 ISpeed, ICAD, TDistance, IPower, ETime
+uint8_t ftmsIndoorBikeData[9] = {0x44, 0x02, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0};                           //00000000100001010100 ISpeed, ICAD, TDistance, IPower, HR
 uint8_t ftmsResistanceLevelRange[6] = {0x00, 0x00, 0x3A, 0x98, 0xC5, 0x68};                                //+-15000 not sure what units
 uint8_t ftmsPowerRange[6] = {0x00, 0x00, 0xA0, 0x0F, 0x01, 0x00};                                          //1-4000 watts
 
@@ -215,24 +215,29 @@ void computeCSC() //What was SIG smoking when they came up with the Cycling Spee
 
 void updateIndoorBikeDataChar()
 {
-  int cad = userConfig.getSimulatedCad();
+  float cadRaw = userConfig.getSimulatedCad();
+  int cad = (int)(cadRaw * 2);
+  
   int watts = userConfig.getSimulatedWatts();
   int hr = userConfig.getSimulatedHr();
-  float gearRatio = 1;
-  int speed = ((cad * 2.75 * 2.08 * 60 * gearRatio) / 10);
+
+  int speed = 0;
+  float speedRaw = userConfig.getSimulatedSpeed();
+  if (speedRaw <= 0) {
+    float gearRatio = 1;
+    speed = ((cad * 2.75 * 2.08 * 60 * gearRatio) / 10);
+  } else {
+    speed = (int)(speedRaw * 100);
+  }
   ftmsIndoorBikeData[2] = (uint8_t)(speed & 0xff);
   ftmsIndoorBikeData[3] = (uint8_t)(speed >> 8);
-  ftmsIndoorBikeData[4] = (uint8_t)((cad * 2) & 0xff);
-  ftmsIndoorBikeData[5] = (uint8_t)((cad * 2) >> 8); // cadence value
-  ftmsIndoorBikeData[6] = 0;                         //distance <
-  ftmsIndoorBikeData[7] = 0;                         //distance <-- uint24 with 1m resolution
-  ftmsIndoorBikeData[8] = 0;                         //distance <
-  ftmsIndoorBikeData[9] = (uint8_t)((watts)&0xff);
-  ftmsIndoorBikeData[10] = (uint8_t)((watts) >> 8); // power value, constrained to avoid negative values, although the specification allows for a sint16
-  ftmsIndoorBikeData[11] = (uint8_t)hr;
-  ftmsIndoorBikeData[12] = 0; // Elapsed Time uint16 in seconds
-  ftmsIndoorBikeData[13] = 0; // Elapsed Time
-  fitnessMachineIndoorBikeData->setValue(ftmsIndoorBikeData, 14);
+  ftmsIndoorBikeData[4] = (uint8_t)(cad & 0xff);
+  ftmsIndoorBikeData[5] = (uint8_t)(cad >> 8); // cadence value
+  ftmsIndoorBikeData[6] = (uint8_t)(watts & 0xff);
+  ftmsIndoorBikeData[7] = (uint8_t)(watts >> 8); // power value, constrained to avoid negative values, although the specification allows for a sint16
+  ftmsIndoorBikeData[8] = (uint8_t)hr;
+  fitnessMachineIndoorBikeData->setValue(ftmsIndoorBikeData, 9);
+
   fitnessMachineFeature->notify();
   fitnessMachineIndoorBikeData->notify();
 } //^^Using the New Way of setting Bytes.
@@ -245,26 +250,36 @@ void updateCyclingPowerMesurementChar()
   cyclingPowerMeasurement[2] = remainder;
   cyclingPowerMeasurement[3] = quotient;
   cyclingPowerMeasurementCharacteristic->setValue(cyclingPowerMeasurement, 9);
-  debugDirector("");
-  for (const auto &text : cyclingPowerMeasurement)
-  { // Range-for!
-    debugDirector(String(text, HEX) + " ", false);
+
+  // Data(18), Sep(data/2), Static(13), Nul(1) == 41, rounded up
+  char logBuf[50];
+  char *logBufP = logBuf;
+  for (const auto &it : cyclingPowerMeasurement)
+  { 
+      logBufP += sprintf(logBufP, "%02x ", it);
   }
+  strcat(logBufP, "<-- CPMC sent");
+  
   cyclingPowerMeasurementCharacteristic->notify();
-  debugDirector("<-- CPMC sent ", false);
-  debugDirector("");
+  debugDirector(String(logBuf), true);
 }
 
 void updateHeartRateMeasurementChar()
 {
   heartRateMeasurement[1] = userConfig.getSimulatedHr();
   heartRateMeasurementCharacteristic->setValue(heartRateMeasurement, 5);
-  for (const auto &text : heartRateMeasurement)
-  { // Range-for!
-    debugDirector(String(text, HEX) + " ", false);
+
+  // Data(10), Sep(data/2), Static(11), Nul(1) == 26, rounded up
+  char logBuf[35];
+  char *logBufP = logBuf;
+  for (const auto &it : heartRateMeasurement)
+  { 
+      logBufP += sprintf(logBufP, "%02x ", it);
   }
-  debugDirector("<-- HR sent ", false);
+  strcat(logBufP, "<-- HR sent");
+  
   heartRateMeasurementCharacteristic->notify();
+  debugDirector(String(logBuf), true);
 }
 
 //Creating Server Connection Callbacks

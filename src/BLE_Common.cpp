@@ -8,12 +8,15 @@
 #include "Main.h"
 #include <math.h>
 #include "BLE_Common.h"
+#include "sensors/SensorData.h"
+#include "sensors/SensorDataFactory.h"
 //#include <queue>
 
 int bleConnDesc = 1;
 bool _BLEClientConnected = false;
 bool updateConnParametersFlag = false;
 TaskHandle_t BLECommunicationTask;
+SensorDataFactory sensorDataFactory;
 
 void BLECommunications(void *pvParameters)
 {
@@ -33,32 +36,55 @@ void BLECommunications(void *pvParameters)
                         if ((myAdvertisedDevice.serviceUUID != BLEUUID((uint16_t)0x0000)) && (pClient->isConnected())) //Client connected with a valid UUID registered
                         {
                             //Write the recieved data to the Debug Director
-                            BLERemoteCharacteristic *pRemoteBLECharacteristic = pClient->getService(myAdvertisedDevice.serviceUUID)->getCharacteristic(myAdvertisedDevice.charUUID); //get the registered services
-                            std::string pData = pRemoteBLECharacteristic->getValue(); //read the data
-                            int length = pData.length();
-                            String debugOutput = "";
-                            for (int i = 0; i < length; i++) //loop and print data
+
+                            BLERemoteCharacteristic *pRemoteBLECharacteristic = pClient->getService(myAdvertisedDevice.serviceUUID)->getCharacteristic(myAdvertisedDevice.charUUID);
+                            std::string data = pRemoteBLECharacteristic->getValue();
+                            uint8_t *pData = reinterpret_cast<uint8_t *>(&data[0]);
+                            int length = data.length();
+
+                            // 250 == Data(60), Spaces(Data/2), Arrow(4), SvrUUID(37), Sep(3), ChrUUID(37), Sep(3), 
+                            //        Name(10), Prefix(2), HR(8), SEP(1), CD(10), SEP(1), PW(8), SEP(1), SP(7), Suffix(2), Nul(1) - 225 rounded up
+                            char logBuf[250];
+                            char *logBufP = logBuf;
+                            for (int i = 0; i < length; i++) 
+
                             {
-                                debugOutput += String(pData[i], HEX) + " ";
+                                logBufP += sprintf(logBufP, "%02x ", pData[i]);
                             }
-                            debugDirector(debugOutput + "<-" + String(myAdvertisedDevice.serviceUUID.toString().c_str()) + " | " + String(myAdvertisedDevice.charUUID.toString().c_str()), true, true);
+                            logBufP += sprintf(logBufP, "<- %s | %s", myAdvertisedDevice.serviceUUID.toString().c_str(), myAdvertisedDevice.charUUID.toString().c_str());
+
+                            std::shared_ptr<SensorData> sensorData = sensorDataFactory.getSensorData(pRemoteBLECharacteristic, pData, length);
                             
-                            if (pRemoteBLECharacteristic->getUUID() == CYCLINGPOWERMEASUREMENT_UUID)
+                            logBufP += sprintf(logBufP, " | %s:[", sensorData->getId().c_str());
+                            if (sensorData->hasHeartRate())
                             {
-                                BLE_CPSDecode(pRemoteBLECharacteristic);
-                                if (!spinBLEClient.connectedPM)
-                                {
-                                    spinBLEClient.connectedPM = true;
-                                }
+                                int heartRate = sensorData->getHeartRate();
+                                userConfig.setSimulatedHr(heartRate);
+                                spinBLEClient.connectedHR |= true;
+                                logBufP += sprintf(logBufP, " HR(%d)", heartRate % 1000);
                             }
-                            if ((pRemoteBLECharacteristic->getUUID() == FITNESSMACHINEINDOORBIKEDATA_UUID) || (pRemoteBLECharacteristic->getUUID() == FLYWHEEL_UART_SERVICE_UUID) || (pRemoteBLECharacteristic->getUUID() == HEARTCHARACTERISTIC_UUID))
+                            if (sensorData->hasCadence())
                             {
-                                BLE_FTMSDecode(pRemoteBLECharacteristic);
-                                if ((!spinBLEClient.connectedPM) &&(pRemoteBLECharacteristic->getUUID()!= HEARTCHARACTERISTIC_UUID)) //PM flag for HR-->PWR
-                                {
-                                    spinBLEClient.connectedPM = true;
-                                }
+                                float cadence = sensorData->getCadence();
+                                userConfig.setSimulatedCad(cadence);
+                                spinBLEClient.connectedCD |= true;
+                                logBufP += sprintf(logBufP, " CD(%.2f)", fmodf(cadence, 1000.0));
                             }
+                            if (sensorData->hasPower())
+                            {
+                                int power = sensorData->getPower();
+                                userConfig.setSimulatedWatts(power);
+                                spinBLEClient.connectedPM |= true;
+                                logBufP += sprintf(logBufP, " PW(%d)", power % 10000);
+                            }
+                            if (sensorData->hasSpeed())
+                            {
+                                float speed = sensorData->getSpeed();
+                                userConfig.setSimulatedSpeed(speed);
+                                logBufP += sprintf(logBufP, " SD(%.2f)", fmodf(speed, 1000.0));
+                            }
+                            strcat(logBufP, " ]");
+                            debugDirector(String(logBuf), true, true);
                         }
                     }
                 }
