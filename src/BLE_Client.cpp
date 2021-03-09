@@ -44,12 +44,13 @@ void bleClientTask(void *pvParameters)
         if (spinBLEClient.doScan && (scanRetries > 0))
         {
             scanRetries--;
+            debugDirector("Initiating Scan from Client Task:");
             spinBLEClient.scanProcess();
         }
 
         vTaskDelay(BLE_CLIENT_DELAY / portTICK_PERIOD_MS); // Delay a second between loops.
 #ifdef DEBUG_STACK
-        debugDirector("BLE_client High Water Mark: " + String(uxTaskGetStackHighWaterMark(BLEClientTask)));
+        Serial.printf("BLEClient: %d \n", uxTaskGetStackHighWaterMark(BLEClientTask));
 #endif
         for (size_t x = 0; x < NUM_BLE_DEVICES; x++)
         {
@@ -90,7 +91,7 @@ bool SpinBLEClient::connectToServer()
             {
                 debugDirector("doConnect and client out of alignment. Resetting device slot");
                 spinBLEClient.myBLEDevices[i].reset();
-                spinBLEClient.doScan = true;
+                spinBLEClient.serverScan(true);
                 return false;
             }
         }
@@ -138,7 +139,7 @@ bool SpinBLEClient::connectToServer()
     {
         debugDirector("Error: Device has no Service UUID");
         spinBLEClient.myBLEDevices[device_number].reset();
-        spinBLEClient.doScan = true;
+        spinBLEClient.serverScan(false);
         return false;
     }
 
@@ -175,7 +176,7 @@ bool SpinBLEClient::connectToServer()
                     spinBLEClient.myBLEDevices[device_number].reset();
                     spinBLEClient.myBLEDevices[device_number].doConnect = false;
                     connectedPM = false;
-                    doScan = true;
+                    serverScan(false);
                 }
                 return false;
             }
@@ -457,7 +458,6 @@ void SpinBLEClient::MyAdvertisedDeviceCallback::onResult(BLEAdvertisedDevice *ad
                 spinBLEClient.myBLEDevices[i].set(advertisedDevice);
                 spinBLEClient.myBLEDevices[i].doConnect = true;
                 debugDirector("doConnect set on device: " + String(i));
-                spinBLEClient.doScan = false;
                 return;
             }
             debugDirector("Checking Slot " + String(i));
@@ -469,7 +469,7 @@ void SpinBLEClient::MyAdvertisedDeviceCallback::onResult(BLEAdvertisedDevice *ad
 
 void SpinBLEClient::scanProcess()
 {
-    //doConnect = connectRequest;
+    spinBLEClient.doScan = false; //Confirming we did the scan
     debugDirector("Scanning for BLE servers and putting them into a list...");
 
     // Retrieve a Scanner and set the callback we want to use to be informed when we
@@ -514,6 +514,7 @@ void SpinBLEClient::scanProcess()
     userConfig.setFoundDevices(output);
 }
 
+//This is the main server scan request process to use.
 void SpinBLEClient::serverScan(bool connectRequest)
 {
     if (connectRequest)

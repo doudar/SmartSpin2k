@@ -21,19 +21,20 @@ void BLECommunications(void *pvParameters)
     for (;;)
     {
         //**********************************Client***************************************/
-        for (size_t x = 0; x < NUM_BLE_DEVICES; x++)
+        for (size_t x = 0; x < NUM_BLE_DEVICES; x++) //loop through discovered devices
         {
-            if (spinBLEClient.myBLEDevices[x].advertisedDevice)
+            if (spinBLEClient.myBLEDevices[x].advertisedDevice) //is device registered?
             {
                 myAdvertisedBLEDevice myAdvertisedDevice = spinBLEClient.myBLEDevices[x];
                 if ((myAdvertisedDevice.connectedClientID != BLE_HS_CONN_HANDLE_NONE) && (myAdvertisedDevice.doConnect == false)) //client must not be in connection process
                 {
-                    if (NimBLEDevice::getClientByPeerAddress(myAdvertisedDevice.peerAddress)) //nullptr chack
+                    if (NimBLEDevice::getClientByPeerAddress(myAdvertisedDevice.peerAddress)) //nullptr check
                     {
                         BLEClient *pClient = NimBLEDevice::getClientByPeerAddress(myAdvertisedDevice.peerAddress);
-                        if ((myAdvertisedDevice.serviceUUID != BLEUUID((uint16_t)0x0000)) && (pClient->isConnected()))
+                        if ((myAdvertisedDevice.serviceUUID != BLEUUID((uint16_t)0x0000)) && (pClient->isConnected())) //Client connected with a valid UUID registered
                         {
                             //Write the recieved data to the Debug Director
+
                             BLERemoteCharacteristic *pRemoteBLECharacteristic = pClient->getService(myAdvertisedDevice.serviceUUID)->getCharacteristic(myAdvertisedDevice.charUUID);
                             std::string data = pRemoteBLECharacteristic->getValue();
                             uint8_t *pData = reinterpret_cast<uint8_t *>(&data[0]);
@@ -44,6 +45,7 @@ void BLECommunications(void *pvParameters)
                             char logBuf[250];
                             char *logBufP = logBuf;
                             for (int i = 0; i < length; i++) 
+
                             {
                                 logBufP += sprintf(logBufP, "%02x ", pData[i]);
                             }
@@ -130,7 +132,7 @@ void BLECommunications(void *pvParameters)
         digitalWrite(LED_PIN, HIGH);
         vTaskDelay((BLE_NOTIFY_DELAY / 2) / portTICK_PERIOD_MS);
 #ifdef DEBUG_STACK
-        debugDirector("BLEServer High Water Mark: " + String(uxTaskGetStackHighWaterMark(BLECommunicationTask)));
+        Serial.printf("BLEComm: %d \n", uxTaskGetStackHighWaterMark(BLECommunicationTask));
 #endif
     }
 }

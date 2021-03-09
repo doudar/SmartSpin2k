@@ -13,6 +13,7 @@ void startHttpServer();
 void webClientUpdate(void *pvParameters);
 void handleSpiffsFile();
 void handleIndexFile();
+void settingsProcessor();
 void handleHrSlider();
 void FirmwareUpdate();
 
