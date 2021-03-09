@@ -4,19 +4,22 @@
 static uint8_t data[9] = { 0x44, 0x02, 0xf2, 0x08, 0xb0, 0x00, 0x40, 0x00, 0x00 };
 
 void test_parses_heartrate(void) {
-    FitnessMachineIndoorBikeData sensor = FitnessMachineIndoorBikeData(data, 9);
+    FitnessMachineIndoorBikeData sensor = FitnessMachineIndoorBikeData();
+    sensor.decode(data, 9);
     TEST_ASSERT_TRUE(sensor.hasHeartRate());
     TEST_ASSERT_EQUAL(0, sensor.getHeartRate());
 }
 
 void test_parses_cadence(void) {
-    FitnessMachineIndoorBikeData sensor = FitnessMachineIndoorBikeData(data, 9);
+    FitnessMachineIndoorBikeData sensor = FitnessMachineIndoorBikeData();
+    sensor.decode(data, 9);
     TEST_ASSERT_TRUE(sensor.hasCadence());
     TEST_ASSERT_EQUAL(88, sensor.getCadence());
 }
 
 void test_parses_power(void) {
-    FitnessMachineIndoorBikeData sensor = FitnessMachineIndoorBikeData(data, 9);
+    FitnessMachineIndoorBikeData sensor = FitnessMachineIndoorBikeData();
+    sensor.decode(data, 9);
     TEST_ASSERT_TRUE(sensor.hasPower());
     TEST_ASSERT_EQUAL(64, sensor.getPower());
 }

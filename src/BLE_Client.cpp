@@ -312,6 +312,7 @@ bool SpinBLEClient::connectToServer()
 void SpinBLEClient::MyClientCallback::onConnect(BLEClient *pclient)
 {
 
+    debugDirector("Connect Called");
     auto addr = pclient->getPeerAddress();
     for (size_t i = 0; i < NUM_BLE_DEVICES; i++)
     {
@@ -337,7 +338,8 @@ void SpinBLEClient::MyClientCallback::onConnect(BLEClient *pclient)
 
 void SpinBLEClient::MyClientCallback::onDisconnect(BLEClient *pclient)
 {
-
+    
+    debugDirector("Disconnect Called");
     if (spinBLEClient.intentionalDisconnect)
     {
         debugDirector("Intentional Disconnect");
@@ -359,11 +361,14 @@ void SpinBLEClient::MyClientCallback::onDisconnect(BLEClient *pclient)
                 spinBLEClient.myBLEDevices[i].doConnect = true;
                 if ((spinBLEClient.myBLEDevices[i].charUUID == CYCLINGPOWERMEASUREMENT_UUID) || (spinBLEClient.myBLEDevices[i].charUUID == FITNESSMACHINEINDOORBIKEDATA_UUID) || (spinBLEClient.myBLEDevices[i].charUUID == FLYWHEEL_UART_RX_UUID))
                 {
+
+                    debugDirector("Deregistered PM on Disconnect");
                     spinBLEClient.connectedPM = false;
                     break;
                 }
                 if ((spinBLEClient.myBLEDevices[i].charUUID == HEARTCHARACTERISTIC_UUID))
                 {
+                    debugDirector("Deregistered HR on Disconnect");
                     spinBLEClient.connectedHR = false;
                     break;
                 }
