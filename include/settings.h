@@ -91,8 +91,11 @@
 //loop speed for the SmartSpin2k BLE Client reconnect 
 #define BLE_CLIENT_DELAY 1000
 
-//Number of devices that can be connected to the Client
+//Number of devices that can be connected to the Client (myBLEDevices size)
 #define NUM_BLE_DEVICES 4
+
+//Number of NIMBLE Devices (Including Clients)
+#define CONFIG_BT_NIMBLE_MAX_CONNECTIONS 8
 
 //loop speed for the Webserver
 #define WEBSERVER_DELAY 30

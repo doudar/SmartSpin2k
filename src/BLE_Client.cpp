@@ -513,6 +513,7 @@ void SpinBLEClient::scanProcess()
     serializeJson(devices, output);
     debugDirector("Bluetooth Client Found Devices: " + output, true, true);
     userConfig.setFoundDevices(output);
+    pBLEScan=nullptr; //free up memory
 }
 
 //This is the main server scan request process to use.
