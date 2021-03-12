@@ -98,7 +98,7 @@ enum userSelect : uint8_t
 };
 
 
-class myAdvertisedBLEDevice
+class SpinBLEAdvertisedDevice
 {
 public: //eventually these shoul be made private
     BLEAdvertisedDevice *advertisedDevice = nullptr;
@@ -128,12 +128,14 @@ public: //eventually these shoul be made private
         connectedClientID = BLE_HS_CONN_HANDLE_NONE;
         serviceUUID = (uint16_t)0x0000;
         charUUID = (uint16_t)0x0000;
-        userSelectedHR = false;
-        userSelectedPM = false;
-        userSelectedCSC = false;
-        userSelectedCT = false;
-        doConnect = false;
+        userSelectedHR = false;  //Heart Rate Monitor
+        userSelectedPM = false;  //Power Meter
+        userSelectedCSC = false; //Cycling Speed/Cadence
+        userSelectedCT = false;  //Controllable Trainer
+        doConnect = false;       //Initiate connection flag
     }
+
+    void print();
 
     //userSelectHR  = 1,userSelectPM  = 2,userSelectCSC = 3,userSelectCT  = 4
     void setSelected(userSelect flags)
@@ -172,7 +174,7 @@ public: //Not all of these need to be public. This should be cleaned up later.
     BLERemoteCharacteristic *pRemoteCharacteristic = nullptr;
 
     //BLEDevices myBLEDevices;
-    myAdvertisedBLEDevice myBLEDevices[NUM_BLE_DEVICES];
+    SpinBLEAdvertisedDevice myBLEDevices[NUM_BLE_DEVICES];
 
     void start();
     void serverScan(bool connectRequest);
