@@ -473,9 +473,6 @@ void SpinBLEClient::scanProcess()
     spinBLEClient.doScan = false; //Confirming we did the scan
     debugDirector("Scanning for BLE servers and putting them into a list...");
 
-    // Retrieve a Scanner and set the callback we want to use to be informed when we
-    // have detected a new device.  Specify that we want active scanning and start the
-    // scan to run for 5 seconds.
     BLEScan *pBLEScan = BLEDevice::getScan();
     pBLEScan->setAdvertisedDeviceCallbacks(new MyAdvertisedDeviceCallback());
     pBLEScan->setInterval(550);
