@@ -8,4 +8,4 @@ data/config.txt
 include/telegram_token.h
 Errors
 SmartSpin_logfile.txt
-!.pio/libdeps/NimBLE-Arduino/src/nimconfig.h
+!.pio\libdeps\esp32doit\NimBLE-Arduino\src\nimconfig.h
