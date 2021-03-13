@@ -142,7 +142,7 @@ void moveStepper(void *pvParameters)
     if (stepperPosition == targetPosition)
     {
       vTaskDelay(300 / portTICK_PERIOD_MS);
-      if (!GlobalBLEClientConnected)
+      if (connectedClientCount()==0)
       {
         digitalWrite(ENABLE_PIN, HIGH); //disable output FETs so stepper can cool
       }

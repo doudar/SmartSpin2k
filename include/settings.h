@@ -95,7 +95,7 @@
 #define NUM_BLE_DEVICES 4
 
 //Number of NIMBLE Devices (Including Clients)
-#define CONFIG_BT_NIMBLE_MAX_CONNECTIONS 6
+//#define CONFIG_BT_NIMBLE_MAX_CONNECTIONS 5
 
 //loop speed for the Webserver
 #define WEBSERVER_DELAY 30

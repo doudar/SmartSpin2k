@@ -10,10 +10,8 @@
 #include "BLE_Common.h"
 #include "sensors/SensorData.h"
 #include "sensors/SensorDataFactory.h"
-//#include <queue>
 
 int bleConnDesc = 1;
-bool _BLEClientConnected = false;
 bool updateConnParametersFlag = false;
 TaskHandle_t BLECommunicationTask;
 SensorDataFactory sensorDataFactory;
@@ -114,30 +112,39 @@ void BLECommunications(void *pvParameters)
             userConfig.setSimulatedHr(0);
         }
 
-        if (_BLEClientConnected)
+        if (connectedClientCount()>0)
         {
             //update the BLE information on the server
             computeCSC();
             updateIndoorBikeDataChar();
             updateCyclingPowerMesurementChar();
             updateHeartRateMeasurementChar();
-            GlobalBLEClientConnected = true;
 
             if (updateConnParametersFlag)
             {
                 vTaskDelay(100 / portTICK_PERIOD_MS);
-                BLEDevice::getServer()->updateConnParams(bleConnDesc, 40, 50, 0, 100);
+                //BLEDevice::getServer()->updateConnParams(bleConnDesc, 40, 50, 0, 100);
+                BLEDevice::getServer()->updateConnParams(bleConnDesc, 80, 200, 0, 800);
                 updateConnParametersFlag = false;
             }
         }
         else
         {
-            GlobalBLEClientConnected = false;
+            
         }
-        if (!_BLEClientConnected)
+        if (connectedClientCount()==0)
         {
             digitalWrite(LED_PIN, LOW); //blink if no client connected
         }
+        if(BLEDevice::getAdvertising())
+        {
+            if(!(BLEDevice::getAdvertising()->isAdvertising())&& (BLEDevice::getServer()->getConnectedCount()<CONFIG_BT_NIMBLE_MAX_CONNECTIONS-NUM_BLE_DEVICES))
+            {
+                debugDirector("Starting Advertising From Communication Loop");
+                BLEDevice::startAdvertising();
+            }
+        }
+
         vTaskDelay((BLE_NOTIFY_DELAY / 2) / portTICK_PERIOD_MS);
         digitalWrite(LED_PIN, HIGH);
         vTaskDelay((BLE_NOTIFY_DELAY / 2) / portTICK_PERIOD_MS);

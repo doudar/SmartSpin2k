@@ -13,8 +13,6 @@
 
 //BLE Server Settings
 
-bool GlobalBLEClientConnected = false; //needs to be moved to BLE_Server
-
 NimBLEServer *pServer = nullptr;
 
 BLECharacteristic *heartRateMeasurementCharacteristic;
@@ -285,29 +283,22 @@ void updateHeartRateMeasurementChar()
 
 void MyServerCallbacks::onConnect(BLEServer *pServer, ble_gap_conn_desc *desc)
 {
-  _BLEClientConnected = true;
   debugDirector("Bluetooth Remote Client Connected: " + String(NimBLEAddress(desc->peer_ota_addr).toString().c_str()) + " Connected Clients: " + String(pServer->getConnectedCount()));
   updateConnParametersFlag = true;
-  //bleConnDesc = desc->conn_handle;
-  
-  //BLEDevice::stopAdvertising();
+  bleConnDesc = desc->conn_handle;
 
-  //if (pServer->getConnectedCount()<CONFIG_BT_NIMBLE_MAX_CONNECTIONS-NUM_BLE_DEVICES)
-  //{
+  if (pServer->getConnectedCount()<CONFIG_BT_NIMBLE_MAX_CONNECTIONS-NUM_BLE_DEVICES)
+  {
     BLEDevice::startAdvertising();
-  //}else
-  //{
-  //  debugDirector("Max Remote Client Connections Reached");
-  //  BLEDevice::stopAdvertising();
-  //}
+  }else
+  {
+    debugDirector("Max Remote Client Connections Reached");
+    BLEDevice::stopAdvertising();
+  }
 };
 
 void MyServerCallbacks::onDisconnect(BLEServer *pServer)
 {
-  if(pServer->getConnectedCount()==0)
-  {
-    _BLEClientConnected = false;
-  }
   debugDirector("Bluetooth Remote Client Disconnected. Remaining Clients: " + String(pServer->getConnectedCount()));
   BLEDevice::startAdvertising();
 }
@@ -356,6 +347,19 @@ void MyCallbacks::onWrite(BLECharacteristic *pCharacteristic)
       debugDirector(" Incline: " + String(userConfig.getIncline() / 100), false);
       debugDirector("");
     }
+  }
+}
+
+//Return number of clients connected to our server. 
+int connectedClientCount()
+{
+  if(BLEDevice::getServer())
+  {
+    return BLEDevice::getServer()->getConnectedCount();
+  }
+  else
+  {
+    return 0;
   }
 }
 
