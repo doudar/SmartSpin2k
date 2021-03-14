@@ -523,6 +523,7 @@ void SpinBLEClient::serverScan(bool connectRequest)
     spinBLEClient.doScan = true;
 }
 
+//Shuts down all BLE processes. 
 void SpinBLEClient::disconnect()
 {
     scanRetries = 0;

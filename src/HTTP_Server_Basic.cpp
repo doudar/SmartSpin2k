@@ -307,7 +307,7 @@ void startHttpServer()
       NULL,              /* parameter of the task */
       1,                 /* priority of the task  - 29 worked*/
       &webClientTask,    /* Task handle to keep track of created task */
-      tskNO_AFFINITY);   /* pin task to core 0 */
+      1);   /* pin task to core 1 */
 
 #ifdef USE_TELEGRAM
   xTaskCreatePinnedToCore(
@@ -317,7 +317,7 @@ void startHttpServer()
       NULL,             /* parameter of the task */
       1,                /* priority of the task  - higher number is higher priority*/
       &telegramTask,    /* Task handle to keep track of created task */
-      tskNO_AFFINITY);  /* pin task to core 0 */
+      1);  /* pin task to core 1 */
 #endif
 
   server.begin();
