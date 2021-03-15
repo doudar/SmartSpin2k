@@ -94,9 +94,6 @@
 //Number of devices that can be connected to the Client (myBLEDevices size)
 #define NUM_BLE_DEVICES 4
 
-//Number of NIMBLE Devices (Including Clients)
-//#define CONFIG_BT_NIMBLE_MAX_CONNECTIONS 5
-
 //loop speed for the Webserver
 #define WEBSERVER_DELAY 30
 
@@ -123,6 +120,9 @@
 
 //Uncomment to enable stack size debugging info
 //#define DEBUG_STACK
+
+//Uncomment to enable HR->PWR debugging info
+//#define DEBUG_HR_TO_PWR
 
 #ifdef USE_TELEGRAM
     //Max number of telegram messages to send per session

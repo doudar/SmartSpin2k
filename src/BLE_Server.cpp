@@ -48,10 +48,10 @@ byte ftmsService[6] = {0x00, 0x00, 0x00, 0b01, 0b0100000, 0x00};
 byte ftmsControlPoint[8] = {0, 0, 0, 0, 0, 0, 0, 0}; //0x08 we need to return a value of 1 for any sucessful change
 byte ftmsMachineStatus[8] = {0, 0, 0, 0, 0, 0, 0, 0};
 
-uint8_t ftmsFeature[8] = {0x86, 0x50, 0x00, 0x00, 0x0C, 0xE0, 0x00, 0x00};                                 //101000010000110 1110000000001100
-uint8_t ftmsIndoorBikeData[9] = {0x44, 0x02, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0};                           //00000000100001010100 ISpeed, ICAD, TDistance, IPower, HR
-uint8_t ftmsResistanceLevelRange[6] = {0x00, 0x00, 0x3A, 0x98, 0xC5, 0x68};                                //+-15000 not sure what units
-uint8_t ftmsPowerRange[6] = {0x00, 0x00, 0xA0, 0x0F, 0x01, 0x00};                                          //1-4000 watts
+uint8_t ftmsFeature[8] = {0x86, 0x50, 0x00, 0x00, 0x0C, 0xE0, 0x00, 0x00};       //101000010000110 1110000000001100
+uint8_t ftmsIndoorBikeData[9] = {0x44, 0x02, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0}; //00000000100001010100 ISpeed, ICAD, TDistance, IPower, HR
+uint8_t ftmsResistanceLevelRange[6] = {0x00, 0x00, 0x3A, 0x98, 0xC5, 0x68};      //+-15000 not sure what units
+uint8_t ftmsPowerRange[6] = {0x00, 0x00, 0xA0, 0x0F, 0x01, 0x00};                //1-4000 watts
 
 void startBLEServer()
 {
@@ -215,16 +215,19 @@ void updateIndoorBikeDataChar()
 {
   float cadRaw = userConfig.getSimulatedCad();
   int cad = (int)(cadRaw * 2);
-  
+
   int watts = userConfig.getSimulatedWatts();
   int hr = userConfig.getSimulatedHr();
 
   int speed = 0;
   float speedRaw = userConfig.getSimulatedSpeed();
-  if (speedRaw <= 0) {
+  if (speedRaw <= 0)
+  {
     float gearRatio = 1;
     speed = ((cad * 2.75 * 2.08 * 60 * gearRatio) / 10);
-  } else {
+  }
+  else
+  {
     speed = (int)(speedRaw * 100);
   }
   ftmsIndoorBikeData[2] = (uint8_t)(speed & 0xff);
@@ -252,11 +255,11 @@ void updateCyclingPowerMesurementChar()
   char logBuf[50];
   char *logBufP = logBuf;
   for (const auto &it : cyclingPowerMeasurement)
-  { 
-      logBufP += sprintf(logBufP, "%02x ", it);
+  {
+    logBufP += sprintf(logBufP, "%02x ", it);
   }
   strcat(logBufP, "<-- CPMC sent");
-  
+
   cyclingPowerMeasurementCharacteristic->notify();
   debugDirector(String(logBuf), true);
 }
@@ -270,11 +273,11 @@ void updateHeartRateMeasurementChar()
   char logBuf[35];
   char *logBufP = logBuf;
   for (const auto &it : heartRateMeasurement)
-  { 
-      logBufP += sprintf(logBufP, "%02x ", it);
+  {
+    logBufP += sprintf(logBufP, "%02x ", it);
   }
   strcat(logBufP, "<-- HR sent");
-  
+
   heartRateMeasurementCharacteristic->notify();
   debugDirector(String(logBuf), true);
 }
@@ -287,10 +290,11 @@ void MyServerCallbacks::onConnect(BLEServer *pServer, ble_gap_conn_desc *desc)
   updateConnParametersFlag = true;
   bleConnDesc = desc->conn_handle;
 
-  if (pServer->getConnectedCount()<CONFIG_BT_NIMBLE_MAX_CONNECTIONS-NUM_BLE_DEVICES)
+  if (pServer->getConnectedCount() < CONFIG_BT_NIMBLE_MAX_CONNECTIONS - NUM_BLE_DEVICES)
   {
     BLEDevice::startAdvertising();
-  }else
+  }
+  else
   {
     debugDirector("Max Remote Client Connections Reached");
     BLEDevice::stopAdvertising();
@@ -350,10 +354,10 @@ void MyCallbacks::onWrite(BLECharacteristic *pCharacteristic)
   }
 }
 
-//Return number of clients connected to our server. 
+//Return number of clients connected to our server.
 int connectedClientCount()
 {
-  if(BLEDevice::getServer())
+  if (BLEDevice::getServer())
   {
     return BLEDevice::getServer()->getConnectedCount();
   }
@@ -365,27 +369,37 @@ int connectedClientCount()
 
 void calculateInstPwrFromHR()
 {
+  static int oldHR = userConfig.getSimulatedHr();
+  static int newHR = userConfig.getSimulatedHr();
+  static double delta = 0;
+
+  oldHR = newHR; //Copying HR from Last loop
+  newHR = userConfig.getSimulatedHr();
+
+  delta = (newHR - oldHR) / (BLE_CLIENT_DELAY / 1000);
 
   //userConfig.setSimulatedWatts((s1Pwr*s2HR)-(s2Pwr*S1HR))/(S2HR-s1HR)+(userConfig.getSimulatedHr(*((s1Pwr-s2Pwr)/(s1HR-s2HR)));
-  int avgP = ((userPWC.session1Pwr * userPWC.session2HR) - (userPWC.session2Pwr * userPWC.session1HR)) / (userPWC.session2HR - userPWC.session1HR) + (userConfig.getSimulatedHr() * ((userPWC.session1Pwr - userPWC.session2Pwr) / (userPWC.session1HR - userPWC.session2HR)));
+  int avgP = ((userPWC.session1Pwr * userPWC.session2HR) - (userPWC.session2Pwr * userPWC.session1HR)) / (userPWC.session2HR - userPWC.session1HR) + (newHR * ((userPWC.session1Pwr - userPWC.session2Pwr) / (userPWC.session1HR - userPWC.session2HR)));
 
   if (avgP < 50)
   {
     avgP = 50;
   }
 
-  if (userConfig.getSimulatedHr() < 90)
+  if (delta < 0)
   {
     //magic math here for inst power
   }
 
-  if (userConfig.getSimulatedHr() > 170)
+  if (delta > 0)
   {
     //magic math here for inst power
   }
 
+#ifndef DEBUG_HR_TO_PWR
   userConfig.setSimulatedWatts(avgP);
   userConfig.setSimulatedCad(90);
+#endif
 
   debugDirector("Power From HR: " + String(avgP));
 }

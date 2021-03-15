@@ -25,21 +25,21 @@ void BLECommunications(void *pvParameters)
         {
             if (spinBLEClient.myBLEDevices[x].connectedClientID != BLE_HS_CONN_HANDLE_NONE)
             {
-                spinBLEClient.myBLEDevices[x].print();
+                //spinBLEClient.myBLEDevices[x].print();
                 if (spinBLEClient.myBLEDevices[x].advertisedDevice) //is device registered?
                 {
-                    debugDirector("1",false);
+                    //debugDirector("1",false);
                     SpinBLEAdvertisedDevice myAdvertisedDevice = spinBLEClient.myBLEDevices[x];
                     if ((myAdvertisedDevice.connectedClientID != BLE_HS_CONN_HANDLE_NONE) && (myAdvertisedDevice.doConnect == false)) //client must not be in connection process
                     {
-                        debugDirector("2",false);
+                        //debugDirector("2",false);
                         if (BLEDevice::getClientByPeerAddress(myAdvertisedDevice.peerAddress)) //nullptr check
                         {
-                            debugDirector("3",false);
+                            //debugDirector("3",false);
                             BLEClient *pClient = NimBLEDevice::getClientByPeerAddress(myAdvertisedDevice.peerAddress);
                             if ((myAdvertisedDevice.serviceUUID != BLEUUID((uint16_t)0x0000)) && (pClient->isConnected())) //Client connected with a valid UUID registered
                             {
-                                debugDirector("4");
+                                //debugDirector("4");
                                 //Write the recieved data to the Debug Director
 
                                 BLERemoteCharacteristic *pRemoteBLECharacteristic = pClient->getService(myAdvertisedDevice.serviceUUID)->getCharacteristic(myAdvertisedDevice.charUUID);
@@ -112,6 +112,10 @@ void BLECommunications(void *pvParameters)
         {
             calculateInstPwrFromHR();
         }
+        #ifdef DEBUG_HR_TO_PWR
+            calculateInstPwrFromHR();
+        #endif
+
         if (!spinBLEClient.connectedPM && !userPWC.hr2Pwr)
         {
             userConfig.setSimulatedCad(0);
