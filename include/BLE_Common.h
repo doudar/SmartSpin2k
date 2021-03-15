@@ -87,19 +87,10 @@ void bleClientTask(void *pvParameters);
 //BLEUUID serviceUUIDs[4] = {FITNESSMACHINESERVICE_UUID, CYCLINGPOWERSERVICE_UUID, HEARTSERVICE_UUID, FLYWHEEL_UART_SERVICE_UUID};
 //BLEUUID charUUIDs[4] = {FITNESSMACHINEINDOORBIKEDATA_UUID, CYCLINGPOWERMEASUREMENT_UUID, HEARTCHARACTERISTIC_UUID, FLYWHEEL_UART_TX_UUID};
 
-enum userSelect : uint8_t
-{
-    HR = 1,
-    PM = 2,
-    CSC = 3,
-    CT = 4
-};
-
-
 class SpinBLEAdvertisedDevice
 {
 public: //eventually these shoul be made private
-    BLEAdvertisedDevice *advertisedDevice = nullptr;
+    NimBLEAdvertisedDevice *advertisedDevice = nullptr;
     NimBLEAddress peerAddress;
     int connectedClientID = BLE_HS_CONN_HANDLE_NONE;
     BLEUUID serviceUUID = (uint16_t)0x0000;
@@ -134,26 +125,6 @@ public: //eventually these shoul be made private
     }
 
     void print();
-
-    //userSelectHR  = 1,userSelectPM  = 2,userSelectCSC = 3,userSelectCT  = 4
-    void setSelected(userSelect flags)
-    {
-        switch (flags)
-        {
-        case 1:
-            userSelectedHR = true;
-            break;
-        case 2:
-            userSelectedPM = true;
-            break;
-        case 3:
-            userSelectedCSC = true;
-            break;
-        case 4:
-            userSelectedCT = true;
-            break;
-        }
-    }
 };
 
 class SpinBLEClient
@@ -180,7 +151,10 @@ public: //Not all of these need to be public. This should be cleaned up later.
     void scanProcess();
     void disconnect();
     //Check for duplicate services of BLEClient and remove the previoulsy connected one.
-    void removeDuplicates(BLEClient *pClient);
+    void removeDuplicates(NimBLEClient *pClient);
+    //Reset devices in myBLEDevices[]. Bool All (true) or only connected ones (false)
+    void resetDevices();
+    void postConnect(NimBLEClient *pClient);
 
 private:
     class MyAdvertisedDeviceCallback : public NimBLEAdvertisedDeviceCallbacks

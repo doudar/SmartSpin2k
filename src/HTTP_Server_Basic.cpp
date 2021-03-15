@@ -144,8 +144,8 @@ void startHttpServer()
   server.on("/BLEScan", []() {
     debugDirector("Scanning from web request");
     String response = "<!DOCTYPE html><html><body>Scanning for BLE Devices. Please wait 15 seconds.</body><script> setTimeout(\"location.href = 'http://" + myIP.toString() + "/bluetoothscanner.html';\",15000);</script></html>";
+    spinBLEClient.resetDevices();
     spinBLEClient.serverScan(true);
-    //spinBLEClient.serverScan(true);
     server.send(200, "text/html", response);
   });
 
@@ -501,6 +501,7 @@ void settingsProcessor()
   if (wasBTUpdate) //Special BT update response
   {
     response += "Selections Saved!</h2></body><script> setTimeout(\"location.href = 'http://" + myIP.toString() + "/bluetoothscanner.html';\",1000);</script></html>";
+    spinBLEClient.resetDevices();
     spinBLEClient.serverScan(true);
   }
   else

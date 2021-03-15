@@ -265,6 +265,7 @@ void scanIfShiftersHeld()
       if ((millis() - scanDelayStart) >= scanDelayTime) // Has this already been done within 10 seconds?
       {
         scanDelayStart += scanDelayTime;
+        spinBLEClient.resetDevices();
         spinBLEClient.serverScan(true);
         shiftersHoldForScan = SHIFTERS_HOLD_FOR_SCAN;
         digitalWrite(LED_PIN, LOW);

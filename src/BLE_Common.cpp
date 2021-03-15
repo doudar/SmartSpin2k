@@ -25,21 +25,21 @@ void BLECommunications(void *pvParameters)
         {
             if (spinBLEClient.myBLEDevices[x].connectedClientID != BLE_HS_CONN_HANDLE_NONE)
             {
-                //spinBLEClient.myBLEDevices[x].print();
+                spinBLEClient.myBLEDevices[x].print();
                 if (spinBLEClient.myBLEDevices[x].advertisedDevice) //is device registered?
                 {
-                   // debugDirector("1",false);
+                    debugDirector("1",false);
                     SpinBLEAdvertisedDevice myAdvertisedDevice = spinBLEClient.myBLEDevices[x];
                     if ((myAdvertisedDevice.connectedClientID != BLE_HS_CONN_HANDLE_NONE) && (myAdvertisedDevice.doConnect == false)) //client must not be in connection process
                     {
-                     //   debugDirector("2",false);
-                        if (NimBLEDevice::getClientByPeerAddress(myAdvertisedDevice.peerAddress)) //nullptr check
+                        debugDirector("2",false);
+                        if (BLEDevice::getClientByPeerAddress(myAdvertisedDevice.peerAddress)) //nullptr check
                         {
-                       //     debugDirector("3",false);
+                            debugDirector("3",false);
                             BLEClient *pClient = NimBLEDevice::getClientByPeerAddress(myAdvertisedDevice.peerAddress);
                             if ((myAdvertisedDevice.serviceUUID != BLEUUID((uint16_t)0x0000)) && (pClient->isConnected())) //Client connected with a valid UUID registered
                             {
-                         //       debugDirector("4");
+                                debugDirector("4");
                                 //Write the recieved data to the Debug Director
 
                                 BLERemoteCharacteristic *pRemoteBLECharacteristic = pClient->getService(myAdvertisedDevice.serviceUUID)->getCharacteristic(myAdvertisedDevice.charUUID);
@@ -90,6 +90,16 @@ void BLECommunications(void *pvParameters)
                                 }
                                 strcat(logBufP, " ]");
                                 debugDirector(String(logBuf), true, true);
+                            }
+                            else if (!pClient->isConnected()) //This shouldn't ever be called really..........
+                            {
+                                if(pClient->disconnect()==0) //0 is a suscessful disconnect :?
+                                {   
+                                BLEDevice::deleteClient(pClient);
+                                vTaskDelay(100/portTICK_PERIOD_MS);
+                                debugDirector("Workaround connect");
+                                myAdvertisedDevice.doConnect = true;
+                                }
                             }
                         }
                     }
