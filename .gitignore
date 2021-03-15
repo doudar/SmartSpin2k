@@ -1,8 +1,4 @@
-.pio/build/*
-.pio/libdeps/esp32doit/ArduinoJson/*
-.pio/libdeps/esp32doit/AsyncTelegram/*
-.pio/libdeps/esp32doit/TMCStepper/*
-.pio/libdeps/esp32doit/UniversalTelegramBot/*
+.pio/*
 .vscode/c_cpp_properties.json
 .vscode/launch.json
 .vscode/ipch
