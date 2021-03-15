@@ -8,7 +8,7 @@
  **********************************************/
 
 /** @brief Un-comment to change the number of simultaneous connections (esp controller max is 9) */
-// #define CONFIG_BT_NIMBLE_MAX_CONNECTIONS 3
+#define CONFIG_BT_NIMBLE_MAX_CONNECTIONS 6
 
 /** @brief Un-comment to change the default MTU size */
 // #define CONFIG_BT_NIMBLE_ATT_PREFERRED_MTU 255
