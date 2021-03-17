@@ -5,6 +5,7 @@
 #include "sensors/FlywheelData.h"
 #include "sensors/FitnessMachineIndoorBikeData.h"
 #include "sensors/HeartRateData.h"
+#include "sensors/EchelonData.h"
 
 std::shared_ptr<SensorData> SensorDataFactory::getSensorData(BLERemoteCharacteristic *characteristic, uint8_t *data, size_t length)
 {
@@ -33,6 +34,10 @@ std::shared_ptr<SensorData> SensorDataFactory::getSensorData(BLERemoteCharacteri
     else if (uuid == FLYWHEEL_UART_SERVICE_UUID)
     {
         sensorData = std::shared_ptr<SensorData>(new FlywheelData());
+    }
+        else if (uuid == ECHELON_SERVICE_UUID)
+    {
+        sensorData = std::shared_ptr<SensorData>(new EchelonData());
     }
     else
     {

@@ -41,6 +41,15 @@
 #define FLYWHEEL_UART_RX_UUID BLEUUID((uint16_t)0xCA9E)
 #define FLYWHEEL_UART_TX_UUID BLEUUID((uint16_t)0xCA9E)
 
+// The Echelon Services
+//#define ECHELON_device_UUID BLEUUID("0bf669f0-45f2-11e7-9598-0800200c9a66"); //not used by SS2K currently
+#define ECHELON_SERVICE_UUID BLEUUID("0bf669f1-45f2-11e7-9598-0800200c9a66")
+#define ECHELON_WRITE_UUID BLEUUID("0bf669f2-45f2-11e7-9598-0800200c9a66")
+#define ECHELON_DATA_UUID BLEUUID("0bf669f4-45f2-11e7-9598-0800200c9a66")
+//#define ECHELON_SERVICE_UUID BLEUUID((uint16_t)0x69f1) // convert to these once this service works
+//#define ECHELON_WRITE_UUID BLEUUID((uint16_t)0x69f2)
+//#define ECHELON_DATA_UUID BLEUUID((uint16_t)0x69f4)
+
 // macros to convert different types of bytes into int The naming here sucks and should be fixed.
 #define bytes_to_s16(MSB, LSB) (((signed int)((signed char)MSB))) << 8 | (((signed char)LSB))
 #define bytes_to_u16(MSB, LSB) (((signed int)((signed char)MSB))) << 8 | (((unsigned char)LSB))

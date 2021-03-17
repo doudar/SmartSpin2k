@@ -122,6 +122,12 @@ bool SpinBLEClient::connectToServer()
             charUUID = FITNESSMACHINEINDOORBIKEDATA_UUID;
             debugDirector("trying to connect to Fitness machine service");
         }
+        else if (myDevice->isAdvertisingService(ECHELON_SERVICE_UUID))
+        {
+            serviceUUID = ECHELON_SERVICE_UUID;
+            charUUID = ECHELON_DATA_UUID;
+            debugDirector("trying to connect to Fitness machine service");
+        }
         else if (myDevice->isAdvertisingService(HEARTSERVICE_UUID))
         {
             serviceUUID = HEARTSERVICE_UUID;
@@ -200,7 +206,7 @@ bool SpinBLEClient::connectToServer()
             }
 
             if (pRemoteCharacteristic->canNotify())
-            {    
+            {
                 debugDirector("Found " + String(pRemoteCharacteristic->getUUID().toString().c_str()) + " on reconnect.");
                 reconnectTries = MAX_RECONNECT_TRIES;
                 //VV Is this really needed? Shouldn't it just carry over from the previous connection? VV
@@ -313,7 +319,7 @@ bool SpinBLEClient::connectToServer()
 
 void SpinBLEClient::MyClientCallback::onConnect(NimBLEClient *pClient)
 {
-    //debugDirector("Connect Called"); This callback happens so early for us it's nearly useless. 
+    //debugDirector("Connect Called"); This callback happens so early for us it's nearly useless.
 }
 
 void SpinBLEClient::MyClientCallback::onDisconnect(NimBLEClient *pclient)
@@ -340,7 +346,7 @@ void SpinBLEClient::MyClientCallback::onDisconnect(NimBLEClient *pclient)
                 //spinBLEClient.myBLEDevices[i].connectedClientID = BLE_HS_CONN_HANDLE_NONE;
                 debugDirector("Detected " + String(spinBLEClient.myBLEDevices[i].serviceUUID.toString().c_str()) + " Disconnect");
                 spinBLEClient.myBLEDevices[i].doConnect = true;
-                if ((spinBLEClient.myBLEDevices[i].charUUID == CYCLINGPOWERMEASUREMENT_UUID) || (spinBLEClient.myBLEDevices[i].charUUID == FITNESSMACHINEINDOORBIKEDATA_UUID) || (spinBLEClient.myBLEDevices[i].charUUID == FLYWHEEL_UART_RX_UUID))
+                if ((spinBLEClient.myBLEDevices[i].charUUID == CYCLINGPOWERMEASUREMENT_UUID) || (spinBLEClient.myBLEDevices[i].charUUID == FITNESSMACHINEINDOORBIKEDATA_UUID) || (spinBLEClient.myBLEDevices[i].charUUID == FLYWHEEL_UART_RX_UUID) || (spinBLEClient.myBLEDevices[i].charUUID == ECHELON_SERVICE_UUID))
                 {
 
                     debugDirector("Deregistered PM on Disconnect");
@@ -394,7 +400,7 @@ void SpinBLEClient::MyAdvertisedDeviceCallback::onResult(BLEAdvertisedDevice *ad
     {
         aDevName = "";
     }
-    if ((advertisedDevice->haveServiceUUID()) && (advertisedDevice->isAdvertisingService(CYCLINGPOWERSERVICE_UUID) || advertisedDevice->isAdvertisingService(FLYWHEEL_UART_SERVICE_UUID) || advertisedDevice->isAdvertisingService(FITNESSMACHINESERVICE_UUID) || advertisedDevice->isAdvertisingService(HEARTSERVICE_UUID)))
+    if ((advertisedDevice->haveServiceUUID()) && (advertisedDevice->isAdvertisingService(CYCLINGPOWERSERVICE_UUID) || advertisedDevice->isAdvertisingService(FLYWHEEL_UART_SERVICE_UUID) || advertisedDevice->isAdvertisingService(FITNESSMACHINESERVICE_UUID) || advertisedDevice->isAdvertisingService(HEARTSERVICE_UUID) || advertisedDevice->isAdvertisingService(ECHELON_SERVICE_UUID)))
     {
         //if ((aDevName == c_PM) || (advertisedDevice->getAddress().toString().c_str() == c_PM) || (aDevName == c_HR) || (advertisedDevice->getAddress().toString().c_str() == c_HR) || (String(c_PM) == ("any")) || (String(c_HR) == ("any")))
         //{ //notice the subtle difference vv getServiceUUID(int) returns the index of the service in the list or the 0 slot if not specified.
@@ -410,7 +416,8 @@ void SpinBLEClient::MyAdvertisedDeviceCallback::onResult(BLEAdvertisedDevice *ad
             {
                 debugDirector("Skipping non-selected HRM |" + aDevName + "|" + String(userConfig.getconnectedHeartMonitor()));
                 return;
-            }else if (aDevName == String(userConfig.getconnectedHeartMonitor()))
+            }
+            else if (aDevName == String(userConfig.getconnectedHeartMonitor()))
             {
                 debugDirector("HR String Matched " + aDevName);
             }
@@ -426,7 +433,8 @@ void SpinBLEClient::MyAdvertisedDeviceCallback::onResult(BLEAdvertisedDevice *ad
             {
                 debugDirector("Skipping non-selected PM |" + aDevName + "|" + String(userConfig.getconnectedPowerMeter()));
                 return;
-            }else if (aDevName == String(userConfig.getconnectedPowerMeter()))
+            }
+            else if (aDevName == String(userConfig.getconnectedPowerMeter()))
             {
                 debugDirector("PM String Matched " + aDevName);
             }
@@ -468,7 +476,7 @@ void SpinBLEClient::scanProcess()
     for (int i = 0; i < count; i++)
     {
         BLEAdvertisedDevice d = foundDevices.getDevice(i);
-        if (d.isAdvertisingService(CYCLINGPOWERSERVICE_UUID) || d.isAdvertisingService(HEARTSERVICE_UUID) || d.isAdvertisingService(FLYWHEEL_UART_SERVICE_UUID) || d.isAdvertisingService(FITNESSMACHINESERVICE_UUID))
+        if (d.isAdvertisingService(CYCLINGPOWERSERVICE_UUID) || d.isAdvertisingService(HEARTSERVICE_UUID) || d.isAdvertisingService(FLYWHEEL_UART_SERVICE_UUID) || d.isAdvertisingService(FITNESSMACHINESERVICE_UUID) || d.isAdvertisingService(ECHELON_SERVICE_UUID))
         {
             device = "device " + String(i);
             devices[device]["address"] = d.getAddress().toString();
@@ -566,14 +574,29 @@ void SpinBLEClient::resetDevices()
 
 void SpinBLEClient::postConnect(NimBLEClient *pClient)
 {
-     for (size_t i = 0; i < NUM_BLE_DEVICES; i++)
+    for (size_t i = 0; i < NUM_BLE_DEVICES; i++)
     {
         if (pClient->getPeerAddress() == this->myBLEDevices[i].peerAddress)
         {
-            if ((this->myBLEDevices[i].charUUID == CYCLINGPOWERMEASUREMENT_UUID) || (this->myBLEDevices[i].charUUID == FITNESSMACHINEINDOORBIKEDATA_UUID) || (this->myBLEDevices[i].charUUID == FLYWHEEL_UART_RX_UUID))
+            if ((this->myBLEDevices[i].charUUID == CYCLINGPOWERMEASUREMENT_UUID) || (this->myBLEDevices[i].charUUID == FITNESSMACHINEINDOORBIKEDATA_UUID) || (this->myBLEDevices[i].charUUID == FLYWHEEL_UART_RX_UUID)|| (this->myBLEDevices[i].charUUID == ECHELON_DATA_UUID))
             {
                 this->connectedPM = true;
                 debugDirector("Registered PM on Connect");
+                if (this->myBLEDevices[i].charUUID == ECHELON_DATA_UUID)
+                {
+                    NimBLERemoteCharacteristic *writeCharacteristic = pClient->getService(ECHELON_SERVICE_UUID)->getCharacteristic(ECHELON_WRITE_UUID);
+                    if (writeCharacteristic == nullptr)
+                    {
+                        debugDirector("Failed to find Echelon write characteristic UUID: ",false);
+                        debugDirector(String(ECHELON_WRITE_UUID.toString().c_str()));
+                        pClient->disconnect();
+                        return;
+                    }
+                    // Enable device notifications
+                    byte message[] = {0xF0, 0xB0, 0x01, 0x01, 0xA2};
+                    writeCharacteristic->writeValue(message, 5);
+                    debugDirector("Activated Echelon callbacks.");
+                }
                 //spinBLEClient.removeDuplicates(pclient);
                 return;
             }
@@ -607,7 +630,3 @@ void SpinBLEAdvertisedDevice::print()
     strcat(logBufP, "|");
     debugDirector(String(logBuf));
 }
-
-
-
-
