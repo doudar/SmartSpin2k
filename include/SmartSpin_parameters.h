@@ -17,6 +17,7 @@ class userParameters
     int     simulatedWatts;                 
     int     simulatedHr;                    
     int     simulatedCad;                   
+    float   simulatedSpeed;                   
     String  deviceName;                     
     int     shiftStep;         
     int     stepperPower;
@@ -38,6 +39,7 @@ class userParameters
     int         getSimulatedWatts()          {return simulatedWatts;}
     int         getSimulatedHr()             {return simulatedHr;}
     float       getSimulatedCad()            {return simulatedCad;}
+    float       getSimulatedSpeed()          {return simulatedSpeed;}
     const char* getDeviceName()              {return deviceName.c_str();}
     int         getShiftStep()               {return shiftStep;}
     int         getStepperPower()            {return stepperPower;}
@@ -59,6 +61,7 @@ class userParameters
     void    setSimulatedWatts(int w)            {simulatedWatts = w;}
     void    setSimulatedHr(int hr)              {simulatedHr = hr;}
     void    setSimulatedCad(float cad)          {simulatedCad = cad;}
+    void    setSimulatedSpeed(float spd)        {simulatedSpeed = spd;}
     void    setDeviceName(String dvcn)          {deviceName = dvcn;}
     void    setShiftStep(int ss)                {shiftStep = ss;}
     void    setStepperPower(int sp)             {stepperPower = sp;}

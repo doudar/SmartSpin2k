@@ -39,6 +39,7 @@ userParameters userConfig;
 physicalWorkingCapacity userPWC;
 
 ///////////////////////////////////////////////////////BEGIN SETUP/////////////////////////////////////
+#ifndef UNIT_TEST
 void setup()
 {
 
@@ -85,7 +86,7 @@ void setup()
   xTaskCreatePinnedToCore(
       moveStepper,           /* Task function. */
       "moveStepperFunction", /* name of task. */
-      700,                   /* Stack size of task */
+      900,                   /* Stack size of task */
       NULL,                  /* parameter of the task */
       18,                    /* priority of the task  - 29 worked  at 1 I get stuttering */
       &moveStepperTask,      /* Task handle to keep track of created task */
@@ -116,14 +117,19 @@ void setup()
 void loop()
 {
   vTaskDelay(1000 / portTICK_RATE_MS);
+  scanIfShiftersHeld();
 
   if (debugToHTML.length() > 500)
   { //Clear up memory
     debugToHTML = "<br>HTML Debug Truncated. Increase buffer if required.";
   }
 
-  scanIfShiftersHeld();
+  #ifdef DEBUG_STACK
+  Serial.printf("Stepper: %d \n", uxTaskGetStackHighWaterMark(moveStepperTask));
+  #endif
+  
 }
+#endif
 
 void moveStepper(void *pvParameters)
 {
@@ -136,7 +142,7 @@ void moveStepper(void *pvParameters)
     if (stepperPosition == targetPosition)
     {
       vTaskDelay(300 / portTICK_PERIOD_MS);
-      if (!GlobalBLEClientConnected)
+      if (connectedClientCount()==0)
       {
         digitalWrite(ENABLE_PIN, HIGH); //disable output FETs so stepper can cool
       }
@@ -259,6 +265,7 @@ void scanIfShiftersHeld()
       if ((millis() - scanDelayStart) >= scanDelayTime) // Has this already been done within 10 seconds?
       {
         scanDelayStart += scanDelayTime;
+        spinBLEClient.resetDevices();
         spinBLEClient.serverScan(true);
         shiftersHoldForScan = SHIFTERS_HOLD_FOR_SCAN;
         digitalWrite(LED_PIN, LOW);
