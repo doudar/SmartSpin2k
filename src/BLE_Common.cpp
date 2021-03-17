@@ -78,7 +78,14 @@ void BLECommunications(void *pvParameters)
                                 if (sensorData->hasPower())
                                 {
                                     int power = sensorData->getPower();
-                                    userConfig.setSimulatedWatts(power);
+                                    if (userConfig.getDoublePower())
+                                    {
+                                        userConfig.setSimulatedWatts(power * 2);
+                                    }
+                                    else
+                                    {
+                                        userConfig.setSimulatedWatts(power);
+                                    }
                                     spinBLEClient.connectedPM |= true;
                                     logBufP += sprintf(logBufP, " PW(%d)", power % 10000);
                                 }
@@ -93,12 +100,12 @@ void BLECommunications(void *pvParameters)
                             }
                             else if (!pClient->isConnected()) //This shouldn't ever be called really..........
                             {
-                                if(pClient->disconnect()==0) //0 is a suscessful disconnect :?
-                                {   
-                                BLEDevice::deleteClient(pClient);
-                                vTaskDelay(100/portTICK_PERIOD_MS);
-                                debugDirector("Workaround connect");
-                                myAdvertisedDevice.doConnect = true;
+                                if (pClient->disconnect() == 0) //0 is a suscessful disconnect :?
+                                {
+                                    BLEDevice::deleteClient(pClient);
+                                    vTaskDelay(100 / portTICK_PERIOD_MS);
+                                    debugDirector("Workaround connect");
+                                    myAdvertisedDevice.doConnect = true;
                                 }
                             }
                         }
@@ -112,9 +119,9 @@ void BLECommunications(void *pvParameters)
         {
             calculateInstPwrFromHR();
         }
-        #ifdef DEBUG_HR_TO_PWR
-            calculateInstPwrFromHR();
-        #endif
+#ifdef DEBUG_HR_TO_PWR
+        calculateInstPwrFromHR();
+#endif
 
         if (!spinBLEClient.connectedPM && !userPWC.hr2Pwr)
         {
@@ -126,7 +133,7 @@ void BLECommunications(void *pvParameters)
             userConfig.setSimulatedHr(0);
         }
 
-        if (connectedClientCount()>0)
+        if (connectedClientCount() > 0)
         {
             //update the BLE information on the server
             computeCSC();
@@ -144,15 +151,14 @@ void BLECommunications(void *pvParameters)
         }
         else
         {
-            
         }
-        if (connectedClientCount()==0)
+        if (connectedClientCount() == 0)
         {
             digitalWrite(LED_PIN, LOW); //blink if no client connected
         }
-        if(BLEDevice::getAdvertising())
+        if (BLEDevice::getAdvertising())
         {
-            if(!(BLEDevice::getAdvertising()->isAdvertising())&& (BLEDevice::getServer()->getConnectedCount()<CONFIG_BT_NIMBLE_MAX_CONNECTIONS-NUM_BLE_DEVICES))
+            if (!(BLEDevice::getAdvertising()->isAdvertising()) && (BLEDevice::getServer()->getConnectedCount() < CONFIG_BT_NIMBLE_MAX_CONNECTIONS - NUM_BLE_DEVICES))
             {
                 debugDirector("Starting Advertising From Communication Loop");
                 BLEDevice::startAdvertising();
@@ -167,4 +173,3 @@ void BLECommunications(void *pvParameters)
 #endif
     }
 }
-
