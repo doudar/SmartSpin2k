@@ -78,7 +78,7 @@ void BLECommunications(void *pvParameters)
                                 if (sensorData->hasPower())
                                 {
                                     int power = sensorData->getPower();
-                                    if (userConfig.getDoublePower)
+                                    if (userConfig.getDoublePower())
                                     {
                                         userConfig.setSimulatedWatts(power*2);
                                     }
