@@ -35,7 +35,7 @@ std::shared_ptr<SensorData> SensorDataFactory::getSensorData(BLERemoteCharacteri
     {
         sensorData = std::shared_ptr<SensorData>(new FlywheelData());
     }
-        else if (uuid == ECHELON_SERVICE_UUID)
+        else if (uuid == ECHELON_DATA_UUID)
     {
         sensorData = std::shared_ptr<SensorData>(new EchelonData());
     }
