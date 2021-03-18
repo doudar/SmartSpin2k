@@ -3,9 +3,9 @@
 
 bool EchelonData::hasHeartRate() { return false; }
 
-bool EchelonData::hasCadence() { return this->hasData; }
+bool EchelonData::hasCadence() { return !isnan(this->cadence); }
 
-bool EchelonData::hasPower() { return this->hasData; }
+bool EchelonData::hasPower() { return this->cadence >= 0 && this->resistance >= 0; }
 
 bool EchelonData::hasSpeed() { return false; }
 
@@ -23,27 +23,22 @@ void EchelonData::decode(uint8_t *data, size_t length)
     {
     // Cadence notification
     case 0xD1:
-        //runtime = int((data[7] << 8) + data[8]); // This runtime has massive drift
-        cadence = int((data[9] << 8) + data[10]);
-        hasData = true;
-        if (cadence == 0 || resistance == 0)
-        {
-            power = (pow(1.090112, resistance) * pow(1.015343, cadence) * 7.228958);
-            break;
-        }      
+        this->cadence = int((data[9] << 8) + data[10]);
         break;
     // Resistance notification
     case 0xD2:
-        resistance = int(data[3]);
-        hasData = true;
-        if (cadence == 0 || resistance == 0)
-        {
-            power = (pow(1.090112, resistance) * pow(1.015343, cadence) * 7.228958);
-            break;
-        }
+        this->resistance = int(data[3]);
         break;
-    //Data 1 didn't match
-    default:
-        hasData = false;
+    }
+    if (isnan(this->cadence) || this->resistance < 0) {
+        return;
+    }
+    if (this->cadence == 0 || this->resistance == 0)
+    {
+        power = 0;
+    }
+    else
+    {
+        power = pow(1.090112, resistance) * pow(1.015343, cadence) * 7.228958;
     }
 }
