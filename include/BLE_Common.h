@@ -37,18 +37,16 @@
 #define FITNESSMACHINEPOWERRANGE_UUID BLEUUID((uint16_t)0x2AD8)
 
 // GATT service/characteristic UUIDs for Flywheel Bike from ptx2/gymnasticon/
-#define FLYWHEEL_UART_SERVICE_UUID BLEUUID((uint16_t)0xCA9E)
-#define FLYWHEEL_UART_RX_UUID BLEUUID((uint16_t)0xCA9E)
-#define FLYWHEEL_UART_TX_UUID BLEUUID((uint16_t)0xCA9E)
+#define FLYWHEEL_UART_SERVICE_UUID BLEUUID("6e400001b5a3f393e0a9e50e24dcca9e")
+#define FLYWHEEL_UART_RX_UUID BLEUUID("6e400002b5a3f393e0a9e50e24dcca9e")
+#define FLYWHEEL_UART_TX_UUID BLEUUID("6e400003b5a3f393e0a9e50e24dcca9e")
 
 // The Echelon Services
 #define ECHELON_DEVICE_UUID BLEUUID("0bf669f0-45f2-11e7-9598-0800200c9a66")
 #define ECHELON_SERVICE_UUID BLEUUID("0bf669f1-45f2-11e7-9598-0800200c9a66")
 #define ECHELON_WRITE_UUID BLEUUID("0bf669f2-45f2-11e7-9598-0800200c9a66")
 #define ECHELON_DATA_UUID BLEUUID("0bf669f4-45f2-11e7-9598-0800200c9a66")
-//#define ECHELON_SERVICE_UUID BLEUUID((uint16_t)0x69f1) // convert to these once this service works
-//#define ECHELON_WRITE_UUID BLEUUID((uint16_t)0x69f2)
-//#define ECHELON_DATA_UUID BLEUUID((uint16_t)0x69f4)
+
 
 // macros to convert different types of bytes into int The naming here sucks and should be fixed.
 #define bytes_to_s16(MSB, LSB) (((signed int)((signed char)MSB))) << 8 | (((signed char)LSB))
