@@ -48,10 +48,14 @@ byte ftmsService[6] = {0x00, 0x00, 0x00, 0b01, 0b0100000, 0x00};
 byte ftmsControlPoint[8] = {0, 0, 0, 0, 0, 0, 0, 0}; //0x08 we need to return a value of 1 for any sucessful change
 byte ftmsMachineStatus[8] = {0, 0, 0, 0, 0, 0, 0, 0};
 
-uint8_t ftmsFeature[8] = {0x86, 0x50, 0x00, 0x00, 0x0C, 0xE0, 0x00, 0x00};       //101000010000110 1110000000001100
-uint8_t ftmsIndoorBikeData[9] = {0x44, 0x02, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0}; //00000000100001010100 ISpeed, ICAD, TDistance, IPower, HR
-uint8_t ftmsResistanceLevelRange[6] = {0x00, 0x00, 0x3A, 0x98, 0xC5, 0x68};      //+-15000 not sure what units
-uint8_t ftmsPowerRange[6] = {0x00, 0x00, 0xA0, 0x0F, 0x01, 0x00};                //1-4000 watts
+struct FitnessMachineFeature ftmsFeature = {
+  FitnessMachineFeatureFlags::Types::CadenceSupported | FitnessMachineFeatureFlags::Types::HeartRateMeasurementSupported | FitnessMachineFeatureFlags::Types::PowerMeasurementSupported,
+  FitnessMachineTargetFlags::Types::InclinationTargetSettingSupported | FitnessMachineTargetFlags::Types::IndoorBikeSimulationParametersSupported
+};
+
+uint8_t ftmsIndoorBikeData[14] = {0x54, 0x0A, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0}; //00000000100001010100 ISpeed, ICAD, TDistance, IPower, ETime
+uint8_t ftmsResistanceLevelRange[6] = {0x00, 0x00, 0x3A, 0x98, 0xC5, 0x68};                           //+-15000 not sure what units
+uint8_t ftmsPowerRange[6] = {0x00, 0x00, 0xA0, 0x0F, 0x01, 0x00};                                     //1-4000 watts
 
 void startBLEServer()
 {
@@ -127,7 +131,7 @@ void startBLEServer()
   cyclingPowerFeatureCharacteristic->setValue(cpFeature, 1);
   sensorLocationCharacteristic->setValue(cpsLocation, 1);
 
-  fitnessMachineFeature->setValue(ftmsFeature, 8);
+  fitnessMachineFeature->setValue(ftmsFeature.bytes, sizeof(ftmsFeature));
   fitnessMachineControlPoint->setValue(ftmsControlPoint, 8);
 
   fitnessMachineIndoorBikeData->setValue(ftmsIndoorBikeData, 14);

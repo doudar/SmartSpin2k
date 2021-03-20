@@ -175,3 +175,74 @@ private:
 };
 
 extern SpinBLEClient spinBLEClient;
+
+struct FitnessMachineFeatureFlags {
+  enum Types: uint
+  {
+    AverageSpeedSupported              = 1U << 0,
+    CadenceSupported                   = 1U << 1,
+    TotalDistanceSupported             = 1U << 2,
+    InclinationSupported               = 1U << 3,
+    ElevationGainSupported             = 1U << 4,
+    PaceSupported                      = 1U << 5,
+    StepCountSupported                 = 1U << 6,
+    ResistanceLevelSupported           = 1U << 7,
+    StrideCountSupported               = 1U << 8,
+    ExpendedEnergySupported            = 1U << 9,
+    HeartRateMeasurementSupported      = 1U << 10,
+    MetabolicEquivalentSupported       = 1U << 11,
+    ElapsedTimeSupported               = 1U << 12,
+    RemainingTimeSupported             = 1U << 13,
+    PowerMeasurementSupported          = 1U << 14,
+    ForceOnBeltAndPowerOutputSupported = 1U << 15,
+    UserDataRetentionSupported         = 1U << 16
+  };
+};
+
+struct FitnessMachineTargetFlags {
+  enum Types: uint {
+    SpeedTargetSettingSupported                           = 1U << 0,
+    InclinationTargetSettingSupported                     = 1U << 1,
+    ResistanceTargetSettingSupported                      = 1U << 2,
+    PowerTargetSettingSupported                           = 1U << 3,
+    HeartRateTargetSettingSupported                       = 1U << 4,
+    TargetedExpendedEnergyConfigurationSupported          = 1U << 5,
+    TargetedStepNumberConfigurationSupported              = 1U << 6,
+    TargetedStrideNumberConfigurationSupported            = 1U << 7,
+    TargetedDistanceConfigurationSupported                = 1U << 8,
+    TargetedTrainingTimeConfigurationSupported            = 1U << 9,
+    TargetedTimeTwoHeartRateZonesConfigurationSupported   = 1U << 10,
+    TargetedTimeThreeHeartRateZonesConfigurationSupported = 1U << 11,
+    TargetedTimeFiveHeartRateZonesConfigurationSupported  = 1U << 12,
+    IndoorBikeSimulationParametersSupported               = 1U << 13,
+    WheelCircumferenceConfigurationSupported              = 1U << 14,
+    SpinDownControlSupported                              = 1U << 15,
+    TargetedCadenceConfigurationSupported                 = 1U << 16
+  };
+};
+
+inline FitnessMachineFeatureFlags::Types operator|(FitnessMachineFeatureFlags::Types a, FitnessMachineFeatureFlags::Types b)
+{
+  return static_cast<FitnessMachineFeatureFlags::Types>(static_cast<int>(a) | static_cast<int>(b));
+};
+
+inline FitnessMachineTargetFlags::Types operator|(FitnessMachineTargetFlags::Types a, FitnessMachineTargetFlags::Types b)
+{
+  return static_cast<FitnessMachineTargetFlags::Types>(static_cast<int>(a) | static_cast<int>(b));
+};
+
+struct FitnessMachineFeature {
+  union {
+    struct {
+        union {
+            enum FitnessMachineFeatureFlags::Types featureFlags;
+            uint8_t bytes[4];
+        } featureFlags;
+        union {  
+            enum FitnessMachineTargetFlags::Types targetFlags;
+            uint8_t bytes[4];
+        } targetFlags;
+    };
+    uint8_t bytes[8];
+  };
+};
