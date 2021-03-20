@@ -248,7 +248,6 @@ bool SpinBLEClient::connectToServer()
     pClient->connect(myDevice->getAddress()); // if you pass BLEAdvertisedDevice instead of address, it will be recognized type of peer device address (public or private)
     debugDirector(" - Connected to server", true);
     debugDirector(" - RSSI " + pClient->getRssi(), true);
-
     // Obtain a reference to the service we are after in the remote BLE server.
     BLERemoteService *pRemoteService = pClient->getService(serviceUUID);
     if (pRemoteService == nullptr)
@@ -464,6 +463,7 @@ void SpinBLEClient::scanProcess()
     pBLEScan->setAdvertisedDeviceCallbacks(new MyAdvertisedDeviceCallback());
     pBLEScan->setInterval(550);
     pBLEScan->setWindow(500);
+    pBLEScan->setDuplicateFilter(true);
     pBLEScan->setActiveScan(true);
     BLEScanResults foundDevices = pBLEScan->start(10, false);
     // Load the scan into a Json String
