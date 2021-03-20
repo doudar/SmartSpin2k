@@ -56,7 +56,7 @@ void BLECommunications(void *pvParameters)
                                 {
                                     logBufP += sprintf(logBufP, "%02x ", pData[i]);
                                 }
-                                logBufP += sprintf(logBufP, "<- %s | %s", myAdvertisedDevice.serviceUUID.toString().c_str(), myAdvertisedDevice.charUUID.toString().c_str());
+                                logBufP += sprintf(logBufP, "<- %.8s | %.8s", myAdvertisedDevice.serviceUUID.toString().c_str(), myAdvertisedDevice.charUUID.toString().c_str());
 
                                 std::shared_ptr<SensorData> sensorData = sensorDataFactory.getSensorData(pRemoteBLECharacteristic, pData, length);
 
