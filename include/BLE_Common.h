@@ -13,6 +13,7 @@
 #include <memory>
 #include <NimBLEDevice.h>
 #include <Arduino.h>
+#include <Main.h>
 
 //Heart Service
 #define HEARTSERVICE_UUID BLEUUID((uint16_t)0x180D)
@@ -48,20 +49,26 @@
 
 //Setup
 void setupBLE();
+extern TaskHandle_t BLECommunicationTask;
+//***********************Common**********************************/
+void BLECommunications(void *pvParameters);
 
-//*****************************Server*****************************
-extern bool GlobalBLEClientConnected;
+//*****************************Server****************************/
+extern int bleConnDesc; //These all need re
+extern bool updateConnParametersFlag;
+
 void startBLEServer();
-void BLENotify(void *pvParameters);
 void computeERG(int, int);
 void computeCSC();
 void updateIndoorBikeDataChar();
 void updateCyclingPowerMesurementChar();
 void calculateInstPwrFromHR();
+void updateHeartRateMeasurementChar();
+int connectedClientCount();
 
 class MyServerCallbacks : public BLEServerCallbacks
 {
-    void onConnect(BLEServer *, ble_gap_conn_desc* desc);
+    void onConnect(BLEServer *, ble_gap_conn_desc *desc);
     void onDisconnect(BLEServer *);
 };
 
@@ -72,51 +79,98 @@ class MyCallbacks : public BLECharacteristicCallbacks
 
 //*****************************Client*****************************
 
-//Keeping the task outside the class so we don't need a mask. 
+//Keeping the task outside the class so we don't need a mask.
 //We're only going to run one anyway.
-void bleClientTask(void *pvParameters);  
+void bleClientTask(void *pvParameters);
 
-class SpinBLEClient{ 
-    
-    public: //Not all of these need to be public. This should be cleaned up later.
-    boolean doConnectPM         = false;
-    boolean doConnectHR         = false;
-    boolean connectedPM         = false;
-    boolean connectedHR         = false;
-    boolean doScan              = false;
-    float crankRev[2]           = {0, 0};
-    float crankEventTime[2]     = {0, 0};
-    int noReadingIn             = 0;
-    int cscCumulativeCrankRev   = 0;
-    int cscLastCrankEvtTime     = 0;
-    int lastConnectedPMID       = 0;
+//UUID's the client has methods for
+//BLEUUID serviceUUIDs[4] = {FITNESSMACHINESERVICE_UUID, CYCLINGPOWERSERVICE_UUID, HEARTSERVICE_UUID, FLYWHEEL_UART_SERVICE_UUID};
+//BLEUUID charUUIDs[4] = {FITNESSMACHINEINDOORBIKEDATA_UUID, CYCLINGPOWERMEASUREMENT_UUID, HEARTCHARACTERISTIC_UUID, FLYWHEEL_UART_TX_UUID};
 
-    BLERemoteCharacteristic *pRemoteCharacteristic  = nullptr;
-    BLEAdvertisedDevice     *myPowerMeter           = nullptr;
-    BLEAdvertisedDevice     *myHeartMonitor         = nullptr;
+class SpinBLEAdvertisedDevice
+{
+public: //eventually these shoul be made private
+    NimBLEAdvertisedDevice *advertisedDevice = nullptr;
+    NimBLEAddress peerAddress;
+    int connectedClientID = BLE_HS_CONN_HANDLE_NONE;
+    BLEUUID serviceUUID = (uint16_t)0x0000;
+    BLEUUID charUUID = (uint16_t)0x0000;
+    bool userSelectedHR = false;
+    bool userSelectedPM = false;
+    bool userSelectedCSC = false;
+    bool userSelectedCT = false;
+    bool doConnect = false;
+
+    void set(BLEAdvertisedDevice *device, int id = BLE_HS_CONN_HANDLE_NONE, BLEUUID inserviceUUID = (uint16_t)0x0000, BLEUUID incharUUID = (uint16_t)0x0000)
+    {
+        advertisedDevice = device;
+        peerAddress = device->getAddress();
+        connectedClientID = id;
+        serviceUUID = BLEUUID(inserviceUUID);
+        charUUID = BLEUUID(incharUUID);
+    }
+
+    void reset()
+    {
+        advertisedDevice = nullptr;
+        //NimBLEAddress peerAddress;
+        connectedClientID = BLE_HS_CONN_HANDLE_NONE;
+        serviceUUID = (uint16_t)0x0000;
+        charUUID = (uint16_t)0x0000;
+        userSelectedHR = false;  //Heart Rate Monitor
+        userSelectedPM = false;  //Power Meter
+        userSelectedCSC = false; //Cycling Speed/Cadence
+        userSelectedCT = false;  //Controllable Trainer
+        doConnect = false;       //Initiate connection flag
+    }
+
+    void print();
+};
+
+class SpinBLEClient
+{
+
+public: //Not all of these need to be public. This should be cleaned up later.
+    boolean connectedPM = false;
+    boolean connectedHR = false;
+    boolean connectedCD = false;
+    boolean doScan = false;
+    bool intentionalDisconnect = false;
+    int noReadingIn = 0;
+    int cscCumulativeCrankRev = 0;
+    int cscLastCrankEvtTime = 0;
+
+    BLERemoteCharacteristic *pRemoteCharacteristic = nullptr;
+
+    //BLEDevices myBLEDevices;
+    SpinBLEAdvertisedDevice myBLEDevices[NUM_BLE_DEVICES];
 
     void start();
-    void serverScan(bool connectRequest);   
+    void serverScan(bool connectRequest);
     bool connectToServer();
     void scanProcess();
     void disconnect();
+    //Check for duplicate services of BLEClient and remove the previoulsy connected one.
+    void removeDuplicates(NimBLEClient *pClient);
+    //Reset devices in myBLEDevices[]. Bool All (true) or only connected ones (false)
+    void resetDevices();
+    void postConnect(NimBLEClient *pClient);
 
 private:
-    
     class MyAdvertisedDeviceCallback : public NimBLEAdvertisedDeviceCallbacks
     {
-       public:
-       void onResult(NimBLEAdvertisedDevice *);
+    public:
+        void onResult(NimBLEAdvertisedDevice *);
     };
 
     class MyClientCallback : public NimBLEClientCallbacks
     {
-        public:
-        void        onConnect(BLEClient *);
-        void        onDisconnect(BLEClient *);
-        uint32_t    onPassKeyRequest();
-        bool        onConfirmPIN(uint32_t);
-        void        onAuthenticationComplete(ble_gap_conn_desc);
+    public:
+        void onConnect(BLEClient *);
+        void onDisconnect(BLEClient *);
+        uint32_t onPassKeyRequest();
+        bool onConfirmPIN(uint32_t);
+        void onAuthenticationComplete(ble_gap_conn_desc);
     };
 };
 
@@ -298,3 +352,5 @@ struct FitnessMachineFeature {
     uint8_t bytes[8];
   };
 };
+
+extern SpinBLEClient spinBLEClient;

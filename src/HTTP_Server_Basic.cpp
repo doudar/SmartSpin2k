@@ -19,7 +19,6 @@
 #include <Update.h>
 #include <DNSServer.h>
 
-
 File fsUploadFile;
 
 TaskHandle_t webClientTask;
@@ -36,11 +35,11 @@ WiFiClientSecure client;
 WebServer server(80);
 
 #ifdef USE_TELEGRAM
-  #include <UniversalTelegramBot.h>
-  TaskHandle_t telegramTask;
-  bool telegramMessageWaiting = false;
-  UniversalTelegramBot bot(TELEGRAM_TOKEN, client);
-  String telegramMessage = "";
+#include <UniversalTelegramBot.h>
+TaskHandle_t telegramTask;
+bool telegramMessageWaiting = false;
+UniversalTelegramBot bot(TELEGRAM_TOKEN, client);
+String telegramMessage = "";
 #endif
 
 //********************************WIFI Setup*************************//
@@ -140,148 +139,13 @@ void startHttpServer()
   server.on("/bluetoothscanner.html", handleSpiffsFile);
   server.on("/hrtowatts.html", handleSpiffsFile);
   server.on("/favicon.ico", handleSpiffsFile);
-
-  server.on("/send_settings", []() {
-    String tString;
-    bool wasBTUpdate = false;
-    if (!server.arg("ssid").isEmpty())
-    {
-      tString = server.arg("ssid");
-      tString.trim();
-      userConfig.setSsid(tString);
-    }
-    if (!server.arg("password").isEmpty())
-    {
-      tString = server.arg("password");
-      tString.trim();
-      userConfig.setPassword(tString);
-    }
-    if (!server.arg("deviceName").isEmpty())
-    {
-      tString = server.arg("deviceName");
-      tString.trim();
-      userConfig.setDeviceName(tString);
-    }
-    if (!server.arg("shiftStep").isEmpty())
-    {
-      userConfig.setShiftStep(server.arg("shiftStep").toInt());
-    }
-    if (!server.arg("stepperPower").isEmpty())
-    {
-      userConfig.setStepperPower(server.arg("stepperPower").toInt());
-      updateStepperPower();
-    }
-    //checkboxes don't report off, so need to check using another parameter that's always present on that page
-    if (!server.arg("stepperPower").isEmpty())
-    {
-      if (!server.arg("autoUpdate").isEmpty())
-      {
-        userConfig.setAutoUpdate(true);
-      }
-      else
-      {
-        userConfig.setAutoUpdate(false);
-      }
-      if (!server.arg("stealthchop").isEmpty())
-      {
-        userConfig.setStealthChop(true);
-        updateStealthchop();
-      }
-      else
-      {
-        userConfig.setStealthChop(false);
-        updateStealthchop();
-      }
-    }
-    if (!server.arg("inclineMultiplier").isEmpty())
-    {
-      userConfig.setInclineMultiplier(server.arg("inclineMultiplier").toFloat());
-    }
-    if (!server.arg("blePMDropdown").isEmpty())
-    {
-      wasBTUpdate = true;
-      if (server.arg("blePMDropdown"))
-      {
-        tString = server.arg("blePMDropdown");
-        userConfig.setConnectedPowerMeter(server.arg("blePMDropdown"));
-      }
-      else
-      {
-        userConfig.setConnectedPowerMeter("any");
-      }
-    }
-    if (!server.arg("bleHRDropdown").isEmpty())
-    {
-      wasBTUpdate = true;
-      if (server.arg("bleHRDropdown"))
-      {
-        tString = server.arg("bleHRDropdown");
-        userConfig.setConnectedHeartMonitor(server.arg("bleHRDropdown"));
-      }
-      else
-      {
-        userConfig.setConnectedHeartMonitor("any");
-      }
-      if (!server.arg("doublePower").isEmpty())
-      {
-        userConfig.setDoublePower(true);
-      }
-      else
-      {
-        userConfig.setDoublePower(false);
-      }
-    }
-
-    if (!server.arg("session1HR").isEmpty()) //Needs checking for unrealistic numbers.
-    {
-      userPWC.session1HR = server.arg("session1HR").toInt();
-    }
-    if (!server.arg("session1Pwr").isEmpty())
-    {
-      userPWC.session1Pwr = server.arg("session1Pwr").toInt();
-    }
-    if (!server.arg("session2HR").isEmpty())
-    {
-      userPWC.session2HR = server.arg("session2HR").toInt();
-    }
-    if (!server.arg("session2Pwr").isEmpty())
-    {
-      userPWC.session2Pwr = server.arg("session2Pwr").toInt();
-
-      if (!server.arg("hr2Pwr").isEmpty())
-      {
-        userPWC.hr2Pwr = true;
-      }
-      else
-      {
-        userPWC.hr2Pwr = false;
-      }
-    }
-
-    String response = "<!DOCTYPE html><html><body><h2>";
-
-    if (wasBTUpdate) //Special BT update response
-    {
-      response += "Selections Saved!</h2></body><script> setTimeout(\"location.href = 'http://" + myIP.toString() + "/bluetoothscanner.html';\",1000);</script></html>";
-      spinBLEClient.serverScan(true);
-    }
-    else
-    { //Normal response
-      response += "Network settings will be applied at next reboot. <br> Everything else is availiable immediatly.</h2></body><script> setTimeout(\"location.href = 'http://" + myIP.toString() + "/index.html';\",1000);</script></html>";
-    }
-    server.send(200, "text/html", response);
-    debugDirector("Config Updated From Web");
-    userConfig.saveToSPIFFS();
-    userConfig.printFile();
-    userPWC.saveToSPIFFS();
-    userPWC.printFile();
-  });
+  server.on("/send_settings", settingsProcessor);
 
   server.on("/BLEScan", []() {
     debugDirector("Scanning from web request");
     String response = "<!DOCTYPE html><html><body>Scanning for BLE Devices. Please wait 15 seconds.</body><script> setTimeout(\"location.href = 'http://" + myIP.toString() + "/bluetoothscanner.html';\",15000);</script></html>";
+    spinBLEClient.resetDevices();
     spinBLEClient.serverScan(true);
-    //spinBLEClient.serverScan(true);
     server.send(200, "text/html", response);
   });
 
@@ -323,7 +187,6 @@ void startHttpServer()
       debugDirector("HR is now: " + String(userConfig.getSimulatedHr()));
       server.send(200, "text/plain", "OK");
     }
-    debugDirector("Webclient High Water Mark: " + String(uxTaskGetStackHighWaterMark(webClientTask)));
   });
 
   server.on("/wattsslider", []() {
@@ -346,7 +209,6 @@ void startHttpServer()
       debugDirector("Watts are now: " + String(userConfig.getSimulatedWatts()));
       server.send(200, "text/plain", "OK");
     }
-    debugDirector("Webclient High Water Mark: " + String(uxTaskGetStackHighWaterMark(webClientTask)));
   });
 
   server.on("/hrValue", []() {
@@ -441,11 +303,11 @@ void startHttpServer()
   xTaskCreatePinnedToCore(
       webClientUpdate,   /* Task function. */
       "webClientUpdate", /* name of task. */
-      4000,              /* Stack size of task Used to be 3000*/
+      4500,              /* Stack size of task Used to be 3000*/
       NULL,              /* parameter of the task */
       1,                 /* priority of the task  - 29 worked*/
       &webClientTask,    /* Task handle to keep track of created task */
-      tskNO_AFFINITY);   /* pin task to core 0 */
+      1);   /* pin task to core 1 */
 
 #ifdef USE_TELEGRAM
   xTaskCreatePinnedToCore(
@@ -455,7 +317,7 @@ void startHttpServer()
       NULL,             /* parameter of the task */
       1,                /* priority of the task  - higher number is higher priority*/
       &telegramTask,    /* Task handle to keep track of created task */
-      tskNO_AFFINITY);  /* pin task to core 0 */
+      1);  /* pin task to core 1 */
 #endif
 
   server.begin();
@@ -474,10 +336,10 @@ void webClientUpdate(void *pvParameters)
       dnsServer.processNextRequest();
     }
     //Keep MDNS alive
-    if((millis()-mDnsTimer)>60000)
+    if ((millis() - mDnsTimer) > 60000)
     {
       MDNS.addServiceTxt("http", "_tcp", "lf", String(mDnsTimer));
-      mDnsTimer = millis(); 
+      mDnsTimer = millis();
     }
   }
 }
@@ -515,6 +377,143 @@ void handleSpiffsFile()
     debugDirector(filename + " not found. Sending builtin Index.html");
     server.send(404, "text/html", "<html><body><h1>ERROR 404 <br> FILE NOT FOUND!</h1></body></html>");
   }
+}
+
+void settingsProcessor()
+{
+  String tString;
+  bool wasBTUpdate = false;
+  if (!server.arg("ssid").isEmpty())
+  {
+    tString = server.arg("ssid");
+    tString.trim();
+    userConfig.setSsid(tString);
+  }
+  if (!server.arg("password").isEmpty())
+  {
+    tString = server.arg("password");
+    tString.trim();
+    userConfig.setPassword(tString);
+  }
+  if (!server.arg("deviceName").isEmpty())
+  {
+    tString = server.arg("deviceName");
+    tString.trim();
+    userConfig.setDeviceName(tString);
+  }
+  if (!server.arg("shiftStep").isEmpty())
+  {
+    userConfig.setShiftStep(server.arg("shiftStep").toInt());
+  }
+  if (!server.arg("stepperPower").isEmpty())
+  {
+    userConfig.setStepperPower(server.arg("stepperPower").toInt());
+    updateStepperPower();
+  }
+  //checkboxes don't report off, so need to check using another parameter that's always present on that page
+  if (!server.arg("stepperPower").isEmpty())
+  {
+    if (!server.arg("autoUpdate").isEmpty())
+    {
+      userConfig.setAutoUpdate(true);
+    }
+    else
+    {
+      userConfig.setAutoUpdate(false);
+    }
+    if (!server.arg("stealthchop").isEmpty())
+    {
+      userConfig.setStealthChop(true);
+      updateStealthchop();
+    }
+    else
+    {
+      userConfig.setStealthChop(false);
+      updateStealthchop();
+    }
+  }
+  if (!server.arg("inclineMultiplier").isEmpty())
+  {
+    userConfig.setInclineMultiplier(server.arg("inclineMultiplier").toFloat());
+  }
+  if (!server.arg("blePMDropdown").isEmpty())
+  {
+    wasBTUpdate = true;
+    if (server.arg("blePMDropdown"))
+    {
+      tString = server.arg("blePMDropdown");
+      userConfig.setConnectedPowerMeter(server.arg("blePMDropdown"));
+    }
+    else
+    {
+      userConfig.setConnectedPowerMeter("any");
+    }
+  }
+  if (!server.arg("bleHRDropdown").isEmpty())
+  {
+    wasBTUpdate = true;
+    if (server.arg("bleHRDropdown"))
+    {
+      tString = server.arg("bleHRDropdown");
+      userConfig.setConnectedHeartMonitor(server.arg("bleHRDropdown"));
+    }
+    else
+    {
+      userConfig.setConnectedHeartMonitor("any");
+    }
+    if (!server.arg("doublePower").isEmpty())
+    {
+      userConfig.setDoublePower(true);
+    }
+    else
+    {
+      userConfig.setDoublePower(false);
+    }
+  }
+
+  if (!server.arg("session1HR").isEmpty()) //Needs checking for unrealistic numbers.
+  {
+    userPWC.session1HR = server.arg("session1HR").toInt();
+  }
+  if (!server.arg("session1Pwr").isEmpty())
+  {
+    userPWC.session1Pwr = server.arg("session1Pwr").toInt();
+  }
+  if (!server.arg("session2HR").isEmpty())
+  {
+    userPWC.session2HR = server.arg("session2HR").toInt();
+  }
+  if (!server.arg("session2Pwr").isEmpty())
+  {
+    userPWC.session2Pwr = server.arg("session2Pwr").toInt();
+
+    if (!server.arg("hr2Pwr").isEmpty())
+    {
+      userPWC.hr2Pwr = true;
+    }
+    else
+    {
+      userPWC.hr2Pwr = false;
+    }
+  }
+  String response = "<!DOCTYPE html><html><body><h2>";
+
+  if (wasBTUpdate) //Special BT update response
+  {
+    response += "Selections Saved!</h2></body><script> setTimeout(\"location.href = 'http://" + myIP.toString() + "/bluetoothscanner.html';\",1000);</script></html>";
+    spinBLEClient.resetDevices();
+    spinBLEClient.serverScan(true);
+  }
+  else
+  { //Normal response
+    response += "Network settings will be applied at next reboot. <br> Everything else is availiable immediatly.</h2></body><script> setTimeout(\"location.href = 'http://" + myIP.toString() + "/index.html';\",1000);</script></html>";
+  }
+  server.send(200, "text/html", response);
+  debugDirector("Config Updated From Web");
+  userConfig.saveToSPIFFS();
+  userConfig.printFile();
+  userPWC.saveToSPIFFS();
+  userPWC.printFile();
 }
 
 //github fingerprint 70:94:DE:DD:E6:C4:69:48:3A:92:70:A1:48:56:78:2D:18:64:E0:B7
@@ -646,7 +645,7 @@ void telegramUpdate(void *pvParameters)
       if (!rm)
       {
         telegramFailures++;
-        debugDirector("Telegram failed to send!", + TELEGRAM_CHAT_ID);
+        debugDirector("Telegram failed to send!", +TELEGRAM_CHAT_ID);
         if (telegramFailures > 2)
         {
           internetConnection = false;
@@ -660,9 +659,11 @@ void telegramUpdate(void *pvParameters)
       client.stop();
       telegramMessage = "";
     }
-    //Serial.println(uxTaskGetStackHighWaterMark(telegramTask));
-    //Serial.println(uxTaskGetStackHighWaterMark(webClientTask));
-    //Serial.println(ESP.getFreeHeap());
+#ifdef DEBUG_STACK
+    Serial.printf("Telegram: %d \n", uxTaskGetStackHighWaterMark(telegramTask));
+    Serial.printf("Web: %d \n", uxTaskGetStackHighWaterMark(webClientTask));
+    Serial.printf("Free: %d \n", ESP.getFreeHeap());
+#endif
     vTaskDelay(4000 / portTICK_RATE_MS);
   }
 }

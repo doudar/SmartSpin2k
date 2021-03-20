@@ -16,14 +16,14 @@ void userParameters::setDefaults() //Move these to set the values as #define in 
 {
   firmwareUpdateURL     = FW_UPDATEURL;
   incline               = 0.0;
-  simulatedWatts        = 30;
-  simulatedHr           = 60;
-  simulatedCad          = 90;
+  simulatedWatts        = 00;
+  simulatedHr           = 00;
+  simulatedCad          = 00;
   deviceName            = DEVICE_NAME;
-  shiftStep             = 400;
+  shiftStep             = 600;
   stepperPower          = STEPPER_POWER;
   stealthchop           = STEALTHCHOP;
-  inclineMultiplier     = 2.0;
+  inclineMultiplier     = 3.0;
   doublePower           = false;
   simulateHr            = true;
   ERGMode               = false;
@@ -93,9 +93,9 @@ void userParameters::saveToSPIFFS()
 
   doc["firmwareUpdateURL"]      = firmwareUpdateURL;
   doc["incline"]                = incline;
-  doc["simulatedWatts"]         = simulatedWatts;
-  doc["simulatedHr"]            = simulatedHr;
-  doc["simulatedCad"]           = simulatedCad;
+  //doc["simulatedWatts"]       = simulatedWatts;
+  //doc["simulatedHr"]          = simulatedHr;
+  //doc["simulatedCad"]         = simulatedCad;
   doc["deviceName"]             = deviceName;
   doc["shiftStep"]              = shiftStep;
   doc["stepperPower"]           = stepperPower;
@@ -151,9 +151,9 @@ void userParameters::loadFromSPIFFS()
   // Copy values from the JsonDocument to the Config
   setFirmwareUpdateURL    (doc["firmwareUpdateURL"]);
   setIncline              (doc["incline"]);
-  setSimulatedWatts       (doc["simulatedWatts"]);
-  setSimulatedHr          (doc["simulatedHr"]);
-  setSimulatedCad         (doc["simulatedCad"]);
+  //setSimulatedWatts     (doc["simulatedWatts"]);
+  //setSimulatedHr        (doc["simulatedHr"]);
+  //setSimulatedCad       (doc["simulatedCad"]);
   setDeviceName           (doc["deviceName"]);
   setShiftStep            (doc["shiftStep"]);
   setStepperPower         (doc["stepperPower"]);

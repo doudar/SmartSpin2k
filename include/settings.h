@@ -85,11 +85,14 @@
 //Give up scanning for the lost connection after this many tries: 
 #define MAX_SCAN_RETRIES 1
 
-//loop speed for the SmartSpin2k BLE Server
-#define BLE_NOTIFY_DELAY 1000
+//loop speed for the SmartSpin2k BLE communications
+#define BLE_NOTIFY_DELAY 999
 
 //loop speed for the SmartSpin2k BLE Client reconnect 
-#define BLE_CLIENT_DELAY 998
+#define BLE_CLIENT_DELAY 1000
+
+//Number of devices that can be connected to the Client (myBLEDevices size)
+#define NUM_BLE_DEVICES 4
 
 //loop speed for the Webserver
 #define WEBSERVER_DELAY 30
@@ -114,6 +117,12 @@
 
 //Uncomment to enable sending Telegram debug messages back to the chat specified in telegram_token.h
 #define USE_TELEGRAM
+
+//Uncomment to enable stack size debugging info
+//#define DEBUG_STACK
+
+//Uncomment to enable HR->PWR debugging info. Always displays HR->PWR Calculation. Never sets userConfig.setSimulatedPower();
+//#define DEBUG_HR_TO_PWR
 
 #ifdef USE_TELEGRAM
     //Max number of telegram messages to send per session
