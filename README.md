@@ -109,5 +109,6 @@ Here is the earliest prototype mounted on a spin bike. (Cardboard wrapped in duc
 
 Any help or feedback is greatly appreciated.
 
-
-
+## Licensing
+The hardware designs in this project are licensed under the [CERN Open Hardware Licence Version 2 - Permissive license](Hardware/LICENSE).
+The software in this project is licensed under the [GNU GENERAL PUBLIC LICENSE Version 2, June 1991 license](LICENSE).

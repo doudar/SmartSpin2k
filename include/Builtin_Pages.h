@@ -1,25 +1,29 @@
-// SmartSpin2K code
-// This software registers an ESP32 as a BLE FTMS device which then uses a stepper motor to turn the resistance knob on a regular spin bike.
-// BLE code based on examples from https://github.com/nkolban
-// Copyright 2020 Anthony Doud
-// This work is licensed under the GNU General Public License v2
-// Prototype hardware build from plans in the SmartSpin2k repository are licensed under Cern Open Hardware Licence version 2 Permissive
-// 
+/*
+ * Copyright (C) 2020  Anthony Doud & Joel Baranick
+ * All rights reserved
+ *
+ * SPDX-License-Identifier: GPL-2.0-only
+ */
 
-
-//OTA Update pages. Not stored in SPIFFS because we will use this to restore the webserver files if they get corrupt.
+// OTA Update pages. Not stored in SPIFFS because we will use this to restore
+// the webserver files if they get corrupt.
 /* Style */
-#ifndef BUILTIN_PAGES_H
-#define BUILTIN_PAGES_H
+#pragma once
 
 #include <Arduino.h>
 
 String OTAStyle =
-    "<style>#file-input,input{width:100%;height:44px;border-radius:4px;margin:10px auto;font-size:15px}"
-    "input{background:#f1f1f1;border:0;padding:0 15px}body{background:#3498db;font-family:sans-serif;font-size:14px;color:#777}"
-    "#file-input{padding:0;border:1px solid #ddd;line-height:44px;text-align:left;display:block;cursor:pointer}"
-    "#bar,#prgbar{background-color:#f1f1f1;border-radius:10px}#bar{background-color:#3498db;width:0%;height:10px}"
-    "form{background:#fff;max-width:258px;margin:75px auto;padding:30px;border-radius:5px;text-align:center}"
+    "<style>#file-input,input{width:100%;height:44px;border-radius:4px;margin:"
+    "10px auto;font-size:15px}"
+    "input{background:#f1f1f1;border:0;padding:0 "
+    "15px}body{background:#3498db;font-family:sans-serif;font-size:14px;color:#"
+    "777}"
+    "#file-input{padding:0;border:1px solid "
+    "#ddd;line-height:44px;text-align:left;display:block;cursor:pointer}"
+    "#bar,#prgbar{background-color:#f1f1f1;border-radius:10px}#bar{background-"
+    "color:#3498db;width:0%;height:10px}"
+    "form{background:#fff;max-width:258px;margin:75px "
+    "auto;padding:30px;border-radius:5px;text-align:center}"
     ".btn{background:#3498db;color:#fff;cursor:pointer}</style>";
 
 /* Login page */
@@ -44,7 +48,8 @@ String noIndexHTML =
     "<html>"
     "<body>"
     "<h2>The webserver files <br>need to be updated.</h2>"
-    "Please enter the credentials for your network <br>or upload a new filesystem image using the <br>link below."
+    "Please enter the credentials for your network <br>or upload a new "
+    "filesystem image using the <br>link below."
     "<head>"
     "  <title>SmartSpin2K Web Server</title>"
     "</head>"
@@ -59,7 +64,8 @@ String noIndexHTML =
     "<form action='/reboot.html'>"
     "<input type='submit' value='Reboot!'>"
     "</form>"
-    "<p style='text-align: center;'><strong><a href='login'>Update Firmware</a></strong></p></h2>"
+    "<p style='text-align: center;'><strong><a href='login'>Update "
+    "Firmware</a></strong></p></h2>"
     "</body>"
     "</html> " +
     OTAStyle;
@@ -67,8 +73,10 @@ String noIndexHTML =
 /* Server Index Page */
 String OTAServerIndex =
     "<script src='https://code.jquery.com/jquery-3.3.1.min.js'></script>"
-    "<form method='POST' action='#' enctype='multipart/form-data' id='upload_form'>"
-    "<input type='file' name='update' id='file' onchange='sub(this)' style=display:none>"
+    "<form method='POST' action='#' enctype='multipart/form-data' "
+    "id='upload_form'>"
+    "<input type='file' name='update' id='file' onchange='sub(this)' "
+    "style=display:none>"
     "<label id='file-input' for='file'>   Choose file...</label>"
     "<input type='submit' class=btn value='Update'>"
     "<br><br>"
@@ -77,7 +85,8 @@ String OTAServerIndex =
     "<script>"
     "function sub(obj){"
     "var fileName = obj.value.split('\\\\');"
-    "document.getElementById('file-input').innerHTML = '   '+ fileName[fileName.length-1];"
+    "document.getElementById('file-input').innerHTML = '   '+ "
+    "fileName[fileName.length-1];"
     "};"
     "$('form').submit(function(e){"
     "e.preventDefault();"
@@ -109,7 +118,3 @@ String OTAServerIndex =
     "});"
     "</script>" +
     OTAStyle;
-
-
-
-    #endif
