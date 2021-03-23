@@ -28,8 +28,8 @@ void FlywheelData::decode(uint8_t *data, size_t length)
 {
     if (data[0] == 0xFF)
     {
-        cadence = float(bytes_to_u16(data[4], data[3]));
-        power = data[12];
+        power = bytes_to_u16(data[3], data[4]); // uint16 big-endian at ofs 3
+        cadence = data[12];
         hasData = true;
     }
     else
