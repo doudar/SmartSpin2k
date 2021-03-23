@@ -1,0 +1,7 @@
+BasedOnStyle: Google
+AllowAllParametersOfDeclarationOnNextLine: true
+CommentPragmas: 'NOLINT:.*'
+SortIncludes: false
+ColumnLimit: 180
+AlignConsecutiveMacros: true
+AlignConsecutiveAssignments: true
