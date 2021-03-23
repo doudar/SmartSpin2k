@@ -8,6 +8,7 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
 ### Added
+- Fixed Echelon licences.
 - Fix merge issues.
 - Added initial changelog.
 - Enabled cpp-lint, pio check, and clang-format to enforce coding standards and catch errors.
