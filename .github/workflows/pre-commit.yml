@@ -10,5 +10,13 @@ jobs:
       - uses: actions/checkout@v2
         with:
           fetch-depth: 0
-      - uses: actions/setup-python@v2
-      - uses: pre-commit/action@v2.0.0
+      - name: Ensure updated changelog 
+        uses: dangoslen/changelog-enforcer@v2
+        with:
+          changeLogPath: 'CHANGELOG.md'
+          skipLabels: 'Skip-Changelog'
+      - name: Setup python
+        uses: actions/setup-python@v2
+      - name: Check pre-commit hooks
+        uses: pre-commit/action@v2.0.0
+
