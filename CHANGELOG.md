@@ -12,6 +12,7 @@ All notable changes to this project will be documented in this file.
 - Enabled cpp-lint, pio check, and clang-format to enforce coding standards and catch errors.
 - Added support for ruing pre-commit to run pre-push checks
 - Added github workflow on pull_request to validate changelog and coding standards
+- Added Insert Peloton 7 Flat .sldpart and .stl
 
 ### Modified
 - Fixed many issues exposed by the addition of cpp-lint, pio check, and clang-format
