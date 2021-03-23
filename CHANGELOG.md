@@ -8,7 +8,13 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
 ### Added
+- Added initial changelog.
+- Enabled cpp-lint, pio check, and clang-format to enforce coding standards and catch errors.
+- Added support for ruing pre-commit to run pre-push checks.
+- Added github workflow on pull_request to validate changelog and coding standards.
 - Add hyphens to Flywheel GATT UUIDs.
 - Filter Flywheel advertisements by name.
 - Fix Flywheel power/cadence decoding.
 
+### Modified
+- Fixed many issues exposed by the addition of cpp-lint, pio check, and clang-format.
