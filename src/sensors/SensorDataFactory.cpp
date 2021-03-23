@@ -1,3 +1,10 @@
+// SmartSpin2K code
+// This software registers an ESP32 as a BLE FTMS device which then uses a stepper motor to turn the resistance knob on a regular spin bike.
+// BLE code based on examples from https://github.com/nkolban
+// Copyright 2020 Anthony Doud & Joel Baranick
+// This work is licensed under the GNU General Public License v2
+// Prototype hardware build from plans in the SmartSpin2k repository are licensed under Cern Open Hardware Licence version 2 Permissive
+
 #include "BLE_Common.h"
 #include "sensors/SensorDataFactory.h"
 #include "sensors/SensorData.h"
@@ -5,6 +12,7 @@
 #include "sensors/FlywheelData.h"
 #include "sensors/FitnessMachineIndoorBikeData.h"
 #include "sensors/HeartRateData.h"
+#include "sensors/EchelonData.h"
 
 std::shared_ptr<SensorData> SensorDataFactory::getSensorData(BLERemoteCharacteristic *characteristic, uint8_t *data, size_t length)
 {
@@ -33,6 +41,10 @@ std::shared_ptr<SensorData> SensorDataFactory::getSensorData(BLERemoteCharacteri
     else if (uuid == FLYWHEEL_UART_SERVICE_UUID)
     {
         sensorData = std::shared_ptr<SensorData>(new FlywheelData());
+    }
+        else if (uuid == ECHELON_DATA_UUID)
+    {
+        sensorData = std::shared_ptr<SensorData>(new EchelonData());
     }
     else
     {
