@@ -1,30 +1,29 @@
-// SmartSpin2K code
-// This software registers an ESP32 as a BLE FTMS device which then uses a stepper motor to turn the resistance knob on a regular spin bike.
-// BLE code based on examples from https://github.com/nkolban
-// Copyright 2020 Anthony Doud & Joel Baranick
-// This work is licensed under the GNU General Public License v2
-// Prototype hardware build from plans in the SmartSpin2k repository are licensed under Cern Open Hardware Licence version 2 Permissive
+/*
+ * Copyright (C) 2020  Anthony Doud & Joel Baranick
+ * All rights reserved
+ *
+ * SPDX-License-Identifier: GPL-2.0-only
+ */
 
 #pragma once
 
 #include <Arduino.h>
 
-class SensorData
-{
-public:
-    SensorData(String id) : id(id){};
+class SensorData {
+ public:
+  explicit SensorData(String id) : id(id) {}
 
-    String getId();
-    virtual bool hasHeartRate() = 0;
-    virtual bool hasCadence() = 0;
-    virtual bool hasPower() = 0;
-    virtual bool hasSpeed() = 0;
-    virtual int getHeartRate() = 0;
-    virtual float getCadence() = 0;
-    virtual int getPower() = 0;
-    virtual float getSpeed() = 0;
-    virtual void decode(uint8_t *data, size_t length) = 0;
+  String getId();
+  virtual bool hasHeartRate()                       = 0;
+  virtual bool hasCadence()                         = 0;
+  virtual bool hasPower()                           = 0;
+  virtual bool hasSpeed()                           = 0;
+  virtual int getHeartRate()                        = 0;
+  virtual float getCadence()                        = 0;
+  virtual int getPower()                            = 0;
+  virtual float getSpeed()                          = 0;
+  virtual void decode(uint8_t *data, size_t length) = 0;
 
-private:
-    String id;
+ private:
+  String id;
 };
