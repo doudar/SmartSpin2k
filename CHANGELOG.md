@@ -8,6 +8,7 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
 ### Added
+- Fix merge issues.
 - Added initial changelog.
 - Enabled cpp-lint, pio check, and clang-format to enforce coding standards and catch errors.
 - Added support for ruing pre-commit to run pre-push checks.
