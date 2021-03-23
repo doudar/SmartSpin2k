@@ -6,6 +6,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 ### Added
+- Added initial credits file.
 - Added initial changelog.
 - Enabled cpp-lint, pio check, and clang-format to enforce coding standards and catch errors.
 - Added support for ruing pre-commit to run pre-push checks.
