@@ -11,9 +11,12 @@ All notable changes to this project will be documented in this file.
 - Fix merge issues.
 - Added initial changelog.
 - Enabled cpp-lint, pio check, and clang-format to enforce coding standards and catch errors.
-- Added support for ruing pre-commit to run pre-push checks
-- Added github workflow on pull_request to validate changelog and coding standards
+- Added support for ruing pre-commit to run pre-push checks.
+- Added github workflow on pull_request to validate changelog and coding standards.
+- Add hyphens to Flywheel GATT UUIDs.
+- Filter Flywheel advertisements by name.
+- Fix Flywheel power/cadence decoding.
 - Added Insert Peloton 7 Flat .sldpart and .stl
 
 ### Modified
-- Fixed many issues exposed by the addition of cpp-lint, pio check, and clang-format
+- Fixed many issues exposed by the addition of cpp-lint, pio check, and clang-format.

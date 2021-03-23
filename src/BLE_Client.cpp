@@ -321,10 +321,8 @@ void SpinBLEClient::MyAdvertisedDeviceCallback::onResult(BLEAdvertisedDevice *ad
   } else {
     aDevName = "";
   }
-  if ((advertisedDevice->haveServiceUUID()) &&
-      (advertisedDevice->isAdvertisingService(CYCLINGPOWERSERVICE_UUID) || advertisedDevice->isAdvertisingService(FLYWHEEL_UART_SERVICE_UUID) ||
-       advertisedDevice->isAdvertisingService(FITNESSMACHINESERVICE_UUID) || advertisedDevice->isAdvertisingService(HEARTSERVICE_UUID) ||
-       advertisedDevice->isAdvertisingService(ECHELON_DEVICE_UUID))) {
+    if ((advertisedDevice->haveServiceUUID()) && (advertisedDevice->isAdvertisingService(CYCLINGPOWERSERVICE_UUID) || (advertisedDevice->isAdvertisingService(FLYWHEEL_UART_SERVICE_UUID) && aDevName == FLYWHEEL_BLE_NAME) || advertisedDevice->isAdvertisingService(FITNESSMACHINESERVICE_UUID) || advertisedDevice->isAdvertisingService(HEARTSERVICE_UUID) || advertisedDevice->isAdvertisingService(ECHELON_DEVICE_UUID)))
+    {
     // if ((aDevName == c_PM) || (advertisedDevice->getAddress().toString().c_str() == c_PM) || (aDevName == c_HR) || (advertisedDevice->getAddress().toString().c_str() == c_HR) ||
     // (String(c_PM) == ("any")) || (String(c_HR) == ("any"))) { //notice the subtle difference vv getServiceUUID(int) returns the index of the service in the list or the 0 slot if
     // not specified.
@@ -357,6 +355,7 @@ void SpinBLEClient::MyAdvertisedDeviceCallback::onResult(BLEAdvertisedDevice *ad
         spinBLEClient.myBLEDevices[i].set(advertisedDevice);
         spinBLEClient.myBLEDevices[i].doConnect = true;
         debugDirector("doConnect set on device: " + String(i));
+
         return;
       }
       debugDirector("Checking Slot " + String(i));
