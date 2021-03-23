@@ -15,6 +15,7 @@ All notable changes to this project will be documented in this file.
 - Add hyphens to Flywheel GATT UUIDs.
 - Filter Flywheel advertisements by name.
 - Fix Flywheel power/cadence decoding.
+- Added Insert Peloton 7 Flat .sldpart and .stl
 
 ### Modified
 - Fixed many issues exposed by the addition of cpp-lint, pio check, and clang-format.
