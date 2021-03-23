@@ -12,6 +12,7 @@
 #include "sensors/FlywheelData.h"
 #include "sensors/FitnessMachineIndoorBikeData.h"
 #include "sensors/HeartRateData.h"
+#include "sensors/EchelonData.h"
 
 std::shared_ptr<SensorData> SensorDataFactory::getSensorData(BLERemoteCharacteristic *characteristic, uint8_t *data, size_t length) {
   auto uuid = characteristic->getUUID();
@@ -21,18 +22,31 @@ std::shared_ptr<SensorData> SensorDataFactory::getSensorData(BLERemoteCharacteri
     }
   }
 
-  std::shared_ptr<SensorData> sensorData = NULL_SENSOR_DATA;
-  if (uuid == CYCLINGPOWERMEASUREMENT_UUID) {
-    sensorData = std::shared_ptr<SensorData>(new CyclePowerData());
-  } else if (uuid == HEARTCHARACTERISTIC_UUID) {
-    sensorData = std::shared_ptr<SensorData>(new HeartRateData());
-  } else if (uuid == FITNESSMACHINEINDOORBIKEDATA_UUID) {
-    sensorData = std::shared_ptr<SensorData>(new FitnessMachineIndoorBikeData());
-  } else if (uuid == FLYWHEEL_UART_SERVICE_UUID) {
-    sensorData = std::shared_ptr<SensorData>(new FlywheelData());
-  } else {
-    return NULL_SENSOR_DATA;
-  }
+    std::shared_ptr<SensorData> sensorData = NULL_SENSOR_DATA;
+    if (uuid == CYCLINGPOWERMEASUREMENT_UUID)
+    {
+        sensorData = std::shared_ptr<SensorData>(new CyclePowerData());
+    }
+    else if (uuid == HEARTCHARACTERISTIC_UUID)
+    {
+        sensorData = std::shared_ptr<SensorData>(new HeartRateData());
+    }
+    else if (uuid == FITNESSMACHINEINDOORBIKEDATA_UUID)
+    {
+        sensorData = std::shared_ptr<SensorData>(new FitnessMachineIndoorBikeData());
+    }
+    else if (uuid == FLYWHEEL_UART_SERVICE_UUID)
+    {
+        sensorData = std::shared_ptr<SensorData>(new FlywheelData());
+    }
+        else if (uuid == ECHELON_DATA_UUID)
+    {
+        sensorData = std::shared_ptr<SensorData>(new EchelonData());
+    }
+    else
+    {
+        return NULL_SENSOR_DATA;
+    }
 
   KnownDevice *knownDevice = new KnownDevice(uuid, sensorData);
   SensorDataFactory::knownDevices.push_back(knownDevice);

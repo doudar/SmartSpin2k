@@ -40,17 +40,17 @@ void BLECommunications(void *pvParameters) {
                 uint8_t *pData                                    = reinterpret_cast<uint8_t *>(&data[0]);
                 int length                                        = data.length();
 
-                // 250 == Data(60), Spaces(Data/2), Arrow(4),
-                //        SvrUUID(37), Sep(3), ChrUUID(37), Sep(3),
-                //        Name(10), Prefix(2), HR(8), SEP(1),
-                //        CD(10), SEP(1), PW(8), SEP(1), SP(7),
-                //        Suffix(2), Nul(1) - 225 rounded up
-                char logBuf[250];
-                char *logBufP = logBuf;
-                for (int i = 0; i < length; i++) {
-                  logBufP += sprintf(logBufP, "%02x ", pData[i]);
-                }
-                logBufP += sprintf(logBufP, "<- %s | %s", myAdvertisedDevice.serviceUUID.toString().c_str(), myAdvertisedDevice.charUUID.toString().c_str());
+                                // 250 == Data(60), Spaces(Data/2), Arrow(4), SvrUUID(37), Sep(3), ChrUUID(37), Sep(3),
+                                //        Name(10), Prefix(2), HR(8), SEP(1), CD(10), SEP(1), PW(8), SEP(1), SP(7), Suffix(2), Nul(1) - 225 rounded up
+                                char logBuf[250];
+                                char *logBufP = logBuf;
+                                for (int i = 0; i < length; i++)
+
+                                {
+                                    logBufP += sprintf(logBufP, "%02x ", pData[i]);
+                                }
+                                logBufP += sprintf(logBufP, "<- %.8s | %.8s", myAdvertisedDevice.serviceUUID.toString().c_str(), myAdvertisedDevice.charUUID.toString().c_str());
+
 
                 std::shared_ptr<SensorData> sensorData = sensorDataFactory.getSensorData(pRemoteBLECharacteristic, pData, length);
 

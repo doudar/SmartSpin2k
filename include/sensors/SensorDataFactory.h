@@ -15,6 +15,7 @@
 #include "FlywheelData.h"
 #include "FitnessMachineIndoorBikeData.h"
 #include "HeartRateData.h"
+#include "EchelonData.h"
 
 class SensorDataFactory {
  public:
