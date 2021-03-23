@@ -6,7 +6,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 All notable changes to this project will be documented in this file.  
 
-## [Flywheel-Tweaks]
+## [Unreleased]
 ### Added
 - Add hyphens to Flywheel GATT UUIDs.
 - Filter Flywheel advertisements by name.
