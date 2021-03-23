@@ -12,16 +12,11 @@ jobs:
           fetch-depth: 0
       - name: Ensure changelog is updated
         uses: dangoslen/changelog-enforcer@v2
-        with:
-          changeLogPath: 'CHANGELOG.md'
-          skipLabels: 'Skip-Changelog'
       - name: Validate changelog
-        id: changelog_reader
         uses: mindsers/changelog-reader-action@v2
         with:
           validation_depth: 10
           version: Unreleased
-          path: ./CHANGELOG.md
       - name: Setup python
         uses: actions/setup-python@v2
       - name: Check pre-commit hooks
