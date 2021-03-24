@@ -37,9 +37,9 @@
 
 // GATT service/characteristic UUIDs for Flywheel Bike from ptx2/gymnasticon/
 #define FLYWHEEL_UART_SERVICE_UUID BLEUUID("6e400001-b5a3-f393-e0a9-e50e24dcca9e")
-#define FLYWHEEL_UART_RX_UUID BLEUUID("6e400002-b5a3-f393-e0a9-e50e24dcca9e")
-#define FLYWHEEL_UART_TX_UUID BLEUUID("6e400003-b5a3-f393-e0a9-e50e24dcca9e")
-#define FLYWHEEL_BLE_NAME "Flywheel 1"
+#define FLYWHEEL_UART_RX_UUID      BLEUUID("6e400002-b5a3-f393-e0a9-e50e24dcca9e")
+#define FLYWHEEL_UART_TX_UUID      BLEUUID("6e400003-b5a3-f393-e0a9-e50e24dcca9e")
+#define FLYWHEEL_BLE_NAME          "Flywheel 1"
 
 // The Echelon Services
 #define ECHELON_DEVICE_UUID  BLEUUID("0bf669f0-45f2-11e7-9598-0800200c9a66")
