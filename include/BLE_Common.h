@@ -39,9 +39,9 @@
 
 // GATT service/characteristic UUIDs for Flywheel Bike from ptx2/gymnasticon/
 #define FLYWHEEL_UART_SERVICE_UUID BLEUUID("6e400001-b5a3-f393-e0a9-e50e24dcca9e")
-#define FLYWHEEL_UART_RX_UUID BLEUUID("6e400002-b5a3-f393-e0a9-e50e24dcca9e")
-#define FLYWHEEL_UART_TX_UUID BLEUUID("6e400003-b5a3-f393-e0a9-e50e24dcca9e")
-#define FLYWHEEL_BLE_NAME "Flywheel 1"
+#define FLYWHEEL_UART_RX_UUID      BLEUUID("6e400002-b5a3-f393-e0a9-e50e24dcca9e")
+#define FLYWHEEL_UART_TX_UUID      BLEUUID("6e400003-b5a3-f393-e0a9-e50e24dcca9e")
+#define FLYWHEEL_BLE_NAME          "Flywheel 1"
 
 // The Echelon Services
 #define ECHELON_DEVICE_UUID  BLEUUID("0bf669f0-45f2-11e7-9598-0800200c9a66")
@@ -85,6 +85,7 @@ class MyCallbacks : public BLECharacteristicCallbacks {
   void onWrite(BLECharacteristic *);
 };
 
+//static void onNotify(NimBLECharacteristic *pCharacteristic, uint8_t *pData);
 // *****************************Client*****************************
 
 // Keeping the task outside the class so we don't need a mask.
@@ -110,7 +111,7 @@ class SpinBLEAdvertisedDevice {
   bool userSelectedCSC  = false;
   bool userSelectedCT   = false;
   bool doConnect        = false;
-  std::queue<std::string> dataBuffer;
+  std::queue<uint8_t *> dataBuffer;
 
   void set(BLEAdvertisedDevice *device, int id = BLE_HS_CONN_HANDLE_NONE, BLEUUID inserviceUUID = (uint16_t)0x0000, BLEUUID incharUUID = (uint16_t)0x0000) {
     advertisedDevice  = device;
@@ -118,6 +119,9 @@ class SpinBLEAdvertisedDevice {
     connectedClientID = id;
     serviceUUID       = BLEUUID(inserviceUUID);
     charUUID          = BLEUUID(incharUUID);
+    while (!dataBuffer.empty()) {
+      dataBuffer.pop();
+    }
   }
 
   void reset() {
@@ -131,7 +135,11 @@ class SpinBLEAdvertisedDevice {
     userSelectedCSC   = false;  // Cycling Speed/Cadence
     userSelectedCT    = false;  // Controllable Trainer
     doConnect         = false;  // Initiate connection flag
+    while (!dataBuffer.empty()) {
+    dataBuffer.pop();
   }
+  }
+
 
   void print();
 };
@@ -180,6 +188,7 @@ class SpinBLEClient {
     bool onConfirmPIN(uint32_t);
     void onAuthenticationComplete(ble_gap_conn_desc);
   };
+
 };
 
 extern SpinBLEClient spinBLEClient;

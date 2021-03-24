@@ -36,6 +36,15 @@ void SpinBLEClient::start() {
                           1);
 }
 
+static void onNotify(BLERemoteCharacteristic *pBLERemoteCharacteristic, uint8_t *pData, size_t length, bool isNotify) {
+  for (size_t i = 0; i < NUM_BLE_DEVICES; i++) {
+    if (pBLERemoteCharacteristic->getUUID() == spinBLEClient.myBLEDevices[i].charUUID) {
+      spinBLEClient.myBLEDevices[i].dataBuffer.push(pData);
+      debugDirector("notify");
+    }
+  }
+}
+
 // BLE Client loop task
 void bleClientTask(void *pvParameters) {
   for (;;) {
@@ -175,7 +184,7 @@ bool SpinBLEClient::connectToServer() {
         // VV Is this really needed? Shouldn't it just carry over from the previous connection? VV
         spinBLEClient.myBLEDevices[device_number].set(myDevice, pClient->getConnId(), serviceUUID, charUUID);
         spinBLEClient.myBLEDevices[device_number].doConnect = false;
-        pRemoteCharacteristic->subscribe(true, nullptr, true);
+        pRemoteCharacteristic->subscribe(true, onNotify);
         postConnect(pClient);
         return true;
       } else {
@@ -226,7 +235,7 @@ bool SpinBLEClient::connectToServer() {
     }
 
     if (pRemoteCharacteristic->canNotify()) {
-      pRemoteCharacteristic->subscribe(true, nullptr, true);
+      pRemoteCharacteristic->subscribe(true, onNotify);
       reconnectTries = MAX_RECONNECT_TRIES;
       scanRetries    = MAX_SCAN_RETRIES;
     } else {
@@ -258,7 +267,7 @@ bool SpinBLEClient::connectToServer() {
  **                       Remove as you see fit for your needs                        */
 
 void SpinBLEClient::MyClientCallback::onConnect(NimBLEClient *pClient) {
-  // debugDirector("Connect Called"); This callback happens so early for us it's nearly useless.
+  // Currently Not Used
 }
 
 void SpinBLEClient::MyClientCallback::onDisconnect(NimBLEClient *pclient) {
@@ -321,8 +330,10 @@ void SpinBLEClient::MyAdvertisedDeviceCallback::onResult(BLEAdvertisedDevice *ad
   } else {
     aDevName = "";
   }
-    if ((advertisedDevice->haveServiceUUID()) && (advertisedDevice->isAdvertisingService(CYCLINGPOWERSERVICE_UUID) || (advertisedDevice->isAdvertisingService(FLYWHEEL_UART_SERVICE_UUID) && aDevName == FLYWHEEL_BLE_NAME) || advertisedDevice->isAdvertisingService(FITNESSMACHINESERVICE_UUID) || advertisedDevice->isAdvertisingService(HEARTSERVICE_UUID) || advertisedDevice->isAdvertisingService(ECHELON_DEVICE_UUID)))
-    {
+  if ((advertisedDevice->haveServiceUUID()) &&
+      (advertisedDevice->isAdvertisingService(CYCLINGPOWERSERVICE_UUID) || (advertisedDevice->isAdvertisingService(FLYWHEEL_UART_SERVICE_UUID) && aDevName == FLYWHEEL_BLE_NAME) ||
+       advertisedDevice->isAdvertisingService(FITNESSMACHINESERVICE_UUID) || advertisedDevice->isAdvertisingService(HEARTSERVICE_UUID) ||
+       advertisedDevice->isAdvertisingService(ECHELON_DEVICE_UUID))) {
     // if ((aDevName == c_PM) || (advertisedDevice->getAddress().toString().c_str() == c_PM) || (aDevName == c_HR) || (advertisedDevice->getAddress().toString().c_str() == c_HR) ||
     // (String(c_PM) == ("any")) || (String(c_HR) == ("any"))) { //notice the subtle difference vv getServiceUUID(int) returns the index of the service in the list or the 0 slot if
     // not specified.

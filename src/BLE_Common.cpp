@@ -32,55 +32,60 @@ void BLECommunications(void *pvParameters) {
               BLEClient *pClient = NimBLEDevice::getClientByPeerAddress(myAdvertisedDevice.peerAddress);
               // Client connected with a valid UUID registered
               if ((myAdvertisedDevice.serviceUUID != BLEUUID((uint16_t)0x0000)) && (pClient->isConnected())) {
-                // debugDirector("4");
+                debugDirector("4");
                 // Write the recieved data to the Debug Director
 
                 BLERemoteCharacteristic *pRemoteBLECharacteristic = pClient->getService(myAdvertisedDevice.serviceUUID)->getCharacteristic(myAdvertisedDevice.charUUID);
-                std::string data                                  = pRemoteBLECharacteristic->getValue();
-                uint8_t *pData                                    = reinterpret_cast<uint8_t *>(&data[0]);
-                int length                                        = data.length();
-
+                // std::string data                                  = pRemoteBLECharacteristic->getValue();
+                // uint8_t *pData                                    = reinterpret_cast<uint8_t *>(&data[0]);
+                // int length                                        = data.length();
                 // 250 == Data(60), Spaces(Data/2), Arrow(4), SvrUUID(37), Sep(3), ChrUUID(37), Sep(3),
                 //        Name(10), Prefix(2), HR(8), SEP(1), CD(10), SEP(1), PW(8), SEP(1), SP(7), Suffix(2), Nul(1) - 225 rounded up
-                char logBuf[250];
-                char *logBufP = logBuf;
-                for (int i = 0; i < length; i++) {
-                  logBufP += sprintf(logBufP, "%02x ", pData[i]);
-                }
-                logBufP += sprintf(logBufP, "<- %.8s | %.8s", myAdvertisedDevice.serviceUUID.toString().c_str(), myAdvertisedDevice.charUUID.toString().c_str());
 
-                std::shared_ptr<SensorData> sensorData = sensorDataFactory.getSensorData(pRemoteBLECharacteristic, pData, length);
-
-                logBufP += sprintf(logBufP, " | %s:[", sensorData->getId().c_str());
-                if (sensorData->hasHeartRate()) {
-                  int heartRate = sensorData->getHeartRate();
-                  userConfig.setSimulatedHr(heartRate);
-                  spinBLEClient.connectedHR |= true;
-                  logBufP += sprintf(logBufP, " HR(%d)", heartRate % 1000);
-                }
-                if (sensorData->hasCadence()) {
-                  float cadence = sensorData->getCadence();
-                  userConfig.setSimulatedCad(cadence);
-                  spinBLEClient.connectedCD |= true;
-                  logBufP += sprintf(logBufP, " CD(%.2f)", fmodf(cadence, 1000.0));
-                }
-                if (sensorData->hasPower()) {
-                  int power = sensorData->getPower();
-                  if (userConfig.getDoublePower()) {
-                    userConfig.setSimulatedWatts(power * 2);
-                  } else {
-                    userConfig.setSimulatedWatts(power);
+                while (!myAdvertisedDevice.dataBuffer.empty()) {
+                  uint8_t *pData = myAdvertisedDevice.dataBuffer.front();
+                  myAdvertisedDevice.dataBuffer.pop();
+                  int length = sizeof(pData)*2;
+                  char logBuf[250];
+                  char *logBufP = logBuf;
+                  for (int i = 0; i < length; i++) {
+                    logBufP += sprintf(logBufP, "%02x ", pData[i]);
                   }
-                  spinBLEClient.connectedPM |= true;
-                  logBufP += sprintf(logBufP, " PW(%d)", power % 10000);
+                  logBufP += sprintf(logBufP, "<- %.8s | %.8s", myAdvertisedDevice.serviceUUID.toString().c_str(), myAdvertisedDevice.charUUID.toString().c_str());
+
+                  std::shared_ptr<SensorData> sensorData = sensorDataFactory.getSensorData(pRemoteBLECharacteristic, pData, length);
+
+                  logBufP += sprintf(logBufP, " | %s:[", sensorData->getId().c_str());
+                  if (sensorData->hasHeartRate()) {
+                    int heartRate = sensorData->getHeartRate();
+                    userConfig.setSimulatedHr(heartRate);
+                    spinBLEClient.connectedHR |= true;
+                    logBufP += sprintf(logBufP, " HR(%d)", heartRate % 1000);
+                  }
+                  if (sensorData->hasCadence()) {
+                    float cadence = sensorData->getCadence();
+                    userConfig.setSimulatedCad(cadence);
+                    spinBLEClient.connectedCD |= true;
+                    logBufP += sprintf(logBufP, " CD(%.2f)", fmodf(cadence, 1000.0));
+                  }
+                  if (sensorData->hasPower()) {
+                    int power = sensorData->getPower();
+                    if (userConfig.getDoublePower()) {
+                      userConfig.setSimulatedWatts(power * 2);
+                    } else {
+                      userConfig.setSimulatedWatts(power);
+                    }
+                    spinBLEClient.connectedPM |= true;
+                    logBufP += sprintf(logBufP, " PW(%d)", power % 10000);
+                  }
+                  if (sensorData->hasSpeed()) {
+                    float speed = sensorData->getSpeed();
+                    userConfig.setSimulatedSpeed(speed);
+                    logBufP += sprintf(logBufP, " SD(%.2f)", fmodf(speed, 1000.0));
+                  }
+                  strcat(logBufP, " ]");
+                  debugDirector(String(logBuf), true, true);
                 }
-                if (sensorData->hasSpeed()) {
-                  float speed = sensorData->getSpeed();
-                  userConfig.setSimulatedSpeed(speed);
-                  logBufP += sprintf(logBufP, " SD(%.2f)", fmodf(speed, 1000.0));
-                }
-                strcat(logBufP, " ]");
-                debugDirector(String(logBuf), true, true);
               } else if (!pClient->isConnected()) {  // This shouldn't ever be
                                                      // called...
                 if (pClient->disconnect() == 0) {    // 0 is a successful disconnect
