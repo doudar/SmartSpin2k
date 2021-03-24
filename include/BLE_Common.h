@@ -14,6 +14,8 @@
 #include <Arduino.h>
 #include <Main.h>
 
+#include <queue>
+
 // Heart Service
 #define HEARTSERVICE_UUID        BLEUUID((uint16_t)0x180D)
 #define HEARTCHARACTERISTIC_UUID BLEUUID((uint16_t)0x2A37)
@@ -108,6 +110,7 @@ class SpinBLEAdvertisedDevice {
   bool userSelectedCSC  = false;
   bool userSelectedCT   = false;
   bool doConnect        = false;
+  std::queue<std::string> dataBuffer;
 
   void set(BLEAdvertisedDevice *device, int id = BLE_HS_CONN_HANDLE_NONE, BLEUUID inserviceUUID = (uint16_t)0x0000, BLEUUID incharUUID = (uint16_t)0x0000) {
     advertisedDevice  = device;
