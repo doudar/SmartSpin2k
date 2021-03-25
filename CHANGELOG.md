@@ -20,3 +20,4 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Fixed merge issues.
 - Fixed Echelon licences.
 - Fix Flywheel power/cadence decoding.
+- Ignore zero heartrate reported from remote FTMS.

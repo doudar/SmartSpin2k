@@ -16,7 +16,7 @@ size_t const FitnessMachineIndoorBikeData::byteSizes[FieldCount]          = {2, 
 uint8_t const FitnessMachineIndoorBikeData::signedFlags[FieldCount]       = {0, 0, 0, 0, 0, 1, 1, 1, 0, 0, 0, 0, 0, 0, 0};
 double_t const FitnessMachineIndoorBikeData::resolutions[FieldCount]      = {0.01, 0.01, 0.5, 0.5, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 0.1, 1.0, 1.0};
 
-bool FitnessMachineIndoorBikeData::hasHeartRate() { return values[Types::HeartRate] != NAN; }
+bool FitnessMachineIndoorBikeData::hasHeartRate() { return values[Types::HeartRate] != NAN && values[Types::HeartRate] != 0; }
 
 bool FitnessMachineIndoorBikeData::hasCadence() { return values[Types::InstantaneousCadence] != NAN; }
 
@@ -26,7 +26,7 @@ bool FitnessMachineIndoorBikeData::hasSpeed() { return values[Types::Instantaneo
 
 int FitnessMachineIndoorBikeData::getHeartRate() {
   double_t value = values[Types::HeartRate];
-  if (value == NAN) {
+  if (value == NAN || value == 0) {
     return INT_MIN;
   }
   return static_cast<int>(value);
