@@ -7,42 +7,48 @@
 
 #include "SS2KLog.h"
 
-DebugLog DebugLog::INSTANCE = DebugLog();
+DebugInfo DebugInfo::INSTANCE = DebugInfo();
 
-void DebugLog::append(const char *format, ...) {
+#if DEBUG_LOG_BUFFER_SIZE > 0
+void DebugInfo::appendLog(const char *format, ...) {
   va_list args;
   va_start(args, format);
-  DebugLog::INSTANCE.append_internal(format, args);
+  DebugInfo::INSTANCE.appendLog_internal(format, args);
   va_end(args);
 }
 
-String DebugLog::get() { return DebugLog::INSTANCE.get_internal(); }
+String DebugInfo::getAndClearLogs() { return DebugInfo::INSTANCE.getAndClearLogs_internal(); }
 
-void DebugLog::append_internal(const char *format, va_list args) {
+void DebugInfo::appendLog_internal(const char *format, va_list args) {
   if (xSemaphoreTake(logBufferMutex, 500) == pdTRUE) {
     int written = vsnprintf(logBuffer + logBufferLength, DEBUG_LOG_BUFFER_SIZE - logBufferLength, format, args);
-    SS2K_LOGD("Logging", "Wrote %d bytes to DebugLog", written);
+    SS2K_LOGD("DebugInfo", "Wrote %d bytes to log", written);
     if (written < 0 || logBufferLength + written > DEBUG_LOG_BUFFER_SIZE) {
       logBufferLength = snprintf(logBuffer, DEBUG_LOG_BUFFER_SIZE, "...\n");
     } else {
       logBufferLength += written;
     }
-    SS2K_LOGD("Logging", "DebugLog buffer length %d of %d bytes", logBufferLength, DEBUG_LOG_BUFFER_SIZE);
+    SS2K_LOGD("DebugInfo", "Log buffer length %d of %d bytes", logBufferLength, DEBUG_LOG_BUFFER_SIZE);
     xSemaphoreGive(logBufferMutex);
   }
 }
 
-String DebugLog::get_internal() {
+String DebugInfo::getAndClearLogs_internal() {
   if (xSemaphoreTake(logBufferMutex, 500) == pdTRUE) {
     String debugLog = String(logBuffer);
     logBufferLength = 0;
     logBuffer[0]    = '\0';
-    SS2K_LOGD("Logging", "DebugLog buffer read %d bytes and cleared", logBufferLength);
+    SS2K_LOGD("DebugInfo", "Log buffer read %d bytes and cleared", logBufferLength);
     xSemaphoreGive(logBufferMutex);
     return debugLog;
   }
   return "";
 }
+#else
+void DebugInfo::appendLog(const char *format, ...) {}
+
+String DebugInfo::getAndClearLogs() { return ""; }
+#endif
 
 int ss2k_log_hex_to_buffer(const byte *data, const size_t data_length, char *buffer, const int buffer_offset, const size_t buffer_length) {
   int written = 0;

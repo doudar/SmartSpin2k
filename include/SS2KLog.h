@@ -53,28 +53,32 @@
 #define SS2K_LOGC(tag, format, ...) SS2K_MODLOG_DFLT(CRITICAL, "C %lu %s: " #format "\n", millis(), tag, ##__VA_ARGS__)
 #define SS2K_LOG(tag, format, ...)  SS2K_MODLOG_DFLT(CRITICAL, "N %lu %s: " #format "\n", millis(), tag, ##__VA_ARGS__)
 
-#if DEBUG_LOG_BUFFER_SIZE > 0
-class DebugLog {
+class DebugInfo {
  public:
-  static void append(const char *format, ...);
+  static void appendLog(const char *format, ...);
 
-  static String get();
+  static String getAndClearLogs();
 
  private:
-  DebugLog() : logBufferLength(0), logBufferMutex(xSemaphoreCreateMutex()) { logBuffer[0] = '\0'; }
-  static DebugLog INSTANCE;
+  static DebugInfo INSTANCE;
+#if DEBUG_LOG_BUFFER_SIZE > 0
+  DebugInfo() : logBufferLength(0), logBufferMutex(xSemaphoreCreateMutex()) { logBuffer[0] = '\0'; }
   int logBufferLength;
   char logBuffer[DEBUG_LOG_BUFFER_SIZE];
   SemaphoreHandle_t logBufferMutex;
-  void append_internal(const char *format, va_list args);
-  String get_internal();
+  void appendLog_internal(const char *format, va_list args);
+  String getAndClearLogs_internal();
+#else
+  DebugInfo() {}
+#endif
 };
 
+#if DEBUG_LOG_BUFFER_SIZE > 0
 #define SS2K_MODLOG_ESP_LOCAL(level, ml_msg_, ...)          \
   do {                                                      \
     if (LOG_LOCAL_LEVEL >= level) {                         \
       esp_log_write(level, "SS2K", ml_msg_, ##__VA_ARGS__); \
-      DebugLog::append(ml_msg_, ##__VA_ARGS__);             \
+      DebugInfo::appendLog(ml_msg_, ##__VA_ARGS__);         \
     }                                                       \
   } while (0)
 #else

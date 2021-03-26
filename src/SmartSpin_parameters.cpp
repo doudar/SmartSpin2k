@@ -66,7 +66,7 @@ String userParameters::returnJSON(bool includeDebugLog) {
   doc["connectedPowerMeter"]   = connectedPowerMeter;
   doc["connectedHeartMonitor"] = connectedHeartMonitor;
   if (includeDebugLog) {
-    doc["debug"] = DebugLog::get();
+    doc["debug"] = DebugInfo::getAndClearLogs();
   }
   String output;
   serializeJson(doc, output);

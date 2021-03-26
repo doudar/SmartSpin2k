@@ -331,8 +331,6 @@ void webClientUpdate(void *pvParameters) {
 
 void handleIndexFile() {
   String filename = "/index.html";
-  server.sendHeader("Cache-Control", CACHE_CONTROL);
-  server.sendHeader("Last-Modified", BUILD_TIMESTAMP);
   if (SPIFFS.exists(filename)) {
     File file = SPIFFS.open(filename, FILE_READ);
     server.streamFile(file, "text/html");
@@ -348,8 +346,6 @@ void handleSpiffsFile() {
   String filename = server.uri();
   int dotPosition = filename.lastIndexOf(".");
   String fileType = filename.substring((dotPosition + 1), filename.length());
-  server.sendHeader("Cache-Control", CACHE_CONTROL);
-  server.sendHeader("Last-Modified", BUILD_TIMESTAMP);
   if (SPIFFS.exists(filename)) {
     File file = SPIFFS.open(filename, FILE_READ);
     server.streamFile(file, "text/" + fileType);

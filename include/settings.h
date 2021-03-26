@@ -142,5 +142,3 @@
 #define TELEGRAM_CHAT_ID "1234567890"
 #endif
 #endif
-
-#define CACHE_CONTROL "public, max-age=31536000"
