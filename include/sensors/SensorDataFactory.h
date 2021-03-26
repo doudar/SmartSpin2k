@@ -26,12 +26,14 @@ class SensorDataFactory {
  private:
   class KnownDevice {
    public:
-    KnownDevice(NimBLEUUID uuid, std::shared_ptr<SensorData> sensorData) : uuid(uuid), sensorData(sensorData) {}
-    NimBLEUUID getUUID();
+    KnownDevice(BLERemoteCharacteristic *characteristic, std::shared_ptr<SensorData> sensorData)
+        : peerAddress(characteristic->getRemoteService()->getClient()->getPeerAddress()), characteristicId(characteristic->getUUID()), sensorData(sensorData) {}
     std::shared_ptr<SensorData> decode(uint8_t *data, size_t length);
+    bool isSameDeviceCharacteristic(BLERemoteCharacteristic *characteristic);
 
    private:
-    NimBLEUUID uuid;
+    NimBLEAddress peerAddress;
+    NimBLEUUID characteristicId;
     std::shared_ptr<SensorData> sensorData;
   };
 

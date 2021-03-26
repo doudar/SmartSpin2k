@@ -116,7 +116,7 @@
 #define WIFI_CONNECT_TIMEOUT 10
 
 // Max size of userconfig
-#define USERCONFIG_JSON_SIZE 768
+#define USERCONFIG_JSON_SIZE 3000
 
 // Uncomment to enable sending Telegram debug messages back to the chat
 // specified in telegram_token.h
@@ -142,3 +142,5 @@
 #define TELEGRAM_CHAT_ID "1234567890"
 #endif
 #endif
+
+#define CACHE_CONTROL "public, max-age=31536000"

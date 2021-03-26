@@ -14,6 +14,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Add hyphens to Flywheel GATT UUIDs.
 - Filter Flywheel advertisements by name.
 - Added Insert Peloton 7 Flat .sldpart and .stl.
+- Added logging library which supports levels
 
 ### Changed
 - Fixed many issues exposed by the addition of cpp-lint, pio check, and clang-format.
@@ -21,3 +22,4 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Fixed Echelon licences.
 - Fix Flywheel power/cadence decoding.
 - Ignore zero heartrate reported from remote FTMS.
+- Changed all logging calls to new logging library

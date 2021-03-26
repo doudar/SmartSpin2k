@@ -1,4 +1,6 @@
-.pio/*
+.pio/
+!.pio/libdeps/debug/NimBLE-Arduino/*
+!.pio/libdeps/release/NimBLE-Arduino/*
 .vscode/c_cpp_properties.json
 .vscode/launch.json
 .vscode/ipch
