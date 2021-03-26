@@ -46,6 +46,7 @@ String userParameters::returnJSON(bool includeDebugLog) {
   // Set the values in the document
 
   doc["firmwareUpdateURL"]     = firmwareUpdateURL;
+  doc["firmwareVersion"]       = FIRMWARE_VERSION;
   doc["incline"]               = incline;
   doc["simulatedWatts"]        = simulatedWatts;
   doc["simulatedHr"]           = simulatedHr;

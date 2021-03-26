@@ -77,11 +77,11 @@
           </tbody>
         </table>
       </form>
-      <table style="width: 100%;padding: 0;margin: 0;">
+      <table style="width: 100%;padding: 0;margin: 0;table-layout: fixed;">
         <tbody>
           <tr>
             <td>
-              <p style="text-align: left;/* margin: 0; */float: left;">Debugging Info:</p>
+              <p style="text-align: left;float: left;">Debugging Info:</p>
             </td>
             <td>
               <div style="float: right;">
@@ -92,7 +92,7 @@
           </tr>
           <tr>
             <td colspan="2">
-              <pre id="debug" name="debug" style="margin: 0;background-color:black;background-image:radial-gradient(rgba(0,150,0,0.75), black 120%);text-align: left;height:30vh;width:100%;resize:both;border:1px solid #ccc;color:white;font:1.3rem Inconsolata, monospace;overflow:auto;text-shadow: 0 0 4px #C8C8C8;">Loading</pre>
+              <pre id="debug" name="debug" style="margin: 0;padding: 5;background-color:black;background-image:radial-gradient(rgba(0,150,0,0.75), black 120%);text-align: left;height:30vh;width:100%;resize:both;border:1px solid #ccc;color:white;font:1.3rem Inconsolata, monospace;overflow:auto;text-shadow: 0 0 4px #C8C8C8;">Loading</pre>
             </td>
           </tr>
         </tbody>
@@ -103,19 +103,23 @@
 
 <script>
 
-  var configRetrievePending = false;
   var debugElement = document.getElementById("debug");
   var followElement = document.getElementById("follow");
+  var updatePending = false;
   var updateTimer = undefined;
   
-  window.addEventListener('blur', stopUpdate);
-  window.addEventListener('focus', startUpdate);
-
-  function updateDebugView(newContent) {
-    if (followElement.checked) {
-      debugElement.scrollTop = debugElement.scrollHeight - debugElement.clientHeight
+  function onVisibilityChanged() {
+    if (document.hidden || document.mozHidden || document.webkitHidden || document.msHidden) {
+      stopUpdate();
+    } else {
+      startUpdate();
     }
   }
+
+  document.addEventListener("visibilitychange", onVisibilityChanged, false);
+  document.addEventListener("mozvisibilitychange", onVisibilityChanged, false);
+  document.addEventListener("webkitvisibilitychange", onVisibilityChanged, false);
+  document.addEventListener("msvisibilitychange", onVisibilityChanged, false);
 
   function startUpdate() {
     //Update values on specified interval loading late because this tiny webserver hates frequent requests
@@ -131,12 +135,18 @@
     updateTimer = undefined;
   }
 
+  function updateDebugView(newContent) {
+    if (followElement.checked) {
+      debugElement.scrollTop = debugElement.scrollHeight - debugElement.clientHeight
+    }
+  }
+
   function requestConfigValues() {
-    if (!configRetrievePending) {
-      configRetrievePending = true
+    if (!updatePending) {
+      updatePending = true
       var xhttp = new XMLHttpRequest();
       xhttp.onreadystatechange = function () {
-        configRetrievePending = false;
+        updatePending = false;
         if (this.readyState == 4 && this.status == 200) {
           var obj = JSON.parse(this.responseText);
           document.getElementById("ssid").value = obj.ssid;
@@ -174,8 +184,8 @@
   //Delay loading css to not swamp webserver
   window.addEventListener('load', function () {
     setTimeout(loadCss, 100);
+    startUpdate();
   }, false);
-
 </script>
 
 </html>
