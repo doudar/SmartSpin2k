@@ -10,20 +10,15 @@
 
 bool CyclePowerData::hasHeartRate() { return false; }
 
-bool CyclePowerData::hasCadence() { return this->cadence > 0 || this->missedReadingCount < 3; }
+bool CyclePowerData::hasCadence() { return !isnan(this->cadence); }
 
-bool CyclePowerData::hasPower() { return this->power != INT_MIN; }
+bool CyclePowerData::hasPower() { return true; }
 
 bool CyclePowerData::hasSpeed() { return false; }
 
 int CyclePowerData::getHeartRate() { return INT_MIN; }
 
-float CyclePowerData::getCadence() {
-  if (!this->hasCadence()) {
-    return NAN;
-  }
-  return this->cadence;
-}
+float CyclePowerData::getCadence() { return this->cadence; }
 
 int CyclePowerData::getPower() { return this->power; }
 
@@ -62,11 +57,13 @@ void CyclePowerData::decode(uint8_t *data, size_t length) {
   if (bitRead(flags, 5)) {
     // Crank Revolution data present, lets process it.
     this->lastCrankRev       = this->crankRev;
-    this->crankRev           = bytes_to_int(data[cPos + 1], data[cPos]);
+    this->crankRev           = bytes_to_u16(data[cPos + 1], data[cPos]);
     this->lastCrankEventTime = this->crankEventTime;
-    this->crankEventTime     = bytes_to_int(data[cPos + 3], data[cPos + 2]);
-    if (this->crankRev > this->lastCrankRev && this->crankEventTime - this->lastCrankEventTime != 0) {
-      int cadence = ((abs(this->crankRev - this->lastCrankRev) * 1024) / abs(this->crankEventTime - this->lastCrankEventTime)) * 60;
+    this->crankEventTime     = bytes_to_u16(data[cPos + 3], data[cPos + 2]);
+    if (this->crankRev > this->lastCrankRev && this->crankEventTime != this->lastCrankEventTime) {
+      float crankChange = abs(this->crankRev - this->lastCrankRev) * 1024;
+      float timeElapsed = abs(this->crankEventTime - this->lastCrankEventTime);
+      float cadence     = (crankChange / timeElapsed) * 60;
       if (cadence > 1) {
         if (cadence > 200) {  // Cadence Error
           cadence = 0;
