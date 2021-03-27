@@ -2,6 +2,7 @@ name: pre-commit
 
 on:
   pull_request:
+    paths-ignore: Hardware/**
 
 jobs:
   pre-commit:
@@ -12,13 +13,13 @@ jobs:
           fetch-depth: 0
       - name: Ensure changelog is updated
         uses: dangoslen/changelog-enforcer@v2
-      - name: Validate changelog
-        uses: mindsers/changelog-reader-action@v2
-        with:
-          validation_depth: 10
-          version: Unreleased
       - name: Setup python
         uses: actions/setup-python@v2
       - name: Check pre-commit hooks
         uses: pre-commit/action@v2.0.0
+      - name: Run platformio build
+        uses: docker://kadaan/platformio_esp32:latest
+        with:
+          args: run
+      
 
