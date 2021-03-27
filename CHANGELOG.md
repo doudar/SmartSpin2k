@@ -6,6 +6,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 ### Added
+- Added Insert Peloton 7 Flat V2 .sldpart and .stl.
 - Added initial credits file.
 - Added initial changelog.
 - Enabled cpp-lint, pio check, and clang-format to enforce coding standards and catch errors.
@@ -13,7 +14,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Added github workflow on pull_request to validate changelog and coding standards.
 - Add hyphens to Flywheel GATT UUIDs.
 - Filter Flywheel advertisements by name.
-- Added Insert Peloton 7 Flat .sldpart and .stl.
 
 ### Changed
 - Fixed many issues exposed by the addition of cpp-lint, pio check, and clang-format.
