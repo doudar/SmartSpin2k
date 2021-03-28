@@ -15,7 +15,6 @@ Check it out at https://www.instructables.com/Spin-Bike-Controller/
 
 ## Summary of function
 
-
 <img src="Pictures/Communications_Overview.png" alt="Communications Overview" style="height: 300px; width: 100"/> 
 
 Your power meter (Or optionally the SmartSpin2K's built in HR->PWR calculation) connects to SmartSpin2k which then relays power and cadence to Zwift (or any other cycling app) via bluetooth as a controllable smart trainer. SmartSpin2k simulates gradient recieved from the app by automatically turning the knob a set amount for each percent grade change on your virtual road. SmartSpin2k also supports ERG mode which lets the unit directly control your resistance to match a specified watt target set by the connected app. In addition to adjusting the knob, SmartSpin2k also has shifter buttons to simulate virtual shifting. One of the nice features of having these shifters is that you can use them in ERG mode to get a jump on upcoming intervals. 
@@ -86,7 +85,6 @@ ummm that was easy...right? :)
 
 *note, you can use an A4988 stepper driver also but you'll need to manually set the driver current with a screwdriver as well as possibly modify the output pin settings in /include/settings.h . If you do so, you'll aslo want to turn off automatic firmware updates. 
 
-
 <img src="Pictures/CadPreview.JPG" alt="Cad Preview" style="height: 200px; width: 100"/>
 
 The Finished assembly looks somthing like this prototype. 
@@ -109,5 +107,13 @@ Here is the earliest prototype mounted on a spin bike. (Cardboard wrapped in duc
 
 Any help or feedback is greatly appreciated.
 
+## Contributing
+1. Install Microsoft Visual Code. https://code.visualstudio.com/
+2. Install PlatformIO into Visual Code. https://platformio.org/platformio-ide
+3. Install Pre-commit. https://pre-commit.com
+4. Install pre-push git hooks: `pre-commit install --hook-type pre-push`
+5. Open this project in PlatformIO.
 
-
+## Licensing
+The hardware designs in this project are licensed under the [CERN Open Hardware Licence Version 2 - Permissive license](Hardware/LICENSE).
+The software in this project is licensed under the [GNU GENERAL PUBLIC LICENSE Version 2, June 1991 license](LICENSE).

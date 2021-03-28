@@ -1,0 +1,40 @@
+exclude: (\.pio|lib/NimBLE-Arduino)/.*
+repos:
+  - repo: https://github.com/Lucas-C/pre-commit-hooks
+    rev: v1.1.9
+    hooks:
+      - id: insert-license
+        files: \.(h\+\+|h|hh|hxx|hpp|cuh|c|cc|cpp|cu|c\+\+|cxx|tpp|txx)$
+        args:
+          - --license-filepath
+          - license_header.txt
+          - --comment-style
+          - /*| *| */
+  - repo: local
+    hooks:
+      - id: docker-validate-changelog
+        name: validate-changelog
+        description: Validate the `CHANGELOG.md` file
+        files: CHANGELOG\.md$
+        pass_filenames: false
+        language: docker_image
+        entry: kadaan/parse_a_changelog:latest
+      - id: docker-clang-format
+        name: clang-format
+        description: Run `clang-format` against C/C++ header and source files in Docker container
+        language: docker_image
+        files: \.(h\+\+|h|hh|hxx|hpp|cuh|c|cc|cpp|cu|c\+\+|cxx|tpp|txx)$
+        entry: daverona/pre-commit-cpp:0.8.0 clang-format -i -style=file
+      - id: docker-cpplint
+        name: cpplint
+        description: Run `cpplint` against C/C++ header and source files in Docker container
+        language: docker_image
+        files: \.(h\+\+|h|hh|hxx|hpp|cuh|c|cc|cpp|cu|c\+\+|cxx|tpp|txx)$
+        entry: daverona/pre-commit-cpp:0.8.0 cpplint
+      - id: docker-piocheck
+        name: piocheck
+        description: Run `pio check` against C/C++ source files in Docker container
+        language: docker_image
+        files: \.(c|cc|cpp|cu|c\+\+|cxx|tpp|txx|ino)$
+        pass_filenames: false
+        entry: kadaan/platformio_esp32:latest check

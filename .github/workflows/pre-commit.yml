@@ -1,0 +1,31 @@
+name: pre-commit
+
+on:
+  pull_request:
+
+jobs:
+  pre-commit:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v2
+        with:
+          fetch-depth: 0
+      - uses: dorny/paths-filter@v2
+        id: changes
+        with:
+          filters: |
+            software:
+              - '!(Hardware/**)'
+            hardware:
+              - 'Hardware/**'
+      - name: Ensure changelog is updated
+        uses: dangoslen/changelog-enforcer@v2
+      - name: Setup python
+        uses: actions/setup-python@v2
+      - name: Check pre-commit hooks
+        uses: pre-commit/action@v2.0.0
+      - name: Run platformio build
+        if: steps.filter.outputs.software == 'true'
+        uses: docker://kadaan/platformio_esp32:latest
+        with:
+          args: run
