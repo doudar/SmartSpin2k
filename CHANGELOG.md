@@ -6,7 +6,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 ### Added
-- Updated Echelon Insert
 - Added Insert Peloton 7 Flat V2 .sldpart and .stl.
 - Added initial credits file.
 - Added initial changelog.
@@ -17,6 +16,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Filter Flywheel advertisements by name.
 
 ### Changed
+- Updated Echelon Insert
 - Fixed many issues exposed by the addition of cpp-lint, pio check, and clang-format.
 - Fixed merge issues.
 - Fixed Echelon licences.
