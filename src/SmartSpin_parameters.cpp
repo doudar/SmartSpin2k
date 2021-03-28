@@ -24,8 +24,9 @@ void userParameters::setDefaults() {  // Move these to set the values as #define
   stepperPower          = STEPPER_POWER;
   stealthchop           = STEALTHCHOP;
   inclineMultiplier     = 3.0;
-  doublePower           = false;
+  powerCorrectionFactor = 1.0;
   simulateHr            = true;
+  simulateWatts         = true;
   ERGMode               = false;
   autoUpdate            = AUTO_FIRMWARE_UPDATE;
   ssid                  = DEVICE_NAME;
@@ -54,8 +55,9 @@ String userParameters::returnJSON() {
   doc["stepperPower"]          = stepperPower;
   doc["stealthchop"]           = stealthchop;
   doc["inclineMultiplier"]     = inclineMultiplier;
-  doc["doublePower"]           = doublePower;
+  doc["powerCorrectionFactor"] = powerCorrectionFactor;
   doc["simulateHr"]            = simulateHr;
+  doc["simulateWatts"]         = simulateWatts;
   doc["ERGMode"]               = ERGMode;
   doc["autoUpdate"]            = autoUpdate;
   doc["ssid"]                  = ssid;
@@ -93,17 +95,18 @@ void userParameters::saveToSPIFFS() {
   // doc["simulatedWatts"]       = simulatedWatts;
   // doc["simulatedHr"]          = simulatedHr;
   // doc["simulatedCad"]         = simulatedCad;
-  doc["deviceName"]        = deviceName;
-  doc["shiftStep"]         = shiftStep;
-  doc["stepperPower"]      = stepperPower;
-  doc["stealthchop"]       = stealthchop;
-  doc["inclineMultiplier"] = inclineMultiplier;
-  doc["doublePower"]       = doublePower;
-  doc["simulateHr"]        = simulateHr;
-  doc["ERGMode"]           = ERGMode;
-  doc["autoUpdate"]        = autoUpdate;
-  doc["ssid"]              = ssid;
-  doc["password"]          = password;
+  doc["deviceName"]            = deviceName;
+  doc["shiftStep"]             = shiftStep;
+  doc["stepperPower"]          = stepperPower;
+  doc["stealthchop"]           = stealthchop;
+  doc["inclineMultiplier"]     = inclineMultiplier;
+  doc["powerCorrectionFactor"] = powerCorrectionFactor;
+  doc["simulateHr"]            = simulateHr;
+  doc["simulateWatts"]         = simulateWatts;
+  doc["ERGMode"]               = ERGMode;
+  doc["autoUpdate"]            = autoUpdate;
+  doc["ssid"]                  = ssid;
+  doc["password"]              = password;
   // doc["foundDevices"]         = foundDevices; //I don't see a need
   // currently in keeping this boot to boot
   doc["connectedPowerMeter"]   = connectedPowerMeter;
@@ -153,8 +156,9 @@ void userParameters::loadFromSPIFFS() {
   setStepperPower(doc["stepperPower"]);
   setStealthChop(doc["stealthchop"]);
   setInclineMultiplier(doc["inclineMultiplier"]);
-  setDoublePower(doc["doublePower"]);
+  setPowerCorrectionFactor(doc["powerCorrectionFactor"]);
   setSimulateHr(doc["simulateHr"]);
+  setSimulateWatts(doc["simulateWatts"]);
   setERGMode(doc["ERGMode"]);
   setAutoUpdate(doc["autoUpdate"]);
   setSsid(doc["ssid"]);

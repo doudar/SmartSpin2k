@@ -14,8 +14,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Added github workflow on pull_request to validate changelog and coding standards.
 - Add hyphens to Flywheel GATT UUIDs.
 - Filter Flywheel advertisements by name.
-
+- Add documentation to SensorData class.
 ### Changed
+- Replaced DoublePower setting with PowerCorrectionFactor setting.
 - Fixed many issues exposed by the addition of cpp-lint, pio check, and clang-format.
 - Fixed merge issues.
 - Fixed Echelon licences.
