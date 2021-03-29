@@ -23,10 +23,11 @@ void userParameters::setDefaults() {  // Move these to set the values as #define
   shiftStep             = 600;
   stepperPower          = STEPPER_POWER;
   stealthchop           = STEALTHCHOP;
-  inclineMultiplier     = 3.0;
+  inclineMultiplier     = INCLINE_MULTIPLIER;
   doublePower           = false;
   simulateHr            = true;
   ERGMode               = false;
+  ERGSensitivity        = ERG_SENSITIVITY;
   autoUpdate            = AUTO_FIRMWARE_UPDATE;
   ssid                  = DEVICE_NAME;
   password              = DEFAULT_PASSWORD;
@@ -57,6 +58,7 @@ String userParameters::returnJSON() {
   doc["doublePower"]           = doublePower;
   doc["simulateHr"]            = simulateHr;
   doc["ERGMode"]               = ERGMode;
+  doc["ERGSensitivity"]        = ERGSensitivity;
   doc["autoUpdate"]            = autoUpdate;
   doc["ssid"]                  = ssid;
   doc["password"]              = password;
@@ -87,9 +89,10 @@ void userParameters::saveToSPIFFS() {
   StaticJsonDocument<USERCONFIG_JSON_SIZE> doc;
 
   // Set the values in the document
+  // commented items are not needed in save file
 
   doc["firmwareUpdateURL"] = firmwareUpdateURL;
-  doc["incline"]           = incline;
+  // doc["incline"]           = incline;
   // doc["simulatedWatts"]       = simulatedWatts;
   // doc["simulatedHr"]          = simulatedHr;
   // doc["simulatedCad"]         = simulatedCad;
@@ -100,12 +103,12 @@ void userParameters::saveToSPIFFS() {
   doc["inclineMultiplier"] = inclineMultiplier;
   doc["doublePower"]       = doublePower;
   doc["simulateHr"]        = simulateHr;
-  doc["ERGMode"]           = ERGMode;
-  doc["autoUpdate"]        = autoUpdate;
-  doc["ssid"]              = ssid;
-  doc["password"]          = password;
-  // doc["foundDevices"]         = foundDevices; //I don't see a need
-  // currently in keeping this boot to boot
+  // doc["ERGMode"]           = ERGMode;
+  doc["ERGSensitivity"] = ERGSensitivity;
+  doc["autoUpdate"]     = autoUpdate;
+  doc["ssid"]           = ssid;
+  doc["password"]       = password;
+  // doc["foundDevices"]         = foundDevices;
   doc["connectedPowerMeter"]   = connectedPowerMeter;
   doc["connectedHeartMonitor"] = connectedHeartMonitor;
 
@@ -144,7 +147,7 @@ void userParameters::loadFromSPIFFS() {
 
   // Copy values from the JsonDocument to the Config
   setFirmwareUpdateURL(doc["firmwareUpdateURL"]);
-  setIncline(doc["incline"]);
+  // setIncline(doc["incline"]);
   // setSimulatedWatts     (doc["simulatedWatts"]);
   // setSimulatedHr        (doc["simulatedHr"]);
   // setSimulatedCad       (doc["simulatedCad"]);
@@ -155,7 +158,8 @@ void userParameters::loadFromSPIFFS() {
   setInclineMultiplier(doc["inclineMultiplier"]);
   setDoublePower(doc["doublePower"]);
   setSimulateHr(doc["simulateHr"]);
-  setERGMode(doc["ERGMode"]);
+  // setERGMode(doc["ERGMode"]);
+  setERGSensitivity(doc["ERGSensitivity"]);
   setAutoUpdate(doc["autoUpdate"]);
   setSsid(doc["ssid"]);
   setPassword(doc["password"]);
@@ -164,7 +168,8 @@ void userParameters::loadFromSPIFFS() {
   setConnectedHeartMonitor(doc["connectedHeartMonitor"]);
 
   // Incase these important variables were not in the document, set them to
-  // defaults.
+  // defaults. This happens during initial boot after a firmware upgrade that may
+  // contain new features.
   if (doc["firmwareUpdateURL"] == "null") {
     firmwareUpdateURL = FW_UPDATEURL;
   }
@@ -176,6 +181,9 @@ void userParameters::loadFromSPIFFS() {
   }
   if (doc["password"] == "null") {
     password = DEFAULT_PASSWORD;
+  }
+  if (doc["ERGSensitivity"] == "null") {
+    ERGSensitivity = ERG_SENSITIVITY;
   }
   if (doc["autoUpdate"] == "null") {
     autoUpdate = AUTO_FIRMWARE_UPDATE;

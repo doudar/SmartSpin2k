@@ -26,6 +26,7 @@ class userParameters {
                      // used for HR2VP like calculation
   bool simulateHr;
   bool ERGMode;
+  float ERGSensitivity;
   bool autoUpdate;
   String ssid;
   String password;
@@ -48,6 +49,7 @@ class userParameters {
   bool getDoublePower() { return doublePower; }
   bool getSimulateHr() { return simulateHr; }
   bool getERGMode() { return ERGMode; }
+  float getERGSensitivity() { return ERGSensitivity; }
   bool getautoUpdate() { return autoUpdate; }
   const char* getSsid() { return ssid.c_str(); }
   const char* getPassword() { return password.c_str(); }
@@ -70,6 +72,7 @@ class userParameters {
   void setDoublePower(bool sp) { doublePower = sp; }
   void setSimulateHr(bool shr) { simulateHr = shr; }
   void setERGMode(bool erg) { ERGMode = erg; }
+  void setERGSensitivity(float ergS) { ERGSensitivity = ergS; }
   void setAutoUpdate(bool atupd) { autoUpdate = atupd; }
   void setSsid(String sid) { ssid = sid; }
   void setPassword(String pwd) { password = pwd; }

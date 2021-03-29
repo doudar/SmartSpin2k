@@ -142,13 +142,13 @@ void computeERG(int currentWatts, int setPoint) {
 
   if (cad > 20) {
     // 30  is amount of watts per shift. Was 50, seemed like too much...
-    if (abs(currentWatts - setPoint) < 30) {
-      amountToChangeIncline = (currentWatts - setPoint) * 1;
+    if (abs(currentWatts - setPoint) < WATTS_PER_SHIFT) {
+      amountToChangeIncline = (currentWatts - setPoint) * userConfig.getERGSensitivity();
     }
-    if (abs(currentWatts - setPoint) > 30) {
-      amountToChangeIncline = amountToChangeIncline + ((currentWatts - setPoint)) * 1;
+    if (abs(currentWatts - setPoint) > WATTS_PER_SHIFT) {
+      amountToChangeIncline = amountToChangeIncline + ((currentWatts - setPoint)) * userConfig.getERGSensitivity();
     }
-    amountToChangeIncline = amountToChangeIncline / ((currentWatts / 100) + 1);
+    amountToChangeIncline = amountToChangeIncline / ((currentWatts / 100) + 1); // +1 to eliminate possible divide by zero. 
 
     // limit to 4 shifts at a time
     if (abs(amountToChangeIncline) > userConfig.getShiftStep() * 5) {

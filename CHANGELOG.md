@@ -6,6 +6,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 ### Added
+- Added ERGSensitivity setting in Settings.html
+- Added ERGSensitivy parameter. 
 - Added Insert Peloton 7 Flat V2 .sldpart and .stl.
 - Added initial credits file.
 - Added initial changelog.
@@ -16,6 +18,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Filter Flywheel advertisements by name.
 
 ### Changed
+- Settings page submit returns setting page. 
+- Added explanatory comments in settings for various values. 
+- Decreased (default) expected watts per shift from 50 to 30. 
 - Reverted bytes_to_u16 macro. 
 - Erg mode tweak. 
 - Added another test for Flywheel BLE name.

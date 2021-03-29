@@ -362,11 +362,13 @@ void handleSpiffsFile() {
 
 void settingsProcessor() {
   String tString;
-  bool wasBTUpdate = false;
+  bool wasBTUpdate       = false;
+  bool wasSettingsUpdate = true;
   if (!server.arg("ssid").isEmpty()) {
     tString = server.arg("ssid");
     tString.trim();
     userConfig.setSsid(tString);
+    wasSettingsUpdate = true;
   }
   if (!server.arg("password").isEmpty()) {
     tString = server.arg("password");
@@ -385,9 +387,12 @@ void settingsProcessor() {
     userConfig.setStepperPower(server.arg("stepperPower").toInt());
     updateStepperPower();
   }
+  if (!server.arg("ERGSensitivity").isEmpty()) {
+    userConfig.setERGSensitivity(server.arg("ERGSensitivity").toFloat());
+  }
   // checkboxes don't report off, so need to check using another parameter
   // that's always present on that page
-  if (!server.arg("stepperPower").isEmpty()) {
+  if (wasSettingsUpdate) {
     if (!server.arg("autoUpdate").isEmpty()) {
       userConfig.setAutoUpdate(true);
     } else {
@@ -448,13 +453,19 @@ void settingsProcessor() {
   }
   String response = "<!DOCTYPE html><html><body><h2>";
 
-  if (wasBTUpdate) {  // Special BT update response
+  if (wasBTUpdate) {  // Special BT page update response
     response +=
         "Selections Saved!</h2></body><script> setTimeout(\"location.href "
         "= 'http://" +
         myIP.toString() + "/bluetoothscanner.html';\",1000);</script></html>";
     spinBLEClient.resetDevices();
     spinBLEClient.serverScan(true);
+  } else if (wasSettingsUpdate) {  // Special Settings Page update response
+    response +=
+        "Network settings will be applied at next reboot. <br> Everything "
+        "else is availiable immediatly.</h2></body><script> "
+        "setTimeout(\"location.href = 'http://" +
+        myIP.toString() + "/settings.html';\",1000);</script></html>";
   } else {  // Normal response
     response +=
         "Network settings will be applied at next reboot. <br> Everything "
