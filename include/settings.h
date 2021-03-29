@@ -37,14 +37,14 @@
 #define userPWCFILENAME "/userPWC.txt"
 
 // Default Incline Multiplier.
-// Incline multiplier is the multiple required to convert incline recieved from the remote client (percent grade*100) 
-// into actual stepper steps that move the stepper moter. It takes 2,181.76 steps to rotate the knob 1 full revolution. 
-// Incline_Multiplier may be able to be removed in the future by dividing ShiftSteps by ~200 to get this value but we're not quite ready 
-// to make that commitment yet. 
+// Incline multiplier is the multiple required to convert incline recieved from the remote client (percent grade*100)
+// into actual stepper steps that move the stepper moter. It takes 2,181.76 steps to rotate the knob 1 full revolution.
+// Incline_Multiplier may be able to be removed in the future by dividing ShiftSteps by ~200 to get this value but we're not quite ready
+// to make that commitment yet.
 #define INCLINE_MULTIPLIER 3.0
 
 // Default Stepper Power.
-// Stepper peak current in ma. This is hardware restricted to a maximum of 2000ma on the TMC2225. RMS current is less.  
+// Stepper peak current in ma. This is hardware restricted to a maximum of 2000ma on the TMC2225. RMS current is less.
 #define STEPPER_POWER 1000
 
 // Default ERG Sensitivity. Predicated on # of Shifts (further defined by shift steps) per 30 watts of resistance change.
@@ -53,8 +53,8 @@
 // would move 1200 steps to compensate, however ERG_Sensitivity values much different than 1.0 imply shiftStep has been improperly configured.
 #define ERG_SENSITIVITY 1.0
 
-// Number of watts per shift expected by ERG mode for it's calculation. The user should target this number by adjusting Shift Step until WATTS_PER_SHIFT 
-// is obtained as closely as possible during each shift.   
+// Number of watts per shift expected by ERG mode for it's calculation. The user should target this number by adjusting Shift Step until WATTS_PER_SHIFT
+// is obtained as closely as possible during each shift.
 #define WATTS_PER_SHIFT 30
 
 // Hardware pin for rocker Switch
