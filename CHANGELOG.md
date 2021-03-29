@@ -19,6 +19,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Reverted bytes_to_u16 macro. 
 - Erg mode tweak. 
 - Added another test for Flywheel BLE name.
+- Updated Echelon Insert
 - Fixed many issues exposed by the addition of cpp-lint, pio check, and clang-format.
 - Fixed merge issues.
 - Fixed Echelon licences.
