@@ -68,7 +68,7 @@ class userParameters {
   void setStepperPower(int sp) { stepperPower = sp; }
   void setStealthChop(bool sc) { stealthchop = sc; }
   void setInclineMultiplier(float im) { inclineMultiplier = im; }
-  void setPowerCorrectionFactor(uint8_t pm) { powerCorrectionFactor = pm; }
+  void setPowerCorrectionFactor(float pm) { powerCorrectionFactor = pm; }
   void setSimulateHr(bool shr) { simulateHr = shr; }
   void setSimulateWatts(bool swt) { simulateWatts = swt; }
   void setERGMode(bool erg) { ERGMode = erg; }
