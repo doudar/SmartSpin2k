@@ -141,21 +141,23 @@ void computeERG(int currentWatts, int setPoint) {
   int amountToChangeIncline = 0;
 
   if (cad > 20) {
-    if (abs(currentWatts - setPoint) < 50) {
-      amountToChangeIncline = (currentWatts - setPoint) * .5;
+    // 30  is amount of watts per shift. Was 50, seemed like too much...
+    if (abs(currentWatts - setPoint) < 30) {
+      amountToChangeIncline = (currentWatts - setPoint) * 1;
     }
-    if (abs(currentWatts - setPoint) > 50) {
+    if (abs(currentWatts - setPoint) > 30) {
       amountToChangeIncline = amountToChangeIncline + ((currentWatts - setPoint)) * 1;
     }
     amountToChangeIncline = amountToChangeIncline / ((currentWatts / 100) + 1);
-  }
 
-  if (abs(amountToChangeIncline) > userConfig.getShiftStep() * 3) {
-    if (amountToChangeIncline > 0) {
-      amountToChangeIncline = userConfig.getShiftStep() * 3;
-    }
-    if (amountToChangeIncline < 0) {
-      amountToChangeIncline = -(userConfig.getShiftStep() * 3);
+    // limit to 4 shifts at a time
+    if (abs(amountToChangeIncline) > userConfig.getShiftStep() * 5) {
+      if (amountToChangeIncline > 0) {
+        amountToChangeIncline = userConfig.getShiftStep() * 5;
+      }
+      if (amountToChangeIncline < 0) {
+        amountToChangeIncline = -(userConfig.getShiftStep() * 5);
+      }
     }
   }
 
@@ -281,7 +283,7 @@ void MyCallbacks::onWrite(BLECharacteristic *pCharacteristic) {
     logBufLength += snprintf(logBuf + logBufLength, kLogBufMaxLength - logBufLength, "<- %s | %s ", FITNESSMACHINESERVICE_UUID.toString().c_str(),
                              pCharacteristic->getUUID().toString().c_str());
 
-    if (static_cast<int>(rxValue[0]) == 17) {  // 17 means FTMS Incline Control Mode  (aka SIM mode)
+    if (static_cast<int>(rxValue[0]) == 17) {  // 0x11 17 means FTMS Incline Control Mode  (aka SIM mode)
       signed char buf[2];
       buf[0] = rxValue[3];  // (Least significant byte)
       buf[1] = rxValue[4];  // (Most significant byte)
@@ -295,8 +297,8 @@ void MyCallbacks::onWrite(BLECharacteristic *pCharacteristic) {
       SS2K_LOG("BLE_Server", "%s", logBuf);
       SEND_TO_TELEGRAM(String(logBuf));
     }
-    if ((static_cast<int>(rxValue[0]) == 5) && (spinBLEClient.connectedPM)) {  // 5 means FTMS Watts Control Mode (aka ERG mode)
-      int targetWatts = bytes_to_int(rxValue[2], rxValue[1]);
+    if ((static_cast<int>(rxValue[0]) == 5) && (spinBLEClient.connectedPM)) {  // 0x05 5 means FTMS Watts Control Mode (aka ERG mode)
+      int targetWatts = bytes_to_u16(rxValue[2], rxValue[1]);
       if (!userConfig.getERGMode()) {
         userConfig.setERGMode(true);
       }

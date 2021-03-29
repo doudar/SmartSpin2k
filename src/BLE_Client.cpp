@@ -89,7 +89,7 @@ bool SpinBLEClient::connectToServer() {
   }
   // FUTURE - Iterate through an array of UUID's we support instead of all the if checks.
   if (myDevice->haveServiceUUID()) {
-    if (myDevice->isAdvertisingService(FLYWHEEL_UART_SERVICE_UUID)) {
+    if (myDevice->isAdvertisingService(FLYWHEEL_UART_SERVICE_UUID) && (myDevice->getName() == FLYWHEEL_BLE_NAME)) {
       serviceUUID = FLYWHEEL_UART_SERVICE_UUID;
       charUUID    = FLYWHEEL_UART_TX_UUID;
       SS2K_LOG("BLE_Client", "trying to connect to Flywheel Bike");
