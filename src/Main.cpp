@@ -19,10 +19,10 @@ uint64_t lastDebounceTime = 0;    // the last time the output pin was toggled
 uint64_t debounceDelay    = 500;  // the debounce time; increase if the output flickers
 
 // Stepper Speed - Lower is faster
-int maxStepperSpeed = 500;
+int maxStepperSpeed     = 500;
 int lastShifterPosition = 0;
-int shifterPosition = 0;
-int stepperPosition = 0;
+int shifterPosition     = 0;
+int stepperPosition     = 0;
 HardwareSerial stepperSerial(2);
 TMC2208Stepper driver(&SERIAL_PORT, R_SENSE);  // Hardware Serial
 
@@ -134,7 +134,7 @@ void moveStepper(void *pvParameters) {
       SS2K_LOG("Main", "Shift DOWN: %d", shifterPosition);
     }
     lastShifterPosition = shifterPosition;
-    targetPosition = shifterPosition + (userConfig.getIncline() * userConfig.getInclineMultiplier());
+    targetPosition      = shifterPosition + (userConfig.getIncline() * userConfig.getInclineMultiplier());
     if (stepperPosition == targetPosition) {
       vTaskDelay(300 / portTICK_PERIOD_MS);
       if (connectedClientCount() == 0) {
