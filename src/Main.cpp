@@ -20,6 +20,7 @@ uint64_t debounceDelay    = 500;  // the debounce time; increase if the output f
 
 // Stepper Speed - Lower is faster
 int maxStepperSpeed = 500;
+int lastShifterPosition = 0;
 int shifterPosition = 0;
 int stepperPosition = 0;
 HardwareSerial stepperSerial(2);
@@ -127,6 +128,12 @@ void moveStepper(void *pvParameters) {
   int targetPosition = 0;
 
   while (1) {
+    if (shifterPosition > lastShifterPosition) {
+      SS2K_LOG("Main", "Shift UP: %d", shifterPosition);
+    } else if (shifterPosition < lastShifterPosition) {
+      SS2K_LOG("Main", "Shift DOWN: %d", shifterPosition);
+    }
+    lastShifterPosition = shifterPosition;
     targetPosition = shifterPosition + (userConfig.getIncline() * userConfig.getInclineMultiplier());
     if (stepperPosition == targetPosition) {
       vTaskDelay(300 / portTICK_PERIOD_MS);
@@ -181,7 +188,6 @@ void IRAM_ATTR shiftUp() {  // Handle the shift up interrupt IRAM_ATTR is to kee
   if (deBounce()) {
     if (!digitalRead(SHIFT_UP_PIN)) {  // double checking to make sure the interrupt wasn't triggered by emf
       shifterPosition = (shifterPosition + userConfig.getShiftStep());
-      SS2K_LOG("Main", "Shift UP: %d", shifterPosition);
     } else {
       lastDebounceTime = 0;
     }  // Probably Triggered by EMF, reset the debounce
@@ -192,7 +198,6 @@ void IRAM_ATTR shiftDown() {  // Handle the shift down interrupt
   if (deBounce()) {
     if (!digitalRead(SHIFT_DOWN_PIN)) {  // double checking to make sure the interrupt wasn't triggered by emf
       shifterPosition = (shifterPosition - userConfig.getShiftStep());
-      SS2K_LOG("Main", "Shift DOWN: %d", shifterPosition);
     } else {
       lastDebounceTime = 0;
     }  // Probably Triggered by EMF, reset the debounce
