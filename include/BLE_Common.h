@@ -49,8 +49,8 @@
 
 // macros to convert different types of bytes into int The naming here sucks and
 // should be fixed.
-#define bytes_to_s16(MSB, LSB) (((int16_t)((signed char)MSB))) << 8 | (((signed char)LSB))
-#define bytes_to_u16(MSB, LSB) (((uint16_t)((signed char)MSB))) << 8 | (((unsigned char)LSB))
+#define bytes_to_s16(MSB, LSB) (((signed int)((signed char)MSB))) << 8 | (((signed char)LSB))
+#define bytes_to_u16(MSB, LSB) (((signed int)((signed char)MSB))) << 8 | (((unsigned char)LSB))
 #define bytes_to_int(MSB, LSB) ((static_cast<int>((unsigned char)MSB))) << 8 | (((unsigned char)LSB))
 // Potentially, something like this is a better way of doing this ^^
 // data.getUint16(1, true)
