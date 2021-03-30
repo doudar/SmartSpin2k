@@ -28,3 +28,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Ignore zero heartrate reported from remote FTMS.
 - Fix Assimoa Uno stuck cadence.
 - Changed all logging calls to new logging library.
+
+### Removed
+- Deleted and ignored .pio folder which had been mistakening commited
