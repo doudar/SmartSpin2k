@@ -135,31 +135,34 @@ void startBLEServer() {
 void computeERG(int currentWatts, int setPoint) {
   // cooldownTimer--;
 
-  float incline             = userConfig.getIncline();
-  int cad                   = userConfig.getSimulatedCad();
-  int newIncline            = incline;
-  int amountToChangeIncline = 0;
+  float incline               = userConfig.getIncline();
+  int cad                     = userConfig.getSimulatedCad();
+  float newIncline            = incline;
+  float amountToChangeIncline = 0;
+  const int wattChange        = currentWatts - setPoint;
+  const float subShiftScale   = 1.0;  // Can tweak this value lower as you ride to see what's smoothest
 
-  if (cad > 20) {
-    // 30  is amount of watts per shift. Was 50, seemed like too much...
-    if (abs(currentWatts - setPoint) < WATTS_PER_SHIFT) {
-      amountToChangeIncline = (currentWatts - setPoint) * userConfig.getERGSensitivity();
+  if (cad <= 20) {
+    // Cadence too low, nothing to do here
+    return;
+  }
+  amountToChangeIncline = wattChange * userConfig.getERGSensitivity();
+  // 30  is amount of watts per shift. Was 50, seemed like too much...
+  if (abs(wattChange) < WATTS_PER_SHIFT) {
+    // As the desired value gets closer, make smaller changes for a smoother experience
+    amountToChangeIncline *= subShiftScale;
+  }
+  // limit to 10 shifts at a time
+  if (abs(amountToChangeIncline) > userConfig.getShiftStep() * 10) {
+    if (amountToChangeIncline > 0) {
+      amountToChangeIncline = userConfig.getShiftStep() * 10;
     }
-    if (abs(currentWatts - setPoint) > WATTS_PER_SHIFT) {
-      amountToChangeIncline = amountToChangeIncline + ((currentWatts - setPoint)) * userConfig.getERGSensitivity();
-    }
-    amountToChangeIncline = amountToChangeIncline / ((currentWatts / 100) + 1);  // +1 to eliminate possible divide by zero.
-
-    // limit to 4 shifts at a time
-    if (abs(amountToChangeIncline) > userConfig.getShiftStep() * 5) {
-      if (amountToChangeIncline > 0) {
-        amountToChangeIncline = userConfig.getShiftStep() * 5;
-      }
-      if (amountToChangeIncline < 0) {
-        amountToChangeIncline = -(userConfig.getShiftStep() * 5);
-      }
+    if (amountToChangeIncline < 0) {
+      amountToChangeIncline = -(userConfig.getShiftStep() * 10);
     }
   }
+  // Reduce the amount per loop (don't try to oneshot it.) and reduce the movement the higher the watt target is.
+  amountToChangeIncline = amountToChangeIncline / ((currentWatts / 100) + .1);  // +.1 to eliminate possible divide by zero.
 
   newIncline = incline - amountToChangeIncline;  //  }
   userConfig.setIncline(newIncline);
