@@ -69,12 +69,8 @@ void BLECommunications(void *pvParameters) {
                   logBufLength += snprintf(logBuf + logBufLength, kLogBufMaxLength - logBufLength, " CD(%.2f)", fmodf(cadence, 1000.0));
                 }
                 if (sensorData->hasPower()) {
-                  int power = sensorData->getPower();
-                  if (userConfig.getDoublePower()) {
-                    power *= 2;
-                  } else {
-                    userConfig.setSimulatedWatts(power);
-                  }
+                  int power = sensorData->getPower() * userConfig.getPowerCorrectionFactor();
+                  userConfig.setSimulatedWatts(power);
                   spinBLEClient.connectedPM |= true;
                   logBufLength += snprintf(logBuf + logBufLength, kLogBufMaxLength - logBufLength, " PW(%d)", power % 10000);
                 }
