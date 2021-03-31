@@ -463,7 +463,7 @@ void settingsProcessor() {
   } else if (wasSettingsUpdate) {  // Special Settings Page update response
     response +=
         "Network settings will be applied at next reboot. <br> Everything "
-        "else is availiable immediatly.</h2></body><script> "
+        "else is available immediatly.</h2></body><script> "
         "setTimeout(\"location.href = 'http://" +
         myIP.toString() + "/settings.html';\",1000);</script></html>";
   } else {  // Normal response
