@@ -140,7 +140,7 @@ void computeERG(int currentWatts, int setPoint) {
   float newIncline            = incline;
   float amountToChangeIncline = 0;
   const int wattChange        = currentWatts - setPoint;
-  const float subShiftScale   = 1.0;  // Can tweak this value lower as you ride to see what's smoothest
+  const float subShiftScale   = SUB_SHIFT_SCALE;  // Can tweak this value lower as you ride to see what's smoothest
 
   if (cad <= 20) {
     // Cadence too low, nothing to do here

@@ -57,6 +57,10 @@
 // is obtained as closely as possible during each shift.
 #define WATTS_PER_SHIFT 30
 
+// Multiple to apply in ERG mode when within the watts range of 1 shift. It may be desirable to make this value less than 1 to prevent oscillating around the
+// target watt point.
+#define SUB_SHIFT_SCALE 1
+
 // Hardware pin for rocker Switch
 #define RADIO_PIN 27
 
