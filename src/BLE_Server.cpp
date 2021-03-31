@@ -55,7 +55,7 @@ struct FitnessMachineFeature ftmsFeature = {
         FitnessMachineFeatureFlags::Types::PowerMeasurementSupported,
     FitnessMachineTargetFlags::Types::InclinationTargetSettingSupported | FitnessMachineTargetFlags::Types::IndoorBikeSimulationParametersSupported};
 
-uint8_t ftmsIndoorBikeData[14] = {0x54, 0x0A, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0};  // 00000000100001010100 ISpeed, ICAD,
+uint8_t ftmsIndoorBikeData[14] = {0x44, 0x02, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0};  // 00000000100001010100 ISpeed, ICAD,
                                                                                                             // TDistance, IPower, ETime
 uint8_t ftmsResistanceLevelRange[6] = {0x00, 0x00, 0x3A, 0x98, 0xC5, 0x68};                                 // +-15000 not sure what units
 uint8_t ftmsPowerRange[6]           = {0x00, 0x00, 0xA0, 0x0F, 0x01, 0x00};                                 // 1-4000 watts
@@ -141,21 +141,23 @@ void computeERG(int currentWatts, int setPoint) {
   int amountToChangeIncline = 0;
 
   if (cad > 20) {
-    if (abs(currentWatts - setPoint) < 50) {
-      amountToChangeIncline = (currentWatts - setPoint) * .5;
+    // 30  is amount of watts per shift. Was 50, seemed like too much...
+    if (abs(currentWatts - setPoint) < 30) {
+      amountToChangeIncline = (currentWatts - setPoint) * 1;
     }
-    if (abs(currentWatts - setPoint) > 50) {
+    if (abs(currentWatts - setPoint) > 30) {
       amountToChangeIncline = amountToChangeIncline + ((currentWatts - setPoint)) * 1;
     }
     amountToChangeIncline = amountToChangeIncline / ((currentWatts / 100) + 1);
-  }
 
-  if (abs(amountToChangeIncline) > userConfig.getShiftStep() * 3) {
-    if (amountToChangeIncline > 0) {
-      amountToChangeIncline = userConfig.getShiftStep() * 3;
-    }
-    if (amountToChangeIncline < 0) {
-      amountToChangeIncline = -(userConfig.getShiftStep() * 3);
+    // limit to 4 shifts at a time
+    if (abs(amountToChangeIncline) > userConfig.getShiftStep() * 5) {
+      if (amountToChangeIncline > 0) {
+        amountToChangeIncline = userConfig.getShiftStep() * 5;
+      }
+      if (amountToChangeIncline < 0) {
+        amountToChangeIncline = -(userConfig.getShiftStep() * 5);
+      }
     }
   }
 
@@ -275,7 +277,7 @@ void MyCallbacks::onWrite(BLECharacteristic *pCharacteristic) {
       debugDirector(String(text, HEX) + " ", false);
     }
     debugDirector("<-- From APP ", false);
-    /* 17 means FTMS Incline Control Mode  (aka SIM mode)*/
+    /* 0x11 17 means FTMS Incline Control Mode  (aka SIM mode)*/
 
     if (static_cast<int>(rxValue[0]) == 17) {
       signed char buf[2];
@@ -291,9 +293,9 @@ void MyCallbacks::onWrite(BLECharacteristic *pCharacteristic) {
     }
     debugDirector("");
 
-    /* 5 means FTMS Watts Control Mode (aka ERG mode) */
+    /* 0x05 5 means FTMS Watts Control Mode (aka ERG mode) */
     if ((static_cast<int>(rxValue[0]) == 5) && (spinBLEClient.connectedPM)) {
-      int targetWatts = bytes_to_int(rxValue[2], rxValue[1]);
+      int targetWatts = bytes_to_u16(rxValue[2], rxValue[1]);
       if (!userConfig.getERGMode()) {
         userConfig.setERGMode(true);
       }
