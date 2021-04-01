@@ -70,7 +70,7 @@ void CyclePowerData::decode(uint8_t *data, size_t length) {
     this->crankRev           = bytes_to_u16(data[cPos + 1], data[cPos]);
     this->lastCrankEventTime = this->crankEventTime;
     this->crankEventTime     = bytes_to_u16(data[cPos + 3], data[cPos + 2]);
-    if (this->crankRev > this->lastCrankRev && this->crankEventTime != this->lastCrankEventTime) {
+    if (this->crankRev != this->lastCrankRev && this->crankEventTime != this->lastCrankEventTime) {
       const float crankChange = abs(this->crankRev - this->lastCrankRev) * 1024;
       const float timeElapsed = abs(this->crankEventTime - this->lastCrankEventTime);
       float cadence           = (crankChange / timeElapsed) * 60;
