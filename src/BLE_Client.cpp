@@ -37,10 +37,15 @@ void SpinBLEClient::start() {
 }
 
 static void onNotify(BLERemoteCharacteristic *pBLERemoteCharacteristic, uint8_t *pData, size_t length, bool isNotify) {
+  Serial.print("notify: ");
+  Serial.println(length);
+  uint8_t *dataToBuf = (uint8_t*) malloc(length);
+  memcpy(dataToBuf, pData, length);
+
   for (size_t i = 0; i < NUM_BLE_DEVICES; i++) {
     if (pBLERemoteCharacteristic->getUUID() == spinBLEClient.myBLEDevices[i].charUUID) {
-      spinBLEClient.myBLEDevices[i].dataBuffer.push(pData);
-      debugDirector("notify");
+      xQueueSendToBack(spinBLEClient.myBLEDevices[i].dataBuffer, &dataToBuf, (TickType_t)10);
+      //debugDirector("notify");
     }
   }
 }

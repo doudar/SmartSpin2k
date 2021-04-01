@@ -14,8 +14,6 @@
 #include <Arduino.h>
 #include <Main.h>
 
-#include <queue>
-
 // Heart Service
 #define HEARTSERVICE_UUID        BLEUUID((uint16_t)0x180D)
 #define HEARTCHARACTERISTIC_UUID BLEUUID((uint16_t)0x2A37)
@@ -55,7 +53,6 @@
 #define bytes_to_u16(MSB, LSB) (((signed int)((signed char)MSB))) << 8 | (((unsigned char)LSB))
 #define bytes_to_int(MSB, LSB) ((static_cast<int>((unsigned char)MSB))) << 8 | (((unsigned char)LSB))
 // Potentially, something like this is a better way of doing this ^^
-// data.getUint16(1, true)
 
 // Setup
 void setupBLE();
@@ -85,7 +82,7 @@ class MyCallbacks : public BLECharacteristicCallbacks {
   void onWrite(BLECharacteristic *);
 };
 
-//static void onNotify(NimBLECharacteristic *pCharacteristic, uint8_t *pData);
+// static void onNotify(NimBLECharacteristic *pCharacteristic, uint8_t *pData);
 // *****************************Client*****************************
 
 // Keeping the task outside the class so we don't need a mask.
@@ -103,15 +100,15 @@ class SpinBLEAdvertisedDevice {
  public:  // eventually these shoul be made private
   NimBLEAdvertisedDevice *advertisedDevice = nullptr;
   NimBLEAddress peerAddress;
-  int connectedClientID = BLE_HS_CONN_HANDLE_NONE;
-  BLEUUID serviceUUID   = (uint16_t)0x0000;
-  BLEUUID charUUID      = (uint16_t)0x0000;
-  bool userSelectedHR   = false;
-  bool userSelectedPM   = false;
-  bool userSelectedCSC  = false;
-  bool userSelectedCT   = false;
-  bool doConnect        = false;
-  std::queue<uint8_t *> dataBuffer;
+  int connectedClientID    = BLE_HS_CONN_HANDLE_NONE;
+  BLEUUID serviceUUID      = (uint16_t)0x0000;
+  BLEUUID charUUID         = (uint16_t)0x0000;
+  bool userSelectedHR      = false;
+  bool userSelectedPM      = false;
+  bool userSelectedCSC     = false;
+  bool userSelectedCT      = false;
+  bool doConnect           = false;
+  QueueHandle_t dataBuffer = nullptr;
 
   void set(BLEAdvertisedDevice *device, int id = BLE_HS_CONN_HANDLE_NONE, BLEUUID inserviceUUID = (uint16_t)0x0000, BLEUUID incharUUID = (uint16_t)0x0000) {
     advertisedDevice  = device;
@@ -119,9 +116,8 @@ class SpinBLEAdvertisedDevice {
     connectedClientID = id;
     serviceUUID       = BLEUUID(inserviceUUID);
     charUUID          = BLEUUID(incharUUID);
-    while (!dataBuffer.empty()) {
-      dataBuffer.pop();
-    }
+    dataBuffer        = xQueueCreate((4),                  // length
+                               sizeof(uint8_t *));  // size
   }
 
   void reset() {
@@ -135,11 +131,8 @@ class SpinBLEAdvertisedDevice {
     userSelectedCSC   = false;  // Cycling Speed/Cadence
     userSelectedCT    = false;  // Controllable Trainer
     doConnect         = false;  // Initiate connection flag
-    while (!dataBuffer.empty()) {
-    dataBuffer.pop();
+    xQueueReset(dataBuffer);
   }
-  }
-
 
   void print();
 };
@@ -188,7 +181,6 @@ class SpinBLEClient {
     bool onConfirmPIN(uint32_t);
     void onAuthenticationComplete(ble_gap_conn_desc);
   };
-
 };
 
 extern SpinBLEClient spinBLEClient;

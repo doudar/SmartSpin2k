@@ -32,7 +32,7 @@ void BLECommunications(void *pvParameters) {
               BLEClient *pClient = NimBLEDevice::getClientByPeerAddress(myAdvertisedDevice.peerAddress);
               // Client connected with a valid UUID registered
               if ((myAdvertisedDevice.serviceUUID != BLEUUID((uint16_t)0x0000)) && (pClient->isConnected())) {
-                debugDirector("4");
+                // debugDirector("4");
                 // Write the recieved data to the Debug Director
 
                 BLERemoteCharacteristic *pRemoteBLECharacteristic = pClient->getService(myAdvertisedDevice.serviceUUID)->getCharacteristic(myAdvertisedDevice.charUUID);
@@ -42,10 +42,16 @@ void BLECommunications(void *pvParameters) {
                 // 250 == Data(60), Spaces(Data/2), Arrow(4), SvrUUID(37), Sep(3), ChrUUID(37), Sep(3),
                 //        Name(10), Prefix(2), HR(8), SEP(1), CD(10), SEP(1), PW(8), SEP(1), SP(7), Suffix(2), Nul(1) - 225 rounded up
 
-                while (!myAdvertisedDevice.dataBuffer.empty()) {
-                  uint8_t *pData = myAdvertisedDevice.dataBuffer.front();
-                  myAdvertisedDevice.dataBuffer.pop();
-                  int length = sizeof(pData)*2;
+                while (uxQueueMessagesWaiting(myAdvertisedDevice.dataBuffer)) {
+                  uint8_t *pData; 
+                  xQueueReceive(myAdvertisedDevice.dataBuffer, &pData, portMAX_DELAY);
+                  std::string data = reinterpret_cast<const char *>(&pData);
+                  int length       = data.length();
+
+                 //uint8_t *pData;
+                  //xQueueReceive(myAdvertisedDevice.dataBuffer, &pData, portMAX_DELAY);
+                  //int length = pData.size();
+                  Serial.println(length);
                   char logBuf[250];
                   char *logBufP = logBuf;
                   for (int i = 0; i < length; i++) {
@@ -85,6 +91,7 @@ void BLECommunications(void *pvParameters) {
                   }
                   strcat(logBufP, " ]");
                   debugDirector(String(logBuf), true, true);
+                  free(pData);
                 }
               } else if (!pClient->isConnected()) {  // This shouldn't ever be
                                                      // called...
