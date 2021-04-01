@@ -12,7 +12,7 @@ bool CyclePowerData::hasHeartRate() { return false; }
 
 bool CyclePowerData::hasCadence() { return !isnan(this->cadence); }
 
-bool CyclePowerData::hasPower() { return true; }
+bool CyclePowerData::hasPower() { return this->power != INT_MIN; }
 
 bool CyclePowerData::hasSpeed() { return false; }
 
@@ -56,6 +56,16 @@ void CyclePowerData::decode(uint8_t *data, size_t length) {
   }
   if (bitRead(flags, 5)) {
     // Crank Revolution data present, lets process it.
+    if (!this->hasCadence()) {
+      // Handle the special case that this is first cadence reading
+      // Since we have no lastCrankRev/EventTime we can't do a cadence calc
+      // until the next reading
+      this->crankRev       = bytes_to_u16(data[cPos + 1], data[cPos]);
+      this->crankEventTime = bytes_to_u16(data[cPos + 3], data[cPos + 2]);
+      this->cadence        = 0;
+      return;
+    }
+
     this->lastCrankRev       = this->crankRev;
     this->crankRev           = bytes_to_u16(data[cPos + 1], data[cPos]);
     this->lastCrankEventTime = this->crankEventTime;
