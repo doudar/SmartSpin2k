@@ -141,21 +141,23 @@ void computeERG(int currentWatts, int setPoint) {
   int amountToChangeIncline = 0;
 
   if (cad > 20) {
-    if (abs(currentWatts - setPoint) < 50) {
-      amountToChangeIncline = (currentWatts - setPoint) * .5;
+    // 30  is amount of watts per shift. Was 50, seemed like too much...
+    if (abs(currentWatts - setPoint) < 30) {
+      amountToChangeIncline = (currentWatts - setPoint) * 1;
     }
-    if (abs(currentWatts - setPoint) > 50) {
+    if (abs(currentWatts - setPoint) > 30) {
       amountToChangeIncline = amountToChangeIncline + ((currentWatts - setPoint)) * 1;
     }
     amountToChangeIncline = amountToChangeIncline / ((currentWatts / 100) + 1);
-  }
 
-  if (abs(amountToChangeIncline) > userConfig.getShiftStep() * 3) {
-    if (amountToChangeIncline > 0) {
-      amountToChangeIncline = userConfig.getShiftStep() * 3;
-    }
-    if (amountToChangeIncline < 0) {
-      amountToChangeIncline = -(userConfig.getShiftStep() * 3);
+    // limit to 4 shifts at a time
+    if (abs(amountToChangeIncline) > userConfig.getShiftStep() * 5) {
+      if (amountToChangeIncline > 0) {
+        amountToChangeIncline = userConfig.getShiftStep() * 5;
+      }
+      if (amountToChangeIncline < 0) {
+        amountToChangeIncline = -(userConfig.getShiftStep() * 5);
+      }
     }
   }
 
@@ -275,7 +277,7 @@ void MyCallbacks::onWrite(BLECharacteristic *pCharacteristic) {
       debugDirector(String(text, HEX) + " ", false);
     }
     debugDirector("<-- From APP ", false);
-    /* 17 means FTMS Incline Control Mode  (aka SIM mode)*/
+    /* 0x11 17 means FTMS Incline Control Mode  (aka SIM mode)*/
 
     if (static_cast<int>(rxValue[0]) == 17) {
       signed char buf[2];
@@ -291,9 +293,9 @@ void MyCallbacks::onWrite(BLECharacteristic *pCharacteristic) {
     }
     debugDirector("");
 
-    /* 5 means FTMS Watts Control Mode (aka ERG mode) */
+    /* 0x05 5 means FTMS Watts Control Mode (aka ERG mode) */
     if ((static_cast<int>(rxValue[0]) == 5) && (spinBLEClient.connectedPM)) {
-      int targetWatts = bytes_to_int(rxValue[2], rxValue[1]);
+      int targetWatts = bytes_to_u16(rxValue[2], rxValue[1]);
       if (!userConfig.getERGMode()) {
         userConfig.setERGMode(true);
       }

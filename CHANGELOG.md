@@ -6,6 +6,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 ### Added
+- Added Insert Peloton 7 Flat V2 .sldpart and .stl.
 - Added initial credits file.
 - Added initial changelog.
 - Enabled cpp-lint, pio check, and clang-format to enforce coding standards and catch errors.
@@ -13,12 +14,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Added github workflow on pull_request to validate changelog and coding standards.
 - Add hyphens to Flywheel GATT UUIDs.
 - Filter Flywheel advertisements by name.
-- Added Insert Peloton 7 Flat .sldpart and .stl.
 
 ### Changed
 - Shortened HR characteristic to 2 bytes (Polar OH1 format)
+- Reverted bytes_to_u16 macro. 
+- Erg mode tweak. 
+- Added another test for Flywheel BLE name.
+- Updated Echelon Insert
 - Fixed many issues exposed by the addition of cpp-lint, pio check, and clang-format.
 - Fixed merge issues.
 - Fixed Echelon licences.
 - Fix Flywheel power/cadence decoding.
 - Ignore zero heartrate reported from remote FTMS.
+- Fix Assimoa Uno stuck cadence.
+
+### Removed
+- Deleted and ignored .pio folder which had been mistakening commited
