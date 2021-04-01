@@ -16,6 +16,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Added Insert Peloton 7 Flat .sldpart and .stl.
 
 ### Changed
+- Shortened HR characteristic to 2 bytes (Polar OH1 format)
 - Fixed many issues exposed by the addition of cpp-lint, pio check, and clang-format.
 - Fixed merge issues.
 - Fixed Echelon licences.
