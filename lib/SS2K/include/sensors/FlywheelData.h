@@ -25,6 +25,6 @@ class FlywheelData : public SensorData {
 
  private:
   bool hasData  = false;
-  float cadence = NAN;
+  float cadence = nanf("");
   int power     = INT_MIN;
 };

@@ -1,0 +1,30 @@
+{
+  "name": "SmartSpin2k",
+  "version": "0.0.1",
+  "keywords": "native, espressif32 ,BLE, cycling, http",
+  "description": "Turn any spin bike with a resistance knob into a Smart Trainer!",
+  "homepage": "https://github.com/doudar/SmartSpin2k",
+  "repository":
+  {
+      "type": "git",
+      "url": "https://github.com/doudar/SmartSpin2k.git"
+  },
+  "authors": [
+    {
+      "name": "Anthony Doudar",
+      "maintainer": true
+    },
+    {
+      "name": "Joel Baranick",
+      "maintainer": true
+    }
+  ],
+  "license": "GPL-2.0-only",
+  "frameworks": "*",
+  "platforms": "*",
+  "build": {
+    "flags": [
+        "-std=c++11"
+    ]
+  }
+}

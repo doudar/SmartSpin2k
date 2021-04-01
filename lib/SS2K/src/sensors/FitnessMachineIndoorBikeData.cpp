@@ -5,7 +5,8 @@
  * SPDX-License-Identifier: GPL-2.0-only
  */
 
-#include "BLE_Common.h"
+#include "Data.h"
+#include "os/endian.h"
 #include "sensors/FitnessMachineIndoorBikeData.h"
 
 // See:
@@ -16,17 +17,17 @@ size_t const FitnessMachineIndoorBikeData::byteSizes[FieldCount]          = {2, 
 uint8_t const FitnessMachineIndoorBikeData::signedFlags[FieldCount]       = {0, 0, 0, 0, 0, 1, 1, 1, 0, 0, 0, 0, 0, 0, 0};
 double_t const FitnessMachineIndoorBikeData::resolutions[FieldCount]      = {0.01, 0.01, 0.5, 0.5, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 0.1, 1.0, 1.0};
 
-bool FitnessMachineIndoorBikeData::hasHeartRate() { return values[Types::HeartRate] != NAN && values[Types::HeartRate] != 0; }
+bool FitnessMachineIndoorBikeData::hasHeartRate() { return !std::isnan(values[Types::HeartRate]) && values[Types::HeartRate] != 0; }
 
-bool FitnessMachineIndoorBikeData::hasCadence() { return values[Types::InstantaneousCadence] != NAN; }
+bool FitnessMachineIndoorBikeData::hasCadence() { return !std::isnan(values[Types::InstantaneousCadence]); }
 
-bool FitnessMachineIndoorBikeData::hasPower() { return values[Types::InstantaneousPower] != NAN; }
+bool FitnessMachineIndoorBikeData::hasPower() { return !std::isnan(values[Types::InstantaneousPower]); }
 
-bool FitnessMachineIndoorBikeData::hasSpeed() { return values[Types::InstantaneousSpeed] != NAN; }
+bool FitnessMachineIndoorBikeData::hasSpeed() { return !std::isnan(values[Types::InstantaneousSpeed]); }
 
 int FitnessMachineIndoorBikeData::getHeartRate() {
   double_t value = values[Types::HeartRate];
-  if (value == NAN || value == 0) {
+  if (std::isnan(value) || value == 0) {
     return INT_MIN;
   }
   return static_cast<int>(value);
@@ -34,7 +35,7 @@ int FitnessMachineIndoorBikeData::getHeartRate() {
 
 float FitnessMachineIndoorBikeData::getCadence() {
   double_t value = values[Types::InstantaneousCadence];
-  if (value == NAN) {
+  if (std::isnan(value)) {
     return nanf("");
   }
   return static_cast<float>(value);
@@ -42,7 +43,7 @@ float FitnessMachineIndoorBikeData::getCadence() {
 
 int FitnessMachineIndoorBikeData::getPower() {
   double_t value = values[Types::InstantaneousPower];
-  if (value == NAN) {
+  if (std::isnan(value)) {
     return INT_MIN;
   }
   return static_cast<int>(value);
@@ -50,14 +51,14 @@ int FitnessMachineIndoorBikeData::getPower() {
 
 float FitnessMachineIndoorBikeData::getSpeed() {
   double_t value = values[Types::InstantaneousSpeed];
-  if (value == NAN) {
+  if (std::isnan(value)) {
     return nanf("");
   }
   return static_cast<float>(value);
 }
 
 void FitnessMachineIndoorBikeData::decode(uint8_t *data, size_t length) {
-  int flags         = bytes_to_u16(data[1], data[0]);
+  int flags         = get_le16(&data[0]);
   uint8_t dataIndex = 2;
   for (int typeIndex = Types::InstantaneousSpeed; typeIndex <= Types::RemainingTime; typeIndex++) {
     if (bitRead(flags, flagBitIndices[typeIndex]) == flagEnabledValues[typeIndex]) {

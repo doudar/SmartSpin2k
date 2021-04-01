@@ -8,20 +8,15 @@
 #pragma once
 
 #include <memory>
-#include <Arduino.h>
-#include <NimBLEDevice.h>
-#include "SensorData.h"
-#include "CyclePowerData.h"
-#include "FlywheelData.h"
-#include "FitnessMachineIndoorBikeData.h"
-#include "HeartRateData.h"
-#include "EchelonData.h"
+#include <NimBLEUUID.h>
+#include <vector>
+#include "sensors/SensorData.h"
 
 class SensorDataFactory {
  public:
   SensorDataFactory() {}
 
-  std::shared_ptr<SensorData> getSensorData(BLERemoteCharacteristic *characteristic, uint8_t *data, size_t length);
+  std::shared_ptr<SensorData> getSensorData(NimBLEUUID characteristicUUID, uint8_t *data, size_t length);
 
  private:
   class KnownDevice {

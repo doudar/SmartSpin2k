@@ -6,10 +6,11 @@
  */
 
 #include "Main.h"
-#include <math.h>
 #include "BLE_Common.h"
-#include "sensors/SensorData.h"
-#include "sensors/SensorDataFactory.h"
+
+#include <math.h>
+#include <sensors/SensorData.h>
+#include <sensors/SensorDataFactory.h>
 
 int bleConnDesc               = 1;
 bool updateConnParametersFlag = false;
@@ -49,7 +50,7 @@ void BLECommunications(void *pvParameters) {
                 }
                 logBufP += sprintf(logBufP, "<- %.8s | %.8s", myAdvertisedDevice.serviceUUID.toString().c_str(), myAdvertisedDevice.charUUID.toString().c_str());
 
-                std::shared_ptr<SensorData> sensorData = sensorDataFactory.getSensorData(pRemoteBLECharacteristic, pData, length);
+                std::shared_ptr<SensorData> sensorData = sensorDataFactory.getSensorData(pRemoteBLECharacteristic->getUUID(), pData, length);
 
                 logBufP += sprintf(logBufP, " | %s:[", sensorData->getId().c_str());
                 if (sensorData->hasHeartRate()) {

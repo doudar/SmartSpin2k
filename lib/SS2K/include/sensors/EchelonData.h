@@ -11,7 +11,7 @@
 
 class EchelonData : public SensorData {
  public:
-  EchelonData() : SensorData("ECH"), cadence(NAN), resistance(INT_MIN), power(INT_MIN) {}
+  EchelonData() : SensorData("ECH") {}
 
   bool hasHeartRate();
   bool hasCadence();
@@ -24,7 +24,7 @@ class EchelonData : public SensorData {
   void decode(uint8_t *data, size_t length);
 
  private:
-  float cadence;
-  int resistance;
-  int power;
+  float cadence  = nanf("");
+  int resistance = INT_MIN;
+  int power      = INT_MIN;
 };

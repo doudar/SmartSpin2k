@@ -7,12 +7,11 @@
 
 #pragma once
 
-#include <Arduino.h>
 #include "SensorData.h"
 
 class CyclePowerData : public SensorData {
  public:
-  CyclePowerData() : SensorData("CPS") {}
+  CyclePowerData() : SensorData("CPS"), power() {}
 
   bool hasHeartRate();
   bool hasCadence();
@@ -26,7 +25,7 @@ class CyclePowerData : public SensorData {
 
  private:
   int power                   = INT_MIN;
-  float cadence               = NAN;
+  float cadence               = nanf("");
   uint16_t crankRev           = 0;
   uint16_t lastCrankRev       = 0;
   uint16_t lastCrankEventTime = 0;

@@ -1,4 +1,4 @@
-exclude: (\.pio|lib/NimBLE-Arduino)/.*
+exclude: (\.pio|lib/NimBLE-Arduino|lib/ArduinoCompat)/.*
 repos:
   - repo: https://github.com/Lucas-C/pre-commit-hooks
     rev: v1.1.9
@@ -37,4 +37,11 @@ repos:
         language: docker_image
         files: \.(c|cc|cpp|cu|c\+\+|cxx|tpp|txx|ino)$
         pass_filenames: false
-        entry: kadaan/platformio_esp32:latest check
+        entry: kadaan/platformio_esp32:latest check --environment native --environment esp32doit
+      - id: docker-piotest
+        name: piotest
+        description: Run `pio test` against native C/C++ source files in Docker container
+        language: docker_image
+        files: \.(c|cc|cpp|cu|c\+\+|cxx|tpp|txx|ino)$
+        pass_filenames: false
+        entry: kadaan/platformio_esp32:latest test --environment native

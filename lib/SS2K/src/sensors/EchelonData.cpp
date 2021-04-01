@@ -5,12 +5,11 @@
  * SPDX-License-Identifier: GPL-2.0-only
  */
 
-#include "BLE_Common.h"
 #include "sensors/EchelonData.h"
 
 bool EchelonData::hasHeartRate() { return false; }
 
-bool EchelonData::hasCadence() { return !isnan(this->cadence); }
+bool EchelonData::hasCadence() { return !std::isnan(this->cadence); }
 
 bool EchelonData::hasPower() { return this->cadence >= 0 && this->resistance >= 0; }
 
@@ -22,7 +21,7 @@ float EchelonData::getCadence() { return this->cadence; }
 
 int EchelonData::getPower() { return this->power; }
 
-float EchelonData::getSpeed() { return NAN; }
+float EchelonData::getSpeed() { return nanf(""); }
 
 void EchelonData::decode(uint8_t *data, size_t length) {
   switch (data[1]) {
@@ -35,7 +34,7 @@ void EchelonData::decode(uint8_t *data, size_t length) {
       this->resistance = static_cast<int>(data[3]);
       break;
   }
-  if (isnan(this->cadence) || this->resistance < 0) {
+  if (std::isnan(this->cadence) || this->resistance < 0) {
     return;
   }
   if (this->cadence == 0 || this->resistance == 0) {

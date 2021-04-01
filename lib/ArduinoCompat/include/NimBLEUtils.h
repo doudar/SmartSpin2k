@@ -4,7 +4,3 @@
  *
  * SPDX-License-Identifier: GPL-2.0-only
  */
-
-#include "sensors/SensorData.h"
-
-String SensorData::getId() { return this->id; }
