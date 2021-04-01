@@ -14,6 +14,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Added github workflow on pull_request to validate changelog and coding standards.
 - Add hyphens to Flywheel GATT UUIDs.
 - Filter Flywheel advertisements by name.
+- Added unit tests for CyclePowerData.cpp
 
 ### Changed
 - Reverted bytes_to_u16 macro. 
