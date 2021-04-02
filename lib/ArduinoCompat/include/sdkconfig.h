@@ -7,4 +7,6 @@
 
 #pragma once
 
+#include <cstring>
+
 #define CONFIG_BT_ENABLED 1
