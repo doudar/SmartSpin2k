@@ -37,4 +37,4 @@ repos:
         language: docker_image
         files: \.(c|cc|cpp|cu|c\+\+|cxx|tpp|txx|ino)$
         pass_filenames: false
-        entry: kadaan/platformio_esp32:latest  --check --test=native --build=esp32doit
+        entry: kadaan/platformio_esp32:latest --check --test=native
