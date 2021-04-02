@@ -214,26 +214,6 @@ void startHttpServer() {
     }
   });
 
-/*   NOT CURRENTLY USED
-  server.on("/hrValue", []() {
-    char outString[MAX_BUFFER_SIZE];
-    snprintf(outString, MAX_BUFFER_SIZE, "%d", userConfig.getSimulatedHr());
-    server.send(200, "text/plain", outString);
-  });
-
-  server.on("/wattsValue", []() {
-    char outString[MAX_BUFFER_SIZE];
-    snprintf(outString, MAX_BUFFER_SIZE, "%d", userConfig.getSimulatedWatts());
-    server.send(200, "text/plain", outString);
-  });
-
-    server.on("/cadValue", []() {
-    char outString[MAX_BUFFER_SIZE];
-    snprintf(outString, MAX_BUFFER_SIZE, "%d", userConfig.getSimulatedWatts());
-    server.send(200, "text/plain", outString);
-  });
-*/
-
   server.on("/configJSON", []() {
     String tString;
     tString = userConfig.returnJSON();
