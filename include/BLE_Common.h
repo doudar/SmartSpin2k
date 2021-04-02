@@ -14,34 +14,6 @@
 #include <Arduino.h>
 #include <Main.h>
 
-// Heart Service
-#define HEARTSERVICE_UUID BLEUUID((uint16_t)0x180D)
-
-// Cycling Power Service
-#define CSCSERVICE_UUID          BLEUUID((uint16_t)0x1816)
-#define CSCMEASUREMENT_UUID      BLEUUID((uint16_t)0x2A5B)
-#define CYCLINGPOWERSERVICE_UUID BLEUUID((uint16_t)0x1818)
-#define CYCLINGPOWERFEATURE_UUID BLEUUID((uint16_t)0x2A65)
-#define SENSORLOCATION_UUID      BLEUUID((uint16_t)0x2A5D)
-
-// Fitness Machine Service
-#define FITNESSMACHINESERVICE_UUID              BLEUUID((uint16_t)0x1826)
-#define FITNESSMACHINEFEATURE_UUID              BLEUUID((uint16_t)0x2ACC)
-#define FITNESSMACHINECONTROLPOINT_UUID         BLEUUID((uint16_t)0x2AD9)
-#define FITNESSMACHINESTATUS_UUID               BLEUUID((uint16_t)0x2ADA)
-#define FITNESSMACHINERESISTANCELEVELRANGE_UUID BLEUUID((uint16_t)0x2AD6)
-#define FITNESSMACHINEPOWERRANGE_UUID           BLEUUID((uint16_t)0x2AD8)
-
-// GATT service/characteristic UUIDs for Flywheel Bike from ptx2/gymnasticon/
-#define FLYWHEEL_UART_RX_UUID BLEUUID("6e400002-b5a3-f393-e0a9-e50e24dcca9e")
-#define FLYWHEEL_UART_TX_UUID BLEUUID("6e400003-b5a3-f393-e0a9-e50e24dcca9e")
-#define FLYWHEEL_BLE_NAME     "Flywheel 1"
-
-// The Echelon Services
-#define ECHELON_DEVICE_UUID  BLEUUID("0bf669f0-45f2-11e7-9598-0800200c9a66")
-#define ECHELON_SERVICE_UUID BLEUUID("0bf669f1-45f2-11e7-9598-0800200c9a66")
-#define ECHELON_WRITE_UUID   BLEUUID("0bf669f2-45f2-11e7-9598-0800200c9a66")
-
 // macros to convert different types of bytes into int The naming here sucks and
 // should be fixed.
 #define bytes_to_s16(MSB, LSB) (((signed int)((signed char)MSB))) << 8 | (((signed char)LSB))
