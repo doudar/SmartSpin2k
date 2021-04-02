@@ -35,6 +35,6 @@ repos:
         name: pio
         description: Run platformio check, test, and build C/C++ source files in Docker container
         language: docker_image
-        files: \.(c|cc|cpp|cu|c\+\+|cxx|tpp|txx|ino)$
+        files: \.(h\+\+|h|hh|hxx|hpp|cuh|c|cc|cpp|cu|c\+\+|cxx|tpp|txx)$
         pass_filenames: false
         entry: kadaan/platformio_esp32:latest --check --test=native
