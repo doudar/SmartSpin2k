@@ -14,8 +14,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Added github workflow on pull_request to validate changelog and coding standards.
 - Add hyphens to Flywheel GATT UUIDs.
 - Filter Flywheel advertisements by name.
+- Add documentation to SensorData class.
 
 ### Changed
+- Increased ShiftStep UI slider range.
+- Replaced DoublePower setting with PowerCorrectionFactor setting.
 - Reverted bytes_to_u16 macro. 
 - Erg mode tweak. 
 - Added another test for Flywheel BLE name.
