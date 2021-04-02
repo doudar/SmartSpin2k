@@ -55,7 +55,7 @@ void setup() {
   }
 
   // Load Config
-  userConfig.setDefaults(); //Preload defaults incase config.txt is missing any data
+  userConfig.setDefaults();  // Preload defaults incase config.txt is missing any data
   userConfig.loadFromSPIFFS();
   userConfig.printFile();  // Print userConfig.contents to serial
   userConfig.saveToSPIFFS();
