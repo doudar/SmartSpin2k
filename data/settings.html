@@ -56,10 +56,11 @@
               </td>
               <td>
                 <p
-                  style="padding: 0px; width: 10px; position: relative; top: -12px; left: 100px; color: rgb(250, 250, 250);">
-                  <span id="shiftStepValue">0</span></p>
+                  style="position: relative; top: -12px; color: rgb(250, 250, 250);">
+                  <span id="shiftStepValue">0</span>
+                </p>
                 <input style="position: relative; top: -25px; left: 7px;" type="range" id="shiftStep" name="shiftStep"
-                  min="50" max="1000" value="0" step="50" class="slider1"
+                  min="50" max="6000" value="0" step="50" class="slider1"
                   onchange="updateSlider(this, document.getElementById('shiftStepValue'))" />
               </td>
             </tr>
@@ -70,8 +71,9 @@
               </td>
               <td>
                 <p
-                  style="padding: 0px; width: 10px; position: relative; top: -12px; left: 100px; color: rgb(250, 250, 250);">
-                  <span id="inclineMultiplierValue">0</span></p>
+                  style="position: relative; top: -12px; color: rgb(250, 250, 250);">
+                  <span id="inclineMultiplierValue">0</span>
+                </p>
                 <input style="position: relative; top: -25px; left: 7px;" type="range" id="inclineMultiplier"
                   name="inclineMultiplier" value="0" min="1" max="5" step="1" class="slider1"
                   onchange="updateSlider(this, document.getElementById('inclineMultiplierValue'))" />
@@ -84,8 +86,9 @@
               </td>
               <td>
                 <p
-                  style="padding: 0px; width: 10px; position: relative; top: -12px; left: 100px; color: rgb(250, 250, 250);">
-                  <span id="stepperPowerValue">0</span></p>
+                  style="position: relative; top: -12px; color: rgb(250, 250, 250);">
+                  <span id="stepperPowerValue">0</span>
+                </p>
                 <input style="position: relative; top: -25px; left: 7px;" type="range" id="stepperPower"
                   name="stepperPower" min="500" max="2000" value="0" step="100" class="slider1"
                   onchange="updateSlider(this, document.getElementById('stepperPowerValue'))" />
@@ -97,7 +100,8 @@
                     torque</span></p>
               </td>
               <td>
-              <label class="switch"><input type="checkbox" name = "stealthchop" id="stealthchop"><span class="slider"></span></label>
+                <label class="switch"><input type="checkbox" name="stealthchop" id="stealthchop"><span
+                    class="slider"></span></label>
               </td>
             </tr>
             <tr>
@@ -105,14 +109,14 @@
                 <p class="tooltip">Automatic Updates<span class="tooltiptext">Check for new firmware on boot?</span></p>
               </td>
               <td>
-                <label class="switch"><input type="checkbox" name="autoUpdate" id="autoUpdate"><span class="slider"></span></label>
+                <label class="switch"><input type="checkbox" name="autoUpdate" id="autoUpdate"><span
+                    class="slider"></span></label>
               </td>
             </tr>
-      </tbody>
-      </table>
-      <input type="submit" value="Submit" />
-    </form>
-
+          </tbody>
+        </table>
+        <input type="submit" value="Submit" />
+      </form>
       <p></p>
       <form action="/load_defaults.html">
         <input type="submit" value="Reset to Defaults">
@@ -125,8 +129,6 @@
 </body>
 
 <script>
-
-
   //Update values on specified interval loading late because this tiny webserver hates frequent requests
   setInterval(function () {
     if (document.getElementById("ssid").value == "loading") {
@@ -185,7 +187,7 @@
     } else {
       x.type = "password";
     }
-  } 
+  }
 
 </script>
 
