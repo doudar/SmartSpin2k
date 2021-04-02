@@ -23,9 +23,10 @@ void userParameters::setDefaults() {  // Move these to set the values as #define
   shiftStep             = 600;
   stepperPower          = STEPPER_POWER;
   stealthchop           = STEALTHCHOP;
-  inclineMultiplier     = INCLINE_MULTIPLIER;
-  doublePower           = false;
+  inclineMultiplier     = 3.0;
+  powerCorrectionFactor = 1.0;
   simulateHr            = true;
+  simulateWatts         = true;
   ERGMode               = false;
   ERGSensitivity        = ERG_SENSITIVITY;
   autoUpdate            = AUTO_FIRMWARE_UPDATE;
@@ -55,8 +56,9 @@ String userParameters::returnJSON() {
   doc["stepperPower"]          = stepperPower;
   doc["stealthchop"]           = stealthchop;
   doc["inclineMultiplier"]     = inclineMultiplier;
-  doc["doublePower"]           = doublePower;
+  doc["powerCorrectionFactor"] = powerCorrectionFactor;
   doc["simulateHr"]            = simulateHr;
+  doc["simulateWatts"]         = simulateWatts;
   doc["ERGMode"]               = ERGMode;
   doc["ERGSensitivity"]        = ERGSensitivity;
   doc["autoUpdate"]            = autoUpdate;
@@ -101,6 +103,7 @@ void userParameters::saveToSPIFFS() {
   doc["stepperPower"]      = stepperPower;
   doc["stealthchop"]       = stealthchop;
   doc["inclineMultiplier"] = inclineMultiplier;
+  doc["powerCorrectionFactor"] = powerCorrectionFactor;
   doc["doublePower"]       = doublePower;
   doc["simulateHr"]        = simulateHr;
   // doc["ERGMode"]           = ERGMode;
@@ -156,10 +159,11 @@ void userParameters::loadFromSPIFFS() {
   setStepperPower(doc["stepperPower"]);
   setStealthChop(doc["stealthchop"]);
   setInclineMultiplier(doc["inclineMultiplier"]);
-  setDoublePower(doc["doublePower"]);
+  setPowerCorrectionFactor(doc["powerCorrectionFactor"]);
   setSimulateHr(doc["simulateHr"]);
   // setERGMode(doc["ERGMode"]);
   setERGSensitivity(doc["ERGSensitivity"]);
+  setSimulateWatts(doc["simulateWatts"]);
   setAutoUpdate(doc["autoUpdate"]);
   setSsid(doc["ssid"]);
   setPassword(doc["password"]);

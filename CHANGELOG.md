@@ -16,11 +16,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Added github workflow on pull_request to validate changelog and coding standards.
 - Add hyphens to Flywheel GATT UUIDs.
 - Filter Flywheel advertisements by name.
+- Add documentation to SensorData class.
 
 ### Changed
 - Settings page submit returns setting page. 
 - Added explanatory comments in settings for various values. 
 - Decreased (default) expected watts per shift from 50 to 30. 
+- Increased ShiftStep UI slider range.
+- Replaced DoublePower setting with PowerCorrectionFactor setting.
 - Reverted bytes_to_u16 macro. 
 - Erg mode tweak. 
 - Added another test for Flywheel BLE name.
@@ -31,3 +34,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Fix Flywheel power/cadence decoding.
 - Ignore zero heartrate reported from remote FTMS.
 - Fix Assimoa Uno stuck cadence.
+
+### Removed
+- Deleted and ignored .pio folder which had been mistakening commited

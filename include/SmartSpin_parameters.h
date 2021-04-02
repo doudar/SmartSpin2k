@@ -22,9 +22,9 @@ class userParameters {
   int stepperPower;
   bool stealthchop;
   float inclineMultiplier;
-  bool doublePower;  // didn't really have a good purpose before, going to be
-                     // used for HR2VP like calculation
+  float powerCorrectionFactor;
   bool simulateHr;
+  bool simulateWatts;
   bool ERGMode;
   float ERGSensitivity;
   bool autoUpdate;
@@ -46,8 +46,9 @@ class userParameters {
   int getStepperPower() { return stepperPower; }
   bool getStealthchop() { return stealthchop; }
   float getInclineMultiplier() { return inclineMultiplier; }
-  bool getDoublePower() { return doublePower; }
+  float getPowerCorrectionFactor() { return powerCorrectionFactor; }
   bool getSimulateHr() { return simulateHr; }
+  bool getSimulateWatts() { return simulateWatts; }
   bool getERGMode() { return ERGMode; }
   float getERGSensitivity() { return ERGSensitivity; }
   bool getautoUpdate() { return autoUpdate; }
@@ -69,8 +70,9 @@ class userParameters {
   void setStepperPower(int sp) { stepperPower = sp; }
   void setStealthChop(bool sc) { stealthchop = sc; }
   void setInclineMultiplier(float im) { inclineMultiplier = im; }
-  void setDoublePower(bool sp) { doublePower = sp; }
+  void setPowerCorrectionFactor(float pm) { powerCorrectionFactor = pm; }
   void setSimulateHr(bool shr) { simulateHr = shr; }
+  void setSimulateWatts(bool swt) { simulateWatts = swt; }
   void setERGMode(bool erg) { ERGMode = erg; }
   void setERGSensitivity(float ergS) { ERGSensitivity = ergS; }
   void setAutoUpdate(bool atupd) { autoUpdate = atupd; }

@@ -56,11 +56,11 @@
               </td>
               <td>
                 <p
-                  style="padding: 0px; width: 10px; position: relative; top: -12px; left: 100px; color: rgb(250, 250, 250);">
+                  style="position: relative; top: -12px; color: rgb(250, 250, 250);">
                   <span id="shiftStepValue">0</span>
                 </p>
                 <input style="position: relative; top: -25px; left: 7px;" type="range" id="shiftStep" name="shiftStep"
-                  min="50" max="1000" value="0" step="50" class="slider1"
+                  min="50" max="6000" value="0" step="50" class="slider1"
                   onchange="updateSlider(this, document.getElementById('shiftStepValue'))" />
               </td>
             </tr>
@@ -71,7 +71,7 @@
               </td>
               <td>
                 <p
-                  style="padding: 0px; width: 10px; position: relative; top: -12px; left: 100px; color: rgb(250, 250, 250);">
+                  style="position: relative; top: -12px; color: rgb(250, 250, 250);">
                   <span id="inclineMultiplierValue">0</span>
                 </p>
                 <input style="position: relative; top: -25px; left: 7px;" type="range" id="inclineMultiplier"
@@ -102,7 +102,7 @@
               </td>
               <td>
                 <p
-                  style="padding: 0px; width: 10px; position: relative; top: -12px; left: 100px; color: rgb(250, 250, 250);">
+                  style="position: relative; top: -12px; color: rgb(250, 250, 250);">
                   <span id="stepperPowerValue">0</span>
                 </p>
                 <input style="position: relative; top: -25px; left: 7px;" type="range" id="stepperPower"
@@ -133,7 +133,6 @@
         </table>
         <input type="submit" value="Submit" />
       </form>
-
       <p></p>
       <form action="/load_defaults.html">
         <input type="submit" value="Reset to Defaults">
@@ -147,8 +146,6 @@
 </body>
 
 <script>
-
-
   //Update values on specified interval loading late because this tiny webserver hates frequent requests
   setInterval(function () {
     if (document.getElementById("ssid").value == "loading") {
