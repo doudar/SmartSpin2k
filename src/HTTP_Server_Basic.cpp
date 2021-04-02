@@ -197,6 +197,24 @@ void startHttpServer() {
     }
   });
 
+  server.on("/cadslider", []() {
+    String value = server.arg("value");
+    if (value == "enable") {
+      userConfig.setSimulateCad(true);
+      server.send(200, "text/plain", "OK");
+      debugDirector("CAD Simulator turned on");
+    } else if (value == "disable") {
+      userConfig.setSimulateCad(false);
+      server.send(200, "text/plain", "OK");
+      debugDirector("CAD Simulator turned off");
+    } else {
+      userConfig.setSimulatedCad(value.toInt());
+      debugDirector("CAD is now: " + String(userConfig.getSimulatedCad()));
+      server.send(200, "text/plain", "OK");
+    }
+  });
+
+/*   NOT CURRENTLY USED
   server.on("/hrValue", []() {
     char outString[MAX_BUFFER_SIZE];
     snprintf(outString, MAX_BUFFER_SIZE, "%d", userConfig.getSimulatedHr());
@@ -208,6 +226,13 @@ void startHttpServer() {
     snprintf(outString, MAX_BUFFER_SIZE, "%d", userConfig.getSimulatedWatts());
     server.send(200, "text/plain", outString);
   });
+
+    server.on("/cadValue", []() {
+    char outString[MAX_BUFFER_SIZE];
+    snprintf(outString, MAX_BUFFER_SIZE, "%d", userConfig.getSimulatedWatts());
+    server.send(200, "text/plain", outString);
+  });
+*/
 
   server.on("/configJSON", []() {
     String tString;

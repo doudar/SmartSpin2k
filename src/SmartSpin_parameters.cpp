@@ -25,8 +25,9 @@ void userParameters::setDefaults() {  // Move these to set the values as #define
   stealthchop           = STEALTHCHOP;
   inclineMultiplier     = 3.0;
   powerCorrectionFactor = 1.0;
-  simulateHr            = true;
-  simulateWatts         = true;
+  simulateHr            = false;
+  simulateWatts         = false;
+  simulateCad           = false;
   ERGMode               = false;
   autoUpdate            = AUTO_FIRMWARE_UPDATE;
   ssid                  = DEVICE_NAME;
@@ -58,6 +59,7 @@ String userParameters::returnJSON() {
   doc["powerCorrectionFactor"] = powerCorrectionFactor;
   doc["simulateHr"]            = simulateHr;
   doc["simulateWatts"]         = simulateWatts;
+  doc["simulateCad"]           = simulateCad;
   doc["ERGMode"]               = ERGMode;
   doc["autoUpdate"]            = autoUpdate;
   doc["ssid"]                  = ssid;
@@ -101,12 +103,13 @@ void userParameters::saveToSPIFFS() {
   doc["stealthchop"]           = stealthchop;
   doc["inclineMultiplier"]     = inclineMultiplier;
   doc["powerCorrectionFactor"] = powerCorrectionFactor;
-  doc["simulateHr"]            = simulateHr;
-  doc["simulateWatts"]         = simulateWatts;
-  doc["ERGMode"]               = ERGMode;
-  doc["autoUpdate"]            = autoUpdate;
-  doc["ssid"]                  = ssid;
-  doc["password"]              = password;
+  // doc["simulateHr"]            = simulateHr;
+  // doc["simulateWatts"]         = simulateWatts;
+  // doc["simulateCad"]           = simulateCad;
+  // doc["ERGMode"]               = ERGMode;
+  doc["autoUpdate"] = autoUpdate;
+  doc["ssid"]       = ssid;
+  doc["password"]   = password;
   // doc["foundDevices"]         = foundDevices; //I don't see a need
   // currently in keeping this boot to boot
   doc["connectedPowerMeter"]   = connectedPowerMeter;
@@ -157,45 +160,16 @@ void userParameters::loadFromSPIFFS() {
   setStealthChop(doc["stealthchop"]);
   setInclineMultiplier(doc["inclineMultiplier"]);
   setPowerCorrectionFactor(doc["powerCorrectionFactor"]);
-  setSimulateHr(doc["simulateHr"]);
-  setSimulateWatts(doc["simulateWatts"]);
-  setERGMode(doc["ERGMode"]);
+  setSimulateHr(false);  // Set these false because previous config versions may return true and these values are no longer saved.
+  setSimulateWatts(false);
+  setSimulateCad(false);
+  // setERGMode(doc["ERGMode"]);
   setAutoUpdate(doc["autoUpdate"]);
   setSsid(doc["ssid"]);
   setPassword(doc["password"]);
   // setfoundDevices       (doc["foundDevices"]);
   setConnectedPowerMeter(doc["connectedPowerMeter"]);
   setConnectedHeartMonitor(doc["connectedHeartMonitor"]);
-
-  // Incase these important variables were not in the document, set them to
-  // defaults.
-  if (doc["firmwareUpdateURL"] == "null") {
-    firmwareUpdateURL = FW_UPDATEURL;
-  }
-  if (doc["deviceName"] == "null") {
-    deviceName = DEVICE_NAME;
-  }
-  if (doc["ssid"] == "null") {
-    ssid = DEVICE_NAME;
-  }
-  if (doc["password"] == "null") {
-    password = DEFAULT_PASSWORD;
-  }
-  if (doc["autoUpdate"] == "null") {
-    autoUpdate = AUTO_FIRMWARE_UPDATE;
-  }
-  if (doc["stepperPower"] == "null") {
-    stepperPower = STEPPER_POWER;
-  }
-  if (doc["stealthchop"] == "null") {
-    stealthchop = STEALTHCHOP;
-  }
-  if (doc["connectedPowerMeter"] == "null") {
-    connectedPowerMeter = CONNECTED_POWER_METER;
-  }
-  if (doc["connectedHeartMonitor"] == "null") {
-    connectedHeartMonitor = CONNECTED_HEART_MONITOR;
-  }
 
   debugDirector("Config File Loaded: " + String(configFILENAME));
   file.close();

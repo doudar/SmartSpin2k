@@ -6,6 +6,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 ### Added
+- Added webhook for simulated cadence. 
 - Added Insert Peloton 7 Flat V2 .sldpart and .stl.
 - Added initial credits file.
 - Added initial changelog.
@@ -17,6 +18,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Add documentation to SensorData class.
 
 ### Changed
+- Removed unused http onServer calls.
+- Repaired btsimulator.html
 - Increased ShiftStep UI slider range.
 - Replaced DoublePower setting with PowerCorrectionFactor setting.
 - Reverted bytes_to_u16 macro. 

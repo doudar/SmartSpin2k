@@ -25,6 +25,7 @@ class userParameters {
   float powerCorrectionFactor;
   bool simulateHr;
   bool simulateWatts;
+  bool simulateCad;
   bool ERGMode;
   bool autoUpdate;
   String ssid;
@@ -48,6 +49,7 @@ class userParameters {
   float getPowerCorrectionFactor() { return powerCorrectionFactor; }
   bool getSimulateHr() { return simulateHr; }
   bool getSimulateWatts() { return simulateWatts; }
+  bool getSimulateCad() { return simulateCad; }
   bool getERGMode() { return ERGMode; }
   bool getautoUpdate() { return autoUpdate; }
   const char* getSsid() { return ssid.c_str(); }
@@ -71,6 +73,7 @@ class userParameters {
   void setPowerCorrectionFactor(float pm) { powerCorrectionFactor = pm; }
   void setSimulateHr(bool shr) { simulateHr = shr; }
   void setSimulateWatts(bool swt) { simulateWatts = swt; }
+  void setSimulateCad(bool scd) { simulateCad = scd; }
   void setERGMode(bool erg) { ERGMode = erg; }
   void setAutoUpdate(bool atupd) { autoUpdate = atupd; }
   void setSsid(String sid) { ssid = sid; }
