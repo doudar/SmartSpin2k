@@ -388,7 +388,10 @@ void settingsProcessor() {
     updateStepperPower();
   }
   if (!server.arg("ERGSensitivity").isEmpty()) {
-    userConfig.setERGSensitivity(server.arg("ERGSensitivity").toFloat());
+    float ERGSensitivity = server.arg("ERGSensitivity").toFloat();
+    if (ERGSensitivity >= .5 && ERGSensitivity <= 3) {
+    userConfig.setERGSensitivity(ERGSensitivity);
+    }
   }
   // checkboxes don't report off, so need to check using another parameter
   // that's always present on that page
