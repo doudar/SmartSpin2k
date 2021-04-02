@@ -31,17 +31,10 @@ repos:
         language: docker_image
         files: \.(h\+\+|h|hh|hxx|hpp|cuh|c|cc|cpp|cu|c\+\+|cxx|tpp|txx)$
         entry: daverona/pre-commit-cpp:0.8.0 cpplint
-      - id: docker-piocheck
-        name: piocheck
-        description: Run `pio check` against C/C++ source files in Docker container
+      - id: docker-pio
+        name: pio
+        description: Run platformio check, test, and build C/C++ source files in Docker container
         language: docker_image
         files: \.(c|cc|cpp|cu|c\+\+|cxx|tpp|txx|ino)$
         pass_filenames: false
-        entry: kadaan/platformio_esp32:latest check --environment native --environment esp32doit
-      - id: docker-piotest
-        name: piotest
-        description: Run `pio test` against native C/C++ source files in Docker container
-        language: docker_image
-        files: \.(c|cc|cpp|cu|c\+\+|cxx|tpp|txx|ino)$
-        pass_filenames: false
-        entry: kadaan/platformio_esp32:latest test --environment native
+        entry: kadaan/platformio_esp32:latest  --check --test=native --build=esp32doit
