@@ -23,6 +23,10 @@ static uint8_t t9[]  = {0x20, 0x00, 0x39, 0x00, 0x05, 0x00, 0x31, 0x20};  // <- 
 static uint8_t t10[] = {0x20, 0x00, 0x39, 0x00, 0x05, 0x00, 0x31, 0x20};  // <- 0x1818 | 0x2a63 | CPS:[ CD(56.39) PW(57) ]
 static uint8_t t11[] = {0x20, 0x00, 0x39, 0x00, 0x05, 0x00, 0x31, 0x20};  // <- 0x1818 | 0x2a63 | CPS:[ CD(0) PW(57) ]
 
+// Test wrap around uint16 overflow
+static uint8_t t12[] = {0x20, 0x00, 0x00, 0x00, 0xff, 0xff, 0xff, 0xff};  // <- 0x1818 | 0x2a63 | CPS:[ CD(??) PW(??) ]
+static uint8_t t13[] = {0x20, 0x00, 0x2d, 0x00, 0x00, 0x00, 0xb7, 0x07};  // <- 0x1818 | 0x2a63 | CPS:[ CD(31.09) PW(45) ]
+
 void test_parses_cadence(void) {
   CyclePowerData sensor = CyclePowerData();
   // Pre parse state
@@ -69,6 +73,11 @@ void test_parses_cadence(void) {
   // Unchanged 4X, now realize that cadence is 0
   sensor.decode(t11, sizeof(t0));
   TEST_ASSERT_EQUAL_FLOAT(0.0, sensor.getCadence());
+
+  // Test overflow
+  sensor.decode(t12, sizeof(t0));
+  sensor.decode(t13, sizeof(t0));
+  TEST_ASSERT_EQUAL_FLOAT(31.09312, sensor.getCadence());
 }
 
 void test_parses_heartrate(void) {
