@@ -36,6 +36,8 @@ You'll need the quantity listed below of each item except the driver board. An o
 | 2   | Tactile Switches        | https://amzn.to/33ezmKx | https://www.aliexpress.com/item/32958087576.html      |
 | 2   | 608 Skate Bearings      | https://amzn.to/3isBzrW | https://www.aliexpress.com/item/32700232097.html      | 
 
+If you'd like to build the PCB version, you can directly order the PCB from https://www.pcbway.com/project/shareproject/SmartSpin2k_PCB.html omit the LM2596 from above. (But follow the PCB BOM on the link). 
+
 So for $700-$1000 (or much less if you use HR2VP) you can build a fully functional smart bike! If you already have a Peloton bike collecting dust in the corner, this will work on that too! 
 
 Surprisingly, my spin bike with the SmartSpin2K actually has better "road feel" than my expensive bike trainer, and since it's a belt drive bike, it's virtually silent. That's somthing you cannot achieve with a chain driven bike on any smart trainer. 
