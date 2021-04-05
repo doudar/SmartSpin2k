@@ -37,15 +37,9 @@ void SpinBLEClient::start() {
 }
 
 static void onNotify(BLERemoteCharacteristic *pBLERemoteCharacteristic, uint8_t *pData, size_t length, bool isNotify) {
-  Serial.print("notify: ");
-  Serial.println(length);
-  uint8_t *dataToBuf = (uint8_t*) malloc(length);
-  memcpy(dataToBuf, pData, length);
-
   for (size_t i = 0; i < NUM_BLE_DEVICES; i++) {
     if (pBLERemoteCharacteristic->getUUID() == spinBLEClient.myBLEDevices[i].charUUID) {
-      xQueueSendToBack(spinBLEClient.myBLEDevices[i].dataBuffer, &dataToBuf, (TickType_t)10);
-      //debugDirector("notify");
+      spinBLEClient.myBLEDevices[i].enqueueData(pData, length);
     }
   }
 }
@@ -512,6 +506,56 @@ void SpinBLEClient::postConnect(NimBLEClient *pClient) {
         debugDirector("These did not match|" + String(pClient->getPeerAddress().toString().c_str()) + "|" + String(this->myBLEDevices[i].peerAddress.toString().c_str()) + "|");
       }
     }
+  }
+}
+
+bool SpinBLEAdvertisedDevice::enqueueData(uint8_t *data, size_t length) {
+  if (!this->dataBuffer) {
+    // debugDirector("Creating queue");
+    this->dataBuffer = xQueueCreate(4, sizeof(DataHandle_t));
+    if (!this->dataBuffer) {
+      // debugDirector("Failed to create queue");
+      return pdFALSE;
+    }
+  }
+
+  if (!uxQueueSpacesAvailable(this->dataBuffer)) {
+    // debugDirector("No space available in queue. Skipping enqueue of data.");
+    return pdFALSE;
+  }
+
+  uint8_t *dataCopy = reinterpret_cast<uint8_t *>(malloc(length));
+  memcpy(dataCopy, data, length);
+  DataHandle_t dataHandle = {dataCopy, length};
+  if (xQueueSendToBack(this->dataBuffer, reinterpret_cast<void *>(&dataHandle), (TickType_t)0) == pdFALSE) {
+    // debugDirector("Failed to enqueue data.  Freeing data.");
+    free(dataCopy);
+    return pdFALSE;
+  }
+  // debugDirector("Successfully enqueued data.");
+  return pdTRUE;
+}
+
+std::shared_ptr<DataHandle_t> SpinBLEAdvertisedDevice::dequeueData() {
+  if (this->dataBuffer == nullptr) {
+    // debugDirector("Queue not created.  Skipping dequeue of data.");
+    return std::make_shared<DataHandle_t>();
+  }
+
+  std::shared_ptr<DataHandle_t> pHandle(new DataHandle_t(), deletePayload);
+  if (xQueueReceive(this->dataBuffer, pHandle.get(), (TickType_t)0) == pdFALSE) {
+    // debugDirector("No data dequeued from queue.");
+    return std::make_shared<DataHandle_t>();
+  }
+
+  // debugDirector("Successfully dequeued data from queue.");
+  return pHandle;
+}
+
+void SpinBLEAdvertisedDevice::deletePayload(DataHandle_t *handle) {
+  if (handle->data != nullptr) {
+    free(handle->data);
+    handle->data = nullptr;
   }
 }
 

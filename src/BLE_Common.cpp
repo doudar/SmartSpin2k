@@ -42,16 +42,14 @@ void BLECommunications(void *pvParameters) {
                 // 250 == Data(60), Spaces(Data/2), Arrow(4), SvrUUID(37), Sep(3), ChrUUID(37), Sep(3),
                 //        Name(10), Prefix(2), HR(8), SEP(1), CD(10), SEP(1), PW(8), SEP(1), SP(7), Suffix(2), Nul(1) - 225 rounded up
 
-                while (uxQueueMessagesWaiting(myAdvertisedDevice.dataBuffer)) {
-                  uint8_t *pData; 
-                  xQueueReceive(myAdvertisedDevice.dataBuffer, &pData, portMAX_DELAY);
-                  std::string data = reinterpret_cast<const char *>(&pData);
-                  int length       = data.length();
+                while (pdTRUE) {
+                  std::shared_ptr<DataHandle_t> handle = myAdvertisedDevice.dequeueData();
+                  if (handle == nullptr || handle->data == nullptr || handle->length == 0) {
+                    break;
+                  }
+                  uint8_t *pData = handle->data;
+                  size_t length  = handle->length;
 
-                 //uint8_t *pData;
-                  //xQueueReceive(myAdvertisedDevice.dataBuffer, &pData, portMAX_DELAY);
-                  //int length = pData.size();
-                  Serial.println(length);
                   char logBuf[250];
                   char *logBufP = logBuf;
                   for (int i = 0; i < length; i++) {
@@ -91,7 +89,6 @@ void BLECommunications(void *pvParameters) {
                   }
                   strcat(logBufP, " ]");
                   debugDirector(String(logBuf), true, true);
-                  free(pData);
                 }
               } else if (!pClient->isConnected()) {  // This shouldn't ever be
                                                      // called...
