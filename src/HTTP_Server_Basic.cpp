@@ -10,7 +10,6 @@
 #include "Builtin_Pages.h"
 #include "HTTP_Server_Basic.h"
 #include "cert.h"
-#include <WebServer.h>
 #include <HTTPClient.h>
 #include <HTTPUpdate.h>
 #include <SPIFFS.h>
@@ -18,6 +17,7 @@
 #include <WiFiClientSecure.h>
 #include <Update.h>
 #include <DNSServer.h>
+#include <ESPAsyncWebServer.h>
 
 File fsUploadFile;
 
@@ -32,7 +32,9 @@ const byte DNS_PORT = 53;
 DNSServer dnsServer;
 
 WiFiClientSecure client;
-WebServer server(80);
+AsyncWebServer server(80);
+
+bool gRebootTriggered = false;
 
 #ifdef USE_TELEGRAM
 #include <UniversalTelegramBot.h>
@@ -41,6 +43,11 @@ bool telegramMessageWaiting = false;
 UniversalTelegramBot bot(TELEGRAM_TOKEN, client);
 String telegramMessage = "";
 #endif
+
+// Forward declarations
+void settingsProcessor(AsyncWebServerRequest *request);
+void doUpdate(size_t index, uint8_t *data, size_t len, bool final);
+void doUpload(String filename, size_t index, uint8_t *data, size_t len, bool final);
 
 // ********************************WIFI Setup*************************
 void startWifi() {
@@ -112,25 +119,26 @@ void startWifi() {
 }
 
 void startHttpServer() {
-  server.onNotFound([]() { debugDirector("Link Not Found: " + server.uri()); });
 
   /********************************************Begin
    * Handlers***********************************/
-  server.on("/", handleIndexFile);
-  server.on("/index.html", handleIndexFile);
-  server.on("/generate_204", handleIndexFile);         // Android captive portal
-  server.on("/fwlink", handleIndexFile);               // Microsoft captive portal
-  server.on("/hotspot-detect.html", handleIndexFile);  // Apple captive portal
-  server.on("/style.css", handleSpiffsFile);
-  server.on("/btsimulator.html", handleSpiffsFile);
-  server.on("/settings.html", handleSpiffsFile);
-  server.on("/status.html", handleSpiffsFile);
-  server.on("/bluetoothscanner.html", handleSpiffsFile);
-  server.on("/hrtowatts.html", handleSpiffsFile);
-  server.on("/favicon.ico", handleSpiffsFile);
-  server.on("/send_settings", settingsProcessor);
+  server.serveStatic("/", SPIFFS, "/index.html");
+  server.serveStatic("/index.html", SPIFFS, "/index.html");
+  server.serveStatic("/generate_204", SPIFFS, "/index.html");         // Android captive portal
+  server.serveStatic("/gen_204", SPIFFS, "/index.html");         // Android captive portal
+  server.serveStatic("/fwlink", SPIFFS, "/index.html");               // Microsoft captive portal
+  server.serveStatic("/hotspot-detect.html", SPIFFS, "/index.html");  // Apple captive portal
 
-  server.on("/BLEScan", []() {
+  server.serveStatic("/style.css", SPIFFS, "/style.css");
+  server.serveStatic("/btsimulator.html", SPIFFS, "/btsimulator.html");
+  server.serveStatic("/settings.html", SPIFFS, "/settings.html");
+  server.serveStatic("/status.html", SPIFFS, "/status.html");
+  server.serveStatic("/bluetoothscanner.html", SPIFFS, "/bluetoothscanner.html");
+  server.serveStatic("/hrtowatts.html", SPIFFS, "/hrtowatts.html");
+  server.serveStatic("/favicon.ico", SPIFFS, "/favicon.ico");
+  server.on("/send_settings", [](AsyncWebServerRequest *request) { settingsProcessor(request); });
+
+  server.on("/BLEScan", [](AsyncWebServerRequest *request) {
     debugDirector("Scanning from web request");
     String response =
         "<!DOCTYPE html><html><body>Scanning for BLE Devices. Please wait "
@@ -138,10 +146,10 @@ void startHttpServer() {
         myIP.toString() + "/bluetoothscanner.html';\",15000);</script></html>";
     spinBLEClient.resetDevices();
     spinBLEClient.serverScan(true);
-    server.send(200, "text/html", response);
+    request->send(200, "text/html", response);
   });
 
-  server.on("/load_defaults.html", []() {
+  server.on("/load_defaults.html", [](AsyncWebServerRequest *request) {
     debugDirector("Setting Defaults from Web Request");
     SPIFFS.format();
     userConfig.setDefaults();
@@ -151,147 +159,132 @@ void startHttpServer() {
         "loaded.</h1><p><br><br> Please reconnect to the device on WiFi "
         "network: " +
         myIP.toString() + "</p></body></html>";
-    server.send(200, "text/html", response);
+    request->send(200, "text/html", response);
     ESP.restart();
   });
 
-  server.on("/reboot.html", []() {
+  server.on("/reboot.html", [](AsyncWebServerRequest *request) {
     debugDirector("Rebooting from Web Request");
     String response = "Rebooting....<script> setTimeout(\"location.href = 'http://" + myIP.toString() + "/index.html';\",500); </script>";
-    server.send(200, "text/html", response);
+    request->send(200, "text/html", response);
     vTaskDelay(100 / portTICK_PERIOD_MS);
     ESP.restart();
   });
 
-  server.on("/hrslider", []() {
-    String value = server.arg("value");
+  server.on("/hrslider", [](AsyncWebServerRequest *request) {
+    if (!request->hasParam("value")) {
+      // Invalid request
+      request->send(400);
+    }
+
+    String value = request->getParam("value")->value();
     if (value == "enable") {
       userConfig.setSimulateHr(true);
-      server.send(200, "text/plain", "OK");
+      request->send(200, "text/plain", "OK");
       debugDirector("HR Simulator turned on");
     } else if (value == "disable") {
       userConfig.setSimulateHr(false);
-      server.send(200, "text/plain", "OK");
+      request->send(200, "text/plain", "OK");
       debugDirector("HR Simulator turned off");
     } else {
       userConfig.setSimulatedHr(value.toInt());
       debugDirector("HR is now: " + String(userConfig.getSimulatedHr()));
-      server.send(200, "text/plain", "OK");
+      request->send(200, "text/plain", "OK");
     }
   });
 
-  server.on("/wattsslider", []() {
-    String value = server.arg("value");
+  server.on("/wattsslider", [](AsyncWebServerRequest *request) {
+    if (!request->hasParam("value")) {
+      // Invalid request
+      request->send(400);
+    }
+
+    String value = request->getParam("value")->value();
     if (value == "enable") {
       userConfig.setSimulateWatts(true);
-      server.send(200, "text/plain", "OK");
+      request->send(200, "text/plain", "OK");
       debugDirector("Watt Simulator turned on");
     } else if (value == "disable") {
       userConfig.setSimulateWatts(false);
-      server.send(200, "text/plain", "OK");
+      request->send(200, "text/plain", "OK");
       debugDirector("Watt Simulator turned off");
     } else {
       userConfig.setSimulatedWatts(value.toInt());
       debugDirector("Watts are now: " + String(userConfig.getSimulatedWatts()));
-      server.send(200, "text/plain", "OK");
+      request->send(200, "text/plain", "OK");
     }
   });
 
-  server.on("/hrValue", []() {
+  server.on("/hrValue", [](AsyncWebServerRequest *request) {
     char outString[MAX_BUFFER_SIZE];
     snprintf(outString, MAX_BUFFER_SIZE, "%d", userConfig.getSimulatedHr());
-    server.send(200, "text/plain", outString);
+    request->send(200, "text/plain", outString);
   });
 
-  server.on("/wattsValue", []() {
+  server.on("/wattsValue", [](AsyncWebServerRequest *request) {
     char outString[MAX_BUFFER_SIZE];
     snprintf(outString, MAX_BUFFER_SIZE, "%d", userConfig.getSimulatedWatts());
-    server.send(200, "text/plain", outString);
+    request->send(200, "text/plain", outString);
   });
 
-  server.on("/configJSON", []() {
+  server.on("/configJSON", [](AsyncWebServerRequest *request) {
     String tString;
     tString = userConfig.returnJSON();
     tString.remove(tString.length() - 1, 1);
     tString += String(",\"debug\":\"") + debugToHTML + "\",\"firmwareVersion\":\"" + String(FIRMWARE_VERSION) + "\"}";
-    server.send(200, "text/plain", tString);
+    request->send(200, "text/plain", tString);
     debugToHTML = " ";
   });
 
-  server.on("/PWCJSON", []() {
+  server.on("/PWCJSON", [](AsyncWebServerRequest *request) {
     String tString;
     tString = userPWC.returnJSON();
-    server.send(200, "text/plain", tString);
+    request->send(200, "text/plain", tString);
     debugToHTML = " ";
   });
 
-  server.on("/login", HTTP_GET, []() {
-    server.sendHeader("Connection", "close");
-    server.send(200, "text/html", OTALoginIndex);
+  server.on("/login", HTTP_GET, [](AsyncWebServerRequest *request) {
+    AsyncWebServerResponse *response = request->beginResponse(200, "text/html", OTALoginIndex);
+    response->addHeader("Connection", "close");
+    request->send(response);
   });
 
-  server.on("/OTAIndex", HTTP_GET, []() {
+  server.on("/OTAIndex", HTTP_GET, [](AsyncWebServerRequest *request) {
     spinBLEClient.disconnect();
-    server.sendHeader("Connection", "close");
-    server.send(200, "text/html", OTAServerIndex);
+    AsyncWebServerResponse *response = request->beginResponse(200, "text/html", OTAServerIndex);
+    response->addHeader("Connection", "close");
+    request->send(response);
   });
 
   /*handling uploading firmware file */
   server.on(
       "/update", HTTP_POST,
-      []() {
-        server.sendHeader("Connection", "close");
-        server.send(200, "text/plain", (Update.hasError()) ? "FAIL" : "OK");
+      [](AsyncWebServerRequest *request) {
+        AsyncWebServerResponse *response = request->beginResponse(200, "text/plain", (Update.hasError()) ? "FAIL" : "OK");
+        response->addHeader("Connection", "close");
+        request->send(response);
       },
-      []() {
-        HTTPUpload &upload = server.upload();
-        if (upload.filename == String("firmware.bin").c_str()) {
-          if (upload.status == UPLOAD_FILE_START) {
-            debugDirector("Update: " + upload.filename);
-            if (!Update.begin(UPDATE_SIZE_UNKNOWN)) {  // start with max
-                                                       // available size
-              Update.printError(Serial);
-            }
-          } else if (upload.status == UPLOAD_FILE_WRITE) {
-            /* flashing firmware to ESP*/
-            if (Update.write(upload.buf, upload.currentSize) != upload.currentSize) {
-              Update.printError(Serial);
-            }
-          } else if (upload.status == UPLOAD_FILE_END) {
-            if (Update.end(true)) {  // true to set the size to the
-                                     // current progress
-              server.send(200, "text/plain", "Firmware Uploaded Sucessfully. Rebooting...");
-              vTaskDelay(2000 / portTICK_PERIOD_MS);
-              ESP.restart();
-            } else {
-              Update.printError(Serial);
-            }
+      [](AsyncWebServerRequest *request, String filename, size_t index, uint8_t *data, size_t len, bool final) {
+        if (filename == String("firmware.bin")) {
+          doUpdate(index, data, len, final);
+          if (final) {
+            request->send(200, "text/plain", "Firmware Uploaded Sucessfully. Rebooting...");
+            // Do the reboot in the task loop rather than here so the response makes it out
+            gRebootTriggered = true;
           }
         } else {
-          if (upload.status == UPLOAD_FILE_START) {
-            String filename = upload.filename;
-            if (!filename.startsWith("/")) {
-              filename = "/" + filename;
-            }
-            debugDirector("handleFileUpload Name: " + filename);
-            fsUploadFile = SPIFFS.open(filename, "w");
-            filename     = String();
-          } else if (upload.status == UPLOAD_FILE_WRITE) {
-            if (fsUploadFile) {
-              fsUploadFile.write(upload.buf, upload.currentSize);
-            }
-          } else if (upload.status == UPLOAD_FILE_END) {
-            if (fsUploadFile) {
-              fsUploadFile.close();
-            }
-            debugDirector(String("handleFileUpload Size: ") + String(upload.totalSize));
-            server.send(200, "text/plain", String(upload.filename + " Uploaded Sucessfully."));
+          // TODO Move this to a separate endpoint
+          doUpload(filename, index, data, len, final);
+          if (final) {
+            request->send(200, "text/plain", String(filename + " Uploaded Sucessfully."));
           }
         }
       });
-
-  /********************************************End Server
-   * Handlers*******************************/
+  
+  server.onNotFound([](AsyncWebServerRequest *request) {
+    debugDirector("Link Not Found: " + request->url());
+    request->send(404);
+  });
 
   xTaskCreatePinnedToCore(webClientUpdate,   /* Task function. */
                           "webClientUpdate", /* name of task. */
@@ -315,10 +308,60 @@ void startHttpServer() {
   debugDirector("HTTP server started");
 }
 
+void doUpdate(size_t index, uint8_t *data, size_t len, bool final) {
+  if (!index) {
+    debugDirector("Update Start");
+    if (!Update.begin(UPDATE_SIZE_UNKNOWN)) {
+      Update.printError(Serial);
+    }
+  }
+  if (!Update.hasError()) {
+    if (Update.write(data, len) != len) {
+      Update.printError(Serial);
+    }
+  }
+  if (final) {
+    if (Update.end(true)) {
+      debugDirector("Update Success");
+    } else {
+      Update.printError(Serial);
+    }
+  }
+}
+
+void doUpload(String filename, size_t index, uint8_t *data, size_t len, bool final) {
+  if (!index) {
+    if (!filename.startsWith("/")) {
+      filename = "/" + filename;
+    }
+    debugDirector("Upload Name: " + filename);
+    fsUploadFile = SPIFFS.open(filename, "w");
+  }
+  for (size_t i = 0; i < len; i++) {
+    if (fsUploadFile) {
+      fsUploadFile.write(data, len);
+    }
+  }
+  if (final) {
+    if (fsUploadFile) {
+      fsUploadFile.close();
+    }
+    debugDirector("Upload completed: " + filename);
+  }
+}
+
+/********************************************End Server
+ * Handlers*******************************/
+
 void webClientUpdate(void *pvParameters) {
   static unsigned long mDnsTimer = millis();  // NOLINT: There is no overload in String for uint64_t
   for (;;) {
-    server.handleClient();
+    // Successful updates will trigger a reboot
+    if (gRebootTriggered) {
+      vTaskDelay(2000 / portTICK_PERIOD_MS);
+      ESP.restart();
+    }
+
     vTaskDelay(WEBSERVER_DELAY / portTICK_RATE_MS);
     if (WiFi.getMode() == WIFI_AP) {
       dnsServer.processNextRequest();
@@ -331,61 +374,32 @@ void webClientUpdate(void *pvParameters) {
   }
 }
 
-void handleIndexFile() {
-  String filename = "/index.html";
-  if (SPIFFS.exists(filename)) {
-    File file = SPIFFS.open(filename, FILE_READ);
-    server.streamFile(file, "text/html");
-    file.close();
-  } else {
-    debugDirector(filename + " not found. Sending builtin Index.html");
-    server.send(200, "text/html", noIndexHTML);
-  }
-}
-
-void handleSpiffsFile() {
-  String filename = server.uri();
-  int dotPosition = filename.lastIndexOf(".");
-  String fileType = filename.substring((dotPosition + 1), filename.length());
-  if (SPIFFS.exists(filename)) {
-    File file = SPIFFS.open(filename, FILE_READ);
-    server.streamFile(file, "text/" + fileType);
-    file.close();
-    debugDirector("Served " + filename);
-  } else {
-    debugDirector(filename + " not found. Sending builtin Index.html");
-    server.send(404, "text/html",
-                "<html><body><h1>ERROR 404 <br> FILE NOT "
-                "FOUND!</h1></body></html>");
-  }
-}
-
-void settingsProcessor() {
+void settingsProcessor(AsyncWebServerRequest *request) {
   String tString;
   bool wasBTUpdate = false;
-  if (!server.arg("ssid").isEmpty()) {
-    tString = server.arg("ssid");
+  if (request->hasParam("ssid")) {
+    tString = request->getParam("ssid")->value();
     tString.trim();
     userConfig.setSsid(tString);
   }
-  if (!server.arg("password").isEmpty()) {
-    tString = server.arg("password");
+  if (request->hasParam("password")) {
+    tString = request->getParam("password")->value();
     tString.trim();
     userConfig.setPassword(tString);
   }
-  if (!server.arg("deviceName").isEmpty()) {
-    tString = server.arg("deviceName");
+  if (request->hasParam("deviceName")) {
+    tString = request->getParam("deviceName")->value();
     tString.trim();
     userConfig.setDeviceName(tString);
   }
-  if (!server.arg("shiftStep").isEmpty()) {
-    uint64_t shiftStep = server.arg("shiftStep").toInt();
+  if (request->hasParam("shiftStep")) {
+    uint64_t shiftStep = request->getParam("shiftStep")->value().toInt();
     if (shiftStep >= 50 && shiftStep <= 6000) {
       userConfig.setShiftStep(shiftStep);
     }
   }
-  if (!server.arg("stepperPower").isEmpty()) {
-    uint64_t stepperPower = server.arg("stepperPower").toInt();
+  if (request->hasParam("stepperPower")) {
+    uint64_t stepperPower = request->getParam("stepperPower")->value().toInt();
     if (stepperPower >= 500 && stepperPower <= 2000) {
       userConfig.setStepperPower(stepperPower);
       updateStepperPower();
@@ -393,13 +407,13 @@ void settingsProcessor() {
   }
   // checkboxes don't report off, so need to check using another parameter
   // that's always present on that page
-  if (!server.arg("stepperPower").isEmpty()) {
-    if (!server.arg("autoUpdate").isEmpty()) {
+  if (request->hasParam("stepperPower")) {
+    if (request->hasParam("autoUpdate")) {
       userConfig.setAutoUpdate(true);
     } else {
       userConfig.setAutoUpdate(false);
     }
-    if (!server.arg("stealthchop").isEmpty()) {
+    if (request->hasParam("stealthchop")) {
       userConfig.setStealthChop(true);
       updateStealthchop();
     } else {
@@ -407,50 +421,49 @@ void settingsProcessor() {
       updateStealthchop();
     }
   }
-  if (!server.arg("inclineMultiplier").isEmpty()) {
-    float inclineMultiplier = server.arg("inclineMultiplier").toFloat();
+  if (request->hasParam("inclineMultiplier")) {
+    float inclineMultiplier = request->getParam("inclineMultiplier")->value().toFloat();
     if (inclineMultiplier >= 1 && inclineMultiplier <= 5) {
       userConfig.setInclineMultiplier(inclineMultiplier);
     }
   }
-  if (!server.arg("powerCorrectionFactor").isEmpty()) {
-    float powerCorrectionFactor = server.arg("powerCorrectionFactor").toFloat();
+  if (request->hasParam("powerCorrectionFactor")) {
+    float powerCorrectionFactor = request->getParam("powerCorrectionFactor")->value().toFloat();
     if (powerCorrectionFactor >= 0 && powerCorrectionFactor <= 2) {
       userConfig.setPowerCorrectionFactor(powerCorrectionFactor);
     }
   }
-  if (!server.arg("blePMDropdown").isEmpty()) {
+  if (request->hasParam("blePMDropdown")) {
     wasBTUpdate = true;
-    if (server.arg("blePMDropdown")) {
-      tString = server.arg("blePMDropdown");
-      userConfig.setConnectedPowerMeter(server.arg("blePMDropdown"));
+    if (request->getParam("blePMDropdown")->value()) {
+      tString = request->getParam("blePMDropdown")->value();
+      userConfig.setConnectedPowerMeter(request->getParam("blePMDropdown")->value());
     } else {
       userConfig.setConnectedPowerMeter("any");
     }
   }
-  if (!server.arg("bleHRDropdown").isEmpty()) {
+  if (request->hasParam("bleHRDropdown")) {
     wasBTUpdate = true;
-    if (server.arg("bleHRDropdown")) {
-      tString = server.arg("bleHRDropdown");
-      userConfig.setConnectedHeartMonitor(server.arg("bleHRDropdown"));
+    if (request->getParam("bleHRDropdown")->value()) {
+      tString = request->getParam("bleHRDropdown")->value();
+      userConfig.setConnectedHeartMonitor(request->getParam("bleHRDropdown")->value());
     } else {
       userConfig.setConnectedHeartMonitor("any");
     }
   }
 
-  if (!server.arg("session1HR").isEmpty()) {  // Needs checking for unrealistic numbers.
-    userPWC.session1HR = server.arg("session1HR").toInt();
+  if (request->hasParam("session1HR")) {  // Needs checking for unrealistic numbers.
+    userPWC.session1HR = request->getParam("session1HR")->value().toInt();
   }
-  if (!server.arg("session1Pwr").isEmpty()) {
-    userPWC.session1Pwr = server.arg("session1Pwr").toInt();
+  if (request->hasParam("session1Pwr")) {
+    userPWC.session1Pwr = request->getParam("session1Pwr")->value().toInt();
   }
-  if (!server.arg("session2HR").isEmpty()) {
-    userPWC.session2HR = server.arg("session2HR").toInt();
+  if (request->hasParam("session2HR")) {
+    userPWC.session2HR = request->getParam("session2HR")->value().toInt();
   }
-  if (!server.arg("session2Pwr").isEmpty()) {
-    userPWC.session2Pwr = server.arg("session2Pwr").toInt();
-
-    if (!server.arg("hr2Pwr").isEmpty()) {
+  if (request->hasParam("session2Pwr")) {
+    userPWC.session2Pwr = request->getParam("session2Pwr")->value().toInt();
+    if (request->hasParam("hr2Pwr")) {
       userPWC.hr2Pwr = true;
     } else {
       userPWC.hr2Pwr = false;
@@ -472,7 +485,7 @@ void settingsProcessor() {
         "setTimeout(\"location.href = 'http://" +
         myIP.toString() + "/index.html';\",1000);</script></html>";
   }
-  server.send(200, "text/html", response);
+  request->send(200, "text/html", response);
   debugDirector("Config Updated From Web");
   userConfig.saveToSPIFFS();
   userConfig.printFile();
