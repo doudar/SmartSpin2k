@@ -36,6 +36,34 @@ void userParameters::setDefaults() {  // Move these to set the values as #define
   connectedHeartMonitor = "any";
 }
 
+JsonObject userParameters::json() {
+  DynamicJsonDocument doc(USERCONFIG_JSON_SIZE);
+  JsonObject root = doc.to<JsonObject>();
+
+  root["firmwareUpdateURL"]     = firmwareUpdateURL;
+  root["incline"]               = incline;
+  root["simulatedWatts"]        = simulatedWatts;
+  root["simulatedHr"]           = simulatedHr;
+  root["simulatedCad"]          = simulatedCad;
+  root["deviceName"]            = deviceName;
+  root["shiftStep"]             = shiftStep;
+  root["stepperPower"]          = stepperPower;
+  root["stealthchop"]           = stealthchop;
+  root["inclineMultiplier"]     = inclineMultiplier;
+  root["powerCorrectionFactor"] = powerCorrectionFactor;
+  root["simulateHr"]            = simulateHr;
+  root["simulateWatts"]         = simulateWatts;
+  root["ERGMode"]               = ERGMode;
+  root["autoUpdate"]            = autoUpdate;
+  root["ssid"]                  = ssid;
+  root["password"]              = password;
+  root["foundDevices"]          = foundDevices;
+  root["connectedPowerMeter"]   = connectedPowerMeter;
+  root["connectedHeartMonitor"] = connectedHeartMonitor;
+
+  return root;
+}
+
 //---------------------------------------------------------------------------------
 //-- return all config as one a single JSON string
 String userParameters::returnJSON() {

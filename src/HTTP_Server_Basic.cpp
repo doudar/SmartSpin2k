@@ -34,7 +34,8 @@ DNSServer dnsServer;
 WiFiClientSecure client;
 AsyncWebServer server(80);
 
-bool gRebootTriggered = false;
+bool gRebootTriggered  = false;
+bool gBleScanTriggered = false;
 
 #ifdef USE_TELEGRAM
 #include <UniversalTelegramBot.h>
@@ -118,24 +119,29 @@ void startWifi() {
   }
 }
 
+bool filterSpiffsEmpty(AsyncWebServerRequest *request) {
+  // No index.html, probably no file system
+  return !SPIFFS.exists("/index.html");
+}
+
 void startHttpServer() {
+  // Move these requests to a single endpoint
+  server.rewrite("/generate_204", "/index.html");         // Android captive portal
+  server.rewrite("/gen_204", "/index.html");              // Android captive portal
+  server.rewrite("/fwlink", "/index.html");               // Microsoft captive portal
+  server.rewrite("/hotspot-detect.html", "/index.html");  // Apple captive portal
 
-  /********************************************Begin
-   * Handlers***********************************/
-  server.serveStatic("/", SPIFFS, "/index.html");
-  server.serveStatic("/index.html", SPIFFS, "/index.html");
-  server.serveStatic("/generate_204", SPIFFS, "/index.html");         // Android captive portal
-  server.serveStatic("/gen_204", SPIFFS, "/index.html");         // Android captive portal
-  server.serveStatic("/fwlink", SPIFFS, "/index.html");               // Microsoft captive portal
-  server.serveStatic("/hotspot-detect.html", SPIFFS, "/index.html");  // Apple captive portal
+  server
+      .on("/index.html",
+          [](AsyncWebServerRequest *request) {
+            // If there's no SPIFFS filesystem can't serve /index.html. Tell user to flash a filesystem
+            request->send(200, "text/html", noIndexHTML);
+          })
+      .setFilter(filterSpiffsEmpty);
 
-  server.serveStatic("/style.css", SPIFFS, "/style.css");
-  server.serveStatic("/btsimulator.html", SPIFFS, "/btsimulator.html");
-  server.serveStatic("/settings.html", SPIFFS, "/settings.html");
-  server.serveStatic("/status.html", SPIFFS, "/status.html");
-  server.serveStatic("/bluetoothscanner.html", SPIFFS, "/bluetoothscanner.html");
-  server.serveStatic("/hrtowatts.html", SPIFFS, "/hrtowatts.html");
-  server.serveStatic("/favicon.ico", SPIFFS, "/favicon.ico");
+  // Serve other resources
+  server.serveStatic("/", SPIFFS, "/").setDefaultFile("/index.html");
+
   server.on("/send_settings", [](AsyncWebServerRequest *request) { settingsProcessor(request); });
 
   server.on("/BLEScan", [](AsyncWebServerRequest *request) {
@@ -144,8 +150,7 @@ void startHttpServer() {
         "<!DOCTYPE html><html><body>Scanning for BLE Devices. Please wait "
         "15 seconds.</body><script> setTimeout(\"location.href = 'http://" +
         myIP.toString() + "/bluetoothscanner.html';\",15000);</script></html>";
-    spinBLEClient.resetDevices();
-    spinBLEClient.serverScan(true);
+    gBleScanTriggered = true;
     request->send(200, "text/html", response);
   });
 
@@ -160,15 +165,14 @@ void startHttpServer() {
         "network: " +
         myIP.toString() + "</p></body></html>";
     request->send(200, "text/html", response);
-    ESP.restart();
+    gRebootTriggered = true;
   });
 
   server.on("/reboot.html", [](AsyncWebServerRequest *request) {
     debugDirector("Rebooting from Web Request");
     String response = "Rebooting....<script> setTimeout(\"location.href = 'http://" + myIP.toString() + "/index.html';\",500); </script>";
     request->send(200, "text/html", response);
-    vTaskDelay(100 / portTICK_PERIOD_MS);
-    ESP.restart();
+    gRebootTriggered = true;
   });
 
   server.on("/hrslider", [](AsyncWebServerRequest *request) {
@@ -216,23 +220,25 @@ void startHttpServer() {
   });
 
   server.on("/hrValue", [](AsyncWebServerRequest *request) {
-    char outString[MAX_BUFFER_SIZE];
-    snprintf(outString, MAX_BUFFER_SIZE, "%d", userConfig.getSimulatedHr());
-    request->send(200, "text/plain", outString);
+    AsyncResponseStream *response = request->beginResponseStream("text/plain");
+    response->printf("%d", userConfig.getSimulatedHr());
+    request->send(response);
   });
 
   server.on("/wattsValue", [](AsyncWebServerRequest *request) {
-    char outString[MAX_BUFFER_SIZE];
-    snprintf(outString, MAX_BUFFER_SIZE, "%d", userConfig.getSimulatedWatts());
-    request->send(200, "text/plain", outString);
+    AsyncResponseStream *response = request->beginResponseStream("text/plain");
+    response->printf("%d", userConfig.getSimulatedWatts());
+    request->send(response);
   });
 
   server.on("/configJSON", [](AsyncWebServerRequest *request) {
-    String tString;
-    tString = userConfig.returnJSON();
-    tString.remove(tString.length() - 1, 1);
-    tString += String(",\"debug\":\"") + debugToHTML + "\",\"firmwareVersion\":\"" + String(FIRMWARE_VERSION) + "\"}";
-    request->send(200, "text/plain", tString);
+    AsyncResponseStream *response = request->beginResponseStream("application/json");
+    JsonObject doc                = userConfig.json();
+    doc["debug"]                  = debugToHTML;
+    doc["firmwareVersion"]        = String(FIRMWARE_VERSION);
+    serializeJson(doc, *response);
+    request->send(response);
+    // Clear cached debug log
     debugToHTML = " ";
   });
 
@@ -280,7 +286,7 @@ void startHttpServer() {
           }
         }
       });
-  
+
   server.onNotFound([](AsyncWebServerRequest *request) {
     debugDirector("Link Not Found: " + request->url());
     request->send(404);
@@ -360,6 +366,12 @@ void webClientUpdate(void *pvParameters) {
     if (gRebootTriggered) {
       vTaskDelay(2000 / portTICK_PERIOD_MS);
       ESP.restart();
+    }
+
+    if (gBleScanTriggered) {
+      spinBLEClient.resetDevices();
+      spinBLEClient.serverScan(true);
+      gBleScanTriggered = false;
     }
 
     vTaskDelay(WEBSERVER_DELAY / portTICK_RATE_MS);
@@ -476,8 +488,7 @@ void settingsProcessor(AsyncWebServerRequest *request) {
         "Selections Saved!</h2></body><script> setTimeout(\"location.href "
         "= 'http://" +
         myIP.toString() + "/bluetoothscanner.html';\",1000);</script></html>";
-    spinBLEClient.resetDevices();
-    spinBLEClient.serverScan(true);
+    gBleScanTriggered = true;
   } else {  // Normal response
     response +=
         "Network settings will be applied at next reboot. <br> Everything "

@@ -9,6 +9,9 @@
 
 #include <Arduino.h>
 
+#include <AsyncJson.h>
+#include <ArduinoJson.h>
+
 class userParameters {
  private:
   String firmwareUpdateURL;
@@ -79,6 +82,7 @@ class userParameters {
   void setConnectedPowerMeter(String cpm) { connectedPowerMeter = cpm; }
   void setConnectedHeartMonitor(String cHr) { connectedHeartMonitor = cHr; }
 
+  JsonObject json();
   String returnJSON();
   void saveToSPIFFS();
   void loadFromSPIFFS();
