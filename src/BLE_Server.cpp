@@ -236,7 +236,8 @@ void updateCyclingPowerMeasurementChar() {
 }
 
 void updateHeartRateMeasurementChar() {
-  heartRateMeasurement[1] = userConfig.getSimulatedHr();
+  int hr                  = userConfig.getSimulatedHr();
+  heartRateMeasurement[1] = hr;
   heartRateMeasurementCharacteristic->setValue(heartRateMeasurement, 2);
 
   // 125 == Data(10), Sep(data/2), Arrow(3), CharId(37), Sep(3), CharId(37), Sep(3), Name(8), Prefix(2), HR(7), Suffix(2), Nul(1) == 118, rounded up
