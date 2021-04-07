@@ -6,6 +6,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 ### Added
+- Added XL (Extra Long) Mounting strap for Echelon.
 - Added Insert Peloton 7 Flat V2 .sldpart and .stl.
 - Added initial credits file.
 - Added initial changelog.
@@ -18,6 +19,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Added logging library which supports levels.
 
 ### Changed
+- Shortened HR characteristic to 2 bytes (Polar OH1 format)
 - Increased ShiftStep UI slider range.
 - Replaced DoublePower setting with PowerCorrectionFactor setting.
 - Reverted bytes_to_u16 macro. 

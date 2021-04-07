@@ -40,7 +40,7 @@ BLECharacteristic *fitnessMachineIndoorBikeData;
 // 00000101000010000110
 // 00000000100001010100
 //               100000
-byte heartRateMeasurement[5]    = {0b00000, 60, 0, 0, 0};
+byte heartRateMeasurement[2]    = {0x00, 0x00};
 byte cyclingPowerMeasurement[9] = {0b0000000100011, 0, 200, 0, 0, 0, 0, 0, 0};
 byte cpsLocation[1]             = {0b000};       // sensor location 5 == left crank
 byte cpFeature[1]               = {0b00100000};  // crank information present // 3rd & 2nd
@@ -99,7 +99,7 @@ void startBLEServer() {
   pServer->setCallbacks(new MyServerCallbacks());
 
   // Creating Characteristics
-  heartRateMeasurementCharacteristic->setValue(heartRateMeasurement, 5);
+  heartRateMeasurementCharacteristic->setValue(heartRateMeasurement, 2);
 
   cyclingPowerMeasurementCharacteristic->setValue(cyclingPowerMeasurement, 9);
   cyclingPowerFeatureCharacteristic->setValue(cpFeature, 1);
@@ -236,9 +236,8 @@ void updateCyclingPowerMeasurementChar() {
 }
 
 void updateHeartRateMeasurementChar() {
-  int hr                  = userConfig.getSimulatedHr();
-  heartRateMeasurement[1] = hr;
-  heartRateMeasurementCharacteristic->setValue(heartRateMeasurement, 5);
+  heartRateMeasurement[1] = userConfig.getSimulatedHr();
+  heartRateMeasurementCharacteristic->setValue(heartRateMeasurement, 2);
 
   // 125 == Data(10), Sep(data/2), Arrow(3), CharId(37), Sep(3), CharId(37), Sep(3), Name(8), Prefix(2), HR(7), Suffix(2), Nul(1) == 118, rounded up
   const int kLogBufMaxLength = 125;
