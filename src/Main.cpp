@@ -115,6 +115,14 @@ void setup() {
 
 void loop() {
   vTaskDelay(1000 / portTICK_RATE_MS);
+
+  if (shifterPosition > lastShifterPosition) {
+    SS2K_LOG("Main", "Shift UP: %d", shifterPosition);
+  } else if (shifterPosition < lastShifterPosition) {
+    SS2K_LOG("Main", "Shift DOWN: %d", shifterPosition);
+  }
+  lastShifterPosition = shifterPosition;
+
   scanIfShiftersHeld();
 
 #ifdef DEBUG_STACK
@@ -128,12 +136,6 @@ void moveStepper(void *pvParameters) {
   int targetPosition = 0;
 
   while (1) {
-    if (shifterPosition > lastShifterPosition) {
-      SS2K_LOG("Main", "Shift UP: %d", shifterPosition);
-    } else if (shifterPosition < lastShifterPosition) {
-      SS2K_LOG("Main", "Shift DOWN: %d", shifterPosition);
-    }
-    lastShifterPosition = shifterPosition;
     targetPosition      = shifterPosition + (userConfig.getIncline() * userConfig.getInclineMultiplier());
     if (stepperPosition == targetPosition) {
       vTaskDelay(300 / portTICK_PERIOD_MS);

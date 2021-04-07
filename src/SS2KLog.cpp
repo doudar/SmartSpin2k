@@ -17,7 +17,7 @@ void DebugInfo::appendLog(const char *format, ...) {
   va_end(args);
 }
 
-String DebugInfo::getAndClearLogs() { return DebugInfo::INSTANCE.getAndClearLogs_internal(); }
+const std::string DebugInfo::getAndClearLogs() { return DebugInfo::INSTANCE.getAndClearLogs_internal(); }
 
 void DebugInfo::appendLog_internal(const char *format, va_list args) {
   if (xSemaphoreTake(logBufferMutex, 500) == pdTRUE) {
@@ -33,13 +33,13 @@ void DebugInfo::appendLog_internal(const char *format, va_list args) {
   }
 }
 
-String DebugInfo::getAndClearLogs_internal() {
+const std::string DebugInfo::getAndClearLogs_internal() {
   if (xSemaphoreTake(logBufferMutex, 500) == pdTRUE) {
-    String debugLog = String(logBuffer);
+    const std::string debugLog = std::string(logBuffer, logBufferLength);
     logBufferLength = 0;
     logBuffer[0]    = '\0';
-    SS2K_LOGD("DebugInfo", "Log buffer read %d bytes and cleared", logBufferLength);
     xSemaphoreGive(logBufferMutex);
+    SS2K_LOGD("DebugInfo", "Log buffer read %d bytes and cleared", logBufferLength);
     return debugLog;
   }
   return "";
@@ -49,6 +49,13 @@ void DebugInfo::appendLog(const char *format, ...) {}
 
 String DebugInfo::getAndClearLogs() { return ""; }
 #endif
+
+void ss2k_remove_newlines(std::string *str) {
+  std::string::size_type pos = 0;
+  while ((pos = (*str).find("\n", pos)) != std::string::npos) {
+      (*str).replace(pos, 1, " ");
+  }
+}
 
 int ss2k_log_hex_to_buffer(const byte *data, const size_t data_length, char *buffer, const int buffer_offset, const size_t buffer_length) {
   int written = 0;

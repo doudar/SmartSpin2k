@@ -15,7 +15,7 @@
 #include <freertos/semphr.h>
 
 #ifndef DEBUG_LOG_BUFFER_SIZE
-#define DEBUG_LOG_BUFFER_SIZE 2000
+#define DEBUG_LOG_BUFFER_SIZE 500
 #endif
 
 #ifndef DEBUG_FILE_CHARS_PER_LINE
@@ -57,7 +57,7 @@ class DebugInfo {
  public:
   static void appendLog(const char *format, ...);
 
-  static String getAndClearLogs();
+  static const std::string getAndClearLogs();
 
  private:
   static DebugInfo INSTANCE;
@@ -67,7 +67,7 @@ class DebugInfo {
   char logBuffer[DEBUG_LOG_BUFFER_SIZE];
   SemaphoreHandle_t logBufferMutex;
   void appendLog_internal(const char *format, va_list args);
-  String getAndClearLogs_internal();
+  const std::string getAndClearLogs_internal();
 #else
   DebugInfo() {}
 #endif
@@ -101,6 +101,8 @@ class DebugInfo {
 #define SS2K_MODLOG(ml_lvl_, ml_mod_, ...) SS2K_MODLOG_##ml_lvl_((ml_mod_), __VA_ARGS__)
 
 #define SS2K_MODLOG_DFLT(ml_lvl_, ...) SS2K_MODLOG(ml_lvl_, LOG_MODULE_DEFAULT, __VA_ARGS__);
+
+void ss2k_remove_newlines(std::string *str);
 
 int ss2k_log_hex_to_buffer(const byte *data, const size_t data_length, char *buffer, const int buffer_offset, const size_t buffer_length);
 

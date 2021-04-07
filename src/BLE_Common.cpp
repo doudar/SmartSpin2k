@@ -22,9 +22,16 @@ void BLECommunications(void *pvParameters) {
     // **********************************Client***************************************
     for (size_t x = 0; x < NUM_BLE_DEVICES; x++) {  // loop through discovered devices
       if (spinBLEClient.myBLEDevices[x].connectedClientID != BLE_HS_CONN_HANDLE_NONE) {
-        SS2K_LOGD("BLE_Client", "Address: (%s) Client ID: (%d) SerUUID: (%s) CharUUID: (%s) HRM: (%s) PM: (%s) CSC: (%s) CT: (%s) doConnect: (%s)", peerAddress.toString().c_str(),
-                  connectedClientID, serviceUUID.toString().c_str(), charUUID.toString().c_str(), userSelectedHR ? "true" : "false", userSelectedPM ? "true" : "false",
-                  userSelectedCSC ? "true" : "false", userSelectedCT ? "true" : "false", doConnect ? "true" : "false");
+        SS2K_LOGD("BLE_Client", "Address: (%s) Client ID: (%d) SerUUID: (%s) CharUUID: (%s) HRM: (%s) PM: (%s) CSC: (%s) CT: (%s) doConnect: (%s)",
+                  spinBLEClient.myBLEDevices[x].peerAddress.toString().c_str(),
+                  spinBLEClient.myBLEDevices[x].connectedClientID,
+                  spinBLEClient.myBLEDevices[x].serviceUUID.toString().c_str(),
+                  spinBLEClient.myBLEDevices[x].charUUID.toString().c_str(),
+                  spinBLEClient.myBLEDevices[x].userSelectedHR ? "true" : "false",
+                  spinBLEClient.myBLEDevices[x].userSelectedPM ? "true" : "false",
+                  spinBLEClient.myBLEDevices[x].userSelectedCSC ? "true" : "false",
+                  spinBLEClient.myBLEDevices[x].userSelectedCT ? "true" : "false",
+                  spinBLEClient.myBLEDevices[x].doConnect ? "true" : "false");
         if (spinBLEClient.myBLEDevices[x].advertisedDevice) {  // is device registered?
           // debugDirector("1",false);
           SpinBLEAdvertisedDevice myAdvertisedDevice = spinBLEClient.myBLEDevices[x];

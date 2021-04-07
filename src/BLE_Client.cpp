@@ -315,7 +315,9 @@ void SpinBLEClient::MyClientCallback::onAuthenticationComplete(ble_gap_conn_desc
  */
 
 void SpinBLEClient::MyAdvertisedDeviceCallback::onResult(BLEAdvertisedDevice *advertisedDevice) {
-  SS2K_LOG("BLE_Client", "BLE Advertised Device found: %s", advertisedDevice->toString().c_str());
+  auto advertisedDeviceInfo = advertisedDevice->toString();
+  ss2k_remove_newlines(&advertisedDeviceInfo);
+  SS2K_LOG("BLE_Client", "BLE Advertised Device found: %s", advertisedDeviceInfo.c_str());
   String aDevName;
   if (advertisedDevice->haveName()) {
     aDevName = String(advertisedDevice->getName().c_str());
