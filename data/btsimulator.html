@@ -111,9 +111,9 @@
         document.getElementById("hrValue").innerHTML = obj.simulatedHr + " BPM";
         document.getElementById("HRSlider").value = obj.simulatedHr;
         document.getElementById("hroutput").checked = obj.simulateHr;
-        document.getElementById("wattsoutput").checked = obj.doublePower;
-        document.getElementById("WattsSlider").hidden = !obj.doublePower;
-        document.getElementById("wattsValue").hidden = !obj.doublePower;
+        document.getElementById("wattsoutput").checked = obj.simulateWatts;
+        document.getElementById("WattsSlider").hidden = !obj.simulateWatts;
+        document.getElementById("wattsValue").hidden = !obj.simulateWatts;
         document.getElementById("HRSlider").hidden = !obj.simulateHr;
         document.getElementById("hrValue").hidden = !obj.simulateHr;
       }
