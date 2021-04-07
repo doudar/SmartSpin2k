@@ -18,6 +18,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Add documentation to SensorData class.
 
 ### Changed
+- Shortened HR characteristic to 2 bytes (Polar OH1 format)
 - Increased ShiftStep UI slider range.
 - Replaced DoublePower setting with PowerCorrectionFactor setting.
 - Reverted bytes_to_u16 macro. 
