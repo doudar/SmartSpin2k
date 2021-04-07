@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 ### Added
 - Added webhook for simulated cadence. 
+- Add image for video link in Build How To
+- Added images for video links in Wiki Build How To
 - Added XL (Extra Long) Mounting strap for Echelon.
 - Added Insert Peloton 7 Flat V2 .sldpart and .stl.
 - Added initial credits file.
