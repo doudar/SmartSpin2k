@@ -14,6 +14,7 @@
 
 int bleConnDesc               = 1;
 bool updateConnParametersFlag = false;
+bool hr2p                     = false;
 TaskHandle_t BLECommunicationTask;
 SensorDataFactory sensorDataFactory;
 
@@ -63,19 +64,19 @@ void BLECommunications(void *pvParameters) {
                 std::shared_ptr<SensorData> sensorData = sensorDataFactory.getSensorData(pRemoteBLECharacteristic, pData, length);
 
                 logBufLength += snprintf(logBuf + logBufLength, kLogBufMaxLength - logBufLength, " | %s[", sensorData->getId().c_str());
-                if (sensorData->hasHeartRate()) {
+                if (sensorData->hasHeartRate() && !userConfig.getSimulateHr()) {
                   int heartRate = sensorData->getHeartRate();
                   userConfig.setSimulatedHr(heartRate);
                   spinBLEClient.connectedHR |= true;
                   logBufLength += snprintf(logBuf + logBufLength, kLogBufMaxLength - logBufLength, " HR(%d)", heartRate % 1000);
                 }
-                if (sensorData->hasCadence()) {
+                if (sensorData->hasCadence() && !userConfig.getSimulateCad()) {
                   float cadence = sensorData->getCadence();
                   userConfig.setSimulatedCad(cadence);
                   spinBLEClient.connectedCD |= true;
                   logBufLength += snprintf(logBuf + logBufLength, kLogBufMaxLength - logBufLength, " CD(%.2f)", fmodf(cadence, 1000.0));
                 }
-                if (sensorData->hasPower()) {
+                if (sensorData->hasPower() && !userConfig.getSimulateWatts()) {
                   int power = sensorData->getPower() * userConfig.getPowerCorrectionFactor();
                   userConfig.setSimulatedWatts(power);
                   spinBLEClient.connectedPM |= true;
@@ -105,18 +106,22 @@ void BLECommunications(void *pvParameters) {
     }
 
     // ***********************************SERVER**************************************
-    if ((spinBLEClient.connectedHR && !spinBLEClient.connectedPM) && (userConfig.getSimulatedHr() > 0) && userPWC.hr2Pwr) {
+    if ((spinBLEClient.connectedHR || userConfig.getSimulateHr()) && !spinBLEClient.connectedPM && !userConfig.getSimulateWatts() && (userConfig.getSimulatedHr() > 0) &&
+        userPWC.hr2Pwr) {
       calculateInstPwrFromHR();
+      hr2p = true;
+    } else {
+      hr2p = false;
     }
 #ifdef DEBUG_HR_TO_PWR
     calculateInstPwrFromHR();
 #endif
 
-    if (!spinBLEClient.connectedPM && !userPWC.hr2Pwr) {
+    if (!spinBLEClient.connectedPM && !hr2p && !userConfig.getSimulateWatts() && !userConfig.getSimulateCad()) {
       userConfig.setSimulatedCad(0);
       userConfig.setSimulatedWatts(0);
     }
-    if (!spinBLEClient.connectedHR) {
+    if (!spinBLEClient.connectedHR && !userConfig.getSimulateHr()) {
       userConfig.setSimulatedHr(0);
     }
 
