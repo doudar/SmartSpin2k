@@ -6,6 +6,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 ### Added
+- Add images for video links in Wiki Build How To
 - Added webhook for simulated cadence. 
 - Add image for video link in Build How To
 - Added images for video links in Wiki Build How To
