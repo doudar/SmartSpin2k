@@ -297,13 +297,13 @@ void startHttpServer() {
   /********************************************End Server
    * Handlers*******************************/
 
-  xTaskCreatePinnedToCore(webClientUpdate,                     /* Task function. */
-                          "webClientUpdate",                   /* name of task. */
-                          4500 + (DEBUG_LOG_BUFFER_SIZE * 2),  /* Stack size of task Used to be 3000*/
-                          NULL,                                /* parameter of the task */
-                          1,                                   /* priority of the task  - 29 worked*/
-                          &webClientTask,                      /* Task handle to keep track of created task */
-                          1);                                  /* pin task to core 1 */
+  xTaskCreatePinnedToCore(webClientUpdate,                    /* Task function. */
+                          "webClientUpdate",                  /* name of task. */
+                          4500 + (DEBUG_LOG_BUFFER_SIZE * 2), /* Stack size of task Used to be 3000*/
+                          NULL,                               /* parameter of the task */
+                          1,                                  /* priority of the task  - 29 worked*/
+                          &webClientTask,                     /* Task handle to keep track of created task */
+                          1);                                 /* pin task to core 1 */
 
 #ifdef USE_TELEGRAM
   xTaskCreatePinnedToCore(telegramUpdate,   /* Task function. */

@@ -137,7 +137,7 @@ void moveStepper(void *pvParameters) {
   int targetPosition = 0;
 
   while (1) {
-    targetPosition      = shifterPosition + (userConfig.getIncline() * userConfig.getInclineMultiplier());
+    targetPosition = shifterPosition + (userConfig.getIncline() * userConfig.getInclineMultiplier());
     if (stepperPosition == targetPosition) {
       vTaskDelay(300 / portTICK_PERIOD_MS);
       if (connectedClientCount() == 0) {
