@@ -183,11 +183,11 @@ void startHttpServer() {
   server.on("/wattsslider", []() {
     String value = server.arg("value");
     if (value == "enable") {
-      userConfig.setDoublePower(true);
+      userConfig.setSimulateWatts(true);
       server.send(200, "text/plain", "OK");
       debugDirector("Watt Simulator turned on");
     } else if (value == "disable") {
-      userConfig.setDoublePower(false);
+      userConfig.setSimulateWatts(false);
       server.send(200, "text/plain", "OK");
       debugDirector("Watt Simulator turned off");
     } else {
@@ -197,16 +197,21 @@ void startHttpServer() {
     }
   });
 
-  server.on("/hrValue", []() {
-    char outString[MAX_BUFFER_SIZE];
-    snprintf(outString, MAX_BUFFER_SIZE, "%d", userConfig.getSimulatedHr());
-    server.send(200, "text/plain", outString);
-  });
-
-  server.on("/wattsValue", []() {
-    char outString[MAX_BUFFER_SIZE];
-    snprintf(outString, MAX_BUFFER_SIZE, "%d", userConfig.getSimulatedWatts());
-    server.send(200, "text/plain", outString);
+  server.on("/cadslider", []() {
+    String value = server.arg("value");
+    if (value == "enable") {
+      userConfig.setSimulateCad(true);
+      server.send(200, "text/plain", "OK");
+      debugDirector("CAD Simulator turned on");
+    } else if (value == "disable") {
+      userConfig.setSimulateCad(false);
+      server.send(200, "text/plain", "OK");
+      debugDirector("CAD Simulator turned off");
+    } else {
+      userConfig.setSimulatedCad(value.toInt());
+      debugDirector("CAD is now: " + String(userConfig.getSimulatedCad()));
+      server.send(200, "text/plain", "OK");
+    }
   });
 
   server.on("/configJSON", []() {
@@ -379,11 +384,17 @@ void settingsProcessor() {
     userConfig.setDeviceName(tString);
   }
   if (!server.arg("shiftStep").isEmpty()) {
-    userConfig.setShiftStep(server.arg("shiftStep").toInt());
+    uint64_t shiftStep = server.arg("shiftStep").toInt();
+    if (shiftStep >= 50 && shiftStep <= 6000) {
+      userConfig.setShiftStep(shiftStep);
+    }
   }
   if (!server.arg("stepperPower").isEmpty()) {
-    userConfig.setStepperPower(server.arg("stepperPower").toInt());
-    updateStepperPower();
+    uint64_t stepperPower = server.arg("stepperPower").toInt();
+    if (stepperPower >= 500 && stepperPower <= 2000) {
+      userConfig.setStepperPower(stepperPower);
+      updateStepperPower();
+    }
   }
   // checkboxes don't report off, so need to check using another parameter
   // that's always present on that page
@@ -402,7 +413,16 @@ void settingsProcessor() {
     }
   }
   if (!server.arg("inclineMultiplier").isEmpty()) {
-    userConfig.setInclineMultiplier(server.arg("inclineMultiplier").toFloat());
+    float inclineMultiplier = server.arg("inclineMultiplier").toFloat();
+    if (inclineMultiplier >= 1 && inclineMultiplier <= 5) {
+      userConfig.setInclineMultiplier(inclineMultiplier);
+    }
+  }
+  if (!server.arg("powerCorrectionFactor").isEmpty()) {
+    float powerCorrectionFactor = server.arg("powerCorrectionFactor").toFloat();
+    if (powerCorrectionFactor >= 0 && powerCorrectionFactor <= 2) {
+      userConfig.setPowerCorrectionFactor(powerCorrectionFactor);
+    }
   }
   if (!server.arg("blePMDropdown").isEmpty()) {
     wasBTUpdate = true;
@@ -420,11 +440,6 @@ void settingsProcessor() {
       userConfig.setConnectedHeartMonitor(server.arg("bleHRDropdown"));
     } else {
       userConfig.setConnectedHeartMonitor("any");
-    }
-    if (!server.arg("doublePower").isEmpty()) {
-      userConfig.setDoublePower(true);
-    } else {
-      userConfig.setDoublePower(false);
     }
   }
 

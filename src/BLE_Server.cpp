@@ -40,7 +40,7 @@ BLECharacteristic *fitnessMachineIndoorBikeData;
 // 00000101000010000110
 // 00000000100001010100
 //               100000
-byte heartRateMeasurement[5]    = {0b00000, 60, 0, 0, 0};
+byte heartRateMeasurement[2]    = {0x00, 0x00};
 byte cyclingPowerMeasurement[9] = {0b0000000100011, 0, 200, 0, 0, 0, 0, 0, 0};
 byte cpsLocation[1]             = {0b000};       // sensor location 5 == left crank
 byte cpFeature[1]               = {0b00100000};  // crank information present // 3rd & 2nd
@@ -99,7 +99,7 @@ void startBLEServer() {
   pServer->setCallbacks(new MyServerCallbacks());
 
   // Creating Characteristics
-  heartRateMeasurementCharacteristic->setValue(heartRateMeasurement, 5);
+  heartRateMeasurementCharacteristic->setValue(heartRateMeasurement, 2);
 
   cyclingPowerMeasurementCharacteristic->setValue(cyclingPowerMeasurement, 9);
   cyclingPowerFeatureCharacteristic->setValue(cpFeature, 1);
@@ -141,21 +141,23 @@ void computeERG(int currentWatts, int setPoint) {
   int amountToChangeIncline = 0;
 
   if (cad > 20) {
-    if (abs(currentWatts - setPoint) < 50) {
-      amountToChangeIncline = (currentWatts - setPoint) * .5;
+    // 30  is amount of watts per shift. Was 50, seemed like too much...
+    if (abs(currentWatts - setPoint) < 30) {
+      amountToChangeIncline = (currentWatts - setPoint) * 1;
     }
-    if (abs(currentWatts - setPoint) > 50) {
+    if (abs(currentWatts - setPoint) > 30) {
       amountToChangeIncline = amountToChangeIncline + ((currentWatts - setPoint)) * 1;
     }
     amountToChangeIncline = amountToChangeIncline / ((currentWatts / 100) + 1);
-  }
 
-  if (abs(amountToChangeIncline) > userConfig.getShiftStep() * 3) {
-    if (amountToChangeIncline > 0) {
-      amountToChangeIncline = userConfig.getShiftStep() * 3;
-    }
-    if (amountToChangeIncline < 0) {
-      amountToChangeIncline = -(userConfig.getShiftStep() * 3);
+    // limit to 4 shifts at a time
+    if (abs(amountToChangeIncline) > userConfig.getShiftStep() * 5) {
+      if (amountToChangeIncline > 0) {
+        amountToChangeIncline = userConfig.getShiftStep() * 5;
+      }
+      if (amountToChangeIncline < 0) {
+        amountToChangeIncline = -(userConfig.getShiftStep() * 5);
+      }
     }
   }
 
@@ -232,7 +234,7 @@ void updateCyclingPowerMesurementChar() {
 
 void updateHeartRateMeasurementChar() {
   heartRateMeasurement[1] = userConfig.getSimulatedHr();
-  heartRateMeasurementCharacteristic->setValue(heartRateMeasurement, 5);
+  heartRateMeasurementCharacteristic->setValue(heartRateMeasurement, 2);
 
   // Data(10), Sep(data/2), Static(11), Nul(1) == 26, rounded up
   char logBuf[35];
@@ -275,7 +277,7 @@ void MyCallbacks::onWrite(BLECharacteristic *pCharacteristic) {
       debugDirector(String(text, HEX) + " ", false);
     }
     debugDirector("<-- From APP ", false);
-    /* 17 means FTMS Incline Control Mode  (aka SIM mode)*/
+    /* 0x11 17 means FTMS Incline Control Mode  (aka SIM mode)*/
 
     if (static_cast<int>(rxValue[0]) == 17) {
       signed char buf[2];
@@ -291,9 +293,9 @@ void MyCallbacks::onWrite(BLECharacteristic *pCharacteristic) {
     }
     debugDirector("");
 
-    /* 5 means FTMS Watts Control Mode (aka ERG mode) */
+    /* 0x05 5 means FTMS Watts Control Mode (aka ERG mode) */
     if ((static_cast<int>(rxValue[0]) == 5) && (spinBLEClient.connectedPM)) {
-      int targetWatts = bytes_to_int(rxValue[2], rxValue[1]);
+      int targetWatts = bytes_to_u16(rxValue[2], rxValue[1]);
       if (!userConfig.getERGMode()) {
         userConfig.setERGMode(true);
       }
