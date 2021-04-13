@@ -205,14 +205,14 @@ void startHttpServer() {
     if (value == "enable") {
       userConfig.setSimulateCad(true);
       server.send(200, "text/plain", "OK");
-      debugDirector("CAD Simulator turned on");
+      SS2K_LOG("HTTP_Server", "CAD Simulator turned on");
     } else if (value == "disable") {
       userConfig.setSimulateCad(false);
       server.send(200, "text/plain", "OK");
-      debugDirector("CAD Simulator turned off");
+      SS2K_LOG("HTTP_Server", "CAD Simulator turned off");
     } else {
       userConfig.setSimulatedCad(value.toInt());
-      debugDirector("CAD is now: " + String(userConfig.getSimulatedCad()));
+      SS2K_LOG("HTTP_Server", "CAD is now: %f", userConfig.getSimulatedCad());
       server.send(200, "text/plain", "OK");
     }
   });
