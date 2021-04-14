@@ -23,6 +23,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Add documentation to SensorData class.
 
 ### Changed
+- Fixed missing strap loops on non-pcb case.
 - Power Correction Factor slider now updates correctly. 
 - Removed unused http onServer calls.
 - Repaired btsimulator.html
