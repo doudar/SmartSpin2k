@@ -23,6 +23,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Add documentation to SensorData class.
 
 ### Changed
+- Fixed missing strap loops on non-pcb case.
 - Removed unused http onServer calls.
 - Repaired btsimulator.html
 - Shortened HR characteristic to 2 bytes (Polar OH1 format)
