@@ -36,8 +36,8 @@ void DebugInfo::appendLog_internal(const char *format, va_list args) {
 const std::string DebugInfo::getAndClearLogs_internal() {
   if (xSemaphoreTake(logBufferMutex, 500) == pdTRUE) {
     const std::string debugLog = std::string(logBuffer, logBufferLength);
-    logBufferLength = 0;
-    logBuffer[0]    = '\0';
+    logBufferLength            = 0;
+    logBuffer[0]               = '\0';
     xSemaphoreGive(logBufferMutex);
     SS2K_LOGD("DebugInfo", "Log buffer read %d bytes and cleared", logBufferLength);
     return debugLog;
@@ -53,7 +53,7 @@ String DebugInfo::getAndClearLogs() { return ""; }
 void ss2k_remove_newlines(std::string *str) {
   std::string::size_type pos = 0;
   while ((pos = (*str).find("\n", pos)) != std::string::npos) {
-      (*str).replace(pos, 1, " ");
+    (*str).replace(pos, 1, " ");
   }
 }
 
