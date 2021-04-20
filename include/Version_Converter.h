@@ -17,7 +17,7 @@ struct Version {
   char *branch, *commit;
 
  public:
-  // Parametarized constructor. Pass string to it and it will
+  // Parameterized constructor. Pass string to it and it will
   // extract version-tag from it.
   //
   // Use initializer list to assign version-tag variables
