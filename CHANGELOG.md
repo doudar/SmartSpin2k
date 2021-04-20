@@ -6,8 +6,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 ### Added
+- Added README.md to "~/Hardware/Mounts/" that provides help for the files contained within. 
+- Added BakerEchelonStrap to "~/Hardware/Mounts/".
+- Added positive retention clip to "~/Hardware/Mounts".
+- Added Logan clip to "~/Hardware/Mounts".
 - Added experimental rigid mounting strap. * Fixed width to 65mm. 
-- Add images for video links in Wiki Build How To
+- Add images for video links in Wiki Build How To.
 - Added webhook for simulated cadence. 
 - Add image for video link in Build How To
 - Added images for video links in Wiki Build How To
@@ -23,6 +27,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Add documentation to SensorData class.
 
 ### Changed
+- Reorganized hardware library into per part subfolders.
 - Updater shifter cover to version 9.
 - Fixed missing strap loops on non-pcb case.
 - Power Correction Factor slider now updates correctly. 
