@@ -102,7 +102,7 @@ void startWifi() {
     Serial.print("Retrieving time: ");
     configTime(0, 0, "pool.ntp.org");  // get UTC time via NTP
     time_t now = time(nullptr);
-    while (now < 10) { //wait 10 seconds
+    while (now < 10) {  // wait 10 seconds
       Serial.print(".");
       delay(100);
       now = time(nullptr);
