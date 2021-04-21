@@ -5,7 +5,7 @@ Http://GitHub.com/doudar/SmartSpin2K
 Hardware (3d Printed) and Software Project that uses an ESP32 and stepper motor to control spin bikes that have a resistance knob. 
 The initial target was to use it with Zwift: stationary bike up hills and feel the burn. 
 
-Optionally, the SmartSpin2K project has also progressed to the point of where it's useful without the hardware as a BLE device multiplexer, heart rate to watt converter (estimator), and proprietary BLE device to normal FTMS protocol converter using only the redily availiable ~$6 ESP32 devkit.   
+Optionally, the SmartSpin2K project has also progressed to the point of where it's useful without the hardware as a BLE device multiplexer, heart rate to watt converter (estimator), and proprietary BLE device to normal FTMS protocol converter using only the readily available ~$6 ESP32 devkit.   
 
 ## Background
 I travel for a living and some hotels I stay at have spin bikes. I started carrying my own power meter pedals for the spin bikes so I could ride Zwift, but the experience just isn't the same without automatic resistance on the hills. Then one day I was looking down at that simple to turn knob and I had a thought - With the power meter pedals attached, almost everything is already in place on this $300 spin bike to turn it into the equivalent of a $3,000 computer controlled smart bike! And so here we are....
@@ -17,9 +17,9 @@ Check it out at https://www.instructables.com/Spin-Bike-Controller/
 
 <img src="Pictures/Communications_Overview.png" alt="Communications Overview" style="height: 300px; width: 100"/> 
 
-Your power meter (Or optionally the SmartSpin2K's built in HR->PWR calculation) connects to SmartSpin2k which then relays power and cadence to Zwift (or any other cycling app) via bluetooth as a controllable smart trainer. SmartSpin2k simulates gradient recieved from the app by automatically turning the knob a set amount for each percent grade change on your virtual road. SmartSpin2k also supports ERG mode which lets the unit directly control your resistance to match a specified watt target set by the connected app. In addition to adjusting the knob, SmartSpin2k also has shifter buttons to simulate virtual shifting. One of the nice features of having these shifters is that you can use them in ERG mode to get a jump on upcoming intervals. 
+Your power meter (Or optionally the SmartSpin2K's built in HR->PWR calculation) connects to SmartSpin2k which then relays power and cadence to Zwift (or any other cycling app) via bluetooth as a controllable smart trainer. SmartSpin2k simulates gradient received from the app by automatically turning the knob a set amount for each percent grade change on your virtual road. SmartSpin2k also supports ERG mode which lets the unit directly control your resistance to match a specified watt target set by the connected app. In addition to adjusting the knob, SmartSpin2k also has shifter buttons to simulate virtual shifting. One of the nice features of having these shifters is that you can use them in ERG mode to get a jump on upcoming intervals. 
 
-There are a multitude of configuration options availiable via a web interface on the SmartSpin2k. Automatic updates are also preformed on a regular basis if you choose to connect SmartSpin2k to your home network.  
+There are a multitude of configuration options available via a web interface on the SmartSpin2k. Automatic updates are also preformed on a regular basis if you choose to connect SmartSpin2k to your home network.  
 
 ### Recomended Hardware:
 
@@ -42,10 +42,10 @@ So for $700-$1000 (or much less if you use HR2VP) you can build a fully function
 Surprisingly, my spin bike with the SmartSpin2K actually has better "road feel" than my expensive bike trainer, and since it's a belt drive bike, it's virtually silent. That's somthing you cannot achieve with a chain driven bike on any smart trainer. 
 
 # NEW! - Small quantity of kits availiable!
-If you would like a kit with a PCB, send a request to SmartSpin2K@gmail.com . Cost is $175 + shipping for all the printed parts + electronics, for an "almost ready to use unit". Note that if you go this route, this is still an open source hardware project and responsibility lies with **you** as to the proper construction and use. As such, you'll want to at least pull the cover off before use and take a look to ensure it's built to your standards (I think it's pretty good:) I'll be putting these togather on an as ordered basis, so expect 3-5 days prior to shipping.  Please see https://github.com/doudar/SmartSpin2k/wiki/Fitting-the-SmartSpin2k!
+If you would like a kit with a PCB, send a request to SmartSpin2K@gmail.com . Cost is $175 + shipping for all the printed parts + electronics, for an "almost ready to use unit". Note that if you go this route, this is still an open source hardware project and responsibility lies with **you** as to the proper construction and use. As such, you'll want to at least pull the cover off before use and take a look to ensure it's built to your standards (I think it's pretty good:) I'll be putting these together on an as ordered basis, so expect 3-5 days prior to shipping.  Please see https://github.com/doudar/SmartSpin2k/wiki/Fitting-the-SmartSpin2k!
 
 ### We're working really hard on full documentaion
-If you're adventerious and handy you can probably take a look at my pictures below or the assembly video and start tinkering. Please check out our new Instructable at https://www.instructables.com/Spin-Bike-Controller/ If there are any questions on the Instructable, please add info in the discussions and we will clarify there and on the new Instructable. This is a growing community and we now have a few members that would love to help you to get your SmartSpin2k working. There's also a wiki at https://github.com/doudar/SmartSpin2k/wiki 
+If you're adventurous and handy you can probably take a look at my pictures below or the assembly video and start tinkering. Please check out our new Instructable at https://www.instructables.com/Spin-Bike-Controller/ If there are any questions on the Instructable, please add info in the discussions and we will clarify there and on the new Instructable. This is a growing community and we now have a few members that would love to help you to get your SmartSpin2k working. There's also a wiki at https://github.com/doudar/SmartSpin2k/wiki 
 
 In short, the process is:
 
