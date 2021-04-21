@@ -62,18 +62,18 @@
                   style="position: relative; top: -12px; color: rgb(250, 250, 250);">
                   <span id="powerCorrectionFactorValue">0</span>
                 </p>
-                <input style="position: relative; top: -25px; left: 7px;" type="range" id="powerCorrectionFactor"
+                <input style="position: relative; top: -25px; left: 7px;" type="range" id="powerCorrectionFactorSlider"
                   name="powerCorrectionFactor" value="1.00" min="0.00" max="2.0" step="0.01" class="slider1"
                   onchange="updateSlider(this, document.getElementById('powerCorrectionFactorValue'))" />
               </td>
             </tr>
           </tbody>
         </table>
-        <input type="submit" value="Save Dropdowns and Connect" />
+        <input type="submit" value="Save Dropdowns" />
       </form>
       <p></p>
       <form action="/BLEScan">
-        <input type="submit" value="Ignore Dropdown and Scan/Reconnect">
+        <input type="submit" value="Ignore changes and connect">
         <label style="font-size: .75rem; font-style: italic; font-weight: lighter; line-height: .5em;"><br>
           Hint:
           you can hold both shifters for 3 seconds <br> to scan/reconnect at anytime without using this
@@ -100,7 +100,7 @@
 
   function updateSlider(element, valueElement) {
     var sliderValue = element.value;
-    valueElement.innerHTML = sliderValue;
+    valueElement.innerHTML = sliderValue + " X";
   }
 
   function requestConfigValues() {
@@ -186,8 +186,8 @@
         HRDropdown.add(defaultOptionHR);
         document.getElementById("connectedPowerMeter").innerHTML = data.connectedPowerMeter;
         document.getElementById("connectedHeartMonitor").innerHTML = data.connectedHeartMonitor;
-        updateSlider(document.getElementById("powerCorrectionFactor"), document.getElementById("powerCorrectionFactorValue"));
-        document.getElementById("powerCorrectionFactor").checked = data.powerCorrectionFactor;
+        document.getElementById("powerCorrectionFactorValue").innerHTML = data.powerCorrectionFactor + " X";
+        document.getElementById("powerCorrectionFactorSlider").value = data.powerCorrectionFactor;
         document.getElementById("loadingWatermark").opacity = 0;
         setTimeout(function () { document.getElementById("loadingWatermark").remove(); }, 1000);
       }
