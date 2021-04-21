@@ -1,0 +1,16 @@
+{
+  "name": "AduinoCompat",
+  "version": "0.0.1",
+  "authors": [
+    {
+      "name": "Anthony Doud",
+      "maintainer": true
+    },
+    {
+      "name": "Joel Baranick",
+      "maintainer": true
+    }
+  ],
+  "license": "GPL-2.0-only",
+  "platforms": "native"
+}

@@ -7,10 +7,11 @@
 
 #include "Main.h"
 #include "SS2KLog.h"
-#include <math.h>
 #include "BLE_Common.h"
-#include "sensors/SensorData.h"
-#include "sensors/SensorDataFactory.h"
+
+#include <math.h>
+#include <sensors/SensorData.h>
+#include <sensors/SensorDataFactory.h>
 
 int bleConnDesc               = 1;
 bool updateConnParametersFlag = false;
@@ -57,7 +58,10 @@ void BLECommunications(void *pvParameters) {
                 logBufLength += snprintf(logBuf + logBufLength, kLogBufMaxLength - logBufLength, "<- %.8s | %.8s", myAdvertisedDevice.serviceUUID.toString().c_str(),
                                          myAdvertisedDevice.charUUID.toString().c_str());
 
-                std::shared_ptr<SensorData> sensorData = sensorDataFactory.getSensorData(pRemoteBLECharacteristic, pData, length);
+                std::shared_ptr<SensorData> sensorData = sensorDataFactory.getSensorData(pRemoteBLECharacteristic->getUUID(),
+                                                                                         (uint64_t) pRemoteBLECharacteristic->getRemoteService()->getClient()->getPeerAddress(),
+                                                                                         pData,
+                                                                                         length);
 
                 logBufLength += snprintf(logBuf + logBufLength, kLogBufMaxLength - logBufLength, " | %s[", sensorData->getId().c_str());
                 if (sensorData->hasHeartRate() && !userConfig.getSimulateHr()) {

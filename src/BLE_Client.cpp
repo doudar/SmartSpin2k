@@ -15,8 +15,9 @@ appearance: 1156, manufacturer data: 640302018743, serviceUUID:
 #include "BLE_Common.h"
 #include "SS2KLog.h"
 
-#include <memory>
 #include <ArduinoJson.h>
+#include <Constants.h>
+#include <memory>
 #include <NimBLEDevice.h>
 
 int reconnectTries = MAX_RECONNECT_TRIES;

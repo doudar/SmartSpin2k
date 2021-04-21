@@ -104,7 +104,7 @@ void startWifi() {
     SS2K_LOG("HTTP_Server", "Syncing clock...");
     configTime(0, 0, "pool.ntp.org");  // get UTC time via NTP
     time_t now = time(nullptr);
-    while (now < 5 * 3600) {
+    while (now < 10) {  // wait 10 seconds
       SS2K_LOG("HTTP_Server", "Waiting for clock sync...");
       delay(100);
       now = time(nullptr);

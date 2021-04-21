@@ -10,6 +10,7 @@
 #include "BLE_Common.h"
 
 #include <ArduinoJson.h>
+#include <Constants.h>
 #include <NimBLEDevice.h>
 
 // BLE Server Settings
