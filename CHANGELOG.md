@@ -25,6 +25,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Add hyphens to Flywheel GATT UUIDs.
 - Filter Flywheel advertisements by name.
 - Add documentation to SensorData class.
+- Enabled native testing.
 
 ### Changed
 - Reorganized hardware library into per part subfolders.
@@ -46,6 +47,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Fix Flywheel power/cadence decoding.
 - Ignore zero heartrate reported from remote FTMS.
 - Fix Assimoa Uno stuck cadence.
+- Started extract non-arduino code into a cross-platform library.
 
 ### Removed
 - Deleted and ignored .pio folder which had been mistakening commited

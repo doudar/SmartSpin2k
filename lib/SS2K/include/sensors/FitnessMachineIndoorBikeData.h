@@ -7,7 +7,6 @@
 
 #pragma once
 
-#include <Arduino.h>
 #include "SensorData.h"
 
 class FitnessMachineIndoorBikeData : public SensorData {

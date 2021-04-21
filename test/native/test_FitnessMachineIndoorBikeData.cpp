@@ -5,16 +5,17 @@
  * SPDX-License-Identifier: GPL-2.0-only
  */
 
+#include "sdkconfig.h"
 #include <unity.h>
-#include "BLE_Common.h"
+#include <sensors/FitnessMachineIndoorBikeData.h>
 
 static uint8_t data[9] = {0x44, 0x02, 0xf2, 0x08, 0xb0, 0x00, 0x40, 0x00, 0x00};
 
 void test_parses_heartrate(void) {
   FitnessMachineIndoorBikeData sensor = FitnessMachineIndoorBikeData();
   sensor.decode(data, 9);
-  TEST_ASSERT_TRUE(sensor.hasHeartRate());
-  TEST_ASSERT_EQUAL(0, sensor.getHeartRate());
+  TEST_ASSERT_FALSE(sensor.hasHeartRate());
+  TEST_ASSERT_EQUAL(INT_MIN, sensor.getHeartRate());
 }
 
 void test_parses_cadence(void) {

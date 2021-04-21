@@ -7,20 +7,23 @@
 
 #pragma once
 
-#include <Arduino.h>
+#include <climits>
+#include <cmath>
+#include <cstdint>
+#include <string>
 
 class SensorData {
  public:
   /**
    * @brief Constructor
    */
-  explicit SensorData(String id) : id(id) {}
+  explicit SensorData(std::string id) : id(id) {}
 
   /**
    * @brief Get the Id.
    * @return The unique identifier of the sensor.
    */
-  String getId();
+  std::string getId();
 
   /**
    * @brief Does this sensor have Heartrate data?
@@ -82,5 +85,5 @@ class SensorData {
   virtual void decode(uint8_t *data, size_t length) = 0;
 
  private:
-  String id;
+  std::string id;
 };

@@ -17,10 +17,10 @@ bool HeartRateData::hasSpeed() { return false; }
 
 int HeartRateData::getHeartRate() { return this->heartrate; }
 
-float HeartRateData::getCadence() { return NAN; }
+float HeartRateData::getCadence() { return nanf(""); }
 
 int HeartRateData::getPower() { return INT_MIN; }
 
-float HeartRateData::getSpeed() { return NAN; }
+float HeartRateData::getSpeed() { return nanf(""); }
 
 void HeartRateData::decode(uint8_t *data, size_t length) { this->heartrate = static_cast<int>(data[1]); }
