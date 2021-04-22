@@ -22,6 +22,7 @@ PR  Release
 [ ]  [ ]   Connect to virtual trainer software (Zwift, FullGaz, etc)
      [ ]   Incline accurate
      [ ]   Decline accurate
+     [ ]   ERG response accurate
      [ ]   Disconnect power server and check virtual power with heart rate
 [ ]  [ ]   Enable automatic updates
 [ ]  [ ]   Reboot and confirm automatic update
