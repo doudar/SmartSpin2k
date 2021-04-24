@@ -72,7 +72,7 @@ String noIndexHTML =
 
 /* Server Index Page */
 String OTAServerIndex =
-    "<script src='https://code.jquery.com/jquery-3.3.1.min.js'></script>"
+    "<script src='jquery.js.gz'></script>"
     "<form method='POST' action='#' enctype='multipart/form-data' "
     "id='upload_form'>"
     "<input type='file' name='update' id='file' onchange='sub(this)' "
