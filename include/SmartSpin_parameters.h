@@ -25,6 +25,7 @@ class userParameters {
   float powerCorrectionFactor;
   bool simulateHr;
   bool simulateWatts;
+  bool simulateCad;
   bool ERGMode;
   float ERGSensitivity;
   bool autoUpdate;
@@ -49,6 +50,7 @@ class userParameters {
   float getPowerCorrectionFactor() { return powerCorrectionFactor; }
   bool getSimulateHr() { return simulateHr; }
   bool getSimulateWatts() { return simulateWatts; }
+  bool getSimulateCad() { return simulateCad; }
   bool getERGMode() { return ERGMode; }
   float getERGSensitivity() { return ERGSensitivity; }
   bool getautoUpdate() { return autoUpdate; }
@@ -73,6 +75,7 @@ class userParameters {
   void setPowerCorrectionFactor(float pm) { powerCorrectionFactor = pm; }
   void setSimulateHr(bool shr) { simulateHr = shr; }
   void setSimulateWatts(bool swt) { simulateWatts = swt; }
+  void setSimulateCad(bool scd) { simulateCad = scd; }
   void setERGMode(bool erg) { ERGMode = erg; }
   void setERGSensitivity(float ergS) { ERGSensitivity = ergS; }
   void setAutoUpdate(bool atupd) { autoUpdate = atupd; }

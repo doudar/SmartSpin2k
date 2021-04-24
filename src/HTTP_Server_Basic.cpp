@@ -102,7 +102,7 @@ void startWifi() {
     Serial.print("Retrieving time: ");
     configTime(0, 0, "pool.ntp.org");  // get UTC time via NTP
     time_t now = time(nullptr);
-    while (now < 5 * 3600) {
+    while (now < 10) {  // wait 10 seconds
       Serial.print(".");
       delay(100);
       now = time(nullptr);
@@ -197,16 +197,21 @@ void startHttpServer() {
     }
   });
 
-  server.on("/hrValue", []() {
-    char outString[MAX_BUFFER_SIZE];
-    snprintf(outString, MAX_BUFFER_SIZE, "%d", userConfig.getSimulatedHr());
-    server.send(200, "text/plain", outString);
-  });
-
-  server.on("/wattsValue", []() {
-    char outString[MAX_BUFFER_SIZE];
-    snprintf(outString, MAX_BUFFER_SIZE, "%d", userConfig.getSimulatedWatts());
-    server.send(200, "text/plain", outString);
+  server.on("/cadslider", []() {
+    String value = server.arg("value");
+    if (value == "enable") {
+      userConfig.setSimulateCad(true);
+      server.send(200, "text/plain", "OK");
+      debugDirector("CAD Simulator turned on");
+    } else if (value == "disable") {
+      userConfig.setSimulateCad(false);
+      server.send(200, "text/plain", "OK");
+      debugDirector("CAD Simulator turned off");
+    } else {
+      userConfig.setSimulatedCad(value.toInt());
+      debugDirector("CAD is now: " + String(userConfig.getSimulatedCad()));
+      server.send(200, "text/plain", "OK");
+    }
   });
 
   server.on("/configJSON", []() {

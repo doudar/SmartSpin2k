@@ -8,6 +8,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Added
 - Added ERGSensitivity setting in Settings.html
 - Added ERGSensitivy parameter. 
+- Added firmware checklist to "~/" for PR and release candidate testing.
+- Added README.md to "~/Hardware/*" that provides help for the files contained within. 
+- Added BakerEchelonStrap to "~/Hardware/Mounts/".
+- Added positive retention clip to "~/Hardware/Mounts".
+- Added Logan clip to "~/Hardware/Mounts".
+- Added experimental rigid mounting strap. * Fixed width to 65mm. 
+- Add images for video links in Wiki Build How To.
+- Added webhook for simulated cadence. 
+- Add image for video link in Build How To
+- Added images for video links in Wiki Build How To
 - Added XL (Extra Long) Mounting strap for Echelon.
 - Added Insert Peloton 7 Flat V2 .sldpart and .stl.
 - Added initial credits file.
@@ -18,11 +28,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Add hyphens to Flywheel GATT UUIDs.
 - Filter Flywheel advertisements by name.
 - Add documentation to SensorData class.
+- Enabled native testing.
 
 ### Changed
 - Settings page submit returns setting page. 
 - Added explanatory comments in settings for various values. 
 - Decreased (default) expected watts per shift from 50 to 30. 
+- Fixed minor spulling errurs. 
+- Reorganized hardware library into per part subfolders.
+- Updater shifter cover to version 9.
+- Fixed missing strap loops on non-pcb case.
+- Power Correction Factor slider now updates correctly. 
+- Removed unused http onServer calls.
+- Repaired btsimulator.html
 - Shortened HR characteristic to 2 bytes (Polar OH1 format)
 - Increased ShiftStep UI slider range.
 - Replaced DoublePower setting with PowerCorrectionFactor setting.
@@ -32,10 +50,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Updated Echelon Insert
 - Fixed many issues exposed by the addition of cpp-lint, pio check, and clang-format.
 - Fixed merge issues.
-- Fixed Echelon licences.
+- Fixed Echelon licenses.
 - Fix Flywheel power/cadence decoding.
-- Ignore zero heartrate reported from remote FTMS.
+- Ignore zero heart rate reported from remote FTMS.
 - Fix Assimoa Uno stuck cadence.
+- Started extract non-arduino code into a cross-platform library.
 
 ### Removed
-- Deleted and ignored .pio folder which had been mistakening commited
+- Deleted and ignored .pio folder which had been mistakenly committed.
