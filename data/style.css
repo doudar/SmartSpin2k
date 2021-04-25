@@ -165,7 +165,7 @@ body {
 }
 
 fieldset{
-  border: 30px solid ; 
+  border: 10px solid ; 
   border-color:#1e3252; 
   box-sizing: border-box; 
   grid-area: 1 / 1; 
