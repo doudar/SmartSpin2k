@@ -29,6 +29,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Enabled native testing.
 
 ### Changed
+- Made Revmaster insert slightly smaller. 
 - Fixed minor spulling errurs. 
 - Reorganized hardware library into per part subfolders.
 - Updater shifter cover to version 9.
