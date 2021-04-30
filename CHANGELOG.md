@@ -6,7 +6,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 ### Added
-- Added README.md to "~/Hardware/Mounts/" that provides help for the files contained within. 
+- Added firmware checklist to "~/" for PR and release candidate testing.
+- Added README.md to "~/Hardware/*" that provides help for the files contained within. 
 - Added BakerEchelonStrap to "~/Hardware/Mounts/".
 - Added positive retention clip to "~/Hardware/Mounts".
 - Added Logan clip to "~/Hardware/Mounts".
@@ -29,6 +30,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Added logging library which supports levels.
 
 ### Changed
+- Made Revmaster insert slightly smaller. 
+- Fixed minor spulling errurs. 
 - Reorganized hardware library into per part subfolders.
 - Updater shifter cover to version 9.
 - Fixed missing strap loops on non-pcb case.
@@ -44,12 +47,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Updated Echelon Insert
 - Fixed many issues exposed by the addition of cpp-lint, pio check, and clang-format.
 - Fixed merge issues.
-- Fixed Echelon licences.
+- Fixed Echelon licenses.
 - Fix Flywheel power/cadence decoding.
-- Ignore zero heartrate reported from remote FTMS.
+- Ignore zero heart rate reported from remote FTMS.
 - Fix Assimoa Uno stuck cadence.
 - Started extract non-arduino code into a cross-platform library.
 - Changed all logging calls to new logging library.
 
 ### Removed
-- Deleted and ignored .pio folder which had been mistakening commited
+- Deleted and ignored .pio folder which had been mistakenly committed.

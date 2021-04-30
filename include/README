@@ -6,5 +6,5 @@ Copyright 2020 Anthony Doud
 This work is licensed under the GNU General Public License v2
 Physical prototypes build from plans in the SmartSpin2k repository are licensed under Cern Open Hardware Licence version 2 Permissive
 
-Let the builder beware:  Working SmartSpin2k hardware is experimental and may inadvertantly contain serious flaws.
+Let the builder beware:  Working SmartSpin2k hardware is experimental and may inadvertently contain serious flaws.
 No warranty of any kind is implied or given.  The builder assumes all risks and liabilities with construction and use, be they as minor as a burned out ESP32 or as serious as an injured child.
