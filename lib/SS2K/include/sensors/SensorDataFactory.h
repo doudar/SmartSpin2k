@@ -16,7 +16,7 @@ class SensorDataFactory {
  public:
   SensorDataFactory() {}
 
-  std::shared_ptr<SensorData> getSensorData(NimBLEUUID characteristicUUID, uint8_t *data, size_t length);
+  std::shared_ptr<SensorData> getSensorData(NimBLEUUID characteristicUUID, const uint64_t peerAddress, uint8_t *data, size_t length);
 
  private:
   class KnownDevice {
