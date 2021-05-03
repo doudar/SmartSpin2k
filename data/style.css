@@ -1,10 +1,18 @@
 html {
   font-family: sans-serif;
   display: inline-block;
-  margin: 10px auto;
+  margin: 5px auto;
   text-align: center;
   background-color: #03245c;
   line-height: 1em;
+}
+
+label{
+  font-size: medium;
+}
+
+div{
+  font-size: medium;
 }
 
 a{
@@ -157,11 +165,11 @@ body {
 }
 
 fieldset{
-  border: 30px solid ; 
+  border: 10px solid ; 
   border-color:#1e3252; 
   box-sizing: border-box; 
   grid-area: 1 / 1; 
-  padding: 20px; 
+  padding: 5px; 
   margin: 0 auto;
   z-index: -1;
 }
