@@ -20,7 +20,7 @@ void DebugInfo::appendLog(const char *format, ...) {
 const std::string DebugInfo::getAndClearLogs() { return DebugInfo::INSTANCE.getAndClearLogs_internal(); }
 
 void DebugInfo::appendLog_internal(const char *format, va_list args) {
-  if (xSemaphoreTake(logBufferMutex, 500) == pdTRUE) {
+  if (xSemaphoreTake(logBufferMutex, 1000) == pdTRUE) {
     int written = vsnprintf(logBuffer + logBufferLength, DEBUG_LOG_BUFFER_SIZE - logBufferLength, format, args);
     SS2K_LOGD("DebugInfo", "Wrote %d bytes to log", written);
     if (written < 0 || logBufferLength + written > DEBUG_LOG_BUFFER_SIZE) {
