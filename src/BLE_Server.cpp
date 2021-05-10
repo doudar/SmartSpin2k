@@ -189,9 +189,24 @@ void updateIndoorBikeDataChar() {
   ftmsIndoorBikeData[7] = (uint8_t)(watts >> 8);  // power value, constrained to avoid negative values,
                                                   // although the specification allows for a sint16
   ftmsIndoorBikeData[8] = (uint8_t)hr;
+
+  // 200 == Data(30), Sep(data/2), Arrow(3), CharId(37), Sep(3), CharId(37), Sep(3), Name(10), Prefix(2), HR(7), SEP(1), CD(10), SEP(1), PW(8), SEP(1), SD(7), Suffix(2), Nul(1) == 178, rounded up
+  const int kLogBufMaxLength = 200;
+  char logBuf[kLogBufMaxLength];
+  int logBufLength = ss2k_log_hex_to_buffer(ftmsIndoorBikeData, *(&ftmsIndoorBikeData + 1) - ftmsIndoorBikeData, logBuf, 0, kLogBufMaxLength);
+  logBufLength += snprintf(logBuf + logBufLength, kLogBufMaxLength - logBufLength, "-> %s | %s | FTMS(IBD)[", FITNESSMACHINESERVICE_UUID.toString().c_str(),
+                           fitnessMachineIndoorBikeData->getUUID().toString().c_str());
+  logBufLength += snprintf(logBuf + logBufLength, kLogBufMaxLength - logBufLength, " HR(%d)", hr % 1000);
+  logBufLength += snprintf(logBuf + logBufLength, kLogBufMaxLength - logBufLength, " CD(%.2f)", fmodf(cadRaw, 1000.0));
+  logBufLength += snprintf(logBuf + logBufLength, kLogBufMaxLength - logBufLength, " PW(%d)", watts % 10000);
+  logBufLength += snprintf(logBuf + logBufLength, kLogBufMaxLength - logBufLength, " SD(%.2f)", fmodf(speed, 1000.0));
+  strncat(logBuf + logBufLength, " ]", kLogBufMaxLength - logBufLength);
+
   fitnessMachineIndoorBikeData->setValue(ftmsIndoorBikeData, 9);
   fitnessMachineFeature->notify();
   fitnessMachineIndoorBikeData->notify();
+
+  SS2K_LOG("BLE_Server", "%s", logBuf);
 }  // ^^Using the New Way of setting Bytes.
 
 void updateCyclingPowerMeasurementChar() {
