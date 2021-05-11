@@ -20,6 +20,7 @@ BLECharacteristic *heartRateMeasurementCharacteristic;
 BLECharacteristic *cyclingPowerMeasurementCharacteristic;
 BLECharacteristic *fitnessMachineFeature;
 BLECharacteristic *fitnessMachineIndoorBikeData;
+BLECharacteristic *fitnessMachineStatusCharacteristic;
 
 /********************************Bit field Flag
  * Example***********************************/
@@ -48,13 +49,13 @@ byte cpFeature[1]               = {0b00100000};  // crank information present //
                                                  // byte is reported power
 
 byte ftmsService[6]       = {0x00, 0x00, 0x00, 0b01, 0b0100000, 0x00};
-byte ftmsControlPoint[8]  = {0, 0, 0, 0, 0, 0, 0, 0};  // 0x08 we need to return a value of 1 for any sucessful change
-byte ftmsMachineStatus[8] = {0, 0, 0, 0, 0, 0, 0, 0};
+byte ftmsControlPoint[3]  = {0x00, 0x00, 0x00};  // 0x08 we need to return a value of 1 for any successful change
+byte ftmsMachineStatus[7] = {0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00};
 
-struct FitnessMachineFeature ftmsFeature = {
-    FitnessMachineFeatureFlags::Types::CadenceSupported | FitnessMachineFeatureFlags::Types::HeartRateMeasurementSupported |
-        FitnessMachineFeatureFlags::Types::PowerMeasurementSupported,
-    FitnessMachineTargetFlags::Types::InclinationTargetSettingSupported | FitnessMachineTargetFlags::Types::IndoorBikeSimulationParametersSupported};
+struct FitnessMachineFeature ftmsFeature = {FitnessMachineFeatureFlags::Types::CadenceSupported | FitnessMachineFeatureFlags::Types::HeartRateMeasurementSupported |
+                                                FitnessMachineFeatureFlags::Types::PowerMeasurementSupported,
+                                            FitnessMachineTargetFlags::PowerTargetSettingSupported | FitnessMachineTargetFlags::Types::InclinationTargetSettingSupported |
+                                                FitnessMachineTargetFlags::Types::IndoorBikeSimulationParametersSupported};
 
 uint8_t ftmsIndoorBikeData[14] = {0x44, 0x02, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0};  // 00000000100001010100 ISpeed, ICAD,
                                                                                                             // TDistance, IPower, ETime
@@ -88,7 +89,7 @@ void startBLEServer() {
   BLECharacteristic *fitnessMachineControlPoint =
       pFitnessMachineService->createCharacteristic(FITNESSMACHINECONTROLPOINT_UUID, NIMBLE_PROPERTY::WRITE | NIMBLE_PROPERTY::NOTIFY | NIMBLE_PROPERTY::INDICATE);
 
-  BLECharacteristic *fitnessMachineStatus =
+  fitnessMachineStatusCharacteristic =
       pFitnessMachineService->createCharacteristic(FITNESSMACHINESTATUS_UUID, NIMBLE_PROPERTY::READ | NIMBLE_PROPERTY::WRITE | NIMBLE_PROPERTY::NOTIFY);
 
   fitnessMachineIndoorBikeData = pFitnessMachineService->createCharacteristic(FITNESSMACHINEINDOORBIKEDATA_UUID, NIMBLE_PROPERTY::READ | NIMBLE_PROPERTY::NOTIFY);
@@ -107,11 +108,11 @@ void startBLEServer() {
   sensorLocationCharacteristic->setValue(cpsLocation, 1);
 
   fitnessMachineFeature->setValue(ftmsFeature.bytes, sizeof(ftmsFeature));
-  fitnessMachineControlPoint->setValue(ftmsControlPoint, 8);
+  fitnessMachineControlPoint->setValue(ftmsControlPoint, 3);
 
   fitnessMachineIndoorBikeData->setValue(ftmsIndoorBikeData, 14);
 
-  fitnessMachineStatus->setValue(ftmsMachineStatus, 8);
+  fitnessMachineStatusCharacteristic->setValue(ftmsMachineStatus, 8);
   fitnessMachineResistanceLevelRange->setValue(ftmsResistanceLevelRange, 6);
   fitnessMachinePowerRange->setValue(ftmsPowerRange, 6);
 
@@ -273,42 +274,97 @@ void MyServerCallbacks::onDisconnect(BLEServer *pServer) {
 void MyCallbacks::onWrite(BLECharacteristic *pCharacteristic) {
   std::string rxValue = pCharacteristic->getValue();
 
+  //if (pCharacteristic->getUUID() != FITNESSMACHINECONTROLPOINT_UUID) {
+  //  debugDirector("Unhandled callback for: " + String(pCharacteristic->getUUID().toString().c_str()));
+  //  return;
+  //}
+
+  uint8_t returnValue[3] = {0x80, (uint8_t)rxValue[0], 0x02};
+
   if (rxValue.length() > 1) {
     for (const auto &text : rxValue) {  // Range-for!
       debugDirector(String(text, HEX) + " ", false);
     }
     debugDirector("<-- From APP ", false);
-    /* 0x11 17 means FTMS Incline Control Mode  (aka SIM mode)*/
+        int port =0;
 
-    if (static_cast<int>(rxValue[0]) == 17) {
-      signed char buf[2];
-      buf[0] = rxValue[3];  // (Least significant byte)
-      buf[1] = rxValue[4];  // (Most significant byte)
+    switch ((uint8_t)rxValue[0]) {
 
-      int port = bytes_to_u16(buf[1], buf[0]);
-      userConfig.setIncline(port);
-      if (userConfig.getERGMode()) {
+      case 0x00:  // request control
+        debugDirector(" Control request");
+        returnValue[2] = 0x01;
+        break;
+
+      case 0x03:{  // inclination level setting - differs from sim mode as no negative numbers
+        port = (rxValue[2] << 8) + rxValue[1];
+        port *= 10;
+        userConfig.setIncline(port);
         userConfig.setERGMode(false);
-      }
-      debugDirector(" Target Incline: " + String((userConfig.getIncline() / 100)), false);
+        debugDirector(" Incline Mode: " + String((userConfig.getIncline() / 100)), false);
+        returnValue[2] = 0x01;
+        debugDirector("");
+        uint8_t inclineStatus[3] = {0x06, (uint8_t)rxValue[1], (uint8_t)rxValue[2]};
+        fitnessMachineStatusCharacteristic->setValue(inclineStatus, 3);
+        userConfig.setERGMode(false);
+        break;
     }
-    debugDirector("");
+      case 0x04:{  // Resistance level setting --NEED TO ADD SHIFT FEEDBACK IN USERCONFIG
+        port = rxValue[1];
+        port *= userConfig.getShiftStep();
+        userConfig.setIncline(port);
+        userConfig.setERGMode(false);
+        debugDirector(" Resistance Mode: " + String((userConfig.getIncline() / 100)), false);
+        returnValue[2] = 0x01;
+        debugDirector("");
+        userConfig.setERGMode(false);
+        uint8_t resistanceStatus[2] = {0x07, (uint8_t)rxValue[1]};
+        fitnessMachineStatusCharacteristic->setValue(resistanceStatus, 2);
+        break;
+      }
+      case 0x05:{  // Power Level Mode
+        //if (spinBLEClient.connectedPM) {  
+          int targetWatts = bytes_to_u16(rxValue[2], rxValue[1]);
+          userConfig.setERGMode(true);
+          computeERG(userConfig.getSimulatedWatts(), targetWatts);
+          debugDirector("ERG MODE", false);
+          debugDirector(" Target: " + String(targetWatts), false);
+          debugDirector(" Current: " + String(userConfig.getSimulatedWatts()), false);
+          debugDirector(" Incline: " + String(userConfig.getIncline() / 100), false);
+          debugDirector("");
+          returnValue[2]         = 0x01;
+         uint8_t ERGStatus[3] = {0x08, (uint8_t)rxValue[1], (uint8_t)rxValue[2]};
+         fitnessMachineStatusCharacteristic->setValue(ERGStatus, 3);
+        //} else {
+        //  returnValue[2] = 0x02;  // no power meter connected, so no ERG
+        //}
+        break;
+    }
+      case 0x07:  // Start training
+        returnValue[2] = 0x01;
+        debugDirector(" Start Training");
+        break;
 
-    /* 0x05 5 means FTMS Watts Control Mode (aka ERG mode) */
-    if ((static_cast<int>(rxValue[0]) == 5) && (spinBLEClient.connectedPM)) {
-      int targetWatts = bytes_to_u16(rxValue[2], rxValue[1]);
-      if (!userConfig.getERGMode()) {
-        userConfig.setERGMode(true);
+      case 0x11:{  // sim mode
+        signed char buf[2];
+        // int16_t windSpeed        = (rxValue[2] << 8) + rxValue[1];
+        buf[0] = rxValue[3];  // (Least significant byte)
+        buf[1] = rxValue[4];  // (Most significant byte)
+        // int8_t rollingResistance = rxValue[5];
+        // int8_t windResistance    = rxValue[6];
+        port = bytes_to_u16(buf[1], buf[0]);
+        userConfig.setIncline(port);
+        userConfig.setERGMode(false);
+        debugDirector(" Sim Incline: " + String((userConfig.getIncline() / 100)), false);
+        returnValue[2] = 0x01;
+        debugDirector("");
+        uint8_t simStatus[7] = {0x12, (uint8_t)rxValue[1], (uint8_t)rxValue[2], (uint8_t)rxValue[3], (uint8_t)rxValue[4], (uint8_t)rxValue[5], (uint8_t)rxValue[6]};
+        fitnessMachineStatusCharacteristic->setValue(simStatus, 7);
+        break;
       }
-      computeERG(userConfig.getSimulatedWatts(), targetWatts);
-      debugDirector("ERG MODE", false);
-      debugDirector(" Target: " + String(targetWatts), false);
-      debugDirector(" Current: " + String(userConfig.getSimulatedWatts()),
-                    false);  // not displaying numbers less than 256 correctly
-                             // but they do get sent to Zwift correctly.
-      debugDirector(" Incline: " + String(userConfig.getIncline() / 100), false);
-      debugDirector("");
     }
+    fitnessMachineStatusCharacteristic->notify();
+    pCharacteristic->setValue(returnValue, 3);
+    pCharacteristic->indicate();
   }
 }
 
