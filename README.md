@@ -85,6 +85,8 @@ ummm that was easy...right? :)
 ### TMC2225 Connection Diagram
 <img src="Pictures/SmartSpin2k_TMC_Connections.jpg" alt="esp32 connections" style="height: 200px; width: 100"/> 
 
+Please keep in mind all of the Esp32 pins above are the GPIO reference and not the actual physical pin locations. (look at the silk screen on the devkit).
+
 *note, you can use an A4988 stepper driver also but you'll need to manually set the driver current with a screwdriver as well as possibly modify the output pin settings in /include/settings.h . If you do so, you'll aslo want to turn off automatic firmware updates. 
 
 <img src="Pictures/CadPreview.JPG" alt="Cad Preview" style="height: 200px; width: 100"/>
