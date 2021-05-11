@@ -30,6 +30,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Enabled native testing.
 
 ### Changed
+- Moved Vin to the correct side on the ESP32 connection diagram. 
 - Power Correction Factor minimum value is now .5
 - Made Revmaster insert slightly smaller. 
 - Fixed minor spulling errurs. 
