@@ -15,7 +15,7 @@
 #include <freertos/semphr.h>
 
 #ifndef DEBUG_LOG_BUFFER_SIZE
-#define DEBUG_LOG_BUFFER_SIZE 500
+#define DEBUG_LOG_BUFFER_SIZE 1000
 #endif
 
 #ifndef DEBUG_FILE_CHARS_PER_LINE
