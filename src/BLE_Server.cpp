@@ -190,7 +190,8 @@ void updateIndoorBikeDataChar() {
                                                   // although the specification allows for a sint16
   ftmsIndoorBikeData[8] = (uint8_t)hr;
 
-  // 200 == Data(30), Sep(data/2), Arrow(3), CharId(37), Sep(3), CharId(37), Sep(3), Name(10), Prefix(2), HR(7), SEP(1), CD(10), SEP(1), PW(8), SEP(1), SD(7), Suffix(2), Nul(1) == 178, rounded up
+  // 200 == Data(30), Sep(data/2), Arrow(3), CharId(37), Sep(3), CharId(37), Sep(3), Name(10), Prefix(2), HR(7), SEP(1), CD(10), SEP(1), PW(8), SEP(1), SD(7), Suffix(2), Nul(1) ==
+  // 178, rounded up
   const int kLogBufMaxLength = 200;
   char logBuf[kLogBufMaxLength];
   int logBufLength = ss2k_log_hex_to_buffer(ftmsIndoorBikeData, *(&ftmsIndoorBikeData + 1) - ftmsIndoorBikeData, logBuf, 0, kLogBufMaxLength);
