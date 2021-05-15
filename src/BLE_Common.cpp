@@ -20,9 +20,9 @@ SensorDataFactory sensorDataFactory;
 
 void BLECommunications(void *pvParameters) {
   for (;;) {
-    if(spinDown()){ //dummy load for spinDown check.
-      vTaskDelay(100); 
+    if(spinDown()){ 
     }
+    controlPointIndicate();
     // **********************************Client***************************************
     for (size_t x = 0; x < NUM_BLE_DEVICES; x++) {  // loop through discovered devices
       if (spinBLEClient.myBLEDevices[x].connectedClientID != BLE_HS_CONN_HANDLE_NONE) {

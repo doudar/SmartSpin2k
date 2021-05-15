@@ -16,17 +16,22 @@
 
 NimBLEServer *pServer = nullptr;
 
+BLEService *pHeartService;
 BLECharacteristic *heartRateMeasurementCharacteristic;
+
+BLEService *pPowerMonitor;
 BLECharacteristic *cyclingPowerMeasurementCharacteristic;
 BLECharacteristic *cyclingPowerFeatureCharacteristic;
 BLECharacteristic *sensorLocationCharacteristic;
 
+BLEService *pFitnessMachineService;
 BLECharacteristic *fitnessMachineFeature;
 BLECharacteristic *fitnessMachineIndoorBikeData;
 BLECharacteristic *fitnessMachineStatusCharacteristic;
 BLECharacteristic *fitnessMachineControlPoint;
 BLECharacteristic *fitnessMachineResistanceLevelRange;
 BLECharacteristic *fitnessMachinePowerRange;
+BLECharacteristic *fitnessMachineTrainingStatus;
 
 /********************************Bit field Flag
  * Example***********************************/
@@ -55,8 +60,8 @@ byte cpFeature[1]               = {0b00100000};  // crank information present //
                                                  // byte is reported power
 
 // byte ftmsService[6]       = {0x00, 0x00, 0x00, 0b01, 0b0100000, 0x00};
-byte ftmsControlPoint[3]  = {0x08, 0x00, 0x01};                          // 0x08 we need to return a value of 1 for any successful change
-byte ftmsMachineStatus[7] = {0x04, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00};  // 0x04 means started by the user
+byte ftmsControlPoint[3]  = {0x00, 0x00, 0x00};                          // 0x08 we need to return a value of 1 for any successful change
+byte ftmsMachineStatus[7] = {0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00};  // 0x04 means started by the user
 
 struct FitnessMachineFeature ftmsFeature = {FitnessMachineFeatureFlags::Types::CadenceSupported | FitnessMachineFeatureFlags::Types::HeartRateMeasurementSupported |
                                                 FitnessMachineFeatureFlags::Types::PowerMeasurementSupported | FitnessMachineFeatureFlags::Types::InclinationSupported |
@@ -68,8 +73,9 @@ struct FitnessMachineFeature ftmsFeature = {FitnessMachineFeatureFlags::Types::C
 
 uint8_t ftmsIndoorBikeData[14] = {0x44, 0x02, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0};  // 00000000100001010100 ISpeed, ICAD,
                                                                                                             // TDistance, IPower, ETime
-uint8_t ftmsResistanceLevelRange[6] = {0x00, 0x00, 0x3A, 0x98, 0xC5, 0x68};                                 // +-15000 not sure what units
+uint8_t ftmsResistanceLevelRange[6] = {0x00, 0x00, 0x98, 0x3A, 0x01, 0x00};                                 // +-15000 not sure what units
 uint8_t ftmsPowerRange[6]           = {0x00, 0x00, 0xA0, 0x0F, 0x01, 0x00};                                 // 1-4000 watts
+uint8_t ftmsTrainingStatus[2]       = {0x08, 0x00};
 
 void startBLEServer() {
   // Server Setup
@@ -77,26 +83,24 @@ void startBLEServer() {
   pServer = BLEDevice::createServer();
 
   // HEART RATE MONITOR SERVICE SETUP
-  BLEService *pHeartService          = pServer->createService(HEARTSERVICE_UUID);
+  pHeartService                      = pServer->createService(HEARTSERVICE_UUID);
   heartRateMeasurementCharacteristic = pHeartService->createCharacteristic(HEARTCHARACTERISTIC_UUID, NIMBLE_PROPERTY::READ | NIMBLE_PROPERTY::NOTIFY);
 
   // Power Meter MONITOR SERVICE SETUP
-  BLEService *pPowerMonitor             = pServer->createService(CYCLINGPOWERSERVICE_UUID);
-  cyclingPowerMeasurementCharacteristic = pPowerMonitor->createCharacteristic(CYCLINGPOWERMEASUREMENT_UUID, NIMBLE_PROPERTY::READ | NIMBLE_PROPERTY::NOTIFY);
+  pPowerMonitor                         = pServer->createService(CYCLINGPOWERSERVICE_UUID);
+  cyclingPowerMeasurementCharacteristic = pPowerMonitor->createCharacteristic(CYCLINGPOWERMEASUREMENT_UUID, NIMBLE_PROPERTY::NOTIFY);
   cyclingPowerFeatureCharacteristic     = pPowerMonitor->createCharacteristic(CYCLINGPOWERFEATURE_UUID, NIMBLE_PROPERTY::READ);
   sensorLocationCharacteristic          = pPowerMonitor->createCharacteristic(SENSORLOCATION_UUID, NIMBLE_PROPERTY::READ);
 
   // Fitness Machine service setup
-  BLEService *pFitnessMachineService = pServer->createService(FITNESSMACHINESERVICE_UUID);
-  fitnessMachineFeature              = pFitnessMachineService->createCharacteristic(FITNESSMACHINEFEATURE_UUID,
-                                                                       NIMBLE_PROPERTY::READ | NIMBLE_PROPERTY::WRITE | NIMBLE_PROPERTY::NOTIFY | NIMBLE_PROPERTY::INDICATE);
+  pFitnessMachineService             = pServer->createService(FITNESSMACHINESERVICE_UUID);
+  fitnessMachineFeature              = pFitnessMachineService->createCharacteristic(FITNESSMACHINEFEATURE_UUID, NIMBLE_PROPERTY::READ);
   fitnessMachineControlPoint         = pFitnessMachineService->createCharacteristic(FITNESSMACHINECONTROLPOINT_UUID, NIMBLE_PROPERTY::WRITE | NIMBLE_PROPERTY::INDICATE);
-  fitnessMachineStatusCharacteristic =
-      pFitnessMachineService->createCharacteristic(FITNESSMACHINESTATUS_UUID, NIMBLE_PROPERTY::READ | NIMBLE_PROPERTY::WRITE | NIMBLE_PROPERTY::NOTIFY);
-
+  fitnessMachineStatusCharacteristic = pFitnessMachineService->createCharacteristic(FITNESSMACHINESTATUS_UUID, NIMBLE_PROPERTY::NOTIFY);
   fitnessMachineIndoorBikeData       = pFitnessMachineService->createCharacteristic(FITNESSMACHINEINDOORBIKEDATA_UUID, NIMBLE_PROPERTY::READ | NIMBLE_PROPERTY::NOTIFY);
   fitnessMachineResistanceLevelRange = pFitnessMachineService->createCharacteristic(FITNESSMACHINERESISTANCELEVELRANGE_UUID, NIMBLE_PROPERTY::READ);
   fitnessMachinePowerRange           = pFitnessMachineService->createCharacteristic(FITNESSMACHINEPOWERRANGE_UUID, NIMBLE_PROPERTY::READ);
+  fitnessMachineTrainingStatus       = pFitnessMachineService->createCharacteristic(FITNESSMACHINETRAININGSTATUS_UUID, NIMBLE_PROPERTY::NOTIFY);
 
   pServer->setCallbacks(new MyServerCallbacks());
 
@@ -121,9 +125,9 @@ void startBLEServer() {
   pPowerMonitor->start();           // Power Meter Service
   pFitnessMachineService->start();  // Fitness Machine Service
 
-  const std::string fitnessData = {0b00000001, 0b00100000, 0b00000000};
-  BLEAdvertising *pAdvertising  = BLEDevice::getAdvertising();
-  pAdvertising->setServiceData(FITNESSMACHINESERVICE_UUID, fitnessData);
+  // const std::string fitnessData = {0b00000001, 0b00100000, 0b00000000};
+  BLEAdvertising *pAdvertising = BLEDevice::getAdvertising();
+  // pAdvertising->setServiceData(FITNESSMACHINESERVICE_UUID, fitnessData);
   pAdvertising->addServiceUUID(FITNESSMACHINESERVICE_UUID);
   pAdvertising->addServiceUUID(CYCLINGPOWERSERVICE_UUID);
   pAdvertising->addServiceUUID(HEARTSERVICE_UUID);
@@ -144,22 +148,28 @@ bool spinDown() {
 
   if (rxValue[1] == 0x01) {
     debugDirector("Spin Down Initiated", true);
-    spinStatus[1] = 0x04; // send Stop Pedaling
+    vTaskDelay(1000 / portTICK_RATE_MS);
+    spinStatus[1] = 0x04;  // send Stop Pedaling
+    fitnessMachineStatusCharacteristic->setValue(spinStatus, 2);
   }
   if (rxValue[1] == 0x04) {
     debugDirector("Stop Pedaling", true);
+    vTaskDelay(1000 / portTICK_RATE_MS);
     spinStatus[1] = 0x02;  // Success
+    fitnessMachineStatusCharacteristic->setValue(spinStatus, 2);
   }
   if (rxValue[1] == 0x02) {
     debugDirector("Success", true);
-    spinStatus[0] = 0x01;
+    spinStatus[0] = 0x00;
     spinStatus[1] = 0x00;  // Success
+    fitnessMachineStatusCharacteristic->setValue(spinStatus, 2);
+    uint8_t returnValue[3] = {0x00, 0x00, 0x00};
+    fitnessMachineControlPoint->setValue(returnValue, 3);
+    fitnessMachineControlPoint->indicate();
   }
 
-  fitnessMachineStatusCharacteristic->setValue(spinStatus, 2);
   fitnessMachineStatusCharacteristic->notify();
-  // fitnessMachineControlPoint->setValue(returnValue, 3);
-  // fitnessMachineControlPoint->indicate();
+
   return true;
 }
 
@@ -239,7 +249,6 @@ void updateIndoorBikeDataChar() {
                                                   // although the specification allows for a sint16
   ftmsIndoorBikeData[8] = (uint8_t)hr;
   fitnessMachineIndoorBikeData->setValue(ftmsIndoorBikeData, 9);
-  fitnessMachineFeature->notify();
   fitnessMachineIndoorBikeData->notify();
 }  // ^^Using the New Way of setting Bytes.
 
@@ -308,20 +317,25 @@ void MyCallbacks::onWrite(BLECharacteristic *pCharacteristic) {
   //  return;
   //}
 
-  uint8_t returnValue[3] = {0x80, (uint8_t)rxValue[0], 0x02};
+  // uint8_t success        = 0x80;
+  // ftmsTrainingStatus[0]  = 0x08;
 
   if (rxValue.length() > 1) {
     for (const auto &text : rxValue) {  // Range-for!
       debugDirector(String(text, HEX) + " ", false);
     }
     debugDirector("<-- From APP ", false);
-    int port = 0;
+    int port               = 0;
+    uint8_t returnValue[3] = {0x80, (uint8_t)rxValue[0], 0x02};
 
     switch ((uint8_t)rxValue[0]) {
       case 0x00:  // request control
         debugDirector(" Control request");
         returnValue[2] = 0x01;
         pCharacteristic->setValue(returnValue, 3);
+        ftmsTrainingStatus[1] = 0x01;
+        fitnessMachineTrainingStatus->setValue(ftmsTrainingStatus, 2);
+        fitnessMachineTrainingStatus->notify();
         break;
 
       case 0x03: {  // inclination level setting - differs from sim mode as no negative numbers
@@ -336,6 +350,9 @@ void MyCallbacks::onWrite(BLECharacteristic *pCharacteristic) {
         fitnessMachineStatusCharacteristic->setValue(inclineStatus, 3);
         userConfig.setERGMode(false);
         pCharacteristic->setValue(returnValue, 3);
+        ftmsTrainingStatus[1] = 0x00;
+        fitnessMachineTrainingStatus->setValue(ftmsTrainingStatus, 2);
+        fitnessMachineTrainingStatus->notify();
         break;
       }
       case 0x04: {  // Resistance level setting --NEED TO ADD SHIFT FEEDBACK IN USERCONFIG
@@ -344,12 +361,16 @@ void MyCallbacks::onWrite(BLECharacteristic *pCharacteristic) {
         userConfig.setIncline(port);
         userConfig.setERGMode(false);
         debugDirector(" Resistance Mode: " + String((userConfig.getIncline() / 100)), false);
-        returnValue[2] = 0x01;
+        uint8_t resistanceReturn[4] = {0x80, rxValue[0], rxValue[1], rxValue[2]};
+        pCharacteristic->setValue(resistanceReturn, 4);
         debugDirector("");
         userConfig.setERGMode(false);
         uint8_t resistanceStatus[2] = {0x07, (uint8_t)rxValue[1]};
         fitnessMachineStatusCharacteristic->setValue(resistanceStatus, 2);
         pCharacteristic->setValue(returnValue, 3);
+        ftmsTrainingStatus[1] = 0x00;
+        fitnessMachineTrainingStatus->setValue(ftmsTrainingStatus, 2);
+        fitnessMachineTrainingStatus->notify();
         break;
       }
       case 0x05: {  // Power Level Mode
@@ -362,19 +383,25 @@ void MyCallbacks::onWrite(BLECharacteristic *pCharacteristic) {
         debugDirector(" Current: " + String(userConfig.getSimulatedWatts()), false);
         debugDirector(" Incline: " + String(userConfig.getIncline() / 100), false);
         debugDirector("");
-        returnValue[2]       = 0x01;
-        uint8_t ERGStatus[3] = {0x08, (uint8_t)rxValue[1], (uint8_t)rxValue[2]};
+        uint8_t ERGReturn[3] = {0x80, rxValue[0], 0x01};
+        uint8_t ERGStatus[3] = {0x08, (uint8_t)rxValue[1], 0x01};
         fitnessMachineStatusCharacteristic->setValue(ERGStatus, 3);
+        ftmsTrainingStatus[1] = 0x0C;
+        fitnessMachineTrainingStatus->setValue(ftmsTrainingStatus, 2);
+        fitnessMachineTrainingStatus->notify();
         //} else {
         //  returnValue[2] = 0x02;  // no power meter connected, so no ERG
         //}
-        pCharacteristic->setValue(returnValue, 3);
+        pCharacteristic->setValue(ERGReturn, 3);
         break;
       }
       case 0x07:  // Start training
         returnValue[2] = 0x01;
         debugDirector(" Start Training");
         pCharacteristic->setValue(returnValue, 3);
+        ftmsTrainingStatus[1] = 0x00;
+        fitnessMachineTrainingStatus->setValue(ftmsTrainingStatus, 2);
+        fitnessMachineTrainingStatus->notify();
         break;
 
       case 0x11: {  // sim mode
@@ -390,9 +417,13 @@ void MyCallbacks::onWrite(BLECharacteristic *pCharacteristic) {
         debugDirector(" Sim Incline: " + String((userConfig.getIncline() / 100)), false);
         debugDirector("");
         returnValue[2]       = 0x01;
+        uint8_t SimReturn[3] = {0x80, 0x11, 0x01};
         uint8_t simStatus[7] = {0x12, (uint8_t)rxValue[1], (uint8_t)rxValue[2], (uint8_t)rxValue[3], (uint8_t)rxValue[4], (uint8_t)rxValue[5], (uint8_t)rxValue[6]};
         fitnessMachineStatusCharacteristic->setValue(simStatus, 7);
-        pCharacteristic->setValue(returnValue, 3);
+        pCharacteristic->setValue(SimReturn, 3);
+        ftmsTrainingStatus[1] = 0x00;
+        fitnessMachineTrainingStatus->setValue(ftmsTrainingStatus, 2);
+        fitnessMachineTrainingStatus->notify();
         break;
       }
 
@@ -403,12 +434,34 @@ void MyCallbacks::onWrite(BLECharacteristic *pCharacteristic) {
         fitnessMachineStatusCharacteristic->setValue(spinStatus, 2);
         uint8_t controlPoint[6] = {0x80, 0x01, 0x24, 0x03, 0x96, 0x0e};  // send low and high speed targets
         pCharacteristic->setValue(controlPoint, 6);
+        ftmsTrainingStatus[1] = 0x00;
+        fitnessMachineTrainingStatus->setValue(ftmsTrainingStatus, 2);
+        fitnessMachineTrainingStatus->notify();
         break;
       }
     }
     fitnessMachineStatusCharacteristic->notify();
-    pCharacteristic->indicate();
+  } else {
+    debugDirector("POS app wrote nothing ", false);
+    debugDirector("assuming it's a Control request");
+    uint8_t controlPoint[3] = {0x80, 0x00, 0x01};
+    pCharacteristic->setValue(controlPoint, 3);
+    ftmsTrainingStatus[1] = 0x01;
+    fitnessMachineTrainingStatus->setValue(ftmsTrainingStatus, 2);
+    fitnessMachineTrainingStatus->notify();
   }
+  rxValue = pCharacteristic->getValue();
+  
+  if (rxValue.length() > 1) {
+    for (const auto &text : rxValue) {  // Range-for!
+      debugDirector(String(text, HEX) + " ", false);
+    }
+    debugDirector("<-- Control Point Indicate");
+  }
+}
+
+void controlPointIndicate(){
+  fitnessMachineControlPoint->indicate();
 }
 
 // Return number of clients connected to our server.

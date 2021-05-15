@@ -41,6 +41,7 @@ void updateCyclingPowerMesurementChar();
 void calculateInstPwrFromHR();
 void updateHeartRateMeasurementChar();
 int connectedClientCount();
+void controlPointIndicate();
 
 class MyServerCallbacks : public BLEServerCallbacks {
   void onConnect(BLEServer *, ble_gap_conn_desc *desc);
