@@ -33,6 +33,7 @@ extern int bleConnDesc;  // These all need re
 extern bool updateConnParametersFlag;
 
 void startBLEServer();
+bool spinDown();
 void computeERG(int, int);
 void computeCSC();
 void updateIndoorBikeDataChar();
