@@ -175,6 +175,15 @@ bool spinDown() {
 
 void computeERG(int currentWatts, int setPoint) {
   // cooldownTimer--;
+  static int oldSetPoint = 0;
+
+  if(setPoint == 0){
+    setPoint = oldSetPoint;
+    currentWatts = userConfig.getSimulatedWatts();
+  }else{ //only save the value so we don't run this too much. 
+  oldSetPoint = setPoint;
+  return;
+  }
 
   float incline             = userConfig.getIncline();
   int cad                   = userConfig.getSimulatedCad();
@@ -312,14 +321,6 @@ void MyServerCallbacks::onDisconnect(BLEServer *pServer) {
 void MyCallbacks::onWrite(BLECharacteristic *pCharacteristic) {
   std::string rxValue = pCharacteristic->getValue();
 
-  // if (pCharacteristic->getUUID() != FITNESSMACHINECONTROLPOINT_UUID) {
-  //  debugDirector("Unhandled callback for: " + String(pCharacteristic->getUUID().toString().c_str()));
-  //  return;
-  //}
-
-  // uint8_t success        = 0x80;
-  // ftmsTrainingStatus[0]  = 0x08;
-
   if (rxValue.length() > 1) {
     for (const auto &text : rxValue) {  // Range-for!
       debugDirector(String(text, HEX) + " ", false);
@@ -332,10 +333,12 @@ void MyCallbacks::onWrite(BLECharacteristic *pCharacteristic) {
       case 0x00:  // request control
         debugDirector(" Control request");
         returnValue[2] = 0x01;
+        userConfig.setERGMode(false);
         pCharacteristic->setValue(returnValue, 3);
         ftmsTrainingStatus[1] = 0x01;
         fitnessMachineTrainingStatus->setValue(ftmsTrainingStatus, 2);
         fitnessMachineTrainingStatus->notify();
+        pCharacteristic->setValue(returnValue, 3);
         break;
 
       case 0x03: {  // inclination level setting - differs from sim mode as no negative numbers
@@ -348,7 +351,6 @@ void MyCallbacks::onWrite(BLECharacteristic *pCharacteristic) {
         debugDirector("");
         uint8_t inclineStatus[3] = {0x06, (uint8_t)rxValue[1], (uint8_t)rxValue[2]};
         fitnessMachineStatusCharacteristic->setValue(inclineStatus, 3);
-        userConfig.setERGMode(false);
         pCharacteristic->setValue(returnValue, 3);
         ftmsTrainingStatus[1] = 0x00;
         fitnessMachineTrainingStatus->setValue(ftmsTrainingStatus, 2);
@@ -361,10 +363,9 @@ void MyCallbacks::onWrite(BLECharacteristic *pCharacteristic) {
         userConfig.setIncline(port);
         userConfig.setERGMode(false);
         debugDirector(" Resistance Mode: " + String((userConfig.getIncline() / 100)), false);
-        uint8_t resistanceReturn[4] = {0x80, rxValue[0], rxValue[1], rxValue[2]};
-        pCharacteristic->setValue(resistanceReturn, 4);
         debugDirector("");
         userConfig.setERGMode(false);
+        returnValue[2]              = 0x01;
         uint8_t resistanceStatus[2] = {0x07, (uint8_t)rxValue[1]};
         fitnessMachineStatusCharacteristic->setValue(resistanceStatus, 2);
         pCharacteristic->setValue(returnValue, 3);
@@ -374,25 +375,25 @@ void MyCallbacks::onWrite(BLECharacteristic *pCharacteristic) {
         break;
       }
       case 0x05: {  // Power Level Mode
-                    // if (spinBLEClient.connectedPM) {
-        int targetWatts = bytes_to_u16(rxValue[2], rxValue[1]);
-        userConfig.setERGMode(true);
-        computeERG(userConfig.getSimulatedWatts(), targetWatts);
-        debugDirector("ERG MODE", false);
-        debugDirector(" Target: " + String(targetWatts), false);
-        debugDirector(" Current: " + String(userConfig.getSimulatedWatts()), false);
-        debugDirector(" Incline: " + String(userConfig.getIncline() / 100), false);
-        debugDirector("");
-        uint8_t ERGReturn[3] = {0x80, rxValue[0], 0x01};
-        uint8_t ERGStatus[3] = {0x08, (uint8_t)rxValue[1], 0x01};
-        fitnessMachineStatusCharacteristic->setValue(ERGStatus, 3);
-        ftmsTrainingStatus[1] = 0x0C;
-        fitnessMachineTrainingStatus->setValue(ftmsTrainingStatus, 2);
-        fitnessMachineTrainingStatus->notify();
-        //} else {
-        //  returnValue[2] = 0x02;  // no power meter connected, so no ERG
-        //}
-        pCharacteristic->setValue(ERGReturn, 3);
+        if (spinBLEClient.connectedPM) {
+          int targetWatts = bytes_to_u16(rxValue[2], rxValue[1]);
+          userConfig.setERGMode(true);
+          computeERG(userConfig.getSimulatedWatts(), targetWatts);
+          debugDirector("ERG MODE", false);
+          debugDirector(" Target: " + String(targetWatts), false);
+          debugDirector(" Current: " + String(userConfig.getSimulatedWatts()), false);
+          debugDirector(" Incline: " + String(userConfig.getIncline() / 100), false);
+          debugDirector("");
+          returnValue[2]       = 0x01;
+          uint8_t ERGStatus[3] = {0x08, (uint8_t)rxValue[1], 0x01};
+          fitnessMachineStatusCharacteristic->setValue(ERGStatus, 3);
+          ftmsTrainingStatus[1] = 0x0C;
+          fitnessMachineTrainingStatus->setValue(ftmsTrainingStatus, 2);
+          fitnessMachineTrainingStatus->notify();
+        } else {
+          returnValue[2] = 0x02;  // no power meter connected, so no ERG
+        }
+        pCharacteristic->setValue(returnValue, 3);
         break;
       }
       case 0x07:  // Start training
@@ -417,10 +418,9 @@ void MyCallbacks::onWrite(BLECharacteristic *pCharacteristic) {
         debugDirector(" Sim Incline: " + String((userConfig.getIncline() / 100)), false);
         debugDirector("");
         returnValue[2]       = 0x01;
-        uint8_t SimReturn[3] = {0x80, 0x11, 0x01};
         uint8_t simStatus[7] = {0x12, (uint8_t)rxValue[1], (uint8_t)rxValue[2], (uint8_t)rxValue[3], (uint8_t)rxValue[4], (uint8_t)rxValue[5], (uint8_t)rxValue[6]};
         fitnessMachineStatusCharacteristic->setValue(simStatus, 7);
-        pCharacteristic->setValue(SimReturn, 3);
+        pCharacteristic->setValue(returnValue, 3);
         ftmsTrainingStatus[1] = 0x00;
         fitnessMachineTrainingStatus->setValue(ftmsTrainingStatus, 2);
         fitnessMachineTrainingStatus->notify();
@@ -442,16 +442,17 @@ void MyCallbacks::onWrite(BLECharacteristic *pCharacteristic) {
     }
     fitnessMachineStatusCharacteristic->notify();
   } else {
-    debugDirector("POS app wrote nothing ", false);
+    debugDirector("App wrote nothing ", false);
     debugDirector("assuming it's a Control request");
     uint8_t controlPoint[3] = {0x80, 0x00, 0x01};
+    userConfig.setERGMode(true);
     pCharacteristic->setValue(controlPoint, 3);
     ftmsTrainingStatus[1] = 0x01;
     fitnessMachineTrainingStatus->setValue(ftmsTrainingStatus, 2);
     fitnessMachineTrainingStatus->notify();
   }
   rxValue = pCharacteristic->getValue();
-  
+
   if (rxValue.length() > 1) {
     for (const auto &text : rxValue) {  // Range-for!
       debugDirector(String(text, HEX) + " ", false);
@@ -460,9 +461,7 @@ void MyCallbacks::onWrite(BLECharacteristic *pCharacteristic) {
   }
 }
 
-void controlPointIndicate(){
-  fitnessMachineControlPoint->indicate();
-}
+void controlPointIndicate() { fitnessMachineControlPoint->indicate(); }
 
 // Return number of clients connected to our server.
 int connectedClientCount() {

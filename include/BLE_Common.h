@@ -34,7 +34,7 @@ extern bool updateConnParametersFlag;
 
 void startBLEServer();
 bool spinDown();
-void computeERG(int, int);
+void computeERG(int = 0, int = 0);
 void computeCSC();
 void updateIndoorBikeDataChar();
 void updateCyclingPowerMesurementChar();

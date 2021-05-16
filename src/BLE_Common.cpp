@@ -20,9 +20,6 @@ SensorDataFactory sensorDataFactory;
 
 void BLECommunications(void *pvParameters) {
   for (;;) {
-    if(spinDown()){ 
-    }
-    controlPointIndicate();
     // **********************************Client***************************************
     for (size_t x = 0; x < NUM_BLE_DEVICES; x++) {  // loop through discovered devices
       if (spinBLEClient.myBLEDevices[x].connectedClientID != BLE_HS_CONN_HANDLE_NONE) {
@@ -123,6 +120,12 @@ void BLECommunications(void *pvParameters) {
       updateIndoorBikeDataChar();
       updateCyclingPowerMesurementChar();
       updateHeartRateMeasurementChar();
+      controlPointIndicate();
+      if (spinDown()) {
+      }
+      if (userConfig.getERGMode()) {
+        computeERG();
+      }
 
       if (updateConnParametersFlag) {
         vTaskDelay(100 / portTICK_PERIOD_MS);
