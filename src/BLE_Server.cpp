@@ -357,12 +357,12 @@ void MyCallbacks::onWrite(BLECharacteristic *pCharacteristic) {
         fitnessMachineTrainingStatus->notify();
         break;
       }
-      case 0x04: {  // Resistance level setting --NEED TO ADD SHIFT FEEDBACK IN USERCONFIG
+      case 0x04: {  // Resistance level setting
         port = rxValue[1];
         port *= userConfig.getShiftStep();
-        userConfig.setIncline(port);
+        userConfig.setShifterPosition(port);
         userConfig.setERGMode(false);
-        debugDirector(" Resistance Mode: " + String((userConfig.getIncline() / 100)), false);
+        debugDirector(" Resistance Mode: " + String((userConfig.getShifterPosition() )), false);
         debugDirector("");
         userConfig.setERGMode(false);
         returnValue[2]              = 0x01;
