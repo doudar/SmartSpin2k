@@ -6,6 +6,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 ### Added
+- Pin arduino-esp32 package to version 1.0.5 to fix build issue
 - Added + - Buttons to sliders. 
 - Added firmware checklist to "~/" for PR and release candidate testing.
 - Added README.md to "~/Hardware/*" that provides help for the files contained within. 
