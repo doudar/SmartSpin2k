@@ -6,6 +6,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 ### Added
+- Added additional FTMS characteristics and some refactoring of shared variables
 - Added + - Buttons to sliders. 
 - Added firmware checklist to "~/" for PR and release candidate testing.
 - Added README.md to "~/Hardware/*" that provides help for the files contained within. 
