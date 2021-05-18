@@ -43,12 +43,12 @@
         "utility": "cpp",
         "typeinfo": "cpp",
         "string": "cpp",
-        "atomic": "cpp",
-        "iterator": "cpp",
-        "map": "cpp",
-        "memory_resource": "cpp",
-        "optional": "cpp",
-        "string_view": "cpp"
+        "climits": "cpp",
+        "ble.h": "c",
+        "os_mempool.h": "c",
+        "ble_uuid.h": "c",
+        "ble_hs_priv.h": "c",
+        "nimble_opt.h": "c"
     },
     "C_Cpp.errorSquiggles": "Disabled"
 }
