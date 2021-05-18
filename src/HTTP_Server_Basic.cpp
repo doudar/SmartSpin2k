@@ -129,6 +129,7 @@ void startHttpServer() {
   server.on("/hrtowatts.html", handleSpiffsFile);
   server.on("/favicon.ico", handleSpiffsFile);
   server.on("/send_settings", settingsProcessor);
+  server.on("/jquery.js.gz", handleSpiffsFile);
 
   server.on("/BLEScan", []() {
     debugDirector("Scanning from web request");
@@ -354,6 +355,9 @@ void handleSpiffsFile() {
   String fileType = filename.substring((dotPosition + 1), filename.length());
   if (SPIFFS.exists(filename)) {
     File file = SPIFFS.open(filename, FILE_READ);
+    if (fileType == "gz") {
+      fileType = "html";  // no need to change content type as it's done automacically by .streamfile below VV
+    }
     server.streamFile(file, "text/" + fileType);
     file.close();
     debugDirector("Served " + filename);
