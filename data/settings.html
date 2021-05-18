@@ -55,13 +55,15 @@
                     <br><br>Try to target ~50watt changes.</span></p>
               </td>
               <td>
-                <p
-                  style="position: relative; top: -12px; color: rgb(250, 250, 250);">
+                <div
+                  style="font-size:large; color: rgb(250, 250, 250);">
                   <span id="shiftStepValue">0</span>
-                </p>
-                <input style="position: relative; top: -25px; left: 7px;" type="range" id="shiftStep" name="shiftStep"
+              </div>
+                <input type='button' onclick="clickStep(document.getElementById('shiftStep'), this.value)" value="-">
+                <input style="width:50%; position: relative; top: 5px;" type="range" id="shiftStep" name="shiftStep"
                   min="50" max="6000" value="0" step="50" class="slider1"
-                  onchange="updateSlider(this, document.getElementById('shiftStepValue'))" />
+                  onchange="updateSlider(this.value, document.getElementById('shiftStepValue'))" />
+                  <input type='button' onclick="clickStep(document.getElementById('shiftStep'), this.value)" value="+">
               </td>
             </tr>
             <tr>
@@ -70,13 +72,16 @@
                     noticable. <br><br>Adjust until hills feel realistic.</span></p>
               </td>
               <td>
-                <p
-                  style="position: relative; top: -12px; color: rgb(250, 250, 250);">
-                  <span id="inclineMultiplierValue">0</span>
-                </p>
-                <input style="position: relative; top: -25px; left: 7px;" type="range" id="inclineMultiplier"
+                <div
+                  style="font-size:large; color: rgb(250, 250, 250);">
+                  <span id="inclineMultiplierValue">0</span><span>x</span>
+              </div>
+                <input type='button' onclick="clickStep(document.getElementById('inclineMultiplier'), this.value)" value="-">
+                <input style="width:50%; position: relative; top: 5px;"  type="range" id="inclineMultiplier"
                   name="inclineMultiplier" value="0" min="1" max="5" step="1" class="slider1"
-                  onchange="updateSlider(this, document.getElementById('inclineMultiplierValue'))" />
+                  onchange="updateSlider(this.value, document.getElementById('inclineMultiplierValue'))" />
+                  <input type='button' onclick="clickStep(document.getElementById('inclineMultiplier'), this.value)" value="+">
+
               </td>
             </tr>
             <tr>
@@ -85,13 +90,15 @@
                     motor<br><br>Set to the minimun required to move knob smoothly</span></p>
               </td>
               <td>
-                <p
-                  style="position: relative; top: -12px; color: rgb(250, 250, 250);">
-                  <span id="stepperPowerValue">0</span>
-                </p>
-                <input style="position: relative; top: -25px; left: 7px;" type="range" id="stepperPower"
+                <div
+                  style="font-size:large; color: rgb(250, 250, 250);">
+                  <span id="stepperPowerValue">0</span><span>ma</span>
+              </div>
+                <input type='button' onclick="clickStep(document.getElementById('stepperPower'), this.value)" value="-">
+                <input style="width:50%; position: relative; top: 5px;" type="range" id="stepperPower"
                   name="stepperPower" min="500" max="2000" value="0" step="100" class="slider1"
-                  onchange="updateSlider(this, document.getElementById('stepperPowerValue'))" />
+                  onchange="updateSlider(this.value, document.getElementById('stepperPowerValue'))" />
+                  <input type='button' onclick="clickStep(document.getElementById('stepperPower'), this.value)" value="+">
               </td>
             </tr>
             <tr>
@@ -150,9 +157,9 @@
         document.getElementById("stepperPower").value = obj.stepperPower;
         document.getElementById("stealthchop").checked = obj.stealthchop;
         document.getElementById("autoUpdate").checked = obj.autoUpdate;
-        updateSlider(document.getElementById("shiftStep"), document.getElementById("shiftStepValue"));
-        updateSlider(document.getElementById("inclineMultiplier"), document.getElementById("inclineMultiplierValue"));
-        updateSlider(document.getElementById("stepperPower"), document.getElementById("stepperPowerValue"));
+        updateSlider(document.getElementById("shiftStep").value, document.getElementById("shiftStepValue"));
+        updateSlider(document.getElementById("inclineMultiplier").value, document.getElementById("inclineMultiplierValue"));
+        updateSlider(document.getElementById("stepperPower").value, document.getElementById("stepperPowerValue"));
         document.getElementById("loadingWatermark").opacity = 0;
         setTimeout(function () { document.getElementById("loadingWatermark").remove(); }, 1000);
       }
@@ -175,9 +182,17 @@
     setTimeout(loadCss, 100);
   }, false);
 
-  function updateSlider(element, valueElement) {
-    var sliderValue = element.value;
-    valueElement.innerHTML = sliderValue;
+  function updateSlider(x, valueElement) {
+    valueElement.innerHTML = x;
+  }
+
+ function clickStep(element, incOrDec){
+ 	if(incOrDec == "+"){
+    element.value = parseFloat(element.value) + parseFloat(element.step);
+    }else{
+    element.value = parseFloat(element.value) - parseFloat(element.step);
+    }
+    updateSlider(element.value, document.getElementById(element.name + 'Value')); 
   }
 
   function toggleShowPassword() {

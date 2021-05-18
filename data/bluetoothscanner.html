@@ -53,18 +53,21 @@
             </tr>
             <tr>
               <td>
-                <p class="tooltip">Power Correction Factor<span class="tooltiptext">Increase or decrease
-                    to
-                    correct the power transmitted from your bike.</span></p>
+                <div class="tooltip">Power Correction Factor<span class="tooltiptext">Increase or decrease
+                    to correct the power transmitted from your bike.</span></div>
               </td>
               <td>
-                <p
-                  style="position: relative; top: -12px; color: rgb(250, 250, 250);">
-                  <span id="powerCorrectionFactorValue">0</span>
-                </p>
-                <input style="position: relative; top: -25px; left: 7px;" type="range" id="powerCorrectionFactorSlider"
-                  name="powerCorrectionFactor" value="1.00" min="0.00" max="2.0" step="0.01" class="slider1"
-                  onchange="updateSlider(this, document.getElementById('powerCorrectionFactorValue'))" />
+                <div style="font-size:large; color: rgb(250, 250, 250);">
+                  <span id="powerCorrectionFactorValue">1</span><span>x</span>
+                </div>
+                <input type='button'
+                  onclick="clickStep(document.getElementById('powerCorrectionFactor'), this.value)" value="-">
+                <input style="width:50%; position: relative; top: 5px; left: 0px;" type="range" id="powerCorrectionFactor"
+                  name="powerCorrectionFactor" value="1.00" min="0.5" max="2.0" step="0.01" class="slider1"
+                  onchange="updateSlider(this.value, document.getElementById('powerCorrectionFactorValue'))" />
+                <input type='button'
+                  onclick="clickStep(document.getElementById('powerCorrectionFactor'), this.value)" value="+">
+                  <br><br><br>
               </td>
             </tr>
           </tbody>
@@ -98,10 +101,19 @@
     }
   }, 1000);
 
-  function updateSlider(element, valueElement) {
-    var sliderValue = element.value;
-    valueElement.innerHTML = sliderValue + " X";
+  function updateSlider(x, valueElement) {
+    valueElement.innerHTML = x;
   }
+
+  function clickStep(element, incOrDec) {
+    if (incOrDec == "+") {
+      element.value = parseFloat(element.value) + parseFloat(element.step);
+    } else {
+      element.value = parseFloat(element.value) - parseFloat(element.step);
+    }
+    updateSlider(element.value, document.getElementById(element.name + 'Value'));
+  }
+
 
   function requestConfigValues() {
     var xhttp = new XMLHttpRequest();
@@ -186,8 +198,8 @@
         HRDropdown.add(defaultOptionHR);
         document.getElementById("connectedPowerMeter").innerHTML = data.connectedPowerMeter;
         document.getElementById("connectedHeartMonitor").innerHTML = data.connectedHeartMonitor;
-        document.getElementById("powerCorrectionFactorValue").innerHTML = data.powerCorrectionFactor + " X";
-        document.getElementById("powerCorrectionFactorSlider").value = data.powerCorrectionFactor;
+        document.getElementById("powerCorrectionFactorValue").innerHTML = data.powerCorrectionFactor;
+        document.getElementById("powerCorrectionFactor").value = data.powerCorrectionFactor;
         document.getElementById("loadingWatermark").opacity = 0;
         setTimeout(function () { document.getElementById("loadingWatermark").remove(); }, 1000);
       }
