@@ -368,16 +368,14 @@ void MyCallbacks::onWrite(BLECharacteristic *pCharacteristic) {
         break;
       }
       case 0x04: {  // Resistance level setting
-        port = rxValue[1];
-        port *= userConfig.getShiftStep();
-        userConfig.setShifterPosition(port);
+        int targetResistance = bytes_to_u16(rxValue[2], rxValue[1]);
+        userConfig.setShifterPosition(targetResistance);
         userConfig.setERGMode(false);
         debugDirector(" Resistance Mode: " + String((userConfig.getShifterPosition())), false);
         debugDirector("");
-        userConfig.setERGMode(false);
         returnValue[2]              = 0x01;
-        uint8_t resistanceStatus[2] = {0x07, (uint8_t)rxValue[1]};
-        fitnessMachineStatusCharacteristic->setValue(resistanceStatus, 2);
+        uint8_t resistanceStatus[3] = {0x07, rxValue[2], rxValue[1]};
+        fitnessMachineStatusCharacteristic->setValue(resistanceStatus, 3);
         pCharacteristic->setValue(returnValue, 3);
         ftmsTrainingStatus[1] = 0x00;
         fitnessMachineTrainingStatus->setValue(ftmsTrainingStatus, 2);
