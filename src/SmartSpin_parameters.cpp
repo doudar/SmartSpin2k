@@ -35,6 +35,7 @@ void userParameters::setDefaults() {  // Move these to set the values as #define
   foundDevices          = "";
   connectedPowerMeter   = CONNECTED_POWER_METER;
   connectedHeartMonitor = CONNECTED_HEART_MONITOR;
+  shifterPosition       = 0;
 }
 
 //---------------------------------------------------------------------------------
@@ -67,6 +68,7 @@ String userParameters::returnJSON() {
   doc["foundDevices"]          = foundDevices;
   doc["connectedPowerMeter"]   = connectedPowerMeter;
   doc["connectedHeartMonitor"] = connectedHeartMonitor;
+  doc["shifterPosition"]       = shifterPosition;
   String output;
   serializeJson(doc, output);
   return output;
@@ -114,6 +116,7 @@ void userParameters::saveToSPIFFS() {
   // currently in keeping this boot to boot
   doc["connectedPowerMeter"]   = connectedPowerMeter;
   doc["connectedHeartMonitor"] = connectedHeartMonitor;
+  //doc["shifterPosition"]       = shifterPosition;
 
   // Serialize JSON to file
   if (serializeJson(doc, file) == 0) {
@@ -170,7 +173,7 @@ void userParameters::loadFromSPIFFS() {
   // setfoundDevices       (doc["foundDevices"]);
   setConnectedPowerMeter(doc["connectedPowerMeter"]);
   setConnectedHeartMonitor(doc["connectedHeartMonitor"]);
-
+  //setShifterPosition[doc["shifterPosition"]);
   debugDirector("Config File Loaded: " + String(configFILENAME));
   file.close();
 }

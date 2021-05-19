@@ -173,23 +173,31 @@ bool spinDown() {
   return true;
 }
 
-void computeERG(int currentWatts, int setPoint) {
-  // cooldownTimer--;
-  static int oldSetPoint = 0;
+//as a note, Trainer Road sends 50w target whenever the app is connected.
+void computeERG(int newSetPoint) {
 
-  if(setPoint == 0){
-    setPoint = oldSetPoint;
-    currentWatts = userConfig.getSimulatedWatts();
-  }else{ //only save the value so we don't run this too much. 
-  oldSetPoint = setPoint;
-  return;
+  if(userConfig.getERGMode() && spinBLEClient.connectedPM){
+    //continue
+  }else{
+    return;
   }
 
+  static int setPoint       = 0;
+  int currentWatts          = userConfig.getSimulatedWatts();
   float incline             = userConfig.getIncline();
   int cad                   = userConfig.getSimulatedCad();
   int newIncline            = incline;
   int amountToChangeIncline = 0;
 
+  if (newSetPoint > 0) {  // only update the value
+    setPoint = newSetPoint;
+    return;
+  }
+  if (setPoint == 0){
+    return; 
+  }
+
+  // only update if pedaling faster then 20rpm
   if (cad > 20) {
     // 30  is amount of watts per shift. Was 50, seemed like too much...
     if (abs(currentWatts - setPoint) < 30) {
@@ -209,6 +217,8 @@ void computeERG(int currentWatts, int setPoint) {
         amountToChangeIncline = -(userConfig.getShiftStep() * 5);
       }
     }
+  }else{
+    return;
   }
 
   newIncline = incline - amountToChangeIncline;  //  }
@@ -357,17 +367,15 @@ void MyCallbacks::onWrite(BLECharacteristic *pCharacteristic) {
         fitnessMachineTrainingStatus->notify();
         break;
       }
-      case 0x04: {  // Resistance level setting --NEED TO ADD SHIFT FEEDBACK IN USERCONFIG
-        port = rxValue[1];
-        port *= userConfig.getShiftStep();
-        userConfig.setIncline(port);
+      case 0x04: {  // Resistance level setting
+        int targetResistance = bytes_to_u16(rxValue[2], rxValue[1]);
+        userConfig.setShifterPosition(targetResistance);
         userConfig.setERGMode(false);
-        debugDirector(" Resistance Mode: " + String((userConfig.getIncline() / 100)), false);
+        debugDirector(" Resistance Mode: " + String((userConfig.getShifterPosition())), false);
         debugDirector("");
-        userConfig.setERGMode(false);
         returnValue[2]              = 0x01;
-        uint8_t resistanceStatus[2] = {0x07, (uint8_t)rxValue[1]};
-        fitnessMachineStatusCharacteristic->setValue(resistanceStatus, 2);
+        uint8_t resistanceStatus[3] = {0x07, rxValue[2], rxValue[1]};
+        fitnessMachineStatusCharacteristic->setValue(resistanceStatus, 3);
         pCharacteristic->setValue(returnValue, 3);
         ftmsTrainingStatus[1] = 0x00;
         fitnessMachineTrainingStatus->setValue(ftmsTrainingStatus, 2);
@@ -378,7 +386,7 @@ void MyCallbacks::onWrite(BLECharacteristic *pCharacteristic) {
         if (spinBLEClient.connectedPM) {
           int targetWatts = bytes_to_u16(rxValue[2], rxValue[1]);
           userConfig.setERGMode(true);
-          computeERG(userConfig.getSimulatedWatts(), targetWatts);
+          computeERG(targetWatts);
           debugDirector("ERG MODE", false);
           debugDirector(" Target: " + String(targetWatts), false);
           debugDirector(" Current: " + String(userConfig.getSimulatedWatts()), false);
@@ -392,6 +400,7 @@ void MyCallbacks::onWrite(BLECharacteristic *pCharacteristic) {
           fitnessMachineTrainingStatus->notify();
         } else {
           returnValue[2] = 0x02;  // no power meter connected, so no ERG
+          debugDirector("ERG MODE Requested. No PM Connected");
         }
         pCharacteristic->setValue(returnValue, 3);
         break;

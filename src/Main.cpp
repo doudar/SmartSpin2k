@@ -20,7 +20,6 @@ uint64_t debounceDelay    = 500;  // the debounce time; increase if the output f
 
 // Stepper Speed - Lower is faster
 int maxStepperSpeed = 500;
-int shifterPosition = 0;
 int stepperPosition = 0;
 HardwareSerial stepperSerial(2);
 TMC2208Stepper driver(&SERIAL_PORT, R_SENSE);  // Hardware Serial
@@ -132,7 +131,7 @@ void moveStepper(void *pvParameters) {
   int targetPosition = 0;
 
   while (1) {
-    targetPosition = shifterPosition + (userConfig.getIncline() * userConfig.getInclineMultiplier());
+    targetPosition = userConfig.getShifterPosition() + (userConfig.getIncline() * userConfig.getInclineMultiplier());
     if (stepperPosition == targetPosition) {
       vTaskDelay(300 / portTICK_PERIOD_MS);
       if (connectedClientCount() == 0) {
@@ -155,7 +154,7 @@ void moveStepper(void *pvParameters) {
         digitalWrite(STEP_PIN, LOW);
         stepperPosition++;
         lastDir = true;
-      } else {  // must be (stepperPosition > targetPosition)
+      } else if (stepperPosition > targetPosition) { 
         if (lastDir == true) {
           vTaskDelay(100);  // Stepper was running in opposite
                             // direction. Give it time to stop.
@@ -185,8 +184,8 @@ bool IRAM_ATTR deBounce() {
 void IRAM_ATTR shiftUp() {  // Handle the shift up interrupt IRAM_ATTR is to keep the interrput code in ram always
   if (deBounce()) {
     if (!digitalRead(SHIFT_UP_PIN)) {  // double checking to make sure the interrupt wasn't triggered by emf
-      shifterPosition = (shifterPosition + userConfig.getShiftStep());
-      debugDirector("Shift UP: " + String(shifterPosition));
+      userConfig.setShifterPosition( userConfig.getShifterPosition() + userConfig.getShiftStep() );
+      debugDirector("Shift UP: " + String(userConfig.getShifterPosition() ));
     } else {
       lastDebounceTime = 0;
     }  // Probably Triggered by EMF, reset the debounce
@@ -196,8 +195,8 @@ void IRAM_ATTR shiftUp() {  // Handle the shift up interrupt IRAM_ATTR is to kee
 void IRAM_ATTR shiftDown() {  // Handle the shift down interrupt
   if (deBounce()) {
     if (!digitalRead(SHIFT_DOWN_PIN)) {  // double checking to make sure the interrupt wasn't triggered by emf
-      shifterPosition = (shifterPosition - userConfig.getShiftStep());
-      debugDirector("Shift DOWN: " + String(shifterPosition));
+      userConfig.setShifterPosition( userConfig.getShifterPosition() - userConfig.getShiftStep() );
+      debugDirector("Shift DOWN: " + String(userConfig.getShifterPosition() ));
     } else {
       lastDebounceTime = 0;
     }  // Probably Triggered by EMF, reset the debounce
