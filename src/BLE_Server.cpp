@@ -173,7 +173,15 @@ bool spinDown() {
   return true;
 }
 
+//as a note, Trainer Road sends 50w target whenever the app is connected.
 void computeERG(int newSetPoint) {
+
+  if(userConfig.getERGMode() && spinBLEClient.connectedPM){
+    //continue
+  }else{
+    return;
+  }
+
   static int setPoint       = 0;
   int currentWatts          = userConfig.getSimulatedWatts();
   float incline             = userConfig.getIncline();
@@ -185,7 +193,11 @@ void computeERG(int newSetPoint) {
     setPoint = newSetPoint;
     return;
   }
+  if (setPoint == 0){
+    return; 
+  }
 
+  // only update if pedaling faster then 20rpm
   if (cad > 20) {
     // 30  is amount of watts per shift. Was 50, seemed like too much...
     if (abs(currentWatts - setPoint) < 30) {
@@ -205,6 +217,8 @@ void computeERG(int newSetPoint) {
         amountToChangeIncline = -(userConfig.getShiftStep() * 5);
       }
     }
+  }else{
+    return;
   }
 
   newIncline = incline - amountToChangeIncline;  //  }
@@ -388,6 +402,7 @@ void MyCallbacks::onWrite(BLECharacteristic *pCharacteristic) {
           fitnessMachineTrainingStatus->notify();
         } else {
           returnValue[2] = 0x02;  // no power meter connected, so no ERG
+          debugDirector("ERG MODE Requested. No PM Connected");
         }
         pCharacteristic->setValue(returnValue, 3);
         break;

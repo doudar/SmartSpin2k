@@ -121,11 +121,11 @@ void BLECommunications(void *pvParameters) {
       updateCyclingPowerMesurementChar();
       updateHeartRateMeasurementChar();
       controlPointIndicate();
+
       if (spinDown()) {
       }
-      if (userConfig.getERGMode()) {
-        computeERG();
-      }
+
+      computeERG();
 
       if (updateConnParametersFlag) {
         vTaskDelay(100 / portTICK_PERIOD_MS);
