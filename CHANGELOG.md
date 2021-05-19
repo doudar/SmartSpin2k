@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 ### Added
 - Added additional FTMS characteristics and some refactoring of shared variables
+- Added GZipped jQuery to fix non WAN connected manual updates.
+- Pin arduino-esp32 package to version 1.0.6 to fix build issue
 - Added + - Buttons to sliders. 
 - Added firmware checklist to "~/" for PR and release candidate testing.
 - Added README.md to "~/Hardware/*" that provides help for the files contained within. 
@@ -31,6 +33,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Enabled native testing.
 
 ### Changed
+- Moved Vin to the correct side on the ESP32 connection diagram. 
 - Power Correction Factor minimum value is now .5
 - Made Revmaster insert slightly smaller. 
 - Fixed minor spulling errurs. 
