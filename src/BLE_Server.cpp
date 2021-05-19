@@ -173,22 +173,18 @@ bool spinDown() {
   return true;
 }
 
-void computeERG(int currentWatts, int setPoint) {
-  // cooldownTimer--;
-  static int oldSetPoint = 0;
-
-  if(setPoint == 0){
-    setPoint = oldSetPoint;
-    currentWatts = userConfig.getSimulatedWatts();
-  }else{ //only save the value so we don't run this too much. 
-  oldSetPoint = setPoint;
-  return;
-  }
-
+void computeERG(int newSetPoint) {
+  static int setPoint       = 0;
+  int currentWatts          = userConfig.getSimulatedWatts();
   float incline             = userConfig.getIncline();
   int cad                   = userConfig.getSimulatedCad();
   int newIncline            = incline;
   int amountToChangeIncline = 0;
+
+  if (newSetPoint > 0) {  // only update the value
+    setPoint = newSetPoint;
+    return;
+  }
 
   if (cad > 20) {
     // 30  is amount of watts per shift. Was 50, seemed like too much...
@@ -362,7 +358,7 @@ void MyCallbacks::onWrite(BLECharacteristic *pCharacteristic) {
         port *= userConfig.getShiftStep();
         userConfig.setShifterPosition(port);
         userConfig.setERGMode(false);
-        debugDirector(" Resistance Mode: " + String((userConfig.getShifterPosition() )), false);
+        debugDirector(" Resistance Mode: " + String((userConfig.getShifterPosition())), false);
         debugDirector("");
         userConfig.setERGMode(false);
         returnValue[2]              = 0x01;
@@ -378,7 +374,7 @@ void MyCallbacks::onWrite(BLECharacteristic *pCharacteristic) {
         if (spinBLEClient.connectedPM) {
           int targetWatts = bytes_to_u16(rxValue[2], rxValue[1]);
           userConfig.setERGMode(true);
-          computeERG(userConfig.getSimulatedWatts(), targetWatts);
+          computeERG(targetWatts);
           debugDirector("ERG MODE", false);
           debugDirector(" Target: " + String(targetWatts), false);
           debugDirector(" Current: " + String(userConfig.getSimulatedWatts()), false);
