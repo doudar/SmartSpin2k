@@ -173,12 +173,11 @@ bool spinDown() {
   return true;
 }
 
-//as a note, Trainer Road sends 50w target whenever the app is connected.
+// as a note, Trainer Road sends 50w target whenever the app is connected.
 void computeERG(int newSetPoint) {
-
-  if(userConfig.getERGMode() && spinBLEClient.connectedPM){
-    //continue
-  }else{
+  if (userConfig.getERGMode() && spinBLEClient.connectedPM) {
+    // continue
+  } else {
     return;
   }
 
@@ -189,12 +188,12 @@ void computeERG(int newSetPoint) {
   int newIncline            = incline;
   int amountToChangeIncline = 0;
 
-  if (newSetPoint > 0) {  // only update the value
+  if (newSetPoint > 0) {  // only update the value if value sent
     setPoint = newSetPoint;
     return;
   }
-  if (setPoint == 0){
-    return; 
+  if (setPoint == 0) {
+    return;
   }
 
   // only update if pedaling faster then 20rpm
@@ -208,7 +207,7 @@ void computeERG(int newSetPoint) {
     }
     amountToChangeIncline = amountToChangeIncline / ((currentWatts / 100) + 1);
 
-    // limit to 4 shifts at a time
+    // limit to 5 shifts at a time
     if (abs(amountToChangeIncline) > userConfig.getShiftStep() * 5) {
       if (amountToChangeIncline > 0) {
         amountToChangeIncline = userConfig.getShiftStep() * 5;
@@ -217,7 +216,7 @@ void computeERG(int newSetPoint) {
         amountToChangeIncline = -(userConfig.getShiftStep() * 5);
       }
     }
-  }else{
+  } else {
     return;
   }
 
