@@ -306,8 +306,16 @@ void updateHeartRateMeasurementChar() {
   debugDirector(String(logBuf), true);
 }
 
-// Creating Server Connection Callbacks
 
+void updateFTMStatusCharWithResistance() {
+  uint8_t resistanceStatus[2] = {0x07, 0x00}; // 0x07 - resistance has changed
+  resistanceStatus[1] = userConfig.getShifterPosition() / userConfig.getShiftStep();
+  fitnessMachineStatusCharacteristic->setValue(resistanceStatus, 2);
+  fitnessMachineStatusCharacteristic->notify();
+}
+
+
+// Creating Server Connection Callbacks
 void MyServerCallbacks::onConnect(BLEServer *pServer, ble_gap_conn_desc *desc) {
   debugDirector("Bluetooth Remote Client Connected: " + String(NimBLEAddress(desc->peer_ota_addr).toString().c_str()) +
                 " Connected Clients: " + String(pServer->getConnectedCount()));

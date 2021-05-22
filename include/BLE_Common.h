@@ -40,6 +40,7 @@ void updateIndoorBikeDataChar();
 void updateCyclingPowerMesurementChar();
 void calculateInstPwrFromHR();
 void updateHeartRateMeasurementChar();
+void updateFTMStatusCharWithResistance();
 int connectedClientCount();
 void controlPointIndicate();
 

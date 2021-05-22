@@ -30,6 +30,9 @@ uint64_t scanDelayTime  = 10000;
 uint64_t scanDelayStart = 0;
 bool scanDelayRunning   = false;
 
+// Flag to tell us whether shifter position changed during ISR functions
+bool resistanceDirty = false;
+
 // Setup a task so the stepper will run on a different core than the main code
 // to prevent stuttering
 TaskHandle_t moveStepperTask;
@@ -115,6 +118,7 @@ void setup() {
 void loop() {
   vTaskDelay(1000 / portTICK_RATE_MS);
   scanIfShiftersHeld();
+  broadcastChangesIfRequired();
 
   if (debugToHTML.length() > 500) {  // Clear up memory
     debugToHTML = "<br>HTML Debug Truncated. Increase buffer if required.";
@@ -186,6 +190,8 @@ void IRAM_ATTR shiftUp() {  // Handle the shift up interrupt IRAM_ATTR is to kee
     if (!digitalRead(SHIFT_UP_PIN)) {  // double checking to make sure the interrupt wasn't triggered by emf
       userConfig.setShifterPosition( userConfig.getShifterPosition() + userConfig.getShiftStep() );
       debugDirector("Shift UP: " + String(userConfig.getShifterPosition() ));
+      // Broadcast new resistance
+      resistanceDirty = true;
     } else {
       lastDebounceTime = 0;
     }  // Probably Triggered by EMF, reset the debounce
@@ -197,6 +203,8 @@ void IRAM_ATTR shiftDown() {  // Handle the shift down interrupt
     if (!digitalRead(SHIFT_DOWN_PIN)) {  // double checking to make sure the interrupt wasn't triggered by emf
       userConfig.setShifterPosition( userConfig.getShifterPosition() - userConfig.getShiftStep() );
       debugDirector("Shift DOWN: " + String(userConfig.getShifterPosition() ));
+      // Broadcast new resistance
+      resistanceDirty = true;
     } else {
       lastDebounceTime = 0;
     }  // Probably Triggered by EMF, reset the debounce
@@ -218,6 +226,16 @@ void resetIfShiftersHeld() {
       vTaskDelay(200 / portTICK_PERIOD_MS);
     }
     ESP.restart();
+  }
+}
+
+// If changes have been made locally in ISR code (e.g. via the manual shifters) broadcast these over BLE
+void broadcastChangesIfRequired() {
+  if (resistanceDirty) {
+    resistanceDirty = false;
+
+    // Broadcast changes via BLE
+    updateFTMStatusCharWithResistance();
   }
 }
 
