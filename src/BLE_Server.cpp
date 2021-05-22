@@ -73,7 +73,7 @@ struct FitnessMachineFeature ftmsFeature = {FitnessMachineFeatureFlags::Types::C
 
 uint8_t ftmsIndoorBikeData[14] = {0x44, 0x02, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0};  // 00000000100001010100 ISpeed, ICAD,
                                                                                                             // TDistance, IPower, ETime
-uint8_t ftmsResistanceLevelRange[6] = {0x00, 0x00, 0x98, 0x3A, 0x01, 0x00};                                 // +-15000 not sure what units
+uint8_t ftmsResistanceLevelRange[6] = {0x00, 0x00, 0x25, 0x00, 0x01, 0x00};                                 // 25 increment 1
 uint8_t ftmsPowerRange[6]           = {0x00, 0x00, 0xA0, 0x0F, 0x01, 0x00};                                 // 1-4000 watts
 uint8_t ftmsTrainingStatus[2]       = {0x08, 0x00};
 
@@ -367,7 +367,7 @@ void MyCallbacks::onWrite(BLECharacteristic *pCharacteristic) {
         break;
       }
       case 0x04: {  // Resistance level setting
-        int targetResistance = bytes_to_u16(rxValue[2], rxValue[1]);
+        int targetResistance = rxValue[1] * userConfig.getShiftStep();
         userConfig.setShifterPosition(targetResistance);
         userConfig.setERGMode(false);
         debugDirector(" Resistance Mode: " + String((userConfig.getShifterPosition())), false);
