@@ -373,7 +373,7 @@ void MyCallbacks::onWrite(BLECharacteristic *pCharacteristic) {
         debugDirector(" Resistance Mode: " + String((userConfig.getShifterPosition())), false);
         debugDirector("");
         returnValue[2]              = 0x01;
-        uint8_t resistanceStatus[3] = {0x07, rxValue[2], rxValue[1]};
+        uint8_t resistanceStatus[2] = {0x07, rxValue[1]};
         fitnessMachineStatusCharacteristic->setValue(resistanceStatus, 3);
         pCharacteristic->setValue(returnValue, 3);
         ftmsTrainingStatus[1] = 0x00;
