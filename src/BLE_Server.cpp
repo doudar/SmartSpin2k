@@ -527,8 +527,11 @@ If client wants to write (0x02) to simulatedSpeed:
 
 Client Writes:
 0x02, 0x06, 0x07, 0x01
+(operator, variable, LSO, MSO)
+
 Server will then indicate:
 0x06, 0x07, 0x01
+(operator, LSO, MSO)
 
 Example to read (0x01) from variable 6 (simulatedSpeed)
 
@@ -543,8 +546,8 @@ Pay special attention to the float values below. Since they have to be transmitt
 void WhenIGrowUpIWillBeACallbackForACustomCharacteristic(BLECharacteristic *pCharacteristic) {
   std::string rxValue    = pCharacteristic->getValue();
   uint8_t returnValue[3] = {rxValue[1], rxValue[2], rxValue[3]};
-  bool read              = 0x01; //value in first byte for read 
-  bool write             = 0x02; //value in first byte to request write
+  bool read              = 0x01; //value in first byte for read operation
+  bool write             = 0x02; //value in first byte to request write operation
   bool error             = 0xff; //value server indicates for error/unable
 
   switch (rxValue[1]) {
