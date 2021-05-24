@@ -22,16 +22,16 @@
  #define BLE_inclineMultiplier 0x0B
  #define BLE_powerCorrectionFactor 0x0C
  #define BLE_simulateHr 0x0D
- #define BLE_simulateWatts 0x0F
- #define BLE_simulateCad 0x10
- #define BLE_ERGMode 0x11
- #define BLE_autoUpdate 0x12
- #define BLE_ssid 0x13
- #define BLE_password 0x14
- #define BLE_foundDevices 0x15        
- #define BLE_connectedPowerMeter 0x16  
- #define BLE_connectedHeartMonitor 0x17
- #define BLE_shifterPosition 0x18
+ #define BLE_simulateWatts 0x0E
+ #define BLE_simulateCad 0x0F
+ #define BLE_ERGMode 0x10
+ #define BLE_autoUpdate 0x11
+ #define BLE_ssid 0x12
+ #define BLE_password 0x13
+ #define BLE_foundDevices 0x14        
+ #define BLE_connectedPowerMeter 0x15  
+ #define BLE_connectedHeartMonitor 0x16
+ #define BLE_shifterPosition 0x17
 
 class userParameters {
  private:

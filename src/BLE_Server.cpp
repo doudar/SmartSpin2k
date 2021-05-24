@@ -514,20 +514,45 @@ void calculateInstPwrFromHR() {
   debugDirector("Power From HR: " + String(avgP));
 }
 
-void WhenIGrowUpIWillBeACallbackForACustomCharacteristic(BLECharacteristic *pCharacteristic) {
+/*
+Custom Characteristic for userConfig Variable manipulation via BLE
 
+An example follows to read/write 26.3kph to simulatedSpeed:
+simulatedSpeed is a float and first needs to be converted to int by *10 for transmission, so convert 26.3kph to 263 (multiply by 10)
+Decimal 263 == hexidecimal 0107 but the data needs to be converted to LSO, MSO to match the rest of the BLE spec so 263 == 0x07, 0x01 (LSO,MSO)
+
+So, 
+
+If client wants to write (0x02) to simulatedSpeed:
+
+Client Writes:
+0x02, 0x06, 0x07, 0x01
+Server will then indicate:
+0x06, 0x07, 0x01
+
+Example to read (0x01) from variable 6 (simulatedSpeed)
+
+Client Writes:
+0x01, 0x06
+Server will then indicate:
+0x06, 0x07, 0x01
+
+Pay special attention to the float values below. Since they have to be transmitted as an int, some are converted *100, others are converted *10. 
+*/
+
+void WhenIGrowUpIWillBeACallbackForACustomCharacteristic(BLECharacteristic *pCharacteristic) {
   std::string rxValue    = pCharacteristic->getValue();
   uint8_t returnValue[3] = {rxValue[1], rxValue[2], rxValue[3]};
-  bool read              = 0x01;
-  bool write             = 0x02;
-  bool error             = 0xff;
+  bool read              = 0x01; //value in first byte for read 
+  bool write             = 0x02; //value in first byte to request write
+  bool error             = 0xff; //value server indicates for error/unable
 
   switch (rxValue[1]) {
-    case BLE_firmwareUpdateURL:
+    case BLE_firmwareUpdateURL:  // 0x01
       returnValue[0] = error;
       break;
 
-    case BLE_incline:{
+    case BLE_incline: {  // 0x02
       if (rxValue[0] == read) {
         int inc        = userConfig.getIncline() * 100;
         returnValue[1] = (uint8_t)(inc & 0xff);
@@ -536,9 +561,10 @@ void WhenIGrowUpIWillBeACallbackForACustomCharacteristic(BLECharacteristic *pCha
       if (rxValue[0] == write) {
         userConfig.setIncline(bytes_to_u16(rxValue[3], rxValue[2]) / 100);
       }
-      break;}
+      break;
+    }
 
-    case BLE_simulatedWatts:
+    case BLE_simulatedWatts:  // 0x03
       if (rxValue[0] == read) {
         returnValue[1] = (uint8_t)(userConfig.getSimulatedWatts() & 0xff);
         returnValue[2] = (uint8_t)(userConfig.getSimulatedWatts() >> 8);
@@ -548,7 +574,7 @@ void WhenIGrowUpIWillBeACallbackForACustomCharacteristic(BLECharacteristic *pCha
       }
       break;
 
-    case BLE_simulatedHr:
+    case BLE_simulatedHr:  // 0x04
       if (rxValue[0] == read) {
         returnValue[1] = (uint8_t)(userConfig.getSimulatedHr() & 0xff);
         returnValue[2] = (uint8_t)(userConfig.getSimulatedHr() >> 8);
@@ -558,17 +584,17 @@ void WhenIGrowUpIWillBeACallbackForACustomCharacteristic(BLECharacteristic *pCha
       }
       break;
 
-    case BLE_simulatedCad:
+    case BLE_simulatedCad:  // 0x05
       if (rxValue[0] == read) {
         returnValue[1] = (uint8_t)(userConfig.getSimulatedCad() & 0xff);
         returnValue[2] = (uint8_t)(userConfig.getSimulatedCad() >> 8);
       }
       if (rxValue[0] == write) {
-        userConfig.setSimulatedCad(bytes_to_u16(rxValue[3], rxValue[2]) / 10);
+        userConfig.setSimulatedCad(bytes_to_u16(rxValue[3], rxValue[2]));
       }
       break;
 
-    case BLE_simulatedSpeed:{
+    case BLE_simulatedSpeed: {  // 0x06
       int spd = userConfig.getSimulatedSpeed() * 10;
       if (rxValue[0] == read) {
         returnValue[1] = (uint8_t)(spd & 0xff);
@@ -577,13 +603,14 @@ void WhenIGrowUpIWillBeACallbackForACustomCharacteristic(BLECharacteristic *pCha
       if (rxValue[0] == write) {
         userConfig.setSimulatedSpeed(bytes_to_u16(rxValue[3], rxValue[2]) / 10);
       }
-      break;}
+      break;
+    }
 
-    case BLE_deviceName:
+    case BLE_deviceName:  // 0x07
       returnValue[0] = error;
       break;
 
-    case BLE_shiftStep:
+    case BLE_shiftStep:  // 0x08
       if (rxValue[0] == read) {
         returnValue[1] = (uint8_t)(userConfig.getShiftStep() & 0xff);
         returnValue[2] = (uint8_t)(userConfig.getShiftStep() >> 8);
@@ -593,7 +620,7 @@ void WhenIGrowUpIWillBeACallbackForACustomCharacteristic(BLECharacteristic *pCha
       }
       break;
 
-    case BLE_stepperPower:
+    case BLE_stepperPower:  // 0x09
       if (rxValue[0] == read) {
         returnValue[1] = (uint8_t)(userConfig.getStepperPower() & 0xff);
         returnValue[2] = (uint8_t)(userConfig.getStepperPower() >> 8);
@@ -603,7 +630,7 @@ void WhenIGrowUpIWillBeACallbackForACustomCharacteristic(BLECharacteristic *pCha
       }
       break;
 
-    case BLE_stealthchop:
+    case BLE_stealthchop:  // 0x0A
       if (rxValue[0] == read) {
         returnValue[1] = (uint8_t)(userConfig.getStealthchop());
       }
@@ -612,7 +639,7 @@ void WhenIGrowUpIWillBeACallbackForACustomCharacteristic(BLECharacteristic *pCha
       }
       break;
 
-    case BLE_inclineMultiplier:{
+    case BLE_inclineMultiplier: {  // 0x0B
       int inc = userConfig.getInclineMultiplier() * 10;
       if (rxValue[0] == read) {
         returnValue[1] = (uint8_t)(inc & 0xff);
@@ -621,9 +648,10 @@ void WhenIGrowUpIWillBeACallbackForACustomCharacteristic(BLECharacteristic *pCha
       if (rxValue[0] == write) {
         userConfig.setInclineMultiplier(bytes_to_u16(rxValue[3], rxValue[2]) / 10);
       }
-      break;}
+      break;
+    }
 
-    case BLE_powerCorrectionFactor:{
+    case BLE_powerCorrectionFactor: {  // 0x0C
       int pcf = userConfig.getPowerCorrectionFactor() * 10;
       if (rxValue[0] == read) {
         returnValue[1] = (uint8_t)(pcf & 0xff);
@@ -632,9 +660,10 @@ void WhenIGrowUpIWillBeACallbackForACustomCharacteristic(BLECharacteristic *pCha
       if (rxValue[0] == write) {
         userConfig.setPowerCorrectionFactor(bytes_to_u16(rxValue[3], rxValue[2]) / 10);
       }
-      break;}
+      break;
+    }
 
-    case BLE_simulateHr:
+    case BLE_simulateHr:  // 0x0D
       if (rxValue[0] == read) {
         returnValue[1] = (uint8_t)(userConfig.getSimulateHr());
       }
@@ -643,7 +672,7 @@ void WhenIGrowUpIWillBeACallbackForACustomCharacteristic(BLECharacteristic *pCha
       }
       break;
 
-    case BLE_simulateWatts:
+    case BLE_simulateWatts:  // 0x0E
       if (rxValue[0] == read) {
         returnValue[1] = (uint8_t)(userConfig.getSimulateWatts());
       }
@@ -652,7 +681,7 @@ void WhenIGrowUpIWillBeACallbackForACustomCharacteristic(BLECharacteristic *pCha
       }
       break;
 
-    case BLE_simulateCad:
+    case BLE_simulateCad:  // 0x0F
       if (rxValue[0] == read) {
         returnValue[1] = (uint8_t)(userConfig.getSimulateCad());
       }
@@ -661,7 +690,7 @@ void WhenIGrowUpIWillBeACallbackForACustomCharacteristic(BLECharacteristic *pCha
       }
       break;
 
-    case BLE_ERGMode:
+    case BLE_ERGMode:  // 0x10
       if (rxValue[0] == read) {
         returnValue[1] = (uint8_t)(userConfig.getERGMode());
       }
@@ -670,7 +699,7 @@ void WhenIGrowUpIWillBeACallbackForACustomCharacteristic(BLECharacteristic *pCha
       }
       break;
 
-    case BLE_autoUpdate:
+    case BLE_autoUpdate:  // 0x11
       if (rxValue[0] == read) {
         returnValue[1] = (uint8_t)(userConfig.getautoUpdate());
       }
@@ -679,27 +708,27 @@ void WhenIGrowUpIWillBeACallbackForACustomCharacteristic(BLECharacteristic *pCha
       }
       break;
 
-    case BLE_ssid:
-    returnValue[0] = error;
-      break;
-
-    case BLE_password:
-    returnValue[0] = error;
-      break;
-
-    case BLE_foundDevices:
-    returnValue[0] = error;
-      break;
-
-    case BLE_connectedPowerMeter:
+    case BLE_ssid:  // 0x12
       returnValue[0] = error;
       break;
 
-    case BLE_connectedHeartMonitor:
+    case BLE_password:  // 0x13
       returnValue[0] = error;
       break;
 
-    case BLE_shifterPosition:
+    case BLE_foundDevices:  // 0x14
+      returnValue[0] = error;
+      break;
+
+    case BLE_connectedPowerMeter:  // 0x15
+      returnValue[0] = error;
+      break;
+
+    case BLE_connectedHeartMonitor:  // 0x16
+      returnValue[0] = error;
+      break;
+
+    case BLE_shifterPosition:  // 0x17
       if (rxValue[0] == read) {
         returnValue[1] = (uint8_t)(userConfig.getStepperPower() & 0xff);
         returnValue[2] = (uint8_t)(userConfig.getStepperPower() >> 8);
