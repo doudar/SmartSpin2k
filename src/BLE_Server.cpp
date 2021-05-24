@@ -513,3 +513,203 @@ void calculateInstPwrFromHR() {
 
   debugDirector("Power From HR: " + String(avgP));
 }
+
+void WhenIGrowUpIWillBeACallbackForACustomCharacteristic(BLECharacteristic *pCharacteristic) {
+
+  std::string rxValue    = pCharacteristic->getValue();
+  uint8_t returnValue[3] = {rxValue[1], rxValue[2], rxValue[3]};
+  bool read              = 0x01;
+  bool write             = 0x02;
+  bool error             = 0xff;
+
+  switch (rxValue[1]) {
+    case BLE_firmwareUpdateURL:
+      returnValue[0] = error;
+      break;
+
+    case BLE_incline:{
+      if (rxValue[0] == read) {
+        int inc        = userConfig.getIncline() * 100;
+        returnValue[1] = (uint8_t)(inc & 0xff);
+        returnValue[2] = (uint8_t)(inc >> 8);
+      }
+      if (rxValue[0] == write) {
+        userConfig.setIncline(bytes_to_u16(rxValue[3], rxValue[2]) / 100);
+      }
+      break;}
+
+    case BLE_simulatedWatts:
+      if (rxValue[0] == read) {
+        returnValue[1] = (uint8_t)(userConfig.getSimulatedWatts() & 0xff);
+        returnValue[2] = (uint8_t)(userConfig.getSimulatedWatts() >> 8);
+      }
+      if (rxValue[0] == write) {
+        userConfig.setSimulatedWatts(bytes_to_u16(rxValue[3], rxValue[2]));
+      }
+      break;
+
+    case BLE_simulatedHr:
+      if (rxValue[0] == read) {
+        returnValue[1] = (uint8_t)(userConfig.getSimulatedHr() & 0xff);
+        returnValue[2] = (uint8_t)(userConfig.getSimulatedHr() >> 8);
+      }
+      if (rxValue[0] == write) {
+        userConfig.setSimulatedHr(bytes_to_u16(rxValue[3], rxValue[2]));
+      }
+      break;
+
+    case BLE_simulatedCad:
+      if (rxValue[0] == read) {
+        returnValue[1] = (uint8_t)(userConfig.getSimulatedCad() & 0xff);
+        returnValue[2] = (uint8_t)(userConfig.getSimulatedCad() >> 8);
+      }
+      if (rxValue[0] == write) {
+        userConfig.setSimulatedCad(bytes_to_u16(rxValue[3], rxValue[2]) / 10);
+      }
+      break;
+
+    case BLE_simulatedSpeed:{
+      int spd = userConfig.getSimulatedSpeed() * 10;
+      if (rxValue[0] == read) {
+        returnValue[1] = (uint8_t)(spd & 0xff);
+        returnValue[2] = (uint8_t)(spd >> 8);
+      }
+      if (rxValue[0] == write) {
+        userConfig.setSimulatedSpeed(bytes_to_u16(rxValue[3], rxValue[2]) / 10);
+      }
+      break;}
+
+    case BLE_deviceName:
+      returnValue[0] = error;
+      break;
+
+    case BLE_shiftStep:
+      if (rxValue[0] == read) {
+        returnValue[1] = (uint8_t)(userConfig.getShiftStep() & 0xff);
+        returnValue[2] = (uint8_t)(userConfig.getShiftStep() >> 8);
+      }
+      if (rxValue[0] == write) {
+        userConfig.setShiftStep(bytes_to_u16(rxValue[3], rxValue[2]));
+      }
+      break;
+
+    case BLE_stepperPower:
+      if (rxValue[0] == read) {
+        returnValue[1] = (uint8_t)(userConfig.getStepperPower() & 0xff);
+        returnValue[2] = (uint8_t)(userConfig.getStepperPower() >> 8);
+      }
+      if (rxValue[0] == write) {
+        userConfig.setStepperPower(bytes_to_u16(rxValue[3], rxValue[2]));
+      }
+      break;
+
+    case BLE_stealthchop:
+      if (rxValue[0] == read) {
+        returnValue[1] = (uint8_t)(userConfig.getStealthchop());
+      }
+      if (rxValue[0] == write) {
+        userConfig.setStealthChop(bytes_to_u16(rxValue[3], rxValue[2]));
+      }
+      break;
+
+    case BLE_inclineMultiplier:{
+      int inc = userConfig.getInclineMultiplier() * 10;
+      if (rxValue[0] == read) {
+        returnValue[1] = (uint8_t)(inc & 0xff);
+        returnValue[2] = (uint8_t)(inc >> 8);
+      }
+      if (rxValue[0] == write) {
+        userConfig.setInclineMultiplier(bytes_to_u16(rxValue[3], rxValue[2]) / 10);
+      }
+      break;}
+
+    case BLE_powerCorrectionFactor:{
+      int pcf = userConfig.getPowerCorrectionFactor() * 10;
+      if (rxValue[0] == read) {
+        returnValue[1] = (uint8_t)(pcf & 0xff);
+        returnValue[2] = (uint8_t)(pcf >> 8);
+      }
+      if (rxValue[0] == write) {
+        userConfig.setPowerCorrectionFactor(bytes_to_u16(rxValue[3], rxValue[2]) / 10);
+      }
+      break;}
+
+    case BLE_simulateHr:
+      if (rxValue[0] == read) {
+        returnValue[1] = (uint8_t)(userConfig.getSimulateHr());
+      }
+      if (rxValue[0] == write) {
+        userConfig.setSimulateHr(bytes_to_u16(rxValue[3], rxValue[2]));
+      }
+      break;
+
+    case BLE_simulateWatts:
+      if (rxValue[0] == read) {
+        returnValue[1] = (uint8_t)(userConfig.getSimulateWatts());
+      }
+      if (rxValue[0] == write) {
+        userConfig.setSimulateWatts(bytes_to_u16(rxValue[3], rxValue[2]));
+      }
+      break;
+
+    case BLE_simulateCad:
+      if (rxValue[0] == read) {
+        returnValue[1] = (uint8_t)(userConfig.getSimulateCad());
+      }
+      if (rxValue[0] == write) {
+        userConfig.setSimulateCad(bytes_to_u16(rxValue[3], rxValue[2]));
+      }
+      break;
+
+    case BLE_ERGMode:
+      if (rxValue[0] == read) {
+        returnValue[1] = (uint8_t)(userConfig.getERGMode());
+      }
+      if (rxValue[0] == write) {
+        userConfig.setERGMode(bytes_to_u16(rxValue[3], rxValue[2]));
+      }
+      break;
+
+    case BLE_autoUpdate:
+      if (rxValue[0] == read) {
+        returnValue[1] = (uint8_t)(userConfig.getautoUpdate());
+      }
+      if (rxValue[0] == write) {
+        userConfig.setAutoUpdate(bytes_to_u16(rxValue[3], rxValue[2]));
+      }
+      break;
+
+    case BLE_ssid:
+    returnValue[0] = error;
+      break;
+
+    case BLE_password:
+    returnValue[0] = error;
+      break;
+
+    case BLE_foundDevices:
+    returnValue[0] = error;
+      break;
+
+    case BLE_connectedPowerMeter:
+      returnValue[0] = error;
+      break;
+
+    case BLE_connectedHeartMonitor:
+      returnValue[0] = error;
+      break;
+
+    case BLE_shifterPosition:
+      if (rxValue[0] == read) {
+        returnValue[1] = (uint8_t)(userConfig.getStepperPower() & 0xff);
+        returnValue[2] = (uint8_t)(userConfig.getStepperPower() >> 8);
+      }
+      if (rxValue[0] == write) {
+        userConfig.setStepperPower(bytes_to_u16(rxValue[3], rxValue[2]));
+      }
+      break;
+  }
+
+  pCharacteristic->setValue(returnValue, sizeof(returnValue));
+  pCharacteristic->indicate();
+}

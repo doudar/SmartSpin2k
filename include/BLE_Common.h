@@ -66,7 +66,7 @@ void bleClientTask(void *pvParameters);
 // FLYWHEEL_UART_TX_UUID};
 
 class SpinBLEAdvertisedDevice {
- public:  // eventually these shoul be made private
+ public:  // eventually these should be made private
   NimBLEAdvertisedDevice *advertisedDevice = nullptr;
   NimBLEAddress peerAddress;
   int connectedClientID = BLE_HS_CONN_HANDLE_NONE;
