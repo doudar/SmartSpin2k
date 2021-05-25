@@ -6,6 +6,7 @@
  */
 
 #include "Main.h"
+#include "SS2KLog.h"
 #include "BLE_Common.h"
 
 #include <ArduinoJson.h>
@@ -21,8 +22,7 @@ BLECharacteristic *cyclingPowerMeasurementCharacteristic;
 BLECharacteristic *fitnessMachineFeature;
 BLECharacteristic *fitnessMachineIndoorBikeData;
 
-/********************************Bit field Flag
- * Example***********************************/
+/******** Bit field Flag Example ********/
 // 00000000000000000001 - 1   - 0x001 - Pedal Power Balance Present
 // 00000000000000000010 - 2   - 0x002 - Pedal Power Balance Reference
 // 00000000000000000100 - 4   - 0x004 - Accumulated Torque Present
@@ -63,7 +63,7 @@ uint8_t ftmsPowerRange[6]           = {0x00, 0x00, 0xA0, 0x0F, 0x01, 0x00};     
 
 void startBLEServer() {
   // Server Setup
-  debugDirector("Starting BLE Server");
+  SS2K_LOG("BLE_Server", "Starting BLE Server");
   pServer = BLEDevice::createServer();
 
   // HEART RATE MONITOR SERVICE SETUP
@@ -130,7 +130,7 @@ void startBLEServer() {
   pAdvertising->setScanResponse(true);
   BLEDevice::startAdvertising();
 
-  debugDirector("Bluetooth Characteristic defined!");
+  SS2K_LOG("BLE_Server", "Bluetooth Characteristic defined!");
 }
 
 void computeERG(int currentWatts, int setPoint) {
@@ -166,25 +166,6 @@ void computeERG(int currentWatts, int setPoint) {
   userConfig.setIncline(newIncline);
 }
 
-void computeCSC() {  // What was SIG smoking when they came up with the Cycling
-                     // Speed and Cadence Characteristic?
-  if (userConfig.getSimulatedCad() > 0) {
-    float crankRevPeriod = (60 * 1024) / userConfig.getSimulatedCad();
-    spinBLEClient.cscCumulativeCrankRev++;
-    spinBLEClient.cscLastCrankEvtTime += crankRevPeriod;
-    int remainder, quotient;
-    quotient                   = spinBLEClient.cscCumulativeCrankRev / 256;
-    remainder                  = spinBLEClient.cscCumulativeCrankRev % 256;
-    cyclingPowerMeasurement[5] = remainder;
-    cyclingPowerMeasurement[6] = quotient;
-    quotient                   = spinBLEClient.cscLastCrankEvtTime / 256;
-    remainder                  = spinBLEClient.cscLastCrankEvtTime % 256;
-    cyclingPowerMeasurement[7] = remainder;
-    cyclingPowerMeasurement[8] = quotient;
-  }  // ^^Using the old way of setting bytes because I like it and it makes
-     // more sense to me looking at it.
-}
-
 void updateIndoorBikeDataChar() {
   float cadRaw = userConfig.getSimulatedCad();
   int cad      = static_cast<int>(cadRaw * 2);
@@ -208,65 +189,102 @@ void updateIndoorBikeDataChar() {
   ftmsIndoorBikeData[7] = (uint8_t)(watts >> 8);  // power value, constrained to avoid negative values,
                                                   // although the specification allows for a sint16
   ftmsIndoorBikeData[8] = (uint8_t)hr;
+
+  // 200 == Data(30), Sep(data/2), Arrow(3), CharId(37), Sep(3), CharId(37), Sep(3), Name(10), Prefix(2), HR(7), SEP(1), CD(10), SEP(1), PW(8), SEP(1), SD(7), Suffix(2), Nul(1) ==
+  // 178, rounded up
+  const int kLogBufMaxLength = 200;
+  char logBuf[kLogBufMaxLength];
+  int logBufLength = ss2k_log_hex_to_buffer(ftmsIndoorBikeData, *(&ftmsIndoorBikeData + 1) - ftmsIndoorBikeData, logBuf, 0, kLogBufMaxLength);
+  logBufLength += snprintf(logBuf + logBufLength, kLogBufMaxLength - logBufLength, "-> %s | %s | FTMS(IBD)[", FITNESSMACHINESERVICE_UUID.toString().c_str(),
+                           fitnessMachineIndoorBikeData->getUUID().toString().c_str());
+  logBufLength += snprintf(logBuf + logBufLength, kLogBufMaxLength - logBufLength, " HR(%d)", hr % 1000);
+  logBufLength += snprintf(logBuf + logBufLength, kLogBufMaxLength - logBufLength, " CD(%.2f)", fmodf(cadRaw, 1000.0));
+  logBufLength += snprintf(logBuf + logBufLength, kLogBufMaxLength - logBufLength, " PW(%d)", watts % 10000);
+  logBufLength += snprintf(logBuf + logBufLength, kLogBufMaxLength - logBufLength, " SD(%.2f)", fmodf(speed, 1000.0));
+  strncat(logBuf + logBufLength, " ]", kLogBufMaxLength - logBufLength);
+
   fitnessMachineIndoorBikeData->setValue(ftmsIndoorBikeData, 9);
   fitnessMachineFeature->notify();
   fitnessMachineIndoorBikeData->notify();
+
+  SS2K_LOG("BLE_Server", "%s", logBuf);
 }  // ^^Using the New Way of setting Bytes.
 
-void updateCyclingPowerMesurementChar() {
+void updateCyclingPowerMeasurementChar() {
+  int power = userConfig.getSimulatedWatts();
   int remainder, quotient;
-  quotient                   = userConfig.getSimulatedWatts() / 256;
-  remainder                  = userConfig.getSimulatedWatts() % 256;
+  quotient                   = power / 256;
+  remainder                  = power % 256;
   cyclingPowerMeasurement[2] = remainder;
   cyclingPowerMeasurement[3] = quotient;
   cyclingPowerMeasurementCharacteristic->setValue(cyclingPowerMeasurement, 9);
 
-  // Data(18), Sep(data/2), Static(13), Nul(1) == 41, rounded up
-  char logBuf[50];
-  char *logBufP = logBuf;
-  for (const auto &it : cyclingPowerMeasurement) {
-    logBufP += sprintf(logBufP, "%02x ", it);
+  float cadence = userConfig.getSimulatedCad();
+  if (cadence > 0) {
+    float crankRevPeriod = (60 * 1024) / cadence;
+    spinBLEClient.cscCumulativeCrankRev++;
+    spinBLEClient.cscLastCrankEvtTime += crankRevPeriod;
+    int remainder, quotient;
+    quotient                   = spinBLEClient.cscCumulativeCrankRev / 256;
+    remainder                  = spinBLEClient.cscCumulativeCrankRev % 256;
+    cyclingPowerMeasurement[5] = remainder;
+    cyclingPowerMeasurement[6] = quotient;
+    quotient                   = spinBLEClient.cscLastCrankEvtTime / 256;
+    remainder                  = spinBLEClient.cscLastCrankEvtTime % 256;
+    cyclingPowerMeasurement[7] = remainder;
+    cyclingPowerMeasurement[8] = quotient;
+  }  // ^^Using the old way of setting bytes because I like it and it makes more sense to me looking at it.
+
+  // 150 == Data(18), Sep(data/2), Arrow(3), CharId(37), Sep(3), CharId(37), Sep(3),Name(8), Prefix(2), CD(10), SEP(1), PW(8), Suffix(2), Nul(1) == 142, rounded up
+  const int kLogBufMaxLength = 150;
+  char logBuf[kLogBufMaxLength];
+  int logBufLength = ss2k_log_hex_to_buffer(cyclingPowerMeasurement, *(&cyclingPowerMeasurement + 1) - cyclingPowerMeasurement, logBuf, 0, kLogBufMaxLength);
+  logBufLength += snprintf(logBuf + logBufLength, kLogBufMaxLength - logBufLength, "-> %s | %s | CPS(CPM)[ ", CYCLINGPOWERSERVICE_UUID.toString().c_str(),
+                           cyclingPowerMeasurementCharacteristic->getUUID().toString().c_str());
+
+  if (cadence > 0) {
+    logBufLength += snprintf(logBuf + logBufLength, kLogBufMaxLength - logBufLength, "CD(%.2f) ", fmodf(cadence, 1000.0));
   }
-  strcat(logBufP, "<-- CPMC sent");
+  logBufLength += snprintf(logBuf + logBufLength, kLogBufMaxLength - logBufLength, "PW(%d) ", power % 10000);
+  strncat(logBuf + logBufLength, "]", kLogBufMaxLength - logBufLength);
 
   cyclingPowerMeasurementCharacteristic->notify();
-  debugDirector(String(logBuf), true);
+  SS2K_LOG("BLE_Server", "%s", logBuf);
 }
 
 void updateHeartRateMeasurementChar() {
-  heartRateMeasurement[1] = userConfig.getSimulatedHr();
+  int hr                  = userConfig.getSimulatedHr();
+  heartRateMeasurement[1] = hr;
   heartRateMeasurementCharacteristic->setValue(heartRateMeasurement, 2);
 
-  // Data(10), Sep(data/2), Static(11), Nul(1) == 26, rounded up
-  char logBuf[35];
-  char *logBufP = logBuf;
-  for (const auto &it : heartRateMeasurement) {
-    logBufP += sprintf(logBufP, "%02x ", it);
-  }
-  strcat(logBufP, "<-- HR sent");
+  // 125 == Data(10), Sep(data/2), Arrow(3), CharId(37), Sep(3), CharId(37), Sep(3), Name(8), Prefix(2), HR(7), Suffix(2), Nul(1) == 118, rounded up
+  const int kLogBufMaxLength = 125;
+  char logBuf[kLogBufMaxLength];
+  int logBufLength = ss2k_log_hex_to_buffer(heartRateMeasurement, *(&heartRateMeasurement + 1) - heartRateMeasurement, logBuf, 0, kLogBufMaxLength);
+  snprintf(logBuf + logBufLength, kLogBufMaxLength - logBufLength, "-> %s | %s | HRS(HRM)[ HR(%d) ]", HEARTSERVICE_UUID.toString().c_str(),
+           heartRateMeasurementCharacteristic->getUUID().toString().c_str(), hr % 1000);
 
   heartRateMeasurementCharacteristic->notify();
-  debugDirector(String(logBuf), true);
+  SS2K_LOG("BLE_Server", "%s", logBuf);
 }
 
 // Creating Server Connection Callbacks
 
 void MyServerCallbacks::onConnect(BLEServer *pServer, ble_gap_conn_desc *desc) {
-  debugDirector("Bluetooth Remote Client Connected: " + String(NimBLEAddress(desc->peer_ota_addr).toString().c_str()) +
-                " Connected Clients: " + String(pServer->getConnectedCount()));
+  SS2K_LOG("BLE_Server", "Bluetooth Remote Client Connected: %s Connected Clients: %d", NimBLEAddress(desc->peer_ota_addr).toString().c_str(), pServer->getConnectedCount());
   updateConnParametersFlag = true;
   bleConnDesc              = desc->conn_handle;
 
   if (pServer->getConnectedCount() < CONFIG_BT_NIMBLE_MAX_CONNECTIONS - NUM_BLE_DEVICES) {
     BLEDevice::startAdvertising();
   } else {
-    debugDirector("Max Remote Client Connections Reached");
+    SS2K_LOG("BLE_Server", "Max Remote Client Connections Reached");
     BLEDevice::stopAdvertising();
   }
 }
 
 void MyServerCallbacks::onDisconnect(BLEServer *pServer) {
-  debugDirector("Bluetooth Remote Client Disconnected. Remaining Clients: " + String(pServer->getConnectedCount()));
+  SS2K_LOG("BLE_Server", "Bluetooth Remote Client Disconnected. Remaining Clients: %d", pServer->getConnectedCount());
   BLEDevice::startAdvertising();
 }
 
@@ -274,40 +292,38 @@ void MyCallbacks::onWrite(BLECharacteristic *pCharacteristic) {
   std::string rxValue = pCharacteristic->getValue();
 
   if (rxValue.length() > 1) {
-    for (const auto &text : rxValue) {  // Range-for!
-      debugDirector(String(text, HEX) + " ", false);
-    }
-    debugDirector("<-- From APP ", false);
-    /* 0x11 17 means FTMS Incline Control Mode  (aka SIM mode)*/
+    // 175 == Data(16), Spaces(Data/2), Arrow(3), ChrUUID(37), Sep(3), ChrUUID(37), Sep(3),
+    //        Name(8), Prefix(2), TGT(9), SEP(1), CUR(9), SEP(1), INC(11), Suffix(2), Nul(1) - 151 rounded up
+    const int kLogBufMaxLength = 175;
+    char logBuf[kLogBufMaxLength];
+    int logBufLength = ss2k_log_hex_to_buffer(reinterpret_cast<const unsigned char *>(rxValue.c_str()), rxValue.length(), logBuf, 0, kLogBufMaxLength);
+    logBufLength += snprintf(logBuf + logBufLength, kLogBufMaxLength - logBufLength, "<- %s | %s ", FITNESSMACHINESERVICE_UUID.toString().c_str(),
+                             pCharacteristic->getUUID().toString().c_str());
 
-    if (static_cast<int>(rxValue[0]) == 17) {
+    if (static_cast<int>(rxValue[0]) == 17) {  // 0x11 17 means FTMS Incline Control Mode  (aka SIM mode)
       signed char buf[2];
       buf[0] = rxValue[3];  // (Least significant byte)
       buf[1] = rxValue[4];  // (Most significant byte)
 
-      int port = bytes_to_u16(buf[1], buf[0]);
-      userConfig.setIncline(port);
+      int targetIncline = bytes_to_u16(buf[1], buf[0]);
+      userConfig.setIncline(targetIncline);
       if (userConfig.getERGMode()) {
         userConfig.setERGMode(false);
       }
-      debugDirector(" Target Incline: " + String((userConfig.getIncline() / 100)), false);
+      snprintf(logBuf + logBufLength, kLogBufMaxLength - logBufLength, " | FTMS(CP)[ INC(%.2f) ]", fmodf(targetIncline / 100, 1000.0));
+      SS2K_LOG("BLE_Server", "%s", logBuf);
+      SEND_TO_TELEGRAM(String(logBuf));
     }
-    debugDirector("");
-
-    /* 0x05 5 means FTMS Watts Control Mode (aka ERG mode) */
-    if ((static_cast<int>(rxValue[0]) == 5) && (spinBLEClient.connectedPM)) {
+    if ((static_cast<int>(rxValue[0]) == 5) && (spinBLEClient.connectedPM)) {  // 0x05 5 means FTMS Watts Control Mode (aka ERG mode)
       int targetWatts = bytes_to_u16(rxValue[2], rxValue[1]);
       if (!userConfig.getERGMode()) {
         userConfig.setERGMode(true);
       }
       computeERG(userConfig.getSimulatedWatts(), targetWatts);
-      debugDirector("ERG MODE", false);
-      debugDirector(" Target: " + String(targetWatts), false);
-      debugDirector(" Current: " + String(userConfig.getSimulatedWatts()),
-                    false);  // not displaying numbers less than 256 correctly
-                             // but they do get sent to Zwift correctly.
-      debugDirector(" Incline: " + String(userConfig.getIncline() / 100), false);
-      debugDirector("");
+      snprintf(logBuf + logBufLength, kLogBufMaxLength - logBufLength, " | FTMS(CP)[ TGT(%d) CUR(%d) INC(%.2f) ]", targetWatts % 10000, userConfig.getSimulatedWatts() % 10000,
+               fmodf(userConfig.getIncline() / 100, 1000.0));
+      SS2K_LOG("BLE_Server", "%s", logBuf);
+      SEND_TO_TELEGRAM(String(logBuf));
     }
   }
 }
@@ -325,9 +341,8 @@ void calculateInstPwrFromHR() {
   static int oldHR    = userConfig.getSimulatedHr();
   static int newHR    = userConfig.getSimulatedHr();
   static double delta = 0;
-
-  oldHR = newHR;  // Copying HR from Last loop
-  newHR = userConfig.getSimulatedHr();
+  oldHR               = newHR;  // Copying HR from Last loop
+  newHR               = userConfig.getSimulatedHr();
 
   delta = (newHR - oldHR) / (BLE_CLIENT_DELAY / 1000);
 
@@ -352,5 +367,5 @@ void calculateInstPwrFromHR() {
   userConfig.setSimulatedCad(90);
 #endif
 
-  debugDirector("Power From HR: " + String(avgP));
+  SS2K_LOG("BLE_Server", "Power From HR: %d", avgP);
 }

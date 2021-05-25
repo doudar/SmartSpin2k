@@ -82,7 +82,7 @@ class userParameters {
   void setConnectedPowerMeter(String cpm) { connectedPowerMeter = cpm; }
   void setConnectedHeartMonitor(String cHr) { connectedHeartMonitor = cHr; }
 
-  String returnJSON();
+  String returnJSON(bool includeDebugLog = false);
   void saveToSPIFFS();
   void loadFromSPIFFS();
   void printFile();
