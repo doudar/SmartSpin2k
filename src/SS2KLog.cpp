@@ -17,13 +17,13 @@ const std::string DebugInfo::get_and_clear_logs() { return DebugInfo::INSTANCE.g
 void DebugInfo::append_logv_internal(const char *format, va_list args) {
   if (xSemaphoreTake(logBufferMutex, 1000) == pdTRUE) {
     int written = vsnprintf(logBuffer + logBufferLength, DEBUG_LOG_BUFFER_SIZE - logBufferLength, format, args);
-    SS2K_LOG(DEBUG_INFO_LOG_TAG, "Wrote %d bytes to log", written);
+    SS2K_LOGD(DEBUG_INFO_LOG_TAG, "Wrote %d bytes to log", written);
     if (written < 0 || logBufferLength + written > DEBUG_LOG_BUFFER_SIZE) {
       logBufferLength = snprintf(logBuffer, DEBUG_LOG_BUFFER_SIZE, "...\n");
     } else {
       logBufferLength += written;
     }
-    SS2K_LOG(DEBUG_INFO_LOG_TAG, "Log buffer length %d of %d bytes", logBufferLength, DEBUG_LOG_BUFFER_SIZE);
+    SS2K_LOGD(DEBUG_INFO_LOG_TAG, "Log buffer length %d of %d bytes", logBufferLength, DEBUG_LOG_BUFFER_SIZE);
     xSemaphoreGive(logBufferMutex);
   }
 }
@@ -34,7 +34,7 @@ const std::string DebugInfo::get_and_clear_logs_internal() {
     logBufferLength            = 0;
     logBuffer[0]               = '\0';
     xSemaphoreGive(logBufferMutex);
-    SS2K_LOG(DEBUG_INFO_LOG_TAG, "Log buffer read %d bytes and cleared", logBufferLength);
+    SS2K_LOGD(DEBUG_INFO_LOG_TAG, "Log buffer read %d bytes and cleared", logBufferLength);
     return debugLog;
   }
   return "";
