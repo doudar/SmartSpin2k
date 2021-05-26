@@ -28,7 +28,7 @@ float CyclePowerData::getSpeed() { return nanf(""); }
 void CyclePowerData::decode(uint8_t *data, size_t length) {
   uint8_t flags = data[0];
   int cPos      = 2;  // lowest position cadence could ever be
-  // Instanious power is always present. Do that first.
+  // Instantaneous power is always present. Do that first.
   // first calculate which fields are present. Power is always 2 & 3, cadence
   // can move depending on the flags.
   this->power = get_le16(&data[cPos]);

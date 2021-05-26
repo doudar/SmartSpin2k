@@ -67,7 +67,7 @@ bool SpinBLEClient::connectToServer() {
   NimBLEUUID serviceUUID;
   NimBLEUUID charUUID;
 
-  int sucessful                 = 0;
+  int successful                 = 0;
   BLEAdvertisedDevice *myDevice = nullptr;
   int device_number             = -1;
   for (size_t i = 0; i < NUM_BLE_DEVICES; i++) {
@@ -136,7 +136,7 @@ bool SpinBLEClient::connectToServer() {
       SS2K_LOG(BLE_CLIENT_LOG_TAG, "Client RSSI %d", pClient->getRssi());
       SS2K_LOG(BLE_CLIENT_LOG_TAG, "device RSSI %d", myDevice->getRSSI());
       if (myDevice->getRSSI() == 0) {
-        SS2K_LOG(BLE_CLIENT_LOG_TAG, "no signal detected. abortng.");
+        SS2K_LOG(BLE_CLIENT_LOG_TAG, "no signal detected. aborting.");
         reconnectTries--;
         return false;
       }
@@ -210,7 +210,7 @@ bool SpinBLEClient::connectToServer() {
     SS2K_LOG(BLE_CLIENT_LOG_TAG, "Failed to find service: %s", serviceUUID.toString().c_str());
   } else {
     SS2K_LOG(BLE_CLIENT_LOG_TAG, " - Found service: %s", pRemoteService->getUUID().toString().c_str());
-    sucessful++;
+    successful++;
 
     // Obtain a reference to the characteristic in the service of the remote BLE server.
     pRemoteCharacteristic = pRemoteService->getCharacteristic(charUUID);
@@ -218,7 +218,7 @@ bool SpinBLEClient::connectToServer() {
       SS2K_LOG(BLE_CLIENT_LOG_TAG, "Failed to find our characteristic UUID: %s", charUUID.toString().c_str());
     } else {  // need to iterate through these for all UUID's
       SS2K_LOG(BLE_CLIENT_LOG_TAG, " - Found Characteristic: %s", pRemoteCharacteristic->getUUID().toString().c_str());
-      sucessful++;
+      successful++;
     }
 
     // Read the value of the characteristic.
@@ -235,8 +235,8 @@ bool SpinBLEClient::connectToServer() {
       SS2K_LOG(BLE_CLIENT_LOG_TAG, "Unable to subscribe to notifications");
     }
   }
-  if (sucessful > 0) {
-    SS2K_LOG(BLE_CLIENT_LOG_TAG, "Sucessful %s subscription.", pRemoteCharacteristic->getUUID().toString().c_str());
+  if (successful > 0) {
+    SS2K_LOG(BLE_CLIENT_LOG_TAG, "Successful %s subscription.", pRemoteCharacteristic->getUUID().toString().c_str());
     spinBLEClient.myBLEDevices[device_number].doConnect = false;
     reconnectTries                                      = MAX_RECONNECT_TRIES;
     spinBLEClient.myBLEDevices[device_number].set(myDevice, pClient->getConnId(), serviceUUID, charUUID);

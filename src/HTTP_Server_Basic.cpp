@@ -265,7 +265,7 @@ void startHttpServer() {
           } else if (upload.status == UPLOAD_FILE_END) {
             if (Update.end(true)) {  // true to set the size to the
                                      // current progress
-              server.send(200, "text/plain", "Firmware Uploaded Sucessfully. Rebooting...");
+              server.send(200, "text/plain", "Firmware Uploaded Successfully. Rebooting...");
               vTaskDelay(2000 / portTICK_PERIOD_MS);
               ESP.restart();
             } else {
@@ -290,7 +290,7 @@ void startHttpServer() {
               fsUploadFile.close();
             }
             SS2K_LOG(HTTP_SERVER_LOG_TAG, "handleFileUpload Size: %zu", upload.totalSize);
-            server.send(200, "text/plain", String(upload.filename + " Uploaded Sucessfully."));
+            server.send(200, "text/plain", String(upload.filename + " Uploaded Successfully."));
           }
         }
       });
@@ -355,7 +355,7 @@ void handleSpiffsFile() {
   if (SPIFFS.exists(filename)) {
     File file = SPIFFS.open(filename, FILE_READ);
     if (fileType == "gz") {
-      fileType = "html";  // no need to change content type as it's done automacically by .streamfile below VV
+      fileType = "html";  // no need to change content type as it's done automatically by .streamfile below VV
     }
     server.streamFile(file, "text/" + fileType);
     file.close();
@@ -476,7 +476,7 @@ void settingsProcessor() {
   } else {  // Normal response
     response +=
         "Network settings will be applied at next reboot. <br> Everything "
-        "else is availiable immediatly.</h2></body><script> "
+        "else is availiable immediately.</h2></body><script> "
         "setTimeout(\"location.href = 'http://" +
         myIP.toString() + "/index.html';\",1000);</script></html>";
   }
@@ -553,7 +553,7 @@ void FirmwareUpdate() {
       ret = httpUpdate.update(client, userConfig.getFirmwareUpdateURL() + String(FW_BINFILE));
       switch (ret) {
         case HTTP_UPDATE_FAILED:
-          SS2K_LOG(HTTP_SERVER_LOG_TAG, "HTTP_UPDATE_FAILD Error %d : %s", httpUpdate.getLastError(), httpUpdate.getLastErrorString().c_str());
+          SS2K_LOG(HTTP_SERVER_LOG_TAG, "HTTP_UPDATE_FAILED Error %d : %s", httpUpdate.getLastError(), httpUpdate.getLastErrorString().c_str());
           break;
 
         case HTTP_UPDATE_NO_UPDATES:

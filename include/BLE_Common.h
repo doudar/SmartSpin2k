@@ -70,7 +70,7 @@ void bleClientTask(void *pvParameters);
 // FLYWHEEL_UART_TX_UUID};
 
 class SpinBLEAdvertisedDevice {
- public:  // eventually these shoul be made private
+ public:  // eventually these should be made private
   NimBLEAdvertisedDevice *advertisedDevice = nullptr;
   NimBLEAddress peerAddress;
   int connectedClientID = BLE_HS_CONN_HANDLE_NONE;
@@ -126,7 +126,7 @@ class SpinBLEClient {
   bool connectToServer();
   void scanProcess();
   void disconnect();
-  // Check for duplicate services of BLEClient and remove the previoulsy
+  // Check for duplicate services of BLEClient and remove the previously
   // connected one.
   void removeDuplicates(NimBLEClient *pClient);
   // Reset devices in myBLEDevices[]. Bool All (true) or only connected ones

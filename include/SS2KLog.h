@@ -49,10 +49,10 @@
 
 #if CORE_DEBUG_LEVEL >= 1
 #define SS2K_LOGE(tag, format, ...) SS2K_MODLOG_DFLT(ERROR, "E %lu %s: " #format "\n", millis(), tag, ##__VA_ARGS__)
+
 #else
 #define SS2K_LOGE(tag, format, ...) (void)tag
 #endif
-
 #define SS2K_LOGC(tag, format, ...) SS2K_MODLOG_DFLT(CRITICAL, "C %lu %s: " #format "\n", millis(), tag, ##__VA_ARGS__)
 #define SS2K_LOG(tag, format, ...)  SS2K_MODLOG_DFLT(CRITICAL, "N %lu %s: " #format "\n", millis(), tag, ##__VA_ARGS__)
 
