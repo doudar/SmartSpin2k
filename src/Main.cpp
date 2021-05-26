@@ -6,22 +6,23 @@
  */
 
 #include "Main.h"
+#include "SS2KLog.h"
 #include <TMCStepper.h>
 #include <Arduino.h>
 #include <SPIFFS.h>
 #include <HardwareSerial.h>
 
-String debugToHTML = "<br>Firmware Version " + String(FIRMWARE_VERSION);
-bool lastDir       = true;  // Stepper Last Direction
+bool lastDir = true;  // Stepper Last Direction
 
 // Debounce Setup
 uint64_t lastDebounceTime = 0;    // the last time the output pin was toggled
 uint64_t debounceDelay    = 500;  // the debounce time; increase if the output flickers
 
 // Stepper Speed - Lower is faster
-int maxStepperSpeed = 500;
-int shifterPosition = 0;
-int stepperPosition = 0;
+int maxStepperSpeed     = 500;
+int lastShifterPosition = 0;
+int shifterPosition     = 0;
+int stepperPosition     = 0;
 HardwareSerial stepperSerial(2);
 TMC2208Stepper driver(&SERIAL_PORT, R_SENSE);  // Hardware Serial
 
@@ -45,12 +46,12 @@ void setup() {
   // Serial port for debugging purposes
   Serial.begin(512000);
   stepperSerial.begin(57600, SERIAL_8N2, STEPPERSERIAL_RX, STEPPERSERIAL_TX);
-  debugDirector("Compiled " + String(__DATE__) + String(__TIME__));
+  SS2K_LOG(MAIN_LOG_TAG, "Compiled %s%s", __DATE__, __TIME__);
 
   // Initialize SPIFFS
-  debugDirector("Mounting Filesystem");
+  SS2K_LOG(MAIN_LOG_TAG, "Mounting Filesystem");
   if (!SPIFFS.begin(true)) {
-    debugDirector("An Error has occurred while mounting SPIFFS");
+    SS2K_LOGE(MAIN_LOG_TAG, "An Error has occurred while mounting SPIFFS");
     return;
   }
 
@@ -80,7 +81,7 @@ void setup() {
 
   setupTMCStepperDriver();
 
-  debugDirector("Setting up cpu Tasks");
+  SS2K_LOG(MAIN_LOG_TAG, "Setting up cpu Tasks");
   disableCore0WDT();  // Disable the watchdog timer on core 0 (so long stepper
                       // moves don't cause problems)
 
@@ -106,7 +107,7 @@ void setup() {
   setupBLE();
   startHttpServer();
   resetIfShiftersHeld();
-  debugDirector("Creating Shifter Interrupts");
+  SS2K_LOG(MAIN_LOG_TAG, "Creating Shifter Interrupts");
   // Setup Interrups so shifters work anytime
   attachInterrupt(digitalPinToInterrupt(SHIFT_UP_PIN), shiftUp, CHANGE);
   attachInterrupt(digitalPinToInterrupt(SHIFT_DOWN_PIN), shiftDown, CHANGE);
@@ -115,11 +116,15 @@ void setup() {
 
 void loop() {
   vTaskDelay(1000 / portTICK_RATE_MS);
-  scanIfShiftersHeld();
 
-  if (debugToHTML.length() > 500) {  // Clear up memory
-    debugToHTML = "<br>HTML Debug Truncated. Increase buffer if required.";
+  if (shifterPosition > lastShifterPosition) {
+    SS2K_LOG(MAIN_LOG_TAG, "Shift UP: %d", shifterPosition);
+  } else if (shifterPosition < lastShifterPosition) {
+    SS2K_LOG(MAIN_LOG_TAG, "Shift DOWN: %d", shifterPosition);
   }
+  lastShifterPosition = shifterPosition;
+
+  scanIfShiftersHeld();
 
 #ifdef DEBUG_STACK
   Serial.printf("Stepper: %d \n", uxTaskGetStackHighWaterMark(moveStepperTask));
@@ -186,7 +191,6 @@ void IRAM_ATTR shiftUp() {  // Handle the shift up interrupt IRAM_ATTR is to kee
   if (deBounce()) {
     if (!digitalRead(SHIFT_UP_PIN)) {  // double checking to make sure the interrupt wasn't triggered by emf
       shifterPosition = (shifterPosition + userConfig.getShiftStep());
-      debugDirector("Shift UP: " + String(shifterPosition));
     } else {
       lastDebounceTime = 0;
     }  // Probably Triggered by EMF, reset the debounce
@@ -197,7 +201,6 @@ void IRAM_ATTR shiftDown() {  // Handle the shift down interrupt
   if (deBounce()) {
     if (!digitalRead(SHIFT_DOWN_PIN)) {  // double checking to make sure the interrupt wasn't triggered by emf
       shifterPosition = (shifterPosition - userConfig.getShiftStep());
-      debugDirector("Shift DOWN: " + String(shifterPosition));
     } else {
       lastDebounceTime = 0;
     }  // Probably Triggered by EMF, reset the debounce
@@ -206,8 +209,8 @@ void IRAM_ATTR shiftDown() {  // Handle the shift down interrupt
 
 void resetIfShiftersHeld() {
   if ((digitalRead(SHIFT_UP_PIN) == LOW) && (digitalRead(SHIFT_DOWN_PIN) == LOW)) {
-    debugDirector("Resetting to defaults via shifter buttons.");
-    for (int x = 0; x < 10; x++) {  // blink fast to acknoledge
+    SS2K_LOG(MAIN_LOG_TAG, "Resetting to defaults via shifter buttons.");
+    for (int x = 0; x < 10; x++) {  // blink fast to acknowledge
       digitalWrite(LED_PIN, HIGH);
       vTaskDelay(200 / portTICK_PERIOD_MS);
       digitalWrite(LED_PIN, LOW);
@@ -224,18 +227,18 @@ void resetIfShiftersHeld() {
 
 void scanIfShiftersHeld() {
   if ((digitalRead(SHIFT_UP_PIN) == LOW) && (digitalRead(SHIFT_DOWN_PIN) == LOW)) {  // are both shifters held?
-    debugDirector("Shifters Held " + String(shiftersHoldForScan));
+    SS2K_LOG(MAIN_LOG_TAG, "Shifters Held %d", shiftersHoldForScan);
     if (shiftersHoldForScan < 1) {  // have they been held for enough loops?
-      debugDirector("Shifters Held < 1 " + String(shiftersHoldForScan));
+      SS2K_LOG(MAIN_LOG_TAG, "Shifters Held < 1 %d", shiftersHoldForScan);
       if ((millis() - scanDelayStart) >= scanDelayTime) {  // Has this already been done within 10 seconds?
         scanDelayStart += scanDelayTime;
         spinBLEClient.resetDevices();
         spinBLEClient.serverScan(true);
         shiftersHoldForScan = SHIFTERS_HOLD_FOR_SCAN;
         digitalWrite(LED_PIN, LOW);
-        debugDirector("Scan From Buttons");
+        SS2K_LOG(MAIN_LOG_TAG, "Scan From Buttons");
       } else {
-        debugDirector("Shifters Held but timer not up " + String((millis() - scanDelayStart) >= scanDelayTime));
+        SS2K_LOG(MAIN_LOG_TAG, "Shifters Held but timer not up %d", (millis() - scanDelayStart) >= scanDelayTime);
         shiftersHoldForScan = SHIFTERS_HOLD_FOR_SCAN;
         return;
       }
@@ -245,29 +248,13 @@ void scanIfShiftersHeld() {
   }
 }
 
-// String Text to print, Optional Make newline, Optional Send to Telegram
-void debugDirector(String textToPrint, bool newline, bool telegram) {
-  if (newline) {
-    Serial.println(textToPrint);
-    debugToHTML += String("<br>") + textToPrint;
-  } else {
-    Serial.print(textToPrint);
-    debugToHTML += textToPrint;
-  }
-#ifdef USE_TELEGRAM
-  if (telegram) {
-    sendTelegram(textToPrint);
-  }
-#endif
-}
-
 void setupTMCStepperDriver() {
   driver.begin();
   driver.pdn_disable(true);
   driver.mstep_reg_select(true);
 
   uint16_t msread = driver.microsteps();
-  debugDirector(" read:ms=" + msread);
+  SS2K_LOG(MAIN_LOG_TAG, " read:ms=%ud", msread);
 
   driver.rms_current(userConfig.getStepperPower());  // Set motor RMS current
   driver.microsteps(4);                              // Set microsteps to 1/8th
@@ -279,8 +266,8 @@ void setupTMCStepperDriver() {
   msread               = driver.microsteps();
   uint16_t currentread = driver.cs_actual();
 
-  debugDirector(" read:current=" + currentread);
-  debugDirector(" read:ms=" + msread);
+  SS2K_LOG(MAIN_LOG_TAG, " read:current=%ud", currentread);
+  SS2K_LOG(MAIN_LOG_TAG, " read:ms=%ud", msread);
 
   driver.toff(5);
   bool t_bool = userConfig.getStealthchop();
@@ -290,7 +277,7 @@ void setupTMCStepperDriver() {
 }
 
 void updateStepperPower() {
-  debugDirector("Stepper power is now " + String(userConfig.getStepperPower()));
+  SS2K_LOG(MAIN_LOG_TAG, "Stepper power is now %d", userConfig.getStepperPower());
   driver.rms_current(userConfig.getStepperPower());
 }
 
@@ -299,5 +286,5 @@ void updateStealthchop() {
   driver.en_spreadCycle(!t_bool);
   driver.pwm_autoscale(t_bool);
   driver.pwm_autograd(t_bool);
-  debugDirector("Stealthchop is now " + String(t_bool));
+  SS2K_LOG(MAIN_LOG_TAG, "Stealthchop is now %d", t_bool);
 }

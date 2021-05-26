@@ -77,51 +77,99 @@
           </tbody>
         </table>
       </form>
-      <p style="text-align: left; margin-left:0 auto;">Debugging Info:</p>
-      <div id="debug" name="debug"
-        style="margin-left:0 auto;background-color:black;background-image:radial-gradient(rgba(0,150,0,0.75), black 120%);text-align: left;height:30vh;width:100%;resize:both;border:1px solid #ccc;color:white;font:1.3rem Inconsolata, monospace;overflow:auto;text-shadow: 0 0 4px #C8C8C8;">
-        loading </div>
+      <table style="width: 100%;padding: 0;margin: 0;table-layout: fixed;">
+        <tbody>
+          <tr>
+            <td>
+              <p style="text-align: left;float: left;">Debugging Info:</p>
+            </td>
+            <td>
+              <div style="float: right;">
+                <input type="checkbox" id="follow" name="follow" checked="true">
+                <label for="follow">Follow</label>
+              </div>
+            </td>
+          </tr>
+          <tr>
+            <td colspan="2">
+              <pre id="debug" name="debug" style="margin: 0;padding: 5;background-color:black;background-image:radial-gradient(rgba(0,150,0,0.75), black 120%);text-align: left;height:30vh;width:100%;resize:both;border:1px solid #ccc;color:white;font:1.3rem Inconsolata, monospace;overflow:auto;text-shadow: 0 0 4px #C8C8C8;">Loading</pre>
+            </td>
+          </tr>
+        </tbody>
+      </table>
       <br>
     </h2>
 </body>
 
 <script>
 
-
-  var element = document.getElementById("debug");
-  element.scrollTop = element.scrollHeight;
-
-  function updateScroll() {
-    var element = document.getElementById("debug");
-    element.scrollTop = element.scrollHeight;
+  var debugElement = document.getElementById("debug");
+  var followElement = document.getElementById("follow");
+  var updatePending = false;
+  var updateTimer = undefined;
+  
+  function onVisibilityChanged() {
+    if (document.hidden || document.mozHidden || document.webkitHidden || document.msHidden) {
+      stopUpdate();
+    } else {
+      startUpdate();
+    }
   }
 
-  //Update values on specified interval loading late because this tiny webserver hates frequent requests
-  setInterval(function () {
-    requestConfigValues();
-  }, 1000);
+  document.addEventListener("visibilitychange", onVisibilityChanged, false);
+  document.addEventListener("mozvisibilitychange", onVisibilityChanged, false);
+  document.addEventListener("webkitvisibilitychange", onVisibilityChanged, false);
+  document.addEventListener("msvisibilitychange", onVisibilityChanged, false);
+
+  function startUpdate() {
+    //Update values on specified interval loading late because this tiny webserver hates frequent requests
+    if (updateTimer === undefined) {
+      updateTimer = setInterval(function () {
+        requestConfigValues();
+      }, 1000);
+    }
+  }
+
+  function stopUpdate() {
+    clearInterval(updateTimer);
+    updateTimer = undefined;
+  }
+
+  function updateDebugView(newContent) {
+    if (followElement.checked) {
+      debugElement.scrollTop = debugElement.scrollHeight - debugElement.clientHeight
+    }
+  }
 
   function requestConfigValues() {
-    var xhttp = new XMLHttpRequest();
-    xhttp.onreadystatechange = function () {
-      if (this.readyState == 4 && this.status == 200) {
-        var obj = JSON.parse(this.responseText);
-        document.getElementById("ssid").value = obj.ssid;
-        document.getElementById("connectedHeartMonitor").value = obj.connectedHeartMonitor;
-        document.getElementById("deviceName").value = obj.deviceName;
-        document.getElementById("shiftStep").value = obj.shiftStep;
-        document.getElementById("inclineMultiplier").value = obj.inclineMultiplier;
-        document.getElementById("incline").value = obj.incline;
-        document.getElementById("simulatedHr").value = obj.simulatedHr;
-        document.getElementById("simulatedWatts").value = obj.simulatedWatts;
-        document.getElementById("simulatedCad").value = obj.simulatedCad;
-        document.getElementById("connectedPowerMeter").value = obj.connectedPowerMeter;
-        document.getElementById("debug").innerHTML += obj.debug;
-        updateScroll();
-      }
-    };
-    xhttp.open("GET", "/configJSON", true);
-    xhttp.send();
+    if (!updatePending) {
+      updatePending = true
+      var xhttp = new XMLHttpRequest();
+      xhttp.onreadystatechange = function () {
+        updatePending = false;
+        if (this.readyState == 4 && this.status == 200) {
+          var obj = JSON.parse(this.responseText);
+          document.getElementById("ssid").value = obj.ssid;
+          document.getElementById("connectedHeartMonitor").value = obj.connectedHeartMonitor;
+          document.getElementById("deviceName").value = obj.deviceName;
+          document.getElementById("shiftStep").value = obj.shiftStep;
+          document.getElementById("inclineMultiplier").value = obj.inclineMultiplier;
+          document.getElementById("incline").value = obj.incline;
+          document.getElementById("simulatedHr").value = obj.simulatedHr;
+          document.getElementById("simulatedWatts").value = obj.simulatedWatts;
+          document.getElementById("simulatedCad").value = obj.simulatedCad;
+          document.getElementById("connectedPowerMeter").value = obj.connectedPowerMeter;
+          if (debugElement.innerHTML == "Loading") {
+            document.getElementById("debug").innerHTML = obj.debug;
+          } else {
+            document.getElementById("debug").innerHTML += obj.debug;
+          }
+          updateDebugView(obj.debug);
+        }
+      };
+      xhttp.open("GET", "/configJSON?includeDebugLog=true", true);
+      xhttp.send();
+    }
   }
 
   //define function to load css
@@ -136,8 +184,8 @@
   //Delay loading css to not swamp webserver
   window.addEventListener('load', function () {
     setTimeout(loadCss, 100);
+    startUpdate();
   }, false);
-
 </script>
 
 </html>

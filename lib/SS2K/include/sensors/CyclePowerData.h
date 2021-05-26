@@ -11,7 +11,7 @@
 
 class CyclePowerData : public SensorData {
  public:
-  CyclePowerData() : SensorData("CPS"), power() {}
+  CyclePowerData() : SensorData("CPS") {}
 
   bool hasHeartRate();
   bool hasCadence();

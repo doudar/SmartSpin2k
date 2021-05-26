@@ -9,6 +9,8 @@
 
 #include <Arduino.h>
 
+#define HTTP_SERVER_LOG_TAG "HTTP_Server"
+
 void startHttpServer();
 void webClientUpdate(void *pvParameters);
 void handleSpiffsFile();
@@ -18,8 +20,12 @@ void handleHrSlider();
 void FirmwareUpdate();
 
 #ifdef USE_TELEGRAM
+#define SEND_TO_TELEGRAM(message) sendTelegram(message);
+
 void sendTelegram(String textToSend);
 void telegramUpdate(void *pvParameters);
+#else
+#define SEND_TO_TELEGRAM(message) (void)message
 #endif
 
 // wifi Function
