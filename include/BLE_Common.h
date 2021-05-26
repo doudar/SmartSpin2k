@@ -34,6 +34,7 @@ extern bool updateConnParametersFlag;
 
 void startBLEServer();
 void computeERG(int, int);
+void logCharacteristic(char *buffer, const size_t bufferCapacity, const byte *data, const size_t dataLength, const NimBLEUUID serviceUUID, const NimBLEUUID charUUID, const char *format, ...);
 void updateIndoorBikeDataChar();
 void updateCyclingPowerMeasurementChar();
 void calculateInstPwrFromHR();

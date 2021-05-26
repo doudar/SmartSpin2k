@@ -61,6 +61,19 @@ uint8_t ftmsIndoorBikeData[14] = {0x44, 0x02, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0,
 uint8_t ftmsResistanceLevelRange[6] = {0x00, 0x00, 0x3A, 0x98, 0xC5, 0x68};                                 // +-15000 not sure what units
 uint8_t ftmsPowerRange[6]           = {0x00, 0x00, 0xA0, 0x0F, 0x01, 0x00};                                 // 1-4000 watts
 
+void logCharacteristic(char *buffer, const size_t bufferCapacity, const byte *data, const size_t dataLength, const NimBLEUUID serviceUUID, const NimBLEUUID charUUID, const char *format, ...) {
+  int bufferLength = ss2k_log_hex_to_buffer(data, dataLength, buffer, 0, bufferCapacity);
+  bufferLength += snprintf(buffer + bufferLength, bufferCapacity - bufferLength, "<- %s | %s | ", serviceUUID.toString().c_str(),
+                            charUUID.toString().c_str());
+  va_list args;
+  va_start(args, format);
+  bufferLength += vsnprintf(buffer + bufferLength, bufferCapacity - bufferLength, format, args);
+  va_end(args);
+
+  SS2K_LOG("BLE_Server", "%s", buffer);
+  SEND_TO_TELEGRAM(String(buffer));
+}
+
 void startBLEServer() {
   // Server Setup
   SS2K_LOG("BLE_Server", "Starting BLE Server");
@@ -190,24 +203,15 @@ void updateIndoorBikeDataChar() {
                                                   // although the specification allows for a sint16
   ftmsIndoorBikeData[8] = (uint8_t)hr;
 
-  // 200 == Data(30), Sep(data/2), Arrow(3), CharId(37), Sep(3), CharId(37), Sep(3), Name(10), Prefix(2), HR(7), SEP(1), CD(10), SEP(1), PW(8), SEP(1), SD(7), Suffix(2), Nul(1) ==
-  // 178, rounded up
-  const int kLogBufMaxLength = 200;
-  char logBuf[kLogBufMaxLength];
-  int logBufLength = ss2k_log_hex_to_buffer(ftmsIndoorBikeData, *(&ftmsIndoorBikeData + 1) - ftmsIndoorBikeData, logBuf, 0, kLogBufMaxLength);
-  logBufLength += snprintf(logBuf + logBufLength, kLogBufMaxLength - logBufLength, "-> %s | %s | FTMS(IBD)[", FITNESSMACHINESERVICE_UUID.toString().c_str(),
-                           fitnessMachineIndoorBikeData->getUUID().toString().c_str());
-  logBufLength += snprintf(logBuf + logBufLength, kLogBufMaxLength - logBufLength, " HR(%d)", hr % 1000);
-  logBufLength += snprintf(logBuf + logBufLength, kLogBufMaxLength - logBufLength, " CD(%.2f)", fmodf(cadRaw, 1000.0));
-  logBufLength += snprintf(logBuf + logBufLength, kLogBufMaxLength - logBufLength, " PW(%d)", watts % 10000);
-  logBufLength += snprintf(logBuf + logBufLength, kLogBufMaxLength - logBufLength, " SD(%.2f)", fmodf(speed, 1000.0));
-  strncat(logBuf + logBufLength, " ]", kLogBufMaxLength - logBufLength);
-
   fitnessMachineIndoorBikeData->setValue(ftmsIndoorBikeData, 9);
   fitnessMachineFeature->notify();
   fitnessMachineIndoorBikeData->notify();
 
-  SS2K_LOG("BLE_Server", "%s", logBuf);
+  const int kLogBufCapacity = 200;  // Data(30), Sep(data/2), Arrow(3), CharId(37), Sep(3), CharId(37), Sep(3), Name(10), Prefix(2), HR(7), SEP(1), CD(10), SEP(1), PW(8), SEP(1), SD(7), Suffix(2), Nul(1), rounded up
+  char logBuf[kLogBufCapacity];
+  const size_t ftmsIndoorBikeDataLength = sizeof(ftmsIndoorBikeData)/sizeof(ftmsIndoorBikeData[0]);
+  logCharacteristic(logBuf, kLogBufCapacity, ftmsIndoorBikeData, ftmsIndoorBikeDataLength, FITNESSMACHINESERVICE_UUID, fitnessMachineIndoorBikeData->getUUID(),
+                    "FTMS(IBD)[ HR(%d) CD(%.2f) PW(%d) SD(%.2f) ]", hr % 1000, fmodf(cadRaw, 1000.0), watts % 10000, fmodf(speed, 1000.0));
 }  // ^^Using the New Way of setting Bytes.
 
 void updateCyclingPowerMeasurementChar() {
@@ -235,37 +239,26 @@ void updateCyclingPowerMeasurementChar() {
     cyclingPowerMeasurement[8] = quotient;
   }  // ^^Using the old way of setting bytes because I like it and it makes more sense to me looking at it.
 
-  // 150 == Data(18), Sep(data/2), Arrow(3), CharId(37), Sep(3), CharId(37), Sep(3),Name(8), Prefix(2), CD(10), SEP(1), PW(8), Suffix(2), Nul(1) == 142, rounded up
-  const int kLogBufMaxLength = 150;
-  char logBuf[kLogBufMaxLength];
-  int logBufLength = ss2k_log_hex_to_buffer(cyclingPowerMeasurement, *(&cyclingPowerMeasurement + 1) - cyclingPowerMeasurement, logBuf, 0, kLogBufMaxLength);
-  logBufLength += snprintf(logBuf + logBufLength, kLogBufMaxLength - logBufLength, "-> %s | %s | CPS(CPM)[ ", CYCLINGPOWERSERVICE_UUID.toString().c_str(),
-                           cyclingPowerMeasurementCharacteristic->getUUID().toString().c_str());
-
-  if (cadence > 0) {
-    logBufLength += snprintf(logBuf + logBufLength, kLogBufMaxLength - logBufLength, "CD(%.2f) ", fmodf(cadence, 1000.0));
-  }
-  logBufLength += snprintf(logBuf + logBufLength, kLogBufMaxLength - logBufLength, "PW(%d) ", power % 10000);
-  strncat(logBuf + logBufLength, "]", kLogBufMaxLength - logBufLength);
-
   cyclingPowerMeasurementCharacteristic->notify();
-  SS2K_LOG("BLE_Server", "%s", logBuf);
+
+  const int kLogBufCapacity = 150;  // Data(18), Sep(data/2), Arrow(3), CharId(37), Sep(3), CharId(37), Sep(3),Name(8), Prefix(2), CD(10), SEP(1), PW(8), Suffix(2), Nul(1), rounded up
+  char logBuf[kLogBufCapacity];
+  const size_t cyclingPowerMeasurementLength = sizeof(cyclingPowerMeasurement)/sizeof(cyclingPowerMeasurement[0]);
+  logCharacteristic(logBuf, kLogBufCapacity, cyclingPowerMeasurement, cyclingPowerMeasurementLength, FITNESSMACHINESERVICE_UUID, fitnessMachineIndoorBikeData->getUUID(),
+                    "CPS(CPM)[ CD(%.2f) PW(%d) ]", cadence > 0 ? fmodf(cadence, 1000.0) : 0, power % 10000);
 }
 
 void updateHeartRateMeasurementChar() {
   int hr                  = userConfig.getSimulatedHr();
   heartRateMeasurement[1] = hr;
   heartRateMeasurementCharacteristic->setValue(heartRateMeasurement, 2);
-
-  // 125 == Data(10), Sep(data/2), Arrow(3), CharId(37), Sep(3), CharId(37), Sep(3), Name(8), Prefix(2), HR(7), Suffix(2), Nul(1) == 118, rounded up
-  const int kLogBufMaxLength = 125;
-  char logBuf[kLogBufMaxLength];
-  int logBufLength = ss2k_log_hex_to_buffer(heartRateMeasurement, *(&heartRateMeasurement + 1) - heartRateMeasurement, logBuf, 0, kLogBufMaxLength);
-  snprintf(logBuf + logBufLength, kLogBufMaxLength - logBufLength, "-> %s | %s | HRS(HRM)[ HR(%d) ]", HEARTSERVICE_UUID.toString().c_str(),
-           heartRateMeasurementCharacteristic->getUUID().toString().c_str(), hr % 1000);
-
   heartRateMeasurementCharacteristic->notify();
-  SS2K_LOG("BLE_Server", "%s", logBuf);
+
+  const int kLogBufCapacity = 125;  // Data(10), Sep(data/2), Arrow(3), CharId(37), Sep(3), CharId(37), Sep(3), Name(8), Prefix(2), HR(7), Suffix(2), Nul(1), rounded up
+  char logBuf[kLogBufCapacity];
+  const size_t heartRateMeasurementLength = sizeof(heartRateMeasurement)/sizeof(heartRateMeasurement[0]);
+  logCharacteristic(logBuf, kLogBufCapacity, heartRateMeasurement, heartRateMeasurementLength, HEARTSERVICE_UUID, heartRateMeasurementCharacteristic->getUUID(),
+                    "HRS(HRM)[ HR(%d) ]", hr % 1000);
 }
 
 // Creating Server Connection Callbacks
@@ -292,13 +285,8 @@ void MyCallbacks::onWrite(BLECharacteristic *pCharacteristic) {
   std::string rxValue = pCharacteristic->getValue();
 
   if (rxValue.length() > 1) {
-    // 175 == Data(16), Spaces(Data/2), Arrow(3), ChrUUID(37), Sep(3), ChrUUID(37), Sep(3),
-    //        Name(8), Prefix(2), TGT(9), SEP(1), CUR(9), SEP(1), INC(11), Suffix(2), Nul(1) - 151 rounded up
-    const int kLogBufMaxLength = 175;
-    char logBuf[kLogBufMaxLength];
-    int logBufLength = ss2k_log_hex_to_buffer(reinterpret_cast<const unsigned char *>(rxValue.c_str()), rxValue.length(), logBuf, 0, kLogBufMaxLength);
-    logBufLength += snprintf(logBuf + logBufLength, kLogBufMaxLength - logBufLength, "<- %s | %s ", FITNESSMACHINESERVICE_UUID.toString().c_str(),
-                             pCharacteristic->getUUID().toString().c_str());
+    const size_t kLogBufCapacity = 175;  // Data(16), Spaces(Data/2), Arrow(3), ChrUUID(37), Sep(3), ChrUUID(37), Sep(3), Name(8), Prefix(2), TGT(9), SEP(1), CUR(9), SEP(1), INC(11), Suffix(2), Nul(1), rounded up
+    char logBuf[kLogBufCapacity];
 
     if (static_cast<int>(rxValue[0]) == 17) {  // 0x11 17 means FTMS Incline Control Mode  (aka SIM mode)
       signed char buf[2];
@@ -310,9 +298,8 @@ void MyCallbacks::onWrite(BLECharacteristic *pCharacteristic) {
       if (userConfig.getERGMode()) {
         userConfig.setERGMode(false);
       }
-      snprintf(logBuf + logBufLength, kLogBufMaxLength - logBufLength, " | FTMS(CP)[ INC(%.2f) ]", fmodf(targetIncline / 100, 1000.0));
-      SS2K_LOG("BLE_Server", "%s", logBuf);
-      SEND_TO_TELEGRAM(String(logBuf));
+      logCharacteristic(logBuf, kLogBufCapacity, reinterpret_cast<const unsigned char *>(rxValue.c_str()), rxValue.length(), FITNESSMACHINESERVICE_UUID, pCharacteristic->getUUID(),
+                        "FTMS(CP)[ INC(%.2f) ]", fmodf(targetIncline / 100, 1000.0));
     }
     if ((static_cast<int>(rxValue[0]) == 5) && (spinBLEClient.connectedPM)) {  // 0x05 5 means FTMS Watts Control Mode (aka ERG mode)
       int targetWatts = bytes_to_u16(rxValue[2], rxValue[1]);
@@ -320,10 +307,8 @@ void MyCallbacks::onWrite(BLECharacteristic *pCharacteristic) {
         userConfig.setERGMode(true);
       }
       computeERG(userConfig.getSimulatedWatts(), targetWatts);
-      snprintf(logBuf + logBufLength, kLogBufMaxLength - logBufLength, " | FTMS(CP)[ TGT(%d) CUR(%d) INC(%.2f) ]", targetWatts % 10000, userConfig.getSimulatedWatts() % 10000,
-               fmodf(userConfig.getIncline() / 100, 1000.0));
-      SS2K_LOG("BLE_Server", "%s", logBuf);
-      SEND_TO_TELEGRAM(String(logBuf));
+      logCharacteristic(logBuf, kLogBufCapacity, reinterpret_cast<const unsigned char *>(rxValue.c_str()), rxValue.length(), FITNESSMACHINESERVICE_UUID, pCharacteristic->getUUID(),
+                        "FTMS(CP)[ TGT(%d) CUR(%d) INC(%.2f) ]", targetWatts % 10000, userConfig.getSimulatedWatts() % 10000, fmodf(userConfig.getIncline() / 100, 1000.0));
     }
   }
 }
