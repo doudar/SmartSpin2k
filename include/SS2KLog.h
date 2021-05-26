@@ -14,7 +14,7 @@
 #include <fs.h>
 #include <freertos/semphr.h>
 
-#define SS2K_LOG_TAG "SS2K"
+#define SS2K_LOG_TAG       "SS2K"
 #define DEBUG_INFO_LOG_TAG "DebugInfo"
 
 #ifndef DEBUG_LOG_BUFFER_SIZE
@@ -101,11 +101,11 @@ int ss2k_log_hex_to_buffer(const byte *data, const size_t data_length, char *buf
 
 void ss2k_log_file(const char *tag, File file);
 
-void ss2k_log_write(esp_log_level_t level, const char* format, ...);
+void ss2k_log_write(esp_log_level_t level, const char *format, ...);
 
-void ss2k_log_writev(esp_log_level_t level, const char* format, va_list args);
+void ss2k_log_writev(esp_log_level_t level, const char *format, va_list args);
 
-#define SS2K_LOG_FILE(tag, file)  \
-  do {                            \
-    ss2k_log_file(tag, file);     \
+#define SS2K_LOG_FILE(tag, file) \
+  do {                           \
+    ss2k_log_file(tag, file);    \
   } while (0)

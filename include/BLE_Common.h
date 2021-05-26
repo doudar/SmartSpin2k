@@ -17,7 +17,7 @@
 #define BLE_CLIENT_LOG_TAG "BLE_Client"
 #define BLE_COMMON_LOG_TAG "BLE_Common"
 #define BLE_SERVER_LOG_TAG "BLE_Server"
-#define BLE_SETUP_LOG_TAG "BLE_Setup"
+#define BLE_SETUP_LOG_TAG  "BLE_Setup"
 
 // macros to convert different types of bytes into int The naming here sucks and
 // should be fixed.
