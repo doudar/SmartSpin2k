@@ -70,13 +70,13 @@ void logCharacteristic(char *buffer, const size_t bufferCapacity, const byte *da
   bufferLength += vsnprintf(buffer + bufferLength, bufferCapacity - bufferLength, format, args);
   va_end(args);
 
-  SS2K_LOG("BLE_Server", "%s", buffer);
+  SS2K_LOG(BLE_SERVER_LOG_TAG, "%s", buffer);
   SEND_TO_TELEGRAM(String(buffer));
 }
 
 void startBLEServer() {
   // Server Setup
-  SS2K_LOG("BLE_Server", "Starting BLE Server");
+  SS2K_LOG(BLE_SERVER_LOG_TAG, "Starting BLE Server");
   pServer = BLEDevice::createServer();
 
   // HEART RATE MONITOR SERVICE SETUP
@@ -143,7 +143,7 @@ void startBLEServer() {
   pAdvertising->setScanResponse(true);
   BLEDevice::startAdvertising();
 
-  SS2K_LOG("BLE_Server", "Bluetooth Characteristic defined!");
+  SS2K_LOG(BLE_SERVER_LOG_TAG, "Bluetooth Characteristic defined!");
 }
 
 void computeERG(int currentWatts, int setPoint) {
@@ -266,20 +266,20 @@ void updateHeartRateMeasurementChar() {
 // Creating Server Connection Callbacks
 
 void MyServerCallbacks::onConnect(BLEServer *pServer, ble_gap_conn_desc *desc) {
-  SS2K_LOG("BLE_Server", "Bluetooth Remote Client Connected: %s Connected Clients: %d", NimBLEAddress(desc->peer_ota_addr).toString().c_str(), pServer->getConnectedCount());
+  SS2K_LOG(BLE_SERVER_LOG_TAG, "Bluetooth Remote Client Connected: %s Connected Clients: %d", NimBLEAddress(desc->peer_ota_addr).toString().c_str(), pServer->getConnectedCount());
   updateConnParametersFlag = true;
   bleConnDesc              = desc->conn_handle;
 
   if (pServer->getConnectedCount() < CONFIG_BT_NIMBLE_MAX_CONNECTIONS - NUM_BLE_DEVICES) {
     BLEDevice::startAdvertising();
   } else {
-    SS2K_LOG("BLE_Server", "Max Remote Client Connections Reached");
+    SS2K_LOG(BLE_SERVER_LOG_TAG, "Max Remote Client Connections Reached");
     BLEDevice::stopAdvertising();
   }
 }
 
 void MyServerCallbacks::onDisconnect(BLEServer *pServer) {
-  SS2K_LOG("BLE_Server", "Bluetooth Remote Client Disconnected. Remaining Clients: %d", pServer->getConnectedCount());
+  SS2K_LOG(BLE_SERVER_LOG_TAG, "Bluetooth Remote Client Disconnected. Remaining Clients: %d", pServer->getConnectedCount());
   BLEDevice::startAdvertising();
 }
 
@@ -355,5 +355,5 @@ void calculateInstPwrFromHR() {
   userConfig.setSimulatedCad(90);
 #endif
 
-  SS2K_LOG("BLE_Server", "Power From HR: %d", avgP);
+  SS2K_LOG(BLE_SERVER_LOG_TAG, "Power From HR: %d", avgP);
 }

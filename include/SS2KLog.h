@@ -11,8 +11,11 @@
 #include "esp_log.h"
 #include <stdio.h>
 #include <stdarg.h>
-#include <SPIFFS.h>
+#include <fs.h>
 #include <freertos/semphr.h>
+
+#define SS2K_LOG_TAG "SS2K"
+#define DEBUG_INFO_LOG_TAG "DebugInfo"
 
 #ifndef DEBUG_LOG_BUFFER_SIZE
 #define DEBUG_LOG_BUFFER_SIZE 1000
@@ -55,9 +58,9 @@
 
 class DebugInfo {
  public:
-  static void appendLog(const char *format, ...);
+  static void append_logv(const char *format, va_list args);
 
-  static const std::string getAndClearLogs();
+  static const std::string get_and_clear_logs();
 
  private:
   static DebugInfo INSTANCE;
@@ -66,27 +69,17 @@ class DebugInfo {
   int logBufferLength;
   char logBuffer[DEBUG_LOG_BUFFER_SIZE];
   SemaphoreHandle_t logBufferMutex;
-  void appendLog_internal(const char *format, va_list args);
-  const std::string getAndClearLogs_internal();
+  void append_logv_internal(const char *format, va_list args);
+  const std::string get_and_clear_logs_internal();
 #else
   DebugInfo() {}
 #endif
 };
 
-#if DEBUG_LOG_BUFFER_SIZE > 0
-#define SS2K_MODLOG_ESP_LOCAL(level, ml_msg_, ...)          \
-  do {                                                      \
-    if (LOG_LOCAL_LEVEL >= level) {                         \
-      esp_log_write(level, "SS2K", ml_msg_, ##__VA_ARGS__); \
-      DebugInfo::appendLog(ml_msg_, ##__VA_ARGS__);         \
-    }                                                       \
+#define SS2K_MODLOG_ESP_LOCAL(level, ml_msg_, ...)                               \
+  do {                                                                           \
+    if (LOG_LOCAL_LEVEL >= level) ss2k_log_write(level, ml_msg_, ##__VA_ARGS__); \
   } while (0)
-#else
-#define SS2K_MODLOG_ESP_LOCAL(level, ml_msg_, ...)                                      \
-  do {                                                                                  \
-    if (LOG_LOCAL_LEVEL >= level) esp_log_write(level, "SS2K", ml_msg_, ##__VA_ARGS__); \
-  } while (0)
-#endif
 
 #define SS2K_MODLOG_DEBUG(ml_mod_, ml_msg_, ...) SS2K_MODLOG_ESP_LOCAL(ESP_LOG_DEBUG, ml_msg_, ##__VA_ARGS__)
 
@@ -106,9 +99,13 @@ void ss2k_remove_newlines(std::string *str);
 
 int ss2k_log_hex_to_buffer(const byte *data, const size_t data_length, char *buffer, const int buffer_offset, const size_t buffer_length);
 
-void ss2k_log_file_internal(const char *tag, File file);
+void ss2k_log_file(const char *tag, File file);
 
-#define SS2K_LOG_FILE(tag, file)       \
-  do {                                 \
-    ss2k_log_file_internal(tag, file); \
+void ss2k_log_write(esp_log_level_t level, const char* format, ...);
+
+void ss2k_log_writev(esp_log_level_t level, const char* format, va_list args);
+
+#define SS2K_LOG_FILE(tag, file)  \
+  do {                            \
+    ss2k_log_file(tag, file);     \
   } while (0)

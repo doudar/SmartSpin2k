@@ -12,7 +12,7 @@
 #include <NimBLEDevice.h>
 
 void setupBLE() {  // Common BLE setup for both client and server
-  SS2K_LOG("BLE_Setup", "Starting Arduino BLE Client application...");
+  SS2K_LOG(BLE_SETUP_LOG_TAG, "Starting Arduino BLE Client application...");
   BLEDevice::init(userConfig.getDeviceName());
   spinBLEClient.start();
   startBLEServer();
@@ -25,12 +25,12 @@ void setupBLE() {  // Common BLE setup for both client and server
                           &BLECommunicationTask,  /* Task handle to keep track of created task */
                           1);                     /* pin task to core 0 */
 
-  SS2K_LOG("BLE_Setup", "BLE Notify Task Started");
+  SS2K_LOG(BLE_SETUP_LOG_TAG, "BLE Notify Task Started");
   vTaskDelay(100 / portTICK_PERIOD_MS);
   if (strcmp(userConfig.getconnectedPowerMeter(), "none") != 0 || strcmp(userConfig.getconnectedHeartMonitor(), "none") != 0) {
     spinBLEClient.serverScan(true);
-    SS2K_LOG("BLE_Setup", "Scanning");
+    SS2K_LOG(BLE_SETUP_LOG_TAG, "Scanning");
   }
-  SS2K_LOG("BLE_Setup", "%s %s", userConfig.getconnectedPowerMeter(), userConfig.getconnectedHeartMonitor());
-  SS2K_LOG("BLE_Setup", "End BLE Setup");
+  SS2K_LOG(BLE_SETUP_LOG_TAG, "%s %s", userConfig.getconnectedPowerMeter(), userConfig.getconnectedHeartMonitor());
+  SS2K_LOG(BLE_SETUP_LOG_TAG, "End BLE Setup");
 }

@@ -48,7 +48,7 @@ void startWifi() {
   int i = 0;
 
   // Trying Station mode first:
-  SS2K_LOG("HTTP_Server", "Connecting to: %s", userConfig.getSsid());
+  SS2K_LOG(HTTP_SERVER_LOG_TAG, "Connecting to: %s", userConfig.getSsid());
   if (String(WiFi.SSID()) != userConfig.getSsid()) {
     WiFi.mode(WIFI_STA);
     WiFi.setTxPower(WIFI_POWER_19_5dBm);
@@ -57,11 +57,11 @@ void startWifi() {
 
   while (WiFi.status() != WL_CONNECTED) {
     vTaskDelay(1000 / portTICK_RATE_MS);
-    SS2K_LOG("HTTP_Server", "Waiting for connection to be established...");
+    SS2K_LOG(HTTP_SERVER_LOG_TAG, "Waiting for connection to be established...");
     i++;
     if (i > WIFI_CONNECT_TIMEOUT || (String(userConfig.getSsid()) == DEVICE_NAME)) {
       i = 0;
-      SS2K_LOG("HTTP_Server", "Couldn't Connect. Switching to AP mode");
+      SS2K_LOG(HTTP_SERVER_LOG_TAG, "Couldn't Connect. Switching to AP mode");
       WiFi.disconnect();
       WiFi.mode(WIFI_AP);
       break;
@@ -90,32 +90,32 @@ void startWifi() {
   }
 
   if (!MDNS.begin(userConfig.getDeviceName())) {
-    SS2K_LOG("HTTP_Server", "Error setting up MDNS responder!");
+    SS2K_LOG(HTTP_SERVER_LOG_TAG, "Error setting up MDNS responder!");
   }
 
   MDNS.addService("http", "_tcp", 80);
   MDNS.addServiceTxt("http", "_tcp", "lf", "0");
-  SS2K_LOG("HTTP_Server", "Connected to %s IP address: %s", userConfig.getSsid(), myIP.toString().c_str());
+  SS2K_LOG(HTTP_SERVER_LOG_TAG, "Connected to %s IP address: %s", userConfig.getSsid(), myIP.toString().c_str());
   SEND_TO_TELEGRAM("Connected to " + String(userConfig.getSsid()) + " IP address: " + myIP.toString());
-  SS2K_LOG("HTTP_Server", "Open http://%s.local/", userConfig.getDeviceName());
+  SS2K_LOG(HTTP_SERVER_LOG_TAG, "Open http://%s.local/", userConfig.getDeviceName());
   WiFi.setTxPower(WIFI_POWER_19_5dBm);
 
   if (WiFi.getMode() == WIFI_STA) {
-    SS2K_LOG("HTTP_Server", "Syncing clock...");
+    SS2K_LOG(HTTP_SERVER_LOG_TAG, "Syncing clock...");
     configTime(0, 0, "pool.ntp.org");  // get UTC time via NTP
     time_t now = time(nullptr);
     while (now < 10) {  // wait 10 seconds
-      SS2K_LOG("HTTP_Server", "Waiting for clock sync...");
+      SS2K_LOG(HTTP_SERVER_LOG_TAG, "Waiting for clock sync...");
       delay(100);
       now = time(nullptr);
     }
-    SS2K_LOG("HTTP_Server", "Clock synced to: %.f", difftime(now, (time_t)0));
+    SS2K_LOG(HTTP_SERVER_LOG_TAG, "Clock synced to: %.f", difftime(now, (time_t)0));
     Serial.println(now);
   }
 }
 
 void startHttpServer() {
-  server.onNotFound([]() { SS2K_LOG("HTTP_Server", "Link Not Found: %s", server.uri().c_str()); });
+  server.onNotFound([]() { SS2K_LOG(HTTP_SERVER_LOG_TAG, "Link Not Found: %s", server.uri().c_str()); });
 
   /********************************************Begin
    * Handlers***********************************/
@@ -135,7 +135,7 @@ void startHttpServer() {
   server.on("/jquery.js.gz", handleSpiffsFile);
 
   server.on("/BLEScan", []() {
-    SS2K_LOG("HTTP_Server", "Scanning from web request");
+    SS2K_LOG(HTTP_SERVER_LOG_TAG, "Scanning from web request");
     String response =
         "<!DOCTYPE html><html><body>Scanning for BLE Devices. Please wait "
         "15 seconds.</body><script> setTimeout(\"location.href = 'http://" +
@@ -146,7 +146,7 @@ void startHttpServer() {
   });
 
   server.on("/load_defaults.html", []() {
-    SS2K_LOG("HTTP_Server", "Setting Defaults from Web Request");
+    SS2K_LOG(HTTP_SERVER_LOG_TAG, "Setting Defaults from Web Request");
     SPIFFS.format();
     userConfig.setDefaults();
     userConfig.saveToSPIFFS();
@@ -160,7 +160,7 @@ void startHttpServer() {
   });
 
   server.on("/reboot.html", []() {
-    SS2K_LOG("HTTP_Server", "Rebooting from Web Request");
+    SS2K_LOG(HTTP_SERVER_LOG_TAG, "Rebooting from Web Request");
     String response = "Rebooting....<script> setTimeout(\"location.href = 'http://" + myIP.toString() + "/index.html';\",500); </script>";
     server.send(200, "text/html", response);
     vTaskDelay(100 / portTICK_PERIOD_MS);
@@ -172,14 +172,14 @@ void startHttpServer() {
     if (value == "enable") {
       userConfig.setSimulateHr(true);
       server.send(200, "text/plain", "OK");
-      SS2K_LOG("HTTP_Server", "HR Simulator turned on");
+      SS2K_LOG(HTTP_SERVER_LOG_TAG, "HR Simulator turned on");
     } else if (value == "disable") {
       userConfig.setSimulateHr(false);
       server.send(200, "text/plain", "OK");
-      SS2K_LOG("HTTP_Server", "HR Simulator turned off");
+      SS2K_LOG(HTTP_SERVER_LOG_TAG, "HR Simulator turned off");
     } else {
       userConfig.setSimulatedHr(value.toInt());
-      SS2K_LOG("HTTP_Server", "HR is now: %d", userConfig.getSimulatedHr());
+      SS2K_LOG(HTTP_SERVER_LOG_TAG, "HR is now: %d", userConfig.getSimulatedHr());
       server.send(200, "text/plain", "OK");
     }
   });
@@ -189,14 +189,14 @@ void startHttpServer() {
     if (value == "enable") {
       userConfig.setSimulateWatts(true);
       server.send(200, "text/plain", "OK");
-      SS2K_LOG("HTTP_Server", "Watt Simulator turned on");
+      SS2K_LOG(HTTP_SERVER_LOG_TAG, "Watt Simulator turned on");
     } else if (value == "disable") {
       userConfig.setSimulateWatts(false);
       server.send(200, "text/plain", "OK");
-      SS2K_LOG("HTTP_Server", "Watt Simulator turned off");
+      SS2K_LOG(HTTP_SERVER_LOG_TAG, "Watt Simulator turned off");
     } else {
       userConfig.setSimulatedWatts(value.toInt());
-      SS2K_LOG("HTTP_Server", "Watts are now: %d", userConfig.getSimulatedWatts());
+      SS2K_LOG(HTTP_SERVER_LOG_TAG, "Watts are now: %d", userConfig.getSimulatedWatts());
       server.send(200, "text/plain", "OK");
     }
   });
@@ -206,14 +206,14 @@ void startHttpServer() {
     if (value == "enable") {
       userConfig.setSimulateCad(true);
       server.send(200, "text/plain", "OK");
-      SS2K_LOG("HTTP_Server", "CAD Simulator turned on");
+      SS2K_LOG(HTTP_SERVER_LOG_TAG, "CAD Simulator turned on");
     } else if (value == "disable") {
       userConfig.setSimulateCad(false);
       server.send(200, "text/plain", "OK");
-      SS2K_LOG("HTTP_Server", "CAD Simulator turned off");
+      SS2K_LOG(HTTP_SERVER_LOG_TAG, "CAD Simulator turned off");
     } else {
       userConfig.setSimulatedCad(value.toInt());
-      SS2K_LOG("HTTP_Server", "CAD is now: %f", userConfig.getSimulatedCad());
+      SS2K_LOG(HTTP_SERVER_LOG_TAG, "CAD is now: %f", userConfig.getSimulatedCad());
       server.send(200, "text/plain", "OK");
     }
   });
@@ -252,7 +252,7 @@ void startHttpServer() {
         HTTPUpload &upload = server.upload();
         if (upload.filename == String("firmware.bin").c_str()) {
           if (upload.status == UPLOAD_FILE_START) {
-            SS2K_LOG("HTTP_Server", "Update: %s", upload.filename.c_str());
+            SS2K_LOG(HTTP_SERVER_LOG_TAG, "Update: %s", upload.filename.c_str());
             if (!Update.begin(UPDATE_SIZE_UNKNOWN)) {  // start with max
                                                        // available size
               Update.printError(Serial);
@@ -278,7 +278,7 @@ void startHttpServer() {
             if (!filename.startsWith("/")) {
               filename = "/" + filename;
             }
-            SS2K_LOG("HTTP_Server", "handleFileUpload Name: %s", filename.c_str());
+            SS2K_LOG(HTTP_SERVER_LOG_TAG, "handleFileUpload Name: %s", filename.c_str());
             fsUploadFile = SPIFFS.open(filename, "w");
             filename     = String();
           } else if (upload.status == UPLOAD_FILE_WRITE) {
@@ -289,7 +289,7 @@ void startHttpServer() {
             if (fsUploadFile) {
               fsUploadFile.close();
             }
-            SS2K_LOG("HTTP_Server", "handleFileUpload Size: %zu", upload.totalSize);
+            SS2K_LOG(HTTP_SERVER_LOG_TAG, "handleFileUpload Size: %zu", upload.totalSize);
             server.send(200, "text/plain", String(upload.filename + " Uploaded Sucessfully."));
           }
         }
@@ -316,7 +316,7 @@ void startHttpServer() {
                           1);               /* pin task to core 1 */
 #endif
   server.begin();
-  SS2K_LOG("HTTP_Server", "HTTP server started");
+  SS2K_LOG(HTTP_SERVER_LOG_TAG, "HTTP server started");
 }
 
 void webClientUpdate(void *pvParameters) {
@@ -341,9 +341,9 @@ void handleIndexFile() {
     File file = SPIFFS.open(filename, FILE_READ);
     server.streamFile(file, "text/html");
     file.close();
-    SS2K_LOG("HTTP_Server", "Served %s", filename.c_str());
+    SS2K_LOG(HTTP_SERVER_LOG_TAG, "Served %s", filename.c_str());
   } else {
-    SS2K_LOG("HTTP_Server", "%s not found. Sending builtin Index.html", filename.c_str());
+    SS2K_LOG(HTTP_SERVER_LOG_TAG, "%s not found. Sending builtin Index.html", filename.c_str());
     server.send(200, "text/html", noIndexHTML);
   }
 }
@@ -359,9 +359,9 @@ void handleSpiffsFile() {
     }
     server.streamFile(file, "text/" + fileType);
     file.close();
-    SS2K_LOG("HTTP_Server", "Served %s", filename.c_str());
+    SS2K_LOG(HTTP_SERVER_LOG_TAG, "Served %s", filename.c_str());
   } else {
-    SS2K_LOG("HTTP_Server", "%s not found. Sending 404.", filename.c_str());
+    SS2K_LOG(HTTP_SERVER_LOG_TAG, "%s not found. Sending 404.", filename.c_str());
     server.send(404, "text/html",
                 "<html><body><h1>ERROR 404 <br> FILE NOT "
                 "FOUND!</h1></body></html>");
@@ -481,7 +481,7 @@ void settingsProcessor() {
         myIP.toString() + "/index.html';\",1000);</script></html>";
   }
   server.send(200, "text/html", response);
-  SS2K_LOG("HTTP_Server", "Config Updated From Web");
+  SS2K_LOG(HTTP_SERVER_LOG_TAG, "Config Updated From Web");
   userConfig.saveToSPIFFS();
   userConfig.printFile();
   userPWC.saveToSPIFFS();
@@ -496,7 +496,7 @@ void FirmwareUpdate() {
   // WiFiClientSecure client;
 
   client.setCACert(rootCACertificate);
-  SS2K_LOG("HTTP_Server", "Checking for newer firmware:");
+  SS2K_LOG(HTTP_SERVER_LOG_TAG, "Checking for newer firmware:");
   http.begin(userConfig.getFirmwareUpdateURL() + String(FW_VERSIONFILE),
              rootCACertificate);  // check version URL
   delay(100);
@@ -506,10 +506,10 @@ void FirmwareUpdate() {
   if (httpCode == HTTP_CODE_OK) {  // if version received
     payload = http.getString();    // save received version
     payload.trim();
-    SS2K_LOG("HTTP_Server", "  - Server version: %s", payload.c_str());
+    SS2K_LOG(HTTP_SERVER_LOG_TAG, "  - Server version: %s", payload.c_str());
     internetConnection = true;
   } else {
-    SS2K_LOG("HTTP_Server", "error downloading %s %d", FW_VERSIONFILE, httpCode);
+    SS2K_LOG(HTTP_SERVER_LOG_TAG, "error downloading %s %d", FW_VERSIONFILE, httpCode);
     internetConnection = false;
   }
 
@@ -518,34 +518,34 @@ void FirmwareUpdate() {
     bool updateAnyway = false;
     if (!SPIFFS.exists("/index.html")) {
       updateAnyway = true;
-      SS2K_LOG("HTTP_Server", "  -index.html not found. Forcing update");
+      SS2K_LOG(HTTP_SERVER_LOG_TAG, "  -index.html not found. Forcing update");
     }
     Version availiableVer(payload.c_str());
     Version currentVer(FIRMWARE_VERSION);
 
     if ((availiableVer > currentVer) || (updateAnyway)) {
-      SS2K_LOG("HTTP_Server", "New firmware detected!");
-      SS2K_LOG("HTTP_Server", "Upgrading from %s to %s", FIRMWARE_VERSION, payload.c_str());
+      SS2K_LOG(HTTP_SERVER_LOG_TAG, "New firmware detected!");
+      SS2K_LOG(HTTP_SERVER_LOG_TAG, "Upgrading from %s to %s", FIRMWARE_VERSION, payload.c_str());
 
       // Update Spiffs
       httpUpdate.setLedPin(LED_BUILTIN, LOW);
-      SS2K_LOG("HTTP_Server", "Updating FileSystem");
+      SS2K_LOG(HTTP_SERVER_LOG_TAG, "Updating FileSystem");
       t_httpUpdate_return ret = httpUpdate.updateSpiffs(client, userConfig.getFirmwareUpdateURL() + String(FW_SPIFFSFILE));
       vTaskDelay(100 / portTICK_PERIOD_MS);
       switch (ret) {
         case HTTP_UPDATE_OK:
-          SS2K_LOG("HTTP_Server", "Saving Config.txt");
+          SS2K_LOG(HTTP_SERVER_LOG_TAG, "Saving Config.txt");
           userConfig.saveToSPIFFS();
           userPWC.saveToSPIFFS();
-          SS2K_LOG("HTTP_Server", "Updating Program");
+          SS2K_LOG(HTTP_SERVER_LOG_TAG, "Updating Program");
           break;
 
         case HTTP_UPDATE_NO_UPDATES:
-          SS2K_LOG("HTTP_Server", "HTTP_UPDATE_NO_UPDATES");
+          SS2K_LOG(HTTP_SERVER_LOG_TAG, "HTTP_UPDATE_NO_UPDATES");
           break;
 
         case HTTP_UPDATE_FAILED:
-          SS2K_LOG("HTTP_Server", "SPIFFS Update Failed: %d : %s", httpUpdate.getLastError(), httpUpdate.getLastErrorString().c_str());
+          SS2K_LOG(HTTP_SERVER_LOG_TAG, "SPIFFS Update Failed: %d : %s", httpUpdate.getLastError(), httpUpdate.getLastErrorString().c_str());
           break;
       }
 
@@ -553,19 +553,19 @@ void FirmwareUpdate() {
       ret = httpUpdate.update(client, userConfig.getFirmwareUpdateURL() + String(FW_BINFILE));
       switch (ret) {
         case HTTP_UPDATE_FAILED:
-          SS2K_LOG("HTTP_Server", "HTTP_UPDATE_FAILD Error %d : %s", httpUpdate.getLastError(), httpUpdate.getLastErrorString().c_str());
+          SS2K_LOG(HTTP_SERVER_LOG_TAG, "HTTP_UPDATE_FAILD Error %d : %s", httpUpdate.getLastError(), httpUpdate.getLastErrorString().c_str());
           break;
 
         case HTTP_UPDATE_NO_UPDATES:
-          SS2K_LOG("HTTP_Server", "HTTP_UPDATE_NO_UPDATES");
+          SS2K_LOG(HTTP_SERVER_LOG_TAG, "HTTP_UPDATE_NO_UPDATES");
           break;
 
         case HTTP_UPDATE_OK:
-          SS2K_LOG("HTTP_Server", "HTTP_UPDATE_OK");
+          SS2K_LOG(HTTP_SERVER_LOG_TAG, "HTTP_UPDATE_OK");
           break;
       }
     } else {  // don't update
-      SS2K_LOG("HTTP_Server", "  - Current Version: %s", FIRMWARE_VERSION);
+      SS2K_LOG(HTTP_SERVER_LOG_TAG, "  - Current Version: %s", FIRMWARE_VERSION);
     }
   }
 }
@@ -600,7 +600,7 @@ void telegramUpdate(void *pvParameters) {
       bool rm                = (bot.sendMessage(TELEGRAM_CHAT_ID, telegramMessage, ""));
       if (!rm) {
         telegramFailures++;
-        SS2K_LOG("HTTP_Server", "Telegram failed to send! %s", TELEGRAM_CHAT_ID);
+        SS2K_LOG(HTTP_SERVER_LOG_TAG, "Telegram failed to send! %s", TELEGRAM_CHAT_ID);
         if (telegramFailures > 2) {
           internetConnection = false;
         }

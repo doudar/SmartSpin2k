@@ -24,7 +24,7 @@ void BLECommunications(void *pvParameters) {
     // **********************************Client***************************************
     for (size_t x = 0; x < NUM_BLE_DEVICES; x++) {  // loop through discovered devices
       if (spinBLEClient.myBLEDevices[x].connectedClientID != BLE_HS_CONN_HANDLE_NONE) {
-        SS2K_LOGD("BLE_Client", "Address: (%s) Client ID: (%d) SerUUID: (%s) CharUUID: (%s) HRM: (%s) PM: (%s) CSC: (%s) CT: (%s) doConnect: (%s)",
+        SS2K_LOG(BLE_COMMON_LOG_TAG, "Address: (%s) Client ID: (%d) SerUUID: (%s) CharUUID: (%s) HRM: (%s) PM: (%s) CSC: (%s) CT: (%s) doConnect: (%s)",
                   spinBLEClient.myBLEDevices[x].peerAddress.toString().c_str(), spinBLEClient.myBLEDevices[x].connectedClientID,
                   spinBLEClient.myBLEDevices[x].serviceUUID.toString().c_str(), spinBLEClient.myBLEDevices[x].charUUID.toString().c_str(),
                   spinBLEClient.myBLEDevices[x].userSelectedHR ? "true" : "false", spinBLEClient.myBLEDevices[x].userSelectedPM ? "true" : "false",
@@ -52,7 +52,7 @@ void BLECommunications(void *pvParameters) {
                 //        Name(10), Prefix(2), HR(8), SEP(1), CD(10), SEP(1), PW(8), SEP(1), SP(7), Suffix(2), Nul(1) - 225 rounded up
                 const int kLogBufMaxLength = 250;
                 char logBuf[kLogBufMaxLength];
-                SS2K_LOG("BLE_Common", "Data length: %d", data.length());
+                SS2K_LOG(BLE_COMMON_LOG_TAG, "Data length: %d", data.length());
                 int logBufLength = ss2k_log_hex_to_buffer(pData, length, logBuf, 0, kLogBufMaxLength);
 
                 logBufLength += snprintf(logBuf + logBufLength, kLogBufMaxLength - logBufLength, "<- %.8s | %.8s", myAdvertisedDevice.serviceUUID.toString().c_str(),
@@ -86,14 +86,14 @@ void BLECommunications(void *pvParameters) {
                   logBufLength += snprintf(logBuf + logBufLength, kLogBufMaxLength - logBufLength, " SD(%.2f)", fmodf(speed, 1000.0));
                 }
                 strncat(logBuf + logBufLength, " ]", kLogBufMaxLength - logBufLength);
-                SS2K_LOG("BLE_Common", "%s", logBuf);
+                SS2K_LOG(BLE_COMMON_LOG_TAG, "%s", logBuf);
                 SEND_TO_TELEGRAM(String(logBuf));
               } else if (!pClient->isConnected()) {  // This shouldn't ever be
                                                      // called...
                 if (pClient->disconnect() == 0) {    // 0 is a successful disconnect
                   BLEDevice::deleteClient(pClient);
                   vTaskDelay(100 / portTICK_PERIOD_MS);
-                  SS2K_LOG("BLE_Common", "Workaround connect");
+                  SS2K_LOG(BLE_COMMON_LOG_TAG, "Workaround connect");
                   myAdvertisedDevice.doConnect = true;
                 }
               }
@@ -143,7 +143,7 @@ void BLECommunications(void *pvParameters) {
     }
     if (BLEDevice::getAdvertising()) {
       if (!(BLEDevice::getAdvertising()->isAdvertising()) && (BLEDevice::getServer()->getConnectedCount() < CONFIG_BT_NIMBLE_MAX_CONNECTIONS - NUM_BLE_DEVICES)) {
-        SS2K_LOG("BLE_Common", "Starting Advertising From Communication Loop");
+        SS2K_LOG(BLE_COMMON_LOG_TAG, "Starting Advertising From Communication Loop");
         BLEDevice::startAdvertising();
       }
     }

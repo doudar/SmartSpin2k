@@ -12,6 +12,8 @@
 #include "SmartSpin_parameters.h"
 #include "BLE_Common.h"
 
+#define MAIN_LOG_TAG "Main"
+
 // Function Prototypes
 bool IRAM_ATTR deBounce();
 void IRAM_ATTR moveStepper(void* pvParameters);

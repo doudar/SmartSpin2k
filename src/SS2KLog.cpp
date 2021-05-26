@@ -10,44 +10,41 @@
 DebugInfo DebugInfo::INSTANCE = DebugInfo();
 
 #if DEBUG_LOG_BUFFER_SIZE > 0
-void DebugInfo::appendLog(const char *format, ...) {
-  va_list args;
-  va_start(args, format);
-  DebugInfo::INSTANCE.appendLog_internal(format, args);
-  va_end(args);
+void DebugInfo::append_logv(const char *format, va_list args) {
+  DebugInfo::INSTANCE.append_logv_internal(format, args);
 }
 
-const std::string DebugInfo::getAndClearLogs() { return DebugInfo::INSTANCE.getAndClearLogs_internal(); }
+const std::string DebugInfo::get_and_clear_logs() { return DebugInfo::INSTANCE.get_and_clear_logs_internal(); }
 
-void DebugInfo::appendLog_internal(const char *format, va_list args) {
+void DebugInfo::append_logv_internal(const char *format, va_list args) {
   if (xSemaphoreTake(logBufferMutex, 1000) == pdTRUE) {
     int written = vsnprintf(logBuffer + logBufferLength, DEBUG_LOG_BUFFER_SIZE - logBufferLength, format, args);
-    SS2K_LOGD("DebugInfo", "Wrote %d bytes to log", written);
+    SS2K_LOG(DEBUG_INFO_LOG_TAG, "Wrote %d bytes to log", written);
     if (written < 0 || logBufferLength + written > DEBUG_LOG_BUFFER_SIZE) {
       logBufferLength = snprintf(logBuffer, DEBUG_LOG_BUFFER_SIZE, "...\n");
     } else {
       logBufferLength += written;
     }
-    SS2K_LOGD("DebugInfo", "Log buffer length %d of %d bytes", logBufferLength, DEBUG_LOG_BUFFER_SIZE);
+    SS2K_LOG(DEBUG_INFO_LOG_TAG, "Log buffer length %d of %d bytes", logBufferLength, DEBUG_LOG_BUFFER_SIZE);
     xSemaphoreGive(logBufferMutex);
   }
 }
 
-const std::string DebugInfo::getAndClearLogs_internal() {
+const std::string DebugInfo::get_and_clear_logs_internal() {
   if (xSemaphoreTake(logBufferMutex, 500) == pdTRUE) {
     const std::string debugLog = std::string(logBuffer, logBufferLength);
     logBufferLength            = 0;
     logBuffer[0]               = '\0';
     xSemaphoreGive(logBufferMutex);
-    SS2K_LOGD("DebugInfo", "Log buffer read %d bytes and cleared", logBufferLength);
+    SS2K_LOG(DEBUG_INFO_LOG_TAG, "Log buffer read %d bytes and cleared", logBufferLength);
     return debugLog;
   }
   return "";
 }
 #else
-void DebugInfo::appendLog(const char *format, ...) {}
+void DebugInfo::append_logv_internal(const char *format, va_list args) {}
 
-String DebugInfo::getAndClearLogs() { return ""; }
+String DebugInfo::get_and_clear_logs_internal() { return ""; }
 #endif
 
 void ss2k_remove_newlines(std::string *str) {
@@ -83,4 +80,18 @@ void ss2k_log_file_internal(const char *tag, File file) {
     }
     SS2K_LOG(tag, "%s", char_buffer);
   }
+}
+
+void ss2k_log_write(esp_log_level_t level, const char* format, ...) {
+  va_list args;
+  va_start(args, format);
+  ss2k_log_writev(level, format, args);
+  va_end(args);
+}
+
+void ss2k_log_writev(esp_log_level_t level, const char* format, va_list args) {
+  esp_log_writev(level, SS2K_LOG_TAG, format, args);
+  #if DEBUG_LOG_BUFFER_SIZE > 0
+  DebugInfo::append_logv(format, args);
+  #endif
 }

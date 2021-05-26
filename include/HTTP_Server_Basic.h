@@ -9,6 +9,8 @@
 
 #include <Arduino.h>
 
+#define HTTP_SERVER_LOG_TAG "HTTP_Server"
+
 void startHttpServer();
 void webClientUpdate(void *pvParameters);
 void handleSpiffsFile();

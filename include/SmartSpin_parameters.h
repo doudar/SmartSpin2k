@@ -9,6 +9,8 @@
 
 #include <Arduino.h>
 
+#define CONFIG_LOG_TAG "Config"
+
 class userParameters {
  private:
   String firmwareUpdateURL;

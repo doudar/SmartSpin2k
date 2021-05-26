@@ -14,6 +14,11 @@
 #include <Arduino.h>
 #include <Main.h>
 
+#define BLE_CLIENT_LOG_TAG "BLE_Client"
+#define BLE_COMMON_LOG_TAG "BLE_Common"
+#define BLE_SERVER_LOG_TAG "BLE_Server"
+#define BLE_SETUP_LOG_TAG "BLE_Setup"
+
 // macros to convert different types of bytes into int The naming here sucks and
 // should be fixed.
 #define bytes_to_s16(MSB, LSB) (((signed int)((signed char)MSB))) << 8 | (((signed char)LSB))
