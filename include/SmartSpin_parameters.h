@@ -32,6 +32,7 @@
  #define BLE_connectedPowerMeter 0x15  
  #define BLE_connectedHeartMonitor 0x16
  #define BLE_shifterPosition 0x17
+#define CONFIG_LOG_TAG "Config"
 
 class userParameters {
  private:
@@ -109,7 +110,7 @@ class userParameters {
   void setConnectedHeartMonitor(String cHr) { connectedHeartMonitor = cHr; }
   void setShifterPosition(int sp) { shifterPosition = sp; }
 
-  String returnJSON();
+  String returnJSON(bool includeDebugLog = false);
   void saveToSPIFFS();
   void loadFromSPIFFS();
   void printFile();
