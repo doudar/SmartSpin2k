@@ -136,14 +136,13 @@
 </body>
 
 <script>
-  function startConfigUpdate() {
-    //Update values on specified interval loading late because this tiny webserver hates frequent requests
-    setTimeout(function () {
-      if (document.getElementById("ssid").value == "loading") {
-        requestConfigValues();
-      }
-    }, 1000);
-  }
+  //Update values on specified interval loading late because this tiny webserver hates frequent requests
+  setInterval(function () {
+    if (document.getElementById("ssid").value == "loading") {
+      requestConfigValues();
+    }
+
+  }, 1000);
 
   function requestConfigValues() {
     var xhttp = new XMLHttpRequest();
@@ -162,9 +161,7 @@
         updateSlider(document.getElementById("inclineMultiplier").value, document.getElementById("inclineMultiplierValue"));
         updateSlider(document.getElementById("stepperPower").value, document.getElementById("stepperPowerValue"));
         document.getElementById("loadingWatermark").opacity = 0;
-        document.getElementById("loadingWatermark").remove();
-      } else {
-        startConfigUpdate();
+        setTimeout(function () { document.getElementById("loadingWatermark").remove(); }, 1000);
       }
     };
     xhttp.open("GET", "/configJSON", true);
@@ -183,7 +180,6 @@
   //Delay loading css to not swamp webserver
   window.addEventListener('load', function () {
     setTimeout(loadCss, 100);
-    startConfigUpdate();
   }, false);
 
   function updateSlider(x, valueElement) {

@@ -17,6 +17,7 @@ bool IRAM_ATTR deBounce();
 void IRAM_ATTR moveStepper(void* pvParameters);
 void IRAM_ATTR shiftUp();
 void IRAM_ATTR shiftDown();
+void debugDirector(String, bool = true, bool = false);
 void resetIfShiftersHeld();
 void scanIfShiftersHeld();
 void setupTMCStepperDriver();
@@ -29,3 +30,7 @@ extern userParameters userConfig;
 // Users Physical Working Capacity Calculation Parameters (heartrate to Power
 // calculation)
 extern physicalWorkingCapacity userPWC;
+
+// Variable that will store debugging information that will get appended and
+// then cleared once posted to HTML or a timer expires.
+extern String debugToHTML;

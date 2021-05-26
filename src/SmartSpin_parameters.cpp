@@ -6,7 +6,6 @@
  */
 
 #include "Main.h"
-#include "SS2KLog.h"
 #include "SmartSpin_parameters.h"
 
 #include <ArduinoJson.h>
@@ -40,7 +39,7 @@ void userParameters::setDefaults() {  // Move these to set the values as #define
 
 //---------------------------------------------------------------------------------
 //-- return all config as one a single JSON string
-String userParameters::returnJSON(bool includeDebugLog) {
+String userParameters::returnJSON() {
   // Allocate a temporary JsonDocument
   // Don't forget to change the capacity to match your requirements.
   // Use arduinojson.org/assistant to compute the capacity.
@@ -48,7 +47,6 @@ String userParameters::returnJSON(bool includeDebugLog) {
   // Set the values in the document
 
   doc["firmwareUpdateURL"]     = firmwareUpdateURL;
-  doc["firmwareVersion"]       = FIRMWARE_VERSION;
   doc["incline"]               = incline;
   doc["simulatedWatts"]        = simulatedWatts;
   doc["simulatedHr"]           = simulatedHr;
@@ -69,9 +67,6 @@ String userParameters::returnJSON(bool includeDebugLog) {
   doc["foundDevices"]          = foundDevices;
   doc["connectedPowerMeter"]   = connectedPowerMeter;
   doc["connectedHeartMonitor"] = connectedHeartMonitor;
-  if (includeDebugLog) {
-    doc["debug"] = DebugInfo::getAndClearLogs();
-  }
   String output;
   serializeJson(doc, output);
   return output;
@@ -83,10 +78,10 @@ void userParameters::saveToSPIFFS() {
   SPIFFS.remove(configFILENAME);
 
   // Open file for writing
-  SS2K_LOG("Config", "Writing File: %s", configFILENAME);
+  debugDirector("Writing File: " + String(configFILENAME));
   File file = SPIFFS.open(configFILENAME, FILE_WRITE);
   if (!file) {
-    SS2K_LOGE("Config", "Failed to create file");
+    debugDirector(F("Failed to create file"));
     return;
   }
 
@@ -122,7 +117,7 @@ void userParameters::saveToSPIFFS() {
 
   // Serialize JSON to file
   if (serializeJson(doc, file) == 0) {
-    SS2K_LOGE("Config", "Failed to write to file");
+    debugDirector(F("Failed to write to file"));
   }
   // Close the file
   file.close();
@@ -131,12 +126,12 @@ void userParameters::saveToSPIFFS() {
 // Loads the JSON configuration from a file into a userParameters Object
 void userParameters::loadFromSPIFFS() {
   // Open file for reading
-  SS2K_LOG("Config", "Reading File: %s", configFILENAME);
+  debugDirector("Reading File: " + String(configFILENAME));
   File file = SPIFFS.open(configFILENAME);
 
   // load defaults if filename doesn't exist
   if (!file) {
-    SS2K_LOG("Config", "Couldn't find configuration file. Loading Defaults");
+    debugDirector("Couldn't find configuration file. Loading Defaults");
     setDefaults();
     return;
   }
@@ -148,7 +143,7 @@ void userParameters::loadFromSPIFFS() {
   // Deserialize the JSON document
   DeserializationError error = deserializeJson(doc, file);
   if (error) {
-    SS2K_LOGE("Config", "Failed to read file, using default configuration");
+    debugDirector(F("Failed to read file, using default configuration"));
     setDefaults();
     return;
   }
@@ -176,20 +171,25 @@ void userParameters::loadFromSPIFFS() {
   setConnectedPowerMeter(doc["connectedPowerMeter"]);
   setConnectedHeartMonitor(doc["connectedHeartMonitor"]);
 
-  SS2K_LOG("Config", "Config File Loaded: %s", configFILENAME);
+  debugDirector("Config File Loaded: " + String(configFILENAME));
   file.close();
 }
 
 // Prints the content of a file to the Serial
 void userParameters::printFile() {
   // Open file for reading
-  SS2K_LOG("Config", "Contents of file: %s", configFILENAME);
+  debugDirector("Contents of file: " + String(configFILENAME));
   File file = SPIFFS.open(configFILENAME);
   if (!file) {
-    SS2K_LOGE("Config", "Failed to read file");
+    debugDirector(F("Failed to read file"));
     return;
   }
 
+  // Extract each characters by one by one
+  while (file.available()) {
+    debugDirector(String(static_cast<char>(file.read())), false);
+  }
+  debugDirector(String(" "));
   // Close the file
   file.close();
 }
@@ -225,10 +225,10 @@ void physicalWorkingCapacity::saveToSPIFFS() {
   SPIFFS.remove(userPWCFILENAME);
 
   // Open file for writing
-  SS2K_LOG("Config", "Writing File: %s", userPWCFILENAME);
+  debugDirector("Writing File: " + String(userPWCFILENAME));
   File file = SPIFFS.open(userPWCFILENAME, FILE_WRITE);
   if (!file) {
-    SS2K_LOGE("Config", "Failed to create file");
+    debugDirector(F("Failed to create file"));
     return;
   }
 
@@ -242,7 +242,7 @@ void physicalWorkingCapacity::saveToSPIFFS() {
 
   // Serialize JSON to file
   if (serializeJson(doc, file) == 0) {
-    SS2K_LOGE("Config", "Failed to write to file");
+    debugDirector(F("Failed to write to file"));
   }
   // Close the file
   file.close();
@@ -251,12 +251,12 @@ void physicalWorkingCapacity::saveToSPIFFS() {
 // Loads the JSON configuration from a file
 void physicalWorkingCapacity::loadFromSPIFFS() {
   // Open file for reading
-  SS2K_LOG("Config", "Reading File: %s", userPWCFILENAME);
+  debugDirector("Reading File: " + String(userPWCFILENAME));
   File file = SPIFFS.open(userPWCFILENAME);
 
   // load defaults if filename doesn't exist
   if (!file) {
-    SS2K_LOG("Config", "Couldn't find configuration file. Loading Defaults");
+    debugDirector("Couldn't find configuration file. Loading Defaults");
     setDefaults();
     return;
   }
@@ -266,7 +266,7 @@ void physicalWorkingCapacity::loadFromSPIFFS() {
   // Deserialize the JSON document
   DeserializationError error = deserializeJson(doc, file);
   if (error) {
-    SS2K_LOGE("Config", "Failed to read file, using default configuration");
+    debugDirector(F("Failed to read file, using default configuration"));
     setDefaults();
     return;
   }
@@ -278,20 +278,25 @@ void physicalWorkingCapacity::loadFromSPIFFS() {
   session2Pwr = doc["session2Pwr"];
   hr2Pwr      = doc["hr2Pwr"];
 
-  SS2K_LOG("Config", "Config File Loaded: %s", userPWCFILENAME);
+  debugDirector("Config File Loaded: " + String(userPWCFILENAME));
   file.close();
 }
 
 // Prints the content of a file to the Serial
 void physicalWorkingCapacity::printFile() {
   // Open file for reading
-  SS2K_LOG("Config", "Contents of file: %s", userPWCFILENAME);
+  debugDirector("Contents of file: " + String(userPWCFILENAME));
   File file = SPIFFS.open(userPWCFILENAME);
   if (!file) {
-    SS2K_LOGE("Config", "Failed to read file");
+    debugDirector(F("Failed to read file"));
     return;
   }
 
+  // Extract each characters by one by one
+  while (file.available()) {
+    debugDirector(String(static_cast<char>(file.read())), false);
+  }
+  debugDirector(String(" "));
   // Close the file
   file.close();
 }

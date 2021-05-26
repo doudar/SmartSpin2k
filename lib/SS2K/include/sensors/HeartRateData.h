@@ -11,7 +11,7 @@
 
 class HeartRateData : public SensorData {
  public:
-  HeartRateData() : SensorData("HRS(HRM)") {}
+  HeartRateData() : SensorData("HRM") {}
 
   bool hasHeartRate();
   bool hasCadence();
