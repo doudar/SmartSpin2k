@@ -7,8 +7,6 @@
 
 #pragma once
 
-#include "SS2KLog.h"
-
 // Update firmware on boot?
 #define AUTO_FIRMWARE_UPDATE true
 
@@ -118,7 +116,7 @@
 #define WIFI_CONNECT_TIMEOUT 10
 
 // Max size of userconfig
-#define USERCONFIG_JSON_SIZE 768 + DEBUG_LOG_BUFFER_SIZE
+#define USERCONFIG_JSON_SIZE 768
 
 // Uncomment to enable sending Telegram debug messages back to the chat
 // specified in telegram_token.h

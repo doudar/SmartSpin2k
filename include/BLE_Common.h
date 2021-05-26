@@ -34,8 +34,9 @@ extern bool updateConnParametersFlag;
 
 void startBLEServer();
 void computeERG(int, int);
+void computeCSC();
 void updateIndoorBikeDataChar();
-void updateCyclingPowerMeasurementChar();
+void updateCyclingPowerMesurementChar();
 void calculateInstPwrFromHR();
 void updateHeartRateMeasurementChar();
 int connectedClientCount();
@@ -95,6 +96,8 @@ class SpinBLEAdvertisedDevice {
     userSelectedCT    = false;  // Controllable Trainer
     doConnect         = false;  // Initiate connection flag
   }
+
+  void print();
 };
 
 class SpinBLEClient {

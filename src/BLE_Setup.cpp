@@ -7,12 +7,11 @@
 
 #include "BLE_Common.h"
 #include "Main.h"
-#include "SS2KLog.h"
 #include <ArduinoJson.h>
 #include <NimBLEDevice.h>
 
 void setupBLE() {  // Common BLE setup for both client and server
-  SS2K_LOG("BLE_Setup", "Starting Arduino BLE Client application...");
+  debugDirector("Starting Arduino BLE Client application...");
   BLEDevice::init(userConfig.getDeviceName());
   spinBLEClient.start();
   startBLEServer();
@@ -25,12 +24,12 @@ void setupBLE() {  // Common BLE setup for both client and server
                           &BLECommunicationTask,  /* Task handle to keep track of created task */
                           1);                     /* pin task to core 0 */
 
-  SS2K_LOG("BLE_Setup", "BLE Notify Task Started");
+  debugDirector("BLE Notify Task Started");
   vTaskDelay(100 / portTICK_PERIOD_MS);
-  if (strcmp(userConfig.getconnectedPowerMeter(), "none") != 0 || strcmp(userConfig.getconnectedHeartMonitor(), "none") != 0) {
+  if (!((String(userConfig.getconnectedPowerMeter()) == "none") && (String(userConfig.getconnectedHeartMonitor()) == "none"))) {
     spinBLEClient.serverScan(true);
-    SS2K_LOG("BLE_Setup", "Scanning");
+    debugDirector("Scanning");
   }
-  SS2K_LOG("BLE_Setup", "%s %s", userConfig.getconnectedPowerMeter(), userConfig.getconnectedHeartMonitor());
-  SS2K_LOG("BLE_Setup", "End BLE Setup");
+  debugDirector(String(userConfig.getconnectedPowerMeter()) + " " + String(userConfig.getconnectedHeartMonitor()));
+  debugDirector("End BLE Setup");
 }

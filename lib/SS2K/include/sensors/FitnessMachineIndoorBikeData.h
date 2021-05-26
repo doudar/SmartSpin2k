@@ -11,7 +11,7 @@
 
 class FitnessMachineIndoorBikeData : public SensorData {
  public:
-  FitnessMachineIndoorBikeData() : SensorData("FTMS(IBD)") {
+  FitnessMachineIndoorBikeData() : SensorData("FTMS") {
     for (int i = 0; i < FieldCount; i++) {
       this->values[i] = nan("");
     }
