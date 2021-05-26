@@ -61,10 +61,10 @@ uint8_t ftmsIndoorBikeData[14] = {0x44, 0x02, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0,
 uint8_t ftmsResistanceLevelRange[6] = {0x00, 0x00, 0x3A, 0x98, 0xC5, 0x68};                                 // +-15000 not sure what units
 uint8_t ftmsPowerRange[6]           = {0x00, 0x00, 0xA0, 0x0F, 0x01, 0x00};                                 // 1-4000 watts
 
-void logCharacteristic(char *buffer, const size_t bufferCapacity, const byte *data, const size_t dataLength, const NimBLEUUID serviceUUID, const NimBLEUUID charUUID, const char *format, ...) {
+void logCharacteristic(char *buffer, const size_t bufferCapacity, const byte *data, const size_t dataLength, const NimBLEUUID serviceUUID, const NimBLEUUID charUUID,
+                       const char *format, ...) {
   int bufferLength = ss2k_log_hex_to_buffer(data, dataLength, buffer, 0, bufferCapacity);
-  bufferLength += snprintf(buffer + bufferLength, bufferCapacity - bufferLength, "<- %s | %s | ", serviceUUID.toString().c_str(),
-                            charUUID.toString().c_str());
+  bufferLength += snprintf(buffer + bufferLength, bufferCapacity - bufferLength, "<- %s | %s | ", serviceUUID.toString().c_str(), charUUID.toString().c_str());
   va_list args;
   va_start(args, format);
   bufferLength += vsnprintf(buffer + bufferLength, bufferCapacity - bufferLength, format, args);
@@ -207,9 +207,10 @@ void updateIndoorBikeDataChar() {
   fitnessMachineFeature->notify();
   fitnessMachineIndoorBikeData->notify();
 
-  const int kLogBufCapacity = 200;  // Data(30), Sep(data/2), Arrow(3), CharId(37), Sep(3), CharId(37), Sep(3), Name(10), Prefix(2), HR(7), SEP(1), CD(10), SEP(1), PW(8), SEP(1), SD(7), Suffix(2), Nul(1), rounded up
+  const int kLogBufCapacity = 200;  // Data(30), Sep(data/2), Arrow(3), CharId(37), Sep(3), CharId(37), Sep(3), Name(10), Prefix(2), HR(7), SEP(1), CD(10), SEP(1), PW(8), SEP(1),
+                                    // SD(7), Suffix(2), Nul(1), rounded up
   char logBuf[kLogBufCapacity];
-  const size_t ftmsIndoorBikeDataLength = sizeof(ftmsIndoorBikeData)/sizeof(ftmsIndoorBikeData[0]);
+  const size_t ftmsIndoorBikeDataLength = sizeof(ftmsIndoorBikeData) / sizeof(ftmsIndoorBikeData[0]);
   logCharacteristic(logBuf, kLogBufCapacity, ftmsIndoorBikeData, ftmsIndoorBikeDataLength, FITNESSMACHINESERVICE_UUID, fitnessMachineIndoorBikeData->getUUID(),
                     "FTMS(IBD)[ HR(%d) CD(%.2f) PW(%d) SD(%.2f) ]", hr % 1000, fmodf(cadRaw, 1000.0), watts % 10000, fmodf(speed, 1000.0));
 }  // ^^Using the New Way of setting Bytes.
@@ -241,9 +242,10 @@ void updateCyclingPowerMeasurementChar() {
 
   cyclingPowerMeasurementCharacteristic->notify();
 
-  const int kLogBufCapacity = 150;  // Data(18), Sep(data/2), Arrow(3), CharId(37), Sep(3), CharId(37), Sep(3),Name(8), Prefix(2), CD(10), SEP(1), PW(8), Suffix(2), Nul(1), rounded up
+  const int kLogBufCapacity =
+      150;  // Data(18), Sep(data/2), Arrow(3), CharId(37), Sep(3), CharId(37), Sep(3),Name(8), Prefix(2), CD(10), SEP(1), PW(8), Suffix(2), Nul(1), rounded up
   char logBuf[kLogBufCapacity];
-  const size_t cyclingPowerMeasurementLength = sizeof(cyclingPowerMeasurement)/sizeof(cyclingPowerMeasurement[0]);
+  const size_t cyclingPowerMeasurementLength = sizeof(cyclingPowerMeasurement) / sizeof(cyclingPowerMeasurement[0]);
   logCharacteristic(logBuf, kLogBufCapacity, cyclingPowerMeasurement, cyclingPowerMeasurementLength, FITNESSMACHINESERVICE_UUID, fitnessMachineIndoorBikeData->getUUID(),
                     "CPS(CPM)[ CD(%.2f) PW(%d) ]", cadence > 0 ? fmodf(cadence, 1000.0) : 0, power % 10000);
 }
@@ -256,7 +258,7 @@ void updateHeartRateMeasurementChar() {
 
   const int kLogBufCapacity = 125;  // Data(10), Sep(data/2), Arrow(3), CharId(37), Sep(3), CharId(37), Sep(3), Name(8), Prefix(2), HR(7), Suffix(2), Nul(1), rounded up
   char logBuf[kLogBufCapacity];
-  const size_t heartRateMeasurementLength = sizeof(heartRateMeasurement)/sizeof(heartRateMeasurement[0]);
+  const size_t heartRateMeasurementLength = sizeof(heartRateMeasurement) / sizeof(heartRateMeasurement[0]);
   logCharacteristic(logBuf, kLogBufCapacity, heartRateMeasurement, heartRateMeasurementLength, HEARTSERVICE_UUID, heartRateMeasurementCharacteristic->getUUID(),
                     "HRS(HRM)[ HR(%d) ]", hr % 1000);
 }
@@ -285,7 +287,8 @@ void MyCallbacks::onWrite(BLECharacteristic *pCharacteristic) {
   std::string rxValue = pCharacteristic->getValue();
 
   if (rxValue.length() > 1) {
-    const size_t kLogBufCapacity = 175;  // Data(16), Spaces(Data/2), Arrow(3), ChrUUID(37), Sep(3), ChrUUID(37), Sep(3), Name(8), Prefix(2), TGT(9), SEP(1), CUR(9), SEP(1), INC(11), Suffix(2), Nul(1), rounded up
+    const size_t kLogBufCapacity = 175;  // Data(16), Spaces(Data/2), Arrow(3), ChrUUID(37), Sep(3), ChrUUID(37), Sep(3), Name(8), Prefix(2), TGT(9), SEP(1), CUR(9), SEP(1),
+                                         // INC(11), Suffix(2), Nul(1), rounded up
     char logBuf[kLogBufCapacity];
 
     if (static_cast<int>(rxValue[0]) == 17) {  // 0x11 17 means FTMS Incline Control Mode  (aka SIM mode)
