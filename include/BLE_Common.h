@@ -14,6 +14,11 @@
 #include <Arduino.h>
 #include <Main.h>
 
+#define BLE_CLIENT_LOG_TAG "BLE_Client"
+#define BLE_COMMON_LOG_TAG "BLE_Common"
+#define BLE_SERVER_LOG_TAG "BLE_Server"
+#define BLE_SETUP_LOG_TAG  "BLE_Setup"
+
 // macros to convert different types of bytes into int The naming here sucks and
 // should be fixed.
 #define bytes_to_s16(MSB, LSB) (((signed int)((signed char)MSB))) << 8 | (((signed char)LSB))
@@ -34,9 +39,10 @@ extern bool updateConnParametersFlag;
 
 void startBLEServer();
 void computeERG(int, int);
-void computeCSC();
+void logCharacteristic(char *buffer, const size_t bufferCapacity, const byte *data, const size_t dataLength, const NimBLEUUID serviceUUID, const NimBLEUUID charUUID,
+                       const char *format, ...);
 void updateIndoorBikeDataChar();
-void updateCyclingPowerMesurementChar();
+void updateCyclingPowerMeasurementChar();
 void calculateInstPwrFromHR();
 void updateHeartRateMeasurementChar();
 int connectedClientCount();
@@ -64,7 +70,7 @@ void bleClientTask(void *pvParameters);
 // FLYWHEEL_UART_TX_UUID};
 
 class SpinBLEAdvertisedDevice {
- public:  // eventually these shoul be made private
+ public:  // eventually these should be made private
   NimBLEAdvertisedDevice *advertisedDevice = nullptr;
   NimBLEAddress peerAddress;
   int connectedClientID = BLE_HS_CONN_HANDLE_NONE;
@@ -96,8 +102,6 @@ class SpinBLEAdvertisedDevice {
     userSelectedCT    = false;  // Controllable Trainer
     doConnect         = false;  // Initiate connection flag
   }
-
-  void print();
 };
 
 class SpinBLEClient {
@@ -122,7 +126,7 @@ class SpinBLEClient {
   bool connectToServer();
   void scanProcess();
   void disconnect();
-  // Check for duplicate services of BLEClient and remove the previoulsy
+  // Check for duplicate services of BLEClient and remove the previously
   // connected one.
   void removeDuplicates(NimBLEClient *pClient);
   // Reset devices in myBLEDevices[]. Bool All (true) or only connected ones
