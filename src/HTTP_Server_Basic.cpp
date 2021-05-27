@@ -592,7 +592,8 @@ void sendTelegram(String textToSend) {
 
 // Non blocking task to send telegram message
 void telegramUpdate(void *pvParameters) {
-  client.setInsecure();
+  //client.setInsecure();
+  client.setCACert(TELEGRAM_CERTIFICATE_ROOT);
   for (;;) {
     static int telegramFailures = 0;
     if (telegramMessageWaiting && internetConnection) {
