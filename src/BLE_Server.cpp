@@ -80,7 +80,7 @@ uint8_t ftmsTrainingStatus[2]       = {0x08, 0x00};
 void logCharacteristic(char *buffer, const size_t bufferCapacity, const byte *data, const size_t dataLength, const NimBLEUUID serviceUUID, const NimBLEUUID charUUID,
                        const char *format, ...) {
   int bufferLength = ss2k_log_hex_to_buffer(data, dataLength, buffer, 0, bufferCapacity);
-  bufferLength += snprintf(buffer + bufferLength, bufferCapacity - bufferLength, "<- %s | %s | ", serviceUUID.toString().c_str(), charUUID.toString().c_str());
+  bufferLength += snprintf(buffer + bufferLength, bufferCapacity - bufferLength, "-> %s | %s | ", serviceUUID.toString().c_str(), charUUID.toString().c_str());
   va_list args;
   va_start(args, format);
   bufferLength += vsnprintf(buffer + bufferLength, bufferCapacity - bufferLength, format, args);
@@ -344,22 +344,19 @@ void MyCallbacks::onWrite(BLECharacteristic *pCharacteristic) {
   std::string rxValue = pCharacteristic->getValue();
 
   if (rxValue.length() > 1) {
-    const size_t kLogBufCapacity = 175;  // Data(16), Spaces(Data/2), Arrow(3), ChrUUID(37), Sep(3), ChrUUID(37), Sep(3), Name(8), Prefix(2), TGT(9), SEP(1), CUR(9), SEP(1),
-                                         // INC(11), Suffix(2), Nul(1), rounded up
-    char logBuf[kLogBufCapacity];
+    uint8_t *pData = reinterpret_cast<uint8_t *>(&rxValue[0]);
+    int length     = rxValue.length();
 
-    // Insert new logging here
-    //
-    //
-    //
-    //^^^^^^^^^^^^^^^^^^^^^^
+    const int kLogBufCapacity = (rxValue.length() *2) + 60; //largest comment is 48 VV
+    char logBuf[kLogBufCapacity];
+    int logBufLength = ss2k_log_hex_to_buffer(pData, length, logBuf, 0, kLogBufCapacity);
 
     int port               = 0;
     uint8_t returnValue[3] = {0x80, (uint8_t)rxValue[0], 0x02};
 
     switch ((uint8_t)rxValue[0]) {
       case 0x00:  // request control
-        SS2K_LOG(BLE_SERVER_LOG_TAG, " Control request");
+        logBufLength += snprintf(logBuf + logBufLength, kLogBufCapacity - logBufLength, "-> Control Request");
         returnValue[2] = 0x01;
         userConfig.setERGMode(false);
         pCharacteristic->setValue(returnValue, 3);
@@ -374,7 +371,7 @@ void MyCallbacks::onWrite(BLECharacteristic *pCharacteristic) {
         port *= 10;
         userConfig.setIncline(port);
         userConfig.setERGMode(false);
-        SS2K_LOG(BLE_SERVER_LOG_TAG, " Incline Mode: " + String((userConfig.getIncline() / 100)));
+        logBufLength += snprintf(logBuf + logBufLength, kLogBufCapacity - logBufLength, "-> Incline Mode: %2f", userConfig.getIncline() / 100);
         returnValue[2]           = 0x01;
         uint8_t inclineStatus[3] = {0x06, (uint8_t)rxValue[1], (uint8_t)rxValue[2]};
         fitnessMachineStatusCharacteristic->setValue(inclineStatus, 3);
@@ -388,7 +385,7 @@ void MyCallbacks::onWrite(BLECharacteristic *pCharacteristic) {
         int targetResistance = rxValue[1] * userConfig.getShiftStep();
         userConfig.setShifterPosition(targetResistance);
         userConfig.setERGMode(false);
-        SS2K_LOG(BLE_SERVER_LOG_TAG, " Resistance Mode: %d", +userConfig.getShifterPosition());
+        logBufLength += snprintf(logBuf + logBufLength, kLogBufCapacity - logBufLength, "-> Resistance Mode: %d", userConfig.getShifterPosition());
         returnValue[2]              = 0x01;
         uint8_t resistanceStatus[2] = {0x07, rxValue[1]};
         fitnessMachineStatusCharacteristic->setValue(resistanceStatus, 3);
@@ -399,15 +396,12 @@ void MyCallbacks::onWrite(BLECharacteristic *pCharacteristic) {
         break;
       }
       case 0x05: {  // Power Level Mode
-        if (spinBLEClient.connectedPM) {
+        if (spinBLEClient.connectedPM || userConfig.getSimulateWatts()) {
           int targetWatts = bytes_to_u16(rxValue[2], rxValue[1]);
           userConfig.setERGMode(true);
           computeERG(targetWatts);
-          // debugDirector("ERG MODE", false);
-          // debugDirector(" Target: " + String(targetWatts), false);
-          // debugDirector(" Current: " + String(userConfig.getSimulatedWatts()), false);
-          // debugDirector(" Incline: " + String(userConfig.getIncline() / 100), false);
-          // debugDirector("");
+          logBufLength += snprintf(logBuf + logBufLength, kLogBufCapacity - logBufLength, "-> ERG Mode Target: %d Current: %d Incline: %2f", targetWatts,
+                                   userConfig.getSimulatedWatts(), userConfig.getIncline() / 100);
           returnValue[2]       = 0x01;
           uint8_t ERGStatus[3] = {0x08, (uint8_t)rxValue[1], 0x01};
           fitnessMachineStatusCharacteristic->setValue(ERGStatus, 3);
@@ -416,14 +410,14 @@ void MyCallbacks::onWrite(BLECharacteristic *pCharacteristic) {
           fitnessMachineTrainingStatus->notify();
         } else {
           returnValue[2] = 0x02;  // no power meter connected, so no ERG
-          // debugDirector("ERG MODE Requested. No PM Connected");
+          logBufLength += snprintf(logBuf + logBufLength, kLogBufCapacity - logBufLength, "-> ERG Mode: No Power Meter Connected");
         }
         pCharacteristic->setValue(returnValue, 3);
         break;
       }
       case 0x07:  // Start training
         returnValue[2] = 0x01;
-        // debugDirector(" Start Training");
+        logBufLength += snprintf(logBuf + logBufLength, kLogBufCapacity - logBufLength, "-> Start Training");
         pCharacteristic->setValue(returnValue, 3);
         ftmsTrainingStatus[1] = 0x00;
         fitnessMachineTrainingStatus->setValue(ftmsTrainingStatus, 2);
@@ -439,7 +433,7 @@ void MyCallbacks::onWrite(BLECharacteristic *pCharacteristic) {
         // int8_t windResistance    = rxValue[6];
         port = bytes_to_u16(buf[1], buf[0]);
         userConfig.setIncline(port);
-        SS2K_LOG(BLE_SERVER_LOG_TAG, "Sim Mode");
+        logBufLength += snprintf(logBuf + logBufLength, kLogBufCapacity - logBufLength, "-> Sim Mode Incline %2f", userConfig.getIncline() / 100);
         userConfig.setERGMode(false);
         returnValue[2]       = 0x01;
         uint8_t simStatus[7] = {0x12, (uint8_t)rxValue[1], (uint8_t)rxValue[2], (uint8_t)rxValue[3], (uint8_t)rxValue[4], (uint8_t)rxValue[5], (uint8_t)rxValue[6]};
@@ -452,7 +446,7 @@ void MyCallbacks::onWrite(BLECharacteristic *pCharacteristic) {
       }
 
       case 0x13: {  // Spin Down
-        SS2K_LOG(BLE_SERVER_LOG_TAG, "Spin Down Requested");
+        logBufLength += snprintf(logBuf + logBufLength, kLogBufCapacity - logBufLength, "-> Spin Down Requested");
         uint8_t spinStatus[2] = {0x14, 0x01};  // send low and high speed targets
         fitnessMachineStatusCharacteristic->setValue(spinStatus, 2);
         uint8_t controlPoint[6] = {0x80, 0x01, 0x24, 0x03, 0x96, 0x0e};  // send low and high speed targets
@@ -462,7 +456,12 @@ void MyCallbacks::onWrite(BLECharacteristic *pCharacteristic) {
         fitnessMachineTrainingStatus->notify();
         break;
       }
+
+      default:
+        logBufLength += snprintf(logBuf + logBufLength, kLogBufCapacity - logBufLength, "-> Unsupported FTMS Request");
+        pCharacteristic->setValue(returnValue, 3);
     }
+    SS2K_LOG(BLE_SERVER_LOG_TAG, "%s", logBuf);
     fitnessMachineStatusCharacteristic->notify();
   } else {
     SS2K_LOG(BLE_SERVER_LOG_TAG, "App wrote nothing ");
@@ -475,16 +474,6 @@ void MyCallbacks::onWrite(BLECharacteristic *pCharacteristic) {
     fitnessMachineTrainingStatus->notify();
   }
   rxValue = pCharacteristic->getValue();
-  /*
-    if (rxValue.length() > 1) {
-      for (const auto &text : rxValue) {  // Range-for!
-        debugDirector(String(text, HEX) + " ", false);
-       logCharacteristic(logBuf, kLogBufCapacity, reinterpret_cast<const unsigned char *>(rxValue.c_str()), rxValue.length(), FITNESSMACHINESERVICE_UUID,
-    pCharacteristic->getUUID(), "FTMS(CP)[ INC(%.2f) ]", fmodf(targetIncline / 100, 1000.0));
-      }
-      debugDirector("<-- Control Point Indicate");
-    }
-    */
 }
 
 void controlPointIndicate() { fitnessMachineControlPoint->indicate(); }
