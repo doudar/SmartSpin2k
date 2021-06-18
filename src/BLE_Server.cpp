@@ -34,6 +34,9 @@ BLECharacteristic *fitnessMachineResistanceLevelRange;
 BLECharacteristic *fitnessMachinePowerRange;
 BLECharacteristic *fitnessMachineTrainingStatus;
 
+BLEService *pSmartSpin2kService;
+BLECharacteristic *smartSpin2kCharacteristic;
+
 /******** Bit field Flag Example ********/
 // 00000000000000000001 - 1   - 0x001 - Pedal Power Balance Present
 // 00000000000000000010 - 2   - 0x002 - Pedal Power Balance Reference
@@ -73,9 +76,10 @@ struct FitnessMachineFeature ftmsFeature = {FitnessMachineFeatureFlags::Types::C
 
 uint8_t ftmsIndoorBikeData[14] = {0x44, 0x02, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0};  // 00000000100001010100 ISpeed, ICAD,
                                                                                                             // TDistance, IPower, ETime
-uint8_t ftmsResistanceLevelRange[6] = {0x00, 0x00, 0x25, 0x00, 0x01, 0x00};                                 // 25 increment 1
-uint8_t ftmsPowerRange[6]           = {0x00, 0x00, 0xA0, 0x0F, 0x01, 0x00};                                 // 1-4000 watts
-uint8_t ftmsTrainingStatus[2]       = {0x08, 0x00};
+uint8_t ftmsResistanceLevelRange[6]      = {0x00, 0x00, 0x25, 0x00, 0x01, 0x00};                            // 25 increment 1
+uint8_t ftmsPowerRange[6]                = {0x00, 0x00, 0xA0, 0x0F, 0x01, 0x00};                            // 1-4000 watts
+uint8_t ftmsTrainingStatus[2]            = {0x08, 0x00};
+uint8_t ss2kCustomCharacteristicValue[3] = {0x00, 0x00, 0x00};
 
 void logCharacteristic(char *buffer, const size_t bufferCapacity, const byte *data, const size_t dataLength, const NimBLEUUID serviceUUID, const NimBLEUUID charUUID,
                        const char *format, ...) {
@@ -115,6 +119,9 @@ void startBLEServer() {
   fitnessMachinePowerRange           = pFitnessMachineService->createCharacteristic(FITNESSMACHINEPOWERRANGE_UUID, NIMBLE_PROPERTY::READ);
   fitnessMachineTrainingStatus       = pFitnessMachineService->createCharacteristic(FITNESSMACHINETRAININGSTATUS_UUID, NIMBLE_PROPERTY::NOTIFY);
 
+  pSmartSpin2kService       = pServer->createService(SMARTSPIN2K_SERVICE_UUID);
+  smartSpin2kCharacteristic = pSmartSpin2kService->createCharacteristic(SMARTSPIN2K_CHARACTERISTIC_UUID, NIMBLE_PROPERTY::WRITE | NIMBLE_PROPERTY::INDICATE);
+
   pServer->setCallbacks(new MyServerCallbacks());
 
   // Creating Characteristics
@@ -132,11 +139,16 @@ void startBLEServer() {
   fitnessMachineResistanceLevelRange->setValue(ftmsResistanceLevelRange, 6);
   fitnessMachinePowerRange->setValue(ftmsPowerRange, 6);
 
+  smartSpin2kCharacteristic->setValue(ss2kCustomCharacteristicValue, 3);
+
   fitnessMachineControlPoint->setCallbacks(new MyCallbacks());
 
-  pHeartService->start();           // heart rate service
-  pPowerMonitor->start();           // Power Meter Service
-  pFitnessMachineService->start();  // Fitness Machine Service
+  smartSpin2kCharacteristic->setCallbacks(new ss2kCustomCharacteristicCallbacks());
+
+  pHeartService->start();
+  pPowerMonitor->start();
+  pFitnessMachineService->start();
+  pSmartSpin2kService->start();
 
   // const std::string fitnessData = {0b00000001, 0b00100000, 0b00000000};
   BLEAdvertising *pAdvertising = BLEDevice::getAdvertising();
@@ -144,6 +156,7 @@ void startBLEServer() {
   pAdvertising->addServiceUUID(FITNESSMACHINESERVICE_UUID);
   pAdvertising->addServiceUUID(CYCLINGPOWERSERVICE_UUID);
   pAdvertising->addServiceUUID(HEARTSERVICE_UUID);
+  pAdvertising->addServiceUUID(SMARTSPIN2K_SERVICE_UUID);
   pAdvertising->setMaxInterval(250);
   pAdvertising->setMinInterval(160);
   pAdvertising->setScanResponse(true);
@@ -347,7 +360,7 @@ void MyCallbacks::onWrite(BLECharacteristic *pCharacteristic) {
     uint8_t *pData = reinterpret_cast<uint8_t *>(&rxValue[0]);
     int length     = rxValue.length();
 
-    const int kLogBufCapacity = (rxValue.length() *2) + 60; //largest comment is 48 VV
+    const int kLogBufCapacity = (rxValue.length() * 2) + 60;  // largest comment is 48 VV
     char logBuf[kLogBufCapacity];
     int logBufLength = ss2k_log_hex_to_buffer(pData, length, logBuf, 0, kLogBufCapacity);
 
@@ -379,8 +392,8 @@ void MyCallbacks::onWrite(BLECharacteristic *pCharacteristic) {
         ftmsTrainingStatus[1] = 0x00;
         fitnessMachineTrainingStatus->setValue(ftmsTrainingStatus, 2);
         fitnessMachineTrainingStatus->notify();
-        break;
-      }
+      } break;
+
       case 0x04: {  // Resistance level setting
         int targetResistance = rxValue[1] * userConfig.getShiftStep();
         userConfig.setShifterPosition(targetResistance);
@@ -393,8 +406,8 @@ void MyCallbacks::onWrite(BLECharacteristic *pCharacteristic) {
         ftmsTrainingStatus[1] = 0x00;
         fitnessMachineTrainingStatus->setValue(ftmsTrainingStatus, 2);
         fitnessMachineTrainingStatus->notify();
-        break;
-      }
+      } break;
+
       case 0x05: {  // Power Level Mode
         if (spinBLEClient.connectedPM || userConfig.getSimulateWatts()) {
           int targetWatts = bytes_to_u16(rxValue[2], rxValue[1]);
@@ -413,8 +426,8 @@ void MyCallbacks::onWrite(BLECharacteristic *pCharacteristic) {
           logBufLength += snprintf(logBuf + logBufLength, kLogBufCapacity - logBufLength, "-> ERG Mode: No Power Meter Connected");
         }
         pCharacteristic->setValue(returnValue, 3);
-        break;
-      }
+      } break;
+
       case 0x07:  // Start training
         returnValue[2] = 0x01;
         logBufLength += snprintf(logBuf + logBufLength, kLogBufCapacity - logBufLength, "-> Start Training");
@@ -442,8 +455,7 @@ void MyCallbacks::onWrite(BLECharacteristic *pCharacteristic) {
         ftmsTrainingStatus[1] = 0x00;
         fitnessMachineTrainingStatus->setValue(ftmsTrainingStatus, 2);
         fitnessMachineTrainingStatus->notify();
-        break;
-      }
+      } break;
 
       case 0x13: {  // Spin Down
         logBufLength += snprintf(logBuf + logBufLength, kLogBufCapacity - logBufLength, "-> Spin Down Requested");
@@ -454,8 +466,7 @@ void MyCallbacks::onWrite(BLECharacteristic *pCharacteristic) {
         ftmsTrainingStatus[1] = 0x00;
         fitnessMachineTrainingStatus->setValue(ftmsTrainingStatus, 2);
         fitnessMachineTrainingStatus->notify();
-        break;
-      }
+      } break;
 
       default:
         logBufLength += snprintf(logBuf + logBufLength, kLogBufCapacity - logBufLength, "-> Unsupported FTMS Request");
@@ -529,7 +540,7 @@ Decimal 263 == hexidecimal 0107 but the data needs to be converted to LSO, MSO t
 
 So,
 
-If client wants to write (0x02) to simulatedSpeed:
+If client wants to write (0x02) int value 263 (0x07 0x01) to simulatedSpeed(0x06):
 
 Client Writes:
 0x02, 0x06, 0x07, 0x01
@@ -539,44 +550,48 @@ Server will then indicate:
 0x06, 0x07, 0x01
 (operator, LSO, MSO)
 
-Example to read (0x01) from variable 6 (simulatedSpeed)
+Example to read (0x01) from simulatedSpeed (0x06)
 
 Client Writes:
 0x01, 0x06
 Server will then indicate:
-0x06, 0x07, 0x01
+0x,80, 0x06, 0x07, 0x01 (simulatedSpeed),(0x07 0x01)
 
 Pay special attention to the float values below. Since they have to be transmitted as an int, some are converted *100, others are converted *10.
+True values are >00. False are 00.
 */
 
-void WhenIGrowUpIWillBeACallbackForACustomCharacteristic(BLECharacteristic *pCharacteristic) {
+void ss2kCustomCharacteristicCallbacks::onWrite(BLECharacteristic *pCharacteristic) {
   std::string rxValue    = pCharacteristic->getValue();
-  uint8_t returnValue[3] = {rxValue[1], rxValue[2], rxValue[3]};
-  bool read              = 0x01;  // value in first byte for read operation
-  bool write             = 0x02;  // value in first byte to request write operation
-  bool error             = 0xff;  // value server indicates for error/unable
+  uint8_t read           = 0x01;  // value to request read operation
+  uint8_t write          = 0x02;  // Value to request write operation
+  uint8_t error          = 0xff;  // value server error/unable
+  uint8_t success        = 0x80;  // value for success
+  uint8_t returnValue[4] = {error, rxValue[1], 0x00, 0x00};
 
+  SS2K_LOG(BLE_SERVER_LOG_TAG, "Custom Request Recieved");
   switch (rxValue[1]) {
     case BLE_firmwareUpdateURL:  // 0x01
       returnValue[0] = error;
       break;
 
     case BLE_incline: {  // 0x02
+      returnValue[0] = success;
       if (rxValue[0] == read) {
         int inc        = userConfig.getIncline() * 100;
-        returnValue[1] = (uint8_t)(inc & 0xff);
-        returnValue[2] = (uint8_t)(inc >> 8);
+        returnValue[2] = (uint8_t)(inc & 0xff);
+        returnValue[3] = (uint8_t)(inc >> 8);
       }
       if (rxValue[0] == write) {
         userConfig.setIncline(bytes_to_u16(rxValue[3], rxValue[2]) / 100);
       }
-      break;
-    }
+    } break;
 
     case BLE_simulatedWatts:  // 0x03
+      returnValue[0] = success;
       if (rxValue[0] == read) {
-        returnValue[1] = (uint8_t)(userConfig.getSimulatedWatts() & 0xff);
-        returnValue[2] = (uint8_t)(userConfig.getSimulatedWatts() >> 8);
+        returnValue[2] = (uint8_t)(userConfig.getSimulatedWatts() & 0xff);
+        returnValue[3] = (uint8_t)(userConfig.getSimulatedWatts() >> 8);
       }
       if (rxValue[0] == write) {
         userConfig.setSimulatedWatts(bytes_to_u16(rxValue[3], rxValue[2]));
@@ -584,9 +599,10 @@ void WhenIGrowUpIWillBeACallbackForACustomCharacteristic(BLECharacteristic *pCha
       break;
 
     case BLE_simulatedHr:  // 0x04
+      returnValue[0] = success;
       if (rxValue[0] == read) {
-        returnValue[1] = (uint8_t)(userConfig.getSimulatedHr() & 0xff);
-        returnValue[2] = (uint8_t)(userConfig.getSimulatedHr() >> 8);
+        returnValue[2] = (uint8_t)(userConfig.getSimulatedHr() & 0xff);
+        returnValue[3] = (uint8_t)(userConfig.getSimulatedHr() >> 8);
       }
       if (rxValue[0] == write) {
         userConfig.setSimulatedHr(bytes_to_u16(rxValue[3], rxValue[2]));
@@ -594,9 +610,10 @@ void WhenIGrowUpIWillBeACallbackForACustomCharacteristic(BLECharacteristic *pCha
       break;
 
     case BLE_simulatedCad:  // 0x05
+      returnValue[0] = success;
       if (rxValue[0] == read) {
-        returnValue[1] = (uint8_t)(userConfig.getSimulatedCad() & 0xff);
-        returnValue[2] = (uint8_t)(userConfig.getSimulatedCad() >> 8);
+        returnValue[2] = (uint8_t)(userConfig.getSimulatedCad() & 0xff);
+        returnValue[3] = (uint8_t)(userConfig.getSimulatedCad() >> 8);
       }
       if (rxValue[0] == write) {
         userConfig.setSimulatedCad(bytes_to_u16(rxValue[3], rxValue[2]));
@@ -604,25 +621,26 @@ void WhenIGrowUpIWillBeACallbackForACustomCharacteristic(BLECharacteristic *pCha
       break;
 
     case BLE_simulatedSpeed: {  // 0x06
-      int spd = userConfig.getSimulatedSpeed() * 10;
+      returnValue[0] = success;
+      int spd        = userConfig.getSimulatedSpeed() * 10;
       if (rxValue[0] == read) {
-        returnValue[1] = (uint8_t)(spd & 0xff);
-        returnValue[2] = (uint8_t)(spd >> 8);
+        returnValue[2] = (uint8_t)(spd & 0xff);
+        returnValue[3] = (uint8_t)(spd >> 8);
       }
       if (rxValue[0] == write) {
         userConfig.setSimulatedSpeed(bytes_to_u16(rxValue[3], rxValue[2]) / 10);
       }
-      break;
-    }
+    } break;
 
     case BLE_deviceName:  // 0x07
       returnValue[0] = error;
       break;
 
     case BLE_shiftStep:  // 0x08
+      returnValue[0] = success;
       if (rxValue[0] == read) {
-        returnValue[1] = (uint8_t)(userConfig.getShiftStep() & 0xff);
-        returnValue[2] = (uint8_t)(userConfig.getShiftStep() >> 8);
+        returnValue[2] = (uint8_t)(userConfig.getShiftStep() & 0xff);
+        returnValue[3] = (uint8_t)(userConfig.getShiftStep() >> 8);
       }
       if (rxValue[0] == write) {
         userConfig.setShiftStep(bytes_to_u16(rxValue[3], rxValue[2]));
@@ -630,9 +648,10 @@ void WhenIGrowUpIWillBeACallbackForACustomCharacteristic(BLECharacteristic *pCha
       break;
 
     case BLE_stepperPower:  // 0x09
+      returnValue[0] = success;
       if (rxValue[0] == read) {
-        returnValue[1] = (uint8_t)(userConfig.getStepperPower() & 0xff);
-        returnValue[2] = (uint8_t)(userConfig.getStepperPower() >> 8);
+        returnValue[2] = (uint8_t)(userConfig.getStepperPower() & 0xff);
+        returnValue[3] = (uint8_t)(userConfig.getStepperPower() >> 8);
       }
       if (rxValue[0] == write) {
         userConfig.setStepperPower(bytes_to_u16(rxValue[3], rxValue[2]));
@@ -640,8 +659,9 @@ void WhenIGrowUpIWillBeACallbackForACustomCharacteristic(BLECharacteristic *pCha
       break;
 
     case BLE_stealthchop:  // 0x0A
+      returnValue[0] = success;
       if (rxValue[0] == read) {
-        returnValue[1] = (uint8_t)(userConfig.getStealthchop());
+        returnValue[2] = (uint8_t)(userConfig.getStealthchop());
       }
       if (rxValue[0] == write) {
         userConfig.setStealthChop(bytes_to_u16(rxValue[3], rxValue[2]));
@@ -649,32 +669,33 @@ void WhenIGrowUpIWillBeACallbackForACustomCharacteristic(BLECharacteristic *pCha
       break;
 
     case BLE_inclineMultiplier: {  // 0x0B
-      int inc = userConfig.getInclineMultiplier() * 10;
+      returnValue[0] = success;
+      int inc        = userConfig.getInclineMultiplier();
       if (rxValue[0] == read) {
-        returnValue[1] = (uint8_t)(inc & 0xff);
-        returnValue[2] = (uint8_t)(inc >> 8);
+        returnValue[2] = (uint8_t)(inc & 0xff);
+        returnValue[3] = (uint8_t)(inc >> 8);
       }
       if (rxValue[0] == write) {
-        userConfig.setInclineMultiplier(bytes_to_u16(rxValue[3], rxValue[2]) / 10);
+        userConfig.setInclineMultiplier(bytes_to_u16(rxValue[3], rxValue[2]));
       }
-      break;
-    }
+    } break;
 
     case BLE_powerCorrectionFactor: {  // 0x0C
-      int pcf = userConfig.getPowerCorrectionFactor() * 10;
+      returnValue[0] = success;
+      int pcf        = userConfig.getPowerCorrectionFactor() * 10;
       if (rxValue[0] == read) {
-        returnValue[1] = (uint8_t)(pcf & 0xff);
-        returnValue[2] = (uint8_t)(pcf >> 8);
+        returnValue[2] = (uint8_t)(pcf & 0xff);
+        returnValue[3] = (uint8_t)(pcf >> 8);
       }
       if (rxValue[0] == write) {
         userConfig.setPowerCorrectionFactor(bytes_to_u16(rxValue[3], rxValue[2]) / 10);
       }
-      break;
-    }
+    } break;
 
     case BLE_simulateHr:  // 0x0D
+      returnValue[0] = success;
       if (rxValue[0] == read) {
-        returnValue[1] = (uint8_t)(userConfig.getSimulateHr());
+        returnValue[2] = (uint8_t)(userConfig.getSimulateHr());
       }
       if (rxValue[0] == write) {
         userConfig.setSimulateHr(bytes_to_u16(rxValue[3], rxValue[2]));
@@ -682,8 +703,9 @@ void WhenIGrowUpIWillBeACallbackForACustomCharacteristic(BLECharacteristic *pCha
       break;
 
     case BLE_simulateWatts:  // 0x0E
+      returnValue[0] = success;
       if (rxValue[0] == read) {
-        returnValue[1] = (uint8_t)(userConfig.getSimulateWatts());
+        returnValue[2] = (uint8_t)(userConfig.getSimulateWatts());
       }
       if (rxValue[0] == write) {
         userConfig.setSimulateWatts(bytes_to_u16(rxValue[3], rxValue[2]));
@@ -691,8 +713,9 @@ void WhenIGrowUpIWillBeACallbackForACustomCharacteristic(BLECharacteristic *pCha
       break;
 
     case BLE_simulateCad:  // 0x0F
+      returnValue[0] = success;
       if (rxValue[0] == read) {
-        returnValue[1] = (uint8_t)(userConfig.getSimulateCad());
+        returnValue[2] = (uint8_t)(userConfig.getSimulateCad());
       }
       if (rxValue[0] == write) {
         userConfig.setSimulateCad(bytes_to_u16(rxValue[3], rxValue[2]));
@@ -700,8 +723,9 @@ void WhenIGrowUpIWillBeACallbackForACustomCharacteristic(BLECharacteristic *pCha
       break;
 
     case BLE_ERGMode:  // 0x10
+      returnValue[0] = success;
       if (rxValue[0] == read) {
-        returnValue[1] = (uint8_t)(userConfig.getERGMode());
+        returnValue[2] = (uint8_t)(userConfig.getERGMode());
       }
       if (rxValue[0] == write) {
         userConfig.setERGMode(bytes_to_u16(rxValue[3], rxValue[2]));
@@ -709,8 +733,9 @@ void WhenIGrowUpIWillBeACallbackForACustomCharacteristic(BLECharacteristic *pCha
       break;
 
     case BLE_autoUpdate:  // 0x11
+      returnValue[0] = success;
       if (rxValue[0] == read) {
-        returnValue[1] = (uint8_t)(userConfig.getautoUpdate());
+        returnValue[2] = (uint8_t)(userConfig.getautoUpdate());
       }
       if (rxValue[0] == write) {
         userConfig.setAutoUpdate(bytes_to_u16(rxValue[3], rxValue[2]));
@@ -738,9 +763,10 @@ void WhenIGrowUpIWillBeACallbackForACustomCharacteristic(BLECharacteristic *pCha
       break;
 
     case BLE_shifterPosition:  // 0x17
+      returnValue[0] = success;
       if (rxValue[0] == read) {
-        returnValue[1] = (uint8_t)(userConfig.getStepperPower() & 0xff);
-        returnValue[2] = (uint8_t)(userConfig.getStepperPower() >> 8);
+        returnValue[2] = (uint8_t)(userConfig.getStepperPower() & 0xff);
+        returnValue[3] = (uint8_t)(userConfig.getStepperPower() >> 8);
       }
       if (rxValue[0] == write) {
         userConfig.setStepperPower(bytes_to_u16(rxValue[3], rxValue[2]));
