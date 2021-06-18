@@ -43,6 +43,7 @@
  #define BLE_connectedPowerMeter 0x15  
  #define BLE_connectedHeartMonitor 0x16
  #define BLE_shifterPosition 0x17
+ #define BLE_saveToSpiffs 0x18
 
 // macros to convert different types of bytes into int The naming here sucks and
 // should be fixed.

@@ -772,6 +772,10 @@ void ss2kCustomCharacteristicCallbacks::onWrite(BLECharacteristic *pCharacterist
         userConfig.setStepperPower(bytes_to_u16(rxValue[3], rxValue[2]));
       }
       break;
+
+      case BLE_saveToSpiffs: //0x18
+      userConfig.saveToSPIFFS();
+      break;     
   }
 
   pCharacteristic->setValue(returnValue, sizeof(returnValue));
