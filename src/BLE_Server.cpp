@@ -562,17 +562,21 @@ True values are >00. False are 00.
 */
 
 void ss2kCustomCharacteristicCallbacks::onWrite(BLECharacteristic *pCharacteristic) {
-  std::string rxValue    = pCharacteristic->getValue();
-  uint8_t read           = 0x01;  // value to request read operation
-  uint8_t write          = 0x02;  // Value to request write operation
-  uint8_t error          = 0xff;  // value server error/unable
-  uint8_t success        = 0x80;  // value for success
-  uint8_t returnValue[rxValue.length()];
+  std::string rxValue = pCharacteristic->getValue();
+  uint8_t read        = 0x01;  // value to request read operation
+  uint8_t write       = 0x02;  // Value to request write operation
+  uint8_t error       = 0xff;  // value server error/unable
+  uint8_t success     = 0x80;  // value for success
+  size_t returnLength = rxValue.length();
+  uint8_t returnValue[returnLength];
   returnValue[0] = error;
-  for(size_t i=1;i<rxValue.length();i++){
-    returnValue[i] = rxValue[i]; 
+  for (size_t i = 1; i < returnLength; i++) {
+    returnValue[i] = rxValue[i];
   }
-  
+
+  if (rxValue[0] == read) { // read requests are shorter than writes but outupt is same length. 
+    returnValue += 2;
+  }
 
   SS2K_LOG(BLE_SERVER_LOG_TAG, "Custom Request Recieved");
   switch (rxValue[1]) {
@@ -770,19 +774,19 @@ void ss2kCustomCharacteristicCallbacks::onWrite(BLECharacteristic *pCharacterist
     case BLE_shifterPosition:  // 0x17
       returnValue[0] = success;
       if (rxValue[0] == read) {
-        returnValue[2] = (uint8_t)(userConfig.getStepperPower() & 0xff);
-        returnValue[3] = (uint8_t)(userConfig.getStepperPower() >> 8);
+        returnValue[2] = (uint8_t)(userConfig.getShifterPosition() & 0xff);
+        returnValue[3] = (uint8_t)(userConfig.getShifterPosition() >> 8);
       }
       if (rxValue[0] == write) {
-        userConfig.setStepperPower(bytes_to_u16(rxValue[3], rxValue[2]));
+        userConfig.setShifterPosition(bytes_to_u16(rxValue[3], rxValue[2]));
       }
       break;
 
-      case BLE_saveToSpiffs: //0x18
+    case BLE_saveToSpiffs:  // 0x18
       userConfig.saveToSPIFFS();
-      break;     
+      break;
   }
 
-  pCharacteristic->setValue(returnValue, rxValue.length());
+  pCharacteristic->setValue(returnValue, returnLength);
   pCharacteristic->indicate();
 }
