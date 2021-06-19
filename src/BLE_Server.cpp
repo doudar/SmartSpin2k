@@ -398,7 +398,7 @@ void MyCallbacks::onWrite(BLECharacteristic *pCharacteristic) {
         int targetResistance = rxValue[1] * userConfig.getShiftStep();
         userConfig.setShifterPosition(targetResistance);
         userConfig.setERGMode(false);
-        logBufLength += snprintf(logBuf + logBufLength, kLogBufCapacity - logBufLength, "-> Resistance Mode: %d", userConfig.getShifterPosition());
+        logBufLength += snprintf(logBuf + logBufLength, kLogBufCapacity - logBufLength, "-> Resistance Mode: %ld", userConfig.getShifterPosition());
         returnValue[2]              = 0x01;
         uint8_t resistanceStatus[2] = {0x07, rxValue[1]};
         fitnessMachineStatusCharacteristic->setValue(resistanceStatus, 3);
@@ -567,7 +567,12 @@ void ss2kCustomCharacteristicCallbacks::onWrite(BLECharacteristic *pCharacterist
   uint8_t write          = 0x02;  // Value to request write operation
   uint8_t error          = 0xff;  // value server error/unable
   uint8_t success        = 0x80;  // value for success
-  uint8_t returnValue[4] = {error, rxValue[1], 0x00, 0x00};
+  uint8_t returnValue[sizeof(rxValue)];
+  returnValue[0] = error;
+  for(int i=1;i<sizeof(rxValue);i++){
+    returnValue[i] = rxValue[i]; 
+  }
+  
 
   SS2K_LOG(BLE_SERVER_LOG_TAG, "Custom Request Recieved");
   switch (rxValue[1]) {

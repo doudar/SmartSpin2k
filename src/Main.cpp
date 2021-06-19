@@ -20,8 +20,8 @@ uint64_t debounceDelay    = 500;  // the debounce time; increase if the output f
 
 // Stepper Speed - Lower is faster
 int maxStepperSpeed = 500;
-int stepperPosition = 0;
-int lastShifterPosition = 0;
+long stepperPosition = 0;
+long lastShifterPosition = 0;
 HardwareSerial stepperSerial(2);
 TMC2208Stepper driver(&SERIAL_PORT, R_SENSE);  // Hardware Serial
 
@@ -117,9 +117,9 @@ void loop() {
   vTaskDelay(1000 / portTICK_RATE_MS);
 
   if (userConfig.getShifterPosition() > lastShifterPosition) {
-    SS2K_LOG(MAIN_LOG_TAG, "Shift UP: %d", userConfig.getShifterPosition());
+    SS2K_LOG(MAIN_LOG_TAG, "Shift UP: %l", userConfig.getShifterPosition());
   } else if (userConfig.getShifterPosition() < lastShifterPosition) {
-    SS2K_LOG(MAIN_LOG_TAG, "Shift DOWN: %d", userConfig.getShifterPosition());
+    SS2K_LOG(MAIN_LOG_TAG, "Shift DOWN: %l", userConfig.getShifterPosition());
   }
   lastShifterPosition = userConfig.getShifterPosition();
 
@@ -133,7 +133,7 @@ void loop() {
 
 void moveStepper(void *pvParameters) {
   int acceleration   = maxStepperSpeed;
-  int targetPosition = 0;
+  long targetPosition = 0;
 
   while (1) {
     targetPosition = userConfig.getShifterPosition() + (userConfig.getIncline() * userConfig.getInclineMultiplier());

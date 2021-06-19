@@ -35,7 +35,7 @@ class userParameters {
   String foundDevices          = " ";
   String connectedPowerMeter   = "any";
   String connectedHeartMonitor = "any";
-  int shifterPosition;
+  long shifterPosition;
 
  public:
   const char* getFirmwareUpdateURL() { return firmwareUpdateURL.c_str(); }
@@ -60,7 +60,7 @@ class userParameters {
   const char* getFoundDevices() { return foundDevices.c_str(); }
   const char* getconnectedPowerMeter() { return connectedPowerMeter.c_str(); }
   const char* getconnectedHeartMonitor() { return connectedHeartMonitor.c_str(); }
-  int getShifterPosition() { return shifterPosition; }
+  long getShifterPosition() { return shifterPosition; }
 
   void setDefaults();
   void setFirmwareUpdateURL(String fURL) { firmwareUpdateURL = fURL; }
@@ -85,7 +85,7 @@ class userParameters {
   void setFoundDevices(String fdev) { foundDevices = fdev; }
   void setConnectedPowerMeter(String cpm) { connectedPowerMeter = cpm; }
   void setConnectedHeartMonitor(String cHr) { connectedHeartMonitor = cHr; }
-  void setShifterPosition(int sp) { shifterPosition = sp; }
+  void setShifterPosition(long sp) { shifterPosition = sp; }
 
   String returnJSON(bool includeDebugLog = false);
   void saveToSPIFFS();
