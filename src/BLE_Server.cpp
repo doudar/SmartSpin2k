@@ -567,9 +567,9 @@ void ss2kCustomCharacteristicCallbacks::onWrite(BLECharacteristic *pCharacterist
   uint8_t write          = 0x02;  // Value to request write operation
   uint8_t error          = 0xff;  // value server error/unable
   uint8_t success        = 0x80;  // value for success
-  uint8_t returnValue[sizeof(rxValue)];
+  uint8_t returnValue[rxValue.length()];
   returnValue[0] = error;
-  for(int i=1;i<sizeof(rxValue);i++){
+  for(size_t i=1;i<rxValue.length();i++){
     returnValue[i] = rxValue[i]; 
   }
   
@@ -783,6 +783,6 @@ void ss2kCustomCharacteristicCallbacks::onWrite(BLECharacteristic *pCharacterist
       break;     
   }
 
-  pCharacteristic->setValue(returnValue, sizeof(returnValue));
+  pCharacteristic->setValue(returnValue, rxValue.length());
   pCharacteristic->indicate();
 }
