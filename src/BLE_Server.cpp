@@ -574,7 +574,7 @@ void ss2kCustomCharacteristicCallbacks::onWrite(BLECharacteristic *pCharacterist
     returnValue[i] = rxValue[i];
   }
 
-  if (rxValue[0] == read) { // read requests are shorter than writes but outupt is same length. 
+  if (rxValue[0] == read) {  // read requests are shorter than writes but outupt is same length.
     returnValue += 2;
   }
 
