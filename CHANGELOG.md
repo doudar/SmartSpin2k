@@ -6,6 +6,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 ### Added
+- Initial implementation of the custom characteristic. 
+- Added additional FTMS characteristics and some refactoring of shared variables
 - Added GZipped jQuery to fix non WAN connected manual updates.
 - Pin arduino-esp32 package to version 1.0.6 to fix build issue
 - Added + - Buttons to sliders. 

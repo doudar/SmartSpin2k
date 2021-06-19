@@ -128,6 +128,12 @@ void BLECommunications(void *pvParameters) {
       updateIndoorBikeDataChar();
       updateCyclingPowerMeasurementChar();
       updateHeartRateMeasurementChar();
+      controlPointIndicate();
+
+      if (spinDown()) {
+      }
+
+      computeERG();
 
       if (updateConnParametersFlag) {
         vTaskDelay(100 / portTICK_PERIOD_MS);
