@@ -19,8 +19,8 @@ uint64_t lastDebounceTime = 0;    // the last time the output pin was toggled
 uint64_t debounceDelay    = 500;  // the debounce time; increase if the output flickers
 
 // Stepper Speed - Lower is faster
-int maxStepperSpeed = 500;
-long stepperPosition = 0;
+int maxStepperSpeed      = 500;
+long stepperPosition     = 0;
 long lastShifterPosition = 0;
 HardwareSerial stepperSerial(2);
 TMC2208Stepper driver(&SERIAL_PORT, R_SENSE);  // Hardware Serial
@@ -132,7 +132,7 @@ void loop() {
 #endif
 
 void moveStepper(void *pvParameters) {
-  int acceleration   = maxStepperSpeed;
+  int acceleration    = maxStepperSpeed;
   long targetPosition = 0;
 
   while (1) {
@@ -159,7 +159,7 @@ void moveStepper(void *pvParameters) {
         digitalWrite(STEP_PIN, LOW);
         stepperPosition++;
         lastDir = true;
-      } else if (stepperPosition > targetPosition) { 
+      } else if (stepperPosition > targetPosition) {
         if (lastDir == true) {
           vTaskDelay(100);  // Stepper was running in opposite
                             // direction. Give it time to stop.
@@ -189,7 +189,7 @@ bool IRAM_ATTR deBounce() {
 void IRAM_ATTR shiftUp() {  // Handle the shift up interrupt IRAM_ATTR is to keep the interrput code in ram always
   if (deBounce()) {
     if (!digitalRead(SHIFT_UP_PIN)) {  // double checking to make sure the interrupt wasn't triggered by emf
-      userConfig.setShifterPosition( userConfig.getShifterPosition() + userConfig.getShiftStep() );
+      userConfig.setShifterPosition(userConfig.getShifterPosition() + userConfig.getShiftStep());
     } else {
       lastDebounceTime = 0;
     }  // Probably Triggered by EMF, reset the debounce
@@ -199,7 +199,7 @@ void IRAM_ATTR shiftUp() {  // Handle the shift up interrupt IRAM_ATTR is to kee
 void IRAM_ATTR shiftDown() {  // Handle the shift down interrupt
   if (deBounce()) {
     if (!digitalRead(SHIFT_DOWN_PIN)) {  // double checking to make sure the interrupt wasn't triggered by emf
-      userConfig.setShifterPosition( userConfig.getShifterPosition() - userConfig.getShiftStep() );
+      userConfig.setShifterPosition(userConfig.getShifterPosition() - userConfig.getShiftStep());
     } else {
       lastDebounceTime = 0;
     }  // Probably Triggered by EMF, reset the debounce
