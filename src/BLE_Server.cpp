@@ -575,7 +575,7 @@ void ss2kCustomCharacteristicCallbacks::onWrite(BLECharacteristic *pCharacterist
   }
 
   if (rxValue[0] == read) {  // read requests are shorter than writes but outupt is same length.
-    returnValue += 2;
+    returnLength += 2;
   }
 
   SS2K_LOG(BLE_SERVER_LOG_TAG, "Custom Request Recieved");
