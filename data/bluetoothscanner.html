@@ -2,199 +2,225 @@
 <html>
 
 <head>
-    <style type="text/css">
-        html {
-            background-color: #03245c;
-        }
-    </style>
-    <title>SmartSpin2K Bluetooth Scanner</title>
-    <meta name="viewport" content="width=device-width, initial-scale=1">
+  <style type="text/css">
+    html {
+      background-color: #03245c;
+    }
+  </style>
+  <title>SmartSpin2K Bluetooth Scanner</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1">
 
 </head>
 
 <body>
-    <fieldset>
-        <legend><a href="http://github.com/doudar/SmartSpin2k">http://github.com/doudar/SmartSpin2k</a></legend>
-        <p style="text-align: left;"><strong><a href="index.html">Main Index</a></strong></p>
-        <h1>
-            <div class="watermark" name="loadingWatermark" id="loadingWatermark">Loading</div>
-        </h1>
-        <h1><strong>Select Bluetooth Devices</strong></h1>
-        <form action="/send_settings">
-            <h2>
-                <table>
-                    <tbody>
-                        <tr style="height: 20px;">
-                            <td style="width: 14%; height: 20px;">
-                                <p><label for="connectedPM">Saved Power Meter:</label></p>
-                            </td>
-                            <td style="width: 14%; height: 20px;"><label id="connectedPowerMeter">loading</label></td>
-                        </tr>
-                        <tr style="height: 20px;">
-                            <td style="width: 14%; height: 20px;">
-                                <p><label for="connectedHM">Saved Heart Monitor:</label></p>
-                            </td>
-                            <td style="width: 14%; height: 20px;"><label id="connectedHeartMonitor">loading</label></td>
-                        </tr>
-                        <tr style="height: 20px;">
-                            <td style="width: 14%; height: 20px;">
-                                <p><label for="BluetoothPMDevices">Select New Power Meter:</label></p>
-                            </td>
-                            <td style="width: 14%; height: 20px;"><select id="blePMDropdown" name="blePMDropdown"
-                                    value="loading"></td>
-                        </tr>
-                        <tr style="height: 20px;">
-                            <td style="width: 14%; height: 20px;">
-                                <p><label for="BluetoothHRDevices">Select New Heart Monitor:</label></p>
-                            </td>
-                            <td style="width: 14%; height: 20px;"><select id="bleHRDropdown" name="bleHRDropdown"
-                                    value="loading"></td>
-                        </tr>
-                        <tr>
-                            <td>
-                                <p class="tooltip">Double Powermeter Output<span class="tooltiptext">Double Power Output
-                                        For Certain Pedals</span></p>
-                            </td>
-                            <td>
-                                <label class="switch"><input type="checkbox" name="doublePower" id="doublePower"><span
-                                        class="slider"></span></label>
-                            </td>
-                        </tr>
-                    </tbody>
-                </table>
-                <input type="submit" value="Save Dropdowns and Connect" />
-        </form>
-        <p><br></p>
-        <form action="/BLEScan">
-            <input type="submit" value="Ignore Dropdown and Scan/Reconnect">
-            <label style="font-size: .75rem; font-style: italic; font-weight: lighter; line-height: .5em;"><br> Hint:
-                you can hold both shifters for 3 seconds <br> to scan/reconnect at anytime without using this
-                page.</label>
-        </form>
-        </h2>
+  <fieldset>
+    <legend><a href="http://github.com/doudar/SmartSpin2k">http://github.com/doudar/SmartSpin2k</a></legend>
+    <p style="text-align: left;"><strong><a href="index.html">Main Index</a></strong></p>
+    <h1>
+      <div class="watermark" name="loadingWatermark" id="loadingWatermark">Loading</div>
+    </h1>
+    <h1><strong>Select Bluetooth Devices</strong></h1>
+    <h2>
+      <p></p>
+      <form action="/send_settings">
+        <table class="center" height="182" cellspacing="1">
+          <tbody>
+            <tr>
+              <td>
+                <p><label for="connectedPM">Saved Power Meter:</label></p>
+              </td>
+              <td><label id="connectedPowerMeter">loading</label></td>
+            </tr>
+            <tr>
+              <td>
+                <p><label for="connectedHM">Saved Heart Monitor:</label></p>
+              </td>
+              <td><label id="connectedHeartMonitor">loading</label></td>
+            </tr>
+            <tr>
+              <td>
+                <p><label for="BluetoothPMDevices">Select New Power Meter:</label></p>
+              </td>
+              <td><select id="blePMDropdown" name="blePMDropdown" value="loading">
+              </td>
+            </tr>
+            <tr>
+              <td>
+                <p><label for="BluetoothHRDevices">Select New Heart Monitor:</label></p>
+              </td>
+              <td><select id="bleHRDropdown" name="bleHRDropdown" value="loading">
+              </td>
+            </tr>
+            <tr>
+              <td>
+                <div class="tooltip">Power Correction Factor<span class="tooltiptext">Increase or decrease
+                    to correct the power transmitted from your bike.</span></div>
+              </td>
+              <td>
+                <div style="font-size:large; color: rgb(250, 250, 250);">
+                  <span id="powerCorrectionFactorValue">1</span><span>x</span>
+                </div>
+                <input type='button'
+                  onclick="clickStep(document.getElementById('powerCorrectionFactor'), this.value)" value="-">
+                <input style="width:50%; position: relative; top: 5px; left: 0px;" type="range" id="powerCorrectionFactor"
+                  name="powerCorrectionFactor" value="1.00" min="0.5" max="2.0" step="0.01" class="slider1"
+                  onchange="updateSlider(this.value, document.getElementById('powerCorrectionFactorValue'))" />
+                <input type='button'
+                  onclick="clickStep(document.getElementById('powerCorrectionFactor'), this.value)" value="+">
+                  <br><br><br>
+              </td>
+            </tr>
+          </tbody>
+        </table>
+        <input type="submit" value="Save Dropdowns" />
+      </form>
+      <p></p>
+      <form action="/BLEScan">
+        <input type="submit" value="Ignore changes and connect">
+        <label style="font-size: .75rem; font-style: italic; font-weight: lighter; line-height: .5em;"><br>
+          Hint:
+          you can hold both shifters for 3 seconds <br> to scan/reconnect at anytime without using this
+          page.</label>
+      </form>
+    </h2>
 </body>
 
 <script>
-    let PMDropdown = document.getElementById('blePMDropdown');
-    let HRDropdown = document.getElementById('bleHRDropdown');
-    PMDropdown.length = 0;
-    HRDropdown.length = 0;
+  let PMDropdown = document.getElementById('blePMDropdown');
+  let HRDropdown = document.getElementById('bleHRDropdown');
+  PMDropdown.length = 0;
+  HRDropdown.length = 0;
 
-    PMDropdown.selectedIndex = 1;
-    HRDropdown.selectedIndex = 1;
+  PMDropdown.selectedIndex = 1;
+  HRDropdown.selectedIndex = 1;
 
-    //Update values on specified interval loading late because this tiny webserver hates frequent requests
-    setInterval(function () {
-        if (document.getElementById("connectedPowerMeter").innerHTML == "loading") {
-            requestConfigValues();
-        }
-    }, 1000);
-
-    function requestConfigValues() {
-        var xhttp = new XMLHttpRequest();
-        xhttp.onreadystatechange = function () {
-            if (this.readyState == 4 && this.status == 200) {
-                const data = JSON.parse(this.responseText);
-                let optionPM;
-                optionPM = document.createElement('option');
-                optionPM.text = data.connectedPowerMeter;
-                PMDropdown.add(optionPM);
-                for (var key in data.connectedPowerMeter) {
-                    if (data.connectedPowerMeter[key].UUID == '0x1818') {
-                        optionPM = document.createElement('option');
-                        if (data.connectedPowerMeter[key].name) {
-                            optionPM.text = data.connectedPowerMeter[key].name;
-                        }
-                        else {
-                            optionPM.text = data.connectedPowerMeter[key].address;
-                        }
-                        PMDropdown.add(optionPM);
-                    }
-                }
-                try {
-                    var t_obj = JSON.parse(data.foundDevices)
-                    {
-                        for (var key in t_obj) {
-                            if (t_obj[key].UUID == '0x1818') {
-                                optionPM = document.createElement('option');
-                                if (t_obj[key].name) {
-                                    optionPM.text = t_obj[key].name;
-                                }
-                                else {
-                                    optionPM.text = t_obj[key].address;
-                                }
-                                PMDropdown.add(optionPM);
-                            }
-                        }
-                    }
-                }
-                catch (e) { }
-
-                optionPM = document.createElement('option');
-                optionPM.text = 'none';
-                PMDropdown.add(optionPM);
-                let optionHR;
-                optionHR = document.createElement('option');
-                optionHR.text = data.connectedHeartMonitor;
-                HRDropdown.add(optionHR);
-                for (var key in data.connectedHeartMonitor) {
-                    if (data.connectedHeartMonitor[key].UUID == '0x180d') {
-                        optionHR = document.createElement('option');
-                        if (data.connectedHeartMonitor[key].name) {
-                            optionHR.text = data.connectedHeartMonitor[key].name;
-                        }
-                        else {
-                            optionHR.text = data.connectedHeartMonitor[key].address;
-                        }
-                        HRDropdown.add(optionHR);
-                    }
-                }
-
-                for (var key in t_obj) {
-                    if (t_obj[key].UUID == '0x180d') {
-                        optionPM = document.createElement('option');
-                        if (t_obj[key].name) {
-                            optionHR.text = t_obj[key].name;
-                        }
-                        else {
-                            optionHR.text = t_obj[key].address;
-                        }
-                        HRDropdown.add(optionHR);
-                    }
-                }
-                optionHR = document.createElement('option');
-                optionHR.text = 'none';
-                HRDropdown.add(optionHR);
-                let defaultOptionPM = document.createElement('option');
-                defaultOptionPM.text = 'any';
-                let defaultOptionHR = document.createElement('option');
-                defaultOptionHR.text = 'any';
-                PMDropdown.add(defaultOptionPM);
-                HRDropdown.add(defaultOptionHR);
-                document.getElementById("connectedPowerMeter").innerHTML = data.connectedPowerMeter;
-                document.getElementById("connectedHeartMonitor").innerHTML = data.connectedHeartMonitor;
-                document.getElementById("doublePower").checked = data.doublePower;
-                document.getElementById("loadingWatermark").opacity = 0;
-                setTimeout(function () { document.getElementById("loadingWatermark").remove(); }, 1000);
-            }
-        };
-        xhttp.open('GET', "/configJSON", true);
-        xhttp.send();
+  //Update values on specified interval loading late because this tiny webserver hates frequent requests
+  setInterval(function () {
+    if (document.getElementById("connectedPowerMeter").innerHTML == "loading") {
+      requestConfigValues();
     }
+  }, 1000);
 
-    //define function to load css
-    var loadCss = function () {
-        var cssLink = document.createElement('link');
-        cssLink.rel = 'stylesheet';
-        cssLink.href = 'style.css';
-        var head = document.getElementsByTagName('head')[0];
-        head.parentNode.insertBefore(cssLink, head);
+  function updateSlider(x, valueElement) {
+    valueElement.innerHTML = x;
+  }
+
+  function clickStep(element, incOrDec) {
+    if (incOrDec == "+") {
+      element.value = parseFloat(element.value) + parseFloat(element.step);
+    } else {
+      element.value = parseFloat(element.value) - parseFloat(element.step);
+    }
+    updateSlider(element.value, document.getElementById(element.name + 'Value'));
+  }
+
+
+  function requestConfigValues() {
+    var xhttp = new XMLHttpRequest();
+    xhttp.onreadystatechange = function () {
+      if (this.readyState == 4 && this.status == 200) {
+        const data = JSON.parse(this.responseText);
+        let optionPM;
+        optionPM = document.createElement('option');
+        optionPM.text = data.connectedPowerMeter;
+        PMDropdown.add(optionPM);
+        for (var key in data.connectedPowerMeter) {
+          if (data.connectedPowerMeter[key].UUID == '0x1818') {
+            optionPM = document.createElement('option');
+            if (data.connectedPowerMeter[key].name) {
+              optionPM.text = data.connectedPowerMeter[key].name;
+            }
+            else {
+              optionPM.text = data.connectedPowerMeter[key].address;
+            }
+            PMDropdown.add(optionPM);
+          }
+        }
+        try {
+          var t_obj = JSON.parse(data.foundDevices)
+          {
+            for (var key in t_obj) {
+              if (t_obj[key].UUID == '0x1818') {
+                optionPM = document.createElement('option');
+                if (t_obj[key].name) {
+                  optionPM.text = t_obj[key].name;
+                }
+                else {
+                  optionPM.text = t_obj[key].address;
+                }
+                PMDropdown.add(optionPM);
+              }
+            }
+          }
+        }
+        catch (e) { }
+
+        optionPM = document.createElement('option');
+        optionPM.text = 'none';
+        PMDropdown.add(optionPM);
+        let optionHR;
+        optionHR = document.createElement('option');
+        optionHR.text = data.connectedHeartMonitor;
+        HRDropdown.add(optionHR);
+        for (var key in data.connectedHeartMonitor) {
+          if (data.connectedHeartMonitor[key].UUID == '0x180d') {
+            optionHR = document.createElement('option');
+            if (data.connectedHeartMonitor[key].name) {
+              optionHR.text = data.connectedHeartMonitor[key].name;
+            }
+            else {
+              optionHR.text = data.connectedHeartMonitor[key].address;
+            }
+            HRDropdown.add(optionHR);
+          }
+        }
+
+        for (var key in t_obj) {
+          if (t_obj[key].UUID == '0x180d') {
+            optionPM = document.createElement('option');
+            if (t_obj[key].name) {
+              optionHR.text = t_obj[key].name;
+            }
+            else {
+              optionHR.text = t_obj[key].address;
+            }
+            HRDropdown.add(optionHR);
+          }
+        }
+        optionHR = document.createElement('option');
+        optionHR.text = 'none';
+        HRDropdown.add(optionHR);
+        let defaultOptionPM = document.createElement('option');
+        defaultOptionPM.text = 'any';
+        let defaultOptionHR = document.createElement('option');
+        defaultOptionHR.text = 'any';
+        PMDropdown.add(defaultOptionPM);
+        HRDropdown.add(defaultOptionHR);
+        document.getElementById("connectedPowerMeter").innerHTML = data.connectedPowerMeter;
+        document.getElementById("connectedHeartMonitor").innerHTML = data.connectedHeartMonitor;
+        document.getElementById("powerCorrectionFactorValue").innerHTML = data.powerCorrectionFactor;
+        document.getElementById("powerCorrectionFactor").value = data.powerCorrectionFactor;
+        document.getElementById("loadingWatermark").opacity = 0;
+        setTimeout(function () { document.getElementById("loadingWatermark").remove(); }, 1000);
+      }
     };
+    xhttp.open('GET', "/configJSON", true);
+    xhttp.send();
+  }
 
-    //Delay loading css to not swamp webserver
-    window.addEventListener('load', function () {
-        setTimeout(loadCss, 100);
-    }, false);
+  //define function to load css
+  var loadCss = function () {
+    var cssLink = document.createElement('link');
+    cssLink.rel = 'stylesheet';
+    cssLink.href = 'style.css';
+    var head = document.getElementsByTagName('head')[0];
+    head.parentNode.insertBefore(cssLink, head);
+  };
+
+  //Delay loading css to not swamp webserver
+  window.addEventListener('load', function () {
+    setTimeout(loadCss, 100);
+  }, false);
 
 </script>
 

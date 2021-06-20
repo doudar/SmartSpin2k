@@ -6,36 +6,45 @@
   <style type="text/css">
     html {
       background-color: #03245c;
-    } 
-        </style>
+    }
+  </style>
   <title>SmartSpin2K Web Server</title>
   <meta name="viewport" content="width=device-width, initial-scale=1">
 </head>
 
 <body>
-  <fieldset><legend><a href="http://github.com/doudar/SmartSpin2k">http://github.com/doudar/SmartSpin2k</a></legend>
+  <fieldset>
+    <h1>
+      <div class="watermark" id="loadingWatermark">Loading</div>
+    </h1>
+    <legend><a href="http://github.com/doudar/SmartSpin2k">http://github.com/doudar/SmartSpin2k</a></legend>
     <p style="text-align: left;"><strong><a href="index.html">Main Index</a></strong></p>
-  <h1>BLE Device Simulator</h1>
+    <h1>BLE Device Simulator</h1>
 
-  <h2>Sim Heart Rate</h2>
-  <p><span id="hrValue"></span></p>
-  <p><input type="range" onload="requestConfigValues()" onchange="updateHRSlider(this)" id="HRSlider"
-      min="40" max="250" value="0" step="1" class="slider2"></p>
-  <p><label class="switch"><input type="checkbox" onload="toggleHRCheckbox(this, true)"
-  onchange="toggleHRCheckbox(this,true)" id="hroutput"><span
-        class="slider"></span></label></p>
+    <h2>Sim Heart Rate</h2>
+    <p><span id="hrValue"></span></p>
+    <p><input type="range" onload="requestConfigValues()" onchange="updateHRSlider(this)" id="HRSlider" min="40"
+        max="250" value="0" step="1" class="slider2"></p>
+    <p><label class="switch"><input type="checkbox" onload="toggleHRCheckbox(this, true)"
+          onchange="toggleHRCheckbox(this,true)" id="hrOutput"><span class="slider"></span></label></p>
 
-  <h2>Sim Power Output</h2>
-  <p><span id="wattsValue"></span></p>
-  <p><input type="range" onload="requestConfigValues()" onchange="updateWattsSlider(this)"
-      id="WattsSlider" min="0" max="2000" value="0" step="1" class="slider2"></p>
-  <p><label class="switch"><input type="checkbox" onload="toggleWattsCheckbox(this,true)"
-        onchange="toggleWattsCheckbox(this,true)" id="wattsoutput"><span class="slider"></span></label></p>
+    <h2>Sim Power Output</h2>
+    <p><span id="wattsValue"></span></p>
+    <p><input type="range" onload="requestConfigValues()" onchange="updateWattsSlider(this)" id="WattsSlider" min="0"
+        max="2000" value="0" step="1" class="slider2"></p>
+    <p><label class="switch"><input type="checkbox" onload="toggleWattsCheckbox(this,true)"
+          onchange="toggleWattsCheckbox(this,true)" id="wattsOutput"><span class="slider"></span></label></p>
 
+    <h2>Sim CAD Output</h2>
+    <p><span id="cadValue"></span></p>
+    <p><input type="range" onload="requestConfigValues()" onchange="updateCadSlider(this)" id="CadSlider" min="0"
+        max="180" value="0" step="1" class="slider2"></p>
+    <p><label class="switch"><input type="checkbox" onload="toggleCadCheckbox(this,true)"
+          onchange="toggleCadCheckbox(this,true)" id="cadOutput"><span class="slider"></span></label></p>
 </body>
 <script>
 
-  function toggleHRCheckbox(element,updateServer) {
+  function toggleHRCheckbox(element, updateServer) {
     if (element.checked) {
       document.getElementById("HRSlider").hidden = false;
       document.getElementById("hrValue").hidden = false;
@@ -44,19 +53,20 @@
       document.getElementById("HRSlider").hidden = true;
       document.getElementById("hrValue").hidden = true;
     }
-    if(updateServer){
+    if (updateServer) {
       var xhr = new XMLHttpRequest();
-    if (element.checked) {
-      xhr.open("GET", "/hrslider?value=enable", true);
-      xhr.send();
+      if (element.checked) {
+        xhr.open("GET", "/hrslider?value=enable", true);
+        xhr.send();
+      }
+      else {
+        xhr.open("GET", "/hrslider?value=disable", true);
+        xhr.send();
+      }
     }
-    else {
-      xhr.open("GET", "/hrslider?value=disable", true);
-      xhr.send();
-    }}
   }
 
-  function toggleWattsCheckbox(element,updateServer) {
+  function toggleWattsCheckbox(element, updateServer) {
     if (element.checked) {
       document.getElementById("WattsSlider").hidden = false;
       document.getElementById("wattsValue").hidden = false;
@@ -66,16 +76,40 @@
       document.getElementById("wattsValue").hidden = true;
     }
 
-    if(updateServer){
-    var xhr = new XMLHttpRequest();
+    if (updateServer) {
+      var xhr = new XMLHttpRequest();
+      if (element.checked) {
+        xhr.open("GET", "/wattsslider?value=enable", true);
+        xhr.send();
+      }
+      else {
+        xhr.open("GET", "/wattsslider?value=disable", true);
+        xhr.send();
+      }
+    }
+  }
+
+  function toggleCadCheckbox(element, updateServer) {
     if (element.checked) {
-      xhr.open("GET", "/wattsslider?value=enable", true);
-      xhr.send();
+      document.getElementById("CadSlider").hidden = false;
+      document.getElementById("cadValue").hidden = false;
     }
     else {
-      xhr.open("GET", "/wattsslider?value=disable", true);
-      xhr.send();
-    }}
+      document.getElementById("CadSlider").hidden = true;
+      document.getElementById("cadValue").hidden = true;
+    }
+
+    if (updateServer) {
+      var xhr = new XMLHttpRequest();
+      if (element.checked) {
+        xhr.open("GET", "/cadslider?value=enable", true);
+        xhr.send();
+      }
+      else {
+        xhr.open("GET", "/cadslider?value=disable", true);
+        xhr.send();
+      }
+    }
   }
 
   function updateHRSlider(element) {
@@ -94,6 +128,14 @@
     xhr.send();
   }
 
+  function updateCadSlider(element) {
+    var sliderValue = document.getElementById("CadSlider").value;
+    document.getElementById("cadValue").innerHTML = sliderValue + " RPM";
+    var xhr = new XMLHttpRequest();
+    xhr.open("GET", "/cadslider?value=" + sliderValue, true);
+    xhr.send();
+  }
+
   //Update values on specified interval
   setInterval(function () {
 
@@ -108,34 +150,44 @@
         var obj = JSON.parse(this.responseText);
         document.getElementById("wattsValue").innerHTML = obj.simulatedWatts + " Watts";
         document.getElementById("WattsSlider").value = obj.simulatedWatts;
+        document.getElementById("wattsOutput").checked = obj.simulateWatts;
+        document.getElementById("WattsSlider").hidden = !obj.simulateWatts;
+        document.getElementById("wattsValue").hidden = !obj.simulateWatts;
+
         document.getElementById("hrValue").innerHTML = obj.simulatedHr + " BPM";
         document.getElementById("HRSlider").value = obj.simulatedHr;
-        document.getElementById("hroutput").checked = obj.simulateHr;
-        document.getElementById("wattsoutput").checked = obj.doublePower;
-        document.getElementById("WattsSlider").hidden = !obj.doublePower;
-        document.getElementById("wattsValue").hidden = !obj.doublePower;
+        document.getElementById("hrOutput").checked = obj.simulateHr;
         document.getElementById("HRSlider").hidden = !obj.simulateHr;
         document.getElementById("hrValue").hidden = !obj.simulateHr;
+
+        document.getElementById("cadValue").innerHTML = obj.simulatedCad + " RPM";
+        document.getElementById("CadSlider").value = obj.simulatedCad;
+        document.getElementById("cadOutput").checked = obj.simulateCad;
+        document.getElementById("CadSlider").hidden = !obj.simulateCad;
+        document.getElementById("cadValue").hidden = !obj.simulateCad;
+
+        setTimeout(function () { document.getElementById("loadingWatermark").remove(); }, 1000);
       }
     };
     xhttp.open("GET", "/configJSON", true);
     xhttp.send();
   }
 
-//define function to load css
-var loadCss = function(){
+  //define function to load css
+  var loadCss = function () {
     var cssLink = document.createElement('link');
     cssLink.rel = 'stylesheet';
     cssLink.href = 'style.css';
     var head = document.getElementsByTagName('head')[0];
     head.parentNode.insertBefore(cssLink, head);
-};
- 
-//Delay loading css to not swamp webserver
-window.addEventListener('load', function (){
-  setTimeout(loadCss, 100);
-  setTimeout(requestConfigValues, 500);
-}, false);
+  };
+
+  //Delay loading css to not swamp webserver
+  window.addEventListener('load', function () {
+    setTimeout(loadCss, 100);
+    setTimeout(requestConfigValues, 500);
+  }, false);
 
 </script>
+
 </html>

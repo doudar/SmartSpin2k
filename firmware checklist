@@ -1,0 +1,28 @@
+PR  Release
+     [ ]   Note settings
+[ ]  [ ]   Disable automatic updates
+[ ]  [ ]   Complete build
+[ ]  [ ]   Upload to SS2k
+[ ]  [ ]   Reboot SS2K
+[ ]  [ ]   Access SS2K web UI
+[ ]  [ ]   Version number matches new build
+     [ ]   View all settings have maintained previous default
+[ ]  [ ]   Power correction factor at 1.0
+[ ]  [ ]   Connect Bluetooth servers with shifter buttons
+[ ]  [ ]   SS2K debug shows server connections
+     [ ]   Virtually ride or physically ride servers
+     [ ]   Cadence accurate
+     [ ]   Heart rate accurate
+     [ ]   Power accurate
+[ ]  [ ]   HRM test
+[ ]  [ ]   CPS test
+[ ]  [ ]   FTMS test
+[ ]  [ ]   Shift up
+[ ]  [ ]   Shift down
+[ ]  [ ]   Connect to virtual trainer software (Zwift, FullGaz, etc)
+     [ ]   Incline accurate
+     [ ]   Decline accurate
+     [ ]   ERG response accurate
+     [ ]   Disconnect power server and check virtual power with heart rate
+[ ]  [ ]   Enable automatic updates
+[ ]  [ ]   Reboot and confirm automatic update
