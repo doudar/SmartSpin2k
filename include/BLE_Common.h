@@ -45,6 +45,7 @@
 #define BLE_shifterPosition       0x17
 #define BLE_saveToSpiffs          0x18
 #define BLE_stepperPosition       0x19
+#define BLE_externalControl       0x1A
 
 // macros to convert different types of bytes into int The naming here sucks and
 // should be fixed.
@@ -62,12 +63,12 @@ void BLECommunications(void *pvParameters);
 
 // *****************************Server****************************
 
-extern int bleConnDesc;  
+extern int bleConnDesc;
 extern bool updateConnParametersFlag;
 
-//TODO add the rest of the server to this class
-class SpinBLEServer{
-  public:
+// TODO add the rest of the server to this class
+class SpinBLEServer {
+ public:
   void notifyShift(bool upDown);
 };
 

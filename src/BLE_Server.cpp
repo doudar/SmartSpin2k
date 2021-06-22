@@ -570,6 +570,7 @@ void ss2kCustomCharacteristicCallbacks::onWrite(BLECharacteristic *pCharacterist
   uint8_t write       = 0x02;  // Value to request write operation
   uint8_t error       = 0xff;  // value server error/unable
   uint8_t success     = 0x80;  // value for success
+
   size_t returnLength = rxValue.length();
   uint8_t returnValue[returnLength];
   returnValue[0] = error;
@@ -793,13 +794,23 @@ void ss2kCustomCharacteristicCallbacks::onWrite(BLECharacteristic *pCharacterist
       returnValue[0] = success;
       if (rxValue[0] == read) {
         returnValue[2] = (uint8_t)(targetPosition & 0xff);
-        returnValue[3] = (uint8_t)(targetPosition  >> 8);
-        returnValue[4] = (uint8_t)(targetPosition  >> 16);
+        returnValue[3] = (uint8_t)(targetPosition >> 8);
+        returnValue[4] = (uint8_t)(targetPosition >> 16);
         returnValue[5] = (uint8_t)(targetPosition >> 24);
-        returnLength +=2;
+        returnLength += 2;
       }
       if (rxValue[0] == write) {
         targetPosition = (long((uint8_t)(rxValue[2]) << 0 | (uint8_t)(rxValue[3]) << 8 | (uint8_t)(rxValue[4]) << 16 | (uint8_t)(rxValue[5]) << 24));
+      }
+      break;
+
+    case BLE_externalControl:  // 0x1A
+      returnValue[0] = success;
+      if (rxValue[0] == read) {
+        returnValue[2] = (uint8_t)(externalControl);
+      }
+      if (rxValue[0] == write) {
+        externalControl = (bool)(bytes_to_u16(rxValue[3], rxValue[2]));
       }
       break;
   }
@@ -814,6 +825,6 @@ void SpinBLEServer::notifyShift(bool upDown) {
   returnValue[1] = BLE_shifterPosition;
   returnValue[2] = (uint8_t)(userConfig.getShifterPosition() & 0xff);
   returnValue[3] = (uint8_t)(userConfig.getShifterPosition() >> 8);
-  smartSpin2kCharacteristic->setValue(returnValue, 4); 
+  smartSpin2kCharacteristic->setValue(returnValue, 4);
   smartSpin2kCharacteristic->notify(true);
 }

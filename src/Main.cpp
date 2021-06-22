@@ -23,6 +23,7 @@ int maxStepperSpeed     = 500;
 long stepperPosition    = 0;
 long targetPosition     = 0;
 int lastShifterPosition = 0;
+bool externalControl    = false;
 HardwareSerial stepperSerial(2);
 TMC2208Stepper driver(&SERIAL_PORT, R_SENSE);  // Hardware Serial
 
@@ -146,7 +147,9 @@ void moveStepper(void *pvParameters) {
   int acceleration = maxStepperSpeed;
 
   while (1) {
-    targetPosition = (userConfig.getShifterPosition() * userConfig.getShiftStep()) + (userConfig.getIncline() * userConfig.getInclineMultiplier());
+    if (!externalControl) {
+      targetPosition = (userConfig.getShifterPosition() * userConfig.getShiftStep()) + (userConfig.getIncline() * userConfig.getInclineMultiplier());
+    }
     if (stepperPosition == targetPosition) {
       vTaskDelay(300 / portTICK_PERIOD_MS);
       if (connectedClientCount() == 0) {
