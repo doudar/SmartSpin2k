@@ -27,6 +27,7 @@ void updateStealthchop();
 
 // Main program variable that stores most everything
 extern userParameters userConfig;
+extern long targetPosition; 
 
 // Users Physical Working Capacity Calculation Parameters (heartrate to Power
 // calculation)

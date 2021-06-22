@@ -19,9 +19,10 @@ uint64_t lastDebounceTime = 0;    // the last time the output pin was toggled
 uint64_t debounceDelay    = 500;  // the debounce time; increase if the output flickers
 
 // Stepper Speed - Lower is faster
-int maxStepperSpeed      = 500;
-long stepperPosition     = 0;
-long lastShifterPosition = 0;
+int maxStepperSpeed     = 500;
+long stepperPosition    = 0;
+long targetPosition     = 0;
+int lastShifterPosition = 0;
 HardwareSerial stepperSerial(2);
 TMC2208Stepper driver(&SERIAL_PORT, R_SENSE);  // Hardware Serial
 
@@ -114,29 +115,38 @@ void setup() {
 }
 
 void loop() {
-  vTaskDelay(1000 / portTICK_RATE_MS);
+  static int loopCounter = 0;
+
+  vTaskDelay(200 / portTICK_RATE_MS);
 
   if (userConfig.getShifterPosition() > lastShifterPosition) {
     SS2K_LOG(MAIN_LOG_TAG, "Shift UP: %l", userConfig.getShifterPosition());
+    Serial.println(stepperPosition);
+    spinBLEServer.notifyShift(1);
   } else if (userConfig.getShifterPosition() < lastShifterPosition) {
     SS2K_LOG(MAIN_LOG_TAG, "Shift DOWN: %l", userConfig.getShifterPosition());
+    Serial.println(stepperPosition);
+    spinBLEServer.notifyShift(0);
   }
   lastShifterPosition = userConfig.getShifterPosition();
 
-  scanIfShiftersHeld();
-
+  if (loopCounter > 4) {
+    scanIfShiftersHeld();
 #ifdef DEBUG_STACK
-  Serial.printf("Stepper: %d \n", uxTaskGetStackHighWaterMark(moveStepperTask));
-#endif
+    Serial.printf("Stepper: %d \n", uxTaskGetStackHighWaterMark(moveStepperTask));
+#endif  // DEBUG_STACK
+    loopCounter = 0;
+  }
+
+  loopCounter++;
 }
-#endif
+#endif  // UNIT_TEST
 
 void moveStepper(void *pvParameters) {
-  int acceleration    = maxStepperSpeed;
-  long targetPosition = 0;
+  int acceleration = maxStepperSpeed;
 
   while (1) {
-    targetPosition = userConfig.getShifterPosition() + (userConfig.getIncline() * userConfig.getInclineMultiplier());
+    targetPosition = (userConfig.getShifterPosition() * userConfig.getShiftStep()) + (userConfig.getIncline() * userConfig.getInclineMultiplier());
     if (stepperPosition == targetPosition) {
       vTaskDelay(300 / portTICK_PERIOD_MS);
       if (connectedClientCount() == 0) {
@@ -189,7 +199,7 @@ bool IRAM_ATTR deBounce() {
 void IRAM_ATTR shiftUp() {  // Handle the shift up interrupt IRAM_ATTR is to keep the interrput code in ram always
   if (deBounce()) {
     if (!digitalRead(SHIFT_UP_PIN)) {  // double checking to make sure the interrupt wasn't triggered by emf
-      userConfig.setShifterPosition(userConfig.getShifterPosition() + userConfig.getShiftStep());
+      userConfig.setShifterPosition(userConfig.getShifterPosition() + 1);
     } else {
       lastDebounceTime = 0;
     }  // Probably Triggered by EMF, reset the debounce
@@ -199,7 +209,7 @@ void IRAM_ATTR shiftUp() {  // Handle the shift up interrupt IRAM_ATTR is to kee
 void IRAM_ATTR shiftDown() {  // Handle the shift down interrupt
   if (deBounce()) {
     if (!digitalRead(SHIFT_DOWN_PIN)) {  // double checking to make sure the interrupt wasn't triggered by emf
-      userConfig.setShifterPosition(userConfig.getShifterPosition() - userConfig.getShiftStep());
+      userConfig.setShifterPosition(userConfig.getShifterPosition() - 1);
     } else {
       lastDebounceTime = 0;
     }  // Probably Triggered by EMF, reset the debounce
@@ -264,7 +274,6 @@ void setupTMCStepperDriver() {
   driver.TPOWERDOWN(128);
   msread               = driver.microsteps();
   uint16_t currentread = driver.cs_actual();
-
   SS2K_LOG(MAIN_LOG_TAG, " read:current=%ud", currentread);
   SS2K_LOG(MAIN_LOG_TAG, " read:ms=%ud", msread);
 
