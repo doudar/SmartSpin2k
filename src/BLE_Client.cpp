@@ -50,7 +50,7 @@ void bleClientTask(void *pvParameters) {
     vTaskDelay(BLE_CLIENT_DELAY / portTICK_PERIOD_MS);  // Delay a second between loops.
 #ifdef DEBUG_STACK
     Serial.printf("BLEClient: %d \n", uxTaskGetStackHighWaterMark(BLEClientTask));
-#endif
+#endif //DEBUG_STACK
     for (size_t x = 0; x < NUM_BLE_DEVICES; x++) {
       if (spinBLEClient.myBLEDevices[x].doConnect == true) {
         if (spinBLEClient.connectToServer()) {

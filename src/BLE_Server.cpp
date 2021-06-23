@@ -528,7 +528,7 @@ void calculateInstPwrFromHR() {
 #ifndef DEBUG_HR_TO_PWR
   userConfig.setSimulatedWatts(avgP);
   userConfig.setSimulatedCad(90);
-#endif
+#endif //DEBUG_HR_TO_PWR
 
   SS2K_LOG(BLE_SERVER_LOG_TAG, "Power From HR: %d", avgP);
 }
@@ -668,6 +668,7 @@ void ss2kCustomCharacteristicCallbacks::onWrite(BLECharacteristic *pCharacterist
       }
       if (rxValue[0] == write) {
         userConfig.setStepperPower(bytes_to_u16(rxValue[3], rxValue[2]));
+        updateStepperPower();
       }
       break;
 
@@ -678,6 +679,7 @@ void ss2kCustomCharacteristicCallbacks::onWrite(BLECharacteristic *pCharacterist
       }
       if (rxValue[0] == write) {
         userConfig.setStealthChop(bytes_to_u16(rxValue[3], rxValue[2]));
+        updateStealthchop();
       }
       break;
 

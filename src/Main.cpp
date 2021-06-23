@@ -133,12 +133,13 @@ void loop() {
 
   if (loopCounter > 4) {
     scanIfShiftersHeld();
+    checkDriverTemperature();
+
 #ifdef DEBUG_STACK
     Serial.printf("Stepper: %d \n", uxTaskGetStackHighWaterMark(moveStepperTask));
 #endif  // DEBUG_STACK
     loopCounter = 0;
   }
-
   loopCounter++;
 }
 #endif  // UNIT_TEST
@@ -204,7 +205,7 @@ void IRAM_ATTR shiftUp() {  // Handle the shift up interrupt IRAM_ATTR is to kee
     if (!digitalRead(SHIFT_UP_PIN)) {  // double checking to make sure the interrupt wasn't triggered by emf
       userConfig.setShifterPosition(userConfig.getShifterPosition() + 1);
     } else {
-      lastDebounceTime = 0;
+      lastDebounceTime = millis();
     }  // Probably Triggered by EMF, reset the debounce
   }
 }
@@ -214,7 +215,7 @@ void IRAM_ATTR shiftDown() {  // Handle the shift down interrupt
     if (!digitalRead(SHIFT_DOWN_PIN)) {  // double checking to make sure the interrupt wasn't triggered by emf
       userConfig.setShifterPosition(userConfig.getShifterPosition() - 1);
     } else {
-      lastDebounceTime = 0;
+      lastDebounceTime = millis();
     }  // Probably Triggered by EMF, reset the debounce
   }
 }
@@ -270,10 +271,10 @@ void setupTMCStepperDriver() {
 
   driver.rms_current(userConfig.getStepperPower());  // Set motor RMS current
   driver.microsteps(4);                              // Set microsteps to 1/8th
-  driver.irun(255);
-  driver.ihold(200);      // hold current % 0-255
-  driver.iholddelay(10);  // Controls the number of clock cycles for motor
-                          // power down after standstill is detected
+  driver.irun(DRIVER_MAX_PWR_SCALER);
+  driver.ihold((uint8_t)(DRIVER_MAX_PWR_SCALER * .65));  // hold current % 0-DRIVER_MAX_PWR_SCALER
+  driver.iholddelay(10);                                 // Controls the number of clock cycles for motor
+                                                         // power down after standstill is detected
   driver.TPOWERDOWN(128);
   msread               = driver.microsteps();
   uint16_t currentread = driver.cs_actual();
@@ -287,15 +288,36 @@ void setupTMCStepperDriver() {
   driver.pwm_autograd(t_bool);
 }
 
+//Applies current power to driver
 void updateStepperPower() {
   SS2K_LOG(MAIN_LOG_TAG, "Stepper power is now %d", userConfig.getStepperPower());
   driver.rms_current(userConfig.getStepperPower());
 }
 
+//Applies current Stealthchop to driver
 void updateStealthchop() {
   bool t_bool = userConfig.getStealthchop();
   driver.en_spreadCycle(!t_bool);
   driver.pwm_autoscale(t_bool);
   driver.pwm_autograd(t_bool);
   SS2K_LOG(MAIN_LOG_TAG, "Stealthchop is now %d", t_bool);
+}
+
+//Checks the driver temperature and throttles power if above threshold. 
+void checkDriverTemperature(){
+  static bool overtemp = false;
+    if ((int)temperatureRead() > 72)  // Start throttling driver power at 72C on the ESP32
+    {
+      uint8_t throttledPower = (72 - (int)temperatureRead()) + DRIVER_MAX_PWR_SCALER;
+      driver.irun(throttledPower);
+      if(!overtemp){
+      SS2K_LOGW(MAIN_LOG_TAG, "Overtemp! Driver is throttleing down! ESP32 @ %f C", temperatureRead());
+      overtemp = true;
+      }
+    } else if ((driver.cs_actual() < DRIVER_MAX_PWR_SCALER) && !driver.stst()) {
+      driver.irun(DRIVER_MAX_PWR_SCALER);
+      SS2K_LOG(MAIN_LOG_TAG, "Temperature is now under control. Driver current reset.");
+      overtemp = false;
+    }
+
 }
