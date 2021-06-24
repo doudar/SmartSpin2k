@@ -24,6 +24,7 @@ long stepperPosition    = 0;
 long targetPosition     = 0;
 int lastShifterPosition = 0;
 bool externalControl    = false;
+bool syncMode           = false;
 HardwareSerial stepperSerial(2);
 TMC2208Stepper driver(&SERIAL_PORT, R_SENSE);  // Hardware Serial
 
@@ -150,6 +151,9 @@ void moveStepper(void *pvParameters) {
   while (1) {
     if (!externalControl) {
       targetPosition = (userConfig.getShifterPosition() * userConfig.getShiftStep()) + (userConfig.getIncline() * userConfig.getInclineMultiplier());
+    }
+    if (syncMode) {
+      stepperPosition = targetPosition;
     }
     if (stepperPosition == targetPosition) {
       vTaskDelay(300 / portTICK_PERIOD_MS);
@@ -288,13 +292,13 @@ void setupTMCStepperDriver() {
   driver.pwm_autograd(t_bool);
 }
 
-//Applies current power to driver
+// Applies current power to driver
 void updateStepperPower() {
   SS2K_LOG(MAIN_LOG_TAG, "Stepper power is now %d", userConfig.getStepperPower());
   driver.rms_current(userConfig.getStepperPower());
 }
 
-//Applies current Stealthchop to driver
+// Applies current Stealthchop to driver
 void updateStealthchop() {
   bool t_bool = userConfig.getStealthchop();
   driver.en_spreadCycle(!t_bool);
@@ -303,21 +307,20 @@ void updateStealthchop() {
   SS2K_LOG(MAIN_LOG_TAG, "Stealthchop is now %d", t_bool);
 }
 
-//Checks the driver temperature and throttles power if above threshold. 
-void checkDriverTemperature(){
+// Checks the driver temperature and throttles power if above threshold.
+void checkDriverTemperature() {
   static bool overtemp = false;
-    if ((int)temperatureRead() > 72)  // Start throttling driver power at 72C on the ESP32
-    {
-      uint8_t throttledPower = (72 - (int)temperatureRead()) + DRIVER_MAX_PWR_SCALER;
-      driver.irun(throttledPower);
-      if(!overtemp){
+  if ((int)temperatureRead() > 72)  // Start throttling driver power at 72C on the ESP32
+  {
+    uint8_t throttledPower = (72 - (int)temperatureRead()) + DRIVER_MAX_PWR_SCALER;
+    driver.irun(throttledPower);
+    if (!overtemp) {
       SS2K_LOGW(MAIN_LOG_TAG, "Overtemp! Driver is throttleing down! ESP32 @ %f C", temperatureRead());
       overtemp = true;
-      }
-    } else if ((driver.cs_actual() < DRIVER_MAX_PWR_SCALER) && !driver.stst()) {
-      driver.irun(DRIVER_MAX_PWR_SCALER);
-      SS2K_LOG(MAIN_LOG_TAG, "Temperature is now under control. Driver current reset.");
-      overtemp = false;
     }
-
+  } else if ((driver.cs_actual() < DRIVER_MAX_PWR_SCALER) && !driver.stst()) {
+    driver.irun(DRIVER_MAX_PWR_SCALER);
+    SS2K_LOG(MAIN_LOG_TAG, "Temperature is now under control. Driver current reset.");
+    overtemp = false;
+  }
 }

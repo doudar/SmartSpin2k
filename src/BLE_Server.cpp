@@ -528,7 +528,7 @@ void calculateInstPwrFromHR() {
 #ifndef DEBUG_HR_TO_PWR
   userConfig.setSimulatedWatts(avgP);
   userConfig.setSimulatedCad(90);
-#endif //DEBUG_HR_TO_PWR
+#endif  // DEBUG_HR_TO_PWR
 
   SS2K_LOG(BLE_SERVER_LOG_TAG, "Power From HR: %d", avgP);
 }
@@ -792,7 +792,7 @@ void ss2kCustomCharacteristicCallbacks::onWrite(BLECharacteristic *pCharacterist
       userConfig.saveToSPIFFS();
       break;
 
-    case BLE_stepperPosition:  // 0x19
+    case BLE_targetPosition:  // 0x19
       returnValue[0] = success;
       if (rxValue[0] == read) {
         returnValue[2] = (uint8_t)(targetPosition & 0xff);
@@ -813,6 +813,16 @@ void ss2kCustomCharacteristicCallbacks::onWrite(BLECharacteristic *pCharacterist
       }
       if (rxValue[0] == write) {
         externalControl = (bool)(bytes_to_u16(rxValue[3], rxValue[2]));
+      }
+      break;
+
+    case BLE_syncMode:  // 0x1B
+      returnValue[0] = success;
+      if (rxValue[0] == read) {
+        returnValue[2] = (uint8_t)(syncMode);
+      }
+      if (rxValue[0] == write) {
+        syncMode = (bool)(bytes_to_u16(rxValue[3], rxValue[2]));
       }
       break;
   }

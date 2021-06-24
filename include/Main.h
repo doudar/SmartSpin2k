@@ -30,6 +30,7 @@ void checkDriverTemperature();
 extern userParameters userConfig;
 extern long targetPosition; 
 extern bool externalControl;
+extern bool syncMode;
 
 // Users Physical Working Capacity Calculation Parameters (heartrate to Power
 // calculation)

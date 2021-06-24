@@ -60,7 +60,7 @@ From BLE_common.h
 |BLE_stepperPower          |0x09   |int  |Stepper power in ma                                |
 |BLE_stealthchop           |0x0A   |bool |Stepper stealthchop on/off                         |
 |BLE_inclineMultiplier     |0x0B   |float|- multiplied by incline to get steps per % gradient|
-|BLE_powerCorrectionFactor |0x0C   |float|.5 - 2.0 to calibrate power output                |
+|BLE_powerCorrectionFactor |0x0C   |float|.5 - 2.0 to calibrate power output                 |
 |BLE_simulateHr            |0x0D   |bool |                                                   |
 |BLE_simulateWatts         |0x0E   |bool |                                                   |    
 |BLE_simulateCad           |0x0F   |bool |                                                   |
@@ -73,5 +73,13 @@ From BLE_common.h
 |BLE_connectedHeartMonitor |0x16   |     |Not Implemented                                    |
 |BLE_shifterPosition       |0x17   |int  |That changes when a shift is preformed.            |
 |BLE_saveToSpiffs          |0x18   |bool |01 written will save to spiffs.                    |
+|BLE_targetPosition        |0x19   |int36|Position (in steps) the motor is maintaining.      |
+|BLE_externalControl       |0x1A   |bool |01 disables internal calculation of targetPosition.|
+|BLE_syncMode              |0x1B   |bool |01 stops motor movement for external calibration   |
 
- See code for more references/info in BLE_Server.cpp starting on line 534
+*syncMode will disable the movement of the stepper motor by forcing stepperPosition = targetPosition prior to the motor control. While this mode is enabled, it allows the client to set parameters like incline and shifterPosition without moving the motor from it's current position. Once the parameters are set, this mode should be turned back off and SS2K will resume normal operation.
+
+
+This characteristic also notifies when a shift is preformed or the button is pressed. 
+
+See code for more references/info in BLE_Server.cpp starting on line 534
