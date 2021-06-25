@@ -18,8 +18,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - renamed BLE_stepperPosition to BLE_targetPosition to clarify the variable it controls. 
 - increased BLE communications task to 3500 stack.
 
-### Removed
-
 ## [1.6.21]
 ### Added
 - Initial implementation of the custom characteristic. 
