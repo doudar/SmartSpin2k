@@ -19,6 +19,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - increased BLE communications task to 3500 stack.
 
 ## [1.6.21]
+-
 ### Added
 - Initial implementation of the custom characteristic. 
 - Added additional FTMS characteristics and some refactoring of shared variables
