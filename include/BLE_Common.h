@@ -44,6 +44,9 @@
 #define BLE_connectedHeartMonitor 0x16
 #define BLE_shifterPosition       0x17
 #define BLE_saveToSpiffs          0x18
+#define BLE_targetPosition        0x19
+#define BLE_externalControl       0x1A
+#define BLE_syncMode              0x1B
 
 // macros to convert different types of bytes into int The naming here sucks and
 // should be fixed.
@@ -60,8 +63,17 @@ extern TaskHandle_t BLECommunicationTask;
 void BLECommunications(void *pvParameters);
 
 // *****************************Server****************************
-extern int bleConnDesc;  // These all need re
+
+extern int bleConnDesc;
 extern bool updateConnParametersFlag;
+
+// TODO add the rest of the server to this class
+class SpinBLEServer {
+ public:
+  void notifyShift(bool upDown);
+};
+
+extern SpinBLEServer spinBLEServer;
 
 void startBLEServer();
 bool spinDown();

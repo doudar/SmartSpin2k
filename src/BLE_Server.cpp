@@ -14,6 +14,7 @@
 #include <NimBLEDevice.h>
 
 // BLE Server Settings
+SpinBLEServer spinBLEServer;
 
 NimBLEServer *pServer = nullptr;
 
@@ -119,8 +120,9 @@ void startBLEServer() {
   fitnessMachinePowerRange           = pFitnessMachineService->createCharacteristic(FITNESSMACHINEPOWERRANGE_UUID, NIMBLE_PROPERTY::READ);
   fitnessMachineTrainingStatus       = pFitnessMachineService->createCharacteristic(FITNESSMACHINETRAININGSTATUS_UUID, NIMBLE_PROPERTY::NOTIFY);
 
-  pSmartSpin2kService       = pServer->createService(SMARTSPIN2K_SERVICE_UUID);
-  smartSpin2kCharacteristic = pSmartSpin2kService->createCharacteristic(SMARTSPIN2K_CHARACTERISTIC_UUID, NIMBLE_PROPERTY::WRITE | NIMBLE_PROPERTY::INDICATE);
+  pSmartSpin2kService = pServer->createService(SMARTSPIN2K_SERVICE_UUID);
+  smartSpin2kCharacteristic =
+      pSmartSpin2kService->createCharacteristic(SMARTSPIN2K_CHARACTERISTIC_UUID, NIMBLE_PROPERTY::WRITE | NIMBLE_PROPERTY::INDICATE | NIMBLE_PROPERTY::NOTIFY);
 
   pServer->setCallbacks(new MyServerCallbacks());
 
@@ -395,10 +397,10 @@ void MyCallbacks::onWrite(BLECharacteristic *pCharacteristic) {
       } break;
 
       case 0x04: {  // Resistance level setting
-        int targetResistance = rxValue[1] * userConfig.getShiftStep();
+        int targetResistance = rxValue[1];
         userConfig.setShifterPosition(targetResistance);
         userConfig.setERGMode(false);
-        logBufLength += snprintf(logBuf + logBufLength, kLogBufCapacity - logBufLength, "-> Resistance Mode: %ld", userConfig.getShifterPosition());
+        logBufLength += snprintf(logBuf + logBufLength, kLogBufCapacity - logBufLength, "-> Resistance Mode: %d", userConfig.getShifterPosition());
         returnValue[2]              = 0x01;
         uint8_t resistanceStatus[2] = {0x07, rxValue[1]};
         fitnessMachineStatusCharacteristic->setValue(resistanceStatus, 3);
@@ -526,7 +528,7 @@ void calculateInstPwrFromHR() {
 #ifndef DEBUG_HR_TO_PWR
   userConfig.setSimulatedWatts(avgP);
   userConfig.setSimulatedCad(90);
-#endif
+#endif  // DEBUG_HR_TO_PWR
 
   SS2K_LOG(BLE_SERVER_LOG_TAG, "Power From HR: %d", avgP);
 }
@@ -547,15 +549,16 @@ Client Writes:
 (operator, variable, LSO, MSO)
 
 Server will then indicate:
-0x06, 0x07, 0x01
-(operator, LSO, MSO)
+0x80, 0x06, 0x07, 0x01
+(status, variable, LSO, MSO)
 
 Example to read (0x01) from simulatedSpeed (0x06)
 
 Client Writes:
 0x01, 0x06
 Server will then indicate:
-0x,80, 0x06, 0x07, 0x01 (simulatedSpeed),(0x07 0x01)
+0x80, 0x06, 0x07, 0x01
+success, simulatedSpeed,0x07,0x01
 
 Pay special attention to the float values below. Since they have to be transmitted as an int, some are converted *100, others are converted *10.
 True values are >00. False are 00.
@@ -567,6 +570,7 @@ void ss2kCustomCharacteristicCallbacks::onWrite(BLECharacteristic *pCharacterist
   uint8_t write       = 0x02;  // Value to request write operation
   uint8_t error       = 0xff;  // value server error/unable
   uint8_t success     = 0x80;  // value for success
+
   size_t returnLength = rxValue.length();
   uint8_t returnValue[returnLength];
   returnValue[0] = error;
@@ -574,11 +578,11 @@ void ss2kCustomCharacteristicCallbacks::onWrite(BLECharacteristic *pCharacterist
     returnValue[i] = rxValue[i];
   }
 
-  if (rxValue[0] == read) {  // read requests are shorter than writes but outupt is same length.
+  if (rxValue[0] == read) {  // read requests are shorter than writes but output is same length.
     returnLength += 2;
   }
 
-  SS2K_LOG(BLE_SERVER_LOG_TAG, "Custom Request Recieved");
+  SS2K_LOG(BLE_SERVER_LOG_TAG, "Custom Request Received");
   switch (rxValue[1]) {
     case BLE_firmwareUpdateURL:  // 0x01
       returnValue[0] = error;
@@ -664,6 +668,7 @@ void ss2kCustomCharacteristicCallbacks::onWrite(BLECharacteristic *pCharacterist
       }
       if (rxValue[0] == write) {
         userConfig.setStepperPower(bytes_to_u16(rxValue[3], rxValue[2]));
+        updateStepperPower();
       }
       break;
 
@@ -674,6 +679,7 @@ void ss2kCustomCharacteristicCallbacks::onWrite(BLECharacteristic *pCharacterist
       }
       if (rxValue[0] == write) {
         userConfig.setStealthChop(bytes_to_u16(rxValue[3], rxValue[2]));
+        updateStealthchop();
       }
       break;
 
@@ -785,8 +791,52 @@ void ss2kCustomCharacteristicCallbacks::onWrite(BLECharacteristic *pCharacterist
     case BLE_saveToSpiffs:  // 0x18
       userConfig.saveToSPIFFS();
       break;
+
+    case BLE_targetPosition:  // 0x19
+      returnValue[0] = success;
+      if (rxValue[0] == read) {
+        returnValue[2] = (uint8_t)(targetPosition & 0xff);
+        returnValue[3] = (uint8_t)(targetPosition >> 8);
+        returnValue[4] = (uint8_t)(targetPosition >> 16);
+        returnValue[5] = (uint8_t)(targetPosition >> 24);
+        returnLength += 2;
+      }
+      if (rxValue[0] == write) {
+        targetPosition = (long((uint8_t)(rxValue[2]) << 0 | (uint8_t)(rxValue[3]) << 8 | (uint8_t)(rxValue[4]) << 16 | (uint8_t)(rxValue[5]) << 24));
+      }
+      break;
+
+    case BLE_externalControl:  // 0x1A
+      returnValue[0] = success;
+      if (rxValue[0] == read) {
+        returnValue[2] = (uint8_t)(externalControl);
+      }
+      if (rxValue[0] == write) {
+        externalControl = (bool)(bytes_to_u16(rxValue[3], rxValue[2]));
+      }
+      break;
+
+    case BLE_syncMode:  // 0x1B
+      returnValue[0] = success;
+      if (rxValue[0] == read) {
+        returnValue[2] = (uint8_t)(syncMode);
+      }
+      if (rxValue[0] == write) {
+        syncMode = (bool)(bytes_to_u16(rxValue[3], rxValue[2]));
+      }
+      break;
   }
 
   pCharacteristic->setValue(returnValue, returnLength);
   pCharacteristic->indicate();
+}
+
+void SpinBLEServer::notifyShift(bool upDown) {
+  uint8_t returnValue[4];
+  returnValue[0] = 0x80;
+  returnValue[1] = BLE_shifterPosition;
+  returnValue[2] = (uint8_t)(userConfig.getShifterPosition() & 0xff);
+  returnValue[3] = (uint8_t)(userConfig.getShifterPosition() >> 8);
+  smartSpin2kCharacteristic->setValue(returnValue, 4);
+  smartSpin2kCharacteristic->notify(true);
 }

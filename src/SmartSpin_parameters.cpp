@@ -121,7 +121,7 @@ void userParameters::saveToSPIFFS() {
   // currently in keeping this boot to boot
   doc["connectedPowerMeter"]   = connectedPowerMeter;
   doc["connectedHeartMonitor"] = connectedHeartMonitor;
-  //doc["shifterPosition"]       = shifterPosition;
+  // doc["shifterPosition"]       = shifterPosition;
 
   // Serialize JSON to file
   if (serializeJson(doc, file) == 0) {
@@ -178,7 +178,7 @@ void userParameters::loadFromSPIFFS() {
   // setfoundDevices       (doc["foundDevices"]);
   setConnectedPowerMeter(doc["connectedPowerMeter"]);
   setConnectedHeartMonitor(doc["connectedHeartMonitor"]);
-  //setShifterPosition[doc["shifterPosition"]);
+  // setShifterPosition[doc["shifterPosition"]);
 
   SS2K_LOG(CONFIG_LOG_TAG, "Config File Loaded: %s", configFILENAME);
   file.close();

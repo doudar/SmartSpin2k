@@ -9,7 +9,7 @@
 
 #include <NimBLEUUID.h>
 
-//SmartSpin2K custom UUID's 
+// SmartSpin2K custom UUID's
 #define SMARTSPIN2K_SERVICE_UUID        NimBLEUUID("77776277-7877-7774-4466-896665500000")
 #define SMARTSPIN2K_CHARACTERISTIC_UUID NimBLEUUID("77776277-7877-7774-4466-896665500001")
 
@@ -36,10 +36,10 @@
 #define FITNESSMACHINEPOWERRANGE_UUID           NimBLEUUID((uint16_t)0x2AD8)
 
 // GATT service/characteristic UUIDs for Flywheel Bike from ptx2/gymnasticon/
-#define FLYWHEEL_UART_SERVICE_UUID      NimBLEUUID("6e400001-b5a3-f393-e0a9-e50e24dcca9e")
-#define FLYWHEEL_UART_RX_UUID           NimBLEUUID("6e400002-b5a3-f393-e0a9-e50e24dcca9e")
-#define FLYWHEEL_UART_TX_UUID           NimBLEUUID("6e400003-b5a3-f393-e0a9-e50e24dcca9e")
-#define FLYWHEEL_BLE_NAME "Flywheel 1"
+#define FLYWHEEL_UART_SERVICE_UUID NimBLEUUID("6e400001-b5a3-f393-e0a9-e50e24dcca9e")
+#define FLYWHEEL_UART_RX_UUID      NimBLEUUID("6e400002-b5a3-f393-e0a9-e50e24dcca9e")
+#define FLYWHEEL_UART_TX_UUID      NimBLEUUID("6e400003-b5a3-f393-e0a9-e50e24dcca9e")
+#define FLYWHEEL_BLE_NAME          "Flywheel 1"
 
 // The Echelon Services
 #define ECHELON_DEVICE_UUID  NimBLEUUID("0bf669f0-45f2-11e7-9598-0800200c9a66")

@@ -113,7 +113,7 @@ void BLECommunications(void *pvParameters) {
     }
 #ifdef DEBUG_HR_TO_PWR
     calculateInstPwrFromHR();
-#endif
+#endif  // DEBUG_HR_TO_PWR
 
     if (!spinBLEClient.connectedPM && !hr2p && !userConfig.getSimulateWatts() && !userConfig.getSimulateCad()) {
       userConfig.setSimulatedCad(0);
@@ -159,6 +159,6 @@ void BLECommunications(void *pvParameters) {
     vTaskDelay((BLE_NOTIFY_DELAY / 2) / portTICK_PERIOD_MS);
 #ifdef DEBUG_STACK
     Serial.printf("BLEComm: %d \n", uxTaskGetStackHighWaterMark(BLECommunicationTask));
-#endif
+#endif  // DEBUG_STACK
   }
 }
