@@ -24,9 +24,13 @@ void scanIfShiftersHeld();
 void setupTMCStepperDriver();
 void updateStepperPower();
 void updateStealthchop();
+void checkDriverTemperature();
 
 // Main program variable that stores most everything
 extern userParameters userConfig;
+extern long targetPosition;
+extern bool externalControl;
+extern bool syncMode;
 
 // Users Physical Working Capacity Calculation Parameters (heartrate to Power
 // calculation)

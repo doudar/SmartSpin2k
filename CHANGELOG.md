@@ -5,7 +5,24 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/)
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
+
 ### Added
+- BLE Custom Characteristic motor driver calls now apply settings received
+- Motor current now automatically scales if ESP32 temp starts getting too high. 
+- Added comments after compiler #endif Statements to make it easier to see what the partner #if statement is.
+- Added BLE_syncMode to support syncing shifterPosition with bikes that also report their resistance level. 
+- Added git tag to prevent branch from downgrading to the last release. 
+
+### Changed
+- Bug: Debounce now resets to millis()
+- renamed BLE_stepperPosition to BLE_targetPosition to clarify the variable it controls. 
+- increased BLE communications task to 3500 stack.
+
+## [1.6.21]
+-
+### Added
+- Initial implementation of the custom characteristic. 
+- Added additional FTMS characteristics and some refactoring of shared variables
 - Added GZipped jQuery to fix non WAN connected manual updates.
 - Pin arduino-esp32 package to version 1.0.6 to fix build issue
 - Added + - Buttons to sliders. 

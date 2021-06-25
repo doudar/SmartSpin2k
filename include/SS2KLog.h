@@ -11,7 +11,7 @@
 #include "esp_log.h"
 #include <stdio.h>
 #include <stdarg.h>
-#include <fs.h>
+#include <FS.h>
 #include <freertos/semphr.h>
 
 #define SS2K_LOG_TAG       "SS2K"
