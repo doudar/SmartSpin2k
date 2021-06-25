@@ -209,7 +209,7 @@ void IRAM_ATTR shiftUp() {  // Handle the shift up interrupt IRAM_ATTR is to kee
     if (!digitalRead(SHIFT_UP_PIN)) {  // double checking to make sure the interrupt wasn't triggered by emf
       userConfig.setShifterPosition(userConfig.getShifterPosition() + 1);
     } else {
-      lastDebounceTime = millis();
+      lastDebounceTime = 0;
     }  // Probably Triggered by EMF, reset the debounce
   }
 }
@@ -219,7 +219,7 @@ void IRAM_ATTR shiftDown() {  // Handle the shift down interrupt
     if (!digitalRead(SHIFT_DOWN_PIN)) {  // double checking to make sure the interrupt wasn't triggered by emf
       userConfig.setShifterPosition(userConfig.getShifterPosition() - 1);
     } else {
-      lastDebounceTime = millis();
+      lastDebounceTime = 0;
     }  // Probably Triggered by EMF, reset the debounce
   }
 }
