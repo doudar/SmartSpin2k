@@ -1,18 +1,18 @@
-###For version 2, print:
+### For version 2, print:
 
-##[Case]
+## [Case]
 -Body_Left.stl
 -Body_Right.stl
 
-##[Gears]
+## [Gears]
 -43_Tooth_Mod1.STL
 -Spur gear 1M 11T.STL
 
-##[MountingStrap]
+## [MountingStrap]
 -Mounting_For_New_Case.STL
 
-##[KnobCups]
+## [KnobCups]
 Knob_Cup_V2.STL
 
-##[Inserts]
+## [Inserts]
 -The insert for your bike.
