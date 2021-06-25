@@ -41,7 +41,7 @@ TaskHandle_t telegramTask;
 bool telegramMessageWaiting = false;
 UniversalTelegramBot bot(TELEGRAM_TOKEN, client);
 String telegramMessage = "";
-#endif //USE_TELEGRAM
+#endif  // USE_TELEGRAM
 
 // ********************************WIFI Setup*************************
 void startWifi() {
@@ -313,7 +313,7 @@ void startHttpServer() {
                           1,                /* priority of the task  - higher number is higher priority*/
                           &telegramTask,    /* Task handle to keep track of created task */
                           1);               /* pin task to core 1 */
-#endif //USE_TELEGRAM
+#endif                                      // USE_TELEGRAM
   server.begin();
   SS2K_LOG(HTTP_SERVER_LOG_TAG, "HTTP server started");
 }
@@ -591,7 +591,7 @@ void sendTelegram(String textToSend) {
 
 // Non blocking task to send telegram message
 void telegramUpdate(void *pvParameters) {
-  //client.setInsecure();
+  // client.setInsecure();
   client.setCACert(TELEGRAM_CERTIFICATE_ROOT);
   for (;;) {
     static int telegramFailures = 0;
@@ -615,8 +615,8 @@ void telegramUpdate(void *pvParameters) {
     Serial.printf("Telegram: %d \n", uxTaskGetStackHighWaterMark(telegramTask));
     Serial.printf("Web: %d \n", uxTaskGetStackHighWaterMark(webClientTask));
     Serial.printf("Free: %d \n", ESP.getFreeHeap());
-#endif //DEBUG_STACK
+#endif  // DEBUG_STACK
     vTaskDelay(4000 / portTICK_RATE_MS);
   }
 }
-#endif //USE_TELEGRAM
+#endif  // USE_TELEGRAM
