@@ -28,7 +28,7 @@ void checkDriverTemperature();
 
 // Main program variable that stores most everything
 extern userParameters userConfig;
-extern long targetPosition; 
+extern long targetPosition;
 extern bool externalControl;
 extern bool syncMode;
 
