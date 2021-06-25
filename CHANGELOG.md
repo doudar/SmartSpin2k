@@ -14,12 +14,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Added git tag to prevent branch from downgrading to the last release. 
 
 ### Changed
-- Bug: Debounce now resets to millis()
 - renamed BLE_stepperPosition to BLE_targetPosition to clarify the variable it controls. 
 - increased BLE communications task to 3500 stack.
 
-## [1.6.21]
--
+## [1.6.19] - 2021-6-19
+
 ### Added
 - Initial implementation of the custom characteristic. 
 - Added additional FTMS characteristics and some refactoring of shared variables
