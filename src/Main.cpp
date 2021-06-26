@@ -320,8 +320,8 @@ void checkDriverTemperature() {
     overtemp = true;
   } else if ((driver.cs_actual() < DRIVER_MAX_PWR_SCALER) && !driver.stst()) {
     if (overtemp) {
-    SS2K_LOG(MAIN_LOG_TAG, "Temperature is now under control. Driver current reset.");
-    driver.irun(DRIVER_MAX_PWR_SCALER);
+      SS2K_LOG(MAIN_LOG_TAG, "Temperature is now under control. Driver current reset.");
+      driver.irun(DRIVER_MAX_PWR_SCALER);
     }
     overtemp = false;
   }
