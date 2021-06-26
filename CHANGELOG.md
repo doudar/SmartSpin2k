@@ -16,6 +16,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Changed
 - renamed BLE_stepperPosition to BLE_targetPosition to clarify the variable it controls. 
 - increased BLE communications task to 3500 stack.
+- Fixed recurring debugging line when driver was at normal temp.
 
 ## [1.6.19] - 2021-6-19
 
