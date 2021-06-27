@@ -203,7 +203,6 @@ bool spinDown() {
 
 // as a note, Trainer Road sends 50w target whenever the app is connected.
 void computeERG(int newSetPoint) {
-
   if (userConfig.getERGMode() && spinBLEClient.connectedPM) {
     // continue
   } else {
@@ -213,20 +212,20 @@ void computeERG(int newSetPoint) {
   float incline             = userConfig.getIncline();
   int newIncline            = incline;
   int amountToChangeIncline = 0;
-  const int wattChange        = userConfig.getSimulatedWatts() - setPoint;
+  int wattChange            = userConfig.getSimulatedWatts() - setPoint;
 
   if (newSetPoint > 0) {  // only update the value if new value is sent
     setPoint = newSetPoint;
-    return;
   }
-  if (setPoint == 0) {
-    return;
+  if (setPoint < 50) {  // minumum setPoint
+    setPoint = 50;
   }
 
   if (userConfig.getSimulatedCad() <= 20) {
     // Cadence too low, nothing to do here
     return;
   }
+
   amountToChangeIncline = wattChange * userConfig.getERGSensitivity();
   if (abs(wattChange) < WATTS_PER_SHIFT) {
     // As the desired value gets closer, make smaller changes for a smoother experience
@@ -240,14 +239,11 @@ void computeERG(int newSetPoint) {
     if (amountToChangeIncline < 0) {
       amountToChangeIncline = -(userConfig.getShiftStep() * 10);
     }
-
-  } else {
-    return;
   }
-  // Reduce the amount per loop (don't try to oneshot it.) and reduce the movement the higher the watt target is.
-  amountToChangeIncline = amountToChangeIncline / ((currentWatts / 100) + .1);  // +.1 to eliminate possible divide by zero.
 
-  newIncline = incline - amountToChangeIncline;  //  }
+  // Reduce the amount per loop (don't try to oneshot it) and scale the movement the higher the watt target is as higher wattages require less knob movement.
+  amountToChangeIncline = amountToChangeIncline / ((userConfig.getSimulatedWatts() / 100) + .1);  // +.1 to eliminate possible divide by zero.
+  newIncline            = incline - amountToChangeIncline;
   userConfig.setIncline(newIncline);
 }
 

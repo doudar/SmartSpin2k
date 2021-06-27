@@ -95,9 +95,11 @@
                   style="padding: 0px; width: 10px; position: relative; top: -12px; left: 100px; color: rgb(250, 250, 250);">
                   <span id="ERGSensitivityValue">1.0</span>
                 </p>
+                <input type='button' onclick="clickStep(document.getElementById('ERGSensitivity'), this.value)" value="-">
                 <input style="position: relative; top: -25px; left: 7px;" type="range" id="ERGSensitivity"
-                  name="ERGSensitivity" value="1.0" min=".5" max="3" step=".1" class="slider1"
+                  name="ERGSensitivity" value="1.0" min=".5" max="5" step=".1" class="slider1"
                   onchange="updateSlider(this, document.getElementById('ERGSensitivityValue'))" />
+                  <input type='button' onclick="clickStep(document.getElementById('ERGSensitivity'), this.value)" value="+">
               </td>
             </tr>
             <tr>
