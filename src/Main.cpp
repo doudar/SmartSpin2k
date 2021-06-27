@@ -21,7 +21,7 @@ uint64_t debounceDelay    = 500;  // the debounce time; increase if the output f
 
 // Stepper Speed - Lower is faster
 int maxStepperSpeed     = 500;
-long targetPosition     = 0;
+int32_t targetPosition  = 0;
 int lastShifterPosition = 0;
 bool externalControl    = false;
 bool syncMode           = false;
@@ -297,9 +297,8 @@ void updateStealthchop() {
 // Checks the driver temperature and throttles power if above threshold.
 void checkDriverTemperature() {
   static bool overtemp = false;
-  if ((int)temperatureRead() > 72)  // Start throttling driver power at 72C on the ESP32
-  {
-    uint8_t throttledPower = (72 - (int)temperatureRead()) + DRIVER_MAX_PWR_SCALER;
+  if ((int)temperatureRead() > 72) {  // Start throttling driver power at 72C on the ESP32
+    uint8_t throttledPower = (72 - static_cast<int>(temperatureRead())) + DRIVER_MAX_PWR_SCALER;
     driver.irun(throttledPower);
     SS2K_LOGW(MAIN_LOG_TAG, "Overtemp! Driver is throttleing down! ESP32 @ %f C", temperatureRead());
     overtemp = true;

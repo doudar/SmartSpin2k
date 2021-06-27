@@ -29,7 +29,7 @@ void motorStop(bool releaseTension = false);
 
 // Main program variable that stores most everything
 extern userParameters userConfig;
-extern long targetPosition;
+extern int32_t targetPosition;
 extern bool externalControl;
 extern bool syncMode;
 

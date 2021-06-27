@@ -819,7 +819,7 @@ void ss2kCustomCharacteristicCallbacks::onWrite(BLECharacteristic *pCharacterist
         returnLength += 4;
       }
       if (rxValue[0] == write) {
-        targetPosition = (long((uint8_t)(rxValue[2]) << 0 | (uint8_t)(rxValue[3]) << 8 | (uint8_t)(rxValue[4]) << 16 | (uint8_t)(rxValue[5]) << 24));
+        targetPosition = (int32_t((uint8_t)(rxValue[2]) << 0 | (uint8_t)(rxValue[3]) << 8 | (uint8_t)(rxValue[4]) << 16 | (uint8_t)(rxValue[5]) << 24));
       }
       break;
 
@@ -830,7 +830,7 @@ void ss2kCustomCharacteristicCallbacks::onWrite(BLECharacteristic *pCharacterist
         returnLength += 1;
       }
       if (rxValue[0] == write) {
-        externalControl = (bool)(rxValue[2]);
+        externalControl = static_cast<bool>(rxValue[2]);
       }
       break;
 
@@ -841,7 +841,7 @@ void ss2kCustomCharacteristicCallbacks::onWrite(BLECharacteristic *pCharacterist
         returnLength += 1;
       }
       if (rxValue[0] == write) {
-        syncMode = (bool)(rxValue[2]);
+        syncMode = static_cast<bool>(rxValue[2]);
       }
       break;
   }
