@@ -16,17 +16,19 @@ class SensorDataFactory {
  public:
   SensorDataFactory() {}
 
-  std::shared_ptr<SensorData> getSensorData(NimBLEUUID characteristicUUID, uint8_t *data, size_t length);
+  std::shared_ptr<SensorData> getSensorData(NimBLEUUID characteristicUUID, const uint64_t peerAddress, uint8_t *data, size_t length);
 
  private:
   class KnownDevice {
    public:
-    KnownDevice(NimBLEUUID uuid, std::shared_ptr<SensorData> sensorData) : uuid(uuid), sensorData(sensorData) {}
-    NimBLEUUID getUUID();
+    KnownDevice(const NimBLEUUID characteristicUUID, const uint64_t peerAddress, std::shared_ptr<SensorData> sensorData)
+        : characteristicId(characteristicUUID), peerAddress(peerAddress), sensorData(sensorData) {}
     std::shared_ptr<SensorData> decode(uint8_t *data, size_t length);
+    bool isSameDeviceCharacteristic(const NimBLEUUID characteristicUUID, const uint64_t peerAddress);
 
    private:
-    NimBLEUUID uuid;
+    NimBLEUUID characteristicId;
+    uint64_t peerAddress;
     std::shared_ptr<SensorData> sensorData;
   };
 

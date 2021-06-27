@@ -5,9 +5,24 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/)
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
+
 ### Added
-- Added ERGSensitivity setting in Settings.html
-- Added ERGSensitivy parameter. 
+- BLE Custom Characteristic motor driver calls now apply settings received
+- Motor current now automatically scales if ESP32 temp starts getting too high. 
+- Added comments after compiler #endif Statements to make it easier to see what the partner #if statement is.
+- Added BLE_syncMode to support syncing shifterPosition with bikes that also report their resistance level. 
+- Added git tag to prevent branch from downgrading to the last release. 
+
+### Changed
+- renamed BLE_stepperPosition to BLE_targetPosition to clarify the variable it controls. 
+- increased BLE communications task to 3500 stack.
+- Fixed recurring debugging line when driver was at normal temp.
+
+## [1.6.19] - 2021-6-19
+
+### Added
+- Initial implementation of the custom characteristic. 
+- Added additional FTMS characteristics and some refactoring of shared variables
 - Added GZipped jQuery to fix non WAN connected manual updates.
 - Pin arduino-esp32 package to version 1.0.6 to fix build issue
 - Added + - Buttons to sliders. 
@@ -32,11 +47,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Filter Flywheel advertisements by name.
 - Add documentation to SensorData class.
 - Enabled native testing.
+- Added logging library which supports levels.
 
 ### Changed
-- Settings page submit returns setting page. 
-- Added explanatory comments in settings for various values. 
-- Decreased (default) expected watts per shift from 50 to 30. 
 - Moved Vin to the correct side on the ESP32 connection diagram. 
 - Power Correction Factor minimum value is now .5
 - Made Revmaster insert slightly smaller. 
@@ -61,6 +74,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Ignore zero heart rate reported from remote FTMS.
 - Fix Assimoa Uno stuck cadence.
 - Started extract non-arduino code into a cross-platform library.
+- Changed all logging calls to new logging library.
 
 ### Removed
 - Deleted and ignored .pio folder which had been mistakenly committed.

@@ -9,6 +9,8 @@
 
 #include <Arduino.h>
 
+#define CONFIG_LOG_TAG "Config"
+
 class userParameters {
  private:
   String firmwareUpdateURL;
@@ -34,13 +36,14 @@ class userParameters {
   String foundDevices          = " ";
   String connectedPowerMeter   = "any";
   String connectedHeartMonitor = "any";
+  int shifterPosition;
 
  public:
   const char* getFirmwareUpdateURL() { return firmwareUpdateURL.c_str(); }
   float getIncline() { return incline; }
   int getSimulatedWatts() { return simulatedWatts; }
   int getSimulatedHr() { return simulatedHr; }
-  float getSimulatedCad() { return simulatedCad; }
+  int getSimulatedCad() { return simulatedCad; }
   float getSimulatedSpeed() { return simulatedSpeed; }
   const char* getDeviceName() { return deviceName.c_str(); }
   int getShiftStep() { return shiftStep; }
@@ -59,6 +62,7 @@ class userParameters {
   const char* getFoundDevices() { return foundDevices.c_str(); }
   const char* getconnectedPowerMeter() { return connectedPowerMeter.c_str(); }
   const char* getconnectedHeartMonitor() { return connectedHeartMonitor.c_str(); }
+  int getShifterPosition() { return shifterPosition; }
 
   void setDefaults();
   void setFirmwareUpdateURL(String fURL) { firmwareUpdateURL = fURL; }
@@ -84,8 +88,9 @@ class userParameters {
   void setFoundDevices(String fdev) { foundDevices = fdev; }
   void setConnectedPowerMeter(String cpm) { connectedPowerMeter = cpm; }
   void setConnectedHeartMonitor(String cHr) { connectedHeartMonitor = cHr; }
+  void setShifterPosition(int sp) { shifterPosition = sp; }
 
-  String returnJSON();
+  String returnJSON(bool includeDebugLog = false);
   void saveToSPIFFS();
   void loadFromSPIFFS();
   void printFile();

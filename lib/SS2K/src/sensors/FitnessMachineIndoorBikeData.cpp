@@ -76,7 +76,7 @@ void FitnessMachineIndoorBikeData::decode(uint8_t *data, size_t length) {
         continue;
       }
     }
-    values[typeIndex] = NAN;
+    values[typeIndex] = nanf("");
   }
 }
 

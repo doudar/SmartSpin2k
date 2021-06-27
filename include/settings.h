@@ -7,6 +7,8 @@
 
 #pragma once
 
+#include "SS2KLog.h"
+
 // Update firmware on boot?
 #define AUTO_FIRMWARE_UPDATE true
 
@@ -95,6 +97,9 @@
 // Watterott TMC5160 uses 0.075
 #define R_SENSE 0.11f
 
+// Maximum scaling of the driver output power 0-31
+#define DRIVER_MAX_PWR_SCALER 31
+
 // Hardware pin for indicator LED *note* internal LED on esp32 Dev board is pin
 // 2
 #define LED_PIN 2
@@ -138,7 +143,7 @@
 #define WIFI_CONNECT_TIMEOUT 10
 
 // Max size of userconfig
-#define USERCONFIG_JSON_SIZE 768
+#define USERCONFIG_JSON_SIZE 768 + DEBUG_LOG_BUFFER_SIZE
 
 // Uncomment to enable sending Telegram debug messages back to the chat
 // specified in telegram_token.h
