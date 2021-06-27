@@ -11,6 +11,7 @@
 #include <Arduino.h>
 #include <SPIFFS.h>
 #include <HardwareSerial.h>
+#include "FastAccelStepper.h"
 
 bool lastDir = true;  // Stepper Last Direction
 
@@ -20,13 +21,14 @@ uint64_t debounceDelay    = 500;  // the debounce time; increase if the output f
 
 // Stepper Speed - Lower is faster
 int maxStepperSpeed     = 500;
-long stepperPosition    = 0;
-long targetPosition     = 0;
+int32_t targetPosition  = 0;
 int lastShifterPosition = 0;
 bool externalControl    = false;
 bool syncMode           = false;
 HardwareSerial stepperSerial(2);
 TMC2208Stepper driver(&SERIAL_PORT, R_SENSE);  // Hardware Serial
+FastAccelStepperEngine engine = FastAccelStepperEngine();
+FastAccelStepper *stepper     = NULL;
 
 // Setup for BLEScan via shifters.
 int shiftersHoldForScan = SHIFTERS_HOLD_FOR_SCAN;
@@ -123,11 +125,11 @@ void loop() {
 
   if (userConfig.getShifterPosition() > lastShifterPosition) {
     SS2K_LOG(MAIN_LOG_TAG, "Shift UP: %l", userConfig.getShifterPosition());
-    Serial.println(stepperPosition);
+    Serial.println(targetPosition);
     spinBLEServer.notifyShift(1);
   } else if (userConfig.getShifterPosition() < lastShifterPosition) {
     SS2K_LOG(MAIN_LOG_TAG, "Shift DOWN: %l", userConfig.getShifterPosition());
-    Serial.println(stepperPosition);
+    Serial.println(targetPosition);
     spinBLEServer.notifyShift(0);
   }
   lastShifterPosition = userConfig.getShifterPosition();
@@ -146,49 +148,34 @@ void loop() {
 #endif  // UNIT_TEST
 
 void moveStepper(void *pvParameters) {
-  int acceleration = maxStepperSpeed;
+  engine.init();
+  stepper = engine.stepperConnectToPin(STEP_PIN);
+  stepper->setDirectionPin(DIR_PIN);
+  stepper->setEnablePin(ENABLE_PIN);
+  stepper->setAutoEnable(true);
+  stepper->setSpeedInHz(STEPPER_MAX_SPEED);        // 500 steps/s
+  stepper->setAcceleration(STEPPER_ACCELERATION);  // 100 steps/s²
+  stepper->setDelayToDisable(1000);
 
   while (1) {
     if (!externalControl) {
       targetPosition = (userConfig.getShifterPosition() * userConfig.getShiftStep()) + (userConfig.getIncline() * userConfig.getInclineMultiplier());
     }
     if (syncMode) {
-      stepperPosition = targetPosition;
+      stepper->stopMove();
+      vTaskDelay(100 / portTICK_PERIOD_MS);
+      stepper->setCurrentPosition(targetPosition);
+      vTaskDelay(100 / portTICK_PERIOD_MS);
     }
-    if (stepperPosition == targetPosition) {
-      vTaskDelay(300 / portTICK_PERIOD_MS);
-      if (connectedClientCount() == 0) {
-        digitalWrite(ENABLE_PIN,
-                     HIGH);  // disable output FETs so stepper can cool
-      }
-      vTaskDelay(300 / portTICK_PERIOD_MS);
+    if (stepper) {
+      stepper->moveTo(targetPosition);
+    }
+    vTaskDelay(100 / portTICK_PERIOD_MS);
+    if (connectedClientCount() > 0) {
+      stepper->setAutoEnable(false);  // Keep the stepper from rolling back due to head tube slack. Motor Driver still lowers power between moves
+      stepper->enableOutputs();
     } else {
-      digitalWrite(ENABLE_PIN, LOW);
-      vTaskDelay(1);
-
-      if (stepperPosition < targetPosition) {
-        if (lastDir == false) {
-          vTaskDelay(100);  // Stepper was running in opposite
-                            // direction. Give it time to stop.
-        }
-        digitalWrite(DIR_PIN, HIGH);
-        digitalWrite(STEP_PIN, HIGH);
-        delayMicroseconds(acceleration);
-        digitalWrite(STEP_PIN, LOW);
-        stepperPosition++;
-        lastDir = true;
-      } else if (stepperPosition > targetPosition) {
-        if (lastDir == true) {
-          vTaskDelay(100);  // Stepper was running in opposite
-                            // direction. Give it time to stop.
-        }
-        digitalWrite(DIR_PIN, LOW);
-        digitalWrite(STEP_PIN, HIGH);
-        delayMicroseconds(acceleration);
-        digitalWrite(STEP_PIN, LOW);
-        stepperPosition--;
-        lastDir = false;
-      }
+      stepper->setAutoEnable(true);  // disable output FETs between moves so stepper can cool. Can still shift.
     }
   }
 }
@@ -310,13 +297,10 @@ void updateStealthchop() {
 // Checks the driver temperature and throttles power if above threshold.
 void checkDriverTemperature() {
   static bool overtemp = false;
-  if ((int)temperatureRead() > 72)  // Start throttling driver power at 72C on the ESP32
-  {
-    uint8_t throttledPower = (72 - (int)temperatureRead()) + DRIVER_MAX_PWR_SCALER;
+  if (static_cast<int>(temperatureRead()) > 72) {  // Start throttling driver power at 72C on the ESP32
+    uint8_t throttledPower = (72 - static_cast<int>(temperatureRead())) + DRIVER_MAX_PWR_SCALER;
     driver.irun(throttledPower);
-    if (!overtemp) {
-      SS2K_LOGW(MAIN_LOG_TAG, "Overtemp! Driver is throttleing down! ESP32 @ %f C", temperatureRead());
-    }
+    SS2K_LOGW(MAIN_LOG_TAG, "Overtemp! Driver is throttleing down! ESP32 @ %f C", temperatureRead());
     overtemp = true;
   } else if ((driver.cs_actual() < DRIVER_MAX_PWR_SCALER) && !driver.stst()) {
     if (overtemp) {
@@ -324,5 +308,13 @@ void checkDriverTemperature() {
       driver.irun(DRIVER_MAX_PWR_SCALER);
     }
     overtemp = false;
+  }
+}
+
+void motorStop(bool releaseTension) {
+  stepper->stopMove();
+  stepper->setCurrentPosition(targetPosition);
+  if (releaseTension) {
+    stepper->moveTo(targetPosition - userConfig.getShiftStep() * 4);
   }
 }

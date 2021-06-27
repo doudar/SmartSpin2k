@@ -29,6 +29,7 @@ class userParameters {
   bool simulateWatts;
   bool simulateCad;
   bool ERGMode;
+  float ERGSensitivity;
   bool autoUpdate;
   String ssid;
   String password;
@@ -54,6 +55,7 @@ class userParameters {
   bool getSimulateWatts() { return simulateWatts; }
   bool getSimulateCad() { return simulateCad; }
   bool getERGMode() { return ERGMode; }
+  float getERGSensitivity() { return ERGSensitivity; }
   bool getautoUpdate() { return autoUpdate; }
   const char* getSsid() { return ssid.c_str(); }
   const char* getPassword() { return password.c_str(); }
@@ -79,6 +81,7 @@ class userParameters {
   void setSimulateWatts(bool swt) { simulateWatts = swt; }
   void setSimulateCad(bool scd) { simulateCad = scd; }
   void setERGMode(bool erg) { ERGMode = erg; }
+  void setERGSensitivity(float ergS) { ERGSensitivity = ergS; }
   void setAutoUpdate(bool atupd) { autoUpdate = atupd; }
   void setSsid(String sid) { ssid = sid; }
   void setPassword(String pwd) { password = pwd; }
