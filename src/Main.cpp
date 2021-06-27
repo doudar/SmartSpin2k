@@ -314,9 +314,7 @@ void checkDriverTemperature() {
   {
     uint8_t throttledPower = (72 - (int)temperatureRead()) + DRIVER_MAX_PWR_SCALER;
     driver.irun(throttledPower);
-    if (!overtemp) {
       SS2K_LOGW(MAIN_LOG_TAG, "Overtemp! Driver is throttleing down! ESP32 @ %f C", temperatureRead());
-    }
     overtemp = true;
   } else if ((driver.cs_actual() < DRIVER_MAX_PWR_SCALER) && !driver.stst()) {
     if (overtemp) {

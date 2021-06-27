@@ -424,7 +424,7 @@ void settingsProcessor() {
   }
   if (!server.arg("inclineMultiplier").isEmpty()) {
     float inclineMultiplier = server.arg("inclineMultiplier").toFloat();
-    if (inclineMultiplier >= 1 && inclineMultiplier <= 5) {
+    if (inclineMultiplier >= 1 && inclineMultiplier <= 10) {
       userConfig.setInclineMultiplier(inclineMultiplier);
     }
   }

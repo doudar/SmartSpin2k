@@ -78,7 +78,7 @@
               </div>
                 <input type='button' onclick="clickStep(document.getElementById('inclineMultiplier'), this.value)" value="-">
                 <input style="width:50%; position: relative; top: 5px;"  type="range" id="inclineMultiplier"
-                  name="inclineMultiplier" value="0" min="1" max="5" step="1" class="slider1"
+                  name="inclineMultiplier" value="0" min="1" max="10" step="1" class="slider1"
                   onchange="updateSlider(this.value, document.getElementById('inclineMultiplierValue'))" />
                   <input type='button' onclick="clickStep(document.getElementById('inclineMultiplier'), this.value)" value="+">
 
@@ -105,7 +105,7 @@
             <tr>
               <td>
                 <p class="tooltip">Stepper Power<span class="tooltiptext">Amount in milli amps for stepper
-                    motor<br><br>Set to the minimun required to move knob smoothly</span></p>
+                    motor<br><br>Set to the minimum required to move knob smoothly</span></p>
               </td>
               <td>
                 <div
