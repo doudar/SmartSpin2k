@@ -25,6 +25,7 @@ void setupTMCStepperDriver();
 void updateStepperPower();
 void updateStealthchop();
 void checkDriverTemperature();
+void motorStop(bool releaseTension = false);
 
 // Main program variable that stores most everything
 extern userParameters userConfig;

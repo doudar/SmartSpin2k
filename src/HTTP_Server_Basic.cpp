@@ -403,7 +403,7 @@ void settingsProcessor() {
   if (!server.arg("ERGSensitivity").isEmpty()) {
     float ERGSensitivity = server.arg("ERGSensitivity").toFloat();
     if (ERGSensitivity >= .5 && ERGSensitivity <= 3) {
-    userConfig.setERGSensitivity(ERGSensitivity);
+      userConfig.setERGSensitivity(ERGSensitivity);
     }
   }
   // checkboxes don't report off, so need to check using another parameter
