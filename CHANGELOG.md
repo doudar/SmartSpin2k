@@ -13,14 +13,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Added BLE_syncMode to support syncing shifterPosition with bikes that also report their resistance level. 
 - Added git tag to prevent branch from downgrading to the last release. 
 - Added Hardware Version 2.0. 
+- MCWPWM for stepper control.
+- Erg Sensitivity control added.
+- Function to stop motor and release tension if the user stops pedaling in ERG mode.  
 
 ### Changed
-- Bug: Debounce now resets to millis()
-- renamed BLE_stepperPosition to BLE_targetPosition to clarify the variable it controls. 
-- increased BLE communications task to 3500 stack.
+- Renamed BLE_stepperPosition to BLE_targetPosition to clarify the variable it controls. 
+- Increased BLE communications task to 3500 stack.
+- Fixed recurring debugging line when driver was at normal temp.
+- Fixed length of returnValue on custom BLE bool read requests. 
 
-## [1.6.21]
--
+## [1.6.19] - 2021-6-19
+
 ### Added
 - Initial implementation of the custom characteristic. 
 - Added additional FTMS characteristics and some refactoring of shared variables

@@ -203,53 +203,57 @@ bool spinDown() {
 
 // as a note, Trainer Road sends 50w target whenever the app is connected.
 void computeERG(int newSetPoint) {
+  // SS2K_LOG(BLE_SERVER_LOG_TAG, "ComputeERG. Setpoint: %d", newSetPoint);
   if (userConfig.getERGMode() && spinBLEClient.connectedPM) {
     // continue
   } else {
+    // SS2K_LOG(BLE_SERVER_LOG_TAG, "ERG request but ERG off or no connected PM");
     return;
   }
+  static bool userIsPedaling = true;
+  static int setPoint        = 0;
+  float incline              = userConfig.getIncline();
+  int newIncline             = incline;
+  int amountToChangeIncline  = 0;
+  int wattChange             = userConfig.getSimulatedWatts() - setPoint;
 
-  static int setPoint       = 0;
-  int currentWatts          = userConfig.getSimulatedWatts();
-  float incline             = userConfig.getIncline();
-  int cad                   = userConfig.getSimulatedCad();
-  int newIncline            = incline;
-  int amountToChangeIncline = 0;
-
-  if (newSetPoint > 0) {  // only update the value if value sent
+  if (newSetPoint > 0) {  // only update the value if new value is sent
     setPoint = newSetPoint;
-    return;
   }
-  if (setPoint == 0) {
-    return;
-  }
-
-  // only update if pedaling faster then 20rpm
-  if (cad > 20) {
-    // 30  is amount of watts per shift. Was 50, seemed like too much...
-    if (abs(currentWatts - setPoint) < 30) {
-      amountToChangeIncline = (currentWatts - setPoint) * 1;
-    }
-    if (abs(currentWatts - setPoint) > 30) {
-      amountToChangeIncline = amountToChangeIncline + ((currentWatts - setPoint)) * 1;
-    }
-    amountToChangeIncline = amountToChangeIncline / ((currentWatts / 100) + 1);
-
-    // limit to 5 shifts at a time
-    if (abs(amountToChangeIncline) > userConfig.getShiftStep() * 5) {
-      if (amountToChangeIncline > 0) {
-        amountToChangeIncline = userConfig.getShiftStep() * 5;
-      }
-      if (amountToChangeIncline < 0) {
-        amountToChangeIncline = -(userConfig.getShiftStep() * 5);
-      }
-    }
-  } else {
-    return;
+  if (setPoint < 50) {  // minumum setPoint
+    setPoint = 50;
   }
 
-  newIncline = incline - amountToChangeIncline;  //  }
+  if (userConfig.getSimulatedCad() <= 20) {
+    if (userIsPedaling) {  // Test so motor stop command only happens once.
+      motorStop(true);     // release tension
+    }
+    userIsPedaling = false;
+    // Cadence too low, nothing to do here
+    return;
+  }
+  userIsPedaling = true;
+
+  amountToChangeIncline = wattChange * userConfig.getERGSensitivity();
+  if (abs(wattChange) < WATTS_PER_SHIFT) {
+    // As the desired value gets closer, make smaller changes for a smoother experience
+    amountToChangeIncline *= SUB_SHIFT_SCALE;
+  }
+  // limit to 10 shifts at a time
+  if (abs(amountToChangeIncline) > userConfig.getShiftStep() * 10) {
+    if (amountToChangeIncline > 0) {
+      amountToChangeIncline = userConfig.getShiftStep() * 10;
+    }
+    if (amountToChangeIncline < 0) {
+      amountToChangeIncline = -(userConfig.getShiftStep() * 10);
+    }
+  }
+
+  // Reduce the amount per loop (don't try to oneshot it) and scale the movement the higher the watt target is as higher wattages require less knob movement.
+  amountToChangeIncline = amountToChangeIncline / ((userConfig.getSimulatedWatts() / 100) + .1);  // +.1 to eliminate possible divide by zero.
+  newIncline            = incline - amountToChangeIncline;
   userConfig.setIncline(newIncline);
+  // SS2K_LOG(BLE_SERVER_LOG_TAG, "newincline: %f", newIncline);
 }
 
 void updateIndoorBikeDataChar() {
@@ -578,10 +582,6 @@ void ss2kCustomCharacteristicCallbacks::onWrite(BLECharacteristic *pCharacterist
     returnValue[i] = rxValue[i];
   }
 
-  if (rxValue[0] == read) {  // read requests are shorter than writes but output is same length.
-    returnLength += 2;
-  }
-
   SS2K_LOG(BLE_SERVER_LOG_TAG, "Custom Request Received");
   switch (rxValue[1]) {
     case BLE_firmwareUpdateURL:  // 0x01
@@ -594,6 +594,7 @@ void ss2kCustomCharacteristicCallbacks::onWrite(BLECharacteristic *pCharacterist
         int inc        = userConfig.getIncline() * 100;
         returnValue[2] = (uint8_t)(inc & 0xff);
         returnValue[3] = (uint8_t)(inc >> 8);
+        returnLength += 2;
       }
       if (rxValue[0] == write) {
         userConfig.setIncline(bytes_to_u16(rxValue[3], rxValue[2]) / 100);
@@ -605,6 +606,7 @@ void ss2kCustomCharacteristicCallbacks::onWrite(BLECharacteristic *pCharacterist
       if (rxValue[0] == read) {
         returnValue[2] = (uint8_t)(userConfig.getSimulatedWatts() & 0xff);
         returnValue[3] = (uint8_t)(userConfig.getSimulatedWatts() >> 8);
+        returnLength += 2;
       }
       if (rxValue[0] == write) {
         userConfig.setSimulatedWatts(bytes_to_u16(rxValue[3], rxValue[2]));
@@ -616,6 +618,7 @@ void ss2kCustomCharacteristicCallbacks::onWrite(BLECharacteristic *pCharacterist
       if (rxValue[0] == read) {
         returnValue[2] = (uint8_t)(userConfig.getSimulatedHr() & 0xff);
         returnValue[3] = (uint8_t)(userConfig.getSimulatedHr() >> 8);
+        returnLength += 2;
       }
       if (rxValue[0] == write) {
         userConfig.setSimulatedHr(bytes_to_u16(rxValue[3], rxValue[2]));
@@ -627,6 +630,7 @@ void ss2kCustomCharacteristicCallbacks::onWrite(BLECharacteristic *pCharacterist
       if (rxValue[0] == read) {
         returnValue[2] = (uint8_t)(userConfig.getSimulatedCad() & 0xff);
         returnValue[3] = (uint8_t)(userConfig.getSimulatedCad() >> 8);
+        returnLength += 2;
       }
       if (rxValue[0] == write) {
         userConfig.setSimulatedCad(bytes_to_u16(rxValue[3], rxValue[2]));
@@ -639,6 +643,7 @@ void ss2kCustomCharacteristicCallbacks::onWrite(BLECharacteristic *pCharacterist
       if (rxValue[0] == read) {
         returnValue[2] = (uint8_t)(spd & 0xff);
         returnValue[3] = (uint8_t)(spd >> 8);
+        returnLength += 2;
       }
       if (rxValue[0] == write) {
         userConfig.setSimulatedSpeed(bytes_to_u16(rxValue[3], rxValue[2]) / 10);
@@ -654,6 +659,7 @@ void ss2kCustomCharacteristicCallbacks::onWrite(BLECharacteristic *pCharacterist
       if (rxValue[0] == read) {
         returnValue[2] = (uint8_t)(userConfig.getShiftStep() & 0xff);
         returnValue[3] = (uint8_t)(userConfig.getShiftStep() >> 8);
+        returnLength += 2;
       }
       if (rxValue[0] == write) {
         userConfig.setShiftStep(bytes_to_u16(rxValue[3], rxValue[2]));
@@ -665,6 +671,7 @@ void ss2kCustomCharacteristicCallbacks::onWrite(BLECharacteristic *pCharacterist
       if (rxValue[0] == read) {
         returnValue[2] = (uint8_t)(userConfig.getStepperPower() & 0xff);
         returnValue[3] = (uint8_t)(userConfig.getStepperPower() >> 8);
+        returnLength += 2;
       }
       if (rxValue[0] == write) {
         userConfig.setStepperPower(bytes_to_u16(rxValue[3], rxValue[2]));
@@ -676,9 +683,10 @@ void ss2kCustomCharacteristicCallbacks::onWrite(BLECharacteristic *pCharacterist
       returnValue[0] = success;
       if (rxValue[0] == read) {
         returnValue[2] = (uint8_t)(userConfig.getStealthchop());
+        returnLength += 1;
       }
       if (rxValue[0] == write) {
-        userConfig.setStealthChop(bytes_to_u16(rxValue[3], rxValue[2]));
+        userConfig.setStealthChop(rxValue[2]);
         updateStealthchop();
       }
       break;
@@ -689,6 +697,7 @@ void ss2kCustomCharacteristicCallbacks::onWrite(BLECharacteristic *pCharacterist
       if (rxValue[0] == read) {
         returnValue[2] = (uint8_t)(inc & 0xff);
         returnValue[3] = (uint8_t)(inc >> 8);
+        returnLength += 2;
       }
       if (rxValue[0] == write) {
         userConfig.setInclineMultiplier(bytes_to_u16(rxValue[3], rxValue[2]));
@@ -701,6 +710,7 @@ void ss2kCustomCharacteristicCallbacks::onWrite(BLECharacteristic *pCharacterist
       if (rxValue[0] == read) {
         returnValue[2] = (uint8_t)(pcf & 0xff);
         returnValue[3] = (uint8_t)(pcf >> 8);
+        returnLength += 2;
       }
       if (rxValue[0] == write) {
         userConfig.setPowerCorrectionFactor(bytes_to_u16(rxValue[3], rxValue[2]) / 10);
@@ -711,9 +721,10 @@ void ss2kCustomCharacteristicCallbacks::onWrite(BLECharacteristic *pCharacterist
       returnValue[0] = success;
       if (rxValue[0] == read) {
         returnValue[2] = (uint8_t)(userConfig.getSimulateHr());
+        returnLength += 1;
       }
       if (rxValue[0] == write) {
-        userConfig.setSimulateHr(bytes_to_u16(rxValue[3], rxValue[2]));
+        userConfig.setSimulateHr(rxValue[2]);
       }
       break;
 
@@ -721,9 +732,10 @@ void ss2kCustomCharacteristicCallbacks::onWrite(BLECharacteristic *pCharacterist
       returnValue[0] = success;
       if (rxValue[0] == read) {
         returnValue[2] = (uint8_t)(userConfig.getSimulateWatts());
+        returnLength += 1;
       }
       if (rxValue[0] == write) {
-        userConfig.setSimulateWatts(bytes_to_u16(rxValue[3], rxValue[2]));
+        userConfig.setSimulateWatts(rxValue[2]);
       }
       break;
 
@@ -731,9 +743,10 @@ void ss2kCustomCharacteristicCallbacks::onWrite(BLECharacteristic *pCharacterist
       returnValue[0] = success;
       if (rxValue[0] == read) {
         returnValue[2] = (uint8_t)(userConfig.getSimulateCad());
+        returnLength += 1;
       }
       if (rxValue[0] == write) {
-        userConfig.setSimulateCad(bytes_to_u16(rxValue[3], rxValue[2]));
+        userConfig.setSimulateCad(rxValue[2]);
       }
       break;
 
@@ -741,9 +754,10 @@ void ss2kCustomCharacteristicCallbacks::onWrite(BLECharacteristic *pCharacterist
       returnValue[0] = success;
       if (rxValue[0] == read) {
         returnValue[2] = (uint8_t)(userConfig.getERGMode());
+        returnLength += 1;
       }
       if (rxValue[0] == write) {
-        userConfig.setERGMode(bytes_to_u16(rxValue[3], rxValue[2]));
+        userConfig.setERGMode(rxValue[2]);
       }
       break;
 
@@ -751,9 +765,10 @@ void ss2kCustomCharacteristicCallbacks::onWrite(BLECharacteristic *pCharacterist
       returnValue[0] = success;
       if (rxValue[0] == read) {
         returnValue[2] = (uint8_t)(userConfig.getautoUpdate());
+        returnLength += 1;
       }
       if (rxValue[0] == write) {
-        userConfig.setAutoUpdate(bytes_to_u16(rxValue[3], rxValue[2]));
+        userConfig.setAutoUpdate(rxValue[2]);
       }
       break;
 
@@ -782,6 +797,7 @@ void ss2kCustomCharacteristicCallbacks::onWrite(BLECharacteristic *pCharacterist
       if (rxValue[0] == read) {
         returnValue[2] = (uint8_t)(userConfig.getShifterPosition() & 0xff);
         returnValue[3] = (uint8_t)(userConfig.getShifterPosition() >> 8);
+        returnLength += 2;
       }
       if (rxValue[0] == write) {
         userConfig.setShifterPosition(bytes_to_u16(rxValue[3], rxValue[2]));
@@ -790,6 +806,7 @@ void ss2kCustomCharacteristicCallbacks::onWrite(BLECharacteristic *pCharacterist
 
     case BLE_saveToSpiffs:  // 0x18
       userConfig.saveToSPIFFS();
+      returnValue[0] = success;
       break;
 
     case BLE_targetPosition:  // 0x19
@@ -799,10 +816,10 @@ void ss2kCustomCharacteristicCallbacks::onWrite(BLECharacteristic *pCharacterist
         returnValue[3] = (uint8_t)(targetPosition >> 8);
         returnValue[4] = (uint8_t)(targetPosition >> 16);
         returnValue[5] = (uint8_t)(targetPosition >> 24);
-        returnLength += 2;
+        returnLength += 4;
       }
       if (rxValue[0] == write) {
-        targetPosition = (long((uint8_t)(rxValue[2]) << 0 | (uint8_t)(rxValue[3]) << 8 | (uint8_t)(rxValue[4]) << 16 | (uint8_t)(rxValue[5]) << 24));
+        targetPosition = (int32_t((uint8_t)(rxValue[2]) << 0 | (uint8_t)(rxValue[3]) << 8 | (uint8_t)(rxValue[4]) << 16 | (uint8_t)(rxValue[5]) << 24));
       }
       break;
 
@@ -810,9 +827,10 @@ void ss2kCustomCharacteristicCallbacks::onWrite(BLECharacteristic *pCharacterist
       returnValue[0] = success;
       if (rxValue[0] == read) {
         returnValue[2] = (uint8_t)(externalControl);
+        returnLength += 1;
       }
       if (rxValue[0] == write) {
-        externalControl = (bool)(bytes_to_u16(rxValue[3], rxValue[2]));
+        externalControl = static_cast<bool>(rxValue[2]);
       }
       break;
 
@@ -820,9 +838,10 @@ void ss2kCustomCharacteristicCallbacks::onWrite(BLECharacteristic *pCharacterist
       returnValue[0] = success;
       if (rxValue[0] == read) {
         returnValue[2] = (uint8_t)(syncMode);
+        returnLength += 1;
       }
       if (rxValue[0] == write) {
-        syncMode = (bool)(bytes_to_u16(rxValue[3], rxValue[2]));
+        syncMode = static_cast<bool>(rxValue[2]);
       }
       break;
   }

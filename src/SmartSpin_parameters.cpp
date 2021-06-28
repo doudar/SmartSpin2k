@@ -30,6 +30,7 @@ void userParameters::setDefaults() {  // Move these to set the values as #define
   simulateWatts         = false;
   simulateCad           = false;
   ERGMode               = false;
+  ERGSensitivity        = ERG_SENSITIVITY;
   autoUpdate            = AUTO_FIRMWARE_UPDATE;
   ssid                  = DEVICE_NAME;
   password              = DEFAULT_PASSWORD;
@@ -64,6 +65,7 @@ String userParameters::returnJSON(bool includeDebugLog) {
   doc["simulateWatts"]         = simulateWatts;
   doc["simulateCad"]           = simulateCad;
   doc["ERGMode"]               = ERGMode;
+  doc["ERGSensitivity"]        = ERGSensitivity;
   doc["autoUpdate"]            = autoUpdate;
   doc["ssid"]                  = ssid;
   doc["password"]              = password;
@@ -98,9 +100,10 @@ void userParameters::saveToSPIFFS() {
   StaticJsonDocument<USERCONFIG_JSON_SIZE> doc;
 
   // Set the values in the document
+  // commented items are not needed in save file
 
   doc["firmwareUpdateURL"] = firmwareUpdateURL;
-  doc["incline"]           = incline;
+  // doc["incline"]           = incline;
   // doc["simulatedWatts"]       = simulatedWatts;
   // doc["simulatedHr"]          = simulatedHr;
   // doc["simulatedCad"]         = simulatedCad;
@@ -114,9 +117,10 @@ void userParameters::saveToSPIFFS() {
   // doc["simulateWatts"]         = simulateWatts;
   // doc["simulateCad"]           = simulateCad;
   // doc["ERGMode"]               = ERGMode;
-  doc["autoUpdate"] = autoUpdate;
-  doc["ssid"]       = ssid;
-  doc["password"]   = password;
+  doc["ERGSensitivity"] = ERGSensitivity;
+  doc["autoUpdate"]     = autoUpdate;
+  doc["ssid"]           = ssid;
+  doc["password"]       = password;
   // doc["foundDevices"]         = foundDevices; //I don't see a need
   // currently in keeping this boot to boot
   doc["connectedPowerMeter"]   = connectedPowerMeter;
@@ -158,7 +162,7 @@ void userParameters::loadFromSPIFFS() {
 
   // Copy values from the JsonDocument to the Config
   setFirmwareUpdateURL(doc["firmwareUpdateURL"]);
-  setIncline(doc["incline"]);
+  // setIncline(doc["incline"]);
   // setSimulatedWatts     (doc["simulatedWatts"]);
   // setSimulatedHr        (doc["simulatedHr"]);
   // setSimulatedCad       (doc["simulatedCad"]);
@@ -172,6 +176,9 @@ void userParameters::loadFromSPIFFS() {
   setSimulateWatts(false);
   setSimulateCad(false);
   // setERGMode(doc["ERGMode"]);
+  if (doc["ERGSensitivity"]) {
+    setERGSensitivity(doc["ERGSensitivity"]);
+  }
   setAutoUpdate(doc["autoUpdate"]);
   setSsid(doc["ssid"]);
   setPassword(doc["password"]);
