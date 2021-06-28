@@ -2,10 +2,12 @@
 
 ## [Case]
 -Body_Left.stl
+
 -Body_Right.stl
 
 ## [Gears]
 -43_Tooth_Mod1.STL
+
 -Spur gear 1M 11T.STL
 
 ## [MountingStrap]
