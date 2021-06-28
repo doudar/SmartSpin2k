@@ -12,6 +12,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Added comments after compiler #endif Statements to make it easier to see what the partner #if statement is.
 - Added BLE_syncMode to support syncing shifterPosition with bikes that also report their resistance level. 
 - Added git tag to prevent branch from downgrading to the last release. 
+- Added Hardware Version 2.0. 
 - MCWPWM for stepper control.
 - Erg Sensitivity control added.
 - Function to stop motor and release tension if the user stops pedaling in ERG mode.  
