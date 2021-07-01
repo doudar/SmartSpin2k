@@ -1,9 +1,10 @@
 [![Watch the video](Pictures/youtube.png)](https://youtu.be/cPiIlZ2P5Ac)
 Http://GitHub.com/doudar/SmartSpin2K
 # New Hardware Version 2.0! 
-- Same electronics
+- Same electronics.
 - 25% more torque.
-- Smoother operation
+- Smoother operation.
+- Shorter so it fits more bikes. (49mm center of knob to front vs 60mm.)
 - Much simpler assembly.
 - Easier to print.
 - Less printed parts.
