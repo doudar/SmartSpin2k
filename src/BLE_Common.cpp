@@ -6,6 +6,7 @@
  */
 
 #include "Main.h"
+#include "SS2KLog.h"
 #include "BLE_Common.h"
 
 #include <math.h>
@@ -23,20 +24,19 @@ void BLECommunications(void *pvParameters) {
     // **********************************Client***************************************
     for (size_t x = 0; x < NUM_BLE_DEVICES; x++) {  // loop through discovered devices
       if (spinBLEClient.myBLEDevices[x].connectedClientID != BLE_HS_CONN_HANDLE_NONE) {
-        // spinBLEClient.myBLEDevices[x].print();
+        SS2K_LOGD(BLE_COMMON_LOG_TAG, "Address: (%s) Client ID: (%d) SerUUID: (%s) CharUUID: (%s) HRM: (%s) PM: (%s) CSC: (%s) CT: (%s) doConnect: (%s)",
+                  spinBLEClient.myBLEDevices[x].peerAddress.toString().c_str(), spinBLEClient.myBLEDevices[x].connectedClientID,
+                  spinBLEClient.myBLEDevices[x].serviceUUID.toString().c_str(), spinBLEClient.myBLEDevices[x].charUUID.toString().c_str(),
+                  spinBLEClient.myBLEDevices[x].userSelectedHR ? "true" : "false", spinBLEClient.myBLEDevices[x].userSelectedPM ? "true" : "false",
+                  spinBLEClient.myBLEDevices[x].userSelectedCSC ? "true" : "false", spinBLEClient.myBLEDevices[x].userSelectedCT ? "true" : "false",
+                  spinBLEClient.myBLEDevices[x].doConnect ? "true" : "false");
         if (spinBLEClient.myBLEDevices[x].advertisedDevice) {  // is device registered?
-          // debugDirector("1",false);
           SpinBLEAdvertisedDevice myAdvertisedDevice = spinBLEClient.myBLEDevices[x];
           if ((myAdvertisedDevice.connectedClientID != BLE_HS_CONN_HANDLE_NONE) && (myAdvertisedDevice.doConnect == false)) {  // client must not be in connection process
-            // debugDirector("2",false);
-            if (BLEDevice::getClientByPeerAddress(myAdvertisedDevice.peerAddress)) {  // nullptr check
-              // debugDirector("3",false);
+            if (BLEDevice::getClientByPeerAddress(myAdvertisedDevice.peerAddress)) {                                           // nullptr check
               BLEClient *pClient = NimBLEDevice::getClientByPeerAddress(myAdvertisedDevice.peerAddress);
               // Client connected with a valid UUID registered
               if ((myAdvertisedDevice.serviceUUID != BLEUUID((uint16_t)0x0000)) && (pClient->isConnected())) {
-                // debugDirector("4");
-                // Write the recieved data to the Debug Director
-
                 BLERemoteCharacteristic *pRemoteBLECharacteristic = pClient->getService(myAdvertisedDevice.serviceUUID)->getCharacteristic(myAdvertisedDevice.charUUID);
                 // std::string data                                  = pRemoteBLECharacteristic->getValue();
                 // uint8_t *pData                                    = reinterpret_cast<uint8_t *>(&data[0]);
@@ -49,51 +49,53 @@ void BLECommunications(void *pvParameters) {
                   if (handle == nullptr || handle->data == nullptr || handle->length == 0) {
                     break;
                   }
-                  uint8_t *pData = handle->data;
-                  size_t length  = handle->length;
+                  uint8_t *pData             = handle->data;
+                  size_t length              = handle->length;
+                  const int kLogBufMaxLength = 250;
+                  char logBuf[kLogBufMaxLength];
+                  SS2K_LOGD(BLE_COMMON_LOG_TAG, "Data length: %d", data.length());
+                  int logBufLength = ss2k_log_hex_to_buffer(pData, length, logBuf, 0, kLogBufMaxLength);
 
-                  char logBuf[250];
-                  char *logBufP = logBuf;
-                  for (int i = 0; i < length; i++) {
-                    logBufP += sprintf(logBufP, "%02x ", pData[i]);
-                  }
-                  logBufP += sprintf(logBufP, "<- %.8s | %.8s", myAdvertisedDevice.serviceUUID.toString().c_str(), myAdvertisedDevice.charUUID.toString().c_str());
+                  logBufLength += snprintf(logBuf + logBufLength, kLogBufMaxLength - logBufLength, "<- %.8s | %.8s", myAdvertisedDevice.serviceUUID.toString().c_str(),
+                                           myAdvertisedDevice.charUUID.toString().c_str());
 
-                  std::shared_ptr<SensorData> sensorData = sensorDataFactory.getSensorData(pRemoteBLECharacteristic->getUUID(), pData, length);
+                  std::shared_ptr<SensorData> sensorData = sensorDataFactory.getSensorData(
+                      pRemoteBLECharacteristic->getUUID(), (uint64_t)pRemoteBLECharacteristic->getRemoteService()->getClient()->getPeerAddress(), pData, length);
 
-                  logBufP += sprintf(logBufP, " | %s:[", sensorData->getId().c_str());
+                  logBufLength += snprintf(logBuf + logBufLength, kLogBufMaxLength - logBufLength, " | %s[", sensorData->getId().c_str());
                   if (sensorData->hasHeartRate() && !userConfig.getSimulateHr()) {
                     int heartRate = sensorData->getHeartRate();
                     userConfig.setSimulatedHr(heartRate);
                     spinBLEClient.connectedHR |= true;
-                    logBufP += sprintf(logBufP, " HR(%d)", heartRate % 1000);
+                    logBufLength += snprintf(logBuf + logBufLength, kLogBufMaxLength - logBufLength, " HR(%d)", heartRate % 1000);
                   }
                   if (sensorData->hasCadence() && !userConfig.getSimulateCad()) {
                     float cadence = sensorData->getCadence();
                     userConfig.setSimulatedCad(cadence);
                     spinBLEClient.connectedCD |= true;
-                    logBufP += sprintf(logBufP, " CD(%.2f)", fmodf(cadence, 1000.0));
+                    logBufLength += snprintf(logBuf + logBufLength, kLogBufMaxLength - logBufLength, " CD(%.2f)", fmodf(cadence, 1000.0));
                   }
                   if (sensorData->hasPower() && !userConfig.getSimulateWatts()) {
                     int power = sensorData->getPower() * userConfig.getPowerCorrectionFactor();
                     userConfig.setSimulatedWatts(power);
                     spinBLEClient.connectedPM |= true;
-                    logBufP += sprintf(logBufP, " PW(%d)", power % 10000);
+                    logBufLength += snprintf(logBuf + logBufLength, kLogBufMaxLength - logBufLength, " PW(%d)", power % 10000);
                   }
                   if (sensorData->hasSpeed()) {
                     float speed = sensorData->getSpeed();
                     userConfig.setSimulatedSpeed(speed);
-                    logBufP += sprintf(logBufP, " SD(%.2f)", fmodf(speed, 1000.0));
+                    logBufLength += snprintf(logBuf + logBufLength, kLogBufMaxLength - logBufLength, " SD(%.2f)", fmodf(speed, 1000.0));
                   }
-                  strcat(logBufP, " ]");
-                  debugDirector(String(logBuf), true, true);
+                  strncat(logBuf + logBufLength, " ]", kLogBufMaxLength - logBufLength);
+                  SS2K_LOG(BLE_COMMON_LOG_TAG, "%s", logBuf);
+                  SEND_TO_TELEGRAM(String(logBuf));
                 }
               } else if (!pClient->isConnected()) {  // This shouldn't ever be
                                                      // called...
                 if (pClient->disconnect() == 0) {    // 0 is a successful disconnect
                   BLEDevice::deleteClient(pClient);
                   vTaskDelay(100 / portTICK_PERIOD_MS);
-                  debugDirector("Workaround connect");
+                  SS2K_LOG(BLE_COMMON_LOG_TAG, "Workaround connect");
                   myAdvertisedDevice.doConnect = true;
                 }
               }
@@ -113,7 +115,7 @@ void BLECommunications(void *pvParameters) {
     }
 #ifdef DEBUG_HR_TO_PWR
     calculateInstPwrFromHR();
-#endif
+#endif  // DEBUG_HR_TO_PWR
 
     if (!spinBLEClient.connectedPM && !hr2p && !userConfig.getSimulateWatts() && !userConfig.getSimulateCad()) {
       userConfig.setSimulatedCad(0);
@@ -125,10 +127,15 @@ void BLECommunications(void *pvParameters) {
 
     if (connectedClientCount() > 0) {
       // update the BLE information on the server
-      computeCSC();
       updateIndoorBikeDataChar();
-      updateCyclingPowerMesurementChar();
+      updateCyclingPowerMeasurementChar();
       updateHeartRateMeasurementChar();
+      controlPointIndicate();
+
+      if (spinDown()) {
+      }
+
+      computeERG();
 
       if (updateConnParametersFlag) {
         vTaskDelay(100 / portTICK_PERIOD_MS);
@@ -144,7 +151,7 @@ void BLECommunications(void *pvParameters) {
     }
     if (BLEDevice::getAdvertising()) {
       if (!(BLEDevice::getAdvertising()->isAdvertising()) && (BLEDevice::getServer()->getConnectedCount() < CONFIG_BT_NIMBLE_MAX_CONNECTIONS - NUM_BLE_DEVICES)) {
-        debugDirector("Starting Advertising From Communication Loop");
+        SS2K_LOG(BLE_COMMON_LOG_TAG, "Starting Advertising From Communication Loop");
         BLEDevice::startAdvertising();
       }
     }
@@ -154,6 +161,6 @@ void BLECommunications(void *pvParameters) {
     vTaskDelay((BLE_NOTIFY_DELAY / 2) / portTICK_PERIOD_MS);
 #ifdef DEBUG_STACK
     Serial.printf("BLEComm: %d \n", uxTaskGetStackHighWaterMark(BLECommunicationTask));
-#endif
+#endif  // DEBUG_STACK
   }
 }

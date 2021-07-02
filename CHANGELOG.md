@@ -5,7 +5,29 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/)
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
+
 ### Added
+- BLE Custom Characteristic motor driver calls now apply settings received
+- Motor current now automatically scales if ESP32 temp starts getting too high. 
+- Added comments after compiler #endif Statements to make it easier to see what the partner #if statement is.
+- Added BLE_syncMode to support syncing shifterPosition with bikes that also report their resistance level. 
+- Added git tag to prevent branch from downgrading to the last release. 
+- Added Hardware Version 2.0. 
+- MCWPWM for stepper control.
+- Erg Sensitivity control added.
+- Function to stop motor and release tension if the user stops pedaling in ERG mode.  
+
+### Changed
+- Renamed BLE_stepperPosition to BLE_targetPosition to clarify the variable it controls. 
+- Increased BLE communications task to 3500 stack.
+- Fixed recurring debugging line when driver was at normal temp.
+- Fixed length of returnValue on custom BLE bool read requests. 
+
+## [1.6.19] - 2021-6-19
+
+### Added
+- Initial implementation of the custom characteristic. 
+- Added additional FTMS characteristics and some refactoring of shared variables
 - Added GZipped jQuery to fix non WAN connected manual updates.
 - Pin arduino-esp32 package to version 1.0.6 to fix build issue
 - Added + - Buttons to sliders. 
@@ -30,6 +52,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Filter Flywheel advertisements by name.
 - Add documentation to SensorData class.
 - Enabled native testing.
+- Added logging library which supports levels.
 
 ### Changed
 - Moved Vin to the correct side on the ESP32 connection diagram. 
@@ -56,6 +79,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Ignore zero heart rate reported from remote FTMS.
 - Fix Assimoa Uno stuck cadence.
 - Started extract non-arduino code into a cross-platform library.
+- Changed all logging calls to new logging library.
 
 ### Removed
 - Deleted and ignored .pio folder which had been mistakenly committed.

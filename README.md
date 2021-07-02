@@ -1,5 +1,20 @@
 [![Watch the video](Pictures/youtube.png)](https://youtu.be/cPiIlZ2P5Ac)
 Http://GitHub.com/doudar/SmartSpin2K
+# New Hardware Version 2.0! 
+- Same electronics.
+- 25% more torque.
+- Smoother operation.
+- Shorter so it fits more bikes. (49mm center of knob to front vs 60mm.)
+- Much simpler assembly.
+- Easier to print.
+- Less printed parts.
+- Less hardware. 
+
+Check it out in the hardware folder! I haven't built a non-pcb version of this yet so it may not all fit but if anybody gives it a try, please let me know!
+
+https://github.com/doudar/SmartSpin2k/tree/develop/Hardware/Case%20Version2
+<img src="Pictures/Version2.0.jpg" alt="Hardware 2.0" style="height: 300px; width: 100"/> 
+
 # SmartSpin2K
 
 Hardware (3d Printed) and Software Project that uses an ESP32 and stepper motor to control spin bikes that have a resistance knob. 
@@ -9,9 +24,6 @@ Optionally, the SmartSpin2K project has also progressed to the point of where it
 
 ## Background
 I travel for a living and some hotels I stay at have spin bikes. I started carrying my own power meter pedals for the spin bikes so I could ride Zwift, but the experience just isn't the same without automatic resistance on the hills. Then one day I was looking down at that simple to turn knob and I had a thought - With the power meter pedals attached, almost everything is already in place on this $300 spin bike to turn it into the equivalent of a $3,000 computer controlled smart bike! And so here we are....
-
-## NEW Instrucable!
-Check it out at https://www.instructables.com/Spin-Bike-Controller/
 
 ## Summary of function
 
@@ -41,11 +53,11 @@ So for $700-$1000 (or much less if you use HR2VP) you can build a fully function
 
 Surprisingly, my spin bike with the SmartSpin2K actually has better "road feel" than my expensive bike trainer, and since it's a belt drive bike, it's virtually silent. That's somthing you cannot achieve with a chain driven bike on any smart trainer. 
 
-# NEW! - Small quantity of kits availiable!
-If you would like a kit with a PCB, send a request to SmartSpin2K@gmail.com . Cost is $175 + shipping for all the printed parts + electronics, for an "almost ready to use unit". Note that if you go this route, this is still an open source hardware project and responsibility lies with **you** as to the proper construction and use. As such, you'll want to at least pull the cover off before use and take a look to ensure it's built to your standards (I think it's pretty good:) I'll be putting these together on an as ordered basis, so expect 3-5 days prior to shipping.  Please see https://github.com/doudar/SmartSpin2k/wiki/Fitting-the-SmartSpin2k!
+# Small quantity of kits availiable!
+We're really here to help you build your own SmartSpin2K but If you would like a kit with a PCB, send a request to SmartSpin2K@gmail.com . Cost is $175 + shipping for all the printed parts + electronics, for an "almost ready to use unit". Note that if you go this route, this is still an open source hardware project and responsibility lies with **you** as to the proper construction and use. As such, you'll want to at least pull the cover off before use and take a look to ensure it's built to your standards (I think it's pretty good:) I'll be putting these together on an as ordered basis, so expect 3-5 days prior to shipping.  Please see https://github.com/doudar/SmartSpin2k/wiki/Fitting-the-SmartSpin2k!
 
-### We're working really hard on full documentaion
-If you're adventurous and handy you can probably take a look at my pictures below or the assembly video and start tinkering. Please check out our new Instructable at https://www.instructables.com/Spin-Bike-Controller/ If there are any questions on the Instructable, please add info in the discussions and we will clarify there and on the new Instructable. This is a growing community and we now have a few members that would love to help you to get your SmartSpin2k working. There's also a wiki at https://github.com/doudar/SmartSpin2k/wiki 
+### Documentaion
+Please check out our new Instructable at https://www.instructables.com/Spin-Bike-Controller/ If there are any questions on the Instructable, please add info in the discussions and we will clarify there and on the new Instructable. This is a growing community and we now have a few members that would love to help you to get your SmartSpin2k working. There's also a wiki at https://github.com/doudar/SmartSpin2k/wiki 
 
 In short, the process is:
 
@@ -62,7 +74,7 @@ In short, the process is:
 4. Compile the project and upload to an ESP32
 
 ### Continue from either method above:
-5. Print all the hardware. You'll need 1 Bottom Case, 1 Knob Cup, Both Spur Gears, 1 Stepper Crossbar, 1 Top Cover and a knob insert that fits your spin bike. PETG works well for printing all hardware.
+5. Print all the hardware. Check out the hardware folder for information on which hardware is best for you and what parts you'll need to print.  https://github.com/doudar/SmartSpin2k/tree/develop/Hardware
 6. If you're using the same switches for the shifters, you can optionally print the provided files. Previously I was using tape as a protective enclosure and it worked fine (if ugly).
 7. Wire all of the connections outside the case. Use push on connectors if possible. 
 8. Press both bearings into the recess.
