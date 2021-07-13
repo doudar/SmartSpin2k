@@ -8,8 +8,6 @@
 #include "sdkconfig.h"
 #include <unity.h>
 #include "test.h"
-//#include "test_FitnessMachineIndoorBikeData.cpp"
-//#include "test_CyclePowerData.cpp"
 
 void process() {
   UNITY_BEGIN();

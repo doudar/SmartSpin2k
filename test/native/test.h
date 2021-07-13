@@ -5,6 +5,8 @@
  * SPDX-License-Identifier: GPL-2.0-only
  */
 
+#pragma once 
+
 class test_fitnessMachineIndoorBikeData {
  public:
   static void test_parses_power(void);
