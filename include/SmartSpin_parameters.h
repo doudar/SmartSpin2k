@@ -9,6 +9,8 @@
 
 #include <Arduino.h>
 
+#define CONFIG_LOG_TAG "Config"
+
 class userParameters {
  private:
   String firmwareUpdateURL;
@@ -25,20 +27,23 @@ class userParameters {
   float powerCorrectionFactor;
   bool simulateHr;
   bool simulateWatts;
+  bool simulateCad;
   bool ERGMode;
+  float ERGSensitivity;
   bool autoUpdate;
   String ssid;
   String password;
   String foundDevices          = " ";
   String connectedPowerMeter   = "any";
   String connectedHeartMonitor = "any";
+  int shifterPosition;
 
  public:
   const char* getFirmwareUpdateURL() { return firmwareUpdateURL.c_str(); }
   float getIncline() { return incline; }
   int getSimulatedWatts() { return simulatedWatts; }
   int getSimulatedHr() { return simulatedHr; }
-  float getSimulatedCad() { return simulatedCad; }
+  int getSimulatedCad() { return simulatedCad; }
   float getSimulatedSpeed() { return simulatedSpeed; }
   const char* getDeviceName() { return deviceName.c_str(); }
   int getShiftStep() { return shiftStep; }
@@ -48,13 +53,16 @@ class userParameters {
   float getPowerCorrectionFactor() { return powerCorrectionFactor; }
   bool getSimulateHr() { return simulateHr; }
   bool getSimulateWatts() { return simulateWatts; }
+  bool getSimulateCad() { return simulateCad; }
   bool getERGMode() { return ERGMode; }
+  float getERGSensitivity() { return ERGSensitivity; }
   bool getautoUpdate() { return autoUpdate; }
   const char* getSsid() { return ssid.c_str(); }
   const char* getPassword() { return password.c_str(); }
   const char* getFoundDevices() { return foundDevices.c_str(); }
   const char* getconnectedPowerMeter() { return connectedPowerMeter.c_str(); }
   const char* getconnectedHeartMonitor() { return connectedHeartMonitor.c_str(); }
+  int getShifterPosition() { return shifterPosition; }
 
   void setDefaults();
   void setFirmwareUpdateURL(String fURL) { firmwareUpdateURL = fURL; }
@@ -71,15 +79,18 @@ class userParameters {
   void setPowerCorrectionFactor(float pm) { powerCorrectionFactor = pm; }
   void setSimulateHr(bool shr) { simulateHr = shr; }
   void setSimulateWatts(bool swt) { simulateWatts = swt; }
+  void setSimulateCad(bool scd) { simulateCad = scd; }
   void setERGMode(bool erg) { ERGMode = erg; }
+  void setERGSensitivity(float ergS) { ERGSensitivity = ergS; }
   void setAutoUpdate(bool atupd) { autoUpdate = atupd; }
   void setSsid(String sid) { ssid = sid; }
   void setPassword(String pwd) { password = pwd; }
   void setFoundDevices(String fdev) { foundDevices = fdev; }
   void setConnectedPowerMeter(String cpm) { connectedPowerMeter = cpm; }
   void setConnectedHeartMonitor(String cHr) { connectedHeartMonitor = cHr; }
+  void setShifterPosition(int sp) { shifterPosition = sp; }
 
-  String returnJSON();
+  String returnJSON(bool includeDebugLog = false);
   void saveToSPIFFS();
   void loadFromSPIFFS();
   void printFile();

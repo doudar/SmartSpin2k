@@ -7,6 +7,8 @@
 
 #pragma once
 
+#include "SS2KLog.h"
+
 // Update firmware on boot?
 #define AUTO_FIRMWARE_UPDATE true
 
@@ -36,8 +38,37 @@
 // name of local file to save Physical Working Capacity in Spiffs
 #define userPWCFILENAME "/userPWC.txt"
 
-// Default Stepper Power
-#define STEPPER_POWER 1000
+// Default Incline Multiplier.
+// Incline multiplier is the multiple required to convert incline received from the remote client (percent grade*100)
+// into actual stepper steps that move the stepper motor. It takes 2,181.76 steps to rotate the knob 1 full revolution. with hardware version 1.
+// Incline_Multiplier may be able to be removed in the future by dividing ShiftSteps by ~200 to get this value but we're not quite ready
+// to make that commitment yet.
+#define INCLINE_MULTIPLIER 3.0
+
+// Default Stepper Power.
+// Stepper peak current in ma. This is hardware restricted to a maximum of 2000ma on the TMC2225. RMS current is less.
+
+#define STEPPER_POWER 1500
+
+// Stepper Acceleration in steps/s^2
+#define STEPPER_ACCELERATION 3000
+
+// Stepper Max Speed in steps/s
+#define STEPPER_MAX_SPEED 1000
+
+// Default ERG Sensitivity. Predicated on # of Shifts (further defined by shift steps) per 30 watts of resistance change.
+// I.E. If the difference between ERG target and Current watts were 30, and the Shift step is defined as 600 steps,
+// and ERG_Sensitivity were 1.0, ERG mode would move the stepper motor 600 steps to compensate. With an ERG_Sensitivity of 2.0, the stepper
+// would move 1200 steps to compensate, however ERG_Sensitivity values much different than 1.0 imply shiftStep has been improperly configured.
+#define ERG_SENSITIVITY 1.0
+
+// Number of watts per shift expected by ERG mode for it's calculation. The user should target this number by adjusting Shift Step until WATTS_PER_SHIFT
+// is obtained as closely as possible during each shift.
+#define WATTS_PER_SHIFT 30
+
+// Multiple to apply in ERG mode when within the watts range of 1 shift. It may be desirable to make this value less than 1 to prevent oscillating around the
+// target watt point.
+#define SUB_SHIFT_SCALE 1
 
 // Hardware pin for rocker Switch
 #define RADIO_PIN 27
@@ -67,11 +98,10 @@
 #define SERIAL_PORT stepperSerial
 
 // Match to your driver
-// SilentStepStick series use 0.11
-// UltiMachine Einsy and Archim2 boards use 0.2
-// Panucatt BSD2660 uses 0.1
-// Watterott TMC5160 uses 0.075
 #define R_SENSE 0.11f
+
+// Maximum scaling of the driver output power 0-31
+#define DRIVER_MAX_PWR_SCALER 31
 
 // Hardware pin for indicator LED *note* internal LED on esp32 Dev board is pin
 // 2
@@ -116,7 +146,7 @@
 #define WIFI_CONNECT_TIMEOUT 10
 
 // Max size of userconfig
-#define USERCONFIG_JSON_SIZE 768
+#define USERCONFIG_JSON_SIZE 768 + DEBUG_LOG_BUFFER_SIZE
 
 // Uncomment to enable sending Telegram debug messages back to the chat
 // specified in telegram_token.h

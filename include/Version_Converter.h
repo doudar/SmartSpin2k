@@ -17,7 +17,7 @@ struct Version {
   char *branch, *commit;
 
  public:
-  // Parametarized constructor. Pass string to it and it will
+  // Parameterized constructor. Pass string to it and it will
   // extract version-tag from it.
   //
   // Use initializer list to assign version-tag variables
@@ -25,7 +25,7 @@ struct Version {
   // garbage value to the version-tag, if number of version-tag
   // will be less than four.
   explicit Version(const std::string& version) : major(0), minor(0), revision(0), build(0), commitCount(0), branch(const_cast<char*>("master")), commit(const_cast<char*>("")) {
-    if (sscanf(version.c_str(), "v%d.%d.%d.%d-%s-%d-%s", &major, &minor, &revision, &build, branch, &commitCount, commit) != 7) {
+    if (sscanf(version.c_str(), "v%d.%d.%d.%d-%99s-%d-%99s", &major, &minor, &revision, &build, branch, &commitCount, commit) != 7) {
       if (sscanf(version.c_str(), "v%d.%d.%d.%d", &major, &minor, &revision, &build) != 4) {
         sscanf(version.c_str(), "%d.%d.%d.%d", &major, &minor, &revision, &build);
       }

@@ -28,4 +28,4 @@ jobs:
         if: steps.filter.outputs.software == 'true'
         uses: docker://kadaan/platformio_esp32:latest
         with:
-          args: run
+          args: --build=release

@@ -3,19 +3,19 @@
 	"tasks": [
 		{
 			"type": "PlatformIO",
-			"task": "Upload Filesystem Image (esp32doit)",
+			"task": "Upload Filesystem Image (debug)",
 			"problemMatcher": [
 				"$platformio"
 			],
-			"label": "PlatformIO: Upload Filesystem Image (esp32doit)"
+			"label": "PlatformIO: Upload Filesystem Image (debug)"
 		},
 		{
 			"type": "PlatformIO",
-			"task": "Erase Flash (esp32doit)",
+			"task": "Erase Flash (debug)",
 			"problemMatcher": [
 				"$platformio"
 			],
-			"label": "PlatformIO: Erase Flash (esp32doit)"
+			"label": "PlatformIO: Erase Flash (debug)"
 		},
 		{
 			"type": "PlatformIO",
