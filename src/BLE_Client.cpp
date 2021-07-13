@@ -38,6 +38,14 @@ void SpinBLEClient::start() {
                           1);
 }
 
+static void onNotify(BLERemoteCharacteristic *pBLERemoteCharacteristic, uint8_t *pData, size_t length, bool isNotify) {
+  for (size_t i = 0; i < NUM_BLE_DEVICES; i++) {
+    if (pBLERemoteCharacteristic->getUUID() == spinBLEClient.myBLEDevices[i].charUUID) {
+      spinBLEClient.myBLEDevices[i].enqueueData(pData, length);
+    }
+  }
+}
+
 // BLE Client loop task
 void bleClientTask(void *pvParameters) {
   for (;;) {
@@ -177,7 +185,7 @@ bool SpinBLEClient::connectToServer() {
         // VV Is this really needed? Shouldn't it just carry over from the previous connection? VV
         spinBLEClient.myBLEDevices[device_number].set(myDevice, pClient->getConnId(), serviceUUID, charUUID);
         spinBLEClient.myBLEDevices[device_number].doConnect = false;
-        pRemoteCharacteristic->subscribe(true, nullptr, true);
+        pRemoteCharacteristic->subscribe(true, onNotify);
         postConnect(pClient);
         return true;
       } else {
@@ -228,7 +236,7 @@ bool SpinBLEClient::connectToServer() {
     }
 
     if (pRemoteCharacteristic->canNotify()) {
-      pRemoteCharacteristic->subscribe(true, nullptr, true);
+      pRemoteCharacteristic->subscribe(true, onNotify);
       reconnectTries = MAX_RECONNECT_TRIES;
       scanRetries    = MAX_SCAN_RETRIES;
     } else {
@@ -260,7 +268,7 @@ bool SpinBLEClient::connectToServer() {
  **                       Remove as you see fit for your needs                        */
 
 void SpinBLEClient::MyClientCallback::onConnect(NimBLEClient *pClient) {
-  // debugDirector("Connect Called"); This callback happens so early for us it's nearly useless.
+  // Currently Not Used
 }
 
 void SpinBLEClient::MyClientCallback::onDisconnect(NimBLEClient *pclient) {
@@ -503,4 +511,70 @@ void SpinBLEClient::postConnect(NimBLEClient *pClient) {
       }
     }
   }
+}
+
+bool SpinBLEAdvertisedDevice::enqueueData(uint8_t *data, size_t length) {
+  if (!this->dataBuffer) {
+    // debugDirector("Creating queue");
+    this->dataBuffer = xQueueCreate(4, sizeof(DataHandle_t));
+    if (!this->dataBuffer) {
+      // debugDirector("Failed to create queue");
+      return pdFALSE;
+    }
+  }
+
+  if (!uxQueueSpacesAvailable(this->dataBuffer)) {
+    // debugDirector("No space available in queue. Skipping enqueue of data.");
+    return pdFALSE;
+  }
+
+  uint8_t *dataCopy = reinterpret_cast<uint8_t *>(malloc(length));
+  memcpy(dataCopy, data, length);
+  DataHandle_t dataHandle = {dataCopy, length};
+  if (xQueueSendToBack(this->dataBuffer, reinterpret_cast<void *>(&dataHandle), (TickType_t)0) == pdFALSE) {
+    // debugDirector("Failed to enqueue data.  Freeing data.");
+    free(dataCopy);
+    return pdFALSE;
+  }
+  // debugDirector("Successfully enqueued data.");
+  return pdTRUE;
+}
+
+std::shared_ptr<DataHandle_t> SpinBLEAdvertisedDevice::dequeueData() {
+  if (this->dataBuffer == nullptr) {
+    // debugDirector("Queue not created.  Skipping dequeue of data.");
+    return std::make_shared<DataHandle_t>();
+  }
+
+  std::shared_ptr<DataHandle_t> pHandle(new DataHandle_t(), deletePayload);
+  if (xQueueReceive(this->dataBuffer, pHandle.get(), (TickType_t)0) == pdFALSE) {
+    // debugDirector("No data dequeued from queue.");
+    return std::make_shared<DataHandle_t>();
+  }
+
+  // debugDirector("Successfully dequeued data from queue.");
+  return pHandle;
+}
+
+void SpinBLEAdvertisedDevice::deletePayload(DataHandle_t *handle) {
+  if (handle->data != nullptr) {
+    free(handle->data);
+    handle->data = nullptr;
+  }
+}
+// Was changed in notify-Buffer - - may not be needed **********************************************************************
+void SpinBLEAdvertisedDevice::print() {
+  char logBuf[250];
+  char *logBufP = logBuf;
+  logBufP += sprintf(logBufP, "Address: (%s)", peerAddress.toString().c_str());
+  logBufP += sprintf(logBufP, " Client ID: (%d)", connectedClientID);
+  logBufP += sprintf(logBufP, " SerUUID: (%s)", serviceUUID.toString().c_str());
+  logBufP += sprintf(logBufP, " CharUUID: (%s)", charUUID.toString().c_str());
+  logBufP += sprintf(logBufP, " HRM: (%s)", userSelectedHR ? "true" : "false");
+  logBufP += sprintf(logBufP, " PM: (%s)", userSelectedPM ? "true" : "false");
+  logBufP += sprintf(logBufP, " CSC: (%s)", userSelectedCSC ? "true" : "false");
+  logBufP += sprintf(logBufP, " CT: (%s)", userSelectedCT ? "true" : "false");
+  logBufP += sprintf(logBufP, " doConnect: (%s)", doConnect ? "true" : "false");
+  strcat(logBufP, "|");
+  SS2K_LOG(BLE_CLIENT_LOG_TAG, "%s", String(logBuf));
 }

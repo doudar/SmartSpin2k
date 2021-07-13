@@ -54,7 +54,6 @@
 #define bytes_to_u16(MSB, LSB) (((signed int)((signed char)MSB))) << 8 | (((unsigned char)LSB))
 #define bytes_to_int(MSB, LSB) ((static_cast<int>((unsigned char)MSB))) << 8 | (((unsigned char)LSB))
 // Potentially, something like this is a better way of doing this ^^
-// data.getUint16(1, true)
 
 // Setup
 void setupBLE();
@@ -97,6 +96,7 @@ class MyCallbacks : public BLECharacteristicCallbacks {
   void onWrite(BLECharacteristic *);
 };
 
+// static void onNotify(NimBLECharacteristic *pCharacteristic, uint8_t *pData);
 class ss2kCustomCharacteristicCallbacks : public BLECharacteristicCallbacks {
   void onWrite(BLECharacteristic *);
 };
@@ -114,8 +114,23 @@ void bleClientTask(void *pvParameters);
 // CYCLINGPOWERMEASUREMENT_UUID, HEARTCHARACTERISTIC_UUID,
 // FLYWHEEL_UART_TX_UUID};
 
+typedef struct DataHandle {
+  uint8_t *data;
+  size_t length;
+} DataHandle_t;
+
 class SpinBLEAdvertisedDevice {
  public:  // eventually these should be made private
+  // // TODO: Do we dispose of this object?  Is so, we need to de-allocate the queue.
+  // //       This distructor was called too early and the queue was deleted out from
+  // //       under us.
+  // ~SpinBLEAdvertisedDevice() {
+  //   if (dataBuffer != nullptr) {
+  //     Serial.println("Deleting queue");
+  //     vQueueDelete(dataBuffer);
+  //   }
+  // }
+
   NimBLEAdvertisedDevice *advertisedDevice = nullptr;
   NimBLEAddress peerAddress;
   int connectedClientID = BLE_HS_CONN_HANDLE_NONE;
@@ -133,6 +148,8 @@ class SpinBLEAdvertisedDevice {
     connectedClientID = id;
     serviceUUID       = BLEUUID(inserviceUUID);
     charUUID          = BLEUUID(incharUUID);
+    // dataBuffer        = xQueueCreate((4),                  // length
+    //                            sizeof(uint8_t *));  // size
   }
 
   void reset() {
@@ -146,7 +163,20 @@ class SpinBLEAdvertisedDevice {
     userSelectedCSC   = false;  // Cycling Speed/Cadence
     userSelectedCT    = false;  // Controllable Trainer
     doConnect         = false;  // Initiate connection flag
+    if (dataBuffer != nullptr) {
+      Serial.println("Resetting queue");
+      xQueueReset(dataBuffer);
+    }
   }
+
+  void print();
+
+  bool enqueueData(uint8_t *data, size_t length);
+  std::shared_ptr<DataHandle_t> dequeueData();
+  static void deletePayload(DataHandle_t *data);
+
+ private:
+  QueueHandle_t dataBuffer = nullptr;
 };
 
 class SpinBLEClient {

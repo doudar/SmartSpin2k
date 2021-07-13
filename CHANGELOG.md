@@ -16,6 +16,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - MCWPWM for stepper control.
 - Erg Sensitivity control added.
 - Function to stop motor and release tension if the user stops pedaling in ERG mode.  
+- Received BLE is now buffered and then processed. 
 - Added Fitness Machine supported inclination range characteristic.
 
 ### Changed
