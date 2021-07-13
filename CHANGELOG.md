@@ -18,6 +18,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Function to stop motor and release tension if the user stops pedaling in ERG mode.  
 - Received BLE is now buffered and then processed. 
 - Added Fitness Machine supported inclination range characteristic.
+- Additional unit tests. 
 
 ### Changed
 - Renamed BLE_stepperPosition to BLE_targetPosition to clarify the variable it controls. 
@@ -52,6 +53,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Added github workflow on pull_request to validate changelog and coding standards.
 - Add hyphens to Flywheel GATT UUIDs.
 - Filter Flywheel advertisements by name.
+- Added unit tests for CyclePowerData.cpp
 - Add documentation to SensorData class.
 - Enabled native testing.
 - Added logging library which supports levels.
