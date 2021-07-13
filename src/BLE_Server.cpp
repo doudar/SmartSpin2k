@@ -33,6 +33,7 @@ BLECharacteristic *fitnessMachineStatusCharacteristic;
 BLECharacteristic *fitnessMachineControlPoint;
 BLECharacteristic *fitnessMachineResistanceLevelRange;
 BLECharacteristic *fitnessMachinePowerRange;
+BLECharacteristic *fitnessMachineInclinationRange;
 BLECharacteristic *fitnessMachineTrainingStatus;
 
 BLEService *pSmartSpin2kService;
@@ -77,8 +78,9 @@ struct FitnessMachineFeature ftmsFeature = {FitnessMachineFeatureFlags::Types::C
 
 uint8_t ftmsIndoorBikeData[14] = {0x44, 0x02, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0};  // 00000000100001010100 ISpeed, ICAD,
                                                                                                             // TDistance, IPower, ETime
-uint8_t ftmsResistanceLevelRange[6]      = {0x00, 0x00, 0x25, 0x00, 0x01, 0x00};                            // 25 increment 1
-uint8_t ftmsPowerRange[6]                = {0x00, 0x00, 0xA0, 0x0F, 0x01, 0x00};                            // 1-4000 watts
+uint8_t ftmsResistanceLevelRange[6]      = {0x00, 0x01, 0x25, 0x00, 0x01, 0x00};                            // 1:37 increment 1
+uint8_t ftmsPowerRange[6]                = {0x00, 0x01, 0xA0, 0x0F, 0x01, 0x00};                            // 1:4000 watts increment 1
+uint8_t ftmsInclinationRange[6]          = {0x38, 0xff, 0xc8, 0x00, 0x01, 0x00};                            //-20.0:20.0 increment .1
 uint8_t ftmsTrainingStatus[2]            = {0x08, 0x00};
 uint8_t ss2kCustomCharacteristicValue[3] = {0x00, 0x00, 0x00};
 
@@ -118,6 +120,7 @@ void startBLEServer() {
   fitnessMachineIndoorBikeData       = pFitnessMachineService->createCharacteristic(FITNESSMACHINEINDOORBIKEDATA_UUID, NIMBLE_PROPERTY::READ | NIMBLE_PROPERTY::NOTIFY);
   fitnessMachineResistanceLevelRange = pFitnessMachineService->createCharacteristic(FITNESSMACHINERESISTANCELEVELRANGE_UUID, NIMBLE_PROPERTY::READ);
   fitnessMachinePowerRange           = pFitnessMachineService->createCharacteristic(FITNESSMACHINEPOWERRANGE_UUID, NIMBLE_PROPERTY::READ);
+  fitnessMachineInclinationRange     = pFitnessMachineService->createCharacteristic(FITNESSMACHINEINCLINATIONRANGE_UUID, NIMBLE_PROPERTY::READ);
   fitnessMachineTrainingStatus       = pFitnessMachineService->createCharacteristic(FITNESSMACHINETRAININGSTATUS_UUID, NIMBLE_PROPERTY::NOTIFY);
 
   pSmartSpin2kService = pServer->createService(SMARTSPIN2K_SERVICE_UUID);
@@ -140,6 +143,7 @@ void startBLEServer() {
   fitnessMachineStatusCharacteristic->setValue(ftmsMachineStatus, 7);
   fitnessMachineResistanceLevelRange->setValue(ftmsResistanceLevelRange, 6);
   fitnessMachinePowerRange->setValue(ftmsPowerRange, 6);
+  fitnessMachineInclinationRange->setValue(ftmsInclinationRange, 6);
 
   smartSpin2kCharacteristic->setValue(ss2kCustomCharacteristicValue, 3);
 
