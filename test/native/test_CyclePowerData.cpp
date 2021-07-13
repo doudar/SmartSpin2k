@@ -5,9 +5,10 @@
  * SPDX-License-Identifier: GPL-2.0-only
  */
 
+#include "sdkconfig.h"
 #include <unity.h>
-#include "BLE_Common.h"
 #include "sensors/CyclePowerData.h"
+#include "test.h"
 
 // Data from session w/ Assioma Uno pedals
 static uint8_t t0[]  = {0x20, 0x00, 0x00, 0x00, 0x01, 0x00, 0x00, 0x0b};  // <- 0x1818 | 0x2a63 | CPS:[ CD(0.00) PW(0) ]
@@ -27,7 +28,7 @@ static uint8_t t11[] = {0x20, 0x00, 0x39, 0x00, 0x05, 0x00, 0x31, 0x20};  // <- 
 static uint8_t t12[] = {0x20, 0x00, 0x00, 0x00, 0xff, 0xff, 0xff, 0xff};  // <- 0x1818 | 0x2a63 | CPS:[ CD(??) PW(??) ]
 static uint8_t t13[] = {0x20, 0x00, 0x2d, 0x00, 0x00, 0x00, 0xb7, 0x07};  // <- 0x1818 | 0x2a63 | CPS:[ CD(31.09) PW(45) ]
 
-void test_parses_cadence(void) {
+void test_cyclePowerData::test_parses_cadence(void) {
   CyclePowerData sensor = CyclePowerData();
   // Pre parse state
   TEST_ASSERT_FALSE(sensor.hasCadence());
@@ -54,13 +55,10 @@ void test_parses_cadence(void) {
   // reading count hasn't hit 3
   sensor.decode(t4, sizeof(t0));
   TEST_ASSERT_EQUAL_FLOAT(31.09312, sensor.getCadence());
-
   sensor.decode(t5, sizeof(t0));
   TEST_ASSERT_EQUAL_FLOAT(48.37795, sensor.getCadence());
-
   sensor.decode(t6, sizeof(t0));
   TEST_ASSERT_EQUAL_FLOAT(48.37795, sensor.getCadence());
-
   sensor.decode(t7, sizeof(t0));
   TEST_ASSERT_EQUAL_FLOAT(56.39284, sensor.getCadence());
   sensor.decode(t8, sizeof(t0));
@@ -80,21 +78,21 @@ void test_parses_cadence(void) {
   TEST_ASSERT_EQUAL_FLOAT(31.09312, sensor.getCadence());
 }
 
-void test_parses_heartrate(void) {
+void test_cyclePowerData::test_parses_heartrate(void) {
   // No heart rate data, confirm
   CyclePowerData sensor = CyclePowerData();
   TEST_ASSERT_FALSE(sensor.hasHeartRate());
   TEST_ASSERT_EQUAL_INT(INT_MIN, sensor.getHeartRate());
 }
 
-void test_parses_speed(void) {
+void test_cyclePowerData::test_parses_speed(void) {
   // No speed data, confirm
   CyclePowerData sensor = CyclePowerData();
   TEST_ASSERT_FALSE(sensor.hasSpeed());
   TEST_ASSERT_EQUAL_FLOAT(NAN, sensor.getSpeed());
 }
 
-void test_parses_power(void) {
+void test_cyclePowerData::test_parses_power(void) {
   CyclePowerData sensor = CyclePowerData();
   // Pre parse state
   TEST_ASSERT_FALSE(sensor.hasPower());
@@ -112,31 +110,3 @@ void test_parses_power(void) {
   sensor.decode(t7, sizeof(t0));
   TEST_ASSERT_EQUAL_INT(57, sensor.getPower());
 }
-
-void process() {
-  UNITY_BEGIN();
-  RUN_TEST(test_parses_power);
-  RUN_TEST(test_parses_cadence);
-  RUN_TEST(test_parses_heartrate);
-  RUN_TEST(test_parses_speed);
-  UNITY_END();
-}
-
-#ifdef ARDUINO
-
-#include <Arduino.h>
-void setup() {
-  delay(2000);
-  process();
-}
-
-void loop() {}
-
-#else
-
-int main(int argc, char **argv) {
-  process();
-  return 0;
-}
-
-#endif

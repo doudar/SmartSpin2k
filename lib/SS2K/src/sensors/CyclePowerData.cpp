@@ -61,8 +61,8 @@ void CyclePowerData::decode(uint8_t *data, size_t length) {
       // Handle the special case that this is first cadence reading
       // Since we have no lastCrankRev/EventTime we can't do a cadence calc
       // until the next reading
-      this->crankRev       = bytes_to_u16(data[cPos + 1], data[cPos]);
-      this->crankEventTime = bytes_to_u16(data[cPos + 3], data[cPos + 2]);
+      this->crankRev       = get_le16(&data[cPos]);
+      this->crankEventTime = get_le16(&data[cPos + 2]);
       this->cadence        = 0;
       return;
     }
