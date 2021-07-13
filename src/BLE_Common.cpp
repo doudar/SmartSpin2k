@@ -133,6 +133,7 @@ void BLECommunications(void *pvParameters) {
       controlPointIndicate();
 
       if (spinDown()) {
+        // Possibly do something in the future. Right now we just fake the spindown. 
       }
 
       computeERG();

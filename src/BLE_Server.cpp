@@ -80,7 +80,7 @@ uint8_t ftmsIndoorBikeData[14] = {0x44, 0x02, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0,
                                                                                                             // TDistance, IPower, ETime
 uint8_t ftmsResistanceLevelRange[6]      = {0x00, 0x01, 0x25, 0x00, 0x01, 0x00};                            // 1:37 increment 1
 uint8_t ftmsPowerRange[6]                = {0x00, 0x01, 0xA0, 0x0F, 0x01, 0x00};                            // 1:4000 watts increment 1
-uint8_t ftmsInclinationRange[6]          = {0x38, 0xff, 0xc8, 0x00, 0x01, 0x00};                            //-20.0:20.0 increment .1
+uint8_t ftmsInclinationRange[6]          = {0x38, 0xff, 0xc8, 0x00, 0x01, 0x00};                            // -20.0:20.0 increment .1
 uint8_t ftmsTrainingStatus[2]            = {0x08, 0x00};
 uint8_t ss2kCustomCharacteristicValue[3] = {0x00, 0x00, 0x00};
 
