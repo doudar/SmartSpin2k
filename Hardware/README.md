@@ -1,6 +1,6 @@
 Version 1 is the most tested and currently used. 
 
-Version 2 is new and not well tested, but prints easier, is smaller and uses less hardware. It is currently only compatable with the PCB.  
+Version 2 is new, prints easier, is smaller and uses less hardware. It is currently only compatable with the PCB.  
 
 The inserts and knob_cup_v2 work with both versions of the hardware. You'll need prints from both of those folders no matter which version of the case you decide to use. 
 
