@@ -33,7 +33,7 @@ Your power meter (Or optionally the SmartSpin2K's built in HR->PWR calculation) 
 
 There are a multitude of configuration options available via a web interface on the SmartSpin2k. Automatic updates are also preformed on a regular basis if you choose to connect SmartSpin2k to your home network.  
 
-### Recomended Hardware:
+### Recommended Hardware:
 
 You'll need the quantity listed below of each item except the driver board. An optional PCB is in the hardware library which makes the wiring much simpler! 
 
@@ -53,11 +53,11 @@ So for $700-$1000 (or much less if you use HR2VP) you can build a fully function
 
 Surprisingly, my spin bike with the SmartSpin2K actually has better "road feel" than my expensive bike trainer, and since it's a belt drive bike, it's virtually silent. That's somthing you cannot achieve with a chain driven bike on any smart trainer. 
 
-# Small quantity of kits availiable!
-We're really here to help you build your own SmartSpin2K but If you would like a kit with a PCB, send a request to SmartSpin2K@gmail.com . Cost is $175 + shipping for all the printed parts + electronics, for an "almost ready to use unit". Note that if you go this route, this is still an open source hardware project and responsibility lies with **you** as to the proper construction and use. As such, you'll want to at least pull the cover off before use and take a look to ensure it's built to your standards (I think it's pretty good:) I'll be putting these together on an as ordered basis, so expect 3-5 days prior to shipping.  Please see https://github.com/doudar/SmartSpin2k/wiki/Fitting-the-SmartSpin2k!
+<!---# Small quantity of kits availiable!
+We're really here to help you build your own SmartSpin2K but If you would like a kit with a PCB, send a request to SmartSpin2K@gmail.com . Cost is $175 + shipping for all the printed parts + electronics, for an "almost ready to use unit". Note that if you go this route, this is still an open source hardware project and responsibility lies with **you** as to the proper construction and use. As such, you'll want to at least pull the cover off before use and take a look to ensure it's built to your standards (I think it's pretty good:) I'll be putting these together on an as ordered basis, so expect 3-5 days prior to shipping.  Please see https://github.com/doudar/SmartSpin2k/wiki/Fitting-the-SmartSpin2k! --->
 
 ### Documentaion
-Please check out our new Instructable at https://www.instructables.com/Spin-Bike-Controller/ If there are any questions on the Instructable, please add info in the discussions and we will clarify there and on the new Instructable. This is a growing community and we now have a few members that would love to help you to get your SmartSpin2k working. There's also a wiki at https://github.com/doudar/SmartSpin2k/wiki 
+Please check out the Instructable at https://www.instructables.com/Spin-Bike-Controller/ If there are any questions on the Instructable, please add info in the discussions and we will clarify there and on the new Instructable. This is a growing community and we now have a few members that would love to help you to get your SmartSpin2k working. There's also a wiki at https://github.com/doudar/SmartSpin2k/wiki 
 
 In short, the process is:
 
