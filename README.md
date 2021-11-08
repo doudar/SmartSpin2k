@@ -10,7 +10,7 @@ Http://GitHub.com/doudar/SmartSpin2K
 - Less printed parts.
 - Less hardware. 
 
-Check it out in the hardware folder! I haven't built a non-pcb version of this yet so it may not all fit but if anybody gives it a try, please let me know!
+Check it out in the hardware folder!
 
 https://github.com/doudar/SmartSpin2k/tree/develop/Hardware/Case%20Version2
 <img src="Pictures/Version2.0.jpg" alt="Hardware 2.0" style="height: 300px; width: 100"/> 
