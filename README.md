@@ -10,6 +10,8 @@ Http://GitHub.com/doudar/SmartSpin2K
 - Less printed parts.
 - Less hardware. 
 
+In addition, there's also a PrusaSlicer profile to hopefully make printing easier. 
+
 Check it out in the hardware folder!
 
 https://github.com/doudar/SmartSpin2k/tree/develop/Hardware/Case%20Version2
