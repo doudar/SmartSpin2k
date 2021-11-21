@@ -65,6 +65,7 @@ void BLECommunications(void *pvParameters);
 
 extern int bleConnDesc;
 extern bool updateConnParametersFlag;
+extern std::string FTMSWrite;
 
 // TODO add the rest of the server to this class
 class SpinBLEServer {
@@ -86,6 +87,7 @@ void calculateInstPwrFromHR();
 void updateHeartRateMeasurementChar();
 int connectedClientCount();
 void controlPointIndicate();
+void processFTMSWrite();
 
 class MyServerCallbacks : public BLEServerCallbacks {
   void onConnect(BLEServer *, ble_gap_conn_desc *desc);

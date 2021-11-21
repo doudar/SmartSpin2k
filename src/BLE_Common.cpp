@@ -136,6 +136,7 @@ void BLECommunications(void *pvParameters) {
         // Possibly do something in the future. Right now we just fake the spindown. 
       }
 
+      processFTMSWrite();
       computeERG();
 
       if (updateConnParametersFlag) {

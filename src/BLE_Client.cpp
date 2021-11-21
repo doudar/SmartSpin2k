@@ -417,7 +417,9 @@ void SpinBLEClient::scanProcess() {
   String output;
   serializeJson(devices, output);
   SS2K_LOG(BLE_CLIENT_LOG_TAG, "Bluetooth Client Found Devices: %s", output.c_str());
+  #ifdef USE_TELEGRAM
   SEND_TO_TELEGRAM("Bluetooth Client Found Devices: " + output);
+  #endif
   userConfig.setFoundDevices(output);
   pBLEScan = nullptr;  // free up memory
 }

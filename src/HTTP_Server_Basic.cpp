@@ -96,7 +96,9 @@ void startWifi() {
   MDNS.addService("http", "_tcp", 80);
   MDNS.addServiceTxt("http", "_tcp", "lf", "0");
   SS2K_LOG(HTTP_SERVER_LOG_TAG, "Connected to %s IP address: %s", userConfig.getSsid(), myIP.toString().c_str());
+  #ifdef USE_TELEGRAM
   SEND_TO_TELEGRAM("Connected to " + String(userConfig.getSsid()) + " IP address: " + myIP.toString());
+  #endif
   SS2K_LOG(HTTP_SERVER_LOG_TAG, "Open http://%s.local/", userConfig.getDeviceName());
   WiFi.setTxPower(WIFI_POWER_19_5dBm);
 

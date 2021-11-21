@@ -150,10 +150,10 @@
 
 // Uncomment to enable sending Telegram debug messages back to the chat
 // specified in telegram_token.h
-#define USE_TELEGRAM
+// #define USE_TELEGRAM
 
 // Uncomment to enable stack size debugging info
-// #define DEBUG_STACK
+#define DEBUG_STACK
 
 // Uncomment to enable HR->PWR debugging info. Always displays HR->PWR
 // Calculation. Never sets userConfig.setSimulatedPower(); #define
@@ -161,7 +161,7 @@
 
 #ifdef USE_TELEGRAM
 // Max number of telegram messages to send per session
-#define MAX_TELEGRAM_MESSAGES 5
+#define MAX_TELEGRAM_MESSAGES 1
 // Filler definitions for if telegram_token.h is not included (because it has
 // sensitive information). Do not change these as this file is tracked and
 // therefore public. Enter your own Telegram info into telegram_token.h

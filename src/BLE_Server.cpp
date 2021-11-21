@@ -38,6 +38,7 @@ BLECharacteristic *fitnessMachineTrainingStatus;
 
 BLEService *pSmartSpin2kService;
 BLECharacteristic *smartSpin2kCharacteristic;
+std::string FTMSWrite = "";
 
 /******** Bit field Flag Example ********/
 // 00000000000000000001 - 1   - 0x001 - Pedal Power Balance Present
@@ -217,7 +218,7 @@ void computeERG(int newSetPoint) {
   static bool userIsPedaling = true;
   static int setPoint        = 0;
   float incline              = userConfig.getIncline();
-  int newIncline             = incline;
+  float newIncline           = incline;
   int amountToChangeIncline  = 0;
   int wattChange             = userConfig.getSimulatedWatts() - setPoint;
 
@@ -363,8 +364,18 @@ void MyServerCallbacks::onDisconnect(BLEServer *pServer) {
   BLEDevice::startAdvertising();
 }
 
-void MyCallbacks::onWrite(BLECharacteristic *pCharacteristic) {
-  std::string rxValue = pCharacteristic->getValue();
+void MyCallbacks::onWrite(BLECharacteristic *pCharacteristic) {  
+  FTMSWrite = pCharacteristic->getValue();
+  }
+
+void processFTMSWrite() {
+  if (FTMSWrite == "") {
+    return;
+  }
+
+  BLECharacteristic *pCharacteristic = NimBLEDevice::getServer()->getServiceByUUID(FITNESSMACHINESERVICE_UUID)->getCharacteristic(FITNESSMACHINECONTROLPOINT_UUID);
+
+  std::string rxValue = FTMSWrite;
 
   if (rxValue.length() > 1) {
     uint8_t *pData = reinterpret_cast<uint8_t *>(&rxValue[0]);
@@ -483,6 +494,7 @@ void MyCallbacks::onWrite(BLECharacteristic *pCharacteristic) {
         pCharacteristic->setValue(returnValue, 3);
     }
     SS2K_LOG(BLE_SERVER_LOG_TAG, "%s", logBuf);
+    free(logBuf);
     fitnessMachineStatusCharacteristic->notify();
   } else {
     SS2K_LOG(BLE_SERVER_LOG_TAG, "App wrote nothing ");
@@ -494,7 +506,7 @@ void MyCallbacks::onWrite(BLECharacteristic *pCharacteristic) {
     fitnessMachineTrainingStatus->setValue(ftmsTrainingStatus, 2);
     fitnessMachineTrainingStatus->notify();
   }
-  rxValue = pCharacteristic->getValue();
+  FTMSWrite = "";
 }
 
 void controlPointIndicate() { fitnessMachineControlPoint->indicate(); }
