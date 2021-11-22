@@ -141,9 +141,7 @@ void BLECommunications(void *pvParameters) {
 
       if (updateConnParametersFlag) {
         vTaskDelay(100 / portTICK_PERIOD_MS);
-        // BLEDevice::getServer()->updateConnParams(bleConnDesc, 40, 50,
-        // 0, 100);
-        BLEDevice::getServer()->updateConnParams(bleConnDesc, 80, 200, 0, 800);
+        BLEDevice::getServer()->updateConnParams(bleConnDesc, 20, 100, 0, 2000);
         updateConnParametersFlag = false;
       }
     } else {

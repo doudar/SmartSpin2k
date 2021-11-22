@@ -230,10 +230,12 @@ void computeERG(int newSetPoint) {
   }
 
   if (userConfig.getSimulatedCad() <= 20) {
-    if (userIsPedaling) {  // Test so motor stop command only happens once.
+    if (!userIsPedaling) {  // Test so motor stop command only happens once.
       motorStop(true);     // release tension
+      return;
     }
     userIsPedaling = false;
+    userConfig.setIncline(incline-userConfig.getShiftStep()*2);
     // Cadence too low, nothing to do here
     return;
   }
@@ -245,17 +247,17 @@ void computeERG(int newSetPoint) {
     amountToChangeIncline *= SUB_SHIFT_SCALE;
   }
   // limit to 10 shifts at a time
-  if (abs(amountToChangeIncline) > userConfig.getShiftStep() * 10) {
-    if (amountToChangeIncline > 0) {
-      amountToChangeIncline = userConfig.getShiftStep() * 10;
+  if (abs(amountToChangeIncline) > userConfig.getShiftStep() * 2) {
+    if (amountToChangeIncline > 5) {
+      amountToChangeIncline = userConfig.getShiftStep() * 2;
     }
-    if (amountToChangeIncline < 0) {
-      amountToChangeIncline = -(userConfig.getShiftStep() * 10);
+    if (amountToChangeIncline < -5) {
+      amountToChangeIncline = -(userConfig.getShiftStep() * 2);
     }
   }
 
   // Reduce the amount per loop (don't try to oneshot it) and scale the movement the higher the watt target is as higher wattages require less knob movement.
-  amountToChangeIncline = amountToChangeIncline / ((userConfig.getSimulatedWatts() / 100) + .1);  // +.1 to eliminate possible divide by zero.
+  // amountToChangeIncline = amountToChangeIncline / ((userConfig.getSimulatedWatts() / 100) + .1);  // +.1 to eliminate possible divide by zero.
   newIncline            = incline - amountToChangeIncline;
   userConfig.setIncline(newIncline);
   // SS2K_LOG(BLE_SERVER_LOG_TAG, "newincline: %f", newIncline);
@@ -494,7 +496,6 @@ void processFTMSWrite() {
         pCharacteristic->setValue(returnValue, 3);
     }
     SS2K_LOG(BLE_SERVER_LOG_TAG, "%s", logBuf);
-    free(logBuf);
     fitnessMachineStatusCharacteristic->notify();
   } else {
     SS2K_LOG(BLE_SERVER_LOG_TAG, "App wrote nothing ");

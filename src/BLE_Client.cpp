@@ -31,7 +31,7 @@ void SpinBLEClient::start() {
   // Create the task for the BLE Client loop
   xTaskCreatePinnedToCore(bleClientTask,   /* Task function. */
                           "BLEClientTask", /* name of task. */
-                          4000,            /* Stack size of task */
+                          4200,            /* Stack size of task */
                           NULL,            /* parameter of the task */
                           1,               /* priority of the task  */
                           &BLEClientTask,  /* Task handle to keep track of created task */

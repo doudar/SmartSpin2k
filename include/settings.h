@@ -68,7 +68,7 @@
 
 // Multiple to apply in ERG mode when within the watts range of 1 shift. It may be desirable to make this value less than 1 to prevent oscillating around the
 // target watt point.
-#define SUB_SHIFT_SCALE 1
+#define SUB_SHIFT_SCALE .5
 
 // Hardware pin for rocker Switch
 #define RADIO_PIN 27
@@ -116,7 +116,7 @@
 #define MAX_SCAN_RETRIES 1
 
 // loop speed for the SmartSpin2k BLE communications
-#define BLE_NOTIFY_DELAY 999
+#define BLE_NOTIFY_DELAY 701
 
 // loop speed for the SmartSpin2k BLE Client reconnect
 #define BLE_CLIENT_DELAY 1000
@@ -125,7 +125,7 @@
 #define NUM_BLE_DEVICES 4
 
 // loop speed for the Webserver
-#define WEBSERVER_DELAY 30
+#define WEBSERVER_DELAY 60
 
 // Name of default Power Meter. any connects to anything, none connects to
 // nothing.
@@ -153,7 +153,7 @@
 // #define USE_TELEGRAM
 
 // Uncomment to enable stack size debugging info
-#define DEBUG_STACK
+// #define DEBUG_STACK
 
 // Uncomment to enable HR->PWR debugging info. Always displays HR->PWR
 // Calculation. Never sets userConfig.setSimulatedPower(); #define

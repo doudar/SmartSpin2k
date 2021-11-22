@@ -29,7 +29,7 @@ void DebugInfo::append_logv_internal(const char *format, va_list args) {
 }
 
 const std::string DebugInfo::get_and_clear_logs_internal() {
-  if (xSemaphoreTake(logBufferMutex, 500) == pdTRUE) {
+  if (xSemaphoreTake(logBufferMutex, 1000) == pdTRUE) {
     const std::string debugLog = std::string(logBuffer, logBufferLength);
     logBufferLength            = 0;
     logBuffer[0]               = '\0';

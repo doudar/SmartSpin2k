@@ -91,7 +91,7 @@ void setup() {
 
   xTaskCreatePinnedToCore(moveStepper,           /* Task function. */
                           "moveStepperFunction", /* name of task. */
-                          900,                   /* Stack size of task */
+                          1000,                   /* Stack size of task */
                           NULL,                  /* parameter of the task */
                           18,                    /* priority of the task  - 29 worked  at 1 I get stuttering */
                           &moveStepperTask,      /* Task handle to keep track of created task */
