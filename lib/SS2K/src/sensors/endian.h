@@ -1,4 +1,11 @@
 /*
+ * Copyright (C) 2020  Anthony Doud & Joel Baranick
+ * All rights reserved
+ *
+ * SPDX-License-Identifier: GPL-2.0-only
+ */
+
+/*
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
  * distributed with this work for additional information
