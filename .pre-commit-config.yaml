@@ -1,0 +1,12 @@
+exclude: (\.pio|lib/NimBLE-Arduino|lib/ArduinoCompat)/.*
+repos:
+  - repo: https://github.com/Lucas-C/pre-commit-hooks
+    rev: v1.1.9
+    hooks:
+      - id: insert-license
+        files: \.(h\+\+|h|hh|hxx|hpp|cuh|c|cc|cpp|cu|c\+\+|cxx|tpp|txx)$
+        args:
+          - --license-filepath
+          - license_header.txt
+          - --comment-style
+          - /*| *| */
