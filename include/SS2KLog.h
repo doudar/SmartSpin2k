@@ -18,7 +18,7 @@
 #define DEBUG_INFO_LOG_TAG "DebugInfo"
 
 #ifndef DEBUG_LOG_BUFFER_SIZE
-#define DEBUG_LOG_BUFFER_SIZE 1000
+#define DEBUG_LOG_BUFFER_SIZE 1500
 #endif
 
 #ifndef DEBUG_FILE_CHARS_PER_LINE
@@ -99,13 +99,7 @@ void ss2k_remove_newlines(std::string *str);
 
 int ss2k_log_hex_to_buffer(const byte *data, const size_t data_length, char *buffer, const int buffer_offset, const size_t buffer_length);
 
-void ss2k_log_file(const char *tag, File file);
-
 void ss2k_log_write(esp_log_level_t level, const char *format, ...);
 
 void ss2k_log_writev(esp_log_level_t level, const char *format, va_list args);
 
-#define SS2K_LOG_FILE(tag, file) \
-  do {                           \
-    ss2k_log_file(tag, file);    \
-  } while (0)

@@ -5,7 +5,7 @@
  * SPDX-License-Identifier: GPL-2.0-only
  */
 
-#include "os/endian.h"
+#include "endian.h"
 #include "sensors/FlywheelData.h"
 
 bool FlywheelData::hasHeartRate() { return false; }
