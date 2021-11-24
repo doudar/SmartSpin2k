@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+- Moved FTMS callback decoding outside of the callback.
+- Revamped the way notify buffer works as it was causing a memory leak.
 - BLE Custom Characteristic motor driver calls now apply settings received.
 - Motor current now automatically scales if ESP32 temp starts getting too high. 
 - Added comments after compiler #endif Statements to make it easier to see what the partner #if statement is.
