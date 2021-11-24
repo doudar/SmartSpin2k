@@ -15,7 +15,7 @@ void DebugInfo::append_logv(const char *format, va_list args) { DebugInfo::INSTA
 const std::string DebugInfo::get_and_clear_logs() { return DebugInfo::INSTANCE.get_and_clear_logs_internal(); }
 
 void DebugInfo::append_logv_internal(const char *format, va_list args) {
-  if (xSemaphoreTake(logBufferMutex, 1000) == pdTRUE) {
+  if (xSemaphoreTake(logBufferMutex, 0) == pdTRUE) {
     int written = vsnprintf(logBuffer + logBufferLength, DEBUG_LOG_BUFFER_SIZE - logBufferLength, format, args);
     SS2K_LOGD(DEBUG_INFO_LOG_TAG, "Wrote %d bytes to log", written);
     if (written < 0 || logBufferLength + written > DEBUG_LOG_BUFFER_SIZE) {
@@ -29,7 +29,7 @@ void DebugInfo::append_logv_internal(const char *format, va_list args) {
 }
 
 const std::string DebugInfo::get_and_clear_logs_internal() {
-  if (xSemaphoreTake(logBufferMutex, 1000) == pdTRUE) {
+  if (xSemaphoreTake(logBufferMutex, 0) == pdTRUE) {
     const std::string debugLog = std::string(logBuffer, logBufferLength);
     logBufferLength            = 0;
     logBuffer[0]               = '\0';
@@ -58,26 +58,6 @@ int ss2k_log_hex_to_buffer(const byte *data, const size_t data_length, char *buf
     written += snprintf(buffer + buffer_offset + written, buffer_length - written + buffer_offset, "%02x ", *(data + data_offset));
   }
   return written;
-}
-
-void ss2k_log_file_internal(const char *tag, File file) {
-  if (!file.available()) {
-    return;
-  }
-  char char_buffer[DEBUG_FILE_CHARS_PER_LINE + 1];
-  int bytes_cur_line;
-
-  while (file.available()) {
-    if (file.available() > DEBUG_FILE_CHARS_PER_LINE) {
-      bytes_cur_line = DEBUG_FILE_CHARS_PER_LINE;
-    } else {
-      bytes_cur_line = file.available();
-    }
-    for (int i = 0; i < bytes_cur_line; i++) {
-      sprintf(char_buffer + i, "%c", file.read());
-    }
-    SS2K_LOG(tag, "%s", char_buffer);
-  }
 }
 
 void ss2k_log_write(esp_log_level_t level, const char *format, ...) {

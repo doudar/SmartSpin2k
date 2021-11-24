@@ -139,7 +139,9 @@ void loop() {
     checkDriverTemperature();
 
 #ifdef DEBUG_STACK
-    Serial.printf("Stepper: %d \n", uxTaskGetStackHighWaterMark(moveStepperTask));
+    Serial.printf("Step Task: %d \n", uxTaskGetStackHighWaterMark(moveStepperTask));
+    Serial.printf("Free Heap: %d \n", ESP.getFreeHeap());
+    Serial.printf("Best Blok: %d \n", heap_caps_get_largest_free_block(MALLOC_CAP_8BIT));
 #endif  // DEBUG_STACK
     loopCounter = 0;
   }

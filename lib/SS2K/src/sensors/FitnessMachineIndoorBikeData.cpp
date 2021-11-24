@@ -6,7 +6,7 @@
  */
 
 #include "Data.h"
-#include "os/endian.h"
+#include "endian.h"
 #include "sensors/FitnessMachineIndoorBikeData.h"
 
 // See:

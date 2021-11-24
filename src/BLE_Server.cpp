@@ -231,7 +231,7 @@ void computeERG(int newSetPoint) {
 
   if (userConfig.getSimulatedCad() <= 20) {
     if (!userIsPedaling) {  // Test so motor stop command only happens once.
-      motorStop(true);     // release tension
+      motorStop();     // release tension
       return;
     }
     userIsPedaling = false;
@@ -321,7 +321,7 @@ void updateCyclingPowerMeasurementChar() {
     remainder                  = spinBLEClient.cscLastCrankEvtTime % 256;
     cyclingPowerMeasurement[7] = remainder;
     cyclingPowerMeasurement[8] = quotient;
-  }  // ^^Using the old way of setting bytes because I like it and it makes more sense to me looking at it.
+  } 
 
   cyclingPowerMeasurementCharacteristic->notify();
 

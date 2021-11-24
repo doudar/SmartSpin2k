@@ -116,12 +116,16 @@ void bleClientTask(void *pvParameters);
 // CYCLINGPOWERMEASUREMENT_UUID, HEARTCHARACTERISTIC_UUID,
 // FLYWHEEL_UART_TX_UUID};
 
-typedef struct DataHandle {
-  uint8_t *data;
+typedef struct NotifyData {
+  uint8_t data[25];
   size_t length;
-} DataHandle_t;
+} NotifyData;
 
 class SpinBLEAdvertisedDevice {
+ private:
+  QueueHandle_t dataBufferQueue = nullptr;
+  
+
  public:  // eventually these should be made private
   // // TODO: Do we dispose of this object?  Is so, we need to de-allocate the queue.
   // //       This distructor was called too early and the queue was deleted out from
@@ -135,6 +139,9 @@ class SpinBLEAdvertisedDevice {
 
   NimBLEAdvertisedDevice *advertisedDevice = nullptr;
   NimBLEAddress peerAddress;
+  
+  
+
   int connectedClientID = BLE_HS_CONN_HANDLE_NONE;
   BLEUUID serviceUUID   = (uint16_t)0x0000;
   BLEUUID charUUID      = (uint16_t)0x0000;
@@ -150,8 +157,7 @@ class SpinBLEAdvertisedDevice {
     connectedClientID = id;
     serviceUUID       = BLEUUID(inserviceUUID);
     charUUID          = BLEUUID(incharUUID);
-    // dataBuffer        = xQueueCreate((4),                  // length
-    //                            sizeof(uint8_t *));  // size
+    dataBufferQueue   = xQueueCreate(6, sizeof(NotifyData));
   }
 
   void reset() {
@@ -165,20 +171,15 @@ class SpinBLEAdvertisedDevice {
     userSelectedCSC   = false;  // Cycling Speed/Cadence
     userSelectedCT    = false;  // Controllable Trainer
     doConnect         = false;  // Initiate connection flag
-    if (dataBuffer != nullptr) {
+    if (dataBufferQueue != nullptr) {
       Serial.println("Resetting queue");
-      xQueueReset(dataBuffer);
+      xQueueReset(dataBufferQueue);
     }
   }
 
   void print();
-
-  bool enqueueData(uint8_t *data, size_t length);
-  std::shared_ptr<DataHandle_t> dequeueData();
-  static void deletePayload(DataHandle_t *data);
-
- private:
-  QueueHandle_t dataBuffer = nullptr;
+  bool enqueueData(uint8_t data[25], size_t length);
+  NotifyData dequeueData();
 };
 
 class SpinBLEClient {
