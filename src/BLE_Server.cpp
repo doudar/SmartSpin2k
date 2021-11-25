@@ -394,7 +394,7 @@ void processFTMSWrite() {
       case 0x00:  // request control
         logBufLength += snprintf(logBuf + logBufLength, kLogBufCapacity - logBufLength, "-> Control Request");
         returnValue[2] = 0x01;
-        userConfig.setERGMode(false);
+        //userConfig.setERGMode(false);
         pCharacteristic->setValue(returnValue, 3);
         ftmsTrainingStatus[1] = 0x01;
         fitnessMachineTrainingStatus->setValue(ftmsTrainingStatus, 2);
@@ -501,7 +501,7 @@ void processFTMSWrite() {
     SS2K_LOG(BLE_SERVER_LOG_TAG, "App wrote nothing ");
     SS2K_LOG(BLE_SERVER_LOG_TAG, "assuming it's a Control request");
     uint8_t controlPoint[3] = {0x80, 0x00, 0x01};
-    userConfig.setERGMode(true);
+    //userConfig.setERGMode(true);
     pCharacteristic->setValue(controlPoint, 3);
     ftmsTrainingStatus[1] = 0x01;
     fitnessMachineTrainingStatus->setValue(ftmsTrainingStatus, 2);
