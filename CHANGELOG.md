@@ -4,7 +4,7 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/)
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [11.31.21]
+## [Unreleased]
 ### Added
 - Firmware update will now download only spiffs files if missing without updating the firmware.
 
@@ -13,7 +13,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - settings_processor now checks shiftsteps to determine if it's on the main settings page.
 
 
-## [11.24.21]
+## [1.11.24]
 
 ### Added
 - Moved FTMS callback decoding outside of the callback.
