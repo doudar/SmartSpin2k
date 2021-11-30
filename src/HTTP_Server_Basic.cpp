@@ -364,23 +364,24 @@ void handleSpiffsFile() {
     server.streamFile(file, "text/" + fileType);
     file.close();
     SS2K_LOG(HTTP_SERVER_LOG_TAG, "Served %s", filename.c_str());
+  } else if (!SPIFFS.exists("/index.html")) {
+    SS2K_LOG(HTTP_SERVER_LOG_TAG, "%s not found and no filesystem. Sending builting index.html", filename.c_str());
+    handleIndexFile();
   } else {
     SS2K_LOG(HTTP_SERVER_LOG_TAG, "%s not found. Sending 404.", filename.c_str());
-    server.send(404, "text/html",
-                "<html><body><h1>ERROR 404 <br> FILE NOT "
-                "FOUND!</h1></body></html>");
+    String outputhtml = "<html><body><h1>ERROR 404 <br> FILE NOT FOUND!" + filename + "</h1></body></html>";
+    server.send(404, "text/html", outputhtml);
   }
 }
 
 void settingsProcessor() {
   String tString;
   bool wasBTUpdate       = false;
-  bool wasSettingsUpdate = true;
+  bool wasSettingsUpdate = false;
   if (!server.arg("ssid").isEmpty()) {
     tString = server.arg("ssid");
     tString.trim();
     userConfig.setSsid(tString);
-    wasSettingsUpdate = true;
   }
   if (!server.arg("password").isEmpty()) {
     tString = server.arg("password");
@@ -397,6 +398,7 @@ void settingsProcessor() {
     if (shiftStep >= 50 && shiftStep <= 6000) {
       userConfig.setShiftStep(shiftStep);
     }
+    wasSettingsUpdate = true;
   }
   if (!server.arg("stepperPower").isEmpty()) {
     uint64_t stepperPower = server.arg("stepperPower").toInt();
@@ -413,20 +415,18 @@ void settingsProcessor() {
   }
   // checkboxes don't report off, so need to check using another parameter
   // that's always present on that page
-  if (wasSettingsUpdate) {
     if (!server.arg("autoUpdate").isEmpty()) {
       userConfig.setAutoUpdate(true);
-    } else {
+    } else if (wasSettingsUpdate){
       userConfig.setAutoUpdate(false);
     }
     if (!server.arg("stealthchop").isEmpty()) {
       userConfig.setStealthChop(true);
       updateStealthchop();
-    } else {
+    } else if (wasSettingsUpdate){
       userConfig.setStealthChop(false);
       updateStealthchop();
     }
-  }
   if (!server.arg("inclineMultiplier").isEmpty()) {
     float inclineMultiplier = server.arg("inclineMultiplier").toFloat();
     if (inclineMultiplier >= 1 && inclineMultiplier <= 10) {
@@ -568,19 +568,21 @@ void FirmwareUpdate() {
       }
 
       // Update Firmware
-      ret = httpUpdate.update(client, userConfig.getFirmwareUpdateURL() + String(FW_BINFILE));
-      switch (ret) {
-        case HTTP_UPDATE_FAILED:
-          SS2K_LOG(HTTP_SERVER_LOG_TAG, "HTTP_UPDATE_FAILED Error %d : %s", httpUpdate.getLastError(), httpUpdate.getLastErrorString().c_str());
-          break;
+      if ((availiableVer > currentVer) && (userConfig.getautoUpdate())) {
+        ret = httpUpdate.update(client, userConfig.getFirmwareUpdateURL() + String(FW_BINFILE));
+        switch (ret) {
+          case HTTP_UPDATE_FAILED:
+            SS2K_LOG(HTTP_SERVER_LOG_TAG, "HTTP_UPDATE_FAILED Error %d : %s", httpUpdate.getLastError(), httpUpdate.getLastErrorString().c_str());
+            break;
 
-        case HTTP_UPDATE_NO_UPDATES:
-          SS2K_LOG(HTTP_SERVER_LOG_TAG, "HTTP_UPDATE_NO_UPDATES");
-          break;
+          case HTTP_UPDATE_NO_UPDATES:
+            SS2K_LOG(HTTP_SERVER_LOG_TAG, "HTTP_UPDATE_NO_UPDATES");
+            break;
 
-        case HTTP_UPDATE_OK:
-          SS2K_LOG(HTTP_SERVER_LOG_TAG, "HTTP_UPDATE_OK");
-          break;
+          case HTTP_UPDATE_OK:
+            SS2K_LOG(HTTP_SERVER_LOG_TAG, "HTTP_UPDATE_OK");
+            break;
+        }
       }
     } else {  // don't update
       SS2K_LOG(HTTP_SERVER_LOG_TAG, "  - Current Version: %s", FIRMWARE_VERSION);

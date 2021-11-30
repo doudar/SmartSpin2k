@@ -56,6 +56,7 @@ void setup() {
   SS2K_LOG(MAIN_LOG_TAG, "Mounting Filesystem");
   if (!SPIFFS.begin(true)) {
     SS2K_LOGE(MAIN_LOG_TAG, "An Error has occurred while mounting SPIFFS");
+    // TODO reset flash here
     return;
   }
 
@@ -91,7 +92,7 @@ void setup() {
 
   xTaskCreatePinnedToCore(moveStepper,           /* Task function. */
                           "moveStepperFunction", /* name of task. */
-                          1000,                   /* Stack size of task */
+                          1000,                  /* Stack size of task */
                           NULL,                  /* parameter of the task */
                           18,                    /* priority of the task  - 29 worked  at 1 I get stuttering */
                           &moveStepperTask,      /* Task handle to keep track of created task */
@@ -104,9 +105,7 @@ void setup() {
   // Check for firmware update. It's important that this stays before BLE &
   // HTTP setup because otherwise they use too much traffic and the device
   // fails to update which really sucks when it corrupts your settings.
-  if (userConfig.getautoUpdate()) {
-    FirmwareUpdate();
-  }
+  FirmwareUpdate();
 
   setupBLE();
   startHttpServer();
