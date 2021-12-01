@@ -9,6 +9,9 @@ This fork mods the version2 case of SmartSpin2k to have a dedicated mount for a 
 - Add LED viewing holes to main unit... maybe 
 
 
+![image](https://user-images.githubusercontent.com/24726844/144154082-946314dc-77e9-4369-8a4d-50c85c6263d2.png)
+![image](https://user-images.githubusercontent.com/24726844/144154111-70023323-28be-45eb-903a-97bb79305001.png)
+
 # News
 
 Version 1.11.24 is now live on the OTA server and your units should automatically update. Check out the release for more information but the big change is in overall stability. The last release contained a memory leak that slipped through the cracks causing random crashes. 
