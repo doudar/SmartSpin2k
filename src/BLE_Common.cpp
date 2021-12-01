@@ -45,12 +45,17 @@ void BLECommunications(void *pvParameters) {
                 //        Name(10), Prefix(2), HR(8), SEP(1), CD(10), SEP(1), PW(8), SEP(1), SP(7), Suffix(2), Nul(1) - 225 rounded up
 
                 while (pdTRUE) {
-                  std::shared_ptr<DataHandle_t> handle = myAdvertisedDevice.dequeueData();
-                  if (handle == nullptr || handle->data == nullptr || handle->length == 0) {
+                  NotifyData incomingNotifyData = myAdvertisedDevice.dequeueData();
+                  if (incomingNotifyData.length == 0) {
                     break;
                   }
-                  uint8_t *pData             = handle->data;
-                  size_t length              = handle->length;
+                  size_t length = incomingNotifyData.length;
+                  uint8_t pData[length];
+
+                  for (size_t i = 0; i < length; i++) {
+                    pData[i] = incomingNotifyData.data[i];
+                  }
+
                   const int kLogBufMaxLength = 250;
                   char logBuf[kLogBufMaxLength];
                   SS2K_LOGD(BLE_COMMON_LOG_TAG, "Data length: %d", data.length());
@@ -133,16 +138,15 @@ void BLECommunications(void *pvParameters) {
       controlPointIndicate();
 
       if (spinDown()) {
-        // Possibly do something in the future. Right now we just fake the spindown. 
+        // Possibly do something in the future. Right now we just fake the spindown.
       }
 
+      processFTMSWrite();
       computeERG();
 
       if (updateConnParametersFlag) {
         vTaskDelay(100 / portTICK_PERIOD_MS);
-        // BLEDevice::getServer()->updateConnParams(bleConnDesc, 40, 50,
-        // 0, 100);
-        BLEDevice::getServer()->updateConnParams(bleConnDesc, 80, 200, 0, 800);
+        BLEDevice::getServer()->updateConnParams(bleConnDesc, 20, 100, 0, 2000);
         updateConnParametersFlag = false;
       }
     } else {

@@ -96,7 +96,9 @@ void startWifi() {
   MDNS.addService("http", "_tcp", 80);
   MDNS.addServiceTxt("http", "_tcp", "lf", "0");
   SS2K_LOG(HTTP_SERVER_LOG_TAG, "Connected to %s IP address: %s", userConfig.getSsid(), myIP.toString().c_str());
+#ifdef USE_TELEGRAM
   SEND_TO_TELEGRAM("Connected to " + String(userConfig.getSsid()) + " IP address: " + myIP.toString());
+#endif
   SS2K_LOG(HTTP_SERVER_LOG_TAG, "Open http://%s.local/", userConfig.getDeviceName());
   WiFi.setTxPower(WIFI_POWER_19_5dBm);
 
@@ -299,7 +301,7 @@ void startHttpServer() {
 
   xTaskCreatePinnedToCore(webClientUpdate,                    /* Task function. */
                           "webClientUpdate",                  /* name of task. */
-                          4500 + (DEBUG_LOG_BUFFER_SIZE * 2), /* Stack size of task Used to be 3000*/
+                          5000 + (DEBUG_LOG_BUFFER_SIZE * 2), /* Stack size of task Used to be 3000*/
                           NULL,                               /* parameter of the task */
                           1,                                  /* priority of the task  - 29 worked*/
                           &webClientTask,                     /* Task handle to keep track of created task */
@@ -327,9 +329,12 @@ void webClientUpdate(void *pvParameters) {
       dnsServer.processNextRequest();
     }
     // Keep MDNS alive
-    if ((millis() - mDnsTimer) > 60000) {
+    if ((millis() - mDnsTimer) > 30000) {
       MDNS.addServiceTxt("http", "_tcp", "lf", String(mDnsTimer));
       mDnsTimer = millis();
+#ifdef DEBUG_STACK
+      Serial.printf("HttpServer: %d \n", uxTaskGetStackHighWaterMark(webClientTask));
+#endif  // DEBUG_STACK
     }
   }
 }

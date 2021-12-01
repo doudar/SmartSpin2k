@@ -1,3 +1,15 @@
+# News
+
+Version 1.11.24 is now live on the OTA server and your units should automatically update. Check out the release for more information but the big change is in overall stability. The last release contained a memory leak that slipped through the cracks causing random crashes. 
+
+There have also been some tweaks to the ERG code (again) and so you may need to adjust your erg multiplier or possibly shift step. In general, if it is over and undershooting the target, decrease the ERG sensitivity setting or try lowering your shift step. 
+
+As well, if for some reason there is no power being displayed with a power meter connected, make sure that the power correction factor (on the bluetooth scanner page) isn't set to 0. 
+
+Please send any feedback to the discussions page. 
+
+Enjoy!
+
 [![Watch the video](Pictures/youtube.png)](https://youtu.be/cPiIlZ2P5Ac)
 Http://GitHub.com/doudar/SmartSpin2K
 # New Hardware Version 2.0! 

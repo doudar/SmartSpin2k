@@ -6,7 +6,7 @@
  */
 
 #include "Data.h"
-#include <os/endian.h>
+#include "endian.h"
 #include "sensors/CyclePowerData.h"
 
 bool CyclePowerData::hasHeartRate() { return false; }
@@ -27,7 +27,7 @@ float CyclePowerData::getSpeed() { return nanf(""); }
 
 void CyclePowerData::decode(uint8_t *data, size_t length) {
   uint8_t flags = data[0];
-  int cPos      = 2;  // lowest position cadence could ever be
+  int cPos      = 2;  // lowest position power could ever be
   // Instantaneous power is always present. Do that first.
   // first calculate which fields are present. Power is always 2 & 3, cadence
   // can move depending on the flags.

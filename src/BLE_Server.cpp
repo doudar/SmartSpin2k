@@ -38,6 +38,7 @@ BLECharacteristic *fitnessMachineTrainingStatus;
 
 BLEService *pSmartSpin2kService;
 BLECharacteristic *smartSpin2kCharacteristic;
+std::string FTMSWrite = "";
 
 /******** Bit field Flag Example ********/
 // 00000000000000000001 - 1   - 0x001 - Pedal Power Balance Present
@@ -217,7 +218,7 @@ void computeERG(int newSetPoint) {
   static bool userIsPedaling = true;
   static int setPoint        = 0;
   float incline              = userConfig.getIncline();
-  int newIncline             = incline;
+  float newIncline           = incline;
   int amountToChangeIncline  = 0;
   int wattChange             = userConfig.getSimulatedWatts() - setPoint;
 
@@ -229,10 +230,12 @@ void computeERG(int newSetPoint) {
   }
 
   if (userConfig.getSimulatedCad() <= 20) {
-    if (userIsPedaling) {  // Test so motor stop command only happens once.
-      motorStop(true);     // release tension
+    if (!userIsPedaling) {  // Test so motor stop command only happens once.
+      motorStop();     // release tension
+      return;
     }
     userIsPedaling = false;
+    userConfig.setIncline(incline-userConfig.getShiftStep()*2);
     // Cadence too low, nothing to do here
     return;
   }
@@ -244,17 +247,17 @@ void computeERG(int newSetPoint) {
     amountToChangeIncline *= SUB_SHIFT_SCALE;
   }
   // limit to 10 shifts at a time
-  if (abs(amountToChangeIncline) > userConfig.getShiftStep() * 10) {
-    if (amountToChangeIncline > 0) {
-      amountToChangeIncline = userConfig.getShiftStep() * 10;
+  if (abs(amountToChangeIncline) > userConfig.getShiftStep() * 2) {
+    if (amountToChangeIncline > 5) {
+      amountToChangeIncline = userConfig.getShiftStep() * 2;
     }
-    if (amountToChangeIncline < 0) {
-      amountToChangeIncline = -(userConfig.getShiftStep() * 10);
+    if (amountToChangeIncline < -5) {
+      amountToChangeIncline = -(userConfig.getShiftStep() * 2);
     }
   }
 
   // Reduce the amount per loop (don't try to oneshot it) and scale the movement the higher the watt target is as higher wattages require less knob movement.
-  amountToChangeIncline = amountToChangeIncline / ((userConfig.getSimulatedWatts() / 100) + .1);  // +.1 to eliminate possible divide by zero.
+  // amountToChangeIncline = amountToChangeIncline / ((userConfig.getSimulatedWatts() / 100) + .1);  // +.1 to eliminate possible divide by zero.
   newIncline            = incline - amountToChangeIncline;
   userConfig.setIncline(newIncline);
   // SS2K_LOG(BLE_SERVER_LOG_TAG, "newincline: %f", newIncline);
@@ -318,7 +321,7 @@ void updateCyclingPowerMeasurementChar() {
     remainder                  = spinBLEClient.cscLastCrankEvtTime % 256;
     cyclingPowerMeasurement[7] = remainder;
     cyclingPowerMeasurement[8] = quotient;
-  }  // ^^Using the old way of setting bytes because I like it and it makes more sense to me looking at it.
+  } 
 
   cyclingPowerMeasurementCharacteristic->notify();
 
@@ -363,8 +366,18 @@ void MyServerCallbacks::onDisconnect(BLEServer *pServer) {
   BLEDevice::startAdvertising();
 }
 
-void MyCallbacks::onWrite(BLECharacteristic *pCharacteristic) {
-  std::string rxValue = pCharacteristic->getValue();
+void MyCallbacks::onWrite(BLECharacteristic *pCharacteristic) {  
+  FTMSWrite = pCharacteristic->getValue();
+  }
+
+void processFTMSWrite() {
+  if (FTMSWrite == "") {
+    return;
+  }
+
+  BLECharacteristic *pCharacteristic = NimBLEDevice::getServer()->getServiceByUUID(FITNESSMACHINESERVICE_UUID)->getCharacteristic(FITNESSMACHINECONTROLPOINT_UUID);
+
+  std::string rxValue = FTMSWrite;
 
   if (rxValue.length() > 1) {
     uint8_t *pData = reinterpret_cast<uint8_t *>(&rxValue[0]);
@@ -381,7 +394,7 @@ void MyCallbacks::onWrite(BLECharacteristic *pCharacteristic) {
       case 0x00:  // request control
         logBufLength += snprintf(logBuf + logBufLength, kLogBufCapacity - logBufLength, "-> Control Request");
         returnValue[2] = 0x01;
-        userConfig.setERGMode(false);
+        //userConfig.setERGMode(false);
         pCharacteristic->setValue(returnValue, 3);
         ftmsTrainingStatus[1] = 0x01;
         fitnessMachineTrainingStatus->setValue(ftmsTrainingStatus, 2);
@@ -488,13 +501,13 @@ void MyCallbacks::onWrite(BLECharacteristic *pCharacteristic) {
     SS2K_LOG(BLE_SERVER_LOG_TAG, "App wrote nothing ");
     SS2K_LOG(BLE_SERVER_LOG_TAG, "assuming it's a Control request");
     uint8_t controlPoint[3] = {0x80, 0x00, 0x01};
-    userConfig.setERGMode(true);
+    //userConfig.setERGMode(true);
     pCharacteristic->setValue(controlPoint, 3);
     ftmsTrainingStatus[1] = 0x01;
     fitnessMachineTrainingStatus->setValue(ftmsTrainingStatus, 2);
     fitnessMachineTrainingStatus->notify();
   }
-  rxValue = pCharacteristic->getValue();
+  FTMSWrite = "";
 }
 
 void controlPointIndicate() { fitnessMachineControlPoint->indicate(); }

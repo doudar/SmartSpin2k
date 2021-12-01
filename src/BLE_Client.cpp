@@ -31,7 +31,7 @@ void SpinBLEClient::start() {
   // Create the task for the BLE Client loop
   xTaskCreatePinnedToCore(bleClientTask,   /* Task function. */
                           "BLEClientTask", /* name of task. */
-                          4000,            /* Stack size of task */
+                          4200,            /* Stack size of task */
                           NULL,            /* parameter of the task */
                           1,               /* priority of the task  */
                           &BLEClientTask,  /* Task handle to keep track of created task */
@@ -417,7 +417,9 @@ void SpinBLEClient::scanProcess() {
   String output;
   serializeJson(devices, output);
   SS2K_LOG(BLE_CLIENT_LOG_TAG, "Bluetooth Client Found Devices: %s", output.c_str());
+#ifdef USE_TELEGRAM
   SEND_TO_TELEGRAM("Bluetooth Client Found Devices: " + output);
+#endif
   userConfig.setFoundDevices(output);
   pBLEScan = nullptr;  // free up memory
 }
@@ -514,54 +516,53 @@ void SpinBLEClient::postConnect(NimBLEClient *pClient) {
 }
 
 bool SpinBLEAdvertisedDevice::enqueueData(uint8_t *data, size_t length) {
-  if (!this->dataBuffer) {
-    // debugDirector("Creating queue");
-    this->dataBuffer = xQueueCreate(4, sizeof(DataHandle_t));
-    if (!this->dataBuffer) {
-      // debugDirector("Failed to create queue");
+  NotifyData notifyData;
+  //Serial.println("enqueue Called");
+  if (!this->dataBufferQueue) {
+    //Serial.println("Creating queue");
+    this->dataBufferQueue = xQueueCreate(6, sizeof(NotifyData));
+    if (!this->dataBufferQueue) {
+      //Serial.println("Failed to create queue");
       return pdFALSE;
     }
   }
 
-  if (!uxQueueSpacesAvailable(this->dataBuffer)) {
-    // debugDirector("No space available in queue. Skipping enqueue of data.");
+  if (!uxQueueSpacesAvailable(this->dataBufferQueue)) {
+    //Serial.println("No space available in queue. Skipping enqueue of data.");
     return pdFALSE;
   }
 
-  uint8_t *dataCopy = reinterpret_cast<uint8_t *>(malloc(length));
-  memcpy(dataCopy, data, length);
-  DataHandle_t dataHandle = {dataCopy, length};
-  if (xQueueSendToBack(this->dataBuffer, reinterpret_cast<void *>(&dataHandle), (TickType_t)0) == pdFALSE) {
-    // debugDirector("Failed to enqueue data.  Freeing data.");
-    free(dataCopy);
+  notifyData.length = length;
+  for (size_t i = 0; i < length; i++) {
+    notifyData.data[i] = data[i];
+    //Serial.printf("%02x ", notifyData.data[i]);
+  }
+  //Serial.printf("\n");
+ 
+  if (xQueueSendToBack(this->dataBufferQueue, &notifyData, 10) == pdFALSE) {
+  //  Serial.println("Failed to enqueue data.  Freeing data.");
     return pdFALSE;
   }
-  // debugDirector("Successfully enqueued data.");
+  //Serial.printf("Successfully enqueued data. %d. \n", notifyData.length);
   return pdTRUE;
 }
 
-std::shared_ptr<DataHandle_t> SpinBLEAdvertisedDevice::dequeueData() {
-  if (this->dataBuffer == nullptr) {
-    // debugDirector("Queue not created.  Skipping dequeue of data.");
-    return std::make_shared<DataHandle_t>();
+NotifyData SpinBLEAdvertisedDevice::dequeueData() {
+  NotifyData receivedNotifyData;
+  if (this->dataBufferQueue == nullptr) {
+  //  Serial.println("Queue not created.  Skipping dequeue of data.");
+    receivedNotifyData.length = 0;
+    return receivedNotifyData;
   }
-
-  std::shared_ptr<DataHandle_t> pHandle(new DataHandle_t(), deletePayload);
-  if (xQueueReceive(this->dataBuffer, pHandle.get(), (TickType_t)0) == pdFALSE) {
-    // debugDirector("No data dequeued from queue.");
-    return std::make_shared<DataHandle_t>();
+  if (xQueueReceive(this->dataBufferQueue, &receivedNotifyData, 0) == pdTRUE) {
+  //  Serial.printf("Successfully dequeued data from queue. %d \n", receivedNotifyData.length);
+    return receivedNotifyData;
   }
-
-  // debugDirector("Successfully dequeued data from queue.");
-  return pHandle;
+  //Serial.println("buffer was empty");
+  receivedNotifyData.length = 0;
+  return receivedNotifyData;
 }
 
-void SpinBLEAdvertisedDevice::deletePayload(DataHandle_t *handle) {
-  if (handle->data != nullptr) {
-    free(handle->data);
-    handle->data = nullptr;
-  }
-}
 // Was changed in notify-Buffer - - may not be needed **********************************************************************
 void SpinBLEAdvertisedDevice::print() {
   char logBuf[250];
