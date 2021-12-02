@@ -7,6 +7,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+- New UDP logger by @MarkusSchneider .
 - Added custom IC4 build and mount by @eMadman .
 - Moved FTMS callback decoding outside of the callback.
 - Revamped the way notify buffer works as it was causing a memory leak.
