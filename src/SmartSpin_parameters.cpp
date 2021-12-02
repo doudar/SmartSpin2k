@@ -171,7 +171,12 @@ void userParameters::loadFromSPIFFS() {
   setStepperPower(doc["stepperPower"]);
   setStealthChop(doc["stealthchop"]);
   setInclineMultiplier(doc["inclineMultiplier"]);
-  setPowerCorrectionFactor(doc["powerCorrectionFactor"]);
+  if (doc["powerCorrectionFactor"]) {
+    setPowerCorrectionFactor(doc["powerCorrectionFactor"]);
+    if ((getPowerCorrectionFactor() < MIN_PCF) || (getPowerCorrectionFactor() > MAX_PCF)) {
+      setPowerCorrectionFactor(1);
+    }
+  }
   setSimulateHr(false);  // Set these false because previous config versions may return true and these values are no longer saved.
   setSimulateWatts(false);
   setSimulateCad(false);

@@ -7,17 +7,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 ### Added
 - Firmware update will now download only spiffs files if missing without updating the firmware.
+- New UDP logger by @MarkusSchneider .
+- Added custom IC4 build and mount by @eMadman .
 
 ### BugFixes
+- Power Correction factor now minimum .5 maximum 2.5 and added checks to stay within limits. 
 - 404 now redirects to index file handler.
-- settings_processor now checks shiftsteps to determine if it's on the main settings page.
+- settings_processor now checks shiftsteps field to determine if it's on the main settings page.
 
 
 ## [1.11.24]
 
 ### Added
-- New UDP logger by @MarkusSchneider .
-- Added custom IC4 build and mount by @eMadman .
 - Moved FTMS callback decoding outside of the callback.
 - Revamped the way notify buffer works as it was causing a memory leak.
 - BLE Custom Characteristic motor driver calls now apply settings received.

@@ -435,7 +435,7 @@ void settingsProcessor() {
   }
   if (!server.arg("powerCorrectionFactor").isEmpty()) {
     float powerCorrectionFactor = server.arg("powerCorrectionFactor").toFloat();
-    if (powerCorrectionFactor >= 0 && powerCorrectionFactor <= 2) {
+    if (powerCorrectionFactor >= MIN_PCF && powerCorrectionFactor <= MAX_PCF) {
       userConfig.setPowerCorrectionFactor(powerCorrectionFactor);
     }
   }
