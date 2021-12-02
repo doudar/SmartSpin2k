@@ -6,6 +6,7 @@
  */
 
 #include "SS2KLog.h"
+#include "UdpLogger.h"
 
 DebugInfo DebugInfo::INSTANCE = DebugInfo();
 
@@ -69,6 +70,7 @@ void ss2k_log_write(esp_log_level_t level, const char *format, ...) {
 
 void ss2k_log_writev(esp_log_level_t level, const char *format, va_list args) {
   esp_log_writev(level, SS2K_LOG_TAG, format, args);
+  UdpLogger::log(format, args);
 #if DEBUG_LOG_BUFFER_SIZE > 0
   DebugInfo::append_logv(format, args);
 #endif  // DEBUG_LOG_BUFFER_SIZE > 0
