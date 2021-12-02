@@ -45,6 +45,12 @@
 // to make that commitment yet.
 #define INCLINE_MULTIPLIER 3.0
 
+// Minumum value for power correction factor user setting
+#define MIN_PCF .5
+
+// Maximum value for power correction factor user setting
+#define MAX_PCF 2.5
+
 // Default Stepper Power.
 // Stepper peak current in ma. This is hardware restricted to a maximum of 2000ma on the TMC2225. RMS current is less.
 

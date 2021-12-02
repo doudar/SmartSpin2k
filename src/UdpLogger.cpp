@@ -22,6 +22,6 @@ void UdpLogger::log_internal(const char *format, va_list args) {
     this->udp.write((uint8_t *)buffer, strlen(buffer));
     this->udp.endPacket();
   } else {
-    ESP_LOGE(UDP_LOGGER_TAG, "UPD not logging. No WIFI connection.");
+    //ESP_LOGE(UDP_LOGGER_TAG, "UPD not logging. No WIFI connection.");
   }
 }
