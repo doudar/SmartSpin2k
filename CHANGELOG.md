@@ -5,6 +5,15 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/)
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
+### Added
+- Firmware update will now download only spiffs files if missing without updating the firmware.
+
+### BugFixes
+- 404 now redirects to index file handler.
+- settings_processor now checks shiftsteps to determine if it's on the main settings page.
+
+
+## [1.11.24]
 
 ### Added
 - New UDP logger by @MarkusSchneider .
