@@ -1,14 +1,24 @@
 # News
 
-Version 1.11.24 is now live on the OTA server and your units should automatically update. Check out the release for more information but the big change is in overall stability. The last release contained a memory leak that slipped through the cracks causing random crashes. 
+Version 1.12.2 is now live on the OTA server and your units should automatically update. If they don't, please check your settings page as there was a bug (fixed in the new version) that could have turned off automatic updates. This release is super stable again and one of the big additions is UDP logging on port 10000. Thanks goes to @MarkusSchneider for that.
 
-There have also been some tweaks to the ERG code (again) and so you may need to adjust your erg multiplier or possibly shift step. In general, if it is over and undershooting the target, decrease the ERG sensitivity setting or try lowering your shift step. 
+To view the UDP logging, download [Logbert](https://github.com/couchcoding/Logbert), select Custom UDP Reciever and port 10000. It's really slick. 
 
-As well, if for some reason there is no power being displayed with a power meter connected, make sure that the power correction factor (on the bluetooth scanner page) isn't set to 0. 
+Another recent development is the.....
+
+# @eMadman IC4 mod!
+<img src="Pictures/Schwinn_IC4_MOD.png" alt="Hardware 2.0" style="height: 300px; width: 100"/> 
+<img src="Pictures/Schwinn_IC4_MOD_Closeup.png" alt="Hardware 2.0" style="height: 300px; width: 100"/> 
+
+It's designed to provide a more secure mount for the IC4 and bowflex bikes but may be applicable to other bikes as long as they have a modest amount of space between the head tube and the resistance knob.
+
+The files are in the [MODS folder here](https://github.com/doudar/SmartSpin2k/tree/develop/Hardware/MODS/Case%20V2%20-%20Heat%20Set%20Inserts)
 
 Please send any feedback to the discussions page. 
 
 Enjoy!
+
+---
 
 [![Watch the video](Pictures/youtube.png)](https://youtu.be/cPiIlZ2P5Ac)
 Http://GitHub.com/doudar/SmartSpin2K
@@ -24,9 +34,8 @@ Http://GitHub.com/doudar/SmartSpin2K
 
 In addition, there's also a PrusaSlicer profile to hopefully make printing easier. 
 
-Check it out in the hardware folder!
+Check it out in the [hardware folder!](https://github.com/doudar/SmartSpin2k/tree/develop/Hardware/Case%20Version2)
 
-https://github.com/doudar/SmartSpin2k/tree/develop/Hardware/Case%20Version2
 <img src="Pictures/Version2.0.jpg" alt="Hardware 2.0" style="height: 300px; width: 100"/> 
 
 # SmartSpin2K
