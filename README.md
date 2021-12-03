@@ -2,7 +2,7 @@
 
 Version 1.12.2 is now live on the OTA server and your units should automatically update. If they don't, please check your settings page as there was a bug (fixed in the new version) that could have turned off automatic updates. This release is super stable again and one of the big additions is UDP logging on port 10000. Thanks goes to @MarkusSchneider for that.
 
-To view the UDP logging, download [Logbert](https://github.com/couchcoding/Logbert), select Custom UDP Reciever and port 10000. It's really slick. 
+To view the UDP logging, download [SmartSpin2KFlasher](https://github.com/SmartSpin2K/SmartSpin2kFlasher/releases/tag/v0.0.4), and select UDP log viewer. It's really slick. 
 
 Another recent development is the.....
 
