@@ -415,18 +415,18 @@ void settingsProcessor() {
   }
   // checkboxes don't report off, so need to check using another parameter
   // that's always present on that page
-    if (!server.arg("autoUpdate").isEmpty()) {
-      userConfig.setAutoUpdate(true);
-    } else if (wasSettingsUpdate){
-      userConfig.setAutoUpdate(false);
-    }
-    if (!server.arg("stealthchop").isEmpty()) {
-      userConfig.setStealthChop(true);
-      updateStealthchop();
-    } else if (wasSettingsUpdate){
-      userConfig.setStealthChop(false);
-      updateStealthchop();
-    }
+  if (!server.arg("autoUpdate").isEmpty()) {
+    userConfig.setAutoUpdate(true);
+  } else if (wasSettingsUpdate) {
+    userConfig.setAutoUpdate(false);
+  }
+  if (!server.arg("stealthchop").isEmpty()) {
+    userConfig.setStealthChop(true);
+    updateStealthchop();
+  } else if (wasSettingsUpdate) {
+    userConfig.setStealthChop(false);
+    updateStealthchop();
+  }
   if (!server.arg("inclineMultiplier").isEmpty()) {
     float inclineMultiplier = server.arg("inclineMultiplier").toFloat();
     if (inclineMultiplier >= 1 && inclineMultiplier <= 10) {
