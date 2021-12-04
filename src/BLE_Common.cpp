@@ -142,7 +142,7 @@ void BLECommunications(void *pvParameters) {
       }
 
       processFTMSWrite();
-      computeERG();
+      // computeERG();
 
       if (updateConnParametersFlag) {
         vTaskDelay(100 / portTICK_PERIOD_MS);

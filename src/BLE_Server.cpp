@@ -206,62 +206,6 @@ bool spinDown() {
   return true;
 }
 
-// as a note, Trainer Road sends 50w target whenever the app is connected.
-void computeERG(int newSetPoint) {
-  // SS2K_LOG(BLE_SERVER_LOG_TAG, "ComputeERG. Setpoint: %d", newSetPoint);
-  if (userConfig.getERGMode() && spinBLEClient.connectedPM) {
-    // continue
-  } else {
-    // SS2K_LOG(BLE_SERVER_LOG_TAG, "ERG request but ERG off or no connected PM");
-    return;
-  }
-  static bool userIsPedaling = true;
-  static int setPoint        = 0;
-  float incline              = userConfig.getIncline();
-  float newIncline           = incline;
-  int amountToChangeIncline  = 0;
-  int wattChange             = userConfig.getSimulatedWatts() - setPoint;
-
-  if (newSetPoint > 0) {  // only update the value if new value is sent
-    setPoint = newSetPoint;
-  }
-  if (setPoint < 50) {  // minumum setPoint
-    setPoint = 50;
-  }
-
-  if (userConfig.getSimulatedCad() <= 20) {
-    if (!userIsPedaling) {  // Test so motor stop command only happens once.
-      motorStop();     // release tension
-      return;
-    }
-    userIsPedaling = false;
-    userConfig.setIncline(incline-userConfig.getShiftStep()*2);
-    // Cadence too low, nothing to do here
-    return;
-  }
-  userIsPedaling = true;
-
-  amountToChangeIncline = wattChange * userConfig.getERGSensitivity();
-  if (abs(wattChange) < WATTS_PER_SHIFT) {
-    // As the desired value gets closer, make smaller changes for a smoother experience
-    amountToChangeIncline *= SUB_SHIFT_SCALE;
-  }
-  // limit to 10 shifts at a time
-  if (abs(amountToChangeIncline) > userConfig.getShiftStep() * 2) {
-    if (amountToChangeIncline > 5) {
-      amountToChangeIncline = userConfig.getShiftStep() * 2;
-    }
-    if (amountToChangeIncline < -5) {
-      amountToChangeIncline = -(userConfig.getShiftStep() * 2);
-    }
-  }
-
-  // Reduce the amount per loop (don't try to oneshot it) and scale the movement the higher the watt target is as higher wattages require less knob movement.
-  // amountToChangeIncline = amountToChangeIncline / ((userConfig.getSimulatedWatts() / 100) + .1);  // +.1 to eliminate possible divide by zero.
-  newIncline            = incline - amountToChangeIncline;
-  userConfig.setIncline(newIncline);
-  // SS2K_LOG(BLE_SERVER_LOG_TAG, "newincline: %f", newIncline);
-}
 
 void updateIndoorBikeDataChar() {
   float cadRaw = userConfig.getSimulatedCad();
@@ -321,7 +265,7 @@ void updateCyclingPowerMeasurementChar() {
     remainder                  = spinBLEClient.cscLastCrankEvtTime % 256;
     cyclingPowerMeasurement[7] = remainder;
     cyclingPowerMeasurement[8] = quotient;
-  } 
+  }
 
   cyclingPowerMeasurementCharacteristic->notify();
 
@@ -366,9 +310,7 @@ void MyServerCallbacks::onDisconnect(BLEServer *pServer) {
   BLEDevice::startAdvertising();
 }
 
-void MyCallbacks::onWrite(BLECharacteristic *pCharacteristic) {  
-  FTMSWrite = pCharacteristic->getValue();
-  }
+void MyCallbacks::onWrite(BLECharacteristic *pCharacteristic) { FTMSWrite = pCharacteristic->getValue(); }
 
 void processFTMSWrite() {
   if (FTMSWrite == "") {
@@ -394,7 +336,7 @@ void processFTMSWrite() {
       case 0x00:  // request control
         logBufLength += snprintf(logBuf + logBufLength, kLogBufCapacity - logBufLength, "-> Control Request");
         returnValue[2] = 0x01;
-        //userConfig.setERGMode(false);
+        // userConfig.setERGMode(false);
         pCharacteristic->setValue(returnValue, 3);
         ftmsTrainingStatus[1] = 0x01;
         fitnessMachineTrainingStatus->setValue(ftmsTrainingStatus, 2);
@@ -435,7 +377,9 @@ void processFTMSWrite() {
         if (spinBLEClient.connectedPM || userConfig.getSimulateWatts()) {
           int targetWatts = bytes_to_u16(rxValue[2], rxValue[1]);
           userConfig.setERGMode(true);
-          computeERG(targetWatts);
+          userConfig.setTargetWatts(targetWatts);
+
+          // computeERG(targetWatts);
           logBufLength += snprintf(logBuf + logBufLength, kLogBufCapacity - logBufLength, "-> ERG Mode Target: %d Current: %d Incline: %2f", targetWatts,
                                    userConfig.getSimulatedWatts(), userConfig.getIncline() / 100);
           returnValue[2]       = 0x01;
@@ -501,7 +445,7 @@ void processFTMSWrite() {
     SS2K_LOG(BLE_SERVER_LOG_TAG, "App wrote nothing ");
     SS2K_LOG(BLE_SERVER_LOG_TAG, "assuming it's a Control request");
     uint8_t controlPoint[3] = {0x80, 0x00, 0x01};
-    //userConfig.setERGMode(true);
+    // userConfig.setERGMode(true);
     pCharacteristic->setValue(controlPoint, 3);
     ftmsTrainingStatus[1] = 0x01;
     fitnessMachineTrainingStatus->setValue(ftmsTrainingStatus, 2);

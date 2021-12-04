@@ -15,6 +15,7 @@ class userParameters {
  private:
   String firmwareUpdateURL;
   float incline;
+  int targetWatts;
   int simulatedWatts;
   int simulatedHr;
   int simulatedCad;
@@ -41,6 +42,7 @@ class userParameters {
  public:
   const char* getFirmwareUpdateURL() { return firmwareUpdateURL.c_str(); }
   float getIncline() { return incline; }
+  int getTargetWatts() { return targetWatts; }
   int getSimulatedWatts() { return simulatedWatts; }
   int getSimulatedHr() { return simulatedHr; }
   int getSimulatedCad() { return simulatedCad; }
@@ -67,6 +69,7 @@ class userParameters {
   void setDefaults();
   void setFirmwareUpdateURL(String fURL) { firmwareUpdateURL = fURL; }
   void setIncline(float inc) { incline = inc; }
+  void setTargetWatts(int w) { targetWatts = w; }
   void setSimulatedWatts(int w) { simulatedWatts = w; }
   void setSimulatedHr(int hr) { simulatedHr = hr; }
   void setSimulatedCad(float cad) { simulatedCad = cad; }

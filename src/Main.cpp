@@ -12,6 +12,7 @@
 #include <SPIFFS.h>
 #include <HardwareSerial.h>
 #include "FastAccelStepper.h"
+#include "ERG_Mode.h"
 
 bool lastDir = true;  // Stepper Last Direction
 
@@ -109,6 +110,8 @@ void setup() {
 
   setupBLE();
   startHttpServer();
+  ErgMode::setupERG();
+
   resetIfShiftersHeld();
   SS2K_LOG(MAIN_LOG_TAG, "Creating Shifter Interrupts");
   // Setup Interrups so shifters work anytime

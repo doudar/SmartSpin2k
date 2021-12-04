@@ -77,7 +77,7 @@ extern SpinBLEServer spinBLEServer;
 
 void startBLEServer();
 bool spinDown();
-void computeERG(int = 0);
+// void computeERG(int = 0);
 void computeCSC();
 void logCharacteristic(char *buffer, const size_t bufferCapacity, const byte *data, const size_t dataLength, const NimBLEUUID serviceUUID, const NimBLEUUID charUUID,
                        const char *format, ...);
