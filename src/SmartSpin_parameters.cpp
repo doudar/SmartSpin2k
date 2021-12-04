@@ -16,31 +16,17 @@
 void userParameters::setDefaults() {  // Move these to set the values as #define
                                       // in main.h
   firmwareUpdateURL     = FW_UPDATEURL;
-  incline               = 0.0;
-  targetWatts           = 0;
-  simulatedWatts        = 0;
-  simulatedHr           = 0;
-  simulatedCad          = 0;
   deviceName            = DEVICE_NAME;
   shiftStep             = 600;
-  stepperPower          = STEPPER_POWER;
   stealthchop           = STEALTHCHOP;
   inclineMultiplier     = 3.0;
   powerCorrectionFactor = 1.0;
-  simulateHr            = false;
-  simulateWatts         = false;
-  simulateTargetWatts   = false;
-  simulateCad           = false;
-  ERGMode               = false;
-  stepperRunning        = false;
   ERGSensitivity        = ERG_SENSITIVITY;
   autoUpdate            = AUTO_FIRMWARE_UPDATE;
   ssid                  = DEVICE_NAME;
   password              = DEFAULT_PASSWORD;
-  foundDevices          = "";
   connectedPowerMeter   = CONNECTED_POWER_METER;
   connectedHeartMonitor = CONNECTED_HEART_MONITOR;
-  shifterPosition       = 0;
 }
 
 //---------------------------------------------------------------------------------
@@ -52,33 +38,21 @@ String userParameters::returnJSON(bool includeDebugLog) {
   StaticJsonDocument<USERCONFIG_JSON_SIZE> doc;
   // Set the values in the document
 
-  doc["firmwareUpdateURL"]     = firmwareUpdateURL;
-  doc["firmwareVersion"]       = FIRMWARE_VERSION;
-  doc["incline"]               = incline;
-  doc["targetWatts"]           = targetWatts;
-  doc["simulatedWatts"]        = simulatedWatts;
-  doc["simulatedHr"]           = simulatedHr;
-  doc["simulatedCad"]          = simulatedCad;
-  doc["deviceName"]            = deviceName;
-  doc["shiftStep"]             = shiftStep;
-  doc["stepperPower"]          = stepperPower;
+  doc["firmwareUpdateURL"] = firmwareUpdateURL;
+  doc["firmwareVersion"]   = FIRMWARE_VERSION;
+  doc["deviceName"]        = deviceName;
+  doc["shiftStep"]         = shiftStep;
+  doc["stepperPower"]      = stepperPower;
+
   doc["stealthchop"]           = stealthchop;
   doc["inclineMultiplier"]     = inclineMultiplier;
   doc["powerCorrectionFactor"] = powerCorrectionFactor;
-  doc["simulateHr"]            = simulateHr;
-  doc["simulateWatts"]         = simulateWatts;
-  doc["simulateTargetWatts"]   = simulateTargetWatts;
-  doc["simulateCad"]           = simulateCad;
-  doc["ERGMode"]               = ERGMode;
-  doc["stepperRunning"]        = stepperRunning;
   doc["ERGSensitivity"]        = ERGSensitivity;
   doc["autoUpdate"]            = autoUpdate;
   doc["ssid"]                  = ssid;
   doc["password"]              = password;
-  doc["foundDevices"]          = foundDevices;
   doc["connectedPowerMeter"]   = connectedPowerMeter;
   doc["connectedHeartMonitor"] = connectedHeartMonitor;
-  doc["shifterPosition"]       = shifterPosition;
   if (includeDebugLog) {
     doc["debug"] = DebugInfo::get_and_clear_logs();
   }
@@ -109,29 +83,19 @@ void userParameters::saveToSPIFFS() {
   // commented items are not needed in save file
 
   doc["firmwareUpdateURL"] = firmwareUpdateURL;
-  // doc["incline"]           = incline;
-  // doc["simulatedWatts"]       = simulatedWatts;
-  // doc["simulatedHr"]          = simulatedHr;
-  // doc["simulatedCad"]         = simulatedCad;
   doc["deviceName"]            = deviceName;
   doc["shiftStep"]             = shiftStep;
   doc["stepperPower"]          = stepperPower;
   doc["stealthchop"]           = stealthchop;
   doc["inclineMultiplier"]     = inclineMultiplier;
   doc["powerCorrectionFactor"] = powerCorrectionFactor;
-  // doc["simulateHr"]            = simulateHr;
-  // doc["simulateWatts"]         = simulateWatts;
-  // doc["simulateCad"]           = simulateCad;
-  // doc["ERGMode"]               = ERGMode;
   doc["ERGSensitivity"] = ERGSensitivity;
   doc["autoUpdate"]     = autoUpdate;
   doc["ssid"]           = ssid;
   doc["password"]       = password;
-  // doc["foundDevices"]         = foundDevices; //I don't see a need
   // currently in keeping this boot to boot
   doc["connectedPowerMeter"]   = connectedPowerMeter;
   doc["connectedHeartMonitor"] = connectedHeartMonitor;
-  // doc["shifterPosition"]       = shifterPosition;
 
   // Serialize JSON to file
   if (serializeJson(doc, file) == 0) {
@@ -183,20 +147,14 @@ void userParameters::loadFromSPIFFS() {
       setPowerCorrectionFactor(1);
     }
   }
-  setSimulateHr(false);  // Set these false because previous config versions may return true and these values are no longer saved.
-  setSimulateWatts(false);
-  setSimulateCad(false);
-  // setERGMode(doc["ERGMode"]);
   if (doc["ERGSensitivity"]) {
     setERGSensitivity(doc["ERGSensitivity"]);
   }
   setAutoUpdate(doc["autoUpdate"]);
   setSsid(doc["ssid"]);
   setPassword(doc["password"]);
-  // setfoundDevices       (doc["foundDevices"]);
   setConnectedPowerMeter(doc["connectedPowerMeter"]);
   setConnectedHeartMonitor(doc["connectedHeartMonitor"]);
-  // setShifterPosition[doc["shifterPosition"]);
 
   SS2K_LOG(CONFIG_LOG_TAG, "Config File Loaded: %s", configFILENAME);
   file.close();

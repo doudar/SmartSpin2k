@@ -21,12 +21,12 @@ void setupERG() {
 void ergTaskLoop(void* pvParameters) {
   ErgMode ergMode;
   while (true) {
-    vTaskDelay(1000 / portTICK_PERIOD_MS);
+    vTaskDelay(ERG_MODE_DELAY / portTICK_PERIOD_MS);
 
-    int newSetPoint             = userConfig.getTargetWatts();
-    bool isInErgMode            = userConfig.getERGMode();
+    int newSetPoint             = rtConfig.getTargetWatts();
+    bool isInErgMode            = rtConfig.getERGMode();
     bool hasConnectedPowerMeter = spinBLEClient.connectedPM;
-    bool simulationRunning      = userConfig.getSimulateTargetWatts();
+    bool simulationRunning      = rtConfig.getSimulateTargetWatts();
 
     if (isInErgMode && (hasConnectedPowerMeter || simulationRunning)) {
       SS2K_LOG(ERG_MODE_LOG_TAG, "ComputeERG. Setpoint: %d", newSetPoint);
@@ -47,12 +47,12 @@ void ergTaskLoop(void* pvParameters) {
 void ErgMode::computErg(int newSetPoint) {
   static bool userIsPedaling = true;
   static int setPoint        = 0;
-  float incline              = userConfig.getIncline();
+  float incline              = rtConfig.getIncline();
   float newIncline           = incline;
   int amountToChangeIncline  = 0;
-  int wattChange             = userConfig.getSimulatedWatts() - setPoint;
-  int cadance                = userConfig.getSimulatedCad();
-  bool isStepperRunning      = userConfig.getStepperRunning();
+  int wattChange             = rtConfig.getSimulatedWatts().value - setPoint;
+  int cadance                = rtConfig.getSimulatedCad();
+  bool isStepperRunning      = rtConfig.getStepperRunning();
 
   SS2K_LOG(ERG_MODE_LOG_TAG, "Incline = %f, SetPoint = %d, NewSetPoint = %d, WattChange = %d", incline, setPoint, newSetPoint, wattChange);
   if (isStepperRunning) {
@@ -72,7 +72,7 @@ void ErgMode::computErg(int newSetPoint) {
       return;
     }
     userIsPedaling = false;
-    userConfig.setIncline(incline - userConfig.getShiftStep() * 2);
+    rtConfig.setIncline(incline - userConfig.getShiftStep() * 2);
     // Cadence too low, nothing to do here
     return;
   }
@@ -96,6 +96,6 @@ void ErgMode::computErg(int newSetPoint) {
   // Reduce the amount per loop (don't try to oneshot it) and scale the movement the higher the watt target is as higher wattages require less knob movement.
   // amountToChangeIncline = amountToChangeIncline / ((userConfig.getSimulatedWatts() / 100) + .1);  // +.1 to eliminate possible divide by zero.
   newIncline = incline - amountToChangeIncline;
-  userConfig.setIncline(newIncline);
+  rtConfig.setIncline(newIncline);
   SS2K_LOG(ERG_MODE_LOG_TAG, "newincline: %f", newIncline);
 }

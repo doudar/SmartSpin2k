@@ -43,6 +43,7 @@ TaskHandle_t moveStepperTask;
 
 ///////////// Initialize the Config /////////////
 userParameters userConfig;
+RuntimeParameters rtConfig;
 physicalWorkingCapacity userPWC;
 
 ///////////// BEGIN SETUP /////////////
@@ -127,7 +128,7 @@ void setup() {
   // Check for firmware update. It's important that this stays before BLE &
   // HTTP setup because otherwise they use too much traffic and the device
   // fails to update which really sucks when it corrupts your settings.
-  FirmwareUpdate();
+  // FirmwareUpdate();
 
   startTasks();
   startHttpServer();
@@ -145,16 +146,16 @@ void loop() {
 
   vTaskDelay(200 / portTICK_RATE_MS);
 
-  if (userConfig.getShifterPosition() > lastShifterPosition) {
-    SS2K_LOG(MAIN_LOG_TAG, "Shift UP: %l", userConfig.getShifterPosition());
+  if (rtConfig.getShifterPosition() > lastShifterPosition) {
+    SS2K_LOG(MAIN_LOG_TAG, "Shift UP: %l", rtConfig.getShifterPosition());
     Serial.println(targetPosition);
     spinBLEServer.notifyShift(1);
-  } else if (userConfig.getShifterPosition() < lastShifterPosition) {
-    SS2K_LOG(MAIN_LOG_TAG, "Shift DOWN: %l", userConfig.getShifterPosition());
+  } else if (rtConfig.getShifterPosition() < lastShifterPosition) {
+    SS2K_LOG(MAIN_LOG_TAG, "Shift DOWN: %l", rtConfig.getShifterPosition());
     Serial.println(targetPosition);
     spinBLEServer.notifyShift(0);
   }
-  lastShifterPosition = userConfig.getShifterPosition();
+  lastShifterPosition = rtConfig.getShifterPosition();
 
   if (loopCounter > 4) {
     scanIfShiftersHeld();
@@ -183,7 +184,7 @@ void moveStepper(void *pvParameters) {
 
   while (1) {
     if (!externalControl) {
-      targetPosition = (userConfig.getShifterPosition() * userConfig.getShiftStep()) + (userConfig.getIncline() * userConfig.getInclineMultiplier());
+      targetPosition = (rtConfig.getShifterPosition() * userConfig.getShiftStep()) + (rtConfig.getIncline() * userConfig.getInclineMultiplier());
     }
     if (syncMode) {
       stepper->stopMove();
@@ -195,7 +196,7 @@ void moveStepper(void *pvParameters) {
       stepper->moveTo(targetPosition);
     }
     vTaskDelay(100 / portTICK_PERIOD_MS);
-    userConfig.setStepperRunning(stepper->isRunning());
+    rtConfig.setStepperRunning(stepper->isRunning());
     if (connectedClientCount() > 0) {
       stepper->setAutoEnable(false);  // Keep the stepper from rolling back due to head tube slack. Motor Driver still lowers power between moves
       stepper->enableOutputs();
@@ -219,7 +220,7 @@ bool IRAM_ATTR deBounce() {
 void IRAM_ATTR shiftUp() {  // Handle the shift up interrupt IRAM_ATTR is to keep the interrput code in ram always
   if (deBounce()) {
     if (!digitalRead(SHIFT_UP_PIN)) {  // double checking to make sure the interrupt wasn't triggered by emf
-      userConfig.setShifterPosition(userConfig.getShifterPosition() + 1);
+      rtConfig.setShifterPosition(rtConfig.getShifterPosition() + 1);
     } else {
       lastDebounceTime = 0;
     }  // Probably Triggered by EMF, reset the debounce
@@ -229,7 +230,7 @@ void IRAM_ATTR shiftUp() {  // Handle the shift up interrupt IRAM_ATTR is to kee
 void IRAM_ATTR shiftDown() {  // Handle the shift down interrupt
   if (deBounce()) {
     if (!digitalRead(SHIFT_DOWN_PIN)) {  // double checking to make sure the interrupt wasn't triggered by emf
-      userConfig.setShifterPosition(userConfig.getShifterPosition() - 1);
+      rtConfig.setShifterPosition(rtConfig.getShifterPosition() - 1);
     } else {
       lastDebounceTime = 0;
     }  // Probably Triggered by EMF, reset the debounce

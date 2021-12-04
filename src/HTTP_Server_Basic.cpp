@@ -171,16 +171,16 @@ void startHttpServer() {
   server.on("/hrslider", []() {
     String value = server.arg("value");
     if (value == "enable") {
-      userConfig.setSimulateHr(true);
+      rtConfig.setSimulateHr(true);
       server.send(200, "text/plain", "OK");
       SS2K_LOG(HTTP_SERVER_LOG_TAG, "HR Simulator turned on");
     } else if (value == "disable") {
-      userConfig.setSimulateHr(false);
+      rtConfig.setSimulateHr(false);
       server.send(200, "text/plain", "OK");
       SS2K_LOG(HTTP_SERVER_LOG_TAG, "HR Simulator turned off");
     } else {
-      userConfig.setSimulatedHr(value.toInt());
-      SS2K_LOG(HTTP_SERVER_LOG_TAG, "HR is now: %d", userConfig.getSimulatedHr());
+      rtConfig.setSimulatedHr(value.toInt());
+      SS2K_LOG(HTTP_SERVER_LOG_TAG, "HR is now: %d", rtConfig.getSimulatedHr());
       server.send(200, "text/plain", "OK");
     }
   });
@@ -188,16 +188,16 @@ void startHttpServer() {
   server.on("/wattsslider", []() {
     String value = server.arg("value");
     if (value == "enable") {
-      userConfig.setSimulateWatts(true);
+      rtConfig.setSimulateWatts(true);
       server.send(200, "text/plain", "OK");
       SS2K_LOG(HTTP_SERVER_LOG_TAG, "Watt Simulator turned on");
     } else if (value == "disable") {
-      userConfig.setSimulateWatts(false);
+      rtConfig.setSimulateWatts(false);
       server.send(200, "text/plain", "OK");
       SS2K_LOG(HTTP_SERVER_LOG_TAG, "Watt Simulator turned off");
     } else {
-      userConfig.setSimulatedWatts(value.toInt());
-      SS2K_LOG(HTTP_SERVER_LOG_TAG, "Watts are now: %d", userConfig.getSimulatedWatts());
+      rtConfig.setSimulatedWatts(value.toInt());
+      SS2K_LOG(HTTP_SERVER_LOG_TAG, "Watts are now: %d", rtConfig.getSimulatedWatts());
       server.send(200, "text/plain", "OK");
     }
   });
@@ -205,16 +205,16 @@ void startHttpServer() {
   server.on("/cadslider", []() {
     String value = server.arg("value");
     if (value == "enable") {
-      userConfig.setSimulateCad(true);
+      rtConfig.setSimulateCad(true);
       server.send(200, "text/plain", "OK");
       SS2K_LOG(HTTP_SERVER_LOG_TAG, "CAD Simulator turned on");
     } else if (value == "disable") {
-      userConfig.setSimulateCad(false);
+      rtConfig.setSimulateCad(false);
       server.send(200, "text/plain", "OK");
       SS2K_LOG(HTTP_SERVER_LOG_TAG, "CAD Simulator turned off");
     } else {
-      userConfig.setSimulatedCad(value.toInt());
-      SS2K_LOG(HTTP_SERVER_LOG_TAG, "CAD is now: %d", userConfig.getSimulatedCad());
+      rtConfig.setSimulatedCad(value.toInt());
+      SS2K_LOG(HTTP_SERVER_LOG_TAG, "CAD is now: %d", rtConfig.getSimulatedCad());
       server.send(200, "text/plain", "OK");
     }
   });
@@ -222,11 +222,11 @@ void startHttpServer() {
   server.on("/ergmode", []() {
     String value = server.arg("value");
     if (value == "enable") {
-      userConfig.setERGMode(true);
+      rtConfig.setERGMode(true);
       server.send(200, "text/plain", "OK");
       SS2K_LOG(HTTP_SERVER_LOG_TAG, "ERG Mode turned on");
     } else {
-      userConfig.setERGMode(false);
+      rtConfig.setERGMode(false);
       server.send(200, "text/plain", "OK");
       SS2K_LOG(HTTP_SERVER_LOG_TAG, "ERG Mode turned off");
     }
@@ -235,16 +235,16 @@ void startHttpServer() {
   server.on("/targetwattsslider", []() {
     String value = server.arg("value");
     if (value == "enable") {
-      userConfig.setSimulateTargetWatts(true);
+      rtConfig.setSimulateTargetWatts(true);
       server.send(200, "text/plain", "OK");
       SS2K_LOG(HTTP_SERVER_LOG_TAG, "Target Watts Simulator turned on");
     } else if (value == "disable") {
-      userConfig.setSimulateTargetWatts(false);
+      rtConfig.setSimulateTargetWatts(false);
       server.send(200, "text/plain", "OK");
       SS2K_LOG(HTTP_SERVER_LOG_TAG, "Target Watts Simulator turned off");
     } else {
-      userConfig.setTargetWatts(value.toInt());
-      SS2K_LOG(HTTP_SERVER_LOG_TAG, "Target Watts are now: %d", userConfig.getTargetWatts());
+      rtConfig.setTargetWatts(value.toInt());
+      SS2K_LOG(HTTP_SERVER_LOG_TAG, "Target Watts are now: %d", rtConfig.getTargetWatts());
       server.send(200, "text/plain", "OK");
     }
   });

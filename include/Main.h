@@ -31,6 +31,7 @@ void stopTasks();
 
 // Main program variable that stores most everything
 extern userParameters userConfig;
+extern RuntimeParameters rtConfig;
 extern int32_t targetPosition;
 extern bool externalControl;
 extern bool syncMode;
