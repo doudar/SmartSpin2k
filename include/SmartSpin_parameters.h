@@ -57,7 +57,7 @@ class RuntimeParameters {
 
   void setIncline(float inc) { incline = inc; }
   void setTargetWatts(int w) { targetWatts = w; }
-  void setSimulatedWatts(Measurement w) { simulatedWatts = w; }
+  void setSimulatedWatts(int w) { simulatedWatts = Measurement(w); }
   void setSimulatedHr(int hr) { simulatedHr = hr; }
   void setSimulatedCad(float cad) { simulatedCad = cad; }
   void setSimulatedSpeed(float spd) { simulatedSpeed = spd; }

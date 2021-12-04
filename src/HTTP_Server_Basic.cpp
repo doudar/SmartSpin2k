@@ -197,7 +197,7 @@ void startHttpServer() {
       SS2K_LOG(HTTP_SERVER_LOG_TAG, "Watt Simulator turned off");
     } else {
       rtConfig.setSimulatedWatts(value.toInt());
-      SS2K_LOG(HTTP_SERVER_LOG_TAG, "Watts are now: %d", rtConfig.getSimulatedWatts());
+      SS2K_LOG(HTTP_SERVER_LOG_TAG, "Watts are now: %d", rtConfig.getSimulatedWatts().value);
       server.send(200, "text/plain", "OK");
     }
   });

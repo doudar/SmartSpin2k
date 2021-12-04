@@ -381,7 +381,7 @@ void processFTMSWrite() {
 
           // computeERG(targetWatts);
           logBufLength += snprintf(logBuf + logBufLength, kLogBufCapacity - logBufLength, "-> ERG Mode Target: %d Current: %d Incline: %2f", targetWatts,
-                                   rtConfig.getSimulatedWatts(), rtConfig.getIncline() / 100);
+                                   rtConfig.getSimulatedWatts().value, rtConfig.getIncline() / 100);
           returnValue[2]       = 0x01;
           uint8_t ERGStatus[3] = {0x08, (uint8_t)rxValue[1], 0x01};
           fitnessMachineStatusCharacteristic->setValue(ERGStatus, 3);

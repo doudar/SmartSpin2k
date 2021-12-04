@@ -45,14 +45,17 @@ void ergTaskLoop(void* pvParameters) {
 
 // as a note, Trainer Road sends 50w target whenever the app is connected.
 void ErgMode::computErg(int newSetPoint) {
-  static bool userIsPedaling = true;
-  static int setPoint        = 0;
-  float incline              = rtConfig.getIncline();
-  float newIncline           = incline;
-  int amountToChangeIncline  = 0;
-  int wattChange             = rtConfig.getSimulatedWatts().value - setPoint;
-  int cadance                = rtConfig.getSimulatedCad();
-  bool isStepperRunning      = rtConfig.getStepperRunning();
+  Measurement newWatts      = rtConfig.getSimulatedWatts();
+  float incline             = rtConfig.getIncline();
+  int amountToChangeIncline = 0;
+  int wattChange            = newWatts.value - setPoint;
+  int cadance               = rtConfig.getSimulatedCad();
+  bool isStepperRunning     = rtConfig.getStepperRunning();
+
+  if (watts.timestamp == newWatts.timestamp) {
+    return;  // no new power measurement.
+  }
+  watts = newWatts;
 
   SS2K_LOG(ERG_MODE_LOG_TAG, "Incline = %f, SetPoint = %d, NewSetPoint = %d, WattChange = %d", incline, setPoint, newSetPoint, wattChange);
   if (isStepperRunning) {
@@ -95,7 +98,7 @@ void ErgMode::computErg(int newSetPoint) {
 
   // Reduce the amount per loop (don't try to oneshot it) and scale the movement the higher the watt target is as higher wattages require less knob movement.
   // amountToChangeIncline = amountToChangeIncline / ((userConfig.getSimulatedWatts() / 100) + .1);  // +.1 to eliminate possible divide by zero.
-  newIncline = incline - amountToChangeIncline;
+  float newIncline = incline - amountToChangeIncline;
   rtConfig.setIncline(newIncline);
   SS2K_LOG(ERG_MODE_LOG_TAG, "newincline: %f", newIncline);
 }

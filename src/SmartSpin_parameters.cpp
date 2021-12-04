@@ -132,10 +132,6 @@ void userParameters::loadFromSPIFFS() {
 
   // Copy values from the JsonDocument to the Config
   setFirmwareUpdateURL(doc["firmwareUpdateURL"]);
-  // setIncline(doc["incline"]);
-  // setSimulatedWatts     (doc["simulatedWatts"]);
-  // setSimulatedHr        (doc["simulatedHr"]);
-  // setSimulatedCad       (doc["simulatedCad"]);
   setDeviceName(doc["deviceName"]);
   setShiftStep(doc["shiftStep"]);
   setStepperPower(doc["stepperPower"]);
