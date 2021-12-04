@@ -32,6 +32,7 @@ void userParameters::setDefaults() {  // Move these to set the values as #define
   simulateTargetWatts   = false;
   simulateCad           = false;
   ERGMode               = false;
+  stepperRunning        = false;
   ERGSensitivity        = ERG_SENSITIVITY;
   autoUpdate            = AUTO_FIRMWARE_UPDATE;
   ssid                  = DEVICE_NAME;
@@ -69,6 +70,7 @@ String userParameters::returnJSON(bool includeDebugLog) {
   doc["simulateTargetWatts"]   = simulateTargetWatts;
   doc["simulateCad"]           = simulateCad;
   doc["ERGMode"]               = ERGMode;
+  doc["stepperRunning"]        = stepperRunning;
   doc["ERGSensitivity"]        = ERGSensitivity;
   doc["autoUpdate"]            = autoUpdate;
   doc["ssid"]                  = ssid;

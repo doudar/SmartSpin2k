@@ -284,6 +284,7 @@ void startHttpServer() {
         if (upload.filename == String("firmware.bin").c_str()) {
           if (upload.status == UPLOAD_FILE_START) {
             SS2K_LOG(HTTP_SERVER_LOG_TAG, "Update: %s", upload.filename.c_str());
+            stopTasks();
             if (!Update.begin(UPDATE_SIZE_UNKNOWN)) {  // start with max
                                                        // available size
               Update.printError(Serial);

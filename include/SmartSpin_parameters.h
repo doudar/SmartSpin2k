@@ -13,32 +13,36 @@
 
 class userParameters {
  private:
-  String firmwareUpdateURL;
+  // Runtime Settings
   float incline;
   int targetWatts;
   int simulatedWatts;
   int simulatedHr;
   int simulatedCad;
   float simulatedSpeed;
-  String deviceName;
-  int shiftStep;
   int stepperPower;
-  bool stealthchop;
-  float inclineMultiplier;
-  float powerCorrectionFactor;
   bool simulateHr;
   bool simulateWatts;
   bool simulateTargetWatts;
   bool simulateCad;
   bool ERGMode;
+  int shifterPosition;
+  String foundDevices = " ";
+  bool stepperRunning;
+
+  // System Settings
+  String firmwareUpdateURL;
+  String deviceName;
+  int shiftStep;
+  bool stealthchop;
+  float inclineMultiplier;
+  float powerCorrectionFactor;
   float ERGSensitivity;
   bool autoUpdate;
   String ssid;
   String password;
-  String foundDevices          = " ";
   String connectedPowerMeter   = "any";
   String connectedHeartMonitor = "any";
-  int shifterPosition;
 
  public:
   const char* getFirmwareUpdateURL() { return firmwareUpdateURL.c_str(); }
@@ -67,6 +71,7 @@ class userParameters {
   const char* getconnectedPowerMeter() { return connectedPowerMeter.c_str(); }
   const char* getconnectedHeartMonitor() { return connectedHeartMonitor.c_str(); }
   int getShifterPosition() { return shifterPosition; }
+  bool getStepperRunning() { return stepperRunning; }
 
   void setDefaults();
   void setFirmwareUpdateURL(String fURL) { firmwareUpdateURL = fURL; }
@@ -95,6 +100,7 @@ class userParameters {
   void setConnectedPowerMeter(String cpm) { connectedPowerMeter = cpm; }
   void setConnectedHeartMonitor(String cHr) { connectedHeartMonitor = cHr; }
   void setShifterPosition(int sp) { shifterPosition = sp; }
+  void setStepperRunning(bool running) { stepperRunning = running; }
 
   String returnJSON(bool includeDebugLog = false);
   void saveToSPIFFS();

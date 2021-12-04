@@ -37,9 +37,9 @@ void ergTaskLoop(void* pvParameters) {
       }
     }
 
-    // #ifdef DEBUG_STACK
+#ifdef DEBUG_STACK
     Serial.printf("ERG Task: %d \n", uxTaskGetStackHighWaterMark(ErgTask));
-    // #endif  // DEBUG_STACK
+#endif  // DEBUG_STACK
   }
 }
 
@@ -52,8 +52,12 @@ void ErgMode::computErg(int newSetPoint) {
   int amountToChangeIncline  = 0;
   int wattChange             = userConfig.getSimulatedWatts() - setPoint;
   int cadance                = userConfig.getSimulatedCad();
+  bool isStepperRunning      = userConfig.getStepperRunning();
 
   SS2K_LOG(ERG_MODE_LOG_TAG, "Incline = %f, SetPoint = %d, NewSetPoint = %d, WattChange = %d", incline, setPoint, newSetPoint, wattChange);
+  if (isStepperRunning) {
+    SS2K_LOG(ERG_MODE_LOG_TAG, "Stepper is running. Skip ERG computation");
+  }
 
   if (newSetPoint > 0) {  // only update the value if new value is sent
     setPoint = newSetPoint;

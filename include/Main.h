@@ -26,6 +26,8 @@ void updateStepperPower();
 void updateStealthchop();
 void checkDriverTemperature();
 void motorStop(bool releaseTension = false);
+void startTasks();
+void stopTasks();
 
 // Main program variable that stores most everything
 extern userParameters userConfig;

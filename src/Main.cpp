@@ -47,6 +47,27 @@ physicalWorkingCapacity userPWC;
 
 ///////////// BEGIN SETUP /////////////
 #ifndef UNIT_TEST
+
+void startTasks() {
+  SS2K_LOG(MAIN_LOG_TAG, "Start BLE & ERG Tasks");
+  if (BLECommunicationTask == NULL) {
+    setupBLE();
+  }
+  if (ErgTask == NULL) {
+    setupERG();
+  }
+}
+
+void stopTasks() {
+  SS2K_LOG(MAIN_LOG_TAG, "Stop BLE & ERG Tasks");
+  if (BLECommunicationTask != NULL) {
+    vTaskDelete(BLECommunicationTask);
+  }
+  if (ErgTask != NULL) {
+    vTaskDelete(ErgTask);
+  }
+}
+
 void setup() {
   // Serial port for debugging purposes
   Serial.begin(512000);
@@ -108,8 +129,7 @@ void setup() {
   // fails to update which really sucks when it corrupts your settings.
   FirmwareUpdate();
 
-  setupBLE();
-  setupERG();
+  startTasks();
   startHttpServer();
 
   resetIfShiftersHeld();
@@ -175,6 +195,7 @@ void moveStepper(void *pvParameters) {
       stepper->moveTo(targetPosition);
     }
     vTaskDelay(100 / portTICK_PERIOD_MS);
+    userConfig.setStepperRunning(stepper->isRunning());
     if (connectedClientCount() > 0) {
       stepper->setAutoEnable(false);  // Keep the stepper from rolling back due to head tube slack. Motor Driver still lowers power between moves
       stepper->enableOutputs();
