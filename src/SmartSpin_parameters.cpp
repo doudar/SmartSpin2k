@@ -17,9 +17,10 @@ void userParameters::setDefaults() {  // Move these to set the values as #define
                                       // in main.h
   firmwareUpdateURL     = FW_UPDATEURL;
   incline               = 0.0;
-  simulatedWatts        = 00;
-  simulatedHr           = 00;
-  simulatedCad          = 00;
+  targetWatts           = 0;
+  simulatedWatts        = 0;
+  simulatedHr           = 0;
+  simulatedCad          = 0;
   deviceName            = DEVICE_NAME;
   shiftStep             = 600;
   stepperPower          = STEPPER_POWER;
@@ -28,6 +29,7 @@ void userParameters::setDefaults() {  // Move these to set the values as #define
   powerCorrectionFactor = 1.0;
   simulateHr            = false;
   simulateWatts         = false;
+  simulateTargetWatts   = false;
   simulateCad           = false;
   ERGMode               = false;
   ERGSensitivity        = ERG_SENSITIVITY;
@@ -52,6 +54,7 @@ String userParameters::returnJSON(bool includeDebugLog) {
   doc["firmwareUpdateURL"]     = firmwareUpdateURL;
   doc["firmwareVersion"]       = FIRMWARE_VERSION;
   doc["incline"]               = incline;
+  doc["targetWatts"]           = targetWatts;
   doc["simulatedWatts"]        = simulatedWatts;
   doc["simulatedHr"]           = simulatedHr;
   doc["simulatedCad"]          = simulatedCad;
@@ -63,6 +66,7 @@ String userParameters::returnJSON(bool includeDebugLog) {
   doc["powerCorrectionFactor"] = powerCorrectionFactor;
   doc["simulateHr"]            = simulateHr;
   doc["simulateWatts"]         = simulateWatts;
+  doc["simulateTargetWatts"]   = simulateTargetWatts;
   doc["simulateCad"]           = simulateCad;
   doc["ERGMode"]               = ERGMode;
   doc["ERGSensitivity"]        = ERGSensitivity;

@@ -214,7 +214,37 @@ void startHttpServer() {
       SS2K_LOG(HTTP_SERVER_LOG_TAG, "CAD Simulator turned off");
     } else {
       userConfig.setSimulatedCad(value.toInt());
-      SS2K_LOG(HTTP_SERVER_LOG_TAG, "CAD is now: %f", userConfig.getSimulatedCad());
+      SS2K_LOG(HTTP_SERVER_LOG_TAG, "CAD is now: %d", userConfig.getSimulatedCad());
+      server.send(200, "text/plain", "OK");
+    }
+  });
+
+  server.on("/ergmode", []() {
+    String value = server.arg("value");
+    if (value == "enable") {
+      userConfig.setERGMode(true);
+      server.send(200, "text/plain", "OK");
+      SS2K_LOG(HTTP_SERVER_LOG_TAG, "ERG Mode turned on");
+    } else {
+      userConfig.setERGMode(false);
+      server.send(200, "text/plain", "OK");
+      SS2K_LOG(HTTP_SERVER_LOG_TAG, "ERG Mode turned off");
+    }
+  });
+
+  server.on("/targetwattsslider", []() {
+    String value = server.arg("value");
+    if (value == "enable") {
+      userConfig.setSimulateTargetWatts(true);
+      server.send(200, "text/plain", "OK");
+      SS2K_LOG(HTTP_SERVER_LOG_TAG, "Target Watts Simulator turned on");
+    } else if (value == "disable") {
+      userConfig.setSimulateTargetWatts(false);
+      server.send(200, "text/plain", "OK");
+      SS2K_LOG(HTTP_SERVER_LOG_TAG, "Target Watts Simulator turned off");
+    } else {
+      userConfig.setTargetWatts(value.toInt());
+      SS2K_LOG(HTTP_SERVER_LOG_TAG, "Target Watts are now: %d", userConfig.getTargetWatts());
       server.send(200, "text/plain", "OK");
     }
   });

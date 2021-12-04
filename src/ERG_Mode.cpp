@@ -2,34 +2,45 @@
 #include "SS2KLog.h"
 #include "Main.h"
 
-TaskHandle_t ErgMode::_ergTask;
+TaskHandle_t ErgTask;
 
-void ErgMode::setupERG() {
+void setupERG() {
+  TaskHandle_t task_handle;
   SS2K_LOG(ERG_MODE_LOG_TAG, "Starting ERG Mode task...");
-  xTaskCreatePinnedToCore(loop,          /* Task function. */
+  xTaskCreatePinnedToCore(ergTaskLoop,   /* Task function. */
                           "ERGModeTask", /* name of task. */
-                          1800,          /* Stack size of task*/
+                          2500,          /* Stack size of task*/
                           NULL,          /* parameter of the task */
                           1,             /* priority of the task*/
-                          &_ergTask,     /* Task handle to keep track of created task */
-                          1);            /* pin task to core 0 */
+                          &ErgTask,      /* Task handle to keep track of created task */
+                          0);            /* pin task to core 0 */
 
   SS2K_LOG(ERG_MODE_LOG_TAG, "ERG Mode task started");
 }
 
-void ErgMode::loop(void *pvParameters) {
-  vTaskDelay(ERG_MODE_DELAY / portTICK_PERIOD_MS);
+void ergTaskLoop(void* pvParameters) {
+  ErgMode ergMode;
+  while (true) {
+    vTaskDelay(1000 / portTICK_PERIOD_MS);
 
-  //   int newSetPoint             = userConfig.getTargetWatts();
-  //   bool isInErgMode            = userConfig.getERGMode();
-  //   bool hasConnectedPowerMeter = spinBLEClient.connectedPM;
+    int newSetPoint             = userConfig.getTargetWatts();
+    bool isInErgMode            = userConfig.getERGMode();
+    bool hasConnectedPowerMeter = spinBLEClient.connectedPM;
+    bool simulationRunning      = userConfig.getSimulateTargetWatts();
 
-  //   if (isInErgMode && hasConnectedPowerMeter) {
-  //     SS2K_LOG(ERG_MODE_LOG_TAG, "ComputeERG. Setpoint: %d", newSetPoint);
-  //     ErgMode::computErg(newSetPoint);
-  //   } else {
-  // SS2K_LOG(ERG_MODE_LOG_TAG, "ERG request but ERG off or no connected PM");
-  //   }
+    if (isInErgMode && (hasConnectedPowerMeter || simulationRunning)) {
+      SS2K_LOG(ERG_MODE_LOG_TAG, "ComputeERG. Setpoint: %d", newSetPoint);
+      ergMode.computErg(newSetPoint);
+    } else {
+      if (newSetPoint > 0) {
+        SS2K_LOG(ERG_MODE_LOG_TAG, "ERG request but ERG off or no connected PM");
+      }
+    }
+
+    // #ifdef DEBUG_STACK
+    Serial.printf("ERG Task: %d \n", uxTaskGetStackHighWaterMark(ErgTask));
+    // #endif  // DEBUG_STACK
+  }
 }
 
 // as a note, Trainer Road sends 50w target whenever the app is connected.
@@ -41,6 +52,8 @@ void ErgMode::computErg(int newSetPoint) {
   int amountToChangeIncline  = 0;
   int wattChange             = userConfig.getSimulatedWatts() - setPoint;
   int cadance                = userConfig.getSimulatedCad();
+
+  SS2K_LOG(ERG_MODE_LOG_TAG, "Incline = %f, SetPoint = %d, NewSetPoint = %d, WattChange = %d", incline, setPoint, newSetPoint, wattChange);
 
   if (newSetPoint > 0) {  // only update the value if new value is sent
     setPoint = newSetPoint;

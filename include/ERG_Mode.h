@@ -3,14 +3,13 @@
 #include <Arduino.h>
 
 #define ERG_MODE_LOG_TAG "ERG_Mode"
-#define ERG_MODE_DELAY 1000
+#define ERG_MODE_DELAY   1000
+
+extern TaskHandle_t ErgTask;
+void setupERG();
+void ergTaskLoop(void *pvParameters);
 
 class ErgMode {
  public:
-  static void setupERG();
-
- private:
-  static TaskHandle_t _ergTask;
-  static void loop(void *pvParameters);
-  static void computErg(int newSetpoint);
+  void computErg(int newSetpoint);
 };

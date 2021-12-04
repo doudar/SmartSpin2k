@@ -109,8 +109,8 @@ void setup() {
   FirmwareUpdate();
 
   setupBLE();
+  setupERG();
   startHttpServer();
-  ErgMode::setupERG();
 
   resetIfShiftersHeld();
   SS2K_LOG(MAIN_LOG_TAG, "Creating Shifter Interrupts");
