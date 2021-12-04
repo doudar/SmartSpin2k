@@ -128,7 +128,7 @@ void setup() {
   // Check for firmware update. It's important that this stays before BLE &
   // HTTP setup because otherwise they use too much traffic and the device
   // fails to update which really sucks when it corrupts your settings.
-  // FirmwareUpdate();
+  FirmwareUpdate();
 
   startTasks();
   startHttpServer();
