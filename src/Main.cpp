@@ -50,7 +50,7 @@ physicalWorkingCapacity userPWC;
 #ifndef UNIT_TEST
 
 void startTasks() {
-  SS2K_LOG(MAIN_LOG_TAG, "Start BLE & ERG Tasks");
+  SS2K_LOG(MAIN_LOG_TAG, "Start BLE + ERG Tasks");
   if (BLECommunicationTask == NULL) {
     setupBLE();
   }
@@ -60,7 +60,7 @@ void startTasks() {
 }
 
 void stopTasks() {
-  SS2K_LOG(MAIN_LOG_TAG, "Stop BLE & ERG Tasks");
+  SS2K_LOG(MAIN_LOG_TAG, "Stop BLE + ERG Tasks");
   if (BLECommunicationTask != NULL) {
     vTaskDelete(BLECommunicationTask);
   }
@@ -185,11 +185,21 @@ void moveStepper(void *pvParameters) {
   while (1) {
     if (stepper) {
       int shifterIncline = rtConfig.getShifterPosition() * userConfig.getShiftStep();
-      int ergIncline     = 0;
+      int incline        = 0;
+      float stepsPerWatt = (float)userConfig.getShiftStep() / 30.0;
       if (!externalControl) {
-        ergIncline = rtConfig.getTargetIncline() * userConfig.getInclineMultiplier();
+        if (rtConfig.getERGMode()) {
+          // ERG Mode
+          // Shifter step should taget 30 watt.
+          // TargetIncline is the change in watt -> must devide ShifterStep / 30 to get the steps for 1 watt.
+          incline = rtConfig.getTargetIncline() * stepsPerWatt;
+        } else {
+          // Simulation Mode
+          incline = rtConfig.getTargetIncline() * userConfig.getInclineMultiplier();
+        }
       }
-      targetPosition = shifterIncline + ergIncline;
+
+      targetPosition = shifterIncline + incline;
 
       if (syncMode) {
         stepper->stopMove();
@@ -200,7 +210,7 @@ void moveStepper(void *pvParameters) {
       stepper->moveTo(targetPosition);
       vTaskDelay(100 / portTICK_PERIOD_MS);
 
-      rtConfig.setCurrentIncline(((float)stepper->getCurrentPosition() / (float)userConfig.getInclineMultiplier()) + shifterIncline);
+      rtConfig.setCurrentIncline(((float)(stepper->getCurrentPosition() - shifterIncline)) / stepsPerWatt);
 
       if (connectedClientCount() > 0) {
         stepper->setAutoEnable(false);  // Keep the stepper from rolling back due to head tube slack. Motor Driver still lowers power between moves
