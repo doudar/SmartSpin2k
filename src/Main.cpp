@@ -128,7 +128,7 @@ void setup() {
   // Check for firmware update. It's important that this stays before BLE &
   // HTTP setup because otherwise they use too much traffic and the device
   // fails to update which really sucks when it corrupts your settings.
-  FirmwareUpdate();
+  // FirmwareUpdate();
 
   startTasks();
   startHttpServer();
@@ -183,25 +183,31 @@ void moveStepper(void *pvParameters) {
   stepper->setDelayToDisable(1000);
 
   while (1) {
-    if (!externalControl) {
-      targetPosition = (rtConfig.getShifterPosition() * userConfig.getShiftStep()) + (rtConfig.getIncline() * userConfig.getInclineMultiplier());
-    }
-    if (syncMode) {
-      stepper->stopMove();
-      vTaskDelay(100 / portTICK_PERIOD_MS);
-      stepper->setCurrentPosition(targetPosition);
-      vTaskDelay(100 / portTICK_PERIOD_MS);
-    }
     if (stepper) {
+      int shifterIncline = rtConfig.getShifterPosition() * userConfig.getShiftStep();
+      int ergIncline     = 0;
+      if (!externalControl) {
+        ergIncline = rtConfig.getTargetIncline() * userConfig.getInclineMultiplier();
+      }
+      targetPosition = shifterIncline + ergIncline;
+
+      if (syncMode) {
+        stepper->stopMove();
+        vTaskDelay(100 / portTICK_PERIOD_MS);
+        stepper->setCurrentPosition(targetPosition);
+        vTaskDelay(100 / portTICK_PERIOD_MS);
+      }
       stepper->moveTo(targetPosition);
-    }
-    vTaskDelay(100 / portTICK_PERIOD_MS);
-    rtConfig.setStepperRunning(stepper->isRunning());
-    if (connectedClientCount() > 0) {
-      stepper->setAutoEnable(false);  // Keep the stepper from rolling back due to head tube slack. Motor Driver still lowers power between moves
-      stepper->enableOutputs();
-    } else {
-      stepper->setAutoEnable(true);  // disable output FETs between moves so stepper can cool. Can still shift.
+      vTaskDelay(100 / portTICK_PERIOD_MS);
+
+      rtConfig.setCurrentIncline(((float)stepper->getCurrentPosition() / (float)userConfig.getInclineMultiplier()) + shifterIncline);
+
+      if (connectedClientCount() > 0) {
+        stepper->setAutoEnable(false);  // Keep the stepper from rolling back due to head tube slack. Motor Driver still lowers power between moves
+        stepper->enableOutputs();
+      } else {
+        stepper->setAutoEnable(true);  // disable output FETs between moves so stepper can cool. Can still shift.
+      }
     }
   }
 }

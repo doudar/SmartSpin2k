@@ -15,7 +15,7 @@ class ErgMode {
   void computErg(int newSetpoint);
 
  private:
-  bool userIsPedaling          = true;
-  int setPoint                 = 0;
-  Measurement watts = Measurement(0);
+  bool userIsPedaling = true;
+  // int setPoint        = 0;
+  Measurement watts   = Measurement(0);
 };

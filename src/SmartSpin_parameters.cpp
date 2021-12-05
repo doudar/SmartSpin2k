@@ -12,6 +12,33 @@
 #include <ArduinoJson.h>
 #include <SPIFFS.h>
 
+String RuntimeParameters::returnJSON() {
+  // Allocate a temporary JsonDocument
+  // Don't forget to change the capacity to match your requirements.
+  // Use arduinojson.org/assistant to compute the capacity.
+  StaticJsonDocument<RUNTIMECONFIG_JSON_SIZE> doc;
+  // Set the values in the document
+
+  doc["targetIncline"]       = targetIncline;
+  doc["currentIncline"]      = currentIncline;
+  doc["targetWatts"]         = targetWatts;
+  doc["simulatedWatts"]      = simulatedWatts.value;
+  doc["simulatedHr"]         = simulatedHr;
+  doc["simulatedCad"]        = simulatedCad;
+  doc["simulatedSpeed"]      = simulatedSpeed;
+  doc["simulateHr"]          = simulateHr;
+  doc["simulateWatts"]       = simulateWatts;
+  doc["simulateTargetWatts"] = simulateTargetWatts;
+  doc["simulateCad"]         = simulateCad;
+  doc["ERGMode"]             = ERGMode;
+  doc["shifterPosition"]     = shifterPosition;
+  doc["foundDevices"]        = foundDevices;
+
+  String output;
+  serializeJson(doc, output);
+  return output;
+}
+
 // Default Values
 void userParameters::setDefaults() {  // Move these to set the values as #define
                                       // in main.h
@@ -82,17 +109,17 @@ void userParameters::saveToSPIFFS() {
   // Set the values in the document
   // commented items are not needed in save file
 
-  doc["firmwareUpdateURL"] = firmwareUpdateURL;
+  doc["firmwareUpdateURL"]     = firmwareUpdateURL;
   doc["deviceName"]            = deviceName;
   doc["shiftStep"]             = shiftStep;
   doc["stepperPower"]          = stepperPower;
   doc["stealthchop"]           = stealthchop;
   doc["inclineMultiplier"]     = inclineMultiplier;
   doc["powerCorrectionFactor"] = powerCorrectionFactor;
-  doc["ERGSensitivity"] = ERGSensitivity;
-  doc["autoUpdate"]     = autoUpdate;
-  doc["ssid"]           = ssid;
-  doc["password"]       = password;
+  doc["ERGSensitivity"]        = ERGSensitivity;
+  doc["autoUpdate"]            = autoUpdate;
+  doc["ssid"]                  = ssid;
+  doc["password"]              = password;
   // currently in keeping this boot to boot
   doc["connectedPowerMeter"]   = connectedPowerMeter;
   doc["connectedHeartMonitor"] = connectedHeartMonitor;

@@ -347,9 +347,9 @@ void processFTMSWrite() {
       case 0x03: {  // inclination level setting - differs from sim mode as no negative numbers
         port = (rxValue[2] << 8) + rxValue[1];
         port *= 10;
-        rtConfig.setIncline(port);
+        rtConfig.setTargetIncline(port);
         rtConfig.setERGMode(false);
-        logBufLength += snprintf(logBuf + logBufLength, kLogBufCapacity - logBufLength, "-> Incline Mode: %2f", rtConfig.getIncline() / 100);
+        logBufLength += snprintf(logBuf + logBufLength, kLogBufCapacity - logBufLength, "-> Incline Mode: %2f", rtConfig.getTargetIncline() / 100);
         returnValue[2]           = 0x01;
         uint8_t inclineStatus[3] = {0x06, (uint8_t)rxValue[1], (uint8_t)rxValue[2]};
         fitnessMachineStatusCharacteristic->setValue(inclineStatus, 3);
@@ -381,7 +381,7 @@ void processFTMSWrite() {
 
           // computeERG(targetWatts);
           logBufLength += snprintf(logBuf + logBufLength, kLogBufCapacity - logBufLength, "-> ERG Mode Target: %d Current: %d Incline: %2f", targetWatts,
-                                   rtConfig.getSimulatedWatts().value, rtConfig.getIncline() / 100);
+                                   rtConfig.getSimulatedWatts().value, rtConfig.getTargetIncline() / 100);
           returnValue[2]       = 0x01;
           uint8_t ERGStatus[3] = {0x08, (uint8_t)rxValue[1], 0x01};
           fitnessMachineStatusCharacteristic->setValue(ERGStatus, 3);
@@ -412,8 +412,8 @@ void processFTMSWrite() {
         // int8_t rollingResistance = rxValue[5];
         // int8_t windResistance    = rxValue[6];
         port = bytes_to_u16(buf[1], buf[0]);
-        rtConfig.setIncline(port);
-        logBufLength += snprintf(logBuf + logBufLength, kLogBufCapacity - logBufLength, "-> Sim Mode Incline %2f", rtConfig.getIncline() / 100);
+        rtConfig.setTargetIncline(port);
+        logBufLength += snprintf(logBuf + logBufLength, kLogBufCapacity - logBufLength, "-> Sim Mode Incline %2f", rtConfig.getTargetIncline() / 100);
         rtConfig.setERGMode(false);
         returnValue[2]       = 0x01;
         uint8_t simStatus[7] = {0x12, (uint8_t)rxValue[1], (uint8_t)rxValue[2], (uint8_t)rxValue[3], (uint8_t)rxValue[4], (uint8_t)rxValue[5], (uint8_t)rxValue[6]};
@@ -552,13 +552,13 @@ void ss2kCustomCharacteristicCallbacks::onWrite(BLECharacteristic *pCharacterist
     case BLE_incline: {  // 0x02
       returnValue[0] = success;
       if (rxValue[0] == read) {
-        int inc        = rtConfig.getIncline() * 100;
+        int inc        = rtConfig.getTargetIncline() * 100;
         returnValue[2] = (uint8_t)(inc & 0xff);
         returnValue[3] = (uint8_t)(inc >> 8);
         returnLength += 2;
       }
       if (rxValue[0] == write) {
-        rtConfig.setIncline(bytes_to_u16(rxValue[3], rxValue[2]) / 100);
+        rtConfig.setTargetIncline(bytes_to_u16(rxValue[3], rxValue[2]) / 100);
       }
     } break;
 

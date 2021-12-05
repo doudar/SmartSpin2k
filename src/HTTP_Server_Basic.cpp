@@ -255,6 +255,12 @@ void startHttpServer() {
     server.send(200, "text/plain", tString);
   });
 
+  server.on("/runtimeConfigJSON", []() {
+    String tString;
+    tString = rtConfig.returnJSON();
+    server.send(200, "text/plain", tString);
+  });
+
   server.on("/PWCJSON", []() {
     String tString;
     tString = userPWC.returnJSON();

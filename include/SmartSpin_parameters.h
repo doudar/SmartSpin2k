@@ -24,7 +24,8 @@ class Measurement {
 
 class RuntimeParameters {
  private:
-  float incline              = 0.0;
+  float targetIncline        = 0.0;
+  float currentIncline       = 0.0;
   int targetWatts            = 0;
   Measurement simulatedWatts = Measurement(0);
   int simulatedHr            = 0;
@@ -37,10 +38,11 @@ class RuntimeParameters {
   bool ERGMode               = false;
   int shifterPosition        = 0;
   String foundDevices        = " ";
-  bool stepperRunning        = false;
 
  public:
-  float getIncline() { return incline; }
+  float getTargetIncline() { return targetIncline; }
+  float getCurrentIncline() { return currentIncline; }
+
   int getTargetWatts() { return targetWatts; }
   Measurement getSimulatedWatts() { return simulatedWatts; }
   int getSimulatedHr() { return simulatedHr; }
@@ -52,10 +54,10 @@ class RuntimeParameters {
   bool getSimulateCad() { return simulateCad; }
   bool getERGMode() { return ERGMode; }
   int getShifterPosition() { return shifterPosition; }
-  bool getStepperRunning() { return stepperRunning; }
   const char* getFoundDevices() { return foundDevices.c_str(); }
 
-  void setIncline(float inc) { incline = inc; }
+  void setTargetIncline(float inc) { targetIncline = inc; }
+  void setCurrentIncline(float inc) { currentIncline = inc; }
   void setTargetWatts(int w) { targetWatts = w; }
   void setSimulatedWatts(int w) { simulatedWatts = Measurement(w); }
   void setSimulatedHr(int hr) { simulatedHr = hr; }
@@ -67,8 +69,9 @@ class RuntimeParameters {
   void setSimulateCad(bool scd) { simulateCad = scd; }
   void setERGMode(bool erg) { ERGMode = erg; }
   void setShifterPosition(int sp) { shifterPosition = sp; }
-  void setStepperRunning(bool running) { stepperRunning = running; }
   void setFoundDevices(String fdev) { foundDevices = fdev; }
+
+  String returnJSON();
 };
 
 class userParameters {

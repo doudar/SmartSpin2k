@@ -154,6 +154,8 @@
 // Max size of userconfig
 #define USERCONFIG_JSON_SIZE 768 + DEBUG_LOG_BUFFER_SIZE
 
+#define RUNTIMECONFIG_JSON_SIZE 512
+
 // Uncomment to enable sending Telegram debug messages back to the chat
 // specified in telegram_token.h
 // #define USE_TELEGRAM

@@ -64,6 +64,11 @@
     </p>
 </body>
 <script>
+  //Update values on specified interval
+  setInterval(function () {
+    requestConfigValues();
+
+  }, 2000);
 
   function toggleHRCheckbox(element, updateServer) {
     if (element.checked) {
@@ -200,13 +205,6 @@
     }
   }
 
-  //Update values on specified interval
-  setInterval(function () {
-
-    requestConfigValues();
-
-  }, 2000);
-
   function requestConfigValues() {
     var xhttp = new XMLHttpRequest();
     xhttp.onreadystatechange = function () {
@@ -246,7 +244,7 @@
         }, 1000);
       }
     };
-    xhttp.open("GET", "/configJSON", true);
+    xhttp.open("GET", "/runtimeConfigJSON", true);
     xhttp.send();
   }
 

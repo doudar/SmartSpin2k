@@ -46,28 +46,24 @@ void ergTaskLoop(void* pvParameters) {
 // as a note, Trainer Road sends 50w target whenever the app is connected.
 void ErgMode::computErg(int newSetPoint) {
   Measurement newWatts      = rtConfig.getSimulatedWatts();
-  float incline             = rtConfig.getIncline();
+  float incline             = rtConfig.getCurrentIncline();
   int amountToChangeIncline = 0;
-  int wattChange            = newWatts.value - setPoint;
+  int wattChange            = newWatts.value;  // - setPoint;
   int cadance               = rtConfig.getSimulatedCad();
-  bool isStepperRunning     = rtConfig.getStepperRunning();
 
   if (watts.timestamp == newWatts.timestamp) {
     return;  // no new power measurement.
   }
   watts = newWatts;
 
-  SS2K_LOG(ERG_MODE_LOG_TAG, "Incline = %f, SetPoint = %d, NewSetPoint = %d, WattChange = %d", incline, setPoint, newSetPoint, wattChange);
-  if (isStepperRunning) {
-    SS2K_LOG(ERG_MODE_LOG_TAG, "Stepper is running. Skip ERG computation");
-  }
+  SS2K_LOG(ERG_MODE_LOG_TAG, "Incline = %f, NewSetPoint = %d, CurrentWatts = %d", incline, newSetPoint, wattChange);
 
-  if (newSetPoint > 0) {  // only update the value if new value is sent
-    setPoint = newSetPoint;
-  }
-  if (setPoint < 50) {  // minumum setPoint
-    setPoint = 50;
-  }
+  // if (newSetPoint > 0) {  // only update the value if new value is sent
+  //   setPoint = newSetPoint;
+  // }
+  // if (setPoint < 50) {  // minumum setPoint
+  //   setPoint = 50;
+  // }
 
   if (cadance <= 20) {
     if (!userIsPedaling) {  // Test so motor stop command only happens once.
@@ -75,16 +71,18 @@ void ErgMode::computErg(int newSetPoint) {
       return;
     }
     userIsPedaling = false;
-    rtConfig.setIncline(incline - userConfig.getShiftStep() * 2);
+    rtConfig.setTargetIncline(incline - userConfig.getShiftStep() * 2);
     // Cadence too low, nothing to do here
     return;
   }
   userIsPedaling = true;
 
-  amountToChangeIncline = wattChange * userConfig.getERGSensitivity() * (75.0 / (double)cadance);
+  amountToChangeIncline = wattChange * userConfig.getERGSensitivity();  // * (75.0 / (double)cadance);
+  SS2K_LOG(ERG_MODE_LOG_TAG, "Set amountToChangeIncline to: %f", amountToChangeIncline);
   if (abs(wattChange) < WATTS_PER_SHIFT) {
     // As the desired value gets closer, make smaller changes for a smoother experience
     amountToChangeIncline *= SUB_SHIFT_SCALE;
+    SS2K_LOG(ERG_MODE_LOG_TAG, "Watt change < %d watts. Correct amountToChangeIncline to: %f", WATTS_PER_SHIFT, amountToChangeIncline);
   }
   // limit to 10 shifts at a time
   if (abs(amountToChangeIncline) > userConfig.getShiftStep() * 2) {
@@ -94,11 +92,12 @@ void ErgMode::computErg(int newSetPoint) {
     if (amountToChangeIncline < -5) {
       amountToChangeIncline = -(userConfig.getShiftStep() * 2);
     }
+    SS2K_LOG(ERG_MODE_LOG_TAG, "Watt change > %d watts. Correct amountToChangeIncline to: %f", userConfig.getShiftStep() * 2, amountToChangeIncline);
   }
 
   // Reduce the amount per loop (don't try to oneshot it) and scale the movement the higher the watt target is as higher wattages require less knob movement.
   // amountToChangeIncline = amountToChangeIncline / ((userConfig.getSimulatedWatts() / 100) + .1);  // +.1 to eliminate possible divide by zero.
   float newIncline = incline - amountToChangeIncline;
-  rtConfig.setIncline(newIncline);
+  rtConfig.setTargetIncline(newIncline);
   SS2K_LOG(ERG_MODE_LOG_TAG, "newincline: %f", newIncline);
 }
