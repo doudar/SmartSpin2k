@@ -40,36 +40,47 @@ class RuntimeParameters {
   String foundDevices        = " ";
 
  public:
+  void setTargetIncline(float inc) { targetIncline = inc; }
   float getTargetIncline() { return targetIncline; }
+
+  void setCurrentIncline(float inc) { currentIncline = inc; }
   float getCurrentIncline() { return currentIncline; }
 
-  int getTargetWatts() { return targetWatts; }
-  Measurement getSimulatedWatts() { return simulatedWatts; }
-  int getSimulatedHr() { return simulatedHr; }
-  int getSimulatedCad() { return simulatedCad; }
-  float getSimulatedSpeed() { return simulatedSpeed; }
-  bool getSimulateHr() { return simulateHr; }
-  bool getSimulateWatts() { return simulateWatts; }
-  bool getSimulateTargetWatts() { return simulateTargetWatts; }
-  bool getSimulateCad() { return simulateCad; }
-  bool getERGMode() { return ERGMode; }
-  int getShifterPosition() { return shifterPosition; }
-  const char* getFoundDevices() { return foundDevices.c_str(); }
-
-  void setTargetIncline(float inc) { targetIncline = inc; }
-  void setCurrentIncline(float inc) { currentIncline = inc; }
   void setTargetWatts(int w) { targetWatts = w; }
+  int getTargetWatts() { return targetWatts; }
+  
   void setSimulatedWatts(int w) { simulatedWatts = Measurement(w); }
+  Measurement getSimulatedWatts() { return simulatedWatts; }
+  
   void setSimulatedHr(int hr) { simulatedHr = hr; }
+  int getSimulatedHr() { return simulatedHr; }
+  
   void setSimulatedCad(float cad) { simulatedCad = cad; }
+  int getSimulatedCad() { return simulatedCad; }
+  
   void setSimulatedSpeed(float spd) { simulatedSpeed = spd; }
+  float getSimulatedSpeed() { return simulatedSpeed; }
+  
   void setSimulateHr(bool shr) { simulateHr = shr; }
+  bool getSimulateHr() { return simulateHr; }
+  
   void setSimulateWatts(bool swt) { simulateWatts = swt; }
+  bool getSimulateWatts() { return simulateWatts; }
+  
   void setSimulateTargetWatts(bool swt) { simulateTargetWatts = swt; }
+  bool getSimulateTargetWatts() { return simulateTargetWatts; }
+  
   void setSimulateCad(bool scd) { simulateCad = scd; }
+  bool getSimulateCad() { return simulateCad; }
+  
   void setERGMode(bool erg) { ERGMode = erg; }
+  bool getERGMode() { return ERGMode; }
+  
   void setShifterPosition(int sp) { shifterPosition = sp; }
+  int getShifterPosition() { return shifterPosition; }
+  
   void setFoundDevices(String fdev) { foundDevices = fdev; }
+  const char* getFoundDevices() { return foundDevices.c_str(); }
 
   String returnJSON();
 };

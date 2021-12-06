@@ -46,9 +46,9 @@ void ergTaskLoop(void* pvParameters) {
 void ErgMode::computErg(int newSetPoint) {
   Measurement newWatts        = rtConfig.getSimulatedWatts();
   float incline               = rtConfig.getCurrentIncline();
-  float amountToChangeIncline = 0;
-  float wattChange            = newSetPoint - newWatts.value;  // setpoint_form_trainer - current_power => Amount to increase or decrease incline
   int cadance                 = rtConfig.getSimulatedCad();
+  float wattChange            = newSetPoint - newWatts.value;  // setpoint_form_trainer - current_power => Amount to increase or decrease incline
+  float amountToChangeIncline = 0;
 
   if (watts.timestamp == newWatts.timestamp && this->setPoint == newSetPoint) {
     return;  // no new power measurement.
