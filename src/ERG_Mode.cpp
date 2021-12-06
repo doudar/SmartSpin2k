@@ -59,30 +59,27 @@ void ErgMode::computErg(int newSetPoint) {
     newSetPoint = 50;
   }
 
-  SS2K_LOG(ERG_MODE_LOG_TAG, "Incline = %f, SetPoint = %d, NewSetPoint = %d, CurrentWatts = %d, Watts Change (NewSetPoint - CurrentWatts)= %f", incline, this->setPoint,
-           newSetPoint, newWatts.value, wattChange);
+  SS2K_LOG(ERG_MODE_LOG_TAG, "Incline = %f, SetPoint = %d, NewSetPoint = %d, Watts = (%lu, %d), CurrentWatts = (%lu, %d), Watts Change (NewSetPoint - CurrentWatts)= %f", incline,
+           this->setPoint, newSetPoint, this->watts.timestamp, this->watts.value, newWatts.timestamp, newWatts.value, wattChange);
 
   // store for next cycle for timestamp and value compare
   this->watts    = newWatts;
   this->setPoint = newSetPoint;
 
-  if (cadance <= 20) {
-    if (!this->engineStopped) {                              // Test so motor stop command only happens once.
-      motorStop();                                           // release tension
-      rtConfig.setTargetIncline(incline - WATTS_PER_SHIFT);  // release incline
-      this->engineStopped = true;
-    }
-    return;  // Cadence too low, nothing to do here
+  if (!this->_userIsSpinning(cadance, incline)) {
+    return;
   }
-  this->engineStopped = false;
 
   amountToChangeIncline = wattChange * userConfig.getERGSensitivity();  // * (75.0 / (double)cadance);
   SS2K_LOG(ERG_MODE_LOG_TAG, "Set amountToChangeIncline to: %f", amountToChangeIncline);
+
+  // Minor Steps
   if (abs(wattChange) < WATTS_PER_SHIFT) {
     // As the desired value gets closer, make smaller changes for a smoother experience
     amountToChangeIncline *= SUB_SHIFT_SCALE;
     SS2K_LOG(ERG_MODE_LOG_TAG, "Watt change < %d watts. Correct amountToChangeIncline to: %f", WATTS_PER_SHIFT, amountToChangeIncline);
   }
+
   // limit to 10 shifts at a time
   if (abs(amountToChangeIncline) > WATTS_PER_SHIFT * 2) {
     if (amountToChangeIncline > 5) {
@@ -98,4 +95,18 @@ void ErgMode::computErg(int newSetPoint) {
   float newIncline = incline + amountToChangeIncline;
   rtConfig.setTargetIncline(newIncline);
   SS2K_LOG(ERG_MODE_LOG_TAG, "newincline: %f", newIncline);
+}
+
+bool ErgMode::_userIsSpinning(int cadance, float incline) {
+  if (cadance <= 20) {
+    if (!this->engineStopped) {                              // Test so motor stop command only happens once.
+      motorStop();                                           // release tension
+      rtConfig.setTargetIncline(incline - WATTS_PER_SHIFT);  // release incline
+      this->engineStopped = true;
+    }
+    return false;  // Cadence too low, nothing to do here
+  }
+
+  this->engineStopped = false;
+  return true;
 }

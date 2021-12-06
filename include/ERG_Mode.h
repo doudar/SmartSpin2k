@@ -18,4 +18,6 @@ class ErgMode {
   bool engineStopped = false;
   int setPoint       = 0;
   Measurement watts  = Measurement(0);
+
+  bool _userIsSpinning(int cadence, float incline);
 };
