@@ -15,7 +15,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Removed need for support material from case
 - thicker slide design.  Removes need for washers
 - Slightly shorter slide - should allow more flexibility for ss2k placement on IC4.
-- tighter tolerances on case and bike mount for slide fitting.  It should be a snug fit but shouldn't require force
+- tighter tolerances on case and bike mount for slide fitting.  It should be a tight enough to prevent accidental removal
 - slightly larger diameter holes for m3 screws used in case assembly.  Screws should be much easier to insert
 - combined knob cup & knob insert for schwinn to reduce amount of plastic and print time needed
 
