@@ -97,8 +97,8 @@
                 <input type='button' onclick="clickStep(document.getElementById('ERGSensitivity'), this.value)"
                   value="-">
                 <input style="width:50%; position: relative; top: 5px;" type="range" id="ERGSensitivity"
-                  name="ERGSensitivity" value="1.0" min=".5" max="5" step=".1" class="slider1"
-                  onchange="updateSlider(this, document.getElementById('ERGSensitivityValue'))" />
+                  name="ERGSensitivity" value="1.0" min=".5" max="20" step=".1" class="slider1"
+                  onchange="updateSlider(this.value, document.getElementById('ERGSensitivityValue'))" />
                 <input type='button' onclick="clickStep(document.getElementById('ERGSensitivity'), this.value)"
                   value="+">
               </td>

@@ -23,21 +23,21 @@
 
     <h2>Sim Heart Rate</h2>
     <p><span id="hrValue"></span></p>
-    <p><input type="range" onload="requestConfigValues()" onchange="updatehrSlider(this)" id="hrSlider" min="40"
+    <p><input type="range" onload="requestConfigValues()" onchange="updateHrSlider()" id="hrSlider" min="40"
         max="250" value="0" step="1" class="slider2"></p>
     <p><label class="switch"><input type="checkbox" onload="toggleHRCheckbox(this, true)"
           onchange="toggleHRCheckbox(this,true)" id="hrOutput"><span class="slider"></span></label></p>
 
     <h2>Sim Power Output</h2>
     <p><span id="wattsValue"></span></p>
-    <p><input type="range" onload="requestConfigValues()" onchange="updateWattsSlider(this)" id="wattsSlider" min="0"
-        max="2000" value="0" step="1" class="slider2"></p>
+    <p><input type="range" onload="requestConfigValues()" onchange="updateWattsSlider()" id="wattsSlider" min="0"
+        max="600" value="0" step="1" class="slider2"></p>
     <p><label class="switch"><input type="checkbox" onload="toggleWattsCheckbox(this,true)"
           onchange="toggleWattsCheckbox(this,true)" id="wattsOutput"><span class="slider"></span></label></p>
 
     <h2>Sim CAD Output</h2>
     <p><span id="cadValue"></span></p>
-    <p><input type="range" onload="requestConfigValues()" onchange="updateCadSlider(this)" id="cadSlider" min="0"
+    <p><input type="range" onload="requestConfigValues()" onchange="updateCadSlider()" id="cadSlider" min="0"
         max="180" value="0" step="1" class="slider2"></p>
     <p><label class="switch"><input type="checkbox" onload="toggleCadCheckbox(this,true)"
           onchange="toggleCadCheckbox(this,true)" id="cadOutput"><span class="slider"></span></label></p>
@@ -53,7 +53,7 @@
     </p>
     <h2>ERG Target Watts</h2>
     <p><span id="targetWattsValue"></span></p>
-    <p><input type="range" onload="requestConfigValues()" onchange="updateTargetWattsSlider(this)"
+    <p><input type="range" onload="requestConfigValues()" onchange="updateTargetWattsSlider()"
         id="targetWattsSlider" min="0" max="600" value="0" step="1" class="slider2"></p>
     <p>
       <label class="switch">
@@ -69,6 +69,8 @@
     requestConfigValues();
 
   }, 2000);
+
+  let pwrTimer;
 
   function toggleHRCheckbox(element, updateServer) {
     if (element.checked) {
@@ -96,10 +98,16 @@
     if (element.checked) {
       document.getElementById("wattsSlider").hidden = false;
       document.getElementById("wattsValue").hidden = false;
+      pwrTimer = setInterval(() => {
+        updateWattsSlider();
+      }, 1000)
     }
     else {
       document.getElementById("wattsSlider").hidden = true;
       document.getElementById("wattsValue").hidden = true;
+      if (!!pwrTimer) {
+        clearInterval(pwrTimer);
+      }
     }
 
     if (updateServer) {
@@ -138,7 +146,7 @@
     }
   }
 
-  function updatehrSlider(element) {
+  function updateHrSlider() {
     var sliderValue = document.getElementById("hrSlider").value;
     document.getElementById("hrValue").innerHTML = sliderValue + " BPM";
     var xhr = new XMLHttpRequest();
@@ -146,7 +154,7 @@
     xhr.send();
   }
 
-  function updateWattsSlider(element) {
+  function updateWattsSlider() {
     var sliderValue = document.getElementById("wattsSlider").value;
     document.getElementById("wattsValue").innerHTML = sliderValue + " Watts";
     var xhr = new XMLHttpRequest();
@@ -154,7 +162,7 @@
     xhr.send();
   }
 
-  function updateCadSlider(element) {
+  function updateCadSlider() {
     var sliderValue = document.getElementById("cadSlider").value;
     document.getElementById("cadValue").innerHTML = sliderValue + " RPM";
     var xhr = new XMLHttpRequest();
@@ -162,7 +170,7 @@
     xhr.send();
   }
 
-  function updateTargetWattsSlider(element) {
+  function updateTargetWattsSlider() {
     var sliderValue = document.getElementById("targetWattsSlider").value;
     document.getElementById("targetWattsValue").innerHTML = sliderValue + " Watts";
     var xhr = new XMLHttpRequest();

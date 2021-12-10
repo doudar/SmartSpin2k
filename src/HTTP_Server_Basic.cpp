@@ -446,7 +446,7 @@ void settingsProcessor() {
   }
   if (!server.arg("ERGSensitivity").isEmpty()) {
     float ERGSensitivity = server.arg("ERGSensitivity").toFloat();
-    if (ERGSensitivity >= .5 && ERGSensitivity <= 3) {
+    if (ERGSensitivity >= .5 && ERGSensitivity <= 20) {
       userConfig.setERGSensitivity(ERGSensitivity);
     }
   }

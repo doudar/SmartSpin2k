@@ -184,22 +184,17 @@ void moveStepper(void *pvParameters) {
 
   while (1) {
     if (stepper) {
-      int shifterIncline = rtConfig.getShifterPosition() * userConfig.getShiftStep();
-      int incline        = 0;
-      float stepsPerWatt = (float)userConfig.getShiftStep() / 30.0;
+      int targetPosition = rtConfig.getShifterPosition() * userConfig.getShiftStep();
       if (!externalControl) {
         if (rtConfig.getERGMode()) {
           // ERG Mode
-          // Shifter step should taget 30 watt.
-          // TargetIncline is the change in watt -> must devide ShifterStep / 30 to get the steps for 1 watt.
-          incline = rtConfig.getTargetIncline() * stepsPerWatt;
+          // Shifter not used.
+          targetPosition = rtConfig.getTargetIncline();
         } else {
           // Simulation Mode
-          incline = rtConfig.getTargetIncline() * userConfig.getInclineMultiplier();
+          targetPosition += rtConfig.getTargetIncline() * userConfig.getInclineMultiplier();
         }
       }
-
-      targetPosition = shifterIncline + incline;
 
       if (syncMode) {
         stepper->stopMove();
@@ -210,7 +205,7 @@ void moveStepper(void *pvParameters) {
       stepper->moveTo(targetPosition);
       vTaskDelay(100 / portTICK_PERIOD_MS);
 
-      rtConfig.setCurrentIncline(((float)(stepper->getCurrentPosition() - shifterIncline)) / stepsPerWatt);
+      rtConfig.setCurrentIncline((float)stepper->getCurrentPosition());
 
       if (connectedClientCount() > 0) {
         stepper->setAutoEnable(false);  // Keep the stepper from rolling back due to head tube slack. Motor Driver still lowers power between moves

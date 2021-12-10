@@ -122,10 +122,10 @@
 #define MAX_SCAN_RETRIES 1
 
 // loop speed for the SmartSpin2k BLE communications
-#define BLE_NOTIFY_DELAY 701
+#define BLE_NOTIFY_DELAY 250
 
 // loop speed for the SmartSpin2k BLE Client reconnect
-#define BLE_CLIENT_DELAY 200
+#define BLE_CLIENT_DELAY 1000
 
 // Number of devices that can be connected to the Client (myBLEDevices size)
 #define NUM_BLE_DEVICES 4
