@@ -20,6 +20,7 @@ void setupERG() {
 
 void ergTaskLoop(void* pvParameters) {
   ErgMode ergMode;
+  ergMode._writeLogHeader();
   while (true) {
     vTaskDelay(ERG_MODE_DELAY / portTICK_PERIOD_MS);
 
@@ -53,8 +54,8 @@ void ergTaskLoop(void* pvParameters) {
 // as a note, Trainer Road sends 50w target whenever the app is connected.
 void ErgMode::computErg(int newSetPoint) {
   Measurement newWatts = rtConfig.getSimulatedWatts();
-  float incline        = rtConfig.getCurrentIncline();
-  int cadance          = rtConfig.getSimulatedCad();
+  float currentIncline = rtConfig.getCurrentIncline();
+  int newCadance       = rtConfig.getSimulatedCad();
   int wattChange       = newSetPoint - newWatts.value;  // setpoint_form_trainer - current_power => Amount to increase or decrease incline
   float diviation      = ((float)wattChange * 100.0) / ((float)newSetPoint);
 
@@ -72,44 +73,21 @@ void ErgMode::computErg(int newSetPoint) {
     this->cycles = 0;
   }
 
-  // store for next cycle for timestamp and value compare
-  this->watts    = newWatts;
-  this->setPoint = newSetPoint;
-
-  bool isUserSpinning = this->_userIsSpinning(cadance, incline);
+  bool isUserSpinning = this->_userIsSpinning(newCadance, currentIncline);
   if (!isUserSpinning) {
     return;
   }
 
-  float factor        = abs(diviation) > 10 ? userConfig.getERGSensitivity() : userConfig.getERGSensitivity() / 2;
-  float targetIncline = incline + (wattChange * factor);
+  float factor     = abs(diviation) > 10 ? userConfig.getERGSensitivity() : userConfig.getERGSensitivity() / 2;
+  float newIncline = currentIncline + (wattChange * factor);
 
-  // SS2K_LOG(ERG_MODE_LOG_TAG, "Set amountToChangeIncline to: %f", amountToChangeIncline);
+  rtConfig.setTargetIncline(newIncline);
+  _writeLog(this->cycles, currentIncline, newIncline, setPoint, newSetPoint, this->watts.value, newWatts.value, this->cadence, newCadance);
 
-  // Minor Steps
-  // if (abs(wattChange) < WATTS_PER_SHIFT) {
-  //   // As the desired value gets closer, make smaller changes for a smoother experience
-  //   amountToChangeIncline *= SUB_SHIFT_SCALE;
-  //   SS2K_LOG(ERG_MODE_LOG_TAG, "Watt change < %d watts. Correct amountToChangeIncline to: %f", WATTS_PER_SHIFT, amountToChangeIncline);
-  // }
-
-  // // limit to 10 shifts at a time
-  // if (abs(amountToChangeIncline) > WATTS_PER_SHIFT * 2) {
-  //   if (amountToChangeIncline > 5) {
-  //     amountToChangeIncline = WATTS_PER_SHIFT * 2;
-  //   }
-  //   if (amountToChangeIncline < -5) {
-  //     amountToChangeIncline = -(WATTS_PER_SHIFT * 2);
-  //   }
-  //   SS2K_LOG(ERG_MODE_LOG_TAG, "Watt change > %d watts. Correct amountToChangeIncline to: %f", WATTS_PER_SHIFT * 2, amountToChangeIncline);
-  // }
-
-  // float newIncline = incline + amountToChangeIncline;
-  rtConfig.setTargetIncline(targetIncline);
-  SS2K_LOG(ERG_MODE_LOG_TAG,
-           "Cycle=%d, " + "Incline = %f, " + "TargetIncline = %f, " + "SetPoint = %d, " + "NewSetPoint = %d, " + "Watts = (%lu, %d), " + "CurrentWatts = (%lu, %d), " +
-               "Watts Change (NewSetPoint - CurrentWatts) = %d, " + "diviation = %f",
-           this->cycles, incline, targetIncline, this->setPoint, newSetPoint, this->watts.timestamp, this->watts.value, newWatts.timestamp, newWatts.value, wattChange, diviation);
+  // store for next cycle for timestamp and value compare
+  this->watts    = newWatts;
+  this->setPoint = newSetPoint;
+  this->cadence  = newCadance;
   this->cycles++;
 }
 
@@ -125,4 +103,14 @@ bool ErgMode::_userIsSpinning(int cadance, float incline) {
 
   this->engineStopped = false;
   return true;
+}
+
+void ErgMode::_writeLogHeader() {
+  SS2K_LOG(ERG_MODE_LOG_CSV_TAG, "cycles;current incline;new incline;current setpoint;new setpoint;current watts;new watts;current cadence;new cadence;");
+}
+
+void ErgMode::_writeLog(int cycles, float currentIncline, float newIncline, int currentSetPoint, int newSetPoint, int currentWatts, int newWatts, int currentCadence,
+                        int newCadence) {
+  SS2K_LOG(ERG_MODE_LOG_CSV_TAG, "%d;%.2f;%.2f;%d;%d;%d;%d;%d;%d", cycles, currentIncline, newIncline, currentSetPoint, newSetPoint, currentWatts, newWatts, currentCadence,
+           newCadence);
 }

@@ -3,8 +3,9 @@
 #include <Arduino.h>
 #include "SmartSpin_parameters.h"
 
-#define ERG_MODE_LOG_TAG "ERG_Mode"
-#define ERG_MODE_DELAY   250
+#define ERG_MODE_LOG_TAG     "ERG_Mode"
+#define ERG_MODE_LOG_CSV_TAG "ERG_Mode_CSV"
+#define ERG_MODE_DELAY       250
 
 extern TaskHandle_t ErgTask;
 void setupERG();
@@ -13,6 +14,8 @@ void ergTaskLoop(void *pvParameters);
 class ErgMode {
  public:
   void computErg(int newSetpoint);
+  void _writeLogHeader();
+  void _writeLog(int cycles, float currentIncline, float newIncline, int currentSetPoint, int newSetPoint, int currentWatts, int newWatts, int currentCadence, int newCadence);
 
  private:
   bool engineStopped  = false;
@@ -21,6 +24,7 @@ class ErgMode {
   int cycles          = 0;
   int offsetMuliplier = 0;
   Measurement watts   = Measurement(0);
+  int cadence         = 0;
 
   bool _userIsSpinning(int cadence, float incline);
 };
