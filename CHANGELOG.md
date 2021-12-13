@@ -6,6 +6,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+-
+
+### Changed
+- Increased hex head and nut size to 13mm.
+- Increased depth on Knob Cup 2mm so a thicker nut can be used. 
+
 ## [1.12.2]
 
 ### Added
