@@ -16,10 +16,15 @@ Fusion 360 exports and generic STEP files are both provided
 ## BOM
 - In addition to the electronics specced for the version 2 case, you will need:
 - M3 x 5 x 4 heat set inserts. (5mm diameter).  Source from [Aliexpress](https://www.aliexpress.com/item/4000232858343.html?spm=a2g0s.9042311.0.0.21164c4dGhWHhY).  [Instructions for installation here](https://www.youtube.com/watch?v=cyof7fYFcuQ)
-- 4xM3 screws - I think M3x10 should work. As long as it's long enough to go into the threaded inserts, the length doesn't matter.  There's plenty of clearance if it's too long
+- 4xM3 screws - I think M3x8 or M3x10 should work. As long as it's long enough to go into the threaded inserts, the length doesn't matter.  There's plenty of clearance if it's too long
 - 1 pc M5x12mm for the slide on the arm
 - 2pc M5x30mm - 1 for the bike mount and another for the case
 - 3pc M5 nuts
+
+OPTIONAL (if using [hex bolt shaft mod](https://github.com/doudar/SmartSpin2k/discussions/267))
+- 1 pc 5/16" x 1-1/2" hex head bolt
+- 3pc 5/16" washers
+- 2 pc 5/16" nuts
 
 For the bike mount, you have two options: VHB tape or something similar OR if you want to protect the paint and avoid adhesives, you can use the zip tie and rubber sticker approach:
 
@@ -40,17 +45,25 @@ For the bike mount, you have two options: VHB tape or something similar OR if yo
 - ic4-body-right.stl
 
 ## [Gears]
-- 43_Tooth_Mod1.STL
-- Spur gear 1M 11T.STL
+From main project folder (Case Version2)
+- 40_Tooth_Mod1.STL - fully printed single piece including shaft
+- Spur gear 1m 40T Hex.stl - to be used with an M8 or 5/16x1.5" bolt.  Requires matching knob cup (see info below)
 
-## [MountingStrap]
-- Mounting_For_New_Case.STL
+Optionally available in this folder:
+- Spur Gear 1M 40T HEX - large bolt mod.stl - Bolt spacing is intended for use with [these bolts](https://www.grainger.ca/en/product/TAP-BOLT%2CHX%2C5-16%22-18-X-1-1-2%22%2CUNC%2C100-PK/p/EBP41UC82) or bolts of a similar spec.  1/2" drive size, 7/32" head height.
 
-## [IC4 optimized cup and insert combo]
-- IC4-Optimized Cup-and-insert-combo
 
-NOTE:  If you are using this, you can skip the next two files.  If you are a Schwinn IC4 / Bowflex C6 user, use this version to save on plastic and printing time.
+## [Knob cup and insert]
+MULTIPLE OPTIONS.  READ FIRST:
+You have three options, each with various benefits:
+- Stock cup and insert from the main project
+  -  mix and match inserts to suit your bike.  Cup is available in steel bolt (HEX) or fully printed options.  [See here](https://github.com/doudar/SmartSpin2k/tree/develop/Hardware/KnobCups) and [here](https://github.com/doudar/SmartSpin2k/tree/develop/Hardware/Inserts)
+- IC4-Optimized Cup-and-insert-combo.stl
+  - This combines the stock knob fully printed knob cup and insert.  Works with stock 3d printed 40t gear
+- ic4 HEX knob cup and insert combined.stl
+  - This is to be used with a 5/16x1.5" hex head screw or an M8 with similar length
 
+  
 ## [KnobCups]
 - Knob_Cup_V2.STL
 
