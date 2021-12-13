@@ -7,8 +7,8 @@ To view the UDP logging, download [SmartSpin2KFlasher](https://github.com/SmartS
 Another recent development is the.....
 
 # @eMadman IC4 mod!
-<img src="Pictures/Schwinn_IC4_MOD.png" alt="Hardware 2.0" style="height: 300px; width: 100"/> 
-<img src="Pictures/Schwinn_IC4_MOD_Closeup.png" alt="Hardware 2.0" style="height: 300px; width: 100"/> 
+<img src="Pictures/Schwinn_IC4_MOD.png" alt="Hardware 2.0" style="height: 300px"/> 
+<img src="Pictures/Schwinn_IC4_MOD_Closeup.png" alt="Hardware 2.0" style="height: 300px"/> 
 
 It's designed to provide a more secure mount for the IC4 and bowflex bikes but may be applicable to other bikes as long as they have a modest amount of space between the head tube and the resistance knob.
 
