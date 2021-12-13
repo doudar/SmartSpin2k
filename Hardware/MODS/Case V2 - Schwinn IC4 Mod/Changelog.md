@@ -10,16 +10,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [1.2.0]
 ### Added
-- NEW: Hex bolt mod for 40t gear and matching ic4 cup/mount.
+- NEW: Hex bolt mod for 40t gear and matching ic4 cup/mount. This is a drop-in replacement for the plastic printed gear + cup/holder combination.  Adds a lot of strength
 - rename directory to something more apparent
 - Removed need for support material from case
 - thicker slide design.  Removes need for washers
 - Slightly shorter slide - should allow more flexibility for ss2k placement on IC4.
-- tighter tolerances on case and bike mount for slide fitting.  It should be a snug fit but shouldn't require force
+- tighter tolerances on case and bike mount for slide fitting.  It should be a tight enough to prevent accidental removal
 - slightly larger diameter holes for m3 screws used in case assembly.  Screws should be much easier to insert
 - additional tolerance for m5 fitting
 - combined knob cup & knob insert for schwinn to reduce amount of plastic needed for the schwinn.
-- added schwinn-specific support for the 5/16" HEX bolt mod - this is a drop-in replacement for the plastic printed gear + cup/holder combination.  Adds a lot of strength
 
 ### Changed
 - Including a revised 11t stl - A tiny bit more clearance on inner diameter the drive shaft on my steppers.
