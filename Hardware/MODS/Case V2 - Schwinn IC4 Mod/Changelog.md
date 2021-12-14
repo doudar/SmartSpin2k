@@ -18,7 +18,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - tighter tolerances on case and bike mount for slide fitting.  It should be a tight enough to prevent accidental removal
 - slightly larger diameter holes for m3 screws used in case assembly.  Screws should be much easier to insert
 - additional tolerance for m5 fitting
-- combined knob cup & knob insert for schwinn to reduce amount of plastic needed for the schwinn.
 
 ### Changed
 - Including a revised 11t stl - A tiny bit more clearance on inner diameter the drive shaft on my steppers.
