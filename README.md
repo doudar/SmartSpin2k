@@ -12,7 +12,7 @@ Another recent development is the.....
 
 It's designed to provide a more secure mount for the IC4 and bowflex bikes but may be applicable to other bikes as long as they have a modest amount of space between the head tube and the resistance knob.
 
-The files are in the [MODS folder here](https://github.com/doudar/SmartSpin2k/tree/develop/Hardware/MODS/Case%20V2%20-%20Heat%20Set%20Inserts)
+The files are in the [MODS folder here](https://github.com/doudar/SmartSpin2k/tree/develop/Hardware/MODS/Case%20V2%20-%20Schwinn%20IC4%20Mod)
 
 Please send any feedback to the discussions page. 
 
