@@ -7,12 +7,12 @@ To view the UDP logging, download [SmartSpin2KFlasher](https://github.com/SmartS
 Another recent development is the.....
 
 # @eMadman IC4 mod!
-<img src="Pictures/Schwinn_IC4_MOD.png" alt="Hardware 2.0" style="height: 300px; width: 100"/> 
-<img src="Pictures/Schwinn_IC4_MOD_Closeup.png" alt="Hardware 2.0" style="height: 300px; width: 100"/> 
+<img src="Pictures/Schwinn_IC4_MOD.png" alt="Hardware 2.0" style="height: 300px"/> 
+<img src="Pictures/Schwinn_IC4_MOD_Closeup.png" alt="Hardware 2.0" style="height: 300px"/> 
 
 It's designed to provide a more secure mount for the IC4 and bowflex bikes but may be applicable to other bikes as long as they have a modest amount of space between the head tube and the resistance knob.
 
-The files are in the [MODS folder here](https://github.com/doudar/SmartSpin2k/tree/develop/Hardware/MODS/Case%20V2%20-%20Heat%20Set%20Inserts)
+The files are in the [MODS folder here](https://github.com/doudar/SmartSpin2k/tree/develop/Hardware/MODS/Case%20V2%20-%20Schwinn%20IC4%20Mod)
 
 Please send any feedback to the discussions page. 
 
