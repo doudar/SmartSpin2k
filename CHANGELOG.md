@@ -7,7 +7,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
--
+- image for wiki
 
 ### Changed
 - Increased hex head and nut size to 13mm.
