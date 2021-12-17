@@ -78,7 +78,7 @@ void ErgMode::computErg(int newSetPoint) {
     return;
   }
 
-  float factor     = abs(diviation) > 10 ? userConfig.getERGSensitivity() : userConfig.getERGSensitivity() / 4;
+  float factor     = abs(diviation) > 10 ? userConfig.getERGSensitivity() : userConfig.getERGSensitivity() / 2;
   float newIncline = currentIncline + (wattChange * factor);
 
   rtConfig.setTargetIncline(newIncline);
