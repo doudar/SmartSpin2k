@@ -17,6 +17,7 @@
 // Function Prototypes
 bool IRAM_ATTR deBounce();
 void IRAM_ATTR moveStepper(void* pvParameters);
+void IRAM_ATTR shifterCheck(void* pvParameters);
 void IRAM_ATTR shiftUp();
 void IRAM_ATTR shiftDown();
 void resetIfShiftersHeld();
