@@ -11,10 +11,10 @@
 
 TaskHandle_t ErgTask;
 
-//Create a power table representing 0w-1000w in 50w increments.
-//i.e. powerTable[1] corresponds to the incline required for 50w. powerTable[2] is the incline required for 100w and so on.
+// Create a power table representing 0w-1000w in 50w increments.
+// i.e. powerTable[1] corresponds to the incline required for 50w. powerTable[2] is the incline required for 100w and so on.
 
-PowerEntry ergPowerTable[20]; 
+PowerEntry ergPowerTable[20];
 
 void setupERG() {
   TaskHandle_t task_handle;
@@ -60,6 +60,31 @@ void ergTaskLoop(void* pvParameters) {
     //   int power     = rtConfig.getSimulatedWatts().value;
     //   SS2K_LOG(ERG_MODE_LOG_TAG, "Bike characteristics: INC: %f; CAD: %d; PWR: %d", incline, cadence, power);
     // }
+
+    /* Continuously build and update powertable here. Obviously this won't work (boot to boot at least) without some sort of homing routine to begin with. 
+      
+      Method should be if power has been held within 20w for ~3 seconds, update the corresponding ergPowerTable[x] entry by rounding the watts to the nearest 50:
+      
+      int x = rtConfig.getSimulatedWatts() + 50/2;
+       x -= x % 50; 
+       x = x/50; 
+       Then update the power table:
+      if (!ergPowerTable[x].watts){
+        ergPowerTable[x].watts = rtConfig.getSimulatedWatts();
+        ergPowerTable[x].cad = rtConfig.getSimulatedCad(); 
+        ergPowerTable[x].incline = rtConfig.getSimulatedIncline();
+        ergPowerTable[x].readings = 1;
+      } else{ //Average and update the readings.  Probably should throw out outliers here as well.  
+        ergPowerTable[x].watts = (rtConfig.getSimulatedWatts() + ergPowerTable[x].watts * ergPowerTable[x].readings)/ergPowerTable.readings[x]+1;
+        ergPowerTable[x].cad = (rtConfig.getSimulatedCad() + ERGPowerTable[x].cad * ergPowerTable[x].readings)/ergPowerTable.readings[x]+1; 
+        ergPowerTable[x].incline = rtConfig.getSimulatedIncline() + ERGPowerTable[x].incline *ERGPowerTable[x].readings)/ERGPowerTable.readings[x]+1; 
+        ergPowerTable[x].readings ++;
+        if(ergPowerTable[x].readings > 10){
+          ergPowerTable.readings = 10; //keep from diluting recent readings too far. 
+        }
+      }
+
+    */
   }
 }
 
