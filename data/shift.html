@@ -1,0 +1,93 @@
+<!DOCTYPE html>
+<html>
+
+
+<head>
+    <style type="text/css">
+        html {
+            background-color: #03245c;
+        }
+    </style>
+    <title>SmartSpin2K Web Server</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+</head>
+
+<body>
+    <fieldset>
+        <h1>
+            <div class="watermark" id="loadingWatermark">Loading</div>
+        </h1>
+        <legend><a href="http://github.com/doudar/SmartSpin2k">http://github.com/doudar/SmartSpin2k</a></legend>
+        <p style="text-align: left;"><strong><a href="index.html">Main Index</a></strong></p>
+        <h1>Shift</h1>
+
+        <p><span id="shiftUp"></span></p>
+        <p>
+        <div><input type="button" onload="requestConfigValues()" onclick="sendShift(1)" id="shiftUp" value="UP"
+                class="shiftButton"></div>
+        <p></p><input type="button" onload="requestConfigValues()" onclick="sendShift(-1)" id="shiftDown" value="DOWN"
+            class="shiftButton"></p>
+        Current Gear
+        <div><label><input type="text" onload="updateShiftValue(this, true)" value="loading" class=shiftBox
+                    id="shiftBox"> </label></div>
+        <p></p>
+    </fieldset>
+</body>
+<script>
+    var updateTimer = undefined;
+
+    function sendShift(direction) {
+        var position = parseInt(document.getElementById("shiftBox").value, 10);
+        document.getElementById("shiftBox").value = position + direction;
+        var xhr = new XMLHttpRequest();
+        xhr.open("GET", "/shift?value=" + direction, true);
+        xhr.send();
+    }
+
+
+    function startUpdate() {
+        //Update values on specified interval loading late because this tiny webserver hates frequent requests
+        if (updateTimer === undefined) {
+            updateTimer = setInterval(function () {
+                requestConfigValues();
+            }, 3000);
+        }
+    }
+
+    function requestConfigValues() {
+        var xhttp = new XMLHttpRequest();
+        xhttp.onreadystatechange = function () {
+            if (this.readyState == 4 && this.status == 200) {
+                var obj = JSON.parse(this.responseText);
+                document.getElementById("shiftBox").value = obj.shifterPosition;
+            } else {
+                startUpdate();
+                if (document.getElementById("loadingWatermark")) {
+                    document.getElementById("loadingWatermark").opacity = 0;
+                    document.getElementById("loadingWatermark").remove();
+                }
+            }
+        };
+        xhttp.open("GET", "/configJSON", true);
+        xhttp.send();
+    }
+
+    //define function to load css
+    var loadCss = function () {
+        var cssLink = document.createElement('link');
+        cssLink.rel = 'stylesheet';
+        cssLink.href = 'style.css';
+        var head = document.getElementsByTagName('head')[0];
+        head.parentNode.insertBefore(cssLink, head);
+    };
+
+    //Delay loading css to not swamp webserver
+    window.addEventListener('load', function () {
+        setTimeout(loadCss, 100);
+        setTimeout(requestConfigValues, 500);
+        startUpdate();
+    }, false);
+
+</script>
+
+</html>

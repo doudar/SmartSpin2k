@@ -39,6 +39,7 @@ bool scanDelayRunning   = false;
 // Setup a task so the stepper will run on a different core than the main code
 // to prevent stuttering
 TaskHandle_t moveStepperTask;
+TaskHandle_t shifterCheckTask;
 
 ///////////// Initialize the Config /////////////
 userParameters userConfig;
@@ -94,7 +95,7 @@ void setup() {
                           "moveStepperFunction", /* name of task. */
                           1000,                  /* Stack size of task */
                           NULL,                  /* parameter of the task */
-                          18,                    /* priority of the task  - 29 worked  at 1 I get stuttering */
+                          18,                    /* priority of the task */
                           &moveStepperTask,      /* Task handle to keep track of created task */
                           0);                    /* pin task to core 0 */
 
@@ -115,36 +116,50 @@ void setup() {
   attachInterrupt(digitalPinToInterrupt(SHIFT_UP_PIN), shiftUp, CHANGE);
   attachInterrupt(digitalPinToInterrupt(SHIFT_DOWN_PIN), shiftDown, CHANGE);
   digitalWrite(LED_PIN, HIGH);
+
+  xTaskCreatePinnedToCore(shifterCheck,           /* Task function. */
+                          "shifterCheckFunction", /* name of task. */
+                          2000,                   /* Stack size of task */
+                          NULL,                   /* parameter of the task */
+                          1,                      /* priority of the task */
+                          &shifterCheckTask,      /* Task handle to keep track of created task */
+                          1);                     /* pin task to core 0 */
 }
 
-void loop() {
+void loop() {  // Delete this task so we can make one that's more memory efficient.
+  vTaskDelete(NULL);
+}
+
+void shifterCheck(void *pvParameters) {
   static int loopCounter = 0;
+  while (true) {
+    vTaskDelay(200 / portTICK_RATE_MS);
 
-  vTaskDelay(200 / portTICK_RATE_MS);
+    if (userConfig.getShifterPosition() > lastShifterPosition) {
+      SS2K_LOG(MAIN_LOG_TAG, "Shift UP: %l", userConfig.getShifterPosition());
+      Serial.println(targetPosition);
+      spinBLEServer.notifyShift(1);
+    } else if (userConfig.getShifterPosition() < lastShifterPosition) {
+      SS2K_LOG(MAIN_LOG_TAG, "Shift DOWN: %l", userConfig.getShifterPosition());
+      Serial.println(targetPosition);
+      spinBLEServer.notifyShift(0);
+    }
+    lastShifterPosition = userConfig.getShifterPosition();
 
-  if (userConfig.getShifterPosition() > lastShifterPosition) {
-    SS2K_LOG(MAIN_LOG_TAG, "Shift UP: %l", userConfig.getShifterPosition());
-    Serial.println(targetPosition);
-    spinBLEServer.notifyShift(1);
-  } else if (userConfig.getShifterPosition() < lastShifterPosition) {
-    SS2K_LOG(MAIN_LOG_TAG, "Shift DOWN: %l", userConfig.getShifterPosition());
-    Serial.println(targetPosition);
-    spinBLEServer.notifyShift(0);
-  }
-  lastShifterPosition = userConfig.getShifterPosition();
-
-  if (loopCounter > 4) {
-    scanIfShiftersHeld();
-    checkDriverTemperature();
+    if (loopCounter > 4) {
+      scanIfShiftersHeld();
+      checkDriverTemperature();
 
 #ifdef DEBUG_STACK
-    Serial.printf("Step Task: %d \n", uxTaskGetStackHighWaterMark(moveStepperTask));
-    Serial.printf("Free Heap: %d \n", ESP.getFreeHeap());
-    Serial.printf("Best Blok: %d \n", heap_caps_get_largest_free_block(MALLOC_CAP_8BIT));
+      Serial.printf("Step Task: %d \n", uxTaskGetStackHighWaterMark(moveStepperTask));
+      Serial.printf("Shft Task: %d \n", uxTaskGetStackHighWaterMark(shifterCheckTask));
+      Serial.printf("Free Heap: %d \n", ESP.getFreeHeap());
+      Serial.printf("Best Blok: %d \n", heap_caps_get_largest_free_block(MALLOC_CAP_8BIT));
 #endif  // DEBUG_STACK
-    loopCounter = 0;
+      loopCounter = 0;
+    }
+    loopCounter++;
   }
-  loopCounter++;
 }
 #endif  // UNIT_TEST
 
