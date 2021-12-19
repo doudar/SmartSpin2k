@@ -127,6 +127,7 @@ void startHttpServer() {
   server.on("/hotspot-detect.html", handleIndexFile);  // Apple captive portal
   server.on("/style.css", handleSpiffsFile);
   server.on("/btsimulator.html", handleSpiffsFile);
+  server.on("/shift.html", handleSpiffsFile);
   server.on("/settings.html", handleSpiffsFile);
   server.on("/status.html", handleSpiffsFile);
   server.on("/bluetoothscanner.html", handleSpiffsFile);
@@ -245,6 +246,19 @@ void startHttpServer() {
     } else {
       rtConfig.setTargetWatts(value.toInt());
       SS2K_LOG(HTTP_SERVER_LOG_TAG, "Target Watts are now: %d", rtConfig.getTargetWatts());
+      server.send(200, "text/plain", "OK");
+    }
+  });
+
+  server.on("/shift", []() {
+    int value = server.arg("value").toInt();
+    if ((value > -10) && (value < 10)) {
+      userConfig.setShifterPosition(userConfig.getShifterPosition() + value);
+      server.send(200, "text/plain", "OK");
+      SS2K_LOG(HTTP_SERVER_LOG_TAG, "Shift From HTML");
+    } else {
+      userConfig.setShifterPosition(value);
+      SS2K_LOG(HTTP_SERVER_LOG_TAG, "Invalid HTML Shift");
       server.send(200, "text/plain", "OK");
     }
   });
