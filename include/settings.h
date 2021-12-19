@@ -159,7 +159,7 @@
 // #define USE_TELEGRAM
 
 // Uncomment to enable stack size debugging info
-#define DEBUG_STACK
+// #define DEBUG_STACK
 
 // Uncomment to enable HR->PWR debugging info. Always displays HR->PWR
 // Calculation. Never sets userConfig.setSimulatedPower(); #define

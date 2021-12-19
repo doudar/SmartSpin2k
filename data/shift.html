@@ -23,139 +23,49 @@
 
         <p><span id="shiftUp"></span></p>
         <p>
-        <div><input type="button" onload="requestConfigValues()" onchange="ShiftUpPressed(this)" id="shiftUp" min="40"
-                max="250" value="UP" step="1" class="shiftButton"></div><p></p><input type="button"
-            onload="requestConfigValues()" onchange="ShiftDownPressed(this)" id="shiftDown" min="40" max="250"
-            value="DOWN" step="1" class="shiftButton"></p>
-        Current Position
-        <div><label><input type="text" onload="updateShiftValue(this, true)" value="0" class=shiftBox> </label></div>
-<p></p>
+        <div><input type="button" onload="requestConfigValues()" onclick="sendShift(1)" id="shiftUp" value="UP"
+                class="shiftButton"></div>
+        <p></p><input type="button" onload="requestConfigValues()" onclick="sendShift(-1)" id="shiftDown" value="DOWN"
+            class="shiftButton"></p>
+        Current Gear
+        <div><label><input type="text" onload="updateShiftValue(this, true)" value="loading" class=shiftBox
+                    id="shiftBox"> </label></div>
+        <p></p>
+    </fieldset>
 </body>
 <script>
+    var updateTimer = undefined;
 
-    function toggleHRCheckbox(element, updateServer) {
-        if (element.checked) {
-            document.getElementById("HRSlider").hidden = false;
-            document.getElementById("hrValue").hidden = false;
-        }
-        else {
-            document.getElementById("HRSlider").hidden = true;
-            document.getElementById("hrValue").hidden = true;
-        }
-        if (updateServer) {
-            var xhr = new XMLHttpRequest();
-            if (element.checked) {
-                xhr.open("GET", "/hrslider?value=enable", true);
-                xhr.send();
-            }
-            else {
-                xhr.open("GET", "/hrslider?value=disable", true);
-                xhr.send();
-            }
-        }
-    }
-
-    function toggleWattsCheckbox(element, updateServer) {
-        if (element.checked) {
-            document.getElementById("WattsSlider").hidden = false;
-            document.getElementById("wattsValue").hidden = false;
-        }
-        else {
-            document.getElementById("WattsSlider").hidden = true;
-            document.getElementById("wattsValue").hidden = true;
-        }
-
-        if (updateServer) {
-            var xhr = new XMLHttpRequest();
-            if (element.checked) {
-                xhr.open("GET", "/wattsslider?value=enable", true);
-                xhr.send();
-            }
-            else {
-                xhr.open("GET", "/wattsslider?value=disable", true);
-                xhr.send();
-            }
-        }
-    }
-
-    function toggleCadCheckbox(element, updateServer) {
-        if (element.checked) {
-            document.getElementById("CadSlider").hidden = false;
-            document.getElementById("cadValue").hidden = false;
-        }
-        else {
-            document.getElementById("CadSlider").hidden = true;
-            document.getElementById("cadValue").hidden = true;
-        }
-
-        if (updateServer) {
-            var xhr = new XMLHttpRequest();
-            if (element.checked) {
-                xhr.open("GET", "/cadslider?value=enable", true);
-                xhr.send();
-            }
-            else {
-                xhr.open("GET", "/cadslider?value=disable", true);
-                xhr.send();
-            }
-        }
-    }
-
-    function updateHRSlider(element) {
-        var sliderValue = document.getElementById("HRSlider").value;
-        document.getElementById("hrValue").innerHTML = sliderValue + " BPM";
+    function sendShift(direction) {
+        var position = parseInt(document.getElementById("shiftBox").value, 10);
+        document.getElementById("shiftBox").value = position + direction;
         var xhr = new XMLHttpRequest();
-        xhr.open("GET", "/hrslider?value=" + sliderValue, true);
+        xhr.open("GET", "/shift?value=" + direction, true);
         xhr.send();
     }
 
-    function updateWattsSlider(element) {
-        var sliderValue = document.getElementById("WattsSlider").value;
-        document.getElementById("wattsValue").innerHTML = sliderValue + " Watts";
-        var xhr = new XMLHttpRequest();
-        xhr.open("GET", "/wattsslider?value=" + sliderValue, true);
-        xhr.send();
+
+    function startUpdate() {
+        //Update values on specified interval loading late because this tiny webserver hates frequent requests
+        if (updateTimer === undefined) {
+            updateTimer = setInterval(function () {
+                requestConfigValues();
+            }, 3000);
+        }
     }
-
-    function updateCadSlider(element) {
-        var sliderValue = document.getElementById("CadSlider").value;
-        document.getElementById("cadValue").innerHTML = sliderValue + " RPM";
-        var xhr = new XMLHttpRequest();
-        xhr.open("GET", "/cadslider?value=" + sliderValue, true);
-        xhr.send();
-    }
-
-    //Update values on specified interval
-    setInterval(function () {
-
-        requestConfigValues();
-
-    }, 2000);
 
     function requestConfigValues() {
         var xhttp = new XMLHttpRequest();
         xhttp.onreadystatechange = function () {
             if (this.readyState == 4 && this.status == 200) {
                 var obj = JSON.parse(this.responseText);
-                document.getElementById("wattsValue").innerHTML = obj.simulatedWatts + " Watts";
-                document.getElementById("WattsSlider").value = obj.simulatedWatts;
-                document.getElementById("wattsOutput").checked = obj.simulateWatts;
-                document.getElementById("WattsSlider").hidden = !obj.simulateWatts;
-                document.getElementById("wattsValue").hidden = !obj.simulateWatts;
-
-                document.getElementById("hrValue").innerHTML = obj.simulatedHr + " BPM";
-                document.getElementById("HRSlider").value = obj.simulatedHr;
-                document.getElementById("hrOutput").checked = obj.simulateHr;
-                document.getElementById("HRSlider").hidden = !obj.simulateHr;
-                document.getElementById("hrValue").hidden = !obj.simulateHr;
-
-                document.getElementById("cadValue").innerHTML = obj.simulatedCad + " RPM";
-                document.getElementById("CadSlider").value = obj.simulatedCad;
-                document.getElementById("cadOutput").checked = obj.simulateCad;
-                document.getElementById("CadSlider").hidden = !obj.simulateCad;
-                document.getElementById("cadValue").hidden = !obj.simulateCad;
-
-                setTimeout(function () { document.getElementById("loadingWatermark").remove(); }, 1000);
+                document.getElementById("shiftBox").value = obj.shifterPosition;
+            } else {
+                startUpdate();
+                if (document.getElementById("loadingWatermark")) {
+                    document.getElementById("loadingWatermark").opacity = 0;
+                    document.getElementById("loadingWatermark").remove();
+                }
             }
         };
         xhttp.open("GET", "/configJSON", true);
@@ -175,6 +85,7 @@
     window.addEventListener('load', function () {
         setTimeout(loadCss, 100);
         setTimeout(requestConfigValues, 500);
+        startUpdate();
     }, false);
 
 </script>

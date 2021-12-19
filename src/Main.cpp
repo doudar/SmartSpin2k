@@ -119,7 +119,7 @@ void setup() {
 
   xTaskCreatePinnedToCore(shifterCheck,           /* Task function. */
                           "shifterCheckFunction", /* name of task. */
-                          1500,                   /* Stack size of task */
+                          2000,                   /* Stack size of task */
                           NULL,                   /* parameter of the task */
                           1,                      /* priority of the task */
                           &shifterCheckTask,      /* Task handle to keep track of created task */
