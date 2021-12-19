@@ -10,11 +10,10 @@
 #include "Main.h"
 
 TaskHandle_t ErgTask;
+PowerEntry ergPowerTable[20];
 
 // Create a power table representing 0w-1000w in 50w increments.
 // i.e. powerTable[1] corresponds to the incline required for 50w. powerTable[2] is the incline required for 100w and so on.
-
-PowerEntry ergPowerTable[20];
 
 void setupERG() {
   TaskHandle_t task_handle;
@@ -69,7 +68,7 @@ void ergTaskLoop(void* pvParameters) {
        x -= x % 50; 
        x = x/50; 
        Then update the power table:
-      if (!ergPowerTable[x].watts){
+      if (ergPowerTable[x].readings = 0){
         ergPowerTable[x].watts = rtConfig.getSimulatedWatts();
         ergPowerTable[x].cad = rtConfig.getSimulatedCad(); 
         ergPowerTable[x].incline = rtConfig.getSimulatedIncline();
