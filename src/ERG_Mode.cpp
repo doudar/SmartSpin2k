@@ -11,6 +11,11 @@
 
 TaskHandle_t ErgTask;
 
+//Create a power table representing 0w-1000w in 50w increments.
+//i.e. powerTable[1] corresponds to the incline required for 50w. powerTable[2] is the incline required for 100w and so on.
+
+PowerEntry ergPowerTable[20]; 
+
 void setupERG() {
   TaskHandle_t task_handle;
   SS2K_LOG(ERG_MODE_LOG_TAG, "Starting ERG Mode task...");

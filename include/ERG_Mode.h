@@ -35,3 +35,18 @@ class ErgMode {
 
   bool _userIsSpinning(int cadence, float incline);
 };
+
+class PowerEntry {
+ public:
+  int watts;
+  float incline;
+  int cad;
+  long timestamp;
+
+  PowerEntry(int watts, float incline, int cad) {
+    this->power     = watts;
+    this->incline   = incline;
+    this->cad       = cad;
+    this->timestamp = millis();
+  }
+};
