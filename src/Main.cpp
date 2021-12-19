@@ -200,7 +200,7 @@ void moveStepper(void *pvParameters) {
 
   while (1) {
     if (stepper) {
-      int targetPosition = rtConfig.getShifterPosition() * userConfig.getShiftStep();
+      targetPosition = rtConfig.getShifterPosition() * userConfig.getShiftStep();
       if (!externalControl) {
         if (rtConfig.getERGMode()) {
           // ERG Mode

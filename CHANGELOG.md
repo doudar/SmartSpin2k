@@ -8,12 +8,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 - Added Webpage for Shifting.
+- Added /shift server on backend.
+- Split userConfig into userConfig and rtConfig.
+- Added ERG testing to btsimulator.html
+- Broke out ERG computation into it's own task.
 - Added image for wiki.
 
 ### Changed
 - Adjusted the order of "Submit" "Reboot" and "Reset to Defaults" on the settings page. 
 - Adjusted the setting webpage so "reset to defaults" is harder to accidentally press. 
 - Increased the amount of free stack by removing the default Arduino loop();
+- Updated /shift server on to rtConfig.
+- Fixed redeclaring global targetposition in moveStepper().
+- Renamed Settings page "Submit" button to "Save Setting"
 
 ### Hardware
 - Increased hex head and nut size to 13mm.

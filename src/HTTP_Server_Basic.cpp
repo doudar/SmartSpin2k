@@ -253,11 +253,11 @@ void startHttpServer() {
   server.on("/shift", []() {
     int value = server.arg("value").toInt();
     if ((value > -10) && (value < 10)) {
-      userConfig.setShifterPosition(userConfig.getShifterPosition() + value);
+      rtConfig.setShifterPosition(rtConfig.getShifterPosition() + value);
       server.send(200, "text/plain", "OK");
       SS2K_LOG(HTTP_SERVER_LOG_TAG, "Shift From HTML");
     } else {
-      userConfig.setShifterPosition(value);
+      rtConfig.setShifterPosition(value);
       SS2K_LOG(HTTP_SERVER_LOG_TAG, "Invalid HTML Shift");
       server.send(200, "text/plain", "OK");
     }
