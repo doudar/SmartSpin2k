@@ -44,10 +44,19 @@ class PowerEntry {
   int readings;
 
   PowerEntry() {
-    this->watts     = 0;
-    this->incline   = 0;
-    this->cad       = 0;
-    this->readings  = 0;
+    this->watts    = 0;
+    this->incline  = 0;
+    this->cad      = 0;
+    this->readings = 0;
   }
 };
 
+class PowerTable {
+ public:
+  PowerEntry powerEntry[20];
+
+
+  void newEntry(int watts, float incline, int cad);
+  // returns incline for wattTarget. Null if not found.
+  float lookup(int watts, int cad);
+};

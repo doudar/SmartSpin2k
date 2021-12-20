@@ -10,7 +10,7 @@
 #include "Main.h"
 
 TaskHandle_t ErgTask;
-PowerEntry ergPowerTable[20];
+PowerTable powerTable;
 
 // Create a power table representing 0w-1000w in 50w increments.
 // i.e. powerTable[1] corresponds to the incline required for 50w. powerTable[2] is the incline required for 100w and so on.
@@ -59,32 +59,59 @@ void ergTaskLoop(void* pvParameters) {
     //   int power     = rtConfig.getSimulatedWatts().value;
     //   SS2K_LOG(ERG_MODE_LOG_TAG, "Bike characteristics: INC: %f; CAD: %d; PWR: %d", incline, cadence, power);
     // }
-
-    /* Continuously build and update powertable here. Obviously this won't work (boot to boot at least) without some sort of homing routine to begin with. 
-      
-      Method should be if power has been held within 20w for ~3 seconds, update the corresponding ergPowerTable[x] entry by rounding the watts to the nearest 50:
-      
-      int x = rtConfig.getSimulatedWatts() + 50/2;
-       x -= x % 50; 
-       x = x/50; 
-       Then update the power table:
-      if (ergPowerTable[x].readings = 0){
-        ergPowerTable[x].watts = rtConfig.getSimulatedWatts();
-        ergPowerTable[x].cad = rtConfig.getSimulatedCad(); 
-        ergPowerTable[x].incline = rtConfig.getSimulatedIncline();
-        ergPowerTable[x].readings = 1;
-      } else{ //Average and update the readings.  Probably should throw out outliers here as well.  
-        ergPowerTable[x].watts = (rtConfig.getSimulatedWatts() + ergPowerTable[x].watts * ergPowerTable[x].readings)/ergPowerTable.readings[x]+1;
-        ergPowerTable[x].cad = (rtConfig.getSimulatedCad() + ERGPowerTable[x].cad * ergPowerTable[x].readings)/ergPowerTable.readings[x]+1; 
-        ergPowerTable[x].incline = rtConfig.getSimulatedIncline() + ERGPowerTable[x].incline *ERGPowerTable[x].readings)/ERGPowerTable.readings[x]+1; 
-        ergPowerTable[x].readings ++;
-        if(ergPowerTable[x].readings > 10){
-          ergPowerTable.readings = 10; //keep from diluting recent readings too far. 
-        }
-      }
-
-    */
   }
+}
+
+  // Accepts new data into the table and averages input by number of readings in the power entry.
+void PowerTable::newEntry(int watts, float incline, int cad) {
+  int i = round(watts / 50.0);
+  if (this->powerEntry[i].readings = 0) {
+    this->powerEntry[i].watts    = watts;
+    this->powerEntry[i].cad      = cad;
+    this->powerEntry[i].incline  = incline;
+    this->powerEntry[i].readings = 1;
+  } else {  // Average and update the readings.  Probably should throw out outliers here as well.
+    this->powerEntry[i].watts   = (watts + this->powerEntry[i].watts * this->powerEntry[i].readings) / this->powerEntry[i].readings + 1;
+    this->powerEntry[i].cad     = (cad + this->powerEntry[i].cad * this->powerEntry[i].readings) / this->powerEntry[i].readings + 1;
+    this->powerEntry[i].incline = (incline + this->powerEntry[i].incline * this->powerEntry[i].readings) / this->powerEntry[i].readings + 1;
+    this->powerEntry[i].readings++;
+    if (this->powerEntry[i].readings > 10) {
+      this->powerEntry[i].readings = 10;  // keep from diluting recent readings too far.
+    }
+  }
+}
+
+// looks up an incline for the requested power and cadence and interpolates the result. 
+float PowerTable::lookup(int watts, int cad) {
+  struct entry {
+    float power;
+    float incline;
+  };
+  int i       = round(watts / 50.0); //find the closest entry
+  float scale = watts / 50.0 - i;
+  entry above;
+  entry below;
+  if (scale > 0) { //pick the element above closest entry for interpolation
+    below.power   = this->powerEntry[i].watts;
+    below.incline = this->powerEntry[i].incline;
+    above.power   = this->powerEntry[i+1].watts;
+    above.incline = this->powerEntry[i+1].incline;
+  } else if (scale < 0) { //pick the element below the closest entry for interpolation
+    below.power   = this->powerEntry[i-1].watts;
+    below.incline = this->powerEntry[i-1].incline;
+    above.power   = this->powerEntry[i].watts;
+    above.incline = this->powerEntry[i].incline;
+  } else {
+    // Compute cad offset and return without interpolation
+    //
+    // Cad offset TODO HERE
+    //
+    return this->powerEntry->incline;
+  }
+
+  float rIncline = below.incline + ((watts - below.power) / (above.power - below.power)) * (above.incline - below.incline);
+
+  return rIncline;
 }
 
 // as a note, Trainer Road sends 50w target whenever the app is connected.
