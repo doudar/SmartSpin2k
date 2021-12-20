@@ -9,6 +9,7 @@
 
 #include <Arduino.h>
 #include "SmartSpin_parameters.h"
+#include "settings.h"
 
 #define ERG_MODE_LOG_TAG     "ERG_Mode"
 #define ERG_MODE_LOG_CSV_TAG "ERG_Mode_CSV"
@@ -53,8 +54,7 @@ class PowerEntry {
 
 class PowerTable {
  public:
-  PowerEntry powerEntry[20];
-
+  PowerEntry powerEntry[POWERTABLE_SIZE];
 
   void newEntry(int watts, float incline, int cad);
   // returns incline for wattTarget. Null if not found.

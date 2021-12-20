@@ -156,6 +156,12 @@
 
 #define RUNTIMECONFIG_JSON_SIZE 512
 
+// Number of entries in the ERG Power Lookup Table
+#define POWERTABLE_SIZE 20
+
+// Size of increments (in watts) for the ERG Lookup Table. Needs to be one decimal place for proper calculations i.e. 50.0
+#define POWERTABLE_INCREMENT 50.0
+
 // Uncomment to enable sending Telegram debug messages back to the chat
 // specified in telegram_token.h
 // #define USE_TELEGRAM

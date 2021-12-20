@@ -62,9 +62,9 @@ void ergTaskLoop(void* pvParameters) {
   }
 }
 
-  // Accepts new data into the table and averages input by number of readings in the power entry.
+// Accepts new data into the table and averages input by number of readings in the power entry.
 void PowerTable::newEntry(int watts, float incline, int cad) {
-  int i = round(watts / 50.0);
+  int i = round(watts / POWERTABLE_INCREMENT);
   if (this->powerEntry[i].readings = 0) {
     this->powerEntry[i].watts    = watts;
     this->powerEntry[i].cad      = cad;
@@ -81,26 +81,44 @@ void PowerTable::newEntry(int watts, float incline, int cad) {
   }
 }
 
-// looks up an incline for the requested power and cadence and interpolates the result. 
+// looks up an incline for the requested power and cadence and interpolates the result.
+// Returns NULL of no entry matched.
 float PowerTable::lookup(int watts, int cad) {
   struct entry {
     float power;
     float incline;
   };
-  int i       = round(watts / 50.0); //find the closest entry
-  float scale = watts / 50.0 - i;
+  int i       = round(watts / POWERTABLE_INCREMENT);  // find the closest entry
+  float scale = watts / POWERTABLE_INCREMENT - i;
   entry above;
   entry below;
-  if (scale > 0) { //pick the element above closest entry for interpolation
+  above.power = NULL;
+  below.power = NULL;
+  if (this->powerEntry[i].readings = 0) {
+    return NULL;
+  }
+  //TODO Needs to check elements in the opposite order if not found in the suggested order. 
+
+  if (scale > 0) {  // select the element above closest entry for interpolation
     below.power   = this->powerEntry[i].watts;
     below.incline = this->powerEntry[i].incline;
-    above.power   = this->powerEntry[i+1].watts;
-    above.incline = this->powerEntry[i+1].incline;
-  } else if (scale < 0) { //pick the element below the closest entry for interpolation
-    below.power   = this->powerEntry[i-1].watts;
-    below.incline = this->powerEntry[i-1].incline;
+    for (int nextIndex = i + 1; nextIndex <= POWERTABLE_SIZE; nextIndex++) {
+      if (this->powerEntry[nextIndex].readings > 0) {
+        above.power   = this->powerEntry[nextIndex].watts;
+        above.incline = this->powerEntry[nextIndex].incline;
+        break;
+      }
+    }
+  } else if (scale < 0) {  // select the element below the closest entry for interpolation
     above.power   = this->powerEntry[i].watts;
     above.incline = this->powerEntry[i].incline;
+    for (int previousIndex = i - 1; previousIndex >= 0; previousIndex--) {
+      if (this->powerEntry[previousIndex].readings > 0) {
+        below.power   = this->powerEntry[previousIndex].watts;
+        below.incline = this->powerEntry[previousIndex].incline;
+        break;
+      }
+    }
   } else {
     // Compute cad offset and return without interpolation
     //
@@ -109,6 +127,7 @@ float PowerTable::lookup(int watts, int cad) {
     return this->powerEntry->incline;
   }
 
+//actual interpolation
   float rIncline = below.incline + ((watts - below.power) / (above.power - below.power)) * (above.incline - below.incline);
 
   return rIncline;
