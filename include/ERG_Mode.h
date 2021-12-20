@@ -42,14 +42,12 @@ class PowerEntry {
   float incline;
   int cad;
   int readings;
-  long timestamp;
 
-  PowerEntry(int watts = 0, float incline = 0, int cad = 0, int readings = 0) {
-    this->watts     = watts;
-    this->incline   = incline;
-    this->cad       = cad;
-    this->readings  = readings;
-    this->timestamp = millis();
+  PowerEntry() {
+    this->watts     = 0;
+    this->incline   = 0;
+    this->cad       = 0;
+    this->readings  = 0;
   }
 };
 
