@@ -163,7 +163,7 @@
 #define POWERTABLE_INCREMENT 50.0
 
 //Number of similar power samples to take before writing to the Power Table
-#define POWER_SAMPLES 3 
+#define POWER_SAMPLES 5 
 
 // Uncomment to enable sending Telegram debug messages back to the chat
 // specified in telegram_token.h

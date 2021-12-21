@@ -45,30 +45,29 @@ void ergTaskLoop(void* pvParameters) {
     hasConnectedPowerMeter = spinBLEClient.connectedPM;
     simulationRunning      = rtConfig.getSimulateTargetWatts();
 
-    if ((rtConfig.getSimulatedCad() > 50) && (rtConfig.getSimulatedWatts().value > 10) && (rtConfig.getSimulatedWatts().value<POWERTABLE_SIZE*POWERTABLE_INCREMENT)) {
+    if ((rtConfig.getSimulatedCad() > 50) && (rtConfig.getSimulatedWatts().value > 10) && (rtConfig.getSimulatedWatts().value < POWERTABLE_SIZE * POWERTABLE_INCREMENT)) {
       if (powerBuffer.powerEntry[0].readings == 0) {
         powerBuffer.set(0);
-        SS2K_LOG(ERG_MODE_LOG_TAG, "powerBuffer.set(0);");
+        //SS2K_LOG(ERG_MODE_LOG_TAG, "powerBuffer.set(0);");
       } else if (abs(powerBuffer.powerEntry[0].watts - rtConfig.getSimulatedWatts().value) < POWERTABLE_INCREMENT) {
         for (int i = 1; i < POWER_SAMPLES; i++) {
           if (powerBuffer.powerEntry[i].readings == 0) {
             powerBuffer.set(i);
-            SS2K_LOG(ERG_MODE_LOG_TAG, "powerBuffer.set(%d);", i);
+            //SS2K_LOG(ERG_MODE_LOG_TAG, "powerBuffer.set(%d);", i);
             break;
           }
         }
         if (powerBuffer.powerEntry[POWER_SAMPLES - 1].readings == 1) {
-          SS2K_LOG(ERG_MODE_LOG_TAG, "powerTable.newEntry(powerBuffer);");
+          //SS2K_LOG(ERG_MODE_LOG_TAG, "powerTable.newEntry(powerBuffer);");
           powerTable.newEntry(powerBuffer);
+          powerTable.toLog();
           powerBuffer.reset();
         }
       } else {
         powerBuffer.reset();
-        SS2K_LOG(ERG_MODE_LOG_TAG, "powerBuffer.reset();");
+        //SS2K_LOG(ERG_MODE_LOG_TAG, "powerBuffer.reset();");
       }
     }
-
-    powerTable.toLog();
     if (isInErgMode && (hasConnectedPowerMeter || simulationRunning)) {
       ergMode.computErg(newSetPoint);
     } else {
@@ -93,18 +92,18 @@ void ergTaskLoop(void* pvParameters) {
 }
 
 void PowerBuffer::set(int i) {
-  this->powerEntry[i].readings = 1;
-  this->powerEntry[i].watts    = rtConfig.getSimulatedWatts().value;
-  this->powerEntry[i].cad      = rtConfig.getSimulatedCad();
-  this->powerEntry[i].targetPosition  = ss2k.targetPosition;
+  this->powerEntry[i].readings       = 1;
+  this->powerEntry[i].watts          = rtConfig.getSimulatedWatts().value;
+  this->powerEntry[i].cad            = rtConfig.getSimulatedCad();
+  this->powerEntry[i].targetPosition = ss2k.targetPosition;
 }
 
 void PowerBuffer::reset() {
   for (int i = 0; i < POWER_SAMPLES; i++) {
-    this->powerEntry[i].readings = 0;
-    this->powerEntry[i].watts    = 0;
-    this->powerEntry[i].cad      = 0;
-    this->powerEntry[i].targetPosition  = 0;
+    this->powerEntry[i].readings       = 0;
+    this->powerEntry[i].watts          = 0;
+    this->powerEntry[i].cad            = 0;
+    this->powerEntry[i].targetPosition = 0;
   }
 }
 
@@ -118,19 +117,19 @@ void PowerTable::newEntry(PowerBuffer powerBuffer) {
     tTargetPosition += powerBuffer.powerEntry[i].targetPosition;
     tCad += powerBuffer.powerEntry[i].cad;
   }
-  int watts     = tWatts / POWER_SAMPLES;
-  int cad       = tCad / POWER_SAMPLES;
+  int watts              = tWatts / POWER_SAMPLES;
+  int cad                = tCad / POWER_SAMPLES;
   int32_t targetPosition = tTargetPosition / POWER_SAMPLES;
 
   int i = round(watts / POWERTABLE_INCREMENT);
   if (this->powerEntry[i].readings == 0) {
-    this->powerEntry[i].watts    = watts;
-    this->powerEntry[i].cad      = cad;
-    this->powerEntry[i].targetPosition  = targetPosition;
-    this->powerEntry[i].readings = 1;
-  } else {  // Average and update the readings. 
-    this->powerEntry[i].watts   = (watts + (this->powerEntry[i].watts * this->powerEntry[i].readings)) / (this->powerEntry[i].readings + 1);
-    this->powerEntry[i].cad     = (cad + (this->powerEntry[i].cad * this->powerEntry[i].readings)) / (this->powerEntry[i].readings + 1);
+    this->powerEntry[i].watts          = watts;
+    this->powerEntry[i].cad            = cad;
+    this->powerEntry[i].targetPosition = targetPosition;
+    this->powerEntry[i].readings       = 1;
+  } else {  // Average and update the readings.
+    this->powerEntry[i].watts          = (watts + (this->powerEntry[i].watts * this->powerEntry[i].readings)) / (this->powerEntry[i].readings + 1);
+    this->powerEntry[i].cad            = (cad + (this->powerEntry[i].cad * this->powerEntry[i].readings)) / (this->powerEntry[i].readings + 1);
     this->powerEntry[i].targetPosition = (targetPosition + (this->powerEntry[i].targetPosition * this->powerEntry[i].readings)) / (this->powerEntry[i].readings + 1);
     this->powerEntry[i].readings++;
     if (this->powerEntry[i].readings > 10) {
@@ -141,11 +140,11 @@ void PowerTable::newEntry(PowerBuffer powerBuffer) {
 
 // looks up an incline for the requested power and cadence and interpolates the result.
 // Returns -99 if no entry matched.
-float PowerTable::lookup(int watts, int cad) {
+int32_t PowerTable::lookup(int watts, int cad) {
 #define RETURN_ERROR -99
   struct entry {
     float power;
-    float incline;
+    int32_t targetPosition;
     float cad;
   };
   int i         = round(watts / POWERTABLE_INCREMENT);  // find the closest entry
@@ -220,19 +219,19 @@ float PowerTable::lookup(int watts, int cad) {
 
   if (indexPair != -1) {
     if (i > indexPair) {
-      below.power   = this->powerEntry[indexPair].watts;
-      below.incline = this->powerEntry[indexPair].targetPosition;
-      below.cad     = this->powerEntry[indexPair].cad;
-      above.power   = this->powerEntry[i].watts;
-      above.incline = this->powerEntry[i].targetPosition;
-      above.cad     = this->powerEntry[i].cad;
+      below.power          = this->powerEntry[indexPair].watts;
+      below.targetPosition = this->powerEntry[indexPair].targetPosition;
+      below.cad            = this->powerEntry[indexPair].cad;
+      above.power          = this->powerEntry[i].watts;
+      above.targetPosition = this->powerEntry[i].targetPosition;
+      above.cad            = this->powerEntry[i].cad;
     } else if (i < indexPair) {
-      below.power   = this->powerEntry[i].watts;
-      below.incline = this->powerEntry[i].targetPosition;
-      below.cad     = this->powerEntry[i].cad;
-      above.power   = this->powerEntry[indexPair].watts;
-      above.incline = this->powerEntry[indexPair].targetPosition;
-      above.cad     = this->powerEntry[indexPair].cad;
+      below.power          = this->powerEntry[i].watts;
+      below.targetPosition = this->powerEntry[i].targetPosition;
+      below.cad            = this->powerEntry[i].cad;
+      above.power          = this->powerEntry[indexPair].watts;
+      above.targetPosition = this->powerEntry[indexPair].targetPosition;
+      above.cad            = this->powerEntry[indexPair].cad;
     }
   } else {  // no pair so no interpolation and no CAD correction
     return (this->powerEntry[i].targetPosition);
@@ -243,16 +242,16 @@ float PowerTable::lookup(int watts, int cad) {
   // as higher resistance levels have a steeper slope (bigger increase in power/cad) than low resistance levels.
   float averageCAD = (below.cad - above.cad) / 2;
   float deltaCAD   = abs(averageCAD - cad);
-  if (cad > averageCAD) {  // cad is higher than the table so we need to target a lower wattage (and incline)
+  if (cad > averageCAD) {  // cad is higher than the table so we need to target a lower wattage (and targetPosition)
     watts -= (deltaCAD / 20) * 50;
   }
-  if (cad < averageCAD) {  // cad is lower than the table so we need to target a higher wattage (and incline)
+  if (cad < averageCAD) {  // cad is lower than the table so we need to target a higher wattage (and targetPosition)
     watts += (deltaCAD / 20) * 50;
   }
   // actual interpolation
-  float rIncline = below.incline + ((watts - below.power) / (above.power - below.power)) * (above.incline - below.incline);
+  int32_t rtargetPosition = below.targetPosition + ((watts - below.power) / (above.power - below.power)) * (above.targetPosition - below.targetPosition);
 
-  return rIncline;
+  return rtargetPosition;
 }
 
 bool PowerTable::load() {
@@ -308,7 +307,13 @@ void ErgMode::computErg(int newSetPoint) {
 
   // reset cycle counter to start new erg calculation cycle
   if (this->setPoint != newSetPoint) {
-    this->cycles = 0;
+    this->cycles        = 0;
+    int32_t tableResult = powerTable.lookup(newSetPoint, newCadance);
+    if (tableResult != -99) {
+      SS2K_LOG(ERG_MODE_LOG_TAG, "Using PowerTable Result");
+      rtConfig.setTargetIncline(tableResult);
+      return;
+    }
   }
 
   bool isUserSpinning = this->_userIsSpinning(newCadance, currentIncline);

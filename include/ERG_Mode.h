@@ -14,7 +14,7 @@
 #define ERG_MODE_LOG_TAG     "ERG_Mode"
 #define ERG_MODE_LOG_CSV_TAG "ERG_Mode_CSV"
 #define POWERTABLE_LOG_TAG   "PowTab"
-#define ERG_MODE_DELAY       2000
+#define ERG_MODE_DELAY       700
 
 extern TaskHandle_t ErgTask;
 void setupERG();
@@ -66,7 +66,7 @@ class PowerTable {
   // Catalogs a new entry into the power table.
   void newEntry(PowerBuffer powerBuffer);
   // returns incline for wattTarget. Null if not found.
-  float lookup(int watts, int cad);
+  int32_t lookup(int watts, int cad);
   // load power table from spiffs
   bool load();
   // save powertable from spiffs
