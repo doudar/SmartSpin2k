@@ -82,52 +82,116 @@ void PowerTable::newEntry(int watts, float incline, int cad) {
 }
 
 // looks up an incline for the requested power and cadence and interpolates the result.
-// Returns NULL of no entry matched.
+// Returns -99 if no entry matched.
 float PowerTable::lookup(int watts, int cad) {
+#define RETURN_ERROR -99
   struct entry {
     float power;
     float incline;
+    float cad;
   };
-  int i       = round(watts / POWERTABLE_INCREMENT);  // find the closest entry
-  float scale = watts / POWERTABLE_INCREMENT - i;
+  int i         = round(watts / POWERTABLE_INCREMENT);  // find the closest entry
+  float scale   = watts / POWERTABLE_INCREMENT - i;     // Should we look at the next higher or next lower index for comparison?
+  int indexPair = -1;                                   // The next closes index with data for interpolation
   entry above;
   entry below;
-  above.power = NULL;
-  below.power = NULL;
-  if (this->powerEntry[i].readings = 0) {
-    return NULL;
-  }
-  //TODO Needs to check elements in the opposite order if not found in the suggested order. 
+  above.power = 0;
+  below.power = 0;
 
-  if (scale > 0) {  // select the element above closest entry for interpolation
-    below.power   = this->powerEntry[i].watts;
-    below.incline = this->powerEntry[i].incline;
-    for (int nextIndex = i + 1; nextIndex <= POWERTABLE_SIZE; nextIndex++) {
-      if (this->powerEntry[nextIndex].readings > 0) {
-        above.power   = this->powerEntry[nextIndex].watts;
-        above.incline = this->powerEntry[nextIndex].incline;
+  if (this->powerEntry[i].readings = 0) {  // If matching entry is empty, find the next closest index with data
+    for (int x = 1; x <= POWERTABLE_SIZE; x++) {
+      if (i + x <= POWERTABLE_SIZE) {
+        if (this->powerEntry[i + x].readings > 0) {
+          i += x;
+          break;
+        }
+      }
+      if (i - x >= 0) {
+        if (this->powerEntry[i - x].readings > 0) {
+          i -= x;
+          break;
+        }
+      }
+      if ((i - x <= 0) || (i + x >= POWERTABLE_SIZE)) {
+        SS2K_LOG(ERG_MODE_LOG_TAG, "No data found in powertable.");
+        return RETURN_ERROR;
+      }
+    }
+  }
+  if (scale > 0) {  // select the paired element (preferably) above the entry for interpolation
+    for (int x = 1; x <= POWERTABLE_SIZE; x++) {
+      if (i + x <= POWERTABLE_SIZE) {
+        if (this->powerEntry[i + x].readings > 0) {
+          indexPair = i + x;
+          break;
+        }
+      }
+      if (i - x >= 0) {
+        if (this->powerEntry[i - x].readings > 0) {
+          indexPair = i - x;
+          break;
+        }
+      }
+      if ((i - x <= 0) || (i + x >= POWERTABLE_SIZE)) {
+        SS2K_LOG(ERG_MODE_LOG_TAG, "No pair found in powertable.");
+        indexPair = -1;
         break;
       }
     }
-  } else if (scale < 0) {  // select the element below the closest entry for interpolation
-    above.power   = this->powerEntry[i].watts;
-    above.incline = this->powerEntry[i].incline;
-    for (int previousIndex = i - 1; previousIndex >= 0; previousIndex--) {
-      if (this->powerEntry[previousIndex].readings > 0) {
-        below.power   = this->powerEntry[previousIndex].watts;
-        below.incline = this->powerEntry[previousIndex].incline;
+  } else if (scale < 0) {  // select the paired element (preferably) below the entry for interpolation
+    for (int x = 1; x <= POWERTABLE_SIZE; x++) {
+      if (i - x <= POWERTABLE_SIZE) {
+        if (this->powerEntry[i + x].readings > 0) {
+          indexPair = i - x;
+          break;
+        }
+      }
+      if (i + x >= 0) {
+        if (this->powerEntry[i - x].readings > 0) {
+          indexPair = i + x;
+          break;
+        }
+      }
+      if ((i - x <= 0) || (i + x >= POWERTABLE_SIZE)) {
+        SS2K_LOG(ERG_MODE_LOG_TAG, "No pair found in powertable.");
+        indexPair = -1;
         break;
       }
     }
-  } else {
-    // Compute cad offset and return without interpolation
-    //
-    // Cad offset TODO HERE
-    //
-    return this->powerEntry->incline;
   }
 
-//actual interpolation
+  if (indexPair != -1) {
+    if (i > indexPair) {
+      below.power   = this->powerEntry[indexPair].watts;
+      below.incline = this->powerEntry[indexPair].incline;
+      below.cad     = this->powerEntry[indexPair].cad;
+      above.power   = this->powerEntry[i].watts;
+      above.incline = this->powerEntry[i].incline;
+      above.cad     = this->powerEntry[i].cad;
+    } else if (i < indexPair) {
+      below.power   = this->powerEntry[i].watts;
+      below.incline = this->powerEntry[i].incline;
+      below.cad     = this->powerEntry[i].cad;
+      above.power   = this->powerEntry[indexPair].watts;
+      above.incline = this->powerEntry[indexPair].incline;
+      above.cad     = this->powerEntry[indexPair].cad;
+    }
+  } else {  // no interpolation and so no CAD correction
+    return (this->powerEntry[i].incline);
+  }
+
+  // @MarkusSchneider's data shows a linear relationship between CAD and Watts for a given resistance level.
+  // It looks like for every 20 CAD increase there is ~50w increase in power. This may need to be adjusted later
+  // as higher resistance levels have a steeper slope (bigger increase in power/cad) than low resistance levels.
+  float averageCAD = (below.cad - above.cad) / 2;
+  float deltaCAD   = abs(averageCAD - cad);
+  if (cad > averageCAD) {  // cad is higher than the table so we need to target a lower wattage (and incline)
+    watts -= (deltaCAD / 20) * 50;
+  }
+  if (cad < averageCAD) {  // cad is lower than the table so we need to target a higher wattage (and incline)
+    watts += (deltaCAD / 20) * 50;
+  }
+  // actual interpolation
   float rIncline = below.incline + ((watts - below.power) / (above.power - below.power)) * (above.incline - below.incline);
 
   return rIncline;
