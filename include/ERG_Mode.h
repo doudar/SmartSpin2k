@@ -13,7 +13,8 @@
 
 #define ERG_MODE_LOG_TAG     "ERG_Mode"
 #define ERG_MODE_LOG_CSV_TAG "ERG_Mode_CSV"
-#define ERG_MODE_DELAY       250
+#define POWERTABLE_LOG_TAG   "PowTab"
+#define ERG_MODE_DELAY       2000
 
 extern TaskHandle_t ErgTask;
 void setupERG();
@@ -40,23 +41,38 @@ class ErgMode {
 class PowerEntry {
  public:
   int watts;
-  float incline;
+  int32_t targetPosition;
   int cad;
   int readings;
 
   PowerEntry() {
     this->watts    = 0;
-    this->incline  = 0;
+    this->targetPosition = 0;
     this->cad      = 0;
     this->readings = 0;
   }
 };
 
+class PowerBuffer {
+  public:
+  PowerEntry powerEntry[POWER_SAMPLES];
+  void set(int);
+  void reset();
+};
+
 class PowerTable {
  public:
   PowerEntry powerEntry[POWERTABLE_SIZE];
-
-  void newEntry(int watts, float incline, int cad);
+  // Catalogs a new entry into the power table.
+  void newEntry(PowerBuffer powerBuffer);
   // returns incline for wattTarget. Null if not found.
   float lookup(int watts, int cad);
+  // load power table from spiffs
+  bool load();
+  // save powertable from spiffs
+  bool save();
+  // Display power table in log
+  void toLog();
 };
+
+

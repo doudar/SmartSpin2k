@@ -33,10 +33,21 @@ void stopTasks();
 // Main program variable that stores most everything
 extern userParameters userConfig;
 extern RuntimeParameters rtConfig;
-extern int32_t targetPosition;
-extern bool externalControl;
-extern bool syncMode;
+
+class SS2K {
+ public:
+  int32_t targetPosition;
+  bool externalControl;
+  bool syncMode;
+
+  SS2K() {
+    targetPosition  = 0;
+    externalControl = false;
+    syncMode        = false;
+  }
+};
 
 // Users Physical Working Capacity Calculation Parameters (heartrate to Power
 // calculation)
 extern physicalWorkingCapacity userPWC;
+extern SS2K ss2k;

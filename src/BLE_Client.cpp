@@ -211,7 +211,7 @@ bool SpinBLEClient::connectToServer() {
   pClient->setConnectTimeout(5);
   pClient->connect(myDevice->getAddress());  // if you pass BLEAdvertisedDevice instead of address, it will be recognized type of peer device address (public or private)
   SS2K_LOG(BLE_CLIENT_LOG_TAG, " - Connected to server");
-  SS2K_LOG(BLE_CLIENT_LOG_TAG, " - RSSI %d", pClient->getRssi());
+  //SS2K_LOG(BLE_CLIENT_LOG_TAG, " - RSSI %d", pClient->getRssi());
   // Obtain a reference to the service we are after in the remote BLE server.
   BLERemoteService *pRemoteService = pClient->getService(serviceUUID);
   if (pRemoteService == nullptr) {

@@ -98,9 +98,6 @@
     if (element.checked) {
       document.getElementById("wattsSlider").hidden = false;
       document.getElementById("wattsValue").hidden = false;
-      pwrTimer = setInterval(() => {
-        updateWattsSlider();
-      }, 1000)
     }
     else {
       document.getElementById("wattsSlider").hidden = true;

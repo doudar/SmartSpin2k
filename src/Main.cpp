@@ -22,10 +22,8 @@ uint64_t debounceDelay    = 500;  // the debounce time; increase if the output f
 
 // Stepper Speed - Lower is faster
 int maxStepperSpeed     = 500;
-int32_t targetPosition  = 0;
 int lastShifterPosition = 0;
-bool externalControl    = false;
-bool syncMode           = false;
+
 HardwareSerial stepperSerial(2);
 TMC2208Stepper driver(&SERIAL_PORT, R_SENSE);  // Hardware Serial
 FastAccelStepperEngine engine = FastAccelStepperEngine();
@@ -43,6 +41,7 @@ TaskHandle_t moveStepperTask;
 TaskHandle_t shifterCheckTask;
 
 ///////////// Initialize the Config /////////////
+SS2K ss2k;
 userParameters userConfig;
 RuntimeParameters rtConfig;
 physicalWorkingCapacity userPWC;
@@ -148,6 +147,7 @@ void setup() {
                           1,                      /* priority of the task */
                           &shifterCheckTask,      /* Task handle to keep track of created task */
                           1);                     /* pin task to core 0 */
+
 }
 
 void loop() {  // Delete this task so we can make one that's more memory efficient.
@@ -161,11 +161,11 @@ void shifterCheck(void *pvParameters) {
 
   if (rtConfig.getShifterPosition() > lastShifterPosition) {
     SS2K_LOG(MAIN_LOG_TAG, "Shift UP: %l", rtConfig.getShifterPosition());
-    Serial.println(targetPosition);
+    Serial.println(ss2k.targetPosition);
     spinBLEServer.notifyShift(1);
   } else if (rtConfig.getShifterPosition() < lastShifterPosition) {
     SS2K_LOG(MAIN_LOG_TAG, "Shift DOWN: %l", rtConfig.getShifterPosition());
-    Serial.println(targetPosition);
+    Serial.println(ss2k.targetPosition);
     spinBLEServer.notifyShift(0);
   }
   lastShifterPosition = rtConfig.getShifterPosition();
@@ -200,25 +200,25 @@ void moveStepper(void *pvParameters) {
 
   while (1) {
     if (stepper) {
-      targetPosition = rtConfig.getShifterPosition() * userConfig.getShiftStep();
-      if (!externalControl) {
+      ss2k.targetPosition = rtConfig.getShifterPosition() * userConfig.getShiftStep();
+      if (!ss2k.externalControl) {
         if (rtConfig.getERGMode()) {
           // ERG Mode
           // Shifter not used.
-          targetPosition = rtConfig.getTargetIncline();
+          ss2k.targetPosition = rtConfig.getTargetIncline();
         } else {
           // Simulation Mode
-          targetPosition += rtConfig.getTargetIncline() * userConfig.getInclineMultiplier();
+          ss2k.targetPosition += rtConfig.getTargetIncline() * userConfig.getInclineMultiplier();
         }
       }
 
-      if (syncMode) {
+      if (ss2k.syncMode) {
         stepper->stopMove();
         vTaskDelay(100 / portTICK_PERIOD_MS);
-        stepper->setCurrentPosition(targetPosition);
+        stepper->setCurrentPosition(ss2k.targetPosition);
         vTaskDelay(100 / portTICK_PERIOD_MS);
       }
-      stepper->moveTo(targetPosition);
+      stepper->moveTo(ss2k.targetPosition);
       vTaskDelay(100 / portTICK_PERIOD_MS);
 
       rtConfig.setCurrentIncline((float)stepper->getCurrentPosition());
@@ -366,8 +366,8 @@ void checkDriverTemperature() {
 
 void motorStop(bool releaseTension) {
   stepper->stopMove();
-  stepper->setCurrentPosition(targetPosition);
+  stepper->setCurrentPosition(ss2k.targetPosition);
   if (releaseTension) {
-    stepper->moveTo(targetPosition - userConfig.getShiftStep() * 4);
+    stepper->moveTo(ss2k.targetPosition - userConfig.getShiftStep() * 4);
   }
 }

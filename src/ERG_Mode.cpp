@@ -20,7 +20,7 @@ void setupERG() {
   SS2K_LOG(ERG_MODE_LOG_TAG, "Starting ERG Mode task...");
   xTaskCreatePinnedToCore(ergTaskLoop,   /* Task function. */
                           "ERGModeTask", /* name of task. */
-                          2500,          /* Stack size of task*/
+                          6500,          /* Stack size of task*/
                           NULL,          /* parameter of the task */
                           1,             /* priority of the task*/
                           &ErgTask,      /* Task handle to keep track of created task */
@@ -31,20 +31,50 @@ void setupERG() {
 
 void ergTaskLoop(void* pvParameters) {
   ErgMode ergMode;
+  PowerBuffer powerBuffer;
+
   ergMode._writeLogHeader();
+  int newSetPoint             = rtConfig.getTargetWatts();
+  bool isInErgMode            = rtConfig.getERGMode();
+  bool hasConnectedPowerMeter = spinBLEClient.connectedPM;
+  bool simulationRunning      = rtConfig.getSimulateTargetWatts();
   while (true) {
     vTaskDelay(ERG_MODE_DELAY / portTICK_PERIOD_MS);
+    newSetPoint            = rtConfig.getTargetWatts();
+    isInErgMode            = rtConfig.getERGMode();
+    hasConnectedPowerMeter = spinBLEClient.connectedPM;
+    simulationRunning      = rtConfig.getSimulateTargetWatts();
 
-    int newSetPoint             = rtConfig.getTargetWatts();
-    bool isInErgMode            = rtConfig.getERGMode();
-    bool hasConnectedPowerMeter = spinBLEClient.connectedPM;
-    bool simulationRunning      = rtConfig.getSimulateTargetWatts();
+    if ((rtConfig.getSimulatedCad() > 50) && (rtConfig.getSimulatedWatts().value > 10) && (rtConfig.getSimulatedWatts().value<POWERTABLE_SIZE*POWERTABLE_INCREMENT)) {
+      if (powerBuffer.powerEntry[0].readings == 0) {
+        powerBuffer.set(0);
+        SS2K_LOG(ERG_MODE_LOG_TAG, "powerBuffer.set(0);");
+      } else if (abs(powerBuffer.powerEntry[0].watts - rtConfig.getSimulatedWatts().value) < POWERTABLE_INCREMENT) {
+        for (int i = 1; i < POWER_SAMPLES; i++) {
+          if (powerBuffer.powerEntry[i].readings == 0) {
+            powerBuffer.set(i);
+            SS2K_LOG(ERG_MODE_LOG_TAG, "powerBuffer.set(%d);", i);
+            break;
+          }
+        }
+        if (powerBuffer.powerEntry[POWER_SAMPLES - 1].readings == 1) {
+          SS2K_LOG(ERG_MODE_LOG_TAG, "powerTable.newEntry(powerBuffer);");
+          powerTable.newEntry(powerBuffer);
+          powerBuffer.reset();
+        }
+      } else {
+        powerBuffer.reset();
+        SS2K_LOG(ERG_MODE_LOG_TAG, "powerBuffer.reset();");
+      }
+    }
 
+    powerTable.toLog();
     if (isInErgMode && (hasConnectedPowerMeter || simulationRunning)) {
       ergMode.computErg(newSetPoint);
     } else {
       if (newSetPoint > 0) {
         SS2K_LOG(ERG_MODE_LOG_TAG, "ERG request but ERG off or no connected PM");
+        rtConfig.setERGMode(false);
       }
     }
 
@@ -62,18 +92,46 @@ void ergTaskLoop(void* pvParameters) {
   }
 }
 
+void PowerBuffer::set(int i) {
+  this->powerEntry[i].readings = 1;
+  this->powerEntry[i].watts    = rtConfig.getSimulatedWatts().value;
+  this->powerEntry[i].cad      = rtConfig.getSimulatedCad();
+  this->powerEntry[i].targetPosition  = ss2k.targetPosition;
+}
+
+void PowerBuffer::reset() {
+  for (int i = 0; i < POWER_SAMPLES; i++) {
+    this->powerEntry[i].readings = 0;
+    this->powerEntry[i].watts    = 0;
+    this->powerEntry[i].cad      = 0;
+    this->powerEntry[i].targetPosition  = 0;
+  }
+}
+
 // Accepts new data into the table and averages input by number of readings in the power entry.
-void PowerTable::newEntry(int watts, float incline, int cad) {
+void PowerTable::newEntry(PowerBuffer powerBuffer) {
+  float tWatts, tCad = 0;
+  int32_t tTargetPosition = 0;
+
+  for (int i = 0; i < POWER_SAMPLES; i++) {
+    tWatts += powerBuffer.powerEntry[i].watts;
+    tTargetPosition += powerBuffer.powerEntry[i].targetPosition;
+    tCad += powerBuffer.powerEntry[i].cad;
+  }
+  int watts     = tWatts / POWER_SAMPLES;
+  int cad       = tCad / POWER_SAMPLES;
+  int32_t targetPosition = tTargetPosition / POWER_SAMPLES;
+
   int i = round(watts / POWERTABLE_INCREMENT);
-  if (this->powerEntry[i].readings = 0) {
+  if (this->powerEntry[i].readings == 0) {
     this->powerEntry[i].watts    = watts;
     this->powerEntry[i].cad      = cad;
-    this->powerEntry[i].incline  = incline;
+    this->powerEntry[i].targetPosition  = targetPosition;
     this->powerEntry[i].readings = 1;
-  } else {  // Average and update the readings.  Probably should throw out outliers here as well.
-    this->powerEntry[i].watts   = (watts + this->powerEntry[i].watts * this->powerEntry[i].readings) / this->powerEntry[i].readings + 1;
-    this->powerEntry[i].cad     = (cad + this->powerEntry[i].cad * this->powerEntry[i].readings) / this->powerEntry[i].readings + 1;
-    this->powerEntry[i].incline = (incline + this->powerEntry[i].incline * this->powerEntry[i].readings) / this->powerEntry[i].readings + 1;
+  } else {  // Average and update the readings. 
+    this->powerEntry[i].watts   = (watts + (this->powerEntry[i].watts * this->powerEntry[i].readings)) / (this->powerEntry[i].readings + 1);
+    this->powerEntry[i].cad     = (cad + (this->powerEntry[i].cad * this->powerEntry[i].readings)) / (this->powerEntry[i].readings + 1);
+    this->powerEntry[i].targetPosition = (targetPosition + (this->powerEntry[i].targetPosition * this->powerEntry[i].readings)) / (this->powerEntry[i].readings + 1);
     this->powerEntry[i].readings++;
     if (this->powerEntry[i].readings > 10) {
       this->powerEntry[i].readings = 10;  // keep from diluting recent readings too far.
@@ -98,9 +156,9 @@ float PowerTable::lookup(int watts, int cad) {
   above.power = 0;
   below.power = 0;
 
-  if (this->powerEntry[i].readings = 0) {  // If matching entry is empty, find the next closest index with data
-    for (int x = 1; x <= POWERTABLE_SIZE; x++) {
-      if (i + x <= POWERTABLE_SIZE) {
+  if (this->powerEntry[i].readings == 0) {  // If matching entry is empty, find the next closest index with data
+    for (int x = 1; x < POWERTABLE_SIZE; x++) {
+      if (i + x < POWERTABLE_SIZE) {
         if (this->powerEntry[i + x].readings > 0) {
           i += x;
           break;
@@ -119,8 +177,8 @@ float PowerTable::lookup(int watts, int cad) {
     }
   }
   if (scale > 0) {  // select the paired element (preferably) above the entry for interpolation
-    for (int x = 1; x <= POWERTABLE_SIZE; x++) {
-      if (i + x <= POWERTABLE_SIZE) {
+    for (int x = 1; x < POWERTABLE_SIZE; x++) {
+      if (i + x < POWERTABLE_SIZE) {
         if (this->powerEntry[i + x].readings > 0) {
           indexPair = i + x;
           break;
@@ -139,8 +197,8 @@ float PowerTable::lookup(int watts, int cad) {
       }
     }
   } else if (scale < 0) {  // select the paired element (preferably) below the entry for interpolation
-    for (int x = 1; x <= POWERTABLE_SIZE; x++) {
-      if (i - x <= POWERTABLE_SIZE) {
+    for (int x = 1; x < POWERTABLE_SIZE; x++) {
+      if (i - x < POWERTABLE_SIZE) {
         if (this->powerEntry[i + x].readings > 0) {
           indexPair = i - x;
           break;
@@ -163,21 +221,21 @@ float PowerTable::lookup(int watts, int cad) {
   if (indexPair != -1) {
     if (i > indexPair) {
       below.power   = this->powerEntry[indexPair].watts;
-      below.incline = this->powerEntry[indexPair].incline;
+      below.incline = this->powerEntry[indexPair].targetPosition;
       below.cad     = this->powerEntry[indexPair].cad;
       above.power   = this->powerEntry[i].watts;
-      above.incline = this->powerEntry[i].incline;
+      above.incline = this->powerEntry[i].targetPosition;
       above.cad     = this->powerEntry[i].cad;
     } else if (i < indexPair) {
       below.power   = this->powerEntry[i].watts;
-      below.incline = this->powerEntry[i].incline;
+      below.incline = this->powerEntry[i].targetPosition;
       below.cad     = this->powerEntry[i].cad;
       above.power   = this->powerEntry[indexPair].watts;
-      above.incline = this->powerEntry[indexPair].incline;
+      above.incline = this->powerEntry[indexPair].targetPosition;
       above.cad     = this->powerEntry[indexPair].cad;
     }
-  } else {  // no interpolation and so no CAD correction
-    return (this->powerEntry[i].incline);
+  } else {  // no pair so no interpolation and no CAD correction
+    return (this->powerEntry[i].targetPosition);
   }
 
   // @MarkusSchneider's data shows a linear relationship between CAD and Watts for a given resistance level.
@@ -195,6 +253,40 @@ float PowerTable::lookup(int watts, int cad) {
   float rIncline = below.incline + ((watts - below.power) / (above.power - below.power)) * (above.incline - below.incline);
 
   return rIncline;
+}
+
+bool PowerTable::load() {
+  // load power table from spiffs
+  return false;  // return unsuccessful
+}
+
+bool PowerTable::save() {
+  // save powertable from spiffs
+  return false;  // return unsuccessful
+}
+// Display power table in log
+void PowerTable::toLog() {
+  char buffer[6];
+  String oString = "|";
+  int n;
+  for (int i = 0; i < POWERTABLE_SIZE; i++) {
+    n = sprintf(buffer, "%4d|", this->powerEntry[i].watts);
+    oString += buffer;
+  }
+  // Serial.println(oString);
+  SS2K_LOG(POWERTABLE_LOG_TAG, | % s, oString.c_str());
+  oString = "|";
+  for (int i = 0; i < POWERTABLE_SIZE; i++) {
+    n = sprintf(buffer, "%4d|", this->powerEntry[i].cad);
+    oString += buffer;
+  }
+  SS2K_LOG(POWERTABLE_LOG_TAG, | % s, oString.c_str());
+  oString = "|";
+  for (int i = 0; i < POWERTABLE_SIZE; i++) {
+    n = sprintf(buffer, "%4d|", this->powerEntry[i].targetPosition);
+    oString += buffer;
+  }
+  SS2K_LOG(POWERTABLE_LOG_TAG, | % s, oString.c_str());
 }
 
 // as a note, Trainer Road sends 50w target whenever the app is connected.

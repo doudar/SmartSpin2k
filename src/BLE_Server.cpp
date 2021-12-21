@@ -773,36 +773,36 @@ void ss2kCustomCharacteristicCallbacks::onWrite(BLECharacteristic *pCharacterist
     case BLE_targetPosition:  // 0x19
       returnValue[0] = success;
       if (rxValue[0] == read) {
-        returnValue[2] = (uint8_t)(targetPosition & 0xff);
-        returnValue[3] = (uint8_t)(targetPosition >> 8);
-        returnValue[4] = (uint8_t)(targetPosition >> 16);
-        returnValue[5] = (uint8_t)(targetPosition >> 24);
+        returnValue[2] = (uint8_t)(ss2k.targetPosition & 0xff);
+        returnValue[3] = (uint8_t)(ss2k.targetPosition >> 8);
+        returnValue[4] = (uint8_t)(ss2k.targetPosition >> 16);
+        returnValue[5] = (uint8_t)(ss2k.targetPosition >> 24);
         returnLength += 4;
       }
       if (rxValue[0] == write) {
-        targetPosition = (int32_t((uint8_t)(rxValue[2]) << 0 | (uint8_t)(rxValue[3]) << 8 | (uint8_t)(rxValue[4]) << 16 | (uint8_t)(rxValue[5]) << 24));
+        ss2k.targetPosition = (int32_t((uint8_t)(rxValue[2]) << 0 | (uint8_t)(rxValue[3]) << 8 | (uint8_t)(rxValue[4]) << 16 | (uint8_t)(rxValue[5]) << 24));
       }
       break;
 
     case BLE_externalControl:  // 0x1A
       returnValue[0] = success;
       if (rxValue[0] == read) {
-        returnValue[2] = (uint8_t)(externalControl);
+        returnValue[2] = (uint8_t)(ss2k.externalControl);
         returnLength += 1;
       }
       if (rxValue[0] == write) {
-        externalControl = static_cast<bool>(rxValue[2]);
+        ss2k.externalControl = static_cast<bool>(rxValue[2]);
       }
       break;
 
     case BLE_syncMode:  // 0x1B
       returnValue[0] = success;
       if (rxValue[0] == read) {
-        returnValue[2] = (uint8_t)(syncMode);
+        returnValue[2] = (uint8_t)(ss2k.syncMode);
         returnLength += 1;
       }
       if (rxValue[0] == write) {
-        syncMode = static_cast<bool>(rxValue[2]);
+        ss2k.syncMode = static_cast<bool>(rxValue[2]);
       }
       break;
   }
