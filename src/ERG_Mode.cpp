@@ -310,7 +310,7 @@ void ErgMode::computErg(int newSetPoint) {
     this->cycles        = 0;
     int32_t tableResult = powerTable.lookup(newSetPoint, newCadance);
     if (tableResult != -99) {
-      SS2K_LOG(ERG_MODE_LOG_TAG, "Using PowerTable Result");
+      SS2K_LOG(ERG_MODE_LOG_TAG, "Using PowerTable Result %d", tableResult);
       rtConfig.setTargetIncline(tableResult);
       return;
     }
