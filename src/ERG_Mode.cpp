@@ -280,7 +280,7 @@ bool PowerTable::save() {
 
 // Display power table in log
 void PowerTable::toLog() {
-  char buffer[8]; 
+  char buffer[8];  // add code here to truncate the uint32_t value for display. Or change the value system wide to be a regular int since we probaby dont need that much anymore.
   String oString = "";
   int n;
   char oFormat[5] = "|%6d";

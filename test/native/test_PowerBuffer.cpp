@@ -10,7 +10,7 @@
 #include "ERG_Mode.h"
 
 void TestPowerBuffer::set__should_set_values__expect_values_added_to_correct_index(void) {
-  const PowerBuffer powerBuffer
+  const PowerBuffer powerBuffer;
   // // Pre parse state
   // TEST_ASSERT_FALSE(sensor.hasPower());
   // TEST_ASSERT_EQUAL_INT(INT_MIN, sensor.getPower());
