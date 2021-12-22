@@ -7,9 +7,8 @@
 
 #pragma once
 
-#include <Arduino.h>
-#include "SmartSpin_parameters.h"
 #include "settings.h"
+#include "SmartSpin_parameters.h"
 
 #define ERG_MODE_LOG_TAG     "ERG_Mode"
 #define ERG_MODE_LOG_CSV_TAG "ERG_Mode_CSV"
@@ -63,16 +62,19 @@ class PowerBuffer {
 class PowerTable {
  public:
   PowerEntry powerEntry[POWERTABLE_SIZE];
+  
   // Catalogs a new entry into the power table.
   void newEntry(PowerBuffer powerBuffer);
+  
   // returns incline for wattTarget. Null if not found.
   int32_t lookup(int watts, int cad);
+  
   // load power table from spiffs
   bool load();
+  
   // save powertable from spiffs
   bool save();
+  
   // Display power table in log
   void toLog();
 };
-
-

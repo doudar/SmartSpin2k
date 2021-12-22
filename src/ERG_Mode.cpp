@@ -68,6 +68,7 @@ void ergTaskLoop(void* pvParameters) {
         // SS2K_LOG(ERG_MODE_LOG_TAG, "powerBuffer.reset();");
       }
     }
+
     if (isInErgMode && (hasConnectedPowerMeter || simulationRunning)) {
       ergMode.computErg(newSetPoint);
     } else {
@@ -109,17 +110,28 @@ void PowerBuffer::reset() {
 
 // Accepts new data into the table and averages input by number of readings in the power entry.
 void PowerTable::newEntry(PowerBuffer powerBuffer) {
-  float tWatts, tCad = 0;
-  int32_t tTargetPosition = 0;
+  int watts              = 0;
+  int cad                = 0;
+  int32_t targetPosition = 0;
 
   for (int i = 0; i < POWER_SAMPLES; i++) {
-    tWatts += powerBuffer.powerEntry[i].watts;
-    tTargetPosition += powerBuffer.powerEntry[i].targetPosition;
-    tCad += powerBuffer.powerEntry[i].cad;
+    if (powerBuffer.powerEntry[i].readings == 0) {
+      // break if powerEntry is not set
+      break;
+    }
+
+    if (i == 0) {  // first loop -> assign values
+      watts          = powerBuffer.powerEntry[i].watts;
+      targetPosition = powerBuffer.powerEntry[i].targetPosition;
+      cad            = powerBuffer.powerEntry[i].cad;
+      continue;
+    }
+
+    // calculate average
+    watts          = (watts + powerBuffer.powerEntry[i].watts) / 2;
+    targetPosition = (targetPosition + powerBuffer.powerEntry[i].targetPosition) / 2;
+    cad            = (cad + powerBuffer.powerEntry[i].cad) / 2;
   }
-  int watts              = tWatts / POWER_SAMPLES;
-  int cad                = tCad / POWER_SAMPLES;
-  int32_t targetPosition = tTargetPosition / POWER_SAMPLES;
 
   int i = round(watts / POWERTABLE_INCREMENT);
 
@@ -148,6 +160,7 @@ int32_t PowerTable::lookup(int watts, int cad) {
     int32_t targetPosition;
     float cad;
   };
+
   int i         = round(watts / POWERTABLE_INCREMENT);  // find the closest entry
   float scale   = watts / POWERTABLE_INCREMENT - i;     // Should we look at the next higher or next lower index for comparison?
   int indexPair = -1;                                   // The next closes index with data for interpolation
@@ -264,9 +277,10 @@ bool PowerTable::save() {
   // save powertable from spiffs
   return false;  // return unsuccessful
 }
+
 // Display power table in log
 void PowerTable::toLog() {
-  char buffer[6]; // crashes when targetPosition gets over 9999
+  char buffer[6];  // crashes when targetPosition gets over 9999
   String oString = "|";
   int n;
   for (int i = 0; i < POWERTABLE_SIZE; i++) {
@@ -283,7 +297,7 @@ void PowerTable::toLog() {
   SS2K_LOG(POWERTABLE_LOG_TAG, "|%s", oString.c_str());
   oString = "|";
   for (int i = 0; i < POWERTABLE_SIZE; i++) {
-    n = sprintf(buffer, "%4d|", this->powerEntry[i].targetPosition);
+    n = sprintf(buffer, "%8d|", this->powerEntry[i].targetPosition);
     oString += buffer;
   }
   SS2K_LOG(POWERTABLE_LOG_TAG, "|%s", oString.c_str());
