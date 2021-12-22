@@ -241,7 +241,7 @@ int32_t PowerTable::lookup(int watts, int cad) {
   // @MarkusSchneider's data shows a linear relationship between CAD and Watts for a given resistance level.
   // It looks like for every 20 CAD increase there is ~50w increase in power. This may need to be adjusted later
   // as higher resistance levels have a steeper slope (bigger increase in power/cad) than low resistance levels.
-  float averageCAD = (below.cad - above.cad) / 2;
+  float averageCAD = (below.cad + above.cad) / 2;
   float deltaCAD   = abs(averageCAD - cad);
   if (cad > averageCAD) {  // cad is higher than the table so we need to target a lower wattage (and targetPosition)
     watts -= (deltaCAD / 20) * 50;
