@@ -266,7 +266,7 @@ bool PowerTable::save() {
 }
 // Display power table in log
 void PowerTable::toLog() {
-  char buffer[6];
+  char buffer[6]; // crashes when targetPosition gets over 9999
   String oString = "|";
   int n;
   for (int i = 0; i < POWERTABLE_SIZE; i++) {
