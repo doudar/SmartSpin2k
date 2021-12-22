@@ -48,24 +48,24 @@ void ergTaskLoop(void* pvParameters) {
     if ((rtConfig.getSimulatedCad() > 50) && (rtConfig.getSimulatedWatts().value > 10) && (rtConfig.getSimulatedWatts().value < POWERTABLE_SIZE * POWERTABLE_INCREMENT)) {
       if (powerBuffer.powerEntry[0].readings == 0) {
         powerBuffer.set(0);
-        //SS2K_LOG(ERG_MODE_LOG_TAG, "powerBuffer.set(0);");
+        // SS2K_LOG(ERG_MODE_LOG_TAG, "powerBuffer.set(0);");
       } else if (abs(powerBuffer.powerEntry[0].watts - rtConfig.getSimulatedWatts().value) < POWERTABLE_INCREMENT) {
         for (int i = 1; i < POWER_SAMPLES; i++) {
           if (powerBuffer.powerEntry[i].readings == 0) {
             powerBuffer.set(i);
-            //SS2K_LOG(ERG_MODE_LOG_TAG, "powerBuffer.set(%d);", i);
+            // SS2K_LOG(ERG_MODE_LOG_TAG, "powerBuffer.set(%d);", i);
             break;
           }
         }
         if (powerBuffer.powerEntry[POWER_SAMPLES - 1].readings == 1) {
-          //SS2K_LOG(ERG_MODE_LOG_TAG, "powerTable.newEntry(powerBuffer);");
+          // SS2K_LOG(ERG_MODE_LOG_TAG, "powerTable.newEntry(powerBuffer);");
           powerTable.newEntry(powerBuffer);
           powerTable.toLog();
           powerBuffer.reset();
         }
       } else {
         powerBuffer.reset();
-        //SS2K_LOG(ERG_MODE_LOG_TAG, "powerBuffer.reset();");
+        // SS2K_LOG(ERG_MODE_LOG_TAG, "powerBuffer.reset();");
       }
     }
     if (isInErgMode && (hasConnectedPowerMeter || simulationRunning)) {
@@ -249,9 +249,9 @@ int32_t PowerTable::lookup(int watts, int cad) {
     watts += (deltaCAD / 20) * 50;
   }
   // actual interpolation
-  int32_t rtargetPosition = below.targetPosition + ((watts - below.power) / (above.power - below.power)) * (above.targetPosition - below.targetPosition);
+  int32_t rTargetPosition = below.targetPosition + ((watts - below.power) / (above.power - below.power)) * (above.targetPosition - below.targetPosition);
 
-  return rtargetPosition;
+  return rTargetPosition;
 }
 
 bool PowerTable::load() {
@@ -304,6 +304,14 @@ void ErgMode::computErg(int newSetPoint) {
   if (newSetPoint < 50) {
     newSetPoint = 50;
   }
+    bool isUserSpinning = this->_userIsSpinning(newCadance, currentIncline);
+  if (!isUserSpinning) {
+    return;
+  }
+  bool isUserSpinning = this->_userIsSpinning(newCadance, currentIncline);
+  if (!isUserSpinning) {
+    return;
+  }
 
   // reset cycle counter to start new erg calculation cycle
   if (this->setPoint != newSetPoint) {
@@ -312,13 +320,13 @@ void ErgMode::computErg(int newSetPoint) {
     if (tableResult != -99) {
       SS2K_LOG(ERG_MODE_LOG_TAG, "Using PowerTable Result %d", tableResult);
       rtConfig.setTargetIncline(tableResult);
+      // store for next cycle for timestamp and value compare
+      this->watts    = newWatts;
+      this->setPoint = newSetPoint;
+      this->cadence  = newCadance;
+      this->cycles++;
       return;
     }
-  }
-
-  bool isUserSpinning = this->_userIsSpinning(newCadance, currentIncline);
-  if (!isUserSpinning) {
-    return;
   }
 
   float factor     = abs(diviation) > 10 ? userConfig.getERGSensitivity() : userConfig.getERGSensitivity() / 2;
