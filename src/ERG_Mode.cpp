@@ -280,7 +280,7 @@ bool PowerTable::save() {
 
 // Display power table in log
 void PowerTable::toLog() {
-  char buffer[8];  // crashes when targetPosition gets over 9999
+  char buffer[8]; 
   String oString = "";
   int n;
   char oFormat[5] = "|%6d";
@@ -289,7 +289,6 @@ void PowerTable::toLog() {
     n = sprintf(buffer, oFormat, this->powerEntry[i].watts);
     oString += buffer;
   }
-  // Serial.println(oString);
   SS2K_LOG(POWERTABLE_LOG_TAG, "%s|", oString.c_str());
   oString = "";
   for (int i = 0; i < POWERTABLE_SIZE; i++) {
