@@ -281,26 +281,28 @@ bool PowerTable::save() {
 // Display power table in log
 void PowerTable::toLog() {
   char buffer[8];  // crashes when targetPosition gets over 9999
-  String oString = "|";
+  String oString = "";
   int n;
+  char oFormat[5] = "|%6d";
+
   for (int i = 0; i < POWERTABLE_SIZE; i++) {
-    n = sprintf(buffer, "%6d|", this->powerEntry[i].watts);
+    n = sprintf(buffer, oFormat, this->powerEntry[i].watts);
     oString += buffer;
   }
   // Serial.println(oString);
-  SS2K_LOG(POWERTABLE_LOG_TAG, "|%s", oString.c_str());
-  oString = "|";
+  SS2K_LOG(POWERTABLE_LOG_TAG, "%s|", oString.c_str());
+  oString = "";
   for (int i = 0; i < POWERTABLE_SIZE; i++) {
-    n = sprintf(buffer, "%6d|", this->powerEntry[i].cad);
+    n = sprintf(buffer, oFormat, this->powerEntry[i].cad);
     oString += buffer;
   }
-  SS2K_LOG(POWERTABLE_LOG_TAG, "|%s", oString.c_str());
-  oString = "|";
+  SS2K_LOG(POWERTABLE_LOG_TAG, "%s|", oString.c_str());
+  oString = "";
   for (int i = 0; i < POWERTABLE_SIZE; i++) {
-    n = sprintf(buffer, "%6d|", this->powerEntry[i].targetPosition);
+    n = sprintf(buffer, oFormat, this->powerEntry[i].targetPosition);
     oString += buffer;
   }
-  SS2K_LOG(POWERTABLE_LOG_TAG, "|%s", oString.c_str());
+  SS2K_LOG(POWERTABLE_LOG_TAG, "%s|", oString.c_str());
 }
 
 // as a note, Trainer Road sends 50w target whenever the app is connected.
