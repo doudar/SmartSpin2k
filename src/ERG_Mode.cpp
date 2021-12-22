@@ -63,8 +63,8 @@ void ergTaskLoop(void* pvParameters) {
           powerTable.toLog();
           powerBuffer.reset();
         }
-      } else { //Reading was outside the range - clear the buffer and start over.
-        powerBuffer.reset(); 
+      } else {  // Reading was outside the range - clear the buffer and start over.
+        powerBuffer.reset();
         // SS2K_LOG(ERG_MODE_LOG_TAG, "powerBuffer.reset();");
       }
     }
@@ -274,19 +274,19 @@ void PowerTable::toLog() {
     oString += buffer;
   }
   // Serial.println(oString);
-  SS2K_LOG(POWERTABLE_LOG_TAG, | % s, oString.c_str());
+  SS2K_LOG(POWERTABLE_LOG_TAG, "|%s", oString.c_str());
   oString = "|";
   for (int i = 0; i < POWERTABLE_SIZE; i++) {
     n = sprintf(buffer, "%4d|", this->powerEntry[i].cad);
     oString += buffer;
   }
-  SS2K_LOG(POWERTABLE_LOG_TAG, | % s, oString.c_str());
+  SS2K_LOG(POWERTABLE_LOG_TAG, "|%s", oString.c_str());
   oString = "|";
   for (int i = 0; i < POWERTABLE_SIZE; i++) {
     n = sprintf(buffer, "%4d|", this->powerEntry[i].targetPosition);
     oString += buffer;
   }
-  SS2K_LOG(POWERTABLE_LOG_TAG, | % s, oString.c_str());
+  SS2K_LOG(POWERTABLE_LOG_TAG, "|%s", oString.c_str());
 }
 
 // as a note, Trainer Road sends 50w target whenever the app is connected.
