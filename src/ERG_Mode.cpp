@@ -47,24 +47,24 @@ void ergTaskLoop(void* pvParameters) {
 
     if ((rtConfig.getSimulatedCad() > 50) && (rtConfig.getSimulatedWatts().value > 10) && (rtConfig.getSimulatedWatts().value < POWERTABLE_SIZE * POWERTABLE_INCREMENT)) {
       if (powerBuffer.powerEntry[0].readings == 0) {
-        powerBuffer.set(0);
+        powerBuffer.set(0);  // Take Initial reading
         // SS2K_LOG(ERG_MODE_LOG_TAG, "powerBuffer.set(0);");
       } else if (abs(powerBuffer.powerEntry[0].watts - rtConfig.getSimulatedWatts().value) < POWERTABLE_INCREMENT) {
         for (int i = 1; i < POWER_SAMPLES; i++) {
-          if (powerBuffer.powerEntry[i].readings == 0) {
-            powerBuffer.set(i);
+          if (powerBuffer.powerEntry[i].readings == 0) {  //
+            powerBuffer.set(i);                           // Add additional readings to the buffer.
             // SS2K_LOG(ERG_MODE_LOG_TAG, "powerBuffer.set(%d);", i);
             break;
           }
         }
-        if (powerBuffer.powerEntry[POWER_SAMPLES - 1].readings == 1) {
+        if (powerBuffer.powerEntry[POWER_SAMPLES - 1].readings == 1) {  // If buffer is full, create a new table entry and clear the buffer.
           // SS2K_LOG(ERG_MODE_LOG_TAG, "powerTable.newEntry(powerBuffer);");
           powerTable.newEntry(powerBuffer);
           powerTable.toLog();
           powerBuffer.reset();
         }
-      } else {
-        powerBuffer.reset();
+      } else { //Reading was outside the range - clear the buffer and start over.
+        powerBuffer.reset(); 
         // SS2K_LOG(ERG_MODE_LOG_TAG, "powerBuffer.reset();");
       }
     }
@@ -122,7 +122,8 @@ void PowerTable::newEntry(PowerBuffer powerBuffer) {
   int32_t targetPosition = tTargetPosition / POWER_SAMPLES;
 
   int i = round(watts / POWERTABLE_INCREMENT);
-  if (this->powerEntry[i].readings == 0) {
+
+  if (this->powerEntry[i].readings == 0) {  // if first reading in this entry
     this->powerEntry[i].watts          = watts;
     this->powerEntry[i].cad            = cad;
     this->powerEntry[i].targetPosition = targetPosition;
@@ -304,10 +305,7 @@ void ErgMode::computErg(int newSetPoint) {
   if (newSetPoint < 50) {
     newSetPoint = 50;
   }
-    bool isUserSpinning = this->_userIsSpinning(newCadance, currentIncline);
-  if (!isUserSpinning) {
-    return;
-  }
+
   bool isUserSpinning = this->_userIsSpinning(newCadance, currentIncline);
   if (!isUserSpinning) {
     return;
