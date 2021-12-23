@@ -338,6 +338,9 @@ void ErgMode::computErg(int newSetPoint) {
       this->setPoint = newSetPoint;
       this->cadence  = newCadance;
       this->cycles++;
+      while(rtConfig.getTargetIncline()!=rtConfig.getCurrentIncline()){ //wait while the knob moves to target position.
+        vTaskDelay(100 / portTICK_PERIOD_MS);
+      }
       return;
     }
   }
