@@ -51,7 +51,7 @@ void ergTaskLoop(void* pvParameters) {
       } else if (abs(powerBuffer.powerEntry[0].watts - rtConfig.getSimulatedWatts().value) < POWERTABLE_INCREMENT) {
         for (int i = 1; i < POWER_SAMPLES; i++) {
           if (powerBuffer.powerEntry[i].readings == 0) {
-            powerBuffer.set(i);                           // Add additional readings to the buffer.
+            powerBuffer.set(i);  // Add additional readings to the buffer.
             break;
           }
         }
@@ -68,7 +68,7 @@ void ergTaskLoop(void* pvParameters) {
     if (isInErgMode && (hasConnectedPowerMeter || simulationRunning)) {
       ergMode.computErg(newSetPoint);
     } else {
-      if (newSetPoint > 0) { //reset ERG state
+      if (newSetPoint > 0) {  // reset ERG state
         SS2K_LOG(ERG_MODE_LOG_TAG, "Resetting Target Watts to 0");
         rtConfig.setTargetWatts(0);
         rtConfig.setERGMode(false);
@@ -253,11 +253,14 @@ int32_t PowerTable::lookup(int watts, int cad) {
   // as higher resistance levels have a steeper slope (bigger increase in power/cad) than low resistance levels.
   float averageCAD = (below.cad + above.cad) / 2;
   float deltaCAD   = abs(averageCAD - cad);
-  if (cad > averageCAD) {  // cad is higher than the table so we need to target a lower wattage (and targetPosition)
-    watts -= (deltaCAD / 20) * 50;
-  }
-  if (cad < averageCAD) {  // cad is lower than the table so we need to target a higher wattage (and targetPosition)
-    watts += (deltaCAD / 20) * 50;
+
+  if (deltaCAD > 10) {
+    if (cad > averageCAD) {  // cad is higher than the table so we need to target a lower wattage (and targetPosition)
+      watts -= (deltaCAD / 20) * 50;
+    }
+    if (cad < averageCAD) {  // cad is lower than the table so we need to target a higher wattage (and targetPosition)
+      watts += (deltaCAD / 20) * 50;
+    }
   }
   // actual interpolation
   int32_t rTargetPosition = below.targetPosition + ((watts - below.power) / (above.power - below.power)) * (above.targetPosition - below.targetPosition);
@@ -335,7 +338,7 @@ void ErgMode::computErg(int newSetPoint) {
       this->setPoint = newSetPoint;
       this->cadence  = newCadance;
       this->cycles++;
-      while(rtConfig.getTargetIncline()!=rtConfig.getCurrentIncline()){ //wait while the knob moves to target position.
+      while (rtConfig.getTargetIncline() != rtConfig.getCurrentIncline()) {  // wait while the knob moves to target position.
         vTaskDelay(100 / portTICK_PERIOD_MS);
       }
       return;
