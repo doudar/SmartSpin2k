@@ -12,7 +12,7 @@
 #include <ArduinoJson.h>
 #include <SPIFFS.h>
 
-String RuntimeParameters::returnJSON() {
+String RuntimeParameters::returnJSON(bool includeDebugLog) {
   // Allocate a temporary JsonDocument
   // Don't forget to change the capacity to match your requirements.
   // Use arduinojson.org/assistant to compute the capacity.
@@ -33,6 +33,9 @@ String RuntimeParameters::returnJSON() {
   doc["ERGMode"]             = ERGMode;
   doc["shifterPosition"]     = shifterPosition;
   doc["foundDevices"]        = foundDevices;
+  if (includeDebugLog) {
+    doc["debug"] = DebugInfo::get_and_clear_logs();
+  }
 
   String output;
   serializeJson(doc, output);

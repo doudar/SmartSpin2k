@@ -271,7 +271,7 @@ void startHttpServer() {
 
   server.on("/runtimeConfigJSON", []() {
     String tString;
-    tString = rtConfig.returnJSON();
+    tString = rtConfig.returnJSON(!server.arg("includeDebugLog").isEmpty());
     server.send(200, "text/plain", tString);
   });
 
