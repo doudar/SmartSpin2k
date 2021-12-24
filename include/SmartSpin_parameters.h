@@ -86,7 +86,7 @@ class RuntimeParameters {
   void setFoundDevices(String fdev) { foundDevices = fdev; }
   const char* getFoundDevices() { return foundDevices.c_str(); }
 
-  String returnJSON();
+  String returnJSON(bool includeDebugLog = false);
 };
 
 class userParameters {
