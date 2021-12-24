@@ -68,27 +68,27 @@ void BLECommunications(void *pvParameters) {
                       pRemoteBLECharacteristic->getUUID(), (uint64_t)pRemoteBLECharacteristic->getRemoteService()->getClient()->getPeerAddress(), pData, length);
 
                   logBufLength += snprintf(logBuf + logBufLength, kLogBufMaxLength - logBufLength, " | %s[", sensorData->getId().c_str());
-                  if (sensorData->hasHeartRate() && !userConfig.getSimulateHr()) {
+                  if (sensorData->hasHeartRate() && !rtConfig.getSimulateHr()) {
                     int heartRate = sensorData->getHeartRate();
-                    userConfig.setSimulatedHr(heartRate);
+                    rtConfig.setSimulatedHr(heartRate);
                     spinBLEClient.connectedHR |= true;
                     logBufLength += snprintf(logBuf + logBufLength, kLogBufMaxLength - logBufLength, " HR(%d)", heartRate % 1000);
                   }
-                  if (sensorData->hasCadence() && !userConfig.getSimulateCad()) {
+                  if (sensorData->hasCadence() && !rtConfig.getSimulateCad()) {
                     float cadence = sensorData->getCadence();
-                    userConfig.setSimulatedCad(cadence);
+                    rtConfig.setSimulatedCad(cadence);
                     spinBLEClient.connectedCD |= true;
                     logBufLength += snprintf(logBuf + logBufLength, kLogBufMaxLength - logBufLength, " CD(%.2f)", fmodf(cadence, 1000.0));
                   }
-                  if (sensorData->hasPower() && !userConfig.getSimulateWatts()) {
+                  if (sensorData->hasPower() && !rtConfig.getSimulateWatts()) {
                     int power = sensorData->getPower() * userConfig.getPowerCorrectionFactor();
-                    userConfig.setSimulatedWatts(power);
+                    rtConfig.setSimulatedWatts(power);
                     spinBLEClient.connectedPM |= true;
                     logBufLength += snprintf(logBuf + logBufLength, kLogBufMaxLength - logBufLength, " PW(%d)", power % 10000);
                   }
                   if (sensorData->hasSpeed()) {
                     float speed = sensorData->getSpeed();
-                    userConfig.setSimulatedSpeed(speed);
+                    rtConfig.setSimulatedSpeed(speed);
                     logBufLength += snprintf(logBuf + logBufLength, kLogBufMaxLength - logBufLength, " SD(%.2f)", fmodf(speed, 1000.0));
                   }
                   strncat(logBuf + logBufLength, " ]", kLogBufMaxLength - logBufLength);
@@ -111,7 +111,7 @@ void BLECommunications(void *pvParameters) {
     }
 
     // ***********************************SERVER**************************************
-    if ((spinBLEClient.connectedHR || userConfig.getSimulateHr()) && !spinBLEClient.connectedPM && !userConfig.getSimulateWatts() && (userConfig.getSimulatedHr() > 0) &&
+    if ((spinBLEClient.connectedHR || rtConfig.getSimulateHr()) && !spinBLEClient.connectedPM && !rtConfig.getSimulateWatts() && (rtConfig.getSimulatedHr() > 0) &&
         userPWC.hr2Pwr) {
       calculateInstPwrFromHR();
       hr2p = true;
@@ -122,12 +122,12 @@ void BLECommunications(void *pvParameters) {
     calculateInstPwrFromHR();
 #endif  // DEBUG_HR_TO_PWR
 
-    if (!spinBLEClient.connectedPM && !hr2p && !userConfig.getSimulateWatts() && !userConfig.getSimulateCad()) {
-      userConfig.setSimulatedCad(0);
-      userConfig.setSimulatedWatts(0);
+    if (!spinBLEClient.connectedPM && !hr2p && !rtConfig.getSimulateWatts() && !rtConfig.getSimulateCad()) {
+      rtConfig.setSimulatedCad(0);
+      rtConfig.setSimulatedWatts(0);
     }
-    if (!spinBLEClient.connectedHR && !userConfig.getSimulateHr()) {
-      userConfig.setSimulatedHr(0);
+    if (!spinBLEClient.connectedHR && !rtConfig.getSimulateHr()) {
+      rtConfig.setSimulatedHr(0);
     }
 
     if (connectedClientCount() > 0) {
@@ -142,18 +142,15 @@ void BLECommunications(void *pvParameters) {
       }
 
       processFTMSWrite();
-      computeERG();
+      // computeERG();
 
       if (updateConnParametersFlag) {
         vTaskDelay(100 / portTICK_PERIOD_MS);
         BLEDevice::getServer()->updateConnParams(bleConnDesc, 20, 100, 0, 2000);
         updateConnParametersFlag = false;
       }
-    } else {
     }
-    if (connectedClientCount() == 0) {
-      digitalWrite(LED_PIN, LOW);  // blink if no client connected
-    }
+
     if (BLEDevice::getAdvertising()) {
       if (!(BLEDevice::getAdvertising()->isAdvertising()) && (BLEDevice::getServer()->getConnectedCount() < CONFIG_BT_NIMBLE_MAX_CONNECTIONS - NUM_BLE_DEVICES)) {
         SS2K_LOG(BLE_COMMON_LOG_TAG, "Starting Advertising From Communication Loop");
@@ -161,9 +158,18 @@ void BLECommunications(void *pvParameters) {
       }
     }
 
-    vTaskDelay((BLE_NOTIFY_DELAY / 2) / portTICK_PERIOD_MS);
-    digitalWrite(LED_PIN, HIGH);
-    vTaskDelay((BLE_NOTIFY_DELAY / 2) / portTICK_PERIOD_MS);
+    // blink if no client connected
+    if (connectedClientCount() == 0) {
+      if ((millis() / 500) % 2 == 0) {
+        digitalWrite(LED_PIN, LOW);
+      } else {
+        digitalWrite(LED_PIN, HIGH);
+      }
+    } else {
+      digitalWrite(LED_PIN, HIGH);
+    }
+
+    vTaskDelay((BLE_NOTIFY_DELAY) / portTICK_PERIOD_MS);
 #ifdef DEBUG_STACK
     Serial.printf("BLEComm: %d \n", uxTaskGetStackHighWaterMark(BLECommunicationTask));
 #endif  // DEBUG_STACK

@@ -7,6 +7,8 @@
 
 #pragma once
 
+#ifndef UNIT_TEST
+
 #include "sdkconfig.h"
 #include "esp_log.h"
 #include <stdio.h>
@@ -103,3 +105,6 @@ void ss2k_log_write(esp_log_level_t level, const char *format, ...);
 
 void ss2k_log_writev(esp_log_level_t level, const char *format, va_list args);
 
+#else
+
+#endif

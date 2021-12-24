@@ -172,16 +172,16 @@ void startHttpServer() {
   server.on("/hrslider", []() {
     String value = server.arg("value");
     if (value == "enable") {
-      userConfig.setSimulateHr(true);
+      rtConfig.setSimulateHr(true);
       server.send(200, "text/plain", "OK");
       SS2K_LOG(HTTP_SERVER_LOG_TAG, "HR Simulator turned on");
     } else if (value == "disable") {
-      userConfig.setSimulateHr(false);
+      rtConfig.setSimulateHr(false);
       server.send(200, "text/plain", "OK");
       SS2K_LOG(HTTP_SERVER_LOG_TAG, "HR Simulator turned off");
     } else {
-      userConfig.setSimulatedHr(value.toInt());
-      SS2K_LOG(HTTP_SERVER_LOG_TAG, "HR is now: %d", userConfig.getSimulatedHr());
+      rtConfig.setSimulatedHr(value.toInt());
+      SS2K_LOG(HTTP_SERVER_LOG_TAG, "HR is now: %d", rtConfig.getSimulatedHr());
       server.send(200, "text/plain", "OK");
     }
   });
@@ -189,16 +189,16 @@ void startHttpServer() {
   server.on("/wattsslider", []() {
     String value = server.arg("value");
     if (value == "enable") {
-      userConfig.setSimulateWatts(true);
+      rtConfig.setSimulateWatts(true);
       server.send(200, "text/plain", "OK");
       SS2K_LOG(HTTP_SERVER_LOG_TAG, "Watt Simulator turned on");
     } else if (value == "disable") {
-      userConfig.setSimulateWatts(false);
+      rtConfig.setSimulateWatts(false);
       server.send(200, "text/plain", "OK");
       SS2K_LOG(HTTP_SERVER_LOG_TAG, "Watt Simulator turned off");
     } else {
-      userConfig.setSimulatedWatts(value.toInt());
-      SS2K_LOG(HTTP_SERVER_LOG_TAG, "Watts are now: %d", userConfig.getSimulatedWatts());
+      rtConfig.setSimulatedWatts(value.toInt());
+      SS2K_LOG(HTTP_SERVER_LOG_TAG, "Watts are now: %d", rtConfig.getSimulatedWatts().value);
       server.send(200, "text/plain", "OK");
     }
   });
@@ -206,16 +206,46 @@ void startHttpServer() {
   server.on("/cadslider", []() {
     String value = server.arg("value");
     if (value == "enable") {
-      userConfig.setSimulateCad(true);
+      rtConfig.setSimulateCad(true);
       server.send(200, "text/plain", "OK");
       SS2K_LOG(HTTP_SERVER_LOG_TAG, "CAD Simulator turned on");
     } else if (value == "disable") {
-      userConfig.setSimulateCad(false);
+      rtConfig.setSimulateCad(false);
       server.send(200, "text/plain", "OK");
       SS2K_LOG(HTTP_SERVER_LOG_TAG, "CAD Simulator turned off");
     } else {
-      userConfig.setSimulatedCad(value.toInt());
-      SS2K_LOG(HTTP_SERVER_LOG_TAG, "CAD is now: %f", userConfig.getSimulatedCad());
+      rtConfig.setSimulatedCad(value.toInt());
+      SS2K_LOG(HTTP_SERVER_LOG_TAG, "CAD is now: %d", rtConfig.getSimulatedCad());
+      server.send(200, "text/plain", "OK");
+    }
+  });
+
+  server.on("/ergmode", []() {
+    String value = server.arg("value");
+    if (value == "enable") {
+      rtConfig.setERGMode(true);
+      server.send(200, "text/plain", "OK");
+      SS2K_LOG(HTTP_SERVER_LOG_TAG, "ERG Mode turned on");
+    } else {
+      rtConfig.setERGMode(false);
+      server.send(200, "text/plain", "OK");
+      SS2K_LOG(HTTP_SERVER_LOG_TAG, "ERG Mode turned off");
+    }
+  });
+
+  server.on("/targetwattsslider", []() {
+    String value = server.arg("value");
+    if (value == "enable") {
+      rtConfig.setSimulateTargetWatts(true);
+      server.send(200, "text/plain", "OK");
+      SS2K_LOG(HTTP_SERVER_LOG_TAG, "Target Watts Simulator turned on");
+    } else if (value == "disable") {
+      rtConfig.setSimulateTargetWatts(false);
+      server.send(200, "text/plain", "OK");
+      SS2K_LOG(HTTP_SERVER_LOG_TAG, "Target Watts Simulator turned off");
+    } else {
+      rtConfig.setTargetWatts(value.toInt());
+      SS2K_LOG(HTTP_SERVER_LOG_TAG, "Target Watts are now: %d", rtConfig.getTargetWatts());
       server.send(200, "text/plain", "OK");
     }
   });
@@ -223,11 +253,11 @@ void startHttpServer() {
   server.on("/shift", []() {
     int value = server.arg("value").toInt();
     if ((value > -10) && (value < 10)) {
-      userConfig.setShifterPosition(userConfig.getShifterPosition() + value);
+      rtConfig.setShifterPosition(rtConfig.getShifterPosition() + value);
       server.send(200, "text/plain", "OK");
       SS2K_LOG(HTTP_SERVER_LOG_TAG, "Shift From HTML");
     } else {
-      userConfig.setShifterPosition(value);
+      rtConfig.setShifterPosition(value);
       SS2K_LOG(HTTP_SERVER_LOG_TAG, "Invalid HTML Shift");
       server.send(200, "text/plain", "OK");
     }
@@ -236,6 +266,12 @@ void startHttpServer() {
   server.on("/configJSON", []() {
     String tString;
     tString = userConfig.returnJSON(!server.arg("includeDebugLog").isEmpty());
+    server.send(200, "text/plain", tString);
+  });
+
+  server.on("/runtimeConfigJSON", []() {
+    String tString;
+    tString = rtConfig.returnJSON(!server.arg("includeDebugLog").isEmpty());
     server.send(200, "text/plain", tString);
   });
 
@@ -268,6 +304,7 @@ void startHttpServer() {
         if (upload.filename == String("firmware.bin").c_str()) {
           if (upload.status == UPLOAD_FILE_START) {
             SS2K_LOG(HTTP_SERVER_LOG_TAG, "Update: %s", upload.filename.c_str());
+            stopTasks();
             if (!Update.begin(UPDATE_SIZE_UNKNOWN)) {  // start with max
                                                        // available size
               Update.printError(Serial);
@@ -423,7 +460,7 @@ void settingsProcessor() {
   }
   if (!server.arg("ERGSensitivity").isEmpty()) {
     float ERGSensitivity = server.arg("ERGSensitivity").toFloat();
-    if (ERGSensitivity >= .5 && ERGSensitivity <= 3) {
+    if (ERGSensitivity >= .5 && ERGSensitivity <= 20) {
       userConfig.setERGSensitivity(ERGSensitivity);
     }
   }

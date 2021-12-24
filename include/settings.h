@@ -122,7 +122,7 @@
 #define MAX_SCAN_RETRIES 1
 
 // loop speed for the SmartSpin2k BLE communications
-#define BLE_NOTIFY_DELAY 701
+#define BLE_NOTIFY_DELAY 700
 
 // loop speed for the SmartSpin2k BLE Client reconnect
 #define BLE_CLIENT_DELAY 1000
@@ -153,6 +153,17 @@
 
 // Max size of userconfig
 #define USERCONFIG_JSON_SIZE 768 + DEBUG_LOG_BUFFER_SIZE
+
+#define RUNTIMECONFIG_JSON_SIZE 512
+
+// Number of entries in the ERG Power Lookup Table
+#define POWERTABLE_SIZE 20
+
+// Size of increments (in watts) for the ERG Lookup Table. Needs to be one decimal place for proper calculations i.e. 50.0
+#define POWERTABLE_INCREMENT 50.0
+
+//Number of similar power samples to take before writing to the Power Table
+#define POWER_SAMPLES 5 
 
 // Uncomment to enable sending Telegram debug messages back to the chat
 // specified in telegram_token.h
