@@ -48,32 +48,29 @@ void ergTaskLoop(void* pvParameters) {
     if ((rtConfig.getSimulatedCad() > 50) && (rtConfig.getSimulatedWatts().value > 10) && (rtConfig.getSimulatedWatts().value < POWERTABLE_SIZE * POWERTABLE_INCREMENT)) {
       if (powerBuffer.powerEntry[0].readings == 0) {
         powerBuffer.set(0);  // Take Initial reading
-        // SS2K_LOG(ERG_MODE_LOG_TAG, "powerBuffer.set(0);");
       } else if (abs(powerBuffer.powerEntry[0].watts - rtConfig.getSimulatedWatts().value) < POWERTABLE_INCREMENT) {
         for (int i = 1; i < POWER_SAMPLES; i++) {
-          if (powerBuffer.powerEntry[i].readings == 0) {  //
+          if (powerBuffer.powerEntry[i].readings == 0) {
             powerBuffer.set(i);                           // Add additional readings to the buffer.
-            // SS2K_LOG(ERG_MODE_LOG_TAG, "powerBuffer.set(%d);", i);
             break;
           }
         }
         if (powerBuffer.powerEntry[POWER_SAMPLES - 1].readings == 1) {  // If buffer is full, create a new table entry and clear the buffer.
-          // SS2K_LOG(ERG_MODE_LOG_TAG, "powerTable.newEntry(powerBuffer);");
           powerTable.newEntry(powerBuffer);
           powerTable.toLog();
           powerBuffer.reset();
         }
       } else {  // Reading was outside the range - clear the buffer and start over.
         powerBuffer.reset();
-        // SS2K_LOG(ERG_MODE_LOG_TAG, "powerBuffer.reset();");
       }
     }
 
     if (isInErgMode && (hasConnectedPowerMeter || simulationRunning)) {
       ergMode.computErg(newSetPoint);
     } else {
-      if (newSetPoint > 0) {
-        SS2K_LOG(ERG_MODE_LOG_TAG, "ERG request but ERG off or no connected PM");
+      if (newSetPoint > 0) { //reset ERG state
+        SS2K_LOG(ERG_MODE_LOG_TAG, "Resetting Target Watts to 0");
+        rtConfig.setTargetWatts(0);
         rtConfig.setERGMode(false);
       }
     }
