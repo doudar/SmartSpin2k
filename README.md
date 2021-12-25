@@ -5,9 +5,9 @@ SS2K is an easy to build open source hardware and software project that lets you
 ### Documentaion
 Everything you need to know is in the [SS2k Wiki](https://github.com/doudar/SmartSpin2k/wiki)
 
-[_@eMadman's IC4 model](https://github.com/doudar/SmartSpin2k/tree/develop/Hardware/MODS/Case%20V2%20-%20Schwinn%20IC4%20Mod)
-
 <img src="Pictures/Schwinn_IC4_MOD.png" alt="Hardware 2.0"/> 
+
+[_^^@eMadman's IC4 model_](https://github.com/doudar/SmartSpin2k/tree/develop/Hardware/MODS/Case%20V2%20-%20Schwinn%20IC4%20Mod)
 
 ## Contributing
 1. Install Microsoft Visual Code. https://code.visualstudio.com/
