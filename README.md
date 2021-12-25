@@ -3,7 +3,7 @@
 SS2K is an easy to build open source project that lets you turn any Spin Bike into a Smart Trainer. Designed with the intent to be easy to manufacture, build one for yourself, build some for your friends, or setup a print farm and build them for everybody - we're an open community and welcome all levels of involvement!
 
 ### Documentaion
-Everything you need to know is in the [SS2k Wiki](https://github.com/doudar/SmartSpin2k/wiki)
+Everything you need to know is in the [SS2K Wiki](https://github.com/doudar/SmartSpin2k/wiki)
 
 <img src="Pictures/Schwinn_IC4_MOD.png" alt="Hardware 2.0"/> 
 
