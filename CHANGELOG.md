@@ -7,23 +7,36 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
-- image for wiki
+- Added Webpage for Shifting.
+- Added /shift server on backend.
+- Split userConfig into userConfig and rtConfig.
+- Added ERG testing to btsimulator.html
+- Broke out ERG computation into it's own task.
+- Added image for wiki.
 
 ### Changed
-- Increased hex head and nut size to 13mm.
-- Increased depth on Knob Cup 2mm so a thicker nut can be used. 
+- Adjusted the order of "Submit" "Reboot" and "Reset to Defaults" on the settings page. 
+- Adjusted the setting webpage so "reset to defaults" is harder to accidentally press. 
+- Increased the amount of free stack by removing the default Arduino loop();
+- Updated /shift server on to rtConfig.
+- Fixed redeclaring global targetposition in moveStepper().
+- Renamed Settings page "Submit" button to "Save Setting"
 
 ### Hardware
+- Increased hex head and nut size to 13mm.
+- Increased depth on Knob Cup 2mm so a thicker nut can be used. 
+- Added assembly .gif images.
+
 #### IC4 Mod
-- NEW: Hex bolt mod for 40t gear and matching ic4 cup/mount. This is a drop-in replacement for the plastic printed gear + cup/holder combination.  Adds a lot of strength
-- rename directory to something more apparent
-- Removed need for support material from case
-- thicker slide design.  Removes need for washers
+- NEW: Hex bolt mod for 40t gear and matching ic4 cup/mount. This is a drop-in replacement for the plastic printed gear + cup/holder combination. This adds a lot of strength
+- Renamed directory to something more apparent.
+- Removed need for support material from case.
+- Thicker slide design which removes need for washers.
 - Slightly shorter slide - should allow more flexibility for ss2k placement on IC4.
-- tighter tolerances on case and bike mount for slide fitting.  It should be a tight enough to prevent accidental removal
-- slightly larger diameter holes for m3 screws used in case assembly.  Screws should be much easier to insert
-- additional tolerance for m5 fitting
-- combined knob cup & knob insert for schwinn to reduce amount of plastic needed for the schwinn.
+- Tighter tolerances on case and bike mount for slide fitting. It should be a tight enough to prevent accidental removal
+- Slightly larger diameter holes for m3 screws used in case assembly. Screws should be much easier to insert
+- Additional tolerance for m5 fitting.
+- Combined knob cup & knob insert for schwinn to reduce amount of plastic needed for the schwinn.
 - Including a revised 11t stl - A bit more clearance on inner diameter the drive shaft on my steppers.
 
 ## [1.12.2]
@@ -37,7 +50,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Power Correction factor now minimum .5 maximum 2.5 and added checks to stay within limits. 
 - 404 now redirects to index file handler.
 - settings_processor now checks shiftsteps field to determine if it's on the main settings page.
-
 
 ## [1.11.24]
 

@@ -18,13 +18,20 @@ void process() {
     RUN_TEST(test.test_parses_cadence);
     RUN_TEST(test.test_parses_power);
   }
+
   // Cycle Power Tests
-  test_cyclePowerData test;
   {
+    test_cyclePowerData test;
     RUN_TEST(test.test_parses_power);
     RUN_TEST(test.test_parses_cadence);
     RUN_TEST(test.test_parses_heartrate);
     RUN_TEST(test.test_parses_speed);
+  }
+
+  // ERG Mode
+  {
+    TestPowerBuffer testPowerBuffer;
+    RUN_TEST(testPowerBuffer.set__should_set_values__expect_values_added_to_correct_index);
   }
   UNITY_END();
 }

@@ -17,6 +17,7 @@
 // Function Prototypes
 bool IRAM_ATTR deBounce();
 void IRAM_ATTR moveStepper(void* pvParameters);
+void IRAM_ATTR shifterCheck(void* pvParameters);
 void IRAM_ATTR shiftUp();
 void IRAM_ATTR shiftDown();
 void resetIfShiftersHeld();
@@ -26,13 +27,27 @@ void updateStepperPower();
 void updateStealthchop();
 void checkDriverTemperature();
 void motorStop(bool releaseTension = false);
+void startTasks();
+void stopTasks();
 
 // Main program variable that stores most everything
 extern userParameters userConfig;
-extern int32_t targetPosition;
-extern bool externalControl;
-extern bool syncMode;
+extern RuntimeParameters rtConfig;
+
+class SS2K {
+ public:
+  int32_t targetPosition;
+  bool externalControl;
+  bool syncMode;
+
+  SS2K() {
+    targetPosition  = 0;
+    externalControl = false;
+    syncMode        = false;
+  }
+};
 
 // Users Physical Working Capacity Calculation Parameters (heartrate to Power
 // calculation)
 extern physicalWorkingCapacity userPWC;
+extern SS2K ss2k;
