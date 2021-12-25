@@ -136,3 +136,57 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Removed
 - Deleted and ignored .pio folder which had been mistakenly committed.
+
+*1.3.21
+* SS2K BLE Server now accepts more than one simultaneous connection (you can not connect SS2K to both Zwift and another app simultaneously)
+* Echelon bike is now supported
+* SmartSpin2K.local more accessible with different browsers (fixed certain MDNS dropouts)
+* Flywheel bike support built in (still untested)
+* Backend (client) completely revamped to allow more device decoders, better stability, and faster network speeds.
+* Lots of FTMS server and client polishing
+* Added testing for decoders
+* Versioning now comes from releases
+* NimBLE library included
+* Increased total max connections to 6 devices
+* Refined debugging logs
+
+*1.2.15
+* Fixed BLE cadence when accumulated torque values are present
+* Lowered memory footprint
+ 
+*1.2.6
+* Added limited Telegram BLE debugging information for development. No sensitive information is sent back. I can make this telegram info available as a private group (in Telegram) if anyone is interested in seeing it. This was added because there are a couple BLE devices that don't seem to conform to the standard protocol and we need more information about them to get them to work properly. 
+* Internal web UI links now use IP address instead of the local DNS name for compatibility with certain routers. 
+* Added a favorite icon (favicon.ico) for browser compatibility.
+* Fixed an BLE bug which would occasionally cause a crash on scanning. 
+* Changed priority of subroutines and optimized task memory footprint. 
+* Streamlined the WiFi connect sequence.  
+
+*0.1.1.22
+* Power meter will now switch to the most recently connected and disconnect the other.
+* Double power option in the Bluetooth scanner webpage.
+* Bluetooth scanning now happens via a flag set in the client task.
+* Backend of the Bluetooth scanning page revamped.
+* Removed dedicated HTTP server callback for the Bluetooth scanner.
+
+*0.1.1.11
+* All metrics now zero when correct BLE !connected.
+* Added HR->PWR off/auto switch.
+* WiFi starts up faster.
+* BLE now connects device on save.
+* BLE Scans are less error prone.
+* MDNS Fix for certain android browsers.
+* and probably lots of other stuff. 
+
+*0.1.1.2 A new binary version is out in OTAUpdates. Units should automatically update to this newest version.
+
+* Changes:
+* WiFi Fallback to AP mode is now 10 seconds.
+* WiFi AP mode Fallback SSID is now device name (MDNS name), and the password is whatever you have set.
+* ERG Mode slightly more aggressive.
+* Stealthchop 2 now selectable in settings.
+* Holding both shifters at boot resets the unit to defaults and erases filesystem. (firmware remains intact)
+* Holding both shifters for 3 seconds after boot preforms a BLE device scan/reconnect.
+
+* Bugfixes:
+* Automatic Updates setting switch now works :)
