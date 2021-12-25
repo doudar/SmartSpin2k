@@ -5,8 +5,8 @@
   <style type="text/css">
     html {
       background-color: #03245c;
-    } 
-        </style>
+    }
+  </style>
   <title>SmartSpin2K Web Server</title>
   <meta name="viewport" content="width=device-width, initial-scale=1">
 </head>
@@ -17,7 +17,7 @@
     <p style="text-align: left;"><strong><a href="index.html">Main Index</a></strong></p>
     <h1 style="text-align: left;"><strong>Status</strong></h1>
     <h2>
-      <form action="requestConfigValues()">
+      <form>
         <table>
           <tbody>
             <tr>
@@ -26,9 +26,13 @@
               </td>
               <td><input type="text" id="ssid" name="ssid" value="loading" /></td>
               <td>
-                <p><label for="simulatedWatts">Watts</label></p>
+                <p><label for="simulatedWatts">Current Watts</label></p>
               </td>
               <td><input type="text" id="simulatedWatts" name="simulatedWatts" value="loading" /></td>
+              <td>
+                <p><label for="targetWatts">Target Watts</label></p>
+              </td>
+              <td><input type="text" id="targetWatts" name="targetWatts" value="loading" /></td>
             </tr>
             <tr>
               <td>
@@ -59,9 +63,13 @@
               <td><input type="text" id="shiftStep" name="shiftStep" value="loading" />
               </td>
               <td>
-                <p><label for="ssid">Incline</label></p>
+                <p><label for="ssid">Current Incline</label></p>
               </td>
-              <td><input type="text" id="incline" name="incline" value="loading" /></td>
+              <td><input type="text" id="currentIncline" name="currentIncline" value="loading" /></td>
+              <td>
+                <p><label for="ssid">Target Incline</label></p>
+              </td>
+              <td><input type="text" id="targetIncline" name="targetIncline" value="loading" /></td>
             </tr>
             <tr>
               <td>
@@ -92,7 +100,8 @@
           </tr>
           <tr>
             <td colspan="2">
-              <pre id="debug" name="debug" style="margin: 0;padding: 5;background-color:black;background-image:radial-gradient(rgba(0,150,0,0.75), black 120%);text-align: left;height:30vh;width:100%;resize:both;border:1px solid #ccc;color:white;font:1.3rem Inconsolata, monospace;overflow:auto;text-shadow: 0 0 4px #C8C8C8;">Loading</pre>
+              <pre id="debug" name="debug"
+                style="margin: 0;padding: 5;background-color:black;background-image:radial-gradient(rgba(0,150,0,0.75), black 120%);text-align: left;height:30vh;width:100%;resize:both;border:1px solid #ccc;color:white;font:1.3rem Inconsolata, monospace;overflow:auto;text-shadow: 0 0 4px #C8C8C8;">Loading</pre>
             </td>
           </tr>
         </tbody>
@@ -107,7 +116,7 @@
   var followElement = document.getElementById("follow");
   var updatePending = false;
   var updateTimer = undefined;
-  
+
   function onVisibilityChanged() {
     if (document.hidden || document.mozHidden || document.webkitHidden || document.msHidden) {
       stopUpdate();
@@ -125,7 +134,7 @@
     //Update values on specified interval loading late because this tiny webserver hates frequent requests
     if (updateTimer === undefined) {
       updateTimer = setInterval(function () {
-        requestConfigValues();
+        requestRuntimeValues();
       }, 1500);
     }
   }
@@ -154,11 +163,29 @@
           document.getElementById("deviceName").value = obj.deviceName;
           document.getElementById("shiftStep").value = obj.shiftStep;
           document.getElementById("inclineMultiplier").value = obj.inclineMultiplier;
-          document.getElementById("incline").value = obj.incline;
+          //--- document.getElementById("ERGSensitivity").value = obj.ERGSensitivity; ---//
+          document.getElementById("connectedPowerMeter").value = obj.connectedPowerMeter;
+        }
+      };
+      xhttp.open("GET", "/configJSON?includeDebugLog=true", true);
+      xhttp.send();
+    }
+  }
+
+  function requestRuntimeValues() {
+    if (!updatePending) {
+      updatePending = true
+      var xhttp = new XMLHttpRequest();
+      xhttp.onreadystatechange = function () {
+        updatePending = false;
+        if (this.readyState == 4 && this.status == 200) {
+          var obj = JSON.parse(this.responseText);
+          document.getElementById("currentIncline").value = obj.currentIncline;
+          document.getElementById("targetIncline").value = obj.targetIncline;
           document.getElementById("simulatedHr").value = obj.simulatedHr;
           document.getElementById("simulatedWatts").value = obj.simulatedWatts;
+          document.getElementById("targetWatts").value = obj.targetWatts;
           document.getElementById("simulatedCad").value = obj.simulatedCad;
-          document.getElementById("connectedPowerMeter").value = obj.connectedPowerMeter;
           if (debugElement.innerHTML == "Loading") {
             document.getElementById("debug").innerHTML = obj.debug;
           } else {
@@ -167,7 +194,7 @@
           updateDebugView(obj.debug);
         }
       };
-      xhttp.open("GET", "/configJSON?includeDebugLog=true", true);
+      xhttp.open("GET", "/runtimeConfigJSON?includeDebugLog=true", true);
       xhttp.send();
     }
   }
@@ -184,6 +211,8 @@
   //Delay loading css to not swamp webserver
   window.addEventListener('load', function () {
     setTimeout(loadCss, 100);
+    requestConfigValues();
+    requestRuntimeValues();
     startUpdate();
   }, false);
 </script>
