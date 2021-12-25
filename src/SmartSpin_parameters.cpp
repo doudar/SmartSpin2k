@@ -33,6 +33,8 @@ String RuntimeParameters::returnJSON(bool includeDebugLog) {
   doc["ERGMode"]             = ERGMode;
   doc["shifterPosition"]     = shifterPosition;
   doc["foundDevices"]        = foundDevices;
+  doc["minStep"]             = minStep;
+  doc["maxStep"]             = maxStep;
   if (includeDebugLog) {
     doc["debug"] = DebugInfo::get_and_clear_logs();
   }
@@ -57,6 +59,7 @@ void userParameters::setDefaults() {  // Move these to set the values as #define
   password              = DEFAULT_PASSWORD;
   connectedPowerMeter   = CONNECTED_POWER_METER;
   connectedHeartMonitor = CONNECTED_HEART_MONITOR;
+  maxWatts              = DEFAULT_MAX_WATTS;
 }
 
 //---------------------------------------------------------------------------------
@@ -83,6 +86,7 @@ String userParameters::returnJSON(bool includeDebugLog) {
   doc["password"]              = password;
   doc["connectedPowerMeter"]   = connectedPowerMeter;
   doc["connectedHeartMonitor"] = connectedHeartMonitor;
+  doc["maxWatts"]              = maxWatts;
   if (includeDebugLog) {
     doc["debug"] = DebugInfo::get_and_clear_logs();
   }
@@ -126,6 +130,7 @@ void userParameters::saveToSPIFFS() {
   // currently in keeping this boot to boot
   doc["connectedPowerMeter"]   = connectedPowerMeter;
   doc["connectedHeartMonitor"] = connectedHeartMonitor;
+  doc["maxWatts"]              = maxWatts;
 
   // Serialize JSON to file
   if (serializeJson(doc, file) == 0) {

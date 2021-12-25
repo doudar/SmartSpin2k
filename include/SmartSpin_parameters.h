@@ -41,6 +41,8 @@ class RuntimeParameters {
   bool simulateCad           = false;
   bool ERGMode               = false;
   int shifterPosition        = 0;
+  int minStep                = -200000000;
+  int maxStep                = 200000000;
   String foundDevices        = " ";
 
  public:
@@ -83,6 +85,12 @@ class RuntimeParameters {
   void setShifterPosition(int sp) { shifterPosition = sp; }
   int getShifterPosition() { return shifterPosition; }
 
+  void setMinStep(int ms) { minStep = ms; }
+  int getMinStep() { return minStep; }
+
+  void setMaxStep(int ms) { maxStep = ms; }
+  int getMaxStep() { return maxStep; }
+
   void setFoundDevices(String fdev) { foundDevices = fdev; }
   const char* getFoundDevices() { return foundDevices.c_str(); }
 
@@ -100,6 +108,7 @@ class userParameters {
   float ERGSensitivity;
   bool autoUpdate;
   int stepperPower;
+  int maxWatts;
   String ssid;
   String password;
   String connectedPowerMeter   = "any";
@@ -119,6 +128,7 @@ class userParameters {
   const char* getconnectedPowerMeter() { return connectedPowerMeter.c_str(); }
   const char* getconnectedHeartMonitor() { return connectedHeartMonitor.c_str(); }
   int getStepperPower() { return stepperPower; }
+  int getMaxWatts() { return maxWatts; }
 
   void setDefaults();
   void setFirmwareUpdateURL(String fURL) { firmwareUpdateURL = fURL; }
@@ -134,6 +144,7 @@ class userParameters {
   void setConnectedPowerMeter(String cpm) { connectedPowerMeter = cpm; }
   void setConnectedHeartMonitor(String cHr) { connectedHeartMonitor = cHr; }
   void setStepperPower(int sp) { stepperPower = sp; }
+  void setMaxWatts(int maxW) { maxWatts = maxW; }
 
   String returnJSON(bool includeDebugLog = false);
   void saveToSPIFFS();
