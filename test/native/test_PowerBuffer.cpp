@@ -6,6 +6,7 @@
  */
 
 #include <unity.h>
+#include <task.h>
 #include "test.h"
 #include "ERG_Mode.h"
 
