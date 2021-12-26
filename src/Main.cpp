@@ -147,7 +147,6 @@ void setup() {
                           1,                      /* priority of the task */
                           &shifterCheckTask,      /* Task handle to keep track of created task */
                           1);                     /* pin task to core 0 */
-
 }
 
 void loop() {  // Delete this task so we can make one that's more memory efficient.
@@ -159,17 +158,16 @@ void shifterCheck(void *pvParameters) {
   while (true) {
     vTaskDelay(200 / portTICK_RATE_MS);
 
-  if (rtConfig.getShifterPosition() > lastShifterPosition) {
-    SS2K_LOG(MAIN_LOG_TAG, "Shift UP: %l", rtConfig.getShifterPosition());
-    Serial.println(ss2k.targetPosition);
-    spinBLEServer.notifyShift(1);
-  } else if (rtConfig.getShifterPosition() < lastShifterPosition) {
-    SS2K_LOG(MAIN_LOG_TAG, "Shift DOWN: %l", rtConfig.getShifterPosition());
-    Serial.println(ss2k.targetPosition);
-    spinBLEServer.notifyShift(0);
-  }
-  lastShifterPosition = rtConfig.getShifterPosition();
-
+    if (rtConfig.getShifterPosition() > lastShifterPosition) {
+      SS2K_LOG(MAIN_LOG_TAG, "Shift UP: %l", rtConfig.getShifterPosition());
+      Serial.println(ss2k.targetPosition);
+      spinBLEServer.notifyShift(1);
+    } else if (rtConfig.getShifterPosition() < lastShifterPosition) {
+      SS2K_LOG(MAIN_LOG_TAG, "Shift DOWN: %l", rtConfig.getShifterPosition());
+      Serial.println(ss2k.targetPosition);
+      spinBLEServer.notifyShift(0);
+    }
+    lastShifterPosition = rtConfig.getShifterPosition();
 
     if (loopCounter > 4) {
       scanIfShiftersHeld();
@@ -194,8 +192,8 @@ void moveStepper(void *pvParameters) {
   stepper->setDirectionPin(DIR_PIN);
   stepper->setEnablePin(ENABLE_PIN);
   stepper->setAutoEnable(true);
-  stepper->setSpeedInHz(STEPPER_MAX_SPEED);        // 500 steps/s
-  stepper->setAcceleration(STEPPER_ACCELERATION);  // 100 steps/s²
+  stepper->setSpeedInHz(STEPPER_SPEED);
+  stepper->setAcceleration(STEPPER_ACCELERATION);
   stepper->setDelayToDisable(1000);
 
   while (1) {
@@ -205,6 +203,7 @@ void moveStepper(void *pvParameters) {
         if (rtConfig.getERGMode()) {
           // ERG Mode
           // Shifter not used.
+          stepper->setSpeedInHz(STEPPER_ERG_SPEED);
           ss2k.targetPosition = rtConfig.getTargetIncline();
         } else {
           // Simulation Mode
@@ -218,9 +217,12 @@ void moveStepper(void *pvParameters) {
         stepper->setCurrentPosition(ss2k.targetPosition);
         vTaskDelay(100 / portTICK_PERIOD_MS);
       }
-      stepper->moveTo(ss2k.targetPosition);
+      if (ss2k.targetPosition > rtConfig.getMinStep()) {
+        stepper->moveTo(ss2k.targetPosition);
+      } else { //Limit Stepper to Minimum Position
+        stepper->moveTo(rtConfig.getMinStep());
+      }
       vTaskDelay(100 / portTICK_PERIOD_MS);
-
       rtConfig.setCurrentIncline((float)stepper->getCurrentPosition());
 
       if (connectedClientCount() > 0) {

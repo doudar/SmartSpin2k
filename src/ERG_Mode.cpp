@@ -132,6 +132,10 @@ void PowerTable::newEntry(PowerBuffer powerBuffer) {
 
   int i = round(watts / POWERTABLE_INCREMENT);
 
+  if (i == 1) { //set the minimum resistance level of the trainer.
+    rtConfig.setMinStep(this->powerEntry[i].targetPosition);
+  }
+
   if (this->powerEntry[i].readings == 0) {  // if first reading in this entry
     this->powerEntry[i].watts          = watts;
     this->powerEntry[i].cad            = cad;
@@ -308,9 +312,9 @@ void PowerTable::toLog() {
 void ErgMode::computErg(int newSetPoint) {
   Measurement newWatts = rtConfig.getSimulatedWatts();
   float currentIncline = rtConfig.getCurrentIncline();
-  int newCadance       = rtConfig.getSimulatedCad();
+  int newCadence       = rtConfig.getSimulatedCad();
   int wattChange       = newSetPoint - newWatts.value;  // setpoint_form_trainer - current_power => Amount to increase or decrease incline
-  float diviation      = ((float)wattChange * 100.0) / ((float)newSetPoint);
+  float deviation      = ((float)wattChange * 100.0) / ((float)newSetPoint);
 
   if (watts.timestamp == newWatts.timestamp && this->setPoint == newSetPoint) {
     return;  // no new power measurement.
@@ -321,7 +325,7 @@ void ErgMode::computErg(int newSetPoint) {
     newSetPoint = 50;
   }
 
-  bool isUserSpinning = this->_userIsSpinning(newCadance, currentIncline);
+  bool isUserSpinning = this->_userIsSpinning(newCadence, currentIncline);
   if (!isUserSpinning) {
     return;
   }
@@ -329,14 +333,14 @@ void ErgMode::computErg(int newSetPoint) {
   // reset cycle counter to start new erg calculation cycle
   if (this->setPoint != newSetPoint) {
     this->cycles        = 0;
-    int32_t tableResult = powerTable.lookup(newSetPoint, newCadance);
+    int32_t tableResult = powerTable.lookup(newSetPoint, newCadence);
     if (tableResult != -99) {
       SS2K_LOG(ERG_MODE_LOG_TAG, "Using PowerTable Result %d", tableResult);
       rtConfig.setTargetIncline(tableResult);
       // store for next cycle for timestamp and value compare
       this->watts    = newWatts;
       this->setPoint = newSetPoint;
-      this->cadence  = newCadance;
+      this->cadence  = newCadence;
       this->cycles++;
       while (rtConfig.getTargetIncline() != rtConfig.getCurrentIncline()) {  // wait while the knob moves to target position.
         vTaskDelay(100 / portTICK_PERIOD_MS);
@@ -345,21 +349,21 @@ void ErgMode::computErg(int newSetPoint) {
     }
   }
 
-  float factor     = abs(diviation) > 10 ? userConfig.getERGSensitivity() : userConfig.getERGSensitivity() / 2;
+  float factor     = abs(deviation) > 10 ? userConfig.getERGSensitivity() : userConfig.getERGSensitivity() / 2;
   float newIncline = currentIncline + (wattChange * factor);
 
   rtConfig.setTargetIncline(newIncline);
-  _writeLog(this->cycles, currentIncline, newIncline, setPoint, newSetPoint, this->watts.value, newWatts.value, this->cadence, newCadance);
+  _writeLog(this->cycles, currentIncline, newIncline, setPoint, newSetPoint, this->watts.value, newWatts.value, this->cadence, newCadence);
 
   // store for next cycle for timestamp and value compare
   this->watts    = newWatts;
   this->setPoint = newSetPoint;
-  this->cadence  = newCadance;
+  this->cadence  = newCadence;
   this->cycles++;
 }
 
-bool ErgMode::_userIsSpinning(int cadance, float incline) {
-  if (cadance <= 20) {
+bool ErgMode::_userIsSpinning(int cadence, float incline) {
+  if (cadence <= 20) {
     if (!this->engineStopped) {                              // Test so motor stop command only happens once.
       motorStop();                                           // release tension
       rtConfig.setTargetIncline(incline - WATTS_PER_SHIFT);  // release incline
