@@ -442,10 +442,9 @@ void processFTMSWrite() {
     SS2K_LOG(BLE_SERVER_LOG_TAG, "%s", logBuf);
     fitnessMachineStatusCharacteristic->notify();
   } else {
-    SS2K_LOG(BLE_SERVER_LOG_TAG, "App wrote nothing ");
-    SS2K_LOG(BLE_SERVER_LOG_TAG, "assuming it's a Control request");
+   //SS2K_LOG(BLE_SERVER_LOG_TAG, "App wrote nothing ");
+   //SS2K_LOG(BLE_SERVER_LOG_TAG, "assuming it's a Control request");
     uint8_t controlPoint[3] = {0x80, 0x00, 0x01};
-    // userConfig.setERGMode(true);
     pCharacteristic->setValue(controlPoint, 3);
     ftmsTrainingStatus[1] = 0x01;
     fitnessMachineTrainingStatus->setValue(ftmsTrainingStatus, 2);

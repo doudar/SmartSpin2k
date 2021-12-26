@@ -30,7 +30,7 @@ class ErgMode {
   bool initialized    = false;
   int setPoint        = 0;
   int cycles          = 0;
-  int offsetMuliplier = 0;
+  int offsetMultiplier = 0;
   Measurement watts   = Measurement(0);
   int cadence         = 0;
 

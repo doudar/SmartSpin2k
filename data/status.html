@@ -167,7 +167,7 @@
           document.getElementById("connectedPowerMeter").value = obj.connectedPowerMeter;
         }
       };
-      xhttp.open("GET", "/configJSON?includeDebugLog=true", true);
+      xhttp.open("GET", "/configJSON?includeDebugLog=true", false);
       xhttp.send();
     }
   }

@@ -45,10 +45,10 @@ void ergTaskLoop(void* pvParameters) {
     hasConnectedPowerMeter = spinBLEClient.connectedPM;
     simulationRunning      = rtConfig.getSimulateTargetWatts();
 
-    if ((rtConfig.getSimulatedCad() > 50) && (rtConfig.getSimulatedWatts().value > 10) && (rtConfig.getSimulatedWatts().value < POWERTABLE_SIZE * POWERTABLE_INCREMENT)) {
+    if ((rtConfig.getSimulatedCad() > 70) && (rtConfig.getSimulatedCad() < 100) && (rtConfig.getSimulatedWatts().value > 10) && (rtConfig.getSimulatedWatts().value < POWERTABLE_SIZE * POWERTABLE_INCREMENT)) {
       if (powerBuffer.powerEntry[0].readings == 0) {
         powerBuffer.set(0);  // Take Initial reading
-      } else if (abs(powerBuffer.powerEntry[0].watts - rtConfig.getSimulatedWatts().value) < POWERTABLE_INCREMENT) {
+      } else if (abs(powerBuffer.powerEntry[0].watts - rtConfig.getSimulatedWatts().value) < (POWERTABLE_INCREMENT/2)) {
         for (int i = 1; i < POWER_SAMPLES; i++) {
           if (powerBuffer.powerEntry[i].readings == 0) {
             powerBuffer.set(i);  // Add additional readings to the buffer.
@@ -280,25 +280,33 @@ bool PowerTable::save() {
 
 // Display power table in log
 void PowerTable::toLog() {
-  char buffer[8];  // add code here to truncate the uint32_t value for display. Or change the value system wide to be a regular int since we probaby dont need that much anymore.
-  String oString = "";
-  int n;
-  char oFormat[5] = "|%6d";
+  int len = 4;
+  for (int i = 0; i < POWERTABLE_SIZE; i++) {  // Find the longest integer in the table
+    int l = snprintf(nullptr, 0, "%d", this->powerEntry[i].targetPosition);
+    if (len < l) {
+      len = l;
+    }
+  }
+  char buffer[len +
+              2];  // add code here to truncate the uint32_t value for display. Or change the value system wide to be a regular int since we probaby dont need that much anymore.
+  String oString  = "";
+  char oFormat[5] = "";
+  sprintf(oFormat, "|%%%dd", len);
 
   for (int i = 0; i < POWERTABLE_SIZE; i++) {
-    n = sprintf(buffer, oFormat, this->powerEntry[i].watts);
+    sprintf(buffer, oFormat, this->powerEntry[i].watts);
     oString += buffer;
   }
   SS2K_LOG(POWERTABLE_LOG_TAG, "%s|", oString.c_str());
   oString = "";
   for (int i = 0; i < POWERTABLE_SIZE; i++) {
-    n = sprintf(buffer, oFormat, this->powerEntry[i].cad);
+    sprintf(buffer, oFormat, this->powerEntry[i].cad);
     oString += buffer;
   }
   SS2K_LOG(POWERTABLE_LOG_TAG, "%s|", oString.c_str());
   oString = "";
   for (int i = 0; i < POWERTABLE_SIZE; i++) {
-    n = sprintf(buffer, oFormat, this->powerEntry[i].targetPosition);
+    sprintf(buffer, oFormat, this->powerEntry[i].targetPosition);
     oString += buffer;
   }
   SS2K_LOG(POWERTABLE_LOG_TAG, "%s|", oString.c_str());
@@ -341,6 +349,7 @@ void ErgMode::computErg(int newSetPoint) {
       while (rtConfig.getTargetIncline() != rtConfig.getCurrentIncline()) {  // wait while the knob moves to target position.
         vTaskDelay(100 / portTICK_PERIOD_MS);
       }
+      vTaskDelay(700 / portTICK_PERIOD_MS); // Wait for power meter to register new power
       return;
     }
   }
