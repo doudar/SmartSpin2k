@@ -13,6 +13,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Added ERG testing to btsimulator.html
 - Broke out ERG computation into it's own task.
 - Added image for wiki.
+- Added 2 in 1 shifter housing with improved tactile feedback in MODS folder
 
 ### Changed
 - Adjusted the order of "Submit" "Reboot" and "Reset to Defaults" on the settings page. 
