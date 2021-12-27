@@ -10,7 +10,7 @@ Fusion 360 exports and generic STEP files are both provided
 
 
 ## Assembly
-- Extra care must be taken when soldering since the orientation of the wires makes a different - You must decide up front whether you want the cables to exit  towards the rear or towards the front and wire the left/right channels.  Before cutting the RCA ends of the cable, plug the shifter into your assembled SS2k and short the red audio connector with a paperclip or screwdriver.  Make note of the direction this turns the knob and wire your shifters accordingly.
+- Extra care must be taken when soldering since the orientation of the wires makes a difference. You must decide up front whether you want the cables to exit  towards the rear or towards the front and wire the left/right channels.  Before cutting the RCA ends of the cable, plug the shifter into your assembled SS2k and short the red audio connector with a paperclip or screwdriver.  Make note of the direction this turns the knob and wire your shifters accordingly.
 - In case you need to flip the orientation of the strap on your bike, you can swap the outer pins on the shifter connector where it attatches to the PCB.  These control the left/right signal from the cable.
 
 ## BOM
