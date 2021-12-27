@@ -203,27 +203,27 @@ int32_t PowerTable::lookup(int watts, int cad) {
       if ((i - x <= 0) || (i + x >= POWERTABLE_SIZE)) {
         SS2K_LOG(ERG_MODE_LOG_TAG, "No pair found in powertable.");
         indexPair = -1;
-        break;
+        return(RETURN_ERROR);
       }
     }
   } else if (scale < 0) {  // select the paired element (preferably) below the entry for interpolation
     for (int x = 1; x < POWERTABLE_SIZE; x++) {
-      if (i - x < POWERTABLE_SIZE) {
+      if (i + x < POWERTABLE_SIZE) {
         if (this->powerEntry[i + x].readings > 0) {
-          indexPair = i - x;
+          indexPair = i + x;
           break;
         }
       }
-      if (i + x >= 0) {
+      if (i - x >= 0) {
         if (this->powerEntry[i - x].readings > 0) {
-          indexPair = i + x;
+          indexPair = i - x;
           break;
         }
       }
       if ((i - x <= 0) || (i + x >= POWERTABLE_SIZE)) {
         SS2K_LOG(ERG_MODE_LOG_TAG, "No pair found in powertable.");
         indexPair = -1;
-        break;
+        return(RETURN_ERROR);
       }
     }
   }
