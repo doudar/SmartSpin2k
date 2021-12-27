@@ -207,7 +207,7 @@ void physicalWorkingCapacity::setDefaults() {
   session1Pwr = 100;
   session2HR  = 154;
   session2Pwr = 150;
-  hr2Pwr      = true;
+  hr2Pwr      = false;
 }
 
 //-- return all config as one a single JSON string

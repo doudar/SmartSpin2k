@@ -254,7 +254,7 @@ int32_t PowerTable::lookup(int watts, int cad) {
   float averageCAD = (below.cad + above.cad) / 2;
   float deltaCAD   = abs(averageCAD - cad);
 
-  if (deltaCAD > 10) {
+  if (deltaCAD > 5) {
     if (cad > averageCAD) {  // cad is higher than the table so we need to target a lower wattage (and targetPosition)
       watts -= (deltaCAD / 20) * 50;
     }

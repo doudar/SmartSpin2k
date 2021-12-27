@@ -167,7 +167,7 @@
           document.getElementById("connectedPowerMeter").value = obj.connectedPowerMeter;
         }
       };
-      xhttp.open("GET", "/configJSON?includeDebugLog=true", false);
+      xhttp.open("GET", "/configJSON?includeDebugLog=false", true);
       xhttp.send();
     }
   }
@@ -186,12 +186,14 @@
           document.getElementById("simulatedWatts").value = obj.simulatedWatts;
           document.getElementById("targetWatts").value = obj.targetWatts;
           document.getElementById("simulatedCad").value = obj.simulatedCad;
-          if (debugElement.innerHTML == "Loading") {
-            document.getElementById("debug").innerHTML = obj.debug;
-          } else {
-            document.getElementById("debug").innerHTML += obj.debug;
+          if (obj.debug != null) {
+            if (debugElement.innerHTML == "Loading") {
+              document.getElementById("debug").innerHTML = obj.debug;
+            } else {
+              document.getElementById("debug").innerHTML += obj.debug;
+            }
+            updateDebugView(obj.debug);
           }
-          updateDebugView(obj.debug);
         }
       };
       xhttp.open("GET", "/runtimeConfigJSON?includeDebugLog=true", true);
