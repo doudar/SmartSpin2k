@@ -131,8 +131,8 @@ class userParameters {
   const char* getconnectedHeartMonitor() { return connectedHeartMonitor.c_str(); }
   int getStepperPower() { return stepperPower; }
   int getMaxWatts() { return maxWatts; }
-  bool stepperDir() { return stepperDir;}
-  bool shifterDir() { return shifterDir;}
+  bool getStepperDir() { return stepperDir;}
+  bool getShifterDir() { return shifterDir;}
 
   void setDefaults();
   void setFirmwareUpdateURL(String fURL) { firmwareUpdateURL = fURL; }

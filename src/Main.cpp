@@ -233,7 +233,7 @@ void moveStepper(void *pvParameters) {
       } else {
         stepper->setAutoEnable(true);  // disable output FETs between moves so stepper can cool. Can still shift.
       }
-      if (_stepperDir != userConfig.getStepperDir();) { //User changed the config direction of the stepper wires 
+      if (_stepperDir != userConfig.getStepperDir()) { //User changed the config direction of the stepper wires 
         _stepperDir = userConfig.getStepperDir();
         while (stepper->isMotorRunning()) {
           vTaskDelay(100 / portTICK_PERIOD_MS);
