@@ -7,6 +7,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+- 
+
+### Changed
+- 
+
+### Hardware
+- 
+
+#### IC4 Mod
+- 
+
+## [1.12.26]
+
+### Added
 - Added Webpage for Shifting.
 - Added /shift server on backend.
 - Split userConfig into userConfig and rtConfig.
