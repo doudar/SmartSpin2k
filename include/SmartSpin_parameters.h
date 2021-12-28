@@ -109,6 +109,8 @@ class userParameters {
   bool autoUpdate;
   int stepperPower;
   int maxWatts;
+  bool stepperDir;
+  bool shifterDir;
   String ssid;
   String password;
   String connectedPowerMeter   = "any";
@@ -129,6 +131,8 @@ class userParameters {
   const char* getconnectedHeartMonitor() { return connectedHeartMonitor.c_str(); }
   int getStepperPower() { return stepperPower; }
   int getMaxWatts() { return maxWatts; }
+  bool stepperDir() { return stepperDir;}
+  bool shifterDir() { return shifterDir;}
 
   void setDefaults();
   void setFirmwareUpdateURL(String fURL) { firmwareUpdateURL = fURL; }
@@ -145,6 +149,8 @@ class userParameters {
   void setConnectedHeartMonitor(String cHr) { connectedHeartMonitor = cHr; }
   void setStepperPower(int sp) { stepperPower = sp; }
   void setMaxWatts(int maxW) { maxWatts = maxW; }
+  void setStepperDir(bool sd) { stepperDir = sd; }
+  void setShifterDir(bool sd) { shifterDir = sd; }
 
   String returnJSON(bool includeDebugLog = false);
   void saveToSPIFFS();

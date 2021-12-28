@@ -45,8 +45,7 @@ String RuntimeParameters::returnJSON(bool includeDebugLog) {
 }
 
 // Default Values
-void userParameters::setDefaults() {  // Move these to set the values as #define
-                                      // in main.h
+void userParameters::setDefaults() {
   firmwareUpdateURL     = FW_UPDATEURL;
   deviceName            = DEVICE_NAME;
   shiftStep             = 600;
@@ -60,6 +59,8 @@ void userParameters::setDefaults() {  // Move these to set the values as #define
   connectedPowerMeter   = CONNECTED_POWER_METER;
   connectedHeartMonitor = CONNECTED_HEART_MONITOR;
   maxWatts              = DEFAULT_MAX_WATTS;
+  stepperDir            = true; 
+  shifterDir            = true;
 }
 
 //---------------------------------------------------------------------------------
@@ -76,7 +77,6 @@ String userParameters::returnJSON(bool includeDebugLog) {
   doc["deviceName"]        = deviceName;
   doc["shiftStep"]         = shiftStep;
   doc["stepperPower"]      = stepperPower;
-
   doc["stealthchop"]           = stealthchop;
   doc["inclineMultiplier"]     = inclineMultiplier;
   doc["powerCorrectionFactor"] = powerCorrectionFactor;
@@ -87,6 +87,9 @@ String userParameters::returnJSON(bool includeDebugLog) {
   doc["connectedPowerMeter"]   = connectedPowerMeter;
   doc["connectedHeartMonitor"] = connectedHeartMonitor;
   doc["maxWatts"]              = maxWatts;
+  doc["shifterDir"]            = shifterDir;
+  doc["stepperDir"]            = shifterDir;
+
   if (includeDebugLog) {
     doc["debug"] = DebugInfo::get_and_clear_logs();
   }
@@ -127,10 +130,11 @@ void userParameters::saveToSPIFFS() {
   doc["autoUpdate"]            = autoUpdate;
   doc["ssid"]                  = ssid;
   doc["password"]              = password;
-  // currently in keeping this boot to boot
   doc["connectedPowerMeter"]   = connectedPowerMeter;
   doc["connectedHeartMonitor"] = connectedHeartMonitor;
   doc["maxWatts"]              = maxWatts;
+  doc["shifterDir"]            = shifterDir;
+  doc["stepperDir"]            = shifterDir;
 
   // Serialize JSON to file
   if (serializeJson(doc, file) == 0) {

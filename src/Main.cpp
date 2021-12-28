@@ -128,7 +128,7 @@ void setup() {
   // Check for firmware update. It's important that this stays before BLE &
   // HTTP setup because otherwise they use too much traffic and the device
   // fails to update which really sucks when it corrupts your settings.
-  
+
   FirmwareUpdate();
 
   startTasks();
@@ -189,8 +189,9 @@ void shifterCheck(void *pvParameters) {
 
 void moveStepper(void *pvParameters) {
   engine.init();
-  stepper = engine.stepperConnectToPin(STEP_PIN);
-  stepper->setDirectionPin(DIR_PIN);
+  bool _stepperDir = userConfig.getStepperDir();
+  stepper          = engine.stepperConnectToPin(STEP_PIN);
+  stepper->setDirectionPin(DIR_PIN, _stepperDir);
   stepper->setEnablePin(ENABLE_PIN);
   stepper->setAutoEnable(true);
   stepper->setSpeedInHz(STEPPER_SPEED);
@@ -232,6 +233,13 @@ void moveStepper(void *pvParameters) {
       } else {
         stepper->setAutoEnable(true);  // disable output FETs between moves so stepper can cool. Can still shift.
       }
+      if (_stepperDir != userConfig.getStepperDir();) { //User changed the config direction of the stepper wires 
+        _stepperDir = userConfig.getStepperDir();
+        while (stepper->isMotorRunning()) {
+          vTaskDelay(100 / portTICK_PERIOD_MS);
+        }
+        stepper->setDirectionPin(DIR_PIN, _stepperDir);
+      }
     }
   }
 }
@@ -250,7 +258,7 @@ bool IRAM_ATTR deBounce() {
 void IRAM_ATTR shiftUp() {  // Handle the shift up interrupt IRAM_ATTR is to keep the interrput code in ram always
   if (deBounce()) {
     if (!digitalRead(SHIFT_UP_PIN)) {  // double checking to make sure the interrupt wasn't triggered by emf
-      rtConfig.setShifterPosition(rtConfig.getShifterPosition() + 1);
+      rtConfig.setShifterPosition(rtConfig.getShifterPosition() - 1 + userConfig.getShifterDir() * 2);
     } else {
       lastDebounceTime = 0;
     }  // Probably Triggered by EMF, reset the debounce
@@ -260,7 +268,7 @@ void IRAM_ATTR shiftUp() {  // Handle the shift up interrupt IRAM_ATTR is to kee
 void IRAM_ATTR shiftDown() {  // Handle the shift down interrupt
   if (deBounce()) {
     if (!digitalRead(SHIFT_DOWN_PIN)) {  // double checking to make sure the interrupt wasn't triggered by emf
-      rtConfig.setShifterPosition(rtConfig.getShifterPosition() - 1);
+      rtConfig.setShifterPosition(rtConfig.getShifterPosition() + 1 - userConfig.getShifterDir() * 2);
     } else {
       lastDebounceTime = 0;
     }  // Probably Triggered by EMF, reset the debounce

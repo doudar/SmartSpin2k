@@ -138,6 +138,24 @@
                     class="slider"></span></label>
               </td>
             </tr>
+            <tr>
+              <td>
+                <p class="tooltip">Stepper Direction<span class="tooltiptext">Change Stepper Direction</span></p>
+              </td>
+              <td>
+                <label class="switch"><input type="checkbox" name="stepperDir" id="stepperDir"><span
+                    class="slider"></span></label>
+              </td>
+            </tr>
+            <tr>
+              <td>
+                <p class="tooltip">Shifter Direction<span class="tooltiptext">Change Shifter Direction</span></p>
+              </td>
+              <td>
+                <label class="switch"><input type="checkbox" name="shifterDir" id="shifterDir"><span
+                    class="slider"></span></label>
+              </td>
+            </tr>
           </tbody>
         </table>
         <input type="submit" value="Save Settings" />
@@ -181,6 +199,8 @@
         document.getElementById("stepperPower").value = obj.stepperPower;
         document.getElementById("stealthchop").checked = obj.stealthchop;
         document.getElementById("autoUpdate").checked = obj.autoUpdate;
+        document.getElementById("stepperDir").checked = obj.stepperDir;
+        document.getElementById("shifterDir").checked = obj.shifterDir;
         updateSlider(document.getElementById("shiftStep").value, document.getElementById("shiftStepValue"));
         updateSlider(document.getElementById("inclineMultiplier").value, document.getElementById("inclineMultiplierValue"));
         updateSlider(document.getElementById("ERGSensitivity").value, document.getElementById("ERGSensitivityValue"));

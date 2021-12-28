@@ -471,6 +471,16 @@ void settingsProcessor() {
   } else if (wasSettingsUpdate) {
     userConfig.setAutoUpdate(false);
   }
+    if (!server.arg("stepperDir").isEmpty()) {
+    userConfig.setStepperDir(true);
+  } else if (wasSettingsUpdate) {
+    userConfig.setStepperDir(false);
+  }
+    if (!server.arg("shifterDir").isEmpty()) {
+    userConfig.setShifterDir(true);
+  } else if (wasSettingsUpdate) {
+    userConfig.setShifterDir(false);
+  }
   if (!server.arg("stealthchop").isEmpty()) {
     userConfig.setStealthChop(true);
     updateStealthchop();
