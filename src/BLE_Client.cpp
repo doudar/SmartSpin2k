@@ -420,7 +420,7 @@ void SpinBLEClient::scanProcess() {
 #ifdef USE_TELEGRAM
   SEND_TO_TELEGRAM("Bluetooth Client Found Devices: " + output);
 #endif
-  rtConfig.setFoundDevices(output);
+  userConfig.setFoundDevices(output);
   pBLEScan = nullptr;  // free up memory
 }
 

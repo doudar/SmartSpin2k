@@ -37,6 +37,7 @@ extern RuntimeParameters rtConfig;
 class SS2K {
  public:
   int32_t targetPosition;
+  int32_t currentPosition;
   bool externalControl;
   bool syncMode;
 

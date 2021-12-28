@@ -32,7 +32,6 @@ String RuntimeParameters::returnJSON(bool includeDebugLog) {
   doc["simulateCad"]         = simulateCad;
   doc["ERGMode"]             = ERGMode;
   doc["shifterPosition"]     = shifterPosition;
-  doc["foundDevices"]        = foundDevices;
   doc["minStep"]             = minStep;
   doc["maxStep"]             = maxStep;
   if (includeDebugLog) {
@@ -59,7 +58,7 @@ void userParameters::setDefaults() {
   connectedPowerMeter   = CONNECTED_POWER_METER;
   connectedHeartMonitor = CONNECTED_HEART_MONITOR;
   maxWatts              = DEFAULT_MAX_WATTS;
-  stepperDir            = true; 
+  stepperDir            = true;
   shifterDir            = true;
 }
 
@@ -72,11 +71,11 @@ String userParameters::returnJSON(bool includeDebugLog) {
   StaticJsonDocument<USERCONFIG_JSON_SIZE> doc;
   // Set the values in the document
 
-  doc["firmwareUpdateURL"] = firmwareUpdateURL;
-  doc["firmwareVersion"]   = FIRMWARE_VERSION;
-  doc["deviceName"]        = deviceName;
-  doc["shiftStep"]         = shiftStep;
-  doc["stepperPower"]      = stepperPower;
+  doc["firmwareUpdateURL"]     = firmwareUpdateURL;
+  doc["firmwareVersion"]       = FIRMWARE_VERSION;
+  doc["deviceName"]            = deviceName;
+  doc["shiftStep"]             = shiftStep;
+  doc["stepperPower"]          = stepperPower;
   doc["stealthchop"]           = stealthchop;
   doc["inclineMultiplier"]     = inclineMultiplier;
   doc["powerCorrectionFactor"] = powerCorrectionFactor;
@@ -86,9 +85,10 @@ String userParameters::returnJSON(bool includeDebugLog) {
   doc["password"]              = password;
   doc["connectedPowerMeter"]   = connectedPowerMeter;
   doc["connectedHeartMonitor"] = connectedHeartMonitor;
+  doc["foundDevices"]          = foundDevices;
   doc["maxWatts"]              = maxWatts;
   doc["shifterDir"]            = shifterDir;
-  doc["stepperDir"]            = shifterDir;
+  doc["stepperDir"]            = stepperDir;
 
   if (includeDebugLog) {
     doc["debug"] = DebugInfo::get_and_clear_logs();
@@ -132,9 +132,10 @@ void userParameters::saveToSPIFFS() {
   doc["password"]              = password;
   doc["connectedPowerMeter"]   = connectedPowerMeter;
   doc["connectedHeartMonitor"] = connectedHeartMonitor;
+  doc["foundDevices"]          = foundDevices;
   doc["maxWatts"]              = maxWatts;
   doc["shifterDir"]            = shifterDir;
-  doc["stepperDir"]            = shifterDir;
+  doc["stepperDir"]            = stepperDir;
 
   // Serialize JSON to file
   if (serializeJson(doc, file) == 0) {
@@ -146,14 +147,14 @@ void userParameters::saveToSPIFFS() {
 
 // Loads the JSON configuration from a file into a userParameters Object
 void userParameters::loadFromSPIFFS() {
+  setDefaults();
   // Open file for reading
   SS2K_LOG(CONFIG_LOG_TAG, "Reading File: %s", configFILENAME);
   File file = SPIFFS.open(configFILENAME);
 
   // load defaults if filename doesn't exist
   if (!file) {
-    SS2K_LOG(CONFIG_LOG_TAG, "Couldn't find configuration file. Loading Defaults");
-    setDefaults();
+    SS2K_LOG(CONFIG_LOG_TAG, "Couldn't find configuration file. using defaults");
     return;
   }
   // Allocate a temporary JsonDocument
@@ -164,8 +165,7 @@ void userParameters::loadFromSPIFFS() {
   // Deserialize the JSON document
   DeserializationError error = deserializeJson(doc, file);
   if (error) {
-    SS2K_LOGE(CONFIG_LOG_TAG, "Failed to read file, using default configuration");
-    setDefaults();
+    SS2K_LOGE(CONFIG_LOG_TAG, "Failed to read file, using defaults");
     return;
   }
 
@@ -176,20 +176,30 @@ void userParameters::loadFromSPIFFS() {
   setStepperPower(doc["stepperPower"]);
   setStealthChop(doc["stealthchop"]);
   setInclineMultiplier(doc["inclineMultiplier"]);
+  setAutoUpdate(doc["autoUpdate"]);
+  setSsid(doc["ssid"]);
+  setPassword(doc["password"]);
+  setConnectedPowerMeter(doc["connectedPowerMeter"]);
+  setConnectedHeartMonitor(doc["connectedHeartMonitor"]);
+  setFoundDevices(doc["foundDevices"]);
+  if (doc["ERGSensitivity"]) {  // If statements to upgrade old versions of config.txt that didn't include these
+    setERGSensitivity(doc["ERGSensitivity"]);
+  }
+  if (doc["maxWatts"]) {
+    setMaxWatts(doc["maxWatts"]);
+  }
+  if (!doc["stepperDir"].isNull()) {
+    setStepperDir(doc["stepperDir"]);
+  }
+  if (!doc["shifterDir"].isNull()) {
+    setShifterDir(doc["shifterDir"]);
+  }
   if (doc["powerCorrectionFactor"]) {
     setPowerCorrectionFactor(doc["powerCorrectionFactor"]);
     if ((getPowerCorrectionFactor() < MIN_PCF) || (getPowerCorrectionFactor() > MAX_PCF)) {
       setPowerCorrectionFactor(1);
     }
   }
-  if (doc["ERGSensitivity"]) {
-    setERGSensitivity(doc["ERGSensitivity"]);
-  }
-  setAutoUpdate(doc["autoUpdate"]);
-  setSsid(doc["ssid"]);
-  setPassword(doc["password"]);
-  setConnectedPowerMeter(doc["connectedPowerMeter"]);
-  setConnectedHeartMonitor(doc["connectedHeartMonitor"]);
 
   SS2K_LOG(CONFIG_LOG_TAG, "Config File Loaded: %s", configFILENAME);
   file.close();

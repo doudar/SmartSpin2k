@@ -12,7 +12,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Added backend and html for shifter and stepper directions. 
 
 ### Changed
-- 
+- Fixed a couple bugs in PowerTables
+- Fixed BLE Scanner webpage not displaying devices.
 
 ### Hardware
 - 

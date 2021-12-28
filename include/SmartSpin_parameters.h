@@ -43,7 +43,6 @@ class RuntimeParameters {
   int shifterPosition        = 0;
   int minStep                = -200000000;
   int maxStep                = 200000000;
-  String foundDevices        = " ";
 
  public:
   void setTargetIncline(float inc) { targetIncline = inc; }
@@ -91,9 +90,6 @@ class RuntimeParameters {
   void setMaxStep(int ms) { maxStep = ms; }
   int getMaxStep() { return maxStep; }
 
-  void setFoundDevices(String fdev) { foundDevices = fdev; }
-  const char* getFoundDevices() { return foundDevices.c_str(); }
-
   String returnJSON(bool includeDebugLog = false);
 };
 
@@ -115,6 +111,7 @@ class userParameters {
   String password;
   String connectedPowerMeter   = "any";
   String connectedHeartMonitor = "any";
+  String foundDevices          = " ";
 
  public:
   const char* getFirmwareUpdateURL() { return firmwareUpdateURL.c_str(); }
@@ -131,8 +128,8 @@ class userParameters {
   const char* getconnectedHeartMonitor() { return connectedHeartMonitor.c_str(); }
   int getStepperPower() { return stepperPower; }
   int getMaxWatts() { return maxWatts; }
-  bool getStepperDir() { return stepperDir;}
-  bool getShifterDir() { return shifterDir;}
+  bool getStepperDir() { return stepperDir; }
+  bool getShifterDir() { return shifterDir; }
 
   void setDefaults();
   void setFirmwareUpdateURL(String fURL) { firmwareUpdateURL = fURL; }
@@ -150,7 +147,9 @@ class userParameters {
   void setStepperPower(int sp) { stepperPower = sp; }
   void setMaxWatts(int maxW) { maxWatts = maxW; }
   void setStepperDir(bool sd) { stepperDir = sd; }
-  void setShifterDir(bool sd) { shifterDir = sd; }
+  void setShifterDir(bool shd) { shifterDir = shd; }
+  void setFoundDevices(String fdev) { foundDevices = fdev; }
+  const char* getFoundDevices() { return foundDevices.c_str(); }
 
   String returnJSON(bool includeDebugLog = false);
   void saveToSPIFFS();

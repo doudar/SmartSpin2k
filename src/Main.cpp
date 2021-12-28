@@ -84,7 +84,6 @@ void setup() {
   }
 
   // Load Config
-  userConfig.setDefaults();  // Preload defaults incase config.txt is missing any data
   userConfig.loadFromSPIFFS();
   userConfig.printFile();  // Print userConfig.contents to serial
   userConfig.saveToSPIFFS();
@@ -115,7 +114,7 @@ void setup() {
 
   xTaskCreatePinnedToCore(moveStepper,           /* Task function. */
                           "moveStepperFunction", /* name of task. */
-                          1000,                  /* Stack size of task */
+                          1500,                  /* Stack size of task */
                           NULL,                  /* parameter of the task */
                           18,                    /* priority of the task */
                           &moveStepperTask,      /* Task handle to keep track of created task */
@@ -219,11 +218,15 @@ void moveStepper(void *pvParameters) {
         stepper->setCurrentPosition(ss2k.targetPosition);
         vTaskDelay(100 / portTICK_PERIOD_MS);
       }
-      if (ss2k.targetPosition > rtConfig.getMinStep()) {
+
+      if ((ss2k.targetPosition >= rtConfig.getMinStep()) && (ss2k.targetPosition <= rtConfig.getMaxStep())) {
         stepper->moveTo(ss2k.targetPosition);
-      } else { //Limit Stepper to Minimum Position
+      } else if (ss2k.targetPosition <= rtConfig.getMinStep()) {  // Limit Stepper to Min Position
         stepper->moveTo(rtConfig.getMinStep());
+      } else {  // Limit Stepper to Max Position
+        stepper->moveTo(rtConfig.getMaxStep());
       }
+
       vTaskDelay(100 / portTICK_PERIOD_MS);
       rtConfig.setCurrentIncline((float)stepper->getCurrentPosition());
 
@@ -233,7 +236,8 @@ void moveStepper(void *pvParameters) {
       } else {
         stepper->setAutoEnable(true);  // disable output FETs between moves so stepper can cool. Can still shift.
       }
-      if (_stepperDir != userConfig.getStepperDir()) { //User changed the config direction of the stepper wires 
+
+      if (_stepperDir != userConfig.getStepperDir()) {  // User changed the config direction of the stepper wires
         _stepperDir = userConfig.getStepperDir();
         while (stepper->isMotorRunning()) {
           vTaskDelay(100 / portTICK_PERIOD_MS);

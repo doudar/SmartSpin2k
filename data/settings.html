@@ -51,7 +51,8 @@
             </tr>
             <tr>
               <td>
-                <p class="tooltip">Shift Step<span class="tooltiptext">Amount to move stepper per gear shift.
+                <p class="tooltip">Sim Mode<br>Shift Amount<span class="tooltiptext">Amount to move stepper per gear
+                    shift.
                     <br><br>Try to target ~30watt changes.</span></p>
               </td>
               <td>
@@ -67,8 +68,9 @@
             </tr>
             <tr>
               <td>
-                <p class="tooltip">Incline Multiplier<span class="tooltiptext">Increase to make incline changes more
-                    noticable. <br><br>Adjust until hills feel realistic.</span></p>
+                <p class="tooltip">Sim Mode<br>Incline Multiplier<span class="tooltiptext">Increase to make incline
+                    changes more
+                    noticeable. <br><br>Adjust until hills feel realistic.</span></p>
               </td>
               <td>
                 <div style="font-size:large; color: rgb(250, 250, 250);">
@@ -87,8 +89,9 @@
             <tr>
             <tr>
               <td>
-                <p class="tooltip">ERG Sensitivity<span class="tooltiptext">Increase to make ERG Mode more aggressive.
-                    <br><br>A value far away from 1 may mean that your Shift Step is improperly configured.</span></p>
+                <p class="tooltip">ERG Mode<br>Sensitivity<span class="tooltiptext">Increase to make ERG Mode more
+                    aggressive.
+                  </span></p>
               </td>
               <td>
                 <div style="font-size:large; color: rgb(250, 250, 250);">
@@ -105,7 +108,22 @@
             </tr>
             <tr>
               <td>
-                <p class="tooltip">Stepper Power<span class="tooltiptext">Amount in milli amps for stepper
+                <p class="tooltip">Max Bike<br>Brake Watts<span class="tooltiptext">Set the most watts you've ever seen your bike absorb while you're pedaling</span></p>
+              </td>
+              <td>
+                <div style="font-size:large; color: rgb(250, 250, 250);">
+                  <span id="maxWattsValue">0</span><span>W</span>
+                </div>
+                <input type='button' onclick="clickStep(document.getElementById('maxWatts'), this.value)" value="-">
+                <input style="width:50%; position: relative; top: 5px;" type="range" id="maxWatts" name="maxWatts"
+                  min="300" max="2000" value="0" step="25" class="slider1"
+                  onchange="updateSlider(this.value, document.getElementById('maxWattsValue'))" />
+                <input type='button' onclick="clickStep(document.getElementById('maxWatts'), this.value)" value="+">
+              </td>
+            </tr>
+            <tr>
+              <td>
+                <p class="tooltip">Stepper Motor<br>Power<span class="tooltiptext">Amount in milli amps for stepper
                     motor<br><br>Set to the minimum required to move knob smoothly</span></p>
               </td>
               <td>
@@ -140,7 +158,7 @@
             </tr>
             <tr>
               <td>
-                <p class="tooltip">Stepper Direction<span class="tooltiptext">Change Stepper Direction</span></p>
+                <p class="tooltip">Stepper Motor<br>Direction<span class="tooltiptext">Change Stepper Direction</span></p>
               </td>
               <td>
                 <label class="switch"><input type="checkbox" name="stepperDir" id="stepperDir"><span
@@ -197,6 +215,7 @@
         document.getElementById("inclineMultiplier").value = obj.inclineMultiplier;
         document.getElementById("ERGSensitivity").value = obj.ERGSensitivity;
         document.getElementById("stepperPower").value = obj.stepperPower;
+        document.getElementById("maxWatts").value = obj.maxWatts;
         document.getElementById("stealthchop").checked = obj.stealthchop;
         document.getElementById("autoUpdate").checked = obj.autoUpdate;
         document.getElementById("stepperDir").checked = obj.stepperDir;
@@ -205,6 +224,7 @@
         updateSlider(document.getElementById("inclineMultiplier").value, document.getElementById("inclineMultiplierValue"));
         updateSlider(document.getElementById("ERGSensitivity").value, document.getElementById("ERGSensitivityValue"));
         updateSlider(document.getElementById("stepperPower").value, document.getElementById("stepperPowerValue"));
+        updateSlider(document.getElementById("maxWatts").value, document.getElementById("maxWattsValue"));
         document.getElementById("loadingWatermark").opacity = 0;
         document.getElementById("loadingWatermark").remove();
       } else {

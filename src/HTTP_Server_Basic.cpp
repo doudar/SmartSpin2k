@@ -458,6 +458,12 @@ void settingsProcessor() {
       updateStepperPower();
     }
   }
+    if (!server.arg("maxWatts").isEmpty()) {
+    uint64_t maxWatts = server.arg("maxWatts").toInt();
+    if (maxWatts >= 300 && maxWatts <= 2000) {
+      userConfig.setMaxWatts(maxWatts);
+    }
+  }
   if (!server.arg("ERGSensitivity").isEmpty()) {
     float ERGSensitivity = server.arg("ERGSensitivity").toFloat();
     if (ERGSensitivity >= .5 && ERGSensitivity <= 20) {
