@@ -7,6 +7,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+- 
+
+### Changed
+- 
+
+### Hardware
+- 
+
+#### IC4 Mod
+- 
+
+## [1.12.26]
+
+### Added
 - Added Webpage for Shifting.
 - Added /shift server on backend.
 - Split userConfig into userConfig and rtConfig.
@@ -14,6 +28,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Broke out ERG computation into it's own task.
 - Added image for wiki.
 - Added parameters for auto homing.
+- Replaced existing shifter housing with new and improved 2 in 1 revision
 
 ### Changed
 - Adjusted the order of "Submit" "Reboot" and "Reset to Defaults" on the settings page. 
