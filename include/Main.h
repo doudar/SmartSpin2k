@@ -38,11 +38,14 @@ class SS2K {
  public:
   int32_t targetPosition;
   int32_t currentPosition;
+  bool stepperIsRunning;
   bool externalControl;
   bool syncMode;
 
   SS2K() {
     targetPosition  = 0;
+    currentPosition = 0;
+    stepperIsRunning = false;
     externalControl = false;
     syncMode        = false;
   }

@@ -199,6 +199,7 @@ void moveStepper(void *pvParameters) {
 
   while (1) {
     if (stepper) {
+      ss2k.stepperIsRunning = stepper->isRunning();
       ss2k.targetPosition = rtConfig.getShifterPosition() * userConfig.getShiftStep();
       if (!ss2k.externalControl) {
         if (rtConfig.getERGMode()) {

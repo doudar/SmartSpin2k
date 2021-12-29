@@ -79,7 +79,7 @@ void ergTaskLoop(void* pvParameters) {
     // Set Min and Max Stepper positions
     if (loopCounter > 50) {
       loopCounter = 0;
-      int _return = powerTable.lookup(MIN_WATTS, 70);
+      int _return = powerTable.lookup(MIN_WATTS, 90);
       if (_return != RETURN_ERROR) {
         rtConfig.setMinStep(_return);
         SS2K_LOG(ERG_MODE_LOG_TAG, "Min Position Set: %d", _return);
@@ -193,7 +193,7 @@ int32_t PowerTable::lookup(int watts, int cad) {
           break;
         }
       }
-      if ((i - x <= 0) || (i + x >= POWERTABLE_SIZE)) {
+      if ((i - x <= 0) && (i + x >= POWERTABLE_SIZE)) {
         SS2K_LOG(ERG_MODE_LOG_TAG, "No data found in powertable.");
         return RETURN_ERROR;
       }
@@ -355,10 +355,10 @@ void ErgMode::computErg(int newSetPoint) {
       this->setPoint = newSetPoint;
       this->cadence  = newCadence;
       this->cycles++;
-      while (rtConfig.getTargetIncline() != rtConfig.getCurrentIncline()) {  // wait while the knob moves to target position.
+      while (ss2k.stepperIsRunning) {  // wait while the knob moves to target position.
         vTaskDelay(100 / portTICK_PERIOD_MS);
       }
-      vTaskDelay(700 / portTICK_PERIOD_MS);  // Wait for power meter to register new power
+      vTaskDelay(1500 / portTICK_PERIOD_MS);  // Wait for power meter to register new power
       return;
     }
   }
