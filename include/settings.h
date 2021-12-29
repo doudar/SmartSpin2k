@@ -76,10 +76,10 @@
 #define WATTS_PER_SHIFT 30
 
 // Default Max Watts that the brake on the spin bike can absorb from the user.
-#define DEFAULT_MAX_WATTS 450
+#define DEFAULT_MAX_WATTS 700
 
 // Wattage at which to automatically assume minimum brake resistance.  
-#define MIN_WATTS 35
+#define MIN_WATTS 50
 
 // Hardware pin for rocker Switch
 #define RADIO_PIN 27
