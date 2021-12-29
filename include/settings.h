@@ -60,7 +60,10 @@
 #define STEPPER_ACCELERATION 3000
 
 // Stepper Max Speed in steps/s
-#define STEPPER_MAX_SPEED 1500
+#define STEPPER_SPEED 1500
+
+// Stepper Max Speed in ERG Mode steps/s
+#define STEPPER_ERG_SPEED 1500
 
 // Default ERG Sensitivity. Predicated on # of Shifts (further defined by shift steps) per 30 watts of resistance change.
 // I.E. If the difference between ERG target and Current watts were 30, and the Shift step is defined as 600 steps,
@@ -72,9 +75,11 @@
 // is obtained as closely as possible during each shift.
 #define WATTS_PER_SHIFT 30
 
-// Multiple to apply in ERG mode when within the watts range of 1 shift. It may be desirable to make this value less than 1 to prevent oscillating around the
-// target watt point.
-#define SUB_SHIFT_SCALE .5
+// Default Max Watts that the brake on the spin bike can absorb from the user.
+#define DEFAULT_MAX_WATTS 450
+
+// Wattage at which to automatically assume minimum brake resistance.  
+#define MIN_WATTS 35
 
 // Hardware pin for rocker Switch
 #define RADIO_PIN 27

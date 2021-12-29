@@ -84,7 +84,6 @@ void setup() {
   }
 
   // Load Config
-  userConfig.setDefaults();  // Preload defaults incase config.txt is missing any data
   userConfig.loadFromSPIFFS();
   userConfig.printFile();  // Print userConfig.contents to serial
   userConfig.saveToSPIFFS();
@@ -115,7 +114,7 @@ void setup() {
 
   xTaskCreatePinnedToCore(moveStepper,           /* Task function. */
                           "moveStepperFunction", /* name of task. */
-                          1000,                  /* Stack size of task */
+                          1500,                  /* Stack size of task */
                           NULL,                  /* parameter of the task */
                           18,                    /* priority of the task */
                           &moveStepperTask,      /* Task handle to keep track of created task */
@@ -128,7 +127,7 @@ void setup() {
   // Check for firmware update. It's important that this stays before BLE &
   // HTTP setup because otherwise they use too much traffic and the device
   // fails to update which really sucks when it corrupts your settings.
-  
+
   FirmwareUpdate();
 
   startTasks();
@@ -148,7 +147,6 @@ void setup() {
                           1,                      /* priority of the task */
                           &shifterCheckTask,      /* Task handle to keep track of created task */
                           1);                     /* pin task to core 0 */
-
 }
 
 void loop() {  // Delete this task so we can make one that's more memory efficient.
@@ -160,17 +158,16 @@ void shifterCheck(void *pvParameters) {
   while (true) {
     vTaskDelay(200 / portTICK_RATE_MS);
 
-  if (rtConfig.getShifterPosition() > lastShifterPosition) {
-    SS2K_LOG(MAIN_LOG_TAG, "Shift UP: %l", rtConfig.getShifterPosition());
-    Serial.println(ss2k.targetPosition);
-    spinBLEServer.notifyShift(1);
-  } else if (rtConfig.getShifterPosition() < lastShifterPosition) {
-    SS2K_LOG(MAIN_LOG_TAG, "Shift DOWN: %l", rtConfig.getShifterPosition());
-    Serial.println(ss2k.targetPosition);
-    spinBLEServer.notifyShift(0);
-  }
-  lastShifterPosition = rtConfig.getShifterPosition();
-
+    if (rtConfig.getShifterPosition() > lastShifterPosition) {
+      SS2K_LOG(MAIN_LOG_TAG, "Shift UP: %l", rtConfig.getShifterPosition());
+      Serial.println(ss2k.targetPosition);
+      spinBLEServer.notifyShift(1);
+    } else if (rtConfig.getShifterPosition() < lastShifterPosition) {
+      SS2K_LOG(MAIN_LOG_TAG, "Shift DOWN: %l", rtConfig.getShifterPosition());
+      Serial.println(ss2k.targetPosition);
+      spinBLEServer.notifyShift(0);
+    }
+    lastShifterPosition = rtConfig.getShifterPosition();
 
     if (loopCounter > 4) {
       scanIfShiftersHeld();
@@ -191,21 +188,24 @@ void shifterCheck(void *pvParameters) {
 
 void moveStepper(void *pvParameters) {
   engine.init();
-  stepper = engine.stepperConnectToPin(STEP_PIN);
-  stepper->setDirectionPin(DIR_PIN);
+  bool _stepperDir = userConfig.getStepperDir();
+  stepper          = engine.stepperConnectToPin(STEP_PIN);
+  stepper->setDirectionPin(DIR_PIN, _stepperDir);
   stepper->setEnablePin(ENABLE_PIN);
   stepper->setAutoEnable(true);
-  stepper->setSpeedInHz(STEPPER_MAX_SPEED);        // 500 steps/s
-  stepper->setAcceleration(STEPPER_ACCELERATION);  // 100 steps/s²
+  stepper->setSpeedInHz(STEPPER_SPEED);
+  stepper->setAcceleration(STEPPER_ACCELERATION);
   stepper->setDelayToDisable(1000);
 
   while (1) {
     if (stepper) {
+      ss2k.stepperIsRunning = stepper->isRunning();
       ss2k.targetPosition = rtConfig.getShifterPosition() * userConfig.getShiftStep();
       if (!ss2k.externalControl) {
         if (rtConfig.getERGMode()) {
           // ERG Mode
           // Shifter not used.
+          stepper->setSpeedInHz(STEPPER_ERG_SPEED);
           ss2k.targetPosition = rtConfig.getTargetIncline();
         } else {
           // Simulation Mode
@@ -219,9 +219,16 @@ void moveStepper(void *pvParameters) {
         stepper->setCurrentPosition(ss2k.targetPosition);
         vTaskDelay(100 / portTICK_PERIOD_MS);
       }
-      stepper->moveTo(ss2k.targetPosition);
-      vTaskDelay(100 / portTICK_PERIOD_MS);
 
+      if ((ss2k.targetPosition >= rtConfig.getMinStep()) && (ss2k.targetPosition <= rtConfig.getMaxStep())) {
+        stepper->moveTo(ss2k.targetPosition);
+      } else if (ss2k.targetPosition <= rtConfig.getMinStep()) {  // Limit Stepper to Min Position
+        stepper->moveTo(rtConfig.getMinStep());
+      } else {  // Limit Stepper to Max Position
+        stepper->moveTo(rtConfig.getMaxStep());
+      }
+
+      vTaskDelay(100 / portTICK_PERIOD_MS);
       rtConfig.setCurrentIncline((float)stepper->getCurrentPosition());
 
       if (connectedClientCount() > 0) {
@@ -229,6 +236,14 @@ void moveStepper(void *pvParameters) {
         stepper->enableOutputs();
       } else {
         stepper->setAutoEnable(true);  // disable output FETs between moves so stepper can cool. Can still shift.
+      }
+
+      if (_stepperDir != userConfig.getStepperDir()) {  // User changed the config direction of the stepper wires
+        _stepperDir = userConfig.getStepperDir();
+        while (stepper->isMotorRunning()) {
+          vTaskDelay(100 / portTICK_PERIOD_MS);
+        }
+        stepper->setDirectionPin(DIR_PIN, _stepperDir);
       }
     }
   }
@@ -248,7 +263,7 @@ bool IRAM_ATTR deBounce() {
 void IRAM_ATTR shiftUp() {  // Handle the shift up interrupt IRAM_ATTR is to keep the interrput code in ram always
   if (deBounce()) {
     if (!digitalRead(SHIFT_UP_PIN)) {  // double checking to make sure the interrupt wasn't triggered by emf
-      rtConfig.setShifterPosition(rtConfig.getShifterPosition() + 1);
+      rtConfig.setShifterPosition(rtConfig.getShifterPosition() - 1 + userConfig.getShifterDir() * 2);
     } else {
       lastDebounceTime = 0;
     }  // Probably Triggered by EMF, reset the debounce
@@ -258,7 +273,7 @@ void IRAM_ATTR shiftUp() {  // Handle the shift up interrupt IRAM_ATTR is to kee
 void IRAM_ATTR shiftDown() {  // Handle the shift down interrupt
   if (deBounce()) {
     if (!digitalRead(SHIFT_DOWN_PIN)) {  // double checking to make sure the interrupt wasn't triggered by emf
-      rtConfig.setShifterPosition(rtConfig.getShifterPosition() - 1);
+      rtConfig.setShifterPosition(rtConfig.getShifterPosition() + 1 - userConfig.getShifterDir() * 2);
     } else {
       lastDebounceTime = 0;
     }  // Probably Triggered by EMF, reset the debounce

@@ -7,10 +7,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
-- 
+- Added userConfig shifterDir to change direction of shifters in software to compensate for wiring
+- Added userConfig StepperDir to change direction of stepper in software to compensate for wiring
+- Added backend and html for shifter and stepper directions. 
 
 ### Changed
-- 
+- Fixed a couple bugs in PowerTables
+- Fixed BLE Scanner webpage not displaying devices.
 
 ### Hardware
 - 
@@ -27,6 +30,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Added ERG testing to btsimulator.html
 - Broke out ERG computation into it's own task.
 - Added image for wiki.
+- Added parameters for auto homing.
 - Replaced existing shifter housing with new and improved 2 in 1 revision
 
 ### Changed
