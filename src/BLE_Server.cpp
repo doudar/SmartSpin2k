@@ -206,7 +206,6 @@ bool spinDown() {
   return true;
 }
 
-
 void updateIndoorBikeDataChar() {
   float cadRaw = rtConfig.getSimulatedCad();
   int cad      = static_cast<int>(cadRaw * 2);
@@ -319,9 +318,9 @@ void processFTMSWrite() {
 
   BLECharacteristic *pCharacteristic = NimBLEDevice::getServer()->getServiceByUUID(FITNESSMACHINESERVICE_UUID)->getCharacteristic(FITNESSMACHINECONTROLPOINT_UUID);
 
-  std::string rxValue = FTMSWrite;
+  std::string rxValue       = FTMSWrite;
 
-  if (rxValue.length() > 1) {
+  if (rxValue.length() >= 1) {
     uint8_t *pData = reinterpret_cast<uint8_t *>(&rxValue[0]);
     int length     = rxValue.length();
 
@@ -340,7 +339,17 @@ void processFTMSWrite() {
         pCharacteristic->setValue(returnValue, 3);
         ftmsTrainingStatus[1] = 0x01;
         fitnessMachineTrainingStatus->setValue(ftmsTrainingStatus, 2);
-        fitnessMachineTrainingStatus->notify();
+        fitnessMachineTrainingStatus->notify(false);
+        pCharacteristic->setValue(returnValue, 3);
+        break;
+        
+        case 0x01:  // reset
+        logBufLength += snprintf(logBuf + logBufLength, kLogBufCapacity - logBufLength, "-> Reset");
+        returnValue[2] = 0x01;
+        pCharacteristic->setValue(returnValue, 3);
+        ftmsTrainingStatus[1] = 0x01;
+        fitnessMachineTrainingStatus->setValue(ftmsTrainingStatus, 2);
+        fitnessMachineTrainingStatus->notify(false);
         pCharacteristic->setValue(returnValue, 3);
         break;
 
@@ -442,13 +451,13 @@ void processFTMSWrite() {
     SS2K_LOG(BLE_SERVER_LOG_TAG, "%s", logBuf);
     fitnessMachineStatusCharacteristic->notify();
   } else {
-   //SS2K_LOG(BLE_SERVER_LOG_TAG, "App wrote nothing ");
-   //SS2K_LOG(BLE_SERVER_LOG_TAG, "assuming it's a Control request");
+    SS2K_LOG(BLE_SERVER_LOG_TAG, "App wrote nothing ");
+    SS2K_LOG(BLE_SERVER_LOG_TAG, "assuming it's a Control request");
     uint8_t controlPoint[3] = {0x80, 0x00, 0x01};
     pCharacteristic->setValue(controlPoint, 3);
-    ftmsTrainingStatus[1] = 0x01;
+    ftmsTrainingStatus[1] = 0x00;
     fitnessMachineTrainingStatus->setValue(ftmsTrainingStatus, 2);
-    fitnessMachineTrainingStatus->notify();
+    fitnessMachineTrainingStatus->notify(false);
   }
   FTMSWrite = "";
 }
