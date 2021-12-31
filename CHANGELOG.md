@@ -7,6 +7,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+- 
+
+### Changed
+- Refactored ERG 
+
+### Hardware
+- 
+
+#### IC4 Mod
+- 
+
+## [1.12.30]
+
+### Added
 - Added userConfig shifterDir to change direction of shifters in software to compensate for wiring
 - Added userConfig StepperDir to change direction of stepper in software to compensate for wiring
 - Added backend and html for shifter and stepper directions. 
