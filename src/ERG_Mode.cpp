@@ -30,7 +30,7 @@ void setupERG() {
 }
 
 void ergTaskLoop(void* pvParameters) {
-  ErgMode ergMode;
+  ErgMode ergMode = ErgMode(&powerTable);
   PowerBuffer powerBuffer;
 
   ergMode._writeLogHeader();
@@ -45,10 +45,11 @@ void ergTaskLoop(void* pvParameters) {
     hasConnectedPowerMeter = spinBLEClient.connectedPM;
     simulationRunning      = rtConfig.getSimulateTargetWatts();
 
-    if ((rtConfig.getSimulatedCad() > 70) && (rtConfig.getSimulatedCad() < 100) && (rtConfig.getSimulatedWatts().value > 10) && (rtConfig.getSimulatedWatts().value < POWERTABLE_SIZE * POWERTABLE_INCREMENT)) {
+    if ((rtConfig.getSimulatedCad() > 70) && (rtConfig.getSimulatedCad() < 100) && (rtConfig.getSimulatedWatts().value > 10) &&
+        (rtConfig.getSimulatedWatts().value < POWERTABLE_SIZE * POWERTABLE_INCREMENT)) {
       if (powerBuffer.powerEntry[0].readings == 0) {
         powerBuffer.set(0);  // Take Initial reading
-      } else if (abs(powerBuffer.powerEntry[0].watts - rtConfig.getSimulatedWatts().value) < (POWERTABLE_INCREMENT/2)) {
+      } else if (abs(powerBuffer.powerEntry[0].watts - rtConfig.getSimulatedWatts().value) < (POWERTABLE_INCREMENT / 2)) {
         for (int i = 1; i < POWER_SAMPLES; i++) {
           if (powerBuffer.powerEntry[i].readings == 0) {
             powerBuffer.set(i);  // Add additional readings to the buffer.
@@ -102,6 +103,20 @@ void PowerBuffer::reset() {
     this->powerEntry[i].watts          = 0;
     this->powerEntry[i].cad            = 0;
     this->powerEntry[i].targetPosition = 0;
+  }
+}
+
+void PowerTable::setStepperMinMax() {
+  int _return = this->lookup(MIN_WATTS, 90);
+  if (_return != RETURN_ERROR) {
+    rtConfig.setMinStep(_return);
+    SS2K_LOG(ERG_MODE_LOG_TAG, "Min Position Set: %d", _return);
+  }
+  _return = this->lookup(userConfig.getMaxWatts(), 90);
+
+  if (_return != RETURN_ERROR) {
+    rtConfig.setMaxStep(_return);
+    SS2K_LOG(ERG_MODE_LOG_TAG, "Max Position Set: %d", _return);
   }
 }
 
@@ -203,7 +218,7 @@ int32_t PowerTable::lookup(int watts, int cad) {
       if ((i - x <= 0) || (i + x >= POWERTABLE_SIZE)) {
         SS2K_LOG(ERG_MODE_LOG_TAG, "No pair found in powertable.");
         indexPair = -1;
-        return(RETURN_ERROR);
+        return (RETURN_ERROR);
       }
     }
   } else if (scale < 0) {  // select the paired element (preferably) below the entry for interpolation
@@ -223,7 +238,7 @@ int32_t PowerTable::lookup(int watts, int cad) {
       if ((i - x <= 0) || (i + x >= POWERTABLE_SIZE)) {
         SS2K_LOG(ERG_MODE_LOG_TAG, "No pair found in powertable.");
         indexPair = -1;
-        return(RETURN_ERROR);
+        return (RETURN_ERROR);
       }
     }
   }
@@ -316,9 +331,7 @@ void PowerTable::toLog() {
 void ErgMode::computErg(int newSetPoint) {
   Measurement newWatts = rtConfig.getSimulatedWatts();
   float currentIncline = rtConfig.getCurrentIncline();
-  int newCadance       = rtConfig.getSimulatedCad();
-  int wattChange       = newSetPoint - newWatts.value;  // setpoint_form_trainer - current_power => Amount to increase or decrease incline
-  float diviation      = ((float)wattChange * 100.0) / ((float)newSetPoint);
+  int newCadence       = rtConfig.getSimulatedCad();
 
   if (watts.timestamp == newWatts.timestamp && this->setPoint == newSetPoint) {
     return;  // no new power measurement.
@@ -329,46 +342,70 @@ void ErgMode::computErg(int newSetPoint) {
     newSetPoint = 50;
   }
 
-  bool isUserSpinning = this->_userIsSpinning(newCadance, currentIncline);
+  bool isUserSpinning = this->_userIsSpinning(newCadence, currentIncline);
   if (!isUserSpinning) {
     return;
   }
 
-  // reset cycle counter to start new erg calculation cycle
+  // SetPoint changed
   if (this->setPoint != newSetPoint) {
-    this->cycles        = 0;
-    int32_t tableResult = powerTable.lookup(newSetPoint, newCadance);
-    if (tableResult != -99) {
-      SS2K_LOG(ERG_MODE_LOG_TAG, "Using PowerTable Result %d", tableResult);
-      rtConfig.setTargetIncline(tableResult);
-      // store for next cycle for timestamp and value compare
-      this->watts    = newWatts;
-      this->setPoint = newSetPoint;
-      this->cadence  = newCadance;
-      this->cycles++;
-      while (rtConfig.getTargetIncline() != rtConfig.getCurrentIncline()) {  // wait while the knob moves to target position.
-        vTaskDelay(100 / portTICK_PERIOD_MS);
-      }
-      vTaskDelay(700 / portTICK_PERIOD_MS); // Wait for power meter to register new power
-      return;
-    }
+    _setPointChangeState(newSetPoint, newCadence, newWatts, currentIncline);
+    return;
   }
+
+  // Setpoint unchanged
+  _inSetpointState(newSetPoint, newCadence, newWatts, currentIncline);
+}
+
+void ErgMode::_setPointChangeState(int newSetPoint, int newCadence, Measurement& newWatts, float currentIncline) {
+  this->cycle         = 0;
+  int32_t tableResult = powerTable->lookup(newSetPoint, newCadence);
+  if (tableResult == -99) {
+    int wattChange  = newSetPoint - newWatts.value;
+    float diviation = ((float)wattChange * 100.0) / ((float)newSetPoint);
+    float factor    = abs(diviation) > 10 ? userConfig.getERGSensitivity() : userConfig.getERGSensitivity() / 2;
+    tableResult     = currentIncline + (wattChange * factor);
+  }
+
+  SS2K_LOG(ERG_MODE_LOG_TAG, "Using PowerTable Result %d", tableResult);
+  _updateValues(newSetPoint, newCadence, newWatts, currentIncline, tableResult);
+
+  while (rtConfig.getTargetIncline() != rtConfig.getCurrentIncline()) {  // wait while the knob moves to target position.
+    vTaskDelay(100 / portTICK_PERIOD_MS);
+  }
+
+  vTaskDelay(700 / portTICK_PERIOD_MS);  // Wait for power meter to register new power
+}
+
+void ErgMode::_inSetpointState(int newSetPoint, int newCadence, Measurement& newWatts, float currentIncline) {
+  int watts = newWatts.value;
+
+  // wait for 3 Cycles (Seconds 3) after setPoint changed -> Power should now be stable
+  if (this->watts.value > 0 && this->cycle > 3) {
+    watts = newWatts.value + this->watts.value;  // build arg watts to flat measurement failure
+  }
+
+  int wattChange  = newSetPoint - watts;  // setpoint_form_trainer - current_power => Amount to increase or decrease incline
+  float diviation = ((float)wattChange * 100.0) / ((float)newSetPoint);
 
   float factor     = abs(diviation) > 10 ? userConfig.getERGSensitivity() : userConfig.getERGSensitivity() / 2;
   float newIncline = currentIncline + (wattChange * factor);
 
-  rtConfig.setTargetIncline(newIncline);
-  _writeLog(this->cycles, currentIncline, newIncline, setPoint, newSetPoint, this->watts.value, newWatts.value, this->cadence, newCadance);
-
-  // store for next cycle for timestamp and value compare
-  this->watts    = newWatts;
-  this->setPoint = newSetPoint;
-  this->cadence  = newCadance;
-  this->cycles++;
+  _updateValues(newSetPoint, newCadence, newWatts, currentIncline, newIncline);
 }
 
-bool ErgMode::_userIsSpinning(int cadance, float incline) {
-  if (cadance <= 20) {
+void ErgMode::_updateValues(int newSetPoint, int newCadence, Measurement& newWatts, float currentIncline, float newIncline) {
+  rtConfig.setTargetIncline(newIncline);
+  _writeLog(this->cycle, currentIncline, newIncline, this->setPoint, newSetPoint, this->watts.value, newWatts.value, this->cadence, newCadence);
+
+  this->watts    = newWatts;
+  this->setPoint = newSetPoint;
+  this->cadence  = newCadence;
+  this->cycle++;
+}
+
+bool ErgMode::_userIsSpinning(int cadence, float incline) {
+  if (cadence <= 20) {
     if (!this->engineStopped) {                              // Test so motor stop command only happens once.
       motorStop();                                           // release tension
       rtConfig.setTargetIncline(incline - WATTS_PER_SHIFT);  // release incline
