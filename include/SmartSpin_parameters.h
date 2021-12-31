@@ -41,7 +41,8 @@ class RuntimeParameters {
   bool simulateCad           = false;
   bool ERGMode               = false;
   int shifterPosition        = 0;
-  String foundDevices        = " ";
+  int minStep                = -200000000;
+  int maxStep                = 200000000;
 
  public:
   void setTargetIncline(float inc) { targetIncline = inc; }
@@ -83,8 +84,11 @@ class RuntimeParameters {
   void setShifterPosition(int sp) { shifterPosition = sp; }
   int getShifterPosition() { return shifterPosition; }
 
-  void setFoundDevices(String fdev) { foundDevices = fdev; }
-  const char* getFoundDevices() { return foundDevices.c_str(); }
+  void setMinStep(int ms) { minStep = ms; }
+  int getMinStep() { return minStep; }
+
+  void setMaxStep(int ms) { maxStep = ms; }
+  int getMaxStep() { return maxStep; }
 
   String returnJSON(bool includeDebugLog = false);
 };
@@ -100,10 +104,14 @@ class userParameters {
   float ERGSensitivity;
   bool autoUpdate;
   int stepperPower;
+  int maxWatts;
+  bool stepperDir;
+  bool shifterDir;
   String ssid;
   String password;
   String connectedPowerMeter   = "any";
   String connectedHeartMonitor = "any";
+  String foundDevices          = " ";
 
  public:
   const char* getFirmwareUpdateURL() { return firmwareUpdateURL.c_str(); }
@@ -119,6 +127,9 @@ class userParameters {
   const char* getconnectedPowerMeter() { return connectedPowerMeter.c_str(); }
   const char* getconnectedHeartMonitor() { return connectedHeartMonitor.c_str(); }
   int getStepperPower() { return stepperPower; }
+  int getMaxWatts() { return maxWatts; }
+  bool getStepperDir() { return stepperDir; }
+  bool getShifterDir() { return shifterDir; }
 
   void setDefaults();
   void setFirmwareUpdateURL(String fURL) { firmwareUpdateURL = fURL; }
@@ -134,6 +145,11 @@ class userParameters {
   void setConnectedPowerMeter(String cpm) { connectedPowerMeter = cpm; }
   void setConnectedHeartMonitor(String cHr) { connectedHeartMonitor = cHr; }
   void setStepperPower(int sp) { stepperPower = sp; }
+  void setMaxWatts(int maxW) { maxWatts = maxW; }
+  void setStepperDir(bool sd) { stepperDir = sd; }
+  void setShifterDir(bool shd) { shifterDir = shd; }
+  void setFoundDevices(String fdev) { foundDevices = fdev; }
+  const char* getFoundDevices() { return foundDevices.c_str(); }
 
   String returnJSON(bool includeDebugLog = false);
   void saveToSPIFFS();

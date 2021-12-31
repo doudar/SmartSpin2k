@@ -7,10 +7,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
-- 
+- Added userConfig shifterDir to change direction of shifters in software to compensate for wiring
+- Added userConfig StepperDir to change direction of stepper in software to compensate for wiring
+- Added backend and html for shifter and stepper directions. 
+- Added parameters for auto homing.
 
 ### Changed
-- 
+- Fixed a couple bugs in PowerTables
+- Fixed BLE Scanner webpage not displaying devices.
+- Corrected a check in the FTMS write control point indication. 
 
 ### Hardware
 - 

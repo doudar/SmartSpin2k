@@ -458,6 +458,12 @@ void settingsProcessor() {
       updateStepperPower();
     }
   }
+    if (!server.arg("maxWatts").isEmpty()) {
+    uint64_t maxWatts = server.arg("maxWatts").toInt();
+    if (maxWatts >= 300 && maxWatts <= 2000) {
+      userConfig.setMaxWatts(maxWatts);
+    }
+  }
   if (!server.arg("ERGSensitivity").isEmpty()) {
     float ERGSensitivity = server.arg("ERGSensitivity").toFloat();
     if (ERGSensitivity >= .5 && ERGSensitivity <= 20) {
@@ -470,6 +476,16 @@ void settingsProcessor() {
     userConfig.setAutoUpdate(true);
   } else if (wasSettingsUpdate) {
     userConfig.setAutoUpdate(false);
+  }
+    if (!server.arg("stepperDir").isEmpty()) {
+    userConfig.setStepperDir(true);
+  } else if (wasSettingsUpdate) {
+    userConfig.setStepperDir(false);
+  }
+    if (!server.arg("shifterDir").isEmpty()) {
+    userConfig.setShifterDir(true);
+  } else if (wasSettingsUpdate) {
+    userConfig.setShifterDir(false);
   }
   if (!server.arg("stealthchop").isEmpty()) {
     userConfig.setStealthChop(true);
