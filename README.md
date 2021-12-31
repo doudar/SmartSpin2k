@@ -19,5 +19,5 @@ A limited number of kits are available on sale.  [Click here](https://github.com
 5. Open this project in PlatformIO.
 
 ## Licensing
-The hardware designs in this project are licensed under the [CERN Open Hardware Licence Version 2 - Permissive license](Hardware/LICENSE).
+The hardware designs in this project are licensed under the [CERN Open Hardware License Version 2 - Permissive license](Hardware/LICENSE).
 The software in this project is licensed under the [GNU GENERAL PUBLIC LICENSE Version 2, June 1991 license](LICENSE).
