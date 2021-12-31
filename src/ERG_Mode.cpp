@@ -380,10 +380,10 @@ void ErgMode::_setPointChangeState(int newSetPoint, int newCadence, Measurement&
 void ErgMode::_inSetpointState(int newSetPoint, int newCadence, Measurement& newWatts, float currentIncline) {
   int watts = newWatts.value;
 
-  // wait for 3 Cycles (Seconds 3) after setPoint changed -> Power should now be stable
-  if (this->watts.value > 0 && this->cycle > 3) {
-    watts = newWatts.value + this->watts.value;  // build arg watts to flat measurement failure
-  }
+  // // wait for 3 Cycles (Seconds 3) after setPoint changed -> Power should now be stable
+  // if (this->watts.value > 0 && this->cycle > 3) {
+  //   watts = newWatts.value + this->watts.value;  // build arg watts to flat measurement failure
+  // }
 
   int wattChange  = newSetPoint - watts;  // setpoint_form_trainer - current_power => Amount to increase or decrease incline
   float diviation = ((float)wattChange * 100.0) / ((float)newSetPoint);
