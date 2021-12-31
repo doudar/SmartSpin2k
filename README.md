@@ -5,6 +5,8 @@ SS2K is an easy to build open source project that lets you turn any Spin Bike in
 ### Documentaion
 Everything you need to know is in the [SS2K Wiki](https://github.com/doudar/SmartSpin2k/wiki)
 
+A limited number of kits are available on sale.  [Click here](https://github.com/doudar/SmartSpin2k/wiki/Prebuilt-Kits) for more information
+
 <img src="Pictures/Schwinn_IC4_MOD.png" alt="Hardware 2.0"/> 
 
 [_^^@eMadman's IC4 model_](https://github.com/doudar/SmartSpin2k/tree/develop/Hardware/MODS/Case%20V2%20-%20Schwinn%20IC4%20Mod)
