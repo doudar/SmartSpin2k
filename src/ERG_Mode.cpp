@@ -294,14 +294,13 @@ bool PowerTable::save() {
 // Display power table in log
 void PowerTable::toLog() {
   int len = 4;
-  for (int i = 0; i < POWERTABLE_SIZE; i++) {  // Find the longest integer in the table
+  for (int i = 0; i < POWERTABLE_SIZE; i++) {  // Find the longest integer to dynamically size the power table
     int l = snprintf(nullptr, 0, "%d", this->powerEntry[i].targetPosition);
     if (len < l) {
       len = l;
     }
   }
-  char buffer[len +
-              2];  // add code here to truncate the uint32_t value for display. Or change the value system wide to be a regular int since we probaby dont need that much anymore.
+  char buffer[len + 2];
   String oString  = "";
   char oFormat[5] = "";
   sprintf(oFormat, "|%%%dd", len);
