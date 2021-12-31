@@ -30,66 +30,33 @@ void setupERG() {
 }
 
 void ergTaskLoop(void* pvParameters) {
-  ErgMode ergMode;
+  ErgMode ergMode = ErgMode(&powerTable);
   PowerBuffer powerBuffer;
 
   ergMode._writeLogHeader();
-  int newSetPoint             = rtConfig.getTargetWatts();
-  bool isInErgMode            = rtConfig.getERGMode();
-  bool hasConnectedPowerMeter = spinBLEClient.connectedPM;
-  bool simulationRunning      = rtConfig.getSimulateTargetWatts();
+  bool isInErgMode            = false;
+  bool hasConnectedPowerMeter = false;
+  bool simulationRunning      = false;
   int loopCounter             = 0;
   while (true) {
     vTaskDelay(ERG_MODE_DELAY / portTICK_PERIOD_MS);
-    newSetPoint            = rtConfig.getTargetWatts();
+
     isInErgMode            = rtConfig.getERGMode();
     hasConnectedPowerMeter = spinBLEClient.connectedPM;
     simulationRunning      = rtConfig.getSimulateTargetWatts();
 
-    if ((rtConfig.getSimulatedCad() > 70) && (rtConfig.getSimulatedCad() < 100) && (rtConfig.getSimulatedWatts().value > 10) &&
-        (rtConfig.getSimulatedWatts().value < POWERTABLE_SIZE * POWERTABLE_INCREMENT)) {
-      if (powerBuffer.powerEntry[0].readings == 0) {
-        powerBuffer.set(0);  // Take Initial reading
-      } else if (abs(powerBuffer.powerEntry[0].watts - rtConfig.getSimulatedWatts().value) < (POWERTABLE_INCREMENT / 2)) {
-        for (int i = 1; i < POWER_SAMPLES; i++) {
-          if (powerBuffer.powerEntry[i].readings == 0) {
-            powerBuffer.set(i);  // Add additional readings to the buffer.
-            break;
-          }
-        }
-        if (powerBuffer.powerEntry[POWER_SAMPLES - 1].readings == 1) {  // If buffer is full, create a new table entry and clear the buffer.
-          powerTable.newEntry(powerBuffer);
-          powerTable.toLog();
-          powerBuffer.reset();
-        }
-      } else {  // Reading was outside the range - clear the buffer and start over.
-        powerBuffer.reset();
-      }
+    // add values to power table
+    powerTable.processPowerValue(powerBuffer, rtConfig.getSimulatedCad(), rtConfig.getSimulatedWatts());
+
+    // compute ERG
+    if (isInErgMode && (hasConnectedPowerMeter || simulationRunning)) {
+      ergMode.computErg();
     }
 
-    if (isInErgMode && (hasConnectedPowerMeter || simulationRunning)) {
-      ergMode.computErg(newSetPoint);
-    } else {
-      if (newSetPoint > 0) {  // reset ERG state
-        SS2K_LOG(ERG_MODE_LOG_TAG, "Resetting Target Watts to 0");
-        rtConfig.setTargetWatts(0);
-        rtConfig.setERGMode(false);
-      }
-    }
     // Set Min and Max Stepper positions
     if (loopCounter > 50) {
       loopCounter = 0;
-      int _return = powerTable.lookup(MIN_WATTS, 90);
-      if (_return != RETURN_ERROR) {
-        rtConfig.setMinStep(_return);
-        SS2K_LOG(ERG_MODE_LOG_TAG, "Min Position Set: %d", _return);
-      }
-      _return = powerTable.lookup(userConfig.getMaxWatts(), 90);
-     
-      if (_return != RETURN_ERROR) {
-        rtConfig.setMaxStep(_return);
-        SS2K_LOG(ERG_MODE_LOG_TAG, "Max Position Set: %d", _return);
-      }
+      powerTable.setStepperMinMax();
     }
     loopCounter++;
 
@@ -115,8 +82,45 @@ void PowerBuffer::reset() {
   }
 }
 
+void PowerTable::processPowerValue(PowerBuffer& powerBuffer, int cadence, Measurement watts) {
+  if ((cadence > 70) && (cadence < 100) && (watts.value > 10) && (watts.value < POWERTABLE_SIZE * POWERTABLE_INCREMENT)) {
+    if (powerBuffer.powerEntry[0].readings == 0) {
+      powerBuffer.set(0);  // Take Initial reading
+    } else if (abs(powerBuffer.powerEntry[0].watts - watts.value) < (POWERTABLE_INCREMENT / 2)) {
+      for (int i = 1; i < POWER_SAMPLES; i++) {
+        if (powerBuffer.powerEntry[i].readings == 0) {
+          powerBuffer.set(i);  // Add additional readings to the buffer.
+          break;
+        }
+      }
+      if (powerBuffer.powerEntry[POWER_SAMPLES - 1].readings == 1) {  // If buffer is full, create a new table entry and clear the buffer.
+        this->newEntry(powerBuffer);
+        this->toLog();
+        powerBuffer.reset();
+      }
+    } else {  // Reading was outside the range - clear the buffer and start over.
+      powerBuffer.reset();
+    }
+  }
+}
+
+// Set min / max stepper position
+void PowerTable::setStepperMinMax() {
+  int _return = this->lookup(MIN_WATTS, 90);
+  if (_return != RETURN_ERROR) {
+    rtConfig.setMinStep(_return);
+    SS2K_LOG(ERG_MODE_LOG_TAG, "Min Position Set: %d", _return);
+  }
+  _return = this->lookup(userConfig.getMaxWatts(), 90);
+
+  if (_return != RETURN_ERROR) {
+    rtConfig.setMaxStep(_return);
+    SS2K_LOG(ERG_MODE_LOG_TAG, "Max Position Set: %d", _return);
+  }
+}
+
 // Accepts new data into the table and averages input by number of readings in the power entry.
-void PowerTable::newEntry(PowerBuffer powerBuffer) {
+void PowerTable::newEntry(PowerBuffer& powerBuffer) {
   int watts              = 0;
   int cad                = 0;
   int32_t targetPosition = 0;
@@ -247,15 +251,15 @@ int32_t PowerTable::lookup(int watts, int cad) {
       above.targetPosition = this->powerEntry[indexPair].targetPosition;
       above.cad            = this->powerEntry[indexPair].cad;
     }
-    if(below.targetPosition>=above.targetPosition){
+    if (below.targetPosition >= above.targetPosition) {
       SS2K_LOG(ERG_MODE_LOG_TAG, "Reverse/No Delta in PowerTable");
-      return(RETURN_ERROR);
+      return (RETURN_ERROR);
     }
   } else {  // Not enough data
-    SS2K_LOG(ERG_MODE_LOG_TAG,"No pair in power table");
+    SS2K_LOG(ERG_MODE_LOG_TAG, "No pair in power table");
     return (RETURN_ERROR);
   }
-   SS2K_LOG(ERG_MODE_LOG_TAG,"PowerTable pairs [%d][%d]", i, indexPair);
+  SS2K_LOG(ERG_MODE_LOG_TAG, "PowerTable pairs [%d][%d]", i, indexPair);
 
   // @MarkusSchneider's data shows a linear relationship between CAD and Watts for a given resistance level.
   // It looks like for every 20 CAD increase there is ~50w increase in power. This may need to be adjusted later
@@ -290,14 +294,13 @@ bool PowerTable::save() {
 // Display power table in log
 void PowerTable::toLog() {
   int len = 4;
-  for (int i = 0; i < POWERTABLE_SIZE; i++) {  // Find the longest integer in the table
+  for (int i = 0; i < POWERTABLE_SIZE; i++) {  // Find the longest integer to dynamically size the power table
     int l = snprintf(nullptr, 0, "%d", this->powerEntry[i].targetPosition);
     if (len < l) {
       len = l;
     }
   }
-  char buffer[len +
-              2];  // add code here to truncate the uint32_t value for display. Or change the value system wide to be a regular int since we probaby dont need that much anymore.
+  char buffer[len + 2];
   String oString  = "";
   char oFormat[5] = "";
   sprintf(oFormat, "|%%%dd", len);
@@ -322,15 +325,15 @@ void PowerTable::toLog() {
 }
 
 // as a note, Trainer Road sends 50w target whenever the app is connected.
-void ErgMode::computErg(int newSetPoint) {
+void ErgMode::computErg() {
   Measurement newWatts = rtConfig.getSimulatedWatts();
   float currentIncline = rtConfig.getCurrentIncline();
   int newCadence       = rtConfig.getSimulatedCad();
-  int wattChange       = newSetPoint - newWatts.value;  // setpoint_form_trainer - current_power => Amount to increase or decrease incline
-  float deviation      = ((float)wattChange * 100.0) / ((float)newSetPoint);
+  int newSetPoint      = rtConfig.getTargetWatts();
 
-  if (watts.timestamp == newWatts.timestamp && this->setPoint == newSetPoint) {
-    return;  // no new power measurement.
+  // check for new power value or new setpoint, if watts < 10 treat as faulty
+  if ((this->watts.timestamp == newWatts.timestamp && this->setPoint == newSetPoint) || newWatts.value < 10) {
+    return;
   }
 
   // set minimum SetPoint to 50 watt if trainer sends setpoints lower than 50 watt.
@@ -343,37 +346,61 @@ void ErgMode::computErg(int newSetPoint) {
     return;
   }
 
-  // reset cycle counter to start new erg calculation cycle
+  // SetPoint changed
   if (this->setPoint != newSetPoint) {
-    this->cycles        = 0;
-    int32_t tableResult = powerTable.lookup(newSetPoint, newCadence);
-    if (tableResult != -99) {
-      SS2K_LOG(ERG_MODE_LOG_TAG, "Using PowerTable Result %d", tableResult);
-      rtConfig.setTargetIncline(tableResult);
-      // store for next cycle for timestamp and value compare
-      this->watts    = newWatts;
-      this->setPoint = newSetPoint;
-      this->cadence  = newCadence;
-      this->cycles++;
-      while (ss2k.stepperIsRunning) {  // wait while the knob moves to target position.
-        vTaskDelay(100 / portTICK_PERIOD_MS);
-      }
-      vTaskDelay(1500 / portTICK_PERIOD_MS);  // Wait for power meter to register new power
-      return;
-    }
+    _setPointChangeState(newSetPoint, newCadence, newWatts, currentIncline);
+    return;
   }
 
-  float factor     = abs(deviation) > 10 ? userConfig.getERGSensitivity() : userConfig.getERGSensitivity() / 2;
+  // Setpoint unchanged
+  _inSetpointState(newSetPoint, newCadence, newWatts, currentIncline);
+}
+
+void ErgMode::_setPointChangeState(int newSetPoint, int newCadence, Measurement& newWatts, float currentIncline) {
+  this->cycle         = 0;
+  int32_t tableResult = powerTable->lookup(newSetPoint, newCadence);
+  if (tableResult == -99) {
+    int wattChange  = newSetPoint - newWatts.value;
+    float diviation = ((float)wattChange * 100.0) / ((float)newSetPoint);
+    float factor    = abs(diviation) > 10 ? userConfig.getERGSensitivity() : userConfig.getERGSensitivity() / 2;
+    tableResult     = currentIncline + (wattChange * factor);
+  }
+
+  SS2K_LOG(ERG_MODE_LOG_TAG, "Using PowerTable Result %d", tableResult);
+  _updateValues(newSetPoint, newCadence, newWatts, currentIncline, tableResult);
+
+  while (rtConfig.getTargetIncline() != rtConfig.getCurrentIncline()) {  // wait while the knob moves to target position.
+    vTaskDelay(100 / portTICK_PERIOD_MS);
+  }
+
+  vTaskDelay(700 / portTICK_PERIOD_MS);  // Wait for power meter to register new power
+}
+
+void ErgMode::_inSetpointState(int newSetPoint, int newCadence, Measurement& newWatts, float currentIncline) {
+  int watts = newWatts.value;
+
+  // // wait for 3 Cycles (Seconds 3) after setPoint changed -> Power should now be stable
+  // if (this->watts.value > 0 && this->cycle > 3) {
+  //   watts = newWatts.value + this->watts.value;  // build arg watts to flat measurement failure
+  // }
+
+  int wattChange  = newSetPoint - watts;  // setpoint_form_trainer - current_power => Amount to increase or decrease incline
+  float diviation = ((float)wattChange * 100.0) / ((float)newSetPoint);
+
+  float factor     = abs(diviation) > 10 ? userConfig.getERGSensitivity() : userConfig.getERGSensitivity() / 2;
   float newIncline = currentIncline + (wattChange * factor);
 
-  rtConfig.setTargetIncline(newIncline);
-  _writeLog(this->cycles, currentIncline, newIncline, setPoint, newSetPoint, this->watts.value, newWatts.value, this->cadence, newCadence);
+  _updateValues(newSetPoint, newCadence, newWatts, currentIncline, newIncline);
+}
 
-  // store for next cycle for timestamp and value compare
+void ErgMode::_updateValues(int newSetPoint, int newCadence, Measurement& newWatts, float currentIncline, float newIncline) {
+  rtConfig.setTargetIncline(newIncline);
+  _writeLog(this->cycle, currentIncline, newIncline, this->setPoint, newSetPoint, this->watts.value, newWatts.value, this->cadence, newCadence);
+
   this->watts    = newWatts;
   this->setPoint = newSetPoint;
   this->cadence  = newCadence;
-  this->cycles++;
+  this->cycle++;
 }
 
 bool ErgMode::_userIsSpinning(int cadence, float incline) {
