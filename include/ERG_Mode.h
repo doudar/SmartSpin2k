@@ -14,7 +14,7 @@
 #define ERG_MODE_LOG_CSV_TAG "ERG_Mode_CSV"
 #define POWERTABLE_LOG_TAG   "PowTab"
 #define ERG_MODE_DELAY       700
-#define RETURN_ERROR -99
+#define RETURN_ERROR         -99
 
 extern TaskHandle_t ErgTask;
 void setupERG();
@@ -47,13 +47,13 @@ class PowerTable {
   PowerEntry powerEntry[POWERTABLE_SIZE];
 
   // Pick up new power value and put them into the power table
-  void processPowerValue(int cadence, Measurement watts);
+  void processPowerValue(PowerBuffer& powerBuffer, int cadence, Measurement watts);
 
   // Sets stepper min/max value from power table
   void setStepperMinMax();
 
   // Catalogs a new entry into the power table.
-  void newEntry(PowerBuffer powerBuffer);
+  void newEntry(PowerBuffer& powerBuffer);
 
   // returns incline for wattTarget. Null if not found.
   int32_t lookup(int watts, int cad);
@@ -71,7 +71,7 @@ class PowerTable {
 class ErgMode {
  public:
   ErgMode(PowerTable* powerTable) { this->powerTable = powerTable; }
-  void computErg(int newSetpoint);
+  void computErg();
   void _writeLogHeader();
   void _writeLog(int cycles, float currentIncline, float newIncline, int currentSetPoint, int newSetPoint, int currentWatts, int newWatts, int currentCadence, int newCadence);
 
