@@ -17,6 +17,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Fixed BLE Scanner webpage not displaying devices.
 - Corrected a check in the FTMS write control point indication. 
 - readme copy change
+- added bridging improvements for screw holes - in cad but missing in STL
 
 ### Hardware
 - 
