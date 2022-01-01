@@ -108,7 +108,8 @@
             </tr>
             <tr>
               <td>
-                <p class="tooltip">Max Bike<br>Brake Watts<span class="tooltiptext">Set the most watts you've ever seen your bike absorb while you're pedaling</span></p>
+                <p class="tooltip">Max Bike<br>Brake Watts<span class="tooltiptext">Set the most watts you've ever seen
+                    your bike absorb while you're pedaling</span></p>
               </td>
               <td>
                 <div style="font-size:large; color: rgb(250, 250, 250);">
@@ -158,7 +159,8 @@
             </tr>
             <tr>
               <td>
-                <p class="tooltip">Stepper Motor<br>Direction<span class="tooltiptext">Change Stepper Direction</span></p>
+                <p class="tooltip">Stepper Motor<br>Direction<span class="tooltiptext">Change Stepper Direction</span>
+                </p>
               </td>
               <td>
                 <label class="switch"><input type="checkbox" name="stepperDir" id="stepperDir"><span
@@ -185,8 +187,8 @@
       <p>
       <h1></h1>
       </p>
-      <form action="/load_defaults.html">
-        <input type="submit" value="Reset to Defaults">
+      <form id="loadDefaultsForm" action="/load_defaults.html">
+        <input type="submit" onclick="loadDefaults(event)" value="Reset to Defaults">
       </form>
       <p></p>
     </h2>
@@ -194,6 +196,12 @@
 </body>
 
 <script>
+  function loadDefaults(event) {
+    if (!confirm('Delete all settings and reset to defaults?')) {
+      event.preventDefault();
+    }
+  }
+
   function startConfigUpdate() {
     //Update values on specified interval loading late because this tiny webserver hates frequent requests
     setTimeout(function () {
@@ -225,7 +233,6 @@
         updateSlider(document.getElementById("ERGSensitivity").value, document.getElementById("ERGSensitivityValue"));
         updateSlider(document.getElementById("stepperPower").value, document.getElementById("stepperPowerValue"));
         updateSlider(document.getElementById("maxWatts").value, document.getElementById("maxWattsValue"));
-        document.getElementById("loadingWatermark").opacity = 0;
         document.getElementById("loadingWatermark").remove();
       } else {
         startConfigUpdate();
