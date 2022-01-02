@@ -124,7 +124,6 @@ typedef struct NotifyData {
 class SpinBLEAdvertisedDevice {
  private:
   QueueHandle_t dataBufferQueue = nullptr;
-  
 
  public:  // eventually these should be made private
   // // TODO: Do we dispose of this object?  Is so, we need to de-allocate the queue.
@@ -139,8 +138,6 @@ class SpinBLEAdvertisedDevice {
 
   NimBLEAdvertisedDevice *advertisedDevice = nullptr;
   NimBLEAddress peerAddress;
-  
-  
 
   int connectedClientID = BLE_HS_CONN_HANDLE_NONE;
   BLEUUID serviceUUID   = (uint16_t)0x0000;
@@ -230,6 +227,8 @@ class SpinBLEClient {
 
 extern SpinBLEClient spinBLEClient;
 
+// https://www.bluetooth.com/specifications/specs/fitness-machine-service-1-0/
+// Table 4.3: Definition of the bits of the Fitness Machine Features field
 struct FitnessMachineFeatureFlags {
   enum Types : uint {
     AverageSpeedSupported              = 1U << 0,
@@ -252,6 +251,8 @@ struct FitnessMachineFeatureFlags {
   };
 };
 
+// https://www.bluetooth.com/specifications/specs/fitness-machine-service-1-0/
+// Table 4.4: Definition of the bits of the Target Setting Features field
 struct FitnessMachineTargetFlags {
   enum Types : uint {
     SpeedTargetSettingSupported                           = 1U << 0,
@@ -274,7 +275,46 @@ struct FitnessMachineTargetFlags {
   };
 };
 
-inline FitnessMachineFeatureFlags::Types operator|(FitnessMachineFeatureFlags::Types a, FitnessMachineFeatureFlags::Types b) {
+// https://www.bluetooth.com/specifications/specs/fitness-machine-service-1-0/
+// Table 4.13: Training Status Field Definition
+struct FitnessMachineTrainingStatusFlag {
+  enum Types : uint {
+    Other                           = 0x00,
+    Idle                            = 0x01,
+    WarmingUp                       = 0x02,
+    LowIntensityInterval            = 0x03,
+    HighIntensityInterval           = 0x04,
+    RecoveryInterval                = 0x05,
+    Isometric                       = 0x06,
+    HeartRateControl                = 0x07,
+    FitnessTest                     = 0x08,
+    SpeedOutsideOfControlRegionLow  = 0x09,
+    SpeedOutsideOfControlRegionHigh = 0x0A,
+    CoolDown                        = 0x0B,
+    WattControl                     = 0x0C,
+    ManualMode                      = 0x0D,
+    PreWorkout                      = 0x0E,
+    PostWorkout                     = 0x0F,
+    // Reserved for Future Use 0x10-0xFF
+  };
+};
+
+// https://www.bluetooth.com/specifications/specs/fitness-machine-service-1-0/
+// Table 4.24: Fitness Machine Control Point characteristic – Result Codes
+struct FitnessMachineControlPointResultCodeFlag {
+  enum Types : uint {
+    ReservedForFutureUse = 0x00,
+    Success              = 0x01,
+    OpCodeNotSupported   = 0x02,
+    InvalidParameter     = 0x03,
+    OperationFailed      = 0x04,
+    ControlNotPermitted  = 0x05,
+    // Reserved for Future Use = 0x06-0xFF
+  };
+};
+
+inline FitnessMachineFeatureFlags::Types
+operator|(FitnessMachineFeatureFlags::Types a, FitnessMachineFeatureFlags::Types b) {
   return static_cast<FitnessMachineFeatureFlags::Types>(static_cast<int>(a) | static_cast<int>(b));
 }
 
