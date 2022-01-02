@@ -770,6 +770,7 @@ void ss2kCustomCharacteristicCallbacks::onWrite(BLECharacteristic *pCharacterist
       }
       if (rxValue[0] == write) {
         rtConfig.setShifterPosition(bytes_to_u16(rxValue[3], rxValue[2]));
+        return; //Return here and let SpinBLEServer::notifyShift() handle the return. 
       }
       break;
 
@@ -819,7 +820,7 @@ void ss2kCustomCharacteristicCallbacks::onWrite(BLECharacteristic *pCharacterist
   pCharacteristic->indicate();
 }
 
-void SpinBLEServer::notifyShift(bool upDown) {
+void SpinBLEServer::notifyShift() {
   uint8_t returnValue[4];
   returnValue[0] = 0x80;
   returnValue[1] = BLE_shifterPosition;

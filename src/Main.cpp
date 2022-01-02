@@ -161,11 +161,11 @@ void shifterCheck(void *pvParameters) {
     if (rtConfig.getShifterPosition() > lastShifterPosition) {
       SS2K_LOG(MAIN_LOG_TAG, "Shift UP: %l", rtConfig.getShifterPosition());
       Serial.println(ss2k.targetPosition);
-      spinBLEServer.notifyShift(1);
+      spinBLEServer.notifyShift();
     } else if (rtConfig.getShifterPosition() < lastShifterPosition) {
       SS2K_LOG(MAIN_LOG_TAG, "Shift DOWN: %l", rtConfig.getShifterPosition());
       Serial.println(ss2k.targetPosition);
-      spinBLEServer.notifyShift(0);
+      spinBLEServer.notifyShift();
     }
     lastShifterPosition = rtConfig.getShifterPosition();
 
