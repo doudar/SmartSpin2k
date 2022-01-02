@@ -329,34 +329,34 @@ void processFTMSWrite() {
     int logBufLength = ss2k_log_hex_to_buffer(pData, length, logBuf, 0, kLogBufCapacity);
 
     int port               = 0;
-    uint8_t returnValue[3] = {0x80, (uint8_t)rxValue[0], FitnessMachineControlPointResultCodeFlag::Types::OpCodeNotSupported};
+    uint8_t returnValue[3] = {0x80, (uint8_t)rxValue[0], FitnessMachineControlPointResultCode::OpCodeNotSupported};
 
     switch ((uint8_t)rxValue[0]) {
-      case 0x00:                                                                    // request control
-        returnValue[2] = FitnessMachineControlPointResultCodeFlag::Types::Success;  // 0x01;
+      case 0x00:                                                         // request control
+        returnValue[2] = FitnessMachineControlPointResultCode::Success;  // 0x01;
         pCharacteristic->setValue(returnValue, 3);
 
         logBufLength += snprintf(logBuf + logBufLength, kLogBufCapacity - logBufLength, "-> Control Request");
         // userConfig.setERGMode(false);
-        ftmsTrainingStatus[1] = FitnessMachineTrainingStatusFlag::Types::Idle;  // 0x01;
+        ftmsTrainingStatus[1] = FitnessMachineTrainingStatus::Idle;  // 0x01;
         fitnessMachineTrainingStatus->setValue(ftmsTrainingStatus, 2);
         fitnessMachineTrainingStatus->notify(false);
         pCharacteristic->setValue(returnValue, 3);
         break;
 
-      case 0x01:                                                                    // reset
-        returnValue[2] = FitnessMachineControlPointResultCodeFlag::Types::Success;  // 0x01;
+      case 0x01:                                                         // reset
+        returnValue[2] = FitnessMachineControlPointResultCode::Success;  // 0x01;
         pCharacteristic->setValue(returnValue, 3);
 
         logBufLength += snprintf(logBuf + logBufLength, kLogBufCapacity - logBufLength, "-> Reset");
-        ftmsTrainingStatus[1] = FitnessMachineTrainingStatusFlag::Types::Idle;  // 0x01;
+        ftmsTrainingStatus[1] = FitnessMachineTrainingStatus::Idle;  // 0x01;
         fitnessMachineTrainingStatus->setValue(ftmsTrainingStatus, 2);
         fitnessMachineTrainingStatus->notify(false);
         pCharacteristic->setValue(returnValue, 3);
         break;
 
-      case 0x03: {                                                                  // inclination level setting - differs from sim mode as no negative numbers
-        returnValue[2] = FitnessMachineControlPointResultCodeFlag::Types::Success;  // 0x01;
+      case 0x03: {                                                       // inclination level setting - differs from sim mode as no negative numbers
+        returnValue[2] = FitnessMachineControlPointResultCode::Success;  // 0x01;
         pCharacteristic->setValue(returnValue, 3);
 
         port = (rxValue[2] << 8) + rxValue[1];
@@ -366,13 +366,13 @@ void processFTMSWrite() {
         logBufLength += snprintf(logBuf + logBufLength, kLogBufCapacity - logBufLength, "-> Incline Mode: %2f", rtConfig.getTargetIncline() / 100);
         uint8_t inclineStatus[3] = {0x06, (uint8_t)rxValue[1], (uint8_t)rxValue[2]};
         fitnessMachineStatusCharacteristic->setValue(inclineStatus, 3);
-        ftmsTrainingStatus[1] = FitnessMachineTrainingStatusFlag::Types::Other;  // 0x00;
+        ftmsTrainingStatus[1] = FitnessMachineTrainingStatus::Other;  // 0x00;
         fitnessMachineTrainingStatus->setValue(ftmsTrainingStatus, 2);
         fitnessMachineTrainingStatus->notify();
       } break;
 
-      case 0x04: {                                                                  // Resistance level setting
-        returnValue[2] = FitnessMachineControlPointResultCodeFlag::Types::Success;  // 0x01;
+      case 0x04: {                                                       // Resistance level setting
+        returnValue[2] = FitnessMachineControlPointResultCode::Success;  // 0x01;
         pCharacteristic->setValue(returnValue, 3);
 
         int targetResistance = rxValue[1];
@@ -381,7 +381,7 @@ void processFTMSWrite() {
         logBufLength += snprintf(logBuf + logBufLength, kLogBufCapacity - logBufLength, "-> Resistance Mode: %d", rtConfig.getShifterPosition());
         uint8_t resistanceStatus[2] = {0x07, rxValue[1]};
         fitnessMachineStatusCharacteristic->setValue(resistanceStatus, 3);
-        ftmsTrainingStatus[1] = FitnessMachineTrainingStatusFlag::Types::Other;  // 0x00;
+        ftmsTrainingStatus[1] = FitnessMachineTrainingStatus::Other;  // 0x00;
         fitnessMachineTrainingStatus->setValue(ftmsTrainingStatus, 2);
         fitnessMachineTrainingStatus->notify();
       } break;
@@ -395,32 +395,45 @@ void processFTMSWrite() {
           // computeERG(targetWatts);
           logBufLength += snprintf(logBuf + logBufLength, kLogBufCapacity - logBufLength, "-> ERG Mode Target: %d Current: %d Incline: %2f", targetWatts,
                                    rtConfig.getSimulatedWatts().value, rtConfig.getTargetIncline() / 100);
-          returnValue[2]       = FitnessMachineControlPointResultCodeFlag::Types::Success;  // 0x01;
+          returnValue[2]       = FitnessMachineControlPointResultCode::Success;  // 0x01;
           uint8_t ERGStatus[3] = {0x08, (uint8_t)rxValue[1], 0x01};
           fitnessMachineStatusCharacteristic->setValue(ERGStatus, 3);
-          ftmsTrainingStatus[1] = FitnessMachineTrainingStatusFlag::Types::WattControl;  // 0x0C;
+          ftmsTrainingStatus[1] = FitnessMachineTrainingStatus::WattControl;  // 0x0C;
           fitnessMachineTrainingStatus->setValue(ftmsTrainingStatus, 2);
           fitnessMachineTrainingStatus->notify();
         } else {
-          returnValue[2] = FitnessMachineControlPointResultCodeFlag::Types::OpCodeNotSupported;  // 0x02; no power meter connected, so no ERG
+          returnValue[2] = FitnessMachineControlPointResultCode::OpCodeNotSupported;  // 0x02; no power meter connected, so no ERG
           logBufLength += snprintf(logBuf + logBufLength, kLogBufCapacity - logBufLength, "-> ERG Mode: No Power Meter Connected");
         }
         pCharacteristic->setValue(returnValue, 3);
       } break;
 
-      case 0x07:                                                                    // Start training
-        returnValue[2] = FitnessMachineControlPointResultCodeFlag::Types::Success;  // 0x01;
+      case 0x07:                                                         // Start training
+        returnValue[2] = FitnessMachineControlPointResultCode::Success;  // 0x01;
         pCharacteristic->setValue(returnValue, 3);
 
         logBufLength += snprintf(logBuf + logBufLength, kLogBufCapacity - logBufLength, "-> Start Training");
-        ftmsTrainingStatus[1] = FitnessMachineTrainingStatusFlag::Types::Other;  // 0x00;
+        ftmsTrainingStatus[1] = FitnessMachineTrainingStatus::Other;  // 0x00;
         fitnessMachineTrainingStatus->setValue(ftmsTrainingStatus, 2);
         fitnessMachineTrainingStatus->notify();
 
         break;
 
-      case 0x11: {                                                                  // sim mode
-        returnValue[2] = FitnessMachineControlPointResultCodeFlag::Types::Success;  // 0x01;
+      case 0x08:                                                         // Stop or Pause
+        returnValue[2] = FitnessMachineControlPointResultCode::Success;  // 0x01;
+        pCharacteristic->setValue(returnValue, 3);
+        // rxValue[1] == 1 -> Stop, 2 -> Pause
+        // TODO: Move stepper to Min Position
+
+        logBufLength += snprintf(logBuf + logBufLength, kLogBufCapacity - logBufLength, "-> Stop Training");
+        ftmsTrainingStatus[1] = FitnessMachineTrainingStatus::Other;  // 0x00;
+        fitnessMachineTrainingStatus->setValue(ftmsTrainingStatus, 2);
+        fitnessMachineTrainingStatus->notify();
+
+        break;
+
+      case 0x11: {                                                       // sim mode
+        returnValue[2] = FitnessMachineControlPointResultCode::Success;  // 0x01;
         pCharacteristic->setValue(returnValue, 3);
 
         signed char buf[2];
@@ -435,7 +448,7 @@ void processFTMSWrite() {
         rtConfig.setERGMode(false);
         uint8_t simStatus[7] = {0x12, (uint8_t)rxValue[1], (uint8_t)rxValue[2], (uint8_t)rxValue[3], (uint8_t)rxValue[4], (uint8_t)rxValue[5], (uint8_t)rxValue[6]};
         fitnessMachineStatusCharacteristic->setValue(simStatus, 7);
-        ftmsTrainingStatus[1] = FitnessMachineTrainingStatusFlag::Types::Other;  // 0x00;
+        ftmsTrainingStatus[1] = FitnessMachineTrainingStatus::Other;  // 0x00;
         fitnessMachineTrainingStatus->setValue(ftmsTrainingStatus, 2);
         fitnessMachineTrainingStatus->notify();
       } break;
@@ -446,13 +459,13 @@ void processFTMSWrite() {
         fitnessMachineStatusCharacteristic->setValue(spinStatus, 2);
         uint8_t controlPoint[6] = {0x80, 0x01, 0x24, 0x03, 0x96, 0x0e};  // send low and high speed targets
         pCharacteristic->setValue(controlPoint, 6);
-        ftmsTrainingStatus[1] = FitnessMachineTrainingStatusFlag::Types::Other;  // 0x00;
+        ftmsTrainingStatus[1] = FitnessMachineTrainingStatus::Other;  // 0x00;
         fitnessMachineTrainingStatus->setValue(ftmsTrainingStatus, 2);
         fitnessMachineTrainingStatus->notify();
       } break;
 
-      case 0x15: {                                                                  // Set Targeted Cadence
-        returnValue[2] = FitnessMachineControlPointResultCodeFlag::Types::Success;  // 0x01;
+      case 0x15: {                                                       // Set Targeted Cadence
+        returnValue[2] = FitnessMachineControlPointResultCode::Success;  // 0x01;
         pCharacteristic->setValue(returnValue, 3);
 
         int targetCadence = bytes_to_u16(rxValue[2], rxValue[1]);
@@ -462,7 +475,7 @@ void processFTMSWrite() {
         uint8_t ERGStatus[3] = {0x08, (uint8_t)rxValue[1], 0x01};
         fitnessMachineStatusCharacteristic->setValue(ERGStatus, 3);
 
-        ftmsTrainingStatus[1] = FitnessMachineTrainingStatusFlag::Types::Other;  // 0x00;
+        ftmsTrainingStatus[1] = FitnessMachineTrainingStatus::Other;  // 0x00;
         fitnessMachineTrainingStatus->setValue(ftmsTrainingStatus, 2);
         fitnessMachineTrainingStatus->notify();
       } break;
@@ -471,16 +484,16 @@ void processFTMSWrite() {
         logBufLength += snprintf(logBuf + logBufLength, kLogBufCapacity - logBufLength, "-> Unsupported FTMS Request");
         pCharacteristic->setValue(returnValue, 3);
     }
-    SS2K_LOG(BLE_SERVER_LOG_TAG, "%s", logBuf);
+    SS2K_LOG(FMTS_SERVER_LOG_TAG, "%s", logBuf);
     fitnessMachineStatusCharacteristic->notify();
   } else {
-    SS2K_LOG(BLE_SERVER_LOG_TAG, "App wrote nothing ");
-    SS2K_LOG(BLE_SERVER_LOG_TAG, "assuming it's a Control request");
+    SS2K_LOG(FMTS_SERVER_LOG_TAG, "App wrote nothing ");
+    SS2K_LOG(FMTS_SERVER_LOG_TAG, "assuming it's a Control request");
 
-    uint8_t controlPoint[3] = {0x80, 0x00, FitnessMachineControlPointResultCodeFlag::Types::Success};
+    uint8_t controlPoint[3] = {0x80, 0x00, FitnessMachineControlPointResultCode::Success};
     pCharacteristic->setValue(controlPoint, 3);
 
-    ftmsTrainingStatus[1] = FitnessMachineTrainingStatusFlag::Types::Other;  // 0x00;
+    ftmsTrainingStatus[1] = FitnessMachineTrainingStatus::Other;  // 0x00;
     fitnessMachineTrainingStatus->setValue(ftmsTrainingStatus, 2);
     fitnessMachineTrainingStatus->notify(false);
   }

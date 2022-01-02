@@ -14,10 +14,11 @@
 #include <Arduino.h>
 #include <Main.h>
 
-#define BLE_CLIENT_LOG_TAG "BLE_Client"
-#define BLE_COMMON_LOG_TAG "BLE_Common"
-#define BLE_SERVER_LOG_TAG "BLE_Server"
-#define BLE_SETUP_LOG_TAG  "BLE_Setup"
+#define BLE_CLIENT_LOG_TAG  "BLE_Client"
+#define BLE_COMMON_LOG_TAG  "BLE_Common"
+#define BLE_SERVER_LOG_TAG  "BLE_Server"
+#define BLE_SETUP_LOG_TAG   "BLE_Setup"
+#define FMTS_SERVER_LOG_TAG "FTMS_SERVER"
 
 // custom characteristic codes
 #define BLE_firmwareUpdateURL     0x01
@@ -228,6 +229,40 @@ class SpinBLEClient {
 extern SpinBLEClient spinBLEClient;
 
 // https://www.bluetooth.com/specifications/specs/fitness-machine-service-1-0/
+// Table 4.13: Training Status Field Definition
+enum FitnessMachineTrainingStatus : uint {
+  Other                           = 0x00,
+  Idle                            = 0x01,
+  WarmingUp                       = 0x02,
+  LowIntensityInterval            = 0x03,
+  HighIntensityInterval           = 0x04,
+  RecoveryInterval                = 0x05,
+  Isometric                       = 0x06,
+  HeartRateControl                = 0x07,
+  FitnessTest                     = 0x08,
+  SpeedOutsideOfControlRegionLow  = 0x09,
+  SpeedOutsideOfControlRegionHigh = 0x0A,
+  CoolDown                        = 0x0B,
+  WattControl                     = 0x0C,
+  ManualMode                      = 0x0D,
+  PreWorkout                      = 0x0E,
+  PostWorkout                     = 0x0F,
+  // Reserved for Future Use 0x10-0xFF
+};
+
+// https://www.bluetooth.com/specifications/specs/fitness-machine-service-1-0/
+// Table 4.24: Fitness Machine Control Point characteristic – Result Codes
+enum FitnessMachineControlPointResultCode : uint {
+  ReservedForFutureUse = 0x00,
+  Success              = 0x01,
+  OpCodeNotSupported   = 0x02,
+  InvalidParameter     = 0x03,
+  OperationFailed      = 0x04,
+  ControlNotPermitted  = 0x05,
+  // Reserved for Future Use = 0x06-0xFF
+};
+
+// https://www.bluetooth.com/specifications/specs/fitness-machine-service-1-0/
 // Table 4.3: Definition of the bits of the Fitness Machine Features field
 struct FitnessMachineFeatureFlags {
   enum Types : uint {
@@ -275,46 +310,7 @@ struct FitnessMachineTargetFlags {
   };
 };
 
-// https://www.bluetooth.com/specifications/specs/fitness-machine-service-1-0/
-// Table 4.13: Training Status Field Definition
-struct FitnessMachineTrainingStatusFlag {
-  enum Types : uint {
-    Other                           = 0x00,
-    Idle                            = 0x01,
-    WarmingUp                       = 0x02,
-    LowIntensityInterval            = 0x03,
-    HighIntensityInterval           = 0x04,
-    RecoveryInterval                = 0x05,
-    Isometric                       = 0x06,
-    HeartRateControl                = 0x07,
-    FitnessTest                     = 0x08,
-    SpeedOutsideOfControlRegionLow  = 0x09,
-    SpeedOutsideOfControlRegionHigh = 0x0A,
-    CoolDown                        = 0x0B,
-    WattControl                     = 0x0C,
-    ManualMode                      = 0x0D,
-    PreWorkout                      = 0x0E,
-    PostWorkout                     = 0x0F,
-    // Reserved for Future Use 0x10-0xFF
-  };
-};
-
-// https://www.bluetooth.com/specifications/specs/fitness-machine-service-1-0/
-// Table 4.24: Fitness Machine Control Point characteristic – Result Codes
-struct FitnessMachineControlPointResultCodeFlag {
-  enum Types : uint {
-    ReservedForFutureUse = 0x00,
-    Success              = 0x01,
-    OpCodeNotSupported   = 0x02,
-    InvalidParameter     = 0x03,
-    OperationFailed      = 0x04,
-    ControlNotPermitted  = 0x05,
-    // Reserved for Future Use = 0x06-0xFF
-  };
-};
-
-inline FitnessMachineFeatureFlags::Types
-operator|(FitnessMachineFeatureFlags::Types a, FitnessMachineFeatureFlags::Types b) {
+inline FitnessMachineFeatureFlags::Types operator|(FitnessMachineFeatureFlags::Types a, FitnessMachineFeatureFlags::Types b) {
   return static_cast<FitnessMachineFeatureFlags::Types>(static_cast<int>(a) | static_cast<int>(b));
 }
 
