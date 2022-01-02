@@ -238,7 +238,7 @@
       <h1></h1>
       </p>
       <form id="loadDefaultsForm" action="/load_defaults.html">
-        <input type="submit" onclick="loadDefaults(event)" value="Reset to Defaults">
+        <input type="button" onclick="loadDefaults(event)" value="Reset to Defaults">
       </form>
       <p></p>
     </h2>
@@ -247,8 +247,8 @@
 
 <script>
   function loadDefaults(event) {
-    if (!confirm('Delete all settings and reset to defaults?')) {
-      event.preventDefault();
+    if (confirm('Delete all settings and reset to defaults?')) {
+      document.getElementById("loadDefaultsForm").submit();
     }
   }
 
