@@ -120,8 +120,8 @@ void startHttpServer() {
 
   /********************************************Begin
    * Handlers***********************************/
-  server.on("/", handleIndexFile);
-  server.on("/index.html", handleIndexFile);
+  server.on("/", handleSpiffsFile);
+  server.on("/index.html", handleSpiffsFile);
   server.on("/generate_204", handleIndexFile);         // Android captive portal
   server.on("/fwlink", handleIndexFile);               // Microsoft captive portal
   server.on("/hotspot-detect.html", handleIndexFile);  // Apple captive portal
