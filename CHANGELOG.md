@@ -13,7 +13,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Refactored ERG 
 
 ### Hardware
-- 
+- Added Ultra Short Case mod which should allow as little as ~40mm from knob center to head tube. 
 
 #### IC4 Mod
 - 
