@@ -11,7 +11,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 - Refactored ERG 
-- Removed secondary indication when a shift was preformed via the custom characteristic.
+- Removed conflicting secondary BLE indicate when a shift was preformed via the custom characteristic.
   
 ### Hardware
 - 
