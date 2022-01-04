@@ -228,3 +228,10 @@ fieldset {
 .confirmation-panel > .confirmation-buttongroup {
   padding-top: 10px;
 }
+
+.confirmation-buttongroup > input[type="button"] {
+  width: 75px;
+  height: 40px;
+  font-size: 1em;
+  border-radius: 10px;
+}
