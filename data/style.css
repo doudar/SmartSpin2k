@@ -7,11 +7,11 @@ html {
   line-height: 1em;
 }
 
-label{
+label {
   font-size: medium;
 }
 
-div{
+div {
   font-size: medium;
 }
 
@@ -163,7 +163,7 @@ table.center {
   transition: visibility 0s 2s, opacity 2s linear;
 }
 
-.shiftButton{
+.shiftButton {
   -webkit-appearance: none;
   -webkit-text-stroke: 2px rgba(104, 104, 104, 0.412);
   appearance: auto;
@@ -176,7 +176,7 @@ table.center {
   font-size: calc(1vw + 1vh);
 }
 
-.shiftBox{
+.shiftBox {
   background: #2a9df4;
   color: white;
   font-weight: bold;
@@ -191,14 +191,40 @@ body {
   background-color: #1167b1;
   opacity: 1;
   transition: 0.5s ease-in-out;
+  height: 100%;
+  width: 100%;
 }
 
-fieldset{
-  border: 10px solid ; 
-  border-color:#1e3252; 
-  box-sizing: border-box; 
-  grid-area: 1 / 1; 
-  padding: 5px; 
+fieldset {
+  border: 10px solid;
+  border-color: #1e3252;
+  box-sizing: border-box;
+  grid-area: 1 / 1;
+  padding: 5px;
   margin: 0 auto;
   z-index: -1;
+}
+
+.confirmation-dialog {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  position: fixed;
+  top: 0;
+  left: 0;
+  height: 100%;
+  width: 100%;
+  background-color: rgba(201, 201, 201, 0.7);
+  z-index: 100;
+}
+
+.confirmation-dialog > .confirmation-panel {
+  background-color: #03245c;
+  color: white;
+  padding: 20px;
+  border-radius: 10px;
+}
+
+.confirmation-panel > .confirmation-buttongroup {
+  padding-top: 10px;
 }

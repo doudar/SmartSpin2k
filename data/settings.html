@@ -1,7 +1,6 @@
 <!DOCTYPE html>
 <html>
 
-
 <head>
   <style type="text/css">
     html {
@@ -238,7 +237,16 @@
       <h1></h1>
       </p>
       <form id="loadDefaultsForm" action="/load_defaults.html">
-        <input type="button" onclick="loadDefaults(event)" value="Reset to Defaults">
+        <input type="button" onclick="showLoadDefaultsConfirmation()" value="Reset to Defaults">
+        <div id="confirmation" class="confirmation-dialog" style="display: none;">
+          <div class="confirmation-panel">
+            Delete all settings and reset to defaults?
+            <div class="confirmation-buttongroup">
+              <input type="button" onclick="loadDefaults()" value="Yes">
+              <input type="button" onclick="hideLoadDefaultsConfirmation()" value="No">
+            </div>
+          </div>
+        </div>
       </form>
       <p></p>
     </h2>
@@ -246,10 +254,17 @@
 </body>
 
 <script>
-  function loadDefaults(event) {
-    if (confirm('Delete all settings and reset to defaults?')) {
-      document.getElementById("loadDefaultsForm").submit();
-    }
+  function showLoadDefaultsConfirmation(event) {
+    document.getElementById("confirmation").style.display = "flex";
+  }
+
+  function hideLoadDefaultsConfirmation() {
+    document.getElementById("confirmation").style.display = "none";
+  }
+
+  function loadDefaults() {
+    document.getElementById("loadDefaultsForm").submit();
+    hideLoadDefaultsConfirmation();
   }
 
   function startConfigUpdate() {
@@ -304,7 +319,7 @@
   //Delay loading css to not swamp webserver
   window.addEventListener('load', function () {
     setTimeout(loadCss, 100);
-    startConfigUpdate();
+    // startConfigUpdate();
   }, false);
 
   function updateSlider(x, valueElement) {
@@ -328,7 +343,6 @@
       x.type = "password";
     }
   }
-
 </script>
 
 </html>
