@@ -74,7 +74,7 @@ String noIndexHTML =
 String OTAServerIndex =
     "<script src='jquery.js.gz'></script>"
     "<form method='POST' action='#' enctype='multipart/form-data' id='upload_form'>"
-    "<input type='file' name='update' id='file' onchange='sub(this)' accept='.bin,.html' style=display:none>"
+    "<input type='file' name='update' id='file' onchange='sub(this)' accept='.bin,.html,.css' style=display:none>"
     "<label id='file-input' for='file'>   Choose file...</label>"
     "<input type='submit' class=btn value='Update'>"
     "<br><br>"
