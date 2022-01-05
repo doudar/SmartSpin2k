@@ -71,7 +71,7 @@ extern std::string FTMSWrite;
 // TODO add the rest of the server to this class
 class SpinBLEServer {
  public:
-  void notifyShift(bool upDown);
+  void notifyShift();
 };
 
 extern SpinBLEServer spinBLEServer;
