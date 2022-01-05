@@ -1,0 +1,1 @@
+This is a version of Case V2 that's been shortened to allow use on bikes with less than 49mm head tube spacing. 
