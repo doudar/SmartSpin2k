@@ -47,8 +47,9 @@ String RuntimeParameters::returnJSON(bool includeDebugLog) {
 void userParameters::setDefaults() {
   firmwareUpdateURL     = FW_UPDATEURL;
   deviceName            = DEVICE_NAME;
-  shiftStep             = 600;
+  shiftStep             = DEFAULT_SHIFT_STEP;
   stealthchop           = STEALTHCHOP;
+  stepperPower          = DEFAULT_STEPPER_POWER;
   inclineMultiplier     = 3.0;
   powerCorrectionFactor = 1.0;
   ERGSensitivity        = ERG_SENSITIVITY;
