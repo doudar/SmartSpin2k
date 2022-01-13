@@ -14,7 +14,7 @@ Fusion 360 exports and generic STEP files are both provided
 
 ## BOM
 - Momentary microswitches
-- 3.5mm stereo headphone connector (shifter connector)
+- 1 RCA to 3.5mm audio cable
 See [Recommended Hardware in Wiki](https://github.com/doudar/SmartSpin2k/wiki/Recommended-Hardware) for examples and sourcing information
 
 ## Printing instructions
