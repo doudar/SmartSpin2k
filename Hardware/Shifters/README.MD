@@ -18,7 +18,7 @@ Fusion 360 exports and generic STEP files are both provided
 See [Recommended Hardware in Wiki](https://github.com/doudar/SmartSpin2k/wiki/Recommended-Hardware) for examples and sourcing information
 
 ## Printing instructions
-The bridging layers on this print are tricky to get right with TPU.  It is important to minimize holes in the bridging and ensure it is well sealed against sweat and water.  These tips have worked very well for me with this print in Superslicer.  With good cooling and a slow print speed, this print is very achievable. 
+The bridging layers on this print are tricky to get right with TPU.  It is important to minimize gaps in the bridging layers and ensure it is well sealed against sweat and water.  The instructions listed here have worked well in Superslicer or Prusaslicer. With good cooling and a slow print speed, this print is very achievable. 
 
 If you are unsure, print test_housing.stl - this will print much more quickly than the full strap and allow you to dial in the print using less material and time.
 
