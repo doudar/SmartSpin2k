@@ -1,14 +1,21 @@
 # 2-in-1 strap
-This mod was a design exercise to bring tactile feedback to the shifters.  The stock design uses a lot of TPU material above the momentary switch, resulting in mushiness and lost tactility.  This design also merges two shifters into one housing to  order to save plastic and reduce the travel movements necessary.
-
+This design is intended for printing with TPU.  You will need a hot glue gun for assembly.
 
 Fusion 360 exports and generic STEP files are both provided
 
 ![render of remote](screenshot.png)
 
 
-## Assembly
+## Assembly Instructions
+- [See Shifter Assembly video linked in Wiki](https://github.com/doudar/SmartSpin2k/wiki/Building-How-To)
+
+## Setup
 - In case you need to flip the orientation of the shifter, you can easily do so in the SmartSpin2K User Interface.  Navigate to [http://SmartSpin2K.local/](http://SmartSpin2K.local).  Here, you can toggle the Shifter Direction button until the device shifts in the right direction and save your settings.  You can verify your settings in the [Web Shifter](http://smartspin2k.local/shift.html)
+
+## BOM
+- Momentary microswitches
+- 3.5mm stereo headphone connector (shifter connector)
+See [Recommended Hardware in Wiki](https://github.com/doudar/SmartSpin2k/wiki/Recommended-Hardware) for examples and sourcing information
 
 ## Printing instructions
 The bridging layers on this print are tricky to get right with TPU.  It is important to minimize holes in the bridging and ensure it is well sealed against sweat and water.  These tips have worked very well for me with this print in Superslicer.  With good cooling and a slow print speed, this print is very achievable. 
