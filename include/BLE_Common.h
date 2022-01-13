@@ -230,7 +230,7 @@ extern SpinBLEClient spinBLEClient;
 
 // https://www.bluetooth.com/specifications/specs/fitness-machine-service-1-0/
 // Table 4.13: Training Status Field Definition
-enum FitnessMachineTrainingStatus : uint {
+enum FitnessMachineTrainingStatus : uint8_t {
   Other                           = 0x00,
   Idle                            = 0x01,
   WarmingUp                       = 0x02,
@@ -252,7 +252,7 @@ enum FitnessMachineTrainingStatus : uint {
 
 // https://www.bluetooth.com/specifications/specs/fitness-machine-service-1-0/
 // Table 4.24: Fitness Machine Control Point characteristic – Result Codes
-enum FitnessMachineControlPointResultCode : uint {
+enum FitnessMachineControlPointResultCode : uint8_t {
   ReservedForFutureUse = 0x00,
   Success              = 0x01,
   OpCodeNotSupported   = 0x02,
@@ -308,6 +308,48 @@ struct FitnessMachineTargetFlags {
     SpinDownControlSupported                              = 1U << 15,
     TargetedCadenceConfigurationSupported                 = 1U << 16
   };
+};
+
+// https://www.bluetooth.com/specifications/specs/fitness-machine-service-1-0/
+// Table 4.16.1: Fitness Machine Control Point Procedure Requirements
+enum FitnessMachineControlPointProcedure : uint8_t {
+  RequestControl                    = 0x00,
+  Reset                             = 0x01,
+  SetTargetSpeed                    = 0x02,
+  SetTargetInclination              = 0x03,
+  SetTargetResistanceLevel          = 0x04,
+  SetTargetPower                    = 0x05,
+  SetTargetHeartRate                = 0x06,
+  StartOrResume                     = 0x07,
+  StopOrPause                       = 0x08,
+  SetIndoorBikeSimulationParameters = 0x11,
+  SetWheelCircumference             = 0x12,
+  SpinDownControl                   = 0x13,
+  SetTargetedCadence                = 0x14,
+  // Reserved for Future Use 0x15-0x7F
+  ResponseCode = 0x80
+  // Reserved for Future Use 0x81-0xFF
+};
+
+// https://www.bluetooth.com/specifications/specs/fitness-machine-service-1-0/
+// Table 4.17: Fitness Machine Status
+enum FitnessMachineStatus : uint8_t {
+  ReservedForFutureUse                  = 0x00,
+  Reset                                 = 0x01,
+  StoppedOrPausedByUser                 = 0x02,
+  StoppedOrPausedBySafetyKey            = 0x03,
+  StartedOrResumedByUser                = 0x04,
+  TargetSpeedChanged                    = 0x05,
+  TargetInclineChanged                  = 0x06,
+  TargetResistanceLevelChanged          = 0x07,
+  TargetPowerChanged                    = 0x08,
+  TargetHeartRateChanged                = 0x09,
+  IndoorBikeSimulationParametersChanged = 0x12,
+  WheelCircumferenceChanged             = 0x13,
+  SpinDownStatus                        = 0x14,
+  TargetedCadenceChanged                = 0x15,
+  // Reserved for Future Use 0x16-0xFE
+  ControlPermissionLost = 0xFF
 };
 
 inline FitnessMachineFeatureFlags::Types operator|(FitnessMachineFeatureFlags::Types a, FitnessMachineFeatureFlags::Types b) {
