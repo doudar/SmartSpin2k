@@ -18,6 +18,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Hardware
 - Added Ultra Short Case mod which should allow as little as ~40mm from knob center to head tube. 
+- Revised shifter for easier printing.  Updated printing instructions.
+- moved original shifter design into Archive directory
 
 #### IC4 Mod
 - 
