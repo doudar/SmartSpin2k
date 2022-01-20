@@ -644,7 +644,7 @@ void ss2kCustomCharacteristicCallbacks::onWrite(BLECharacteristic *pCharacterist
       }
       if (rxValue[0] == write) {
         userConfig.setStepperPower(bytes_to_u16(rxValue[3], rxValue[2]));
-        updateStepperPower();
+        ss2k.updateStepperPower();
       }
       break;
 
@@ -656,7 +656,7 @@ void ss2kCustomCharacteristicCallbacks::onWrite(BLECharacteristic *pCharacterist
       }
       if (rxValue[0] == write) {
         userConfig.setStealthChop(rxValue[2]);
-        updateStealthchop();
+        ss2k.updateStealthchop();
       }
       break;
 

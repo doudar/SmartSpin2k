@@ -14,31 +14,14 @@
 #include "FastAccelStepper.h"
 #include "ERG_Mode.h"
 
-bool lastDir = true;  // Stepper Last Direction
-
-// Debounce Setup
-uint64_t lastDebounceTime = 0;    // the last time the output pin was toggled
-uint64_t debounceDelay    = 500;  // the debounce time; increase if the output flickers
-
-// Stepper Speed - Lower is faster
-int maxStepperSpeed     = 500;
-int lastShifterPosition = 0;
-
 HardwareSerial stepperSerial(2);
 TMC2208Stepper driver(&SERIAL_PORT, R_SENSE);  // Hardware Serial
 FastAccelStepperEngine engine = FastAccelStepperEngine();
 FastAccelStepper *stepper     = NULL;
-
-// Setup for BLEScan via shifters.
-int shiftersHoldForScan = SHIFTERS_HOLD_FOR_SCAN;
-uint64_t scanDelayTime  = 10000;
-uint64_t scanDelayStart = 0;
-bool scanDelayRunning   = false;
-
 // Setup a task so the stepper will run on a different core than the main code
 // to prevent stuttering
 TaskHandle_t moveStepperTask;
-TaskHandle_t shifterCheckTask;
+TaskHandle_t maintenanceLoopTask;
 
 ///////////// Initialize the Config /////////////
 SS2K ss2k;
@@ -49,7 +32,7 @@ physicalWorkingCapacity userPWC;
 ///////////// BEGIN SETUP /////////////
 #ifndef UNIT_TEST
 
-void startTasks() {
+void SS2K::startTasks() {
   SS2K_LOG(MAIN_LOG_TAG, "Start BLE + ERG Tasks");
   if (BLECommunicationTask == NULL) {
     setupBLE();
@@ -59,7 +42,7 @@ void startTasks() {
   }
 }
 
-void stopTasks() {
+void SS2K::stopTasks() {
   SS2K_LOG(MAIN_LOG_TAG, "Stop BLE + ERG Tasks");
   if (BLECommunicationTask != NULL) {
     vTaskDelete(BLECommunicationTask);
@@ -106,13 +89,13 @@ void setup() {
   digitalWrite(STEP_PIN, LOW);
   digitalWrite(LED_PIN, LOW);
 
-  setupTMCStepperDriver();
+  ss2k.setupTMCStepperDriver();
 
   SS2K_LOG(MAIN_LOG_TAG, "Setting up cpu Tasks");
   disableCore0WDT();  // Disable the watchdog timer on core 0 (so long stepper
                       // moves don't cause problems)
 
-  xTaskCreatePinnedToCore(moveStepper,           /* Task function. */
+  xTaskCreatePinnedToCore(SS2K::moveStepper,     /* Task function. */
                           "moveStepperFunction", /* name of task. */
                           1500,                  /* Stack size of task */
                           NULL,                  /* parameter of the task */
@@ -128,54 +111,62 @@ void setup() {
   // HTTP setup because otherwise they use too much traffic and the device
   // fails to update which really sucks when it corrupts your settings.
 
-  FirmwareUpdate();
+  httpServer.FirmwareUpdate();
 
-  startTasks();
-  startHttpServer();
+  ss2k.startTasks();
+  httpServer.start();
 
-  resetIfShiftersHeld();
+  ss2k.resetIfShiftersHeld();
   SS2K_LOG(MAIN_LOG_TAG, "Creating Shifter Interrupts");
   // Setup Interrups so shifters work anytime
-  attachInterrupt(digitalPinToInterrupt(SHIFT_UP_PIN), shiftUp, CHANGE);
-  attachInterrupt(digitalPinToInterrupt(SHIFT_DOWN_PIN), shiftDown, CHANGE);
+  attachInterrupt(digitalPinToInterrupt(SHIFT_UP_PIN), ss2k.shiftUp, CHANGE);
+  attachInterrupt(digitalPinToInterrupt(SHIFT_DOWN_PIN), ss2k.shiftDown, CHANGE);
   digitalWrite(LED_PIN, HIGH);
 
-  xTaskCreatePinnedToCore(shifterCheck,           /* Task function. */
-                          "shifterCheckFunction", /* name of task. */
-                          2000,                   /* Stack size of task */
-                          NULL,                   /* parameter of the task */
-                          1,                      /* priority of the task */
-                          &shifterCheckTask,      /* Task handle to keep track of created task */
-                          1);                     /* pin task to core 0 */
+  xTaskCreatePinnedToCore(SS2K::maintenanceLoop,     /* Task function. */
+                          "maintenanceLoopFunction", /* name of task. */
+                          2500,                      /* Stack size of task */
+                          NULL,                      /* parameter of the task */
+                          1,                         /* priority of the task */
+                          &maintenanceLoopTask,      /* Task handle to keep track of created task */
+                          1);                        /* pin task to core 0 */
 }
 
 void loop() {  // Delete this task so we can make one that's more memory efficient.
   vTaskDelete(NULL);
 }
 
-void shifterCheck(void *pvParameters) {
-  static int loopCounter = 0;
+void SS2K::maintenanceLoop(void *pvParameters) {
+  static int loopCounter             = 0;
+  static unsigned long intervalTimer = millis();
   while (true) {
     vTaskDelay(200 / portTICK_RATE_MS);
 
-    if (rtConfig.getShifterPosition() > lastShifterPosition) {
+    if (rtConfig.getShifterPosition() > ss2k.lastShifterPosition) {
       SS2K_LOG(MAIN_LOG_TAG, "Shift UP: %l", rtConfig.getShifterPosition());
       Serial.println(ss2k.targetPosition);
       spinBLEServer.notifyShift();
-    } else if (rtConfig.getShifterPosition() < lastShifterPosition) {
+    } else if (rtConfig.getShifterPosition() < ss2k.lastShifterPosition) {
       SS2K_LOG(MAIN_LOG_TAG, "Shift DOWN: %l", rtConfig.getShifterPosition());
       Serial.println(ss2k.targetPosition);
       spinBLEServer.notifyShift();
     }
-    lastShifterPosition = rtConfig.getShifterPosition();
+    ss2k.lastShifterPosition = rtConfig.getShifterPosition();
+
+    if ((millis() - intervalTimer) > 20000) {  // add check here for when to restart WiFi
+                                               // maybe if in STA mode and 8.8.8.8 no ping return?
+      // ss2k.restartWifi();
+
+      intervalTimer = millis();
+    }
 
     if (loopCounter > 4) {
-      scanIfShiftersHeld();
-      checkDriverTemperature();
+      ss2k.scanIfShiftersHeld();
+      ss2k.checkDriverTemperature();
 
 #ifdef DEBUG_STACK
       Serial.printf("Step Task: %d \n", uxTaskGetStackHighWaterMark(moveStepperTask));
-      Serial.printf("Shft Task: %d \n", uxTaskGetStackHighWaterMark(shifterCheckTask));
+      Serial.printf("Shft Task: %d \n", uxTaskGetStackHighWaterMark(maintenanceLoopTask));
       Serial.printf("Free Heap: %d \n", ESP.getFreeHeap());
       Serial.printf("Best Blok: %d \n", heap_caps_get_largest_free_block(MALLOC_CAP_8BIT));
 #endif  // DEBUG_STACK
@@ -186,7 +177,16 @@ void shifterCheck(void *pvParameters) {
 }
 #endif  // UNIT_TEST
 
-void moveStepper(void *pvParameters) {
+void SS2K::restartWifi() {
+  httpServer.stop();
+  vTaskDelay(100 / portTICK_RATE_MS);
+  stopWifi();
+  vTaskDelay(100 / portTICK_RATE_MS);
+  startWifi();
+  httpServer.start();
+}
+
+void SS2K::moveStepper(void *pvParameters) {
   engine.init();
   bool _stepperDir = userConfig.getStepperDir();
   stepper          = engine.stepperConnectToPin(STEP_PIN);
@@ -200,7 +200,7 @@ void moveStepper(void *pvParameters) {
   while (1) {
     if (stepper) {
       ss2k.stepperIsRunning = stepper->isRunning();
-      ss2k.targetPosition = rtConfig.getShifterPosition() * userConfig.getShiftStep();
+      ss2k.targetPosition   = rtConfig.getShifterPosition() * userConfig.getShiftStep();
       if (!ss2k.externalControl) {
         if (rtConfig.getERGMode()) {
           // ERG Mode
@@ -249,7 +249,7 @@ void moveStepper(void *pvParameters) {
   }
 }
 
-bool IRAM_ATTR deBounce() {
+bool IRAM_ATTR SS2K::deBounce() {
   if ((millis() - lastDebounceTime) > debounceDelay) {  // <----------------This should be assigned it's own task and just switch a global bool whatever the reading is at, it's
                                                         // been there for longer than the debounce delay, so take it as the actual current state: if the button state has changed:
     lastDebounceTime = millis();
@@ -260,27 +260,27 @@ bool IRAM_ATTR deBounce() {
 }
 
 ///////////// Interrupt Functions /////////////
-void IRAM_ATTR shiftUp() {  // Handle the shift up interrupt IRAM_ATTR is to keep the interrput code in ram always
-  if (deBounce()) {
+void IRAM_ATTR SS2K::shiftUp() {  // Handle the shift up interrupt IRAM_ATTR is to keep the interrput code in ram always
+  if (ss2k.deBounce()) {
     if (!digitalRead(SHIFT_UP_PIN)) {  // double checking to make sure the interrupt wasn't triggered by emf
       rtConfig.setShifterPosition(rtConfig.getShifterPosition() - 1 + userConfig.getShifterDir() * 2);
     } else {
-      lastDebounceTime = 0;
+      ss2k.lastDebounceTime = 0;
     }  // Probably Triggered by EMF, reset the debounce
   }
 }
 
-void IRAM_ATTR shiftDown() {  // Handle the shift down interrupt
-  if (deBounce()) {
+void IRAM_ATTR SS2K::shiftDown() {  // Handle the shift down interrupt
+  if (ss2k.deBounce()) {
     if (!digitalRead(SHIFT_DOWN_PIN)) {  // double checking to make sure the interrupt wasn't triggered by emf
       rtConfig.setShifterPosition(rtConfig.getShifterPosition() + 1 - userConfig.getShifterDir() * 2);
     } else {
-      lastDebounceTime = 0;
+      ss2k.lastDebounceTime = 0;
     }  // Probably Triggered by EMF, reset the debounce
   }
 }
 
-void resetIfShiftersHeld() {
+void SS2K::resetIfShiftersHeld() {
   if ((digitalRead(SHIFT_UP_PIN) == LOW) && (digitalRead(SHIFT_DOWN_PIN) == LOW)) {
     SS2K_LOG(MAIN_LOG_TAG, "Resetting to defaults via shifter buttons.");
     for (int x = 0; x < 10; x++) {  // blink fast to acknowledge
@@ -298,7 +298,7 @@ void resetIfShiftersHeld() {
   }
 }
 
-void scanIfShiftersHeld() {
+void SS2K::scanIfShiftersHeld() {
   if ((digitalRead(SHIFT_UP_PIN) == LOW) && (digitalRead(SHIFT_DOWN_PIN) == LOW)) {  // are both shifters held?
     SS2K_LOG(MAIN_LOG_TAG, "Shifters Held %d", shiftersHoldForScan);
     if (shiftersHoldForScan < 1) {  // have they been held for enough loops?
@@ -321,7 +321,7 @@ void scanIfShiftersHeld() {
   }
 }
 
-void setupTMCStepperDriver() {
+void SS2K::setupTMCStepperDriver() {
   driver.begin();
   driver.pdn_disable(true);
   driver.mstep_reg_select(true);
@@ -349,13 +349,13 @@ void setupTMCStepperDriver() {
 }
 
 // Applies current power to driver
-void updateStepperPower() {
+void SS2K::updateStepperPower() {
   SS2K_LOG(MAIN_LOG_TAG, "Stepper power is now %d", userConfig.getStepperPower());
   driver.rms_current(userConfig.getStepperPower());
 }
 
 // Applies current Stealthchop to driver
-void updateStealthchop() {
+void SS2K::updateStealthchop() {
   bool t_bool = userConfig.getStealthchop();
   driver.en_spreadCycle(!t_bool);
   driver.pwm_autoscale(t_bool);
@@ -364,7 +364,7 @@ void updateStealthchop() {
 }
 
 // Checks the driver temperature and throttles power if above threshold.
-void checkDriverTemperature() {
+void SS2K::checkDriverTemperature() {
   static bool overtemp = false;
   if (static_cast<int>(temperatureRead()) > 72) {  // Start throttling driver power at 72C on the ESP32
     uint8_t throttledPower = (72 - static_cast<int>(temperatureRead())) + DRIVER_MAX_PWR_SCALER;
@@ -380,7 +380,7 @@ void checkDriverTemperature() {
   }
 }
 
-void motorStop(bool releaseTension) {
+void SS2K::motorStop(bool releaseTension) {
   stepper->stopMove();
   stepper->setCurrentPosition(ss2k.targetPosition);
   if (releaseTension) {

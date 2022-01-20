@@ -83,6 +83,9 @@
 // Wattage at which to automatically assume minimum brake resistance.  
 #define MIN_WATTS 50
 
+// Default debounce delay for shifters. Increase if you have false shifts. Decrease if shifting takes too long. 
+#define DEBOUNCE_DELAY 400
+
 // Hardware pin for rocker Switch
 #define RADIO_PIN 27
 
@@ -161,7 +164,7 @@
 // Max size of userconfig
 #define USERCONFIG_JSON_SIZE 768 + DEBUG_LOG_BUFFER_SIZE
 
-#define RUNTIMECONFIG_JSON_SIZE 512
+#define RUNTIMECONFIG_JSON_SIZE 512 + DEBUG_LOG_BUFFER_SIZE
 
 // Number of entries in the ERG Power Lookup Table
 #define POWERTABLE_SIZE 20
