@@ -10,8 +10,7 @@ Fusion 360 exports and generic STEP files are both provided
 ## Revisions from standard version 2 case:
 - Minor revisions to motor mount to suit my stepper motor.
 - Replace wood screws with M3 threaded inserts to accept m3 screws. Source from [Aliexpress](https://www.aliexpress.com/item/4000232858343.html?spm=a2g0s.9042311.0.0.21164c4dGhWHhY): M3 x 5 x 4 heat set inserts. (5mm diameter).
-- Design to use a semi-permanent mount on Schwinn IC4/Bowflex C6, allowing one-handed installation and removal.
-- opportunity to 
+- Sturdy yet easy to install and remove between rides.
 
 ## BOM
 - In addition to the electronics specced for the version 2 case, you will need:
@@ -26,9 +25,9 @@ OPTIONAL (if using [hex bolt shaft mod](https://github.com/doudar/SmartSpin2k/di
 - 3pc 5/16" washers
 - 2 pc 5/16" nuts
 
-For the bike mount, you have two options: VHB tape or something similar OR if you want to protect the paint and avoid adhesives, you can use the zip tie and rubber sticker approach:
+For the bike mount, you have two options: VHB tape or something similar OR if you want to protect the paint and avoid adhesives, you can use the velcro strap and rubber sticker approach:
 
-- 6x zip ties for the bike mount - what I did here is fish a zip tie from one end, around the square tube and through the other. Used a 2nd zip tie's ratchet bit to tighten the first zip tie. Trim off the excess. Between the rubber and zip ties, it's a pretty solid mount
+- 1pc 8 x 1/2" velcro cable tie.  [This or something similar.](https://www.amazon.ca/gp/product/B001E1Y5O6/ref=ppx_yo_dt_b_search_asin_title?ie=UTF8&th=1)  
 - some sort of rubber or silicon non-skid stickers to put on the bike mount to prevent sliding.  [I'm using this](https://www.amazon.ca/gp/product/B00P5VQ7HE)
 
 ## Printing instructions
