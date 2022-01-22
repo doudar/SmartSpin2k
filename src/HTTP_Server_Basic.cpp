@@ -23,15 +23,13 @@
 File fsUploadFile;
 
 TaskHandle_t webClientTask;
-#define MAX_BUFFER_SIZE 20
 
 IPAddress myIP;
-bool internetConnection = false;
 
 // DNS server
 const byte DNS_PORT = 53;
 DNSServer dnsServer;
-
+HTTP_Server httpServer;
 WiFiClientSecure client;
 WebServer server(80);
 
@@ -53,6 +51,7 @@ void startWifi() {
     WiFi.mode(WIFI_STA);
     WiFi.setTxPower(WIFI_POWER_19_5dBm);
     WiFi.begin(userConfig.getSsid(), userConfig.getPassword());
+    WiFi.setAutoReconnect(true);
   }
 
   while (WiFi.status() != WL_CONNECTED) {
@@ -69,7 +68,7 @@ void startWifi() {
   }
   if (WiFi.status() == WL_CONNECTED) {
     myIP               = WiFi.localIP();
-    internetConnection = true;
+    httpServer.internetConnection = true;
   }
 
   // Couldn't connect to existing network, Create SoftAP
@@ -115,7 +114,12 @@ void startWifi() {
   }
 }
 
-void startHttpServer() {
+void stopWifi() {
+  SS2K_LOG(HTTP_SERVER_LOG_TAG, "Closing connection to: %s", userConfig.getSsid());
+  WiFi.disconnect();
+}
+
+void HTTP_Server::start() {
   server.onNotFound([]() { SS2K_LOG(HTTP_SERVER_LOG_TAG, "Link Not Found: %s", server.uri().c_str()); });
 
   /********************************************Begin
@@ -304,7 +308,7 @@ void startHttpServer() {
         if (upload.filename == String("firmware.bin").c_str()) {
           if (upload.status == UPLOAD_FILE_START) {
             SS2K_LOG(HTTP_SERVER_LOG_TAG, "Update: %s", upload.filename.c_str());
-            stopTasks();
+            ss2k.stopTasks();
             if (!Update.begin(UPDATE_SIZE_UNKNOWN)) {  // start with max
                                                        // available size
               Update.printError(Serial);
@@ -350,7 +354,7 @@ void startHttpServer() {
   /********************************************End Server
    * Handlers*******************************/
 
-  xTaskCreatePinnedToCore(webClientUpdate,                    /* Task function. */
+  xTaskCreatePinnedToCore(HTTP_Server::webClientUpdate,                    /* Task function. */
                           "webClientUpdate",                  /* name of task. */
                           5000 + (DEBUG_LOG_BUFFER_SIZE * 2), /* Stack size of task Used to be 3000*/
                           NULL,                               /* parameter of the task */
@@ -371,7 +375,7 @@ void startHttpServer() {
   SS2K_LOG(HTTP_SERVER_LOG_TAG, "HTTP server started");
 }
 
-void webClientUpdate(void *pvParameters) {
+void HTTP_Server::webClientUpdate(void *pvParameters) {
   static unsigned long mDnsTimer = millis();  // NOLINT: There is no overload in String for uint64_t
   for (;;) {
     server.handleClient();
@@ -390,7 +394,7 @@ void webClientUpdate(void *pvParameters) {
   }
 }
 
-void handleIndexFile() {
+void HTTP_Server::handleIndexFile() {
   String filename = "/index.html";
   if (SPIFFS.exists(filename)) {
     File file = SPIFFS.open(filename, FILE_READ);
@@ -403,7 +407,7 @@ void handleIndexFile() {
   }
 }
 
-void handleSpiffsFile() {
+void HTTP_Server::handleSpiffsFile() {
   String filename = server.uri();
   int dotPosition = filename.lastIndexOf(".");
   String fileType = filename.substring((dotPosition + 1), filename.length());
@@ -425,7 +429,7 @@ void handleSpiffsFile() {
   }
 }
 
-void settingsProcessor() {
+void HTTP_Server::settingsProcessor() {
   String tString;
   bool wasBTUpdate       = false;
   bool wasSettingsUpdate = false;
@@ -455,10 +459,10 @@ void settingsProcessor() {
     uint64_t stepperPower = server.arg("stepperPower").toInt();
     if (stepperPower >= 500 && stepperPower <= 2000) {
       userConfig.setStepperPower(stepperPower);
-      updateStepperPower();
+      ss2k.updateStepperPower();
     }
   }
-    if (!server.arg("maxWatts").isEmpty()) {
+  if (!server.arg("maxWatts").isEmpty()) {
     uint64_t maxWatts = server.arg("maxWatts").toInt();
     if (maxWatts >= 300 && maxWatts <= 2000) {
       userConfig.setMaxWatts(maxWatts);
@@ -477,22 +481,22 @@ void settingsProcessor() {
   } else if (wasSettingsUpdate) {
     userConfig.setAutoUpdate(false);
   }
-    if (!server.arg("stepperDir").isEmpty()) {
+  if (!server.arg("stepperDir").isEmpty()) {
     userConfig.setStepperDir(true);
   } else if (wasSettingsUpdate) {
     userConfig.setStepperDir(false);
   }
-    if (!server.arg("shifterDir").isEmpty()) {
+  if (!server.arg("shifterDir").isEmpty()) {
     userConfig.setShifterDir(true);
   } else if (wasSettingsUpdate) {
     userConfig.setShifterDir(false);
   }
   if (!server.arg("stealthchop").isEmpty()) {
     userConfig.setStealthChop(true);
-    updateStealthchop();
+    ss2k.updateStealthchop();
   } else if (wasSettingsUpdate) {
     userConfig.setStealthChop(false);
-    updateStealthchop();
+    ss2k.updateStealthchop();
   }
   if (!server.arg("inclineMultiplier").isEmpty()) {
     float inclineMultiplier = server.arg("inclineMultiplier").toFloat();
@@ -555,7 +559,7 @@ void settingsProcessor() {
   } else if (wasSettingsUpdate) {  // Special Settings Page update response
     response +=
         "Network settings will be applied at next reboot. <br> Everything "
-        "else is available immediatly.</h2></body><script> "
+        "else is available immediately.</h2></body><script> "
         "setTimeout(\"location.href = 'http://" +
         myIP.toString() + "/settings.html';\",1000);</script></html>";
   } else {  // Normal response
@@ -573,10 +577,16 @@ void settingsProcessor() {
   userPWC.printFile();
 }
 
+void HTTP_Server::stop() {
+  SS2K_LOG(HTTP_SERVER_LOG_TAG, "Stopping Http Server");
+  server.stop();
+  server.close();
+}
+
 // github fingerprint
 // 70:94:DE:DD:E6:C4:69:48:3A:92:70:A1:48:56:78:2D:18:64:E0:B7
 
-void FirmwareUpdate() {
+void HTTP_Server::FirmwareUpdate() {
   HTTPClient http;
   // WiFiClientSecure client;
 
@@ -592,10 +602,10 @@ void FirmwareUpdate() {
     payload = http.getString();    // save received version
     payload.trim();
     SS2K_LOG(HTTP_SERVER_LOG_TAG, "  - Server version: %s", payload.c_str());
-    internetConnection = true;
+    httpServer.internetConnection = true;
   } else {
     SS2K_LOG(HTTP_SERVER_LOG_TAG, "error downloading %s %d", FW_VERSIONFILE, httpCode);
-    internetConnection = false;
+    httpServer.internetConnection = false;
   }
 
   http.end();

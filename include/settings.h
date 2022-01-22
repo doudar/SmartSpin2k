@@ -53,8 +53,10 @@
 
 // Default Stepper Power.
 // Stepper peak current in ma. This is hardware restricted to a maximum of 2000ma on the TMC2225. RMS current is less.
+#define DEFAULT_STEPPER_POWER 1500
 
-#define STEPPER_POWER 1500
+// Default Shift Step. THe amount to move the stepper motor for a shift press.
+#define DEFAULT_SHIFT_STEP 1000
 
 // Stepper Acceleration in steps/s^2
 #define STEPPER_ACCELERATION 3000
@@ -80,6 +82,9 @@
 
 // Wattage at which to automatically assume minimum brake resistance.  
 #define MIN_WATTS 50
+
+// Default debounce delay for shifters. Increase if you have false shifts. Decrease if shifting takes too long. 
+#define DEBOUNCE_DELAY 400
 
 // Hardware pin for rocker Switch
 #define RADIO_PIN 27
@@ -159,7 +164,7 @@
 // Max size of userconfig
 #define USERCONFIG_JSON_SIZE 768 + DEBUG_LOG_BUFFER_SIZE
 
-#define RUNTIMECONFIG_JSON_SIZE 512
+#define RUNTIMECONFIG_JSON_SIZE 512 + DEBUG_LOG_BUFFER_SIZE
 
 // Number of entries in the ERG Power Lookup Table
 #define POWERTABLE_SIZE 20
