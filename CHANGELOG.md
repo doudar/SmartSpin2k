@@ -16,6 +16,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Removed conflicting secondary BLE indicate when a shift was preformed via the custom characteristic.
 - Default stepper power is now used on reset to defaults. 
 - Refactored Main and HTTP Server.
+- Changed from hard coding to Enums in BLEServer.
  
 
 ### Hardware
