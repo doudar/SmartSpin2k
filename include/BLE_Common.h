@@ -19,6 +19,7 @@
 #define BLE_SERVER_LOG_TAG  "BLE_Server"
 #define BLE_SETUP_LOG_TAG   "BLE_Setup"
 #define FMTS_SERVER_LOG_TAG "FTMS_SERVER"
+#define CUSTOM_CHAR_LOG_TAG  "Custom_C"
 
 // custom characteristic codes
 #define BLE_firmwareUpdateURL     0x01

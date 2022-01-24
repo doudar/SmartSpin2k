@@ -235,7 +235,7 @@ void updateIndoorBikeDataChar() {
   const size_t ftmsIndoorBikeDataLength = sizeof(ftmsIndoorBikeData) / sizeof(ftmsIndoorBikeData[0]);
   logCharacteristic(logBuf, kLogBufCapacity, ftmsIndoorBikeData, ftmsIndoorBikeDataLength, FITNESSMACHINESERVICE_UUID, fitnessMachineIndoorBikeData->getUUID(),
                     "FTMS(IBD)[ HR(%d) CD(%.2f) PW(%d) SD(%.2f) ]", hr % 1000, fmodf(cadRaw, 1000.0), watts % 10000, fmodf(speed, 1000.0));
-}  // ^^Using the New Way of setting Bytes.
+}
 
 void updateCyclingPowerMeasurementChar() {
   int power = rtConfig.getSimulatedWatts().value;
@@ -329,14 +329,14 @@ void processFTMSWrite() {
     ftmsStatus = {FitnessMachineStatus::ReservedForFutureUse};
 
     switch ((uint8_t)rxValue[0]) {
-      case FitnessMachineControlPointProcedure::RequestControl: 
+      case FitnessMachineControlPointProcedure::RequestControl:
         returnValue[2] = FitnessMachineControlPointResultCode::Success;  // 0x01;
         pCharacteristic->setValue(returnValue, 3);
         logBufLength += snprintf(logBuf + logBufLength, kLogBufCapacity - logBufLength, "-> Control Request");
         ftmsTrainingStatus[1] = FitnessMachineTrainingStatus::Idle;  // 0x01;
         fitnessMachineTrainingStatus->setValue(ftmsTrainingStatus, 2);
         ftmsStatus = {FitnessMachineStatus::StartedOrResumedByUser};
-       break;
+        break;
 
       case FitnessMachineControlPointProcedure::Reset: {
         returnValue[2] = FitnessMachineControlPointResultCode::Success;  // 0x01;
@@ -582,6 +582,13 @@ void ss2kCustomCharacteristicCallbacks::onWrite(BLECharacteristic *pCharacterist
   uint8_t error       = 0xff;  // value server error/unable
   uint8_t success     = 0x80;  // value for success
 
+  uint8_t *pData = reinterpret_cast<uint8_t *>(&rxValue[0]);
+  int length     = rxValue.length();
+
+  const int kLogBufCapacity = (rxValue.length() * 2) + 60; //needs to be bigger than the largest message.
+  char logBuf[kLogBufCapacity];
+  int logBufLength = ss2k_log_hex_to_buffer(pData, length, logBuf, 0, kLogBufCapacity);
+
   size_t returnLength = rxValue.length();
   uint8_t returnValue[returnLength];
   returnValue[0] = error;
@@ -589,13 +596,14 @@ void ss2kCustomCharacteristicCallbacks::onWrite(BLECharacteristic *pCharacterist
     returnValue[i] = rxValue[i];
   }
 
-  SS2K_LOG(BLE_SERVER_LOG_TAG, "Custom Request Received");
   switch (rxValue[1]) {
     case BLE_firmwareUpdateURL:  // 0x01
+      logBufLength   += snprintf(logBuf + logBufLength, kLogBufCapacity - logBufLength, "<-Firmware Update URL");
       returnValue[0] = error;
       break;
 
     case BLE_incline: {  // 0x02
+      logBufLength   += snprintf(logBuf + logBufLength, kLogBufCapacity - logBufLength, "<-incline");
       returnValue[0] = success;
       if (rxValue[0] == read) {
         int inc        = rtConfig.getTargetIncline() * 100;
@@ -605,10 +613,12 @@ void ss2kCustomCharacteristicCallbacks::onWrite(BLECharacteristic *pCharacterist
       }
       if (rxValue[0] == write) {
         rtConfig.setTargetIncline(bytes_to_u16(rxValue[3], rxValue[2]) / 100);
+        logBufLength += snprintf(logBuf + logBufLength, kLogBufCapacity - logBufLength, "(%f)", rtConfig.getTargetIncline());
       }
     } break;
 
     case BLE_simulatedWatts:  // 0x03
+      logBufLength   += snprintf(logBuf + logBufLength, kLogBufCapacity - logBufLength, "<-simulatedWatts");
       returnValue[0] = success;
       if (rxValue[0] == read) {
         returnValue[2] = (uint8_t)(rtConfig.getSimulatedWatts().value & 0xff);
@@ -617,10 +627,12 @@ void ss2kCustomCharacteristicCallbacks::onWrite(BLECharacteristic *pCharacterist
       }
       if (rxValue[0] == write) {
         rtConfig.setSimulatedWatts(bytes_to_u16(rxValue[3], rxValue[2]));
+        logBufLength += snprintf(logBuf + logBufLength, kLogBufCapacity - logBufLength, "(%d)", rtConfig.getSimulatedWatts());
       }
       break;
 
     case BLE_simulatedHr:  // 0x04
+      logBufLength   += snprintf(logBuf + logBufLength, kLogBufCapacity - logBufLength, "<-simulatedHr");
       returnValue[0] = success;
       if (rxValue[0] == read) {
         returnValue[2] = (uint8_t)(rtConfig.getSimulatedHr() & 0xff);
@@ -629,10 +641,12 @@ void ss2kCustomCharacteristicCallbacks::onWrite(BLECharacteristic *pCharacterist
       }
       if (rxValue[0] == write) {
         rtConfig.setSimulatedHr(bytes_to_u16(rxValue[3], rxValue[2]));
+        logBufLength += snprintf(logBuf + logBufLength, kLogBufCapacity - logBufLength, "(%d)", rtConfig.getSimulatedHr());
       }
       break;
 
     case BLE_simulatedCad:  // 0x05
+      logBufLength   = snprintf(logBuf + logBufLength, kLogBufCapacity - logBufLength, "<-simulatedCad");
       returnValue[0] = success;
       if (rxValue[0] == read) {
         returnValue[2] = (uint8_t)(rtConfig.getSimulatedCad() & 0xff);
@@ -641,10 +655,12 @@ void ss2kCustomCharacteristicCallbacks::onWrite(BLECharacteristic *pCharacterist
       }
       if (rxValue[0] == write) {
         rtConfig.setSimulatedCad(bytes_to_u16(rxValue[3], rxValue[2]));
+        logBufLength += snprintf(logBuf + logBufLength, kLogBufCapacity - logBufLength, "(%d)", rtConfig.getSimulatedCad());
       }
       break;
 
     case BLE_simulatedSpeed: {  // 0x06
+      logBufLength   += snprintf(logBuf + logBufLength, kLogBufCapacity - logBufLength, "<-simulatedSpeed");
       returnValue[0] = success;
       int spd        = rtConfig.getSimulatedSpeed() * 10;
       if (rxValue[0] == read) {
@@ -654,14 +670,17 @@ void ss2kCustomCharacteristicCallbacks::onWrite(BLECharacteristic *pCharacterist
       }
       if (rxValue[0] == write) {
         rtConfig.setSimulatedSpeed(bytes_to_u16(rxValue[3], rxValue[2]) / 10);
+        logBufLength += snprintf(logBuf + logBufLength, kLogBufCapacity - logBufLength, "(%d)", rtConfig.getSimulatedSpeed());
       }
     } break;
 
     case BLE_deviceName:  // 0x07
+      logBufLength   = snprintf(logBuf + logBufLength, kLogBufCapacity - logBufLength, "<-deviceName");
       returnValue[0] = error;
       break;
 
     case BLE_shiftStep:  // 0x08
+      logBufLength   += snprintf(logBuf + logBufLength, kLogBufCapacity - logBufLength, "<-shiftStep");
       returnValue[0] = success;
       if (rxValue[0] == read) {
         returnValue[2] = (uint8_t)(userConfig.getShiftStep() & 0xff);
@@ -670,10 +689,12 @@ void ss2kCustomCharacteristicCallbacks::onWrite(BLECharacteristic *pCharacterist
       }
       if (rxValue[0] == write) {
         userConfig.setShiftStep(bytes_to_u16(rxValue[3], rxValue[2]));
+        logBufLength += snprintf(logBuf + logBufLength, kLogBufCapacity - logBufLength, "(%d)", userConfig.getShiftStep());
       }
       break;
 
     case BLE_stepperPower:  // 0x09
+      logBufLength   += snprintf(logBuf + logBufLength, kLogBufCapacity - logBufLength, "<-stepperPower");
       returnValue[0] = success;
       if (rxValue[0] == read) {
         returnValue[2] = (uint8_t)(userConfig.getStepperPower() & 0xff);
@@ -683,10 +704,12 @@ void ss2kCustomCharacteristicCallbacks::onWrite(BLECharacteristic *pCharacterist
       if (rxValue[0] == write) {
         userConfig.setStepperPower(bytes_to_u16(rxValue[3], rxValue[2]));
         ss2k.updateStepperPower();
+        logBufLength += snprintf(logBuf + logBufLength, kLogBufCapacity - logBufLength, "(%d)", userConfig.getStepperPower());
       }
       break;
 
     case BLE_stealthchop:  // 0x0A
+      logBufLength   += snprintf(logBuf + logBufLength, kLogBufCapacity - logBufLength, "<-stealthchop");
       returnValue[0] = success;
       if (rxValue[0] == read) {
         returnValue[2] = (uint8_t)(userConfig.getStealthchop());
@@ -695,10 +718,12 @@ void ss2kCustomCharacteristicCallbacks::onWrite(BLECharacteristic *pCharacterist
       if (rxValue[0] == write) {
         userConfig.setStealthChop(rxValue[2]);
         ss2k.updateStealthchop();
+        logBufLength += snprintf(logBuf + logBufLength, kLogBufCapacity - logBufLength, "(%B)", userConfig.getStealthchop());
       }
       break;
 
     case BLE_inclineMultiplier: {  // 0x0B
+      logBufLength   += snprintf(logBuf + logBufLength, kLogBufCapacity - logBufLength, "<-inclineMultiplier");
       returnValue[0] = success;
       int inc        = userConfig.getInclineMultiplier();
       if (rxValue[0] == read) {
@@ -708,10 +733,12 @@ void ss2kCustomCharacteristicCallbacks::onWrite(BLECharacteristic *pCharacterist
       }
       if (rxValue[0] == write) {
         userConfig.setInclineMultiplier(bytes_to_u16(rxValue[3], rxValue[2]));
+        logBufLength += snprintf(logBuf + logBufLength, kLogBufCapacity - logBufLength, "(%f)", userConfig.getInclineMultiplier());
       }
     } break;
 
     case BLE_powerCorrectionFactor: {  // 0x0C
+      logBufLength   += snprintf(logBuf + logBufLength, kLogBufCapacity - logBufLength, "<-powerCorrectionFactor");
       returnValue[0] = success;
       int pcf        = userConfig.getPowerCorrectionFactor() * 10;
       if (rxValue[0] == read) {
@@ -721,10 +748,12 @@ void ss2kCustomCharacteristicCallbacks::onWrite(BLECharacteristic *pCharacterist
       }
       if (rxValue[0] == write) {
         userConfig.setPowerCorrectionFactor(bytes_to_u16(rxValue[3], rxValue[2]) / 10);
+        logBufLength += snprintf(logBuf + logBufLength, kLogBufCapacity - logBufLength, "(%f)", userConfig.getPowerCorrectionFactor());
       }
     } break;
 
     case BLE_simulateHr:  // 0x0D
+      logBufLength   += snprintf(logBuf + logBufLength, kLogBufCapacity - logBufLength, "<-simulateHr");
       returnValue[0] = success;
       if (rxValue[0] == read) {
         returnValue[2] = (uint8_t)(rtConfig.getSimulateHr());
@@ -732,10 +761,12 @@ void ss2kCustomCharacteristicCallbacks::onWrite(BLECharacteristic *pCharacterist
       }
       if (rxValue[0] == write) {
         rtConfig.setSimulateHr(rxValue[2]);
+        logBufLength += snprintf(logBuf + logBufLength, kLogBufCapacity - logBufLength, "(%B)", rtConfig.getSimulateHr());
       }
       break;
 
     case BLE_simulateWatts:  // 0x0E
+      logBufLength   += snprintf(logBuf + logBufLength, kLogBufCapacity - logBufLength, "<-simulateWatts");
       returnValue[0] = success;
       if (rxValue[0] == read) {
         returnValue[2] = (uint8_t)(rtConfig.getSimulateWatts());
@@ -743,10 +774,12 @@ void ss2kCustomCharacteristicCallbacks::onWrite(BLECharacteristic *pCharacterist
       }
       if (rxValue[0] == write) {
         rtConfig.setSimulateWatts(rxValue[2]);
+        logBufLength += snprintf(logBuf + logBufLength, kLogBufCapacity - logBufLength, "(%B)", rtConfig.getSimulateWatts());
       }
       break;
 
     case BLE_simulateCad:  // 0x0F
+      logBufLength   += snprintf(logBuf + logBufLength, kLogBufCapacity - logBufLength, "<-simulateCad");
       returnValue[0] = success;
       if (rxValue[0] == read) {
         returnValue[2] = (uint8_t)(rtConfig.getSimulateCad());
@@ -754,10 +787,12 @@ void ss2kCustomCharacteristicCallbacks::onWrite(BLECharacteristic *pCharacterist
       }
       if (rxValue[0] == write) {
         rtConfig.setSimulateCad(rxValue[2]);
+        logBufLength += snprintf(logBuf + logBufLength, kLogBufCapacity - logBufLength, "(%B)", rtConfig.getSimulateCad());
       }
       break;
 
     case BLE_ERGMode:  // 0x10
+      logBufLength   += snprintf(logBuf + logBufLength, kLogBufCapacity - logBufLength, "<-ERGMode");
       returnValue[0] = success;
       if (rxValue[0] == read) {
         returnValue[2] = (uint8_t)(rtConfig.getERGMode());
@@ -765,10 +800,13 @@ void ss2kCustomCharacteristicCallbacks::onWrite(BLECharacteristic *pCharacterist
       }
       if (rxValue[0] == write) {
         rtConfig.setERGMode(rxValue[2]);
+        logBufLength += snprintf(logBuf + logBufLength, kLogBufCapacity - logBufLength, "(%B)", rtConfig.getERGMode());
       }
       break;
 
     case BLE_autoUpdate:  // 0x11
+      logBufLength += snprintf(logBuf + logBufLength, kLogBufCapacity - logBufLength, "<-autoUpdate");
+
       returnValue[0] = success;
       if (rxValue[0] == read) {
         returnValue[2] = (uint8_t)(userConfig.getautoUpdate());
@@ -776,30 +814,38 @@ void ss2kCustomCharacteristicCallbacks::onWrite(BLECharacteristic *pCharacterist
       }
       if (rxValue[0] == write) {
         userConfig.setAutoUpdate(rxValue[2]);
+        logBufLength += snprintf(logBuf + logBufLength, kLogBufCapacity - logBufLength, "(%B)", userConfig.getautoUpdate());
       }
       break;
 
     case BLE_ssid:  // 0x12
+      logBufLength += snprintf(logBuf + logBufLength, kLogBufCapacity - logBufLength, "<-ssid");
+
       returnValue[0] = error;
       break;
 
     case BLE_password:  // 0x13
+      logBufLength   += snprintf(logBuf + logBufLength, kLogBufCapacity - logBufLength, "<-password");
       returnValue[0] = error;
       break;
 
     case BLE_foundDevices:  // 0x14
+      logBufLength   += snprintf(logBuf + logBufLength, kLogBufCapacity - logBufLength, "<-foundDevices");
       returnValue[0] = error;
       break;
 
     case BLE_connectedPowerMeter:  // 0x15
+      logBufLength   += snprintf(logBuf + logBufLength, kLogBufCapacity - logBufLength, "<-connectedPowerMete");
       returnValue[0] = error;
       break;
 
     case BLE_connectedHeartMonitor:  // 0x16
+      logBufLength   += snprintf(logBuf + logBufLength, kLogBufCapacity - logBufLength, "<-connectedHeartMonitor");
       returnValue[0] = error;
       break;
 
     case BLE_shifterPosition:  // 0x17
+      logBufLength   += snprintf(logBuf + logBufLength, kLogBufCapacity - logBufLength, "<-shifterPosition");
       returnValue[0] = success;
       if (rxValue[0] == read) {
         returnValue[2] = (uint8_t)(rtConfig.getShifterPosition() & 0xff);
@@ -808,16 +854,20 @@ void ss2kCustomCharacteristicCallbacks::onWrite(BLECharacteristic *pCharacterist
       }
       if (rxValue[0] == write) {
         rtConfig.setShifterPosition(bytes_to_u16(rxValue[3], rxValue[2]));
-        return;  // Return here and let SpinBLEServer::notifyShift() handle the return.
+        logBufLength += snprintf(logBuf + logBufLength, kLogBufCapacity - logBufLength, "(%B)", rtConfig.getShifterPosition());
+        SS2K_LOG(CUSTOM_CHAR_LOG_TAG, "%s", logBuf);
+        return;  // Return here and let SpinBLEServer::notifyShift() handle the return to prevent duplicate notifications.
       }
       break;
 
     case BLE_saveToSpiffs:  // 0x18
+      logBufLength += snprintf(logBuf + logBufLength, kLogBufCapacity - logBufLength, "<-saveToSpiffs");
       userConfig.saveToSPIFFS();
       returnValue[0] = success;
       break;
 
     case BLE_targetPosition:  // 0x19
+      logBufLength   += snprintf(logBuf + logBufLength, kLogBufCapacity - logBufLength, "<-targetPosition");
       returnValue[0] = success;
       if (rxValue[0] == read) {
         returnValue[2] = (uint8_t)(ss2k.targetPosition & 0xff);
@@ -828,10 +878,12 @@ void ss2kCustomCharacteristicCallbacks::onWrite(BLECharacteristic *pCharacterist
       }
       if (rxValue[0] == write) {
         ss2k.targetPosition = (int32_t((uint8_t)(rxValue[2]) << 0 | (uint8_t)(rxValue[3]) << 8 | (uint8_t)(rxValue[4]) << 16 | (uint8_t)(rxValue[5]) << 24));
+        logBufLength        += snprintf(logBuf + logBufLength, kLogBufCapacity - logBufLength, " (%f)", ss2k.targetPosition);
       }
       break;
 
     case BLE_externalControl:  // 0x1A
+      logBufLength   += snprintf(logBuf + logBufLength, kLogBufCapacity - logBufLength, "<-externalControl");
       returnValue[0] = success;
       if (rxValue[0] == read) {
         returnValue[2] = (uint8_t)(ss2k.externalControl);
@@ -839,10 +891,12 @@ void ss2kCustomCharacteristicCallbacks::onWrite(BLECharacteristic *pCharacterist
       }
       if (rxValue[0] == write) {
         ss2k.externalControl = static_cast<bool>(rxValue[2]);
+        logBufLength         += snprintf(logBuf + logBufLength, kLogBufCapacity - logBufLength, "(%B)", ss2k.externalControl);
       }
       break;
 
     case BLE_syncMode:  // 0x1B
+      logBufLength   += snprintf(logBuf + logBufLength, kLogBufCapacity - logBufLength, "<-syncMode");
       returnValue[0] = success;
       if (rxValue[0] == read) {
         returnValue[2] = (uint8_t)(ss2k.syncMode);
@@ -850,10 +904,11 @@ void ss2kCustomCharacteristicCallbacks::onWrite(BLECharacteristic *pCharacterist
       }
       if (rxValue[0] == write) {
         ss2k.syncMode = static_cast<bool>(rxValue[2]);
+        logBufLength  += snprintf(logBuf + logBufLength, kLogBufCapacity - logBufLength, "(%B)", ss2k.syncMode);
       }
       break;
   }
-
+  SS2K_LOG(CUSTOM_CHAR_LOG_TAG, "%s", logBuf);
   pCharacteristic->setValue(returnValue, returnLength);
   pCharacteristic->indicate();
 }
