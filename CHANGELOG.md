@@ -18,6 +18,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Default stepper power is now used on reset to defaults. 
 - Refactored Main and HTTP Server.
 - Changed from hard coding to Enums in BLEServer.
+- Added simulateWatts to ERG mode internal check.
+- Increased BLE Stack(s) and reduced ERG stack. 
  
 
 ### Hardware

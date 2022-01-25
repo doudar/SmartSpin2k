@@ -20,7 +20,7 @@ void setupERG() {
   SS2K_LOG(ERG_MODE_LOG_TAG, "Starting ERG Mode task...");
   xTaskCreatePinnedToCore(ergTaskLoop,   /* Task function. */
                           "ERGModeTask", /* name of task. */
-                          6500,          /* Stack size of task*/
+                          5500,          /* Stack size of task*/
                           NULL,          /* parameter of the task */
                           1,             /* priority of the task*/
                           &ErgTask,      /* Task handle to keep track of created task */
@@ -43,7 +43,10 @@ void ergTaskLoop(void* pvParameters) {
 
     isInErgMode            = rtConfig.getERGMode();
     hasConnectedPowerMeter = spinBLEClient.connectedPM;
-    simulationRunning      = rtConfig.getSimulateTargetWatts();
+    simulationRunning = rtConfig.getSimulateTargetWatts();
+    if (!simulationRunning) {
+      simulationRunning = rtConfig.getSimulateWatts();
+    }
 
     // add values to power table
     powerTable.processPowerValue(powerBuffer, rtConfig.getSimulatedCad(), rtConfig.getSimulatedWatts());
@@ -333,22 +336,26 @@ void ErgMode::computErg() {
 
   // check for new power value or new setpoint, if watts < 10 treat as faulty
   if ((this->watts.timestamp == newWatts.timestamp && this->setPoint == newSetPoint) || newWatts.value < 10) {
+    SS2K_LOG(ERG_MODE_LOG_TAG, "Watts were old.");
     return;
   }
 
   // set minimum SetPoint to 50 watt if trainer sends setpoints lower than 50 watt.
   if (newSetPoint < 50) {
+    SS2K_LOG(ERG_MODE_LOG_TAG, "ERG Target Below Minumum Value.");
     newSetPoint = 50;
   }
 
   bool isUserSpinning = this->_userIsSpinning(newCadence, currentIncline);
   if (!isUserSpinning) {
+    SS2K_LOG(ERG_MODE_LOG_TAG, "ERG Mode but no userspin");
     return;
   }
 
   // SetPoint changed
   if (this->setPoint != newSetPoint) {
     _setPointChangeState(newSetPoint, newCadence, newWatts, currentIncline);
+    SS2K_LOG(ERG_MODE_LOG_TAG, "SetPoint changed");
     return;
   }
 
@@ -406,7 +413,7 @@ void ErgMode::_updateValues(int newSetPoint, int newCadence, Measurement& newWat
 bool ErgMode::_userIsSpinning(int cadence, float incline) {
   if (cadence <= 20) {
     if (!this->engineStopped) {                              // Test so motor stop command only happens once.
-      ss2k.motorStop();                                           // release tension
+      ss2k.motorStop();                                      // release tension
       rtConfig.setTargetIncline(incline - WATTS_PER_SHIFT);  // release incline
       this->engineStopped = true;
     }

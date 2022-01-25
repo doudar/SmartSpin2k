@@ -645,7 +645,7 @@ void HTTP_Server::FirmwareUpdate() {
       }
 
       // Update Firmware
-      if ((availiableVer > currentVer) && (userConfig.getautoUpdate())) {
+      if ((availiableVer > currentVer) && (userConfig.getAutoUpdate())) {
         ret = httpUpdate.update(client, userConfig.getFirmwareUpdateURL() + String(FW_BINFILE));
         switch (ret) {
           case HTTP_UPDATE_FAILED:

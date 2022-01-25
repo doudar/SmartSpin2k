@@ -121,7 +121,7 @@ class userParameters {
   float getInclineMultiplier() { return inclineMultiplier; }
   float getPowerCorrectionFactor() { return powerCorrectionFactor; }
   float getERGSensitivity() { return ERGSensitivity; }
-  bool getautoUpdate() { return autoUpdate; }
+  bool getAutoUpdate() { return autoUpdate; }
   const char* getSsid() { return ssid.c_str(); }
   const char* getPassword() { return password.c_str(); }
   const char* getconnectedPowerMeter() { return connectedPowerMeter.c_str(); }
