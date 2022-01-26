@@ -20,6 +20,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Changed from hard coding to Enums in BLEServer.
 - Added simulateWatts to ERG mode internal check.
 - Increased BLE Stack(s) and reduced ERG stack. 
+- Adde option to enable/disable UDP loging. Default is disabled.
  
 
 ### Hardware
