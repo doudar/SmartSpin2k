@@ -904,7 +904,7 @@ void ss2kCustomCharacteristicCallbacks::onWrite(BLECharacteristic *pCharacterist
       }
       if (rxValue[0] == write) {
         ss2k.syncMode = static_cast<bool>(rxValue[2]);
-        logBufLength  += snprintf(logBuf + logBufLength, kLogBufCapacity - logBufLength, "(%B)", ss2k.syncMode);
+        logBufLength  += snprintf(logBuf + logBufLength, kLogBufCapacity - logBufLength, "(%s)", ss2k.syncMode ? "true" : "false");
       }
       break;
   }
