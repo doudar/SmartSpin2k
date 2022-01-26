@@ -24,6 +24,7 @@ class SS2K {
   int shiftersHoldForScan;
   uint64_t scanDelayTime;
   uint64_t scanDelayStart;
+  bool UDPloggingAutoDisabled;
 
  public:
   int32_t targetPosition;
@@ -47,19 +48,21 @@ class SS2K {
   void updateStealthchop();
   void checkDriverTemperature();
   void motorStop(bool releaseTension = false);
+  void toggleUDPLog(bool requestOff = false);
 
   SS2K() {
-    targetPosition      = 0;
-    currentPosition     = 0;
-    stepperIsRunning    = false;
-    externalControl     = false;
-    syncMode            = false;
-    lastDebounceTime    = 0;
-    debounceDelay       = DEBOUNCE_DELAY;
-    lastShifterPosition = 0;
-    shiftersHoldForScan = SHIFTERS_HOLD_FOR_SCAN;
-    scanDelayTime       = 10000;
-    scanDelayStart      = 0;
+    targetPosition         = 0;
+    currentPosition        = 0;
+    stepperIsRunning       = false;
+    externalControl        = false;
+    syncMode               = false;
+    lastDebounceTime       = 0;
+    debounceDelay          = DEBOUNCE_DELAY;
+    lastShifterPosition    = 0;
+    shiftersHoldForScan    = SHIFTERS_HOLD_FOR_SCAN;
+    scanDelayTime          = 10000;
+    scanDelayStart         = 0;
+    UDPloggingAutoDisabled = false;
   }
 };
 

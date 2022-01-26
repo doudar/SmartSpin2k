@@ -9,6 +9,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Added
 - Added functions to start and stop WiFi and Http server.
 - Added Additional logging to the custom characteristic.
+- Added option to enable/disable UDP logging. Default is disabled.
 
 ### Changed
 - Refactored ERG.
@@ -20,8 +21,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Changed from hard coding to Enums in BLEServer.
 - Added simulateWatts to ERG mode internal check.
 - Increased BLE Stack(s) and reduced ERG stack. 
-- Adde option to enable/disable UDP loging. Default is disabled.
- 
+- Disabled shifter ISR while ERG is running. 
+- Fixed possible infinite loop in ERG when stepper never reached target position due to being past min or max position.
 
 ### Hardware
 - Added Ultra Short Case mod which should allow as little as ~40mm from knob center to head tube. 

@@ -61,6 +61,7 @@ void userParameters::setDefaults() {
   maxWatts              = DEFAULT_MAX_WATTS;
   stepperDir            = true;
   shifterDir            = true;
+  udpLogEnabled         = false;
 }
 
 //---------------------------------------------------------------------------------
@@ -198,7 +199,7 @@ void userParameters::loadFromSPIFFS() {
     setShifterDir(doc["shifterDir"]);
   }
   if (!doc["udpLogEnabled"].isNull()) {
-    setShifterDir(doc["udpLogEnabled"]);
+    setUdpLogEnabled(doc["udpLogEnabled"]);
   }
   if (doc["powerCorrectionFactor"]) {
     setPowerCorrectionFactor(doc["powerCorrectionFactor"]);
