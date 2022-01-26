@@ -107,6 +107,7 @@ class userParameters {
   int maxWatts;
   bool stepperDir;
   bool shifterDir;
+  bool udpLogEnabled = false;
   String ssid;
   String password;
   String connectedPowerMeter   = "any";
@@ -130,6 +131,7 @@ class userParameters {
   int getMaxWatts() { return maxWatts; }
   bool getStepperDir() { return stepperDir; }
   bool getShifterDir() { return shifterDir; }
+  bool getUdpLogEnabled() { return udpLogEnabled; }
 
   void setDefaults();
   void setFirmwareUpdateURL(String fURL) { firmwareUpdateURL = fURL; }
@@ -148,6 +150,7 @@ class userParameters {
   void setMaxWatts(int maxW) { maxWatts = maxW; }
   void setStepperDir(bool sd) { stepperDir = sd; }
   void setShifterDir(bool shd) { shifterDir = shd; }
+  void setUdpLogEnabled(bool enabled) { udpLogEnabled = enabled; }
   void setFoundDevices(String fdev) { foundDevices = fdev; }
   const char* getFoundDevices() { return foundDevices.c_str(); }
 

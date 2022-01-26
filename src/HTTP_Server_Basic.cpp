@@ -67,7 +67,7 @@ void startWifi() {
     }
   }
   if (WiFi.status() == WL_CONNECTED) {
-    myIP               = WiFi.localIP();
+    myIP                          = WiFi.localIP();
     httpServer.internetConnection = true;
   }
 
@@ -354,7 +354,7 @@ void HTTP_Server::start() {
   /********************************************End Server
    * Handlers*******************************/
 
-  xTaskCreatePinnedToCore(HTTP_Server::webClientUpdate,                    /* Task function. */
+  xTaskCreatePinnedToCore(HTTP_Server::webClientUpdate,       /* Task function. */
                           "webClientUpdate",                  /* name of task. */
                           5000 + (DEBUG_LOG_BUFFER_SIZE * 2), /* Stack size of task Used to be 3000*/
                           NULL,                               /* parameter of the task */
@@ -490,6 +490,11 @@ void HTTP_Server::settingsProcessor() {
     userConfig.setShifterDir(true);
   } else if (wasSettingsUpdate) {
     userConfig.setShifterDir(false);
+  }
+  if (!server.arg("udpLogEnabled").isEmpty()) {
+    userConfig.setUdpLogEnabled(true);
+  } else if (wasSettingsUpdate) {
+    userConfig.setUdpLogEnabled(false);
   }
   if (!server.arg("stealthchop").isEmpty()) {
     userConfig.setStealthChop(true);

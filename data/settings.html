@@ -225,6 +225,15 @@
                     class="slider"></span></label>
               </td>
             </tr>
+            <tr>
+              <td>
+                <p class="tooltip">Enable UDP Logging<span class="tooltiptext">Sending log-messages via UDP Port 10.000</span></p>
+              </td>
+              <td>
+                <label class="switch"><input type="checkbox" name="udpLogEnabled" id="udpLogEnabled"><span
+                    class="slider"></span></label>
+              </td>
+            </tr>
           </tbody>
         </table>
         <input type="submit" value="Save Settings" />
@@ -293,6 +302,7 @@
         document.getElementById("autoUpdate").checked = obj.autoUpdate;
         document.getElementById("stepperDir").checked = obj.stepperDir;
         document.getElementById("shifterDir").checked = obj.shifterDir;
+        document.getElementById("udpLogEnabled").checked = !!obj.udpLogEnabled;
         updateSlider(document.getElementById("shiftStep").value, document.getElementById("shiftStepValue"));
         updateSlider(document.getElementById("inclineMultiplier").value, document.getElementById("inclineMultiplierValue"));
         updateSlider(document.getElementById("ERGSensitivity").value, document.getElementById("ERGSensitivityValue"));
