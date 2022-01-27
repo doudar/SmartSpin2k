@@ -15,26 +15,16 @@
 #define MAIN_LOG_TAG "Main"
 
 // Function Prototypes
-bool IRAM_ATTR deBounce();
-void IRAM_ATTR moveStepper(void* pvParameters);
-void IRAM_ATTR shifterCheck(void* pvParameters);
-void IRAM_ATTR shiftUp();
-void IRAM_ATTR shiftDown();
-void resetIfShiftersHeld();
-void scanIfShiftersHeld();
-void setupTMCStepperDriver();
-void updateStepperPower();
-void updateStealthchop();
-void checkDriverTemperature();
-void motorStop(bool releaseTension = false);
-void startTasks();
-void stopTasks();
-
-// Main program variable that stores most everything
-extern userParameters userConfig;
-extern RuntimeParameters rtConfig;
 
 class SS2K {
+ private:
+  uint64_t lastDebounceTime;
+  uint16_t debounceDelay;
+  int lastShifterPosition;
+  int shiftersHoldForScan;
+  uint64_t scanDelayTime;
+  uint64_t scanDelayStart;
+
  public:
   int32_t targetPosition;
   int32_t currentPosition;
@@ -42,12 +32,34 @@ class SS2K {
   bool externalControl;
   bool syncMode;
 
+  bool IRAM_ATTR deBounce();
+  static void IRAM_ATTR moveStepper(void* pvParameters);
+  static void IRAM_ATTR maintenanceLoop(void* pvParameters);
+  static void IRAM_ATTR shiftUp();
+  static void IRAM_ATTR shiftDown();
+  void resetIfShiftersHeld();
+  void scanIfShiftersHeld();
+  void startTasks();
+  void stopTasks();
+  void restartWifi();
+  void setupTMCStepperDriver();
+  void updateStepperPower();
+  void updateStealthchop();
+  void checkDriverTemperature();
+  void motorStop(bool releaseTension = false);
+
   SS2K() {
-    targetPosition  = 0;
-    currentPosition = 0;
-    stepperIsRunning = false;
-    externalControl = false;
-    syncMode        = false;
+    targetPosition         = 0;
+    currentPosition        = 0;
+    stepperIsRunning       = false;
+    externalControl        = false;
+    syncMode               = false;
+    lastDebounceTime       = 0;
+    debounceDelay          = DEBOUNCE_DELAY;
+    lastShifterPosition    = 0;
+    shiftersHoldForScan    = SHIFTERS_HOLD_FOR_SCAN;
+    scanDelayTime          = 10000;
+    scanDelayStart         = 0;
   }
 };
 
@@ -55,3 +67,7 @@ class SS2K {
 // calculation)
 extern physicalWorkingCapacity userPWC;
 extern SS2K ss2k;
+
+// Main program variable that stores most everything
+extern userParameters userConfig;
+extern RuntimeParameters rtConfig;

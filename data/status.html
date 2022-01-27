@@ -116,6 +116,7 @@
   var followElement = document.getElementById("follow");
   var updatePending = false;
   var updateTimer = undefined;
+  var udpLogEnabled = true;
 
   function onVisibilityChanged() {
     if (document.hidden || document.mozHidden || document.webkitHidden || document.msHidden) {
@@ -165,9 +166,12 @@
           document.getElementById("inclineMultiplier").value = obj.inclineMultiplier;
           //--- document.getElementById("ERGSensitivity").value = obj.ERGSensitivity; ---//
           document.getElementById("connectedPowerMeter").value = obj.connectedPowerMeter;
+          if (obj.udpLogEnabled) {
+            udpLogEnabled = obj.udpLogEnabled.value;
+          }
         }
       };
-      xhttp.open("GET", "/configJSON?includeDebugLog=false", true);
+      xhttp.open("GET", "/configJSON", true);
       xhttp.send();
     }
   }
@@ -186,17 +190,20 @@
           document.getElementById("simulatedWatts").value = obj.simulatedWatts;
           document.getElementById("targetWatts").value = obj.targetWatts;
           document.getElementById("simulatedCad").value = obj.simulatedCad;
-          if (obj.debug != null) {
-            if (debugElement.innerHTML == "Loading") {
+          if (obj.debug != null || !udpLogEnabled) {
+            if (debugElement.innerHTML == "Loading" && !udpLogEnabled) {
               document.getElementById("debug").innerHTML = obj.debug;
-            } else {
+            } else if (!udpLogEnabled) {
+              document.getElementById("debug").innerHTML = "UDP logging is enabled in settings.<p>Please see the <a href='https://github.com/doudar/SmartSpin2k/wiki/Viewing-logs-via-UDP' style='color:white;'>SS2K Wiki</a><p>for more information.";
+            }
+            else {
               document.getElementById("debug").innerHTML += obj.debug;
             }
             updateDebugView(obj.debug);
           }
         }
       };
-      xhttp.open("GET", "/runtimeConfigJSON?includeDebugLog=true", true);
+      xhttp.open("GET", !udpLogEnabled ? "/runtimeConfigJSON" : "/runtimeConfigJSON?includeDebugLog=true", true);
       xhttp.send();
     }
   }
@@ -214,7 +221,7 @@
   window.addEventListener('load', function () {
     setTimeout(loadCss, 100);
     requestConfigValues();
-    requestRuntimeValues();
+    setTimeout(requestRuntimeValues(),200);
     startUpdate();
   }, false);
 </script>

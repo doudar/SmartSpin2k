@@ -61,6 +61,7 @@ void userParameters::setDefaults() {
   maxWatts              = DEFAULT_MAX_WATTS;
   stepperDir            = true;
   shifterDir            = true;
+  udpLogEnabled         = false;
 }
 
 //---------------------------------------------------------------------------------
@@ -90,6 +91,7 @@ String userParameters::returnJSON(bool includeDebugLog) {
   doc["maxWatts"]              = maxWatts;
   doc["shifterDir"]            = shifterDir;
   doc["stepperDir"]            = stepperDir;
+  doc["udpLogEnabled"]         = udpLogEnabled;
 
   if (includeDebugLog) {
     doc["debug"] = DebugInfo::get_and_clear_logs();
@@ -137,6 +139,7 @@ void userParameters::saveToSPIFFS() {
   doc["maxWatts"]              = maxWatts;
   doc["shifterDir"]            = shifterDir;
   doc["stepperDir"]            = stepperDir;
+  doc["udpLogEnabled"]         = udpLogEnabled;
 
   // Serialize JSON to file
   if (serializeJson(doc, file) == 0) {
@@ -194,6 +197,9 @@ void userParameters::loadFromSPIFFS() {
   }
   if (!doc["shifterDir"].isNull()) {
     setShifterDir(doc["shifterDir"]);
+  }
+  if (!doc["udpLogEnabled"].isNull()) {
+    setUdpLogEnabled(doc["udpLogEnabled"]);
   }
   if (doc["powerCorrectionFactor"]) {
     setPowerCorrectionFactor(doc["powerCorrectionFactor"]);

@@ -7,14 +7,24 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
-- 
+- Added functions to start and stop WiFi and Http server.
+- Added Additional logging to the custom characteristic.
+- Added option to enable/disable UDP logging. Default is disabled.
+- Added Wiki links to most SS2K pages. [see #314](https://github.com/doudar/SmartSpin2k/issues/314)
 
 ### Changed
-- Refactored ERG 
+- Refactored ERG.
 - Reset to Default must be confirmed [see #51](https://github.com/doudar/SmartSpin2k/issues/51)
 - Update Firmware: Upload dialog accepts .bin, .html and .css files. [see #98](https://github.com/doudar/SmartSpin2k/issues/98)
 - Removed conflicting secondary BLE indicate when a shift was preformed via the custom characteristic.
 - Default stepper power is now used on reset to defaults. 
+- Refactored Main and HTTP Server.
+- Changed from hard coding to Enums in BLEServer.
+- Added simulateWatts to ERG mode internal check.
+- Increased BLE Stack(s) and reduced ERG stack. 
+- Disabled shifter ISR while ERG is running. 
+- Fixed possible infinite loop in ERG when stepper never reached target position due to being past min or max position.
+- When UDP logging is enabled, html will no longer request logging info. 
 
 ### Hardware
 - Added Ultra Short Case mod which should allow as little as ~40mm from knob center to head tube. 

@@ -14,10 +14,12 @@
 #include <Arduino.h>
 #include <Main.h>
 
-#define BLE_CLIENT_LOG_TAG "BLE_Client"
-#define BLE_COMMON_LOG_TAG "BLE_Common"
-#define BLE_SERVER_LOG_TAG "BLE_Server"
-#define BLE_SETUP_LOG_TAG  "BLE_Setup"
+#define BLE_CLIENT_LOG_TAG  "BLE_Client"
+#define BLE_COMMON_LOG_TAG  "BLE_Common"
+#define BLE_SERVER_LOG_TAG  "BLE_Server"
+#define BLE_SETUP_LOG_TAG   "BLE_Setup"
+#define FMTS_SERVER_LOG_TAG "FTMS_SERVER"
+#define CUSTOM_CHAR_LOG_TAG  "Custom_C"
 
 // custom characteristic codes
 #define BLE_firmwareUpdateURL     0x01
@@ -124,7 +126,6 @@ typedef struct NotifyData {
 class SpinBLEAdvertisedDevice {
  private:
   QueueHandle_t dataBufferQueue = nullptr;
-  
 
  public:  // eventually these should be made private
   // // TODO: Do we dispose of this object?  Is so, we need to de-allocate the queue.
@@ -139,8 +140,6 @@ class SpinBLEAdvertisedDevice {
 
   NimBLEAdvertisedDevice *advertisedDevice = nullptr;
   NimBLEAddress peerAddress;
-  
-  
 
   int connectedClientID = BLE_HS_CONN_HANDLE_NONE;
   BLEUUID serviceUUID   = (uint16_t)0x0000;
@@ -230,6 +229,46 @@ class SpinBLEClient {
 
 extern SpinBLEClient spinBLEClient;
 
+// https://www.bluetooth.com/specifications/specs/fitness-machine-service-1-0/
+// Table 4.13: Training Status Field Definition
+struct FitnessMachineTrainingStatus {
+  enum Types : uint8_t {
+    Other                           = 0x00,
+    Idle                            = 0x01,
+    WarmingUp                       = 0x02,
+    LowIntensityInterval            = 0x03,
+    HighIntensityInterval           = 0x04,
+    RecoveryInterval                = 0x05,
+    Isometric                       = 0x06,
+    HeartRateControl                = 0x07,
+    FitnessTest                     = 0x08,
+    SpeedOutsideOfControlRegionLow  = 0x09,
+    SpeedOutsideOfControlRegionHigh = 0x0A,
+    CoolDown                        = 0x0B,
+    WattControl                     = 0x0C,
+    ManualMode                      = 0x0D,
+    PreWorkout                      = 0x0E,
+    PostWorkout                     = 0x0F,
+    // Reserved for Future Use 0x10-0xFF
+  };
+};
+
+// https://www.bluetooth.com/specifications/specs/fitness-machine-service-1-0/
+// Table 4.24: Fitness Machine Control Point characteristic – Result Codes
+struct FitnessMachineControlPointResultCode {
+  enum Types : uint8_t {
+    ReservedForFutureUse = 0x00,
+    Success              = 0x01,
+    OpCodeNotSupported   = 0x02,
+    InvalidParameter     = 0x03,
+    OperationFailed      = 0x04,
+    ControlNotPermitted  = 0x05,
+    // Reserved for Future Use = 0x06-0xFF
+  };
+};
+
+// https://www.bluetooth.com/specifications/specs/fitness-machine-service-1-0/
+// Table 4.3: Definition of the bits of the Fitness Machine Features field
 struct FitnessMachineFeatureFlags {
   enum Types : uint {
     AverageSpeedSupported              = 1U << 0,
@@ -252,6 +291,8 @@ struct FitnessMachineFeatureFlags {
   };
 };
 
+// https://www.bluetooth.com/specifications/specs/fitness-machine-service-1-0/
+// Table 4.4: Definition of the bits of the Target Setting Features field
 struct FitnessMachineTargetFlags {
   enum Types : uint {
     SpeedTargetSettingSupported                           = 1U << 0,
@@ -271,6 +312,52 @@ struct FitnessMachineTargetFlags {
     WheelCircumferenceConfigurationSupported              = 1U << 14,
     SpinDownControlSupported                              = 1U << 15,
     TargetedCadenceConfigurationSupported                 = 1U << 16
+  };
+};
+
+// https://www.bluetooth.com/specifications/specs/fitness-machine-service-1-0/
+// Table 4.16.1: Fitness Machine Control Point Procedure Requirements
+struct FitnessMachineControlPointProcedure {
+  enum Types : uint8_t {
+    RequestControl                    = 0x00,
+    Reset                             = 0x01,
+    SetTargetSpeed                    = 0x02,
+    SetTargetInclination              = 0x03,
+    SetTargetResistanceLevel          = 0x04,
+    SetTargetPower                    = 0x05,
+    SetTargetHeartRate                = 0x06,
+    StartOrResume                     = 0x07,
+    StopOrPause                       = 0x08,
+    SetIndoorBikeSimulationParameters = 0x11,
+    SetWheelCircumference             = 0x12,
+    SpinDownControl                   = 0x13,
+    SetTargetedCadence                = 0x14,
+    // Reserved for Future Use 0x15-0x7F
+    ResponseCode = 0x80
+    // Reserved for Future Use 0x81-0xFF
+  };
+};
+
+// https://www.bluetooth.com/specifications/specs/fitness-machine-service-1-0/
+// Table 4.17: Fitness Machine Status
+struct FitnessMachineStatus {
+  enum Types : uint {
+    ReservedForFutureUse                  = 0x00,
+    Reset                                 = 0x01,
+    StoppedOrPausedByUser                 = 0x02,
+    StoppedOrPausedBySafetyKey            = 0x03,
+    StartedOrResumedByUser                = 0x04,
+    TargetSpeedChanged                    = 0x05,
+    TargetInclineChanged                  = 0x06,
+    TargetResistanceLevelChanged          = 0x07,
+    TargetPowerChanged                    = 0x08,
+    TargetHeartRateChanged                = 0x09,
+    IndoorBikeSimulationParametersChanged = 0x12,
+    WheelCircumferenceChanged             = 0x13,
+    SpinDownStatus                        = 0x14,
+    TargetedCadenceChanged                = 0x15,
+    // Reserved for Future Use 0x16-0xFE
+    ControlPermissionLost = 0xFF
   };
 };
 
@@ -296,4 +383,9 @@ struct FitnessMachineFeature {
     };
     uint8_t bytes[8];
   };
+};
+
+struct FtmsStatus {
+  uint8_t data[8];
+  int length;
 };

@@ -48,7 +48,14 @@
         "os_mempool.h": "c",
         "ble_uuid.h": "c",
         "ble_hs_priv.h": "c",
-        "nimble_opt.h": "c"
+        "nimble_opt.h": "c",
+        "atomic": "cpp",
+        "iterator": "cpp",
+        "map": "cpp",
+        "memory_resource": "cpp",
+        "optional": "cpp",
+        "random": "cpp",
+        "string_view": "cpp"
     },
     "C_Cpp.errorSquiggles": "Disabled"
 }
