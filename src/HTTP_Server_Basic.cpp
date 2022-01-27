@@ -271,18 +271,12 @@ void HTTP_Server::start() {
     String tString;
     tString = userConfig.returnJSON(!server.arg("includeDebugLog").isEmpty());
     server.send(200, "text/plain", tString);
-    if (!server.arg("includeDebugLog").isEmpty()) {
-      ss2k.toggleUDPLog(true);  // reduce WiFi use
-    }
   });
 
   server.on("/runtimeConfigJSON", []() {
     String tString;
     tString = rtConfig.returnJSON(!server.arg("includeDebugLog").isEmpty());
     server.send(200, "text/plain", tString);
-    if (!server.arg("includeDebugLog").isEmpty()) {
-      ss2k.toggleUDPLog(true);  // reduce WiFi use
-    }
   });
 
   server.on("/PWCJSON", []() {

@@ -156,7 +156,7 @@ void SS2K::maintenanceLoop(void *pvParameters) {
     if ((millis() - intervalTimer) > 10000) {  // add check here for when to restart WiFi
                                                // maybe if in STA mode and 8.8.8.8 no ping return?
       // ss2k.restartWifi();
-      ss2k.toggleUDPLog(false);  // check to see if UDP Logging is disabled
+     
       intervalTimer = millis();
     }
 
@@ -176,25 +176,6 @@ void SS2K::maintenanceLoop(void *pvParameters) {
   }
 }
 #endif  // UNIT_TEST
-
-// Test is False, Request Off is True
-void SS2K::toggleUDPLog(bool requestOff) {
-  static bool userUDPpreference = userConfig.getUdpLogEnabled();
-  if (!ss2k.UDPloggingAutoDisabled && !requestOff) {  // timer check only, return fast.
-    return;
-  }
-  if (!ss2k.UDPloggingAutoDisabled && requestOff) {  // Initial request off
-    userConfig.setUdpLogEnabled(false);
-    ss2k.UDPloggingAutoDisabled = true;
-  }
-  if (ss2k.UDPloggingAutoDisabled && requestOff) {  // Repeat request off
-    userConfig.setUdpLogEnabled(false);
-  }
-  if (ss2k.UDPloggingAutoDisabled && !requestOff) {  // timer expired, reset to original user setting.
-    userConfig.setUdpLogEnabled(userUDPpreference);
-    ss2k.UDPloggingAutoDisabled = false;
-  }
-}
 
 void SS2K::restartWifi() {
   httpServer.stop();
