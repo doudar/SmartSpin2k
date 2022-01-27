@@ -194,7 +194,7 @@
             if (debugElement.innerHTML == "Loading" && !udpLogEnabled) {
               document.getElementById("debug").innerHTML = obj.debug;
             } else if (!udpLogEnabled) {
-              document.getElementById("debug").innerHTML = "UDP logging is enabled in settings.\n\nView logs using Logbert or a similar\nUDP logging utility, and define\na custom UDP logger on port 10000\nwithout a filter.";
+              document.getElementById("debug").innerHTML = "UDP logging is enabled in settings.<p>Please see the <a href='https://github.com/doudar/SmartSpin2k/wiki/Viewing-logs-via-UDP' style='color:white;'>SS2K Wiki</a><p>for more information.";
             }
             else {
               document.getElementById("debug").innerHTML += obj.debug;
