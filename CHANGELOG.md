@@ -10,7 +10,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Added functions to start and stop WiFi and Http server.
 - Added Additional logging to the custom characteristic.
 - Added option to enable/disable UDP logging. Default is disabled.
-- Added Wiki links to most SS2K pages. 
+- Added Wiki links to most SS2K pages. [see #314](https://github.com/doudar/SmartSpin2k/issues/314)
 
 ### Changed
 - Refactored ERG.
