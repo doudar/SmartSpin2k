@@ -23,6 +23,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Increased BLE Stack(s) and reduced ERG stack. 
 - Disabled shifter ISR while ERG is running. 
 - Fixed possible infinite loop in ERG when stepper never reached target position due to being past min or max position.
+- When UDP logging is enabled, html will no longer request logging info. 
 
 ### Hardware
 - Added Ultra Short Case mod which should allow as little as ~40mm from knob center to head tube. 
