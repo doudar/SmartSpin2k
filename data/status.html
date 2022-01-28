@@ -192,8 +192,9 @@
           document.getElementById("inclineMultiplier").value = obj.inclineMultiplier;
           //--- document.getElementById("ERGSensitivity").value = obj.ERGSensitivity; ---//
           document.getElementById("connectedPowerMeter").value = obj.connectedPowerMeter;
-          if (obj.udpLogEnabled) {
-            udpLogEnabled = obj.udpLogEnabled.value;
+          udpLogEnabled = obj.udpLogEnabled.value;
+          if (!udpLogEnabled) {       
+            document.getElementById("debug").innerHTML = "UDP logging is enabled in settings.<p>Please see the <a href='https://github.com/doudar/SmartSpin2k/wiki/Viewing-logs-via-UDP' style='color:white;'>SS2K Wiki</a><p>for more information.";
           }
         }
       };

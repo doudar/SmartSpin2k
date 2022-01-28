@@ -20,7 +20,7 @@ void WebSocket::loop() { webSocket.loop(); }
 void WebSocket::log(const char *format, va_list args) { WebSocket::INSTANCE.log_internal(format, args); }
 
 void WebSocket::log_internal(const char *format, va_list args) {
-  if (WiFi.status() == WL_CONNECTED) {
+  if (WiFi.status() == WL_CONNECTED && webSocket.connectedClients()) {
     const size_t buffer_size = 255;
     char buffer[buffer_size];
 

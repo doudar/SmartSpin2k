@@ -74,7 +74,8 @@ void ss2k_log_writev(esp_log_level_t level, const char *format, va_list args) {
   esp_log_writev(level, SS2K_LOG_TAG, format, args);
 
   if (userConfig.getUdpLogEnabled()) {
-    //UdpLogger::log(format, args);
+    UdpLogger::log(format, args);
+  } else {
     WebSocket::log(format, args);
   }
 
