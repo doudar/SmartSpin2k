@@ -115,6 +115,7 @@ void setup() {
 
   ss2k.startTasks();
   httpServer.start();
+  WebSocket::INSTANCE.start();
 
   ss2k.resetIfShiftersHeld();
   SS2K_LOG(MAIN_LOG_TAG, "Creating Shifter Interrupts");
@@ -141,7 +142,6 @@ void SS2K::maintenanceLoop(void *pvParameters) {
   static unsigned long intervalTimer = millis();
   while (true) {
     vTaskDelay(200 / portTICK_RATE_MS);
-
     if (rtConfig.getShifterPosition() > ss2k.lastShifterPosition) {
       SS2K_LOG(MAIN_LOG_TAG, "Shift UP: %l", rtConfig.getShifterPosition());
       Serial.println(ss2k.targetPosition);
@@ -156,7 +156,7 @@ void SS2K::maintenanceLoop(void *pvParameters) {
     if ((millis() - intervalTimer) > 10000) {  // add check here for when to restart WiFi
                                                // maybe if in STA mode and 8.8.8.8 no ping return?
       // ss2k.restartWifi();
-     
+
       intervalTimer = millis();
     }
 

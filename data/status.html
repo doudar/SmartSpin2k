@@ -117,6 +117,32 @@
   var updatePending = false;
   var updateTimer = undefined;
   var udpLogEnabled = true;
+  var webServerAddress = "ws://";
+  webServerAddress = webServerAddress.concat(location.host, ":81");
+  try {
+    var socket = new WebSocket(webServerAddress);
+  }
+  catch (e) {
+    alert("Could not connect to Websocket.");
+  }
+
+  try {
+    socket.onmessage = function (event) {
+      if (debugElement.innerHTML == "Loading") {
+        document.getElementById("debug").innerHTML = event.data;
+      } else {
+        document.getElementById("debug").innerHTML += event.data;
+      }
+      updateDebugView(event.data);
+    };
+  } catch (e) {
+    if (socket) {
+      socket = WebSocket(webServerAddress);
+    }
+    else {
+      socket = new WebSocket(webServerAddress);
+    }
+  }
 
   function onVisibilityChanged() {
     if (document.hidden || document.mozHidden || document.webkitHidden || document.msHidden) {
@@ -136,7 +162,7 @@
     if (updateTimer === undefined) {
       updateTimer = setInterval(function () {
         requestRuntimeValues();
-      }, 1500);
+      }, 2500);
     }
   }
 
@@ -190,19 +216,11 @@
           document.getElementById("simulatedWatts").value = obj.simulatedWatts;
           document.getElementById("targetWatts").value = obj.targetWatts;
           document.getElementById("simulatedCad").value = obj.simulatedCad;
-          if (obj.debug != null || !udpLogEnabled) {
-            if (debugElement.innerHTML == "Loading" && !udpLogEnabled) {
-              document.getElementById("debug").innerHTML = obj.debug;
-            } else if (!udpLogEnabled) {
-              document.getElementById("debug").innerHTML = "UDP logging is enabled in settings.<p>Please see the <a href='https://github.com/doudar/SmartSpin2k/wiki/Viewing-logs-via-UDP' style='color:white;'>SS2K Wiki</a><p>for more information.";
-            }
-            else {
-              document.getElementById("debug").innerHTML += obj.debug;
-            }
-            updateDebugView(obj.debug);
-          }
         }
       };
+      if (socket.CLOSED) {
+        socket.OPEN;
+      }
       xhttp.open("GET", !udpLogEnabled ? "/runtimeConfigJSON" : "/runtimeConfigJSON?includeDebugLog=true", true);
       xhttp.send();
     }
@@ -221,7 +239,7 @@
   window.addEventListener('load', function () {
     setTimeout(loadCss, 100);
     requestConfigValues();
-    setTimeout(requestRuntimeValues(),200);
+    setTimeout(requestRuntimeValues(), 200);
     startUpdate();
   }, false);
 </script>
