@@ -11,6 +11,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Added Additional logging to the custom characteristic.
 - Added option to enable/disable UDP logging. Default is disabled.
 - Added Wiki links to most SS2K pages. [see #314](https://github.com/doudar/SmartSpin2k/issues/314)
+- Added WebSockets for logging [see #173](https://github.com/doudar/SmartSpin2k/issues/173)
+- Reworked logging to run log-appender outside the worker task (task no longer blocked by logger traffic).
 
 ### Changed
 - Refactored ERG.

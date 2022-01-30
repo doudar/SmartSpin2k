@@ -34,8 +34,6 @@ void LogHandler::writeLogs() {
     }
     buffer[receivedBytes] = '\0';
 
-    ESP_LOGE("LogHandler", "Received message from buffer %s", buffer);
-
     for (ILogAppender *appender : _appenders) {
       appender->Log(buffer);
     }
