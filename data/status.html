@@ -118,7 +118,7 @@
   var updateTimer = undefined;
   var udpLogEnabled = true;
   var webServerAddress = "ws://";
-  webServerAddress = webServerAddress.concat(location.host, ":81");
+  webServerAddress = webServerAddress.concat(location.host, ":8080");
   try {
     var socket = new WebSocket(webServerAddress);
   }
