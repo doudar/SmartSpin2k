@@ -11,7 +11,6 @@
 #include "HTTP_Server_Basic.h"
 #include "SmartSpin_parameters.h"
 #include "BLE_Common.h"
-#include "Websocket.h"
 
 #define MAIN_LOG_TAG "Main"
 

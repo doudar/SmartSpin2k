@@ -15,12 +15,16 @@
 #include <stdarg.h>
 #include <FS.h>
 #include <freertos/semphr.h>
+#include <freertos/message_buffer.h>
+#include "LogAppender.h"
+#include <vector>
 
 #define SS2K_LOG_TAG       "SS2K"
 #define DEBUG_INFO_LOG_TAG "DebugInfo"
 
 #ifndef DEBUG_LOG_BUFFER_SIZE
-#define DEBUG_LOG_BUFFER_SIZE 1500
+#define DEBUG_LOG_BUFFER_SIZE 0
+// #define DEBUG_LOG_BUFFER_SIZE 1500
 #endif
 
 #ifndef DEBUG_FILE_CHARS_PER_LINE
@@ -67,16 +71,35 @@ class DebugInfo {
  private:
   static DebugInfo INSTANCE;
 #if DEBUG_LOG_BUFFER_SIZE > 0
+  void append_logv_internal(const char *format, va_list args);
+  const std::string get_and_clear_logs_internal();
   DebugInfo() : logBufferLength(0), logBufferMutex(xSemaphoreCreateMutex()) { logBuffer[0] = '\0'; }
   int logBufferLength;
   char logBuffer[DEBUG_LOG_BUFFER_SIZE];
   SemaphoreHandle_t logBufferMutex;
-  void append_logv_internal(const char *format, va_list args);
-  const std::string get_and_clear_logs_internal();
 #else
   DebugInfo() {}
 #endif
 };
+
+#define LOG_BUFFER_SIZE_BYTES 10000
+class LogHandler {
+ public:
+  LogHandler();
+  void writev(esp_log_level_t level, const char *format, va_list args);
+  void addAppender(ILogAppender* appender);
+  void initialize();
+  void writeLogs();
+
+ private:
+  static uint8_t _messageBuffer[];
+  StaticMessageBuffer_t _messageBufferStruct;
+  MessageBufferHandle_t _messageBufferHandle;
+  SemaphoreHandle_t _logBufferMutex;
+  std::vector<ILogAppender*> _appenders;
+};
+
+extern LogHandler logHandler;
 
 #define SS2K_MODLOG_ESP_LOCAL(level, ml_msg_, ...)                               \
   do {                                                                           \
@@ -104,6 +127,8 @@ int ss2k_log_hex_to_buffer(const byte *data, const size_t data_length, char *buf
 void ss2k_log_write(esp_log_level_t level, const char *format, ...);
 
 void ss2k_log_writev(esp_log_level_t level, const char *format, va_list args);
+
+// Message Buffer
 
 #else
 

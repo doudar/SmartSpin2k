@@ -6,11 +6,58 @@
  */
 
 #include "SS2KLog.h"
-#include "UdpLogger.h"
-#include "Websocket.h"
 #include "Main.h"
 
 DebugInfo DebugInfo::INSTANCE = DebugInfo();
+LogHandler logHandler         = LogHandler();
+
+uint8_t LogHandler::_messageBuffer[LOG_BUFFER_SIZE_BYTES];
+
+LogHandler::LogHandler() { _messageBufferHandle = xMessageBufferCreateStatic(LOG_BUFFER_SIZE_BYTES, _messageBuffer, &_messageBufferStruct); }
+
+void LogHandler::addAppender(ILogAppender *appender) { _appenders.push_back(appender); }
+
+void LogHandler::initialize() {
+  for (ILogAppender *appender : _appenders) {
+    appender->Initialize();
+  }
+}
+
+void LogHandler::writeLogs() {
+  const size_t buffer_size = 512;
+  char buffer[buffer_size];
+
+  for (int index = 0; index < 100; index++) {
+    size_t receivedBytes = xMessageBufferReceive(_messageBufferHandle, &buffer, buffer_size - 1, 0);
+    if (receivedBytes == 0) {
+      return;
+    }
+    buffer[receivedBytes] = '\0';
+
+    ESP_LOGE("LogHandler", "Received message from buffer %s", buffer);
+
+    for (ILogAppender *appender : _appenders) {
+      appender->Log(buffer);
+    }
+  }
+  ESP_LOGE("LogHandler", "Return write logs. Messages remaining in buffer");
+}
+
+void LogHandler::writev(esp_log_level_t level, const char *format, va_list args) {
+  if (_messageBufferHandle == NULL) {
+    ESP_LOGE("LogHandler", "Can not send log message. Message Buffer is NULL");
+  }
+
+  const size_t buffer_size = 512;
+  char buffer[buffer_size];
+
+  vsnprintf(buffer, buffer_size, format, args);
+
+  size_t bytesSent = xMessageBufferSend(_messageBufferHandle, buffer, strnlen(buffer, buffer_size), 0);
+  if (bytesSent < strnlen(buffer, buffer_size)) {
+    ESP_LOGE("LogHandler", "Can not send log message. Not enough free space left in buffer.");
+  }
+}
 
 #if DEBUG_LOG_BUFFER_SIZE > 0
 void DebugInfo::append_logv(const char *format, va_list args) { DebugInfo::INSTANCE.append_logv_internal(format, args); }
@@ -43,9 +90,7 @@ const std::string DebugInfo::get_and_clear_logs_internal() {
   return "";
 }
 #else
-void DebugInfo::append_logv_internal(const char *format, va_list args) {}
-
-String DebugInfo::get_and_clear_logs_internal() { return ""; }
+const std::string DebugInfo::get_and_clear_logs() { return ""; }
 #endif  // DEBUG_LOG_BUFFER_SIZE > 0
 
 void ss2k_remove_newlines(std::string *str) {
@@ -72,14 +117,15 @@ void ss2k_log_write(esp_log_level_t level, const char *format, ...) {
 
 void ss2k_log_writev(esp_log_level_t level, const char *format, va_list args) {
   esp_log_writev(level, SS2K_LOG_TAG, format, args);
+  logHandler.writev(level, format, args);
 
-  if (userConfig.getUdpLogEnabled()) {
-    UdpLogger::log(format, args);
-  } else {
-    WebSocket::log(format, args);
-  }
+  // if (userConfig.getUdpLogEnabled()) {
+  //   UdpLogger::log(format, args);
+  // } else {
+  //   WebSocket::log(format, args);
+  // }
 
-#if DEBUG_LOG_BUFFER_SIZE > 0
-  DebugInfo::append_logv(format, args);
-#endif  // DEBUG_LOG_BUFFER_SIZE > 0
+  // #if DEBUG_LOG_BUFFER_SIZE > 0
+  //   DebugInfo::append_logv(format, args);
+  // #endif  // DEBUG_LOG_BUFFER_SIZE > 0
 }
