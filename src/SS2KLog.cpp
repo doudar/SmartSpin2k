@@ -8,8 +8,7 @@
 #include "SS2KLog.h"
 #include "Main.h"
 
-DebugInfo DebugInfo::INSTANCE = DebugInfo();
-LogHandler logHandler         = LogHandler();
+LogHandler logHandler = LogHandler();
 
 uint8_t LogHandler::_messageBuffer[LOG_BUFFER_SIZE_BYTES];
 
@@ -38,66 +37,63 @@ void LogHandler::writeLogs() {
     buffer[receivedBytes] = '\0';
 
     for (ILogAppender *appender : _appenders) {
-      appender->Log(buffer);
+      try {
+        appender->Log(buffer);
+      } catch (...) {
+        ESP_LOGE("LogHandler", "Fatal error during writing to logs.");
+      }
     }
   }
-  ESP_LOGE("LogHandler", "Return write logs. Messages remaining in buffer");
+  ESP_LOGE("LogHandler", "Exit writeLogs(). Messages remaining in buffer.");
 }
 
-void LogHandler::writev(esp_log_level_t level, const char *format, va_list args) {
-  if (xSemaphoreTake(_logBufferMutex, 0) == pdFALSE) {
+void LogHandler::writev(esp_log_level_t level, const char *module, const char *format, va_list args) {
+  if (xSemaphoreTake(_logBufferMutex, 10) == pdFALSE) {
+    ESP_LOGE("LogHandler", "Can not write log message. Write is blocke by other task.");
     return;
   }
 
   if (_messageBufferHandle == NULL) {
     ESP_LOGE("LogHandler", "Can not send log message. Message Buffer is NULL");
+    return;
   }
+
+  char formatString[256];
+  sprintf(formatString, "[%6lu][%c](%s): %s", millis(), _logLevelToLetter(level), module, format);
 
   const size_t buffer_size = 512;
   char buffer[buffer_size];
+  int written = vsnprintf(buffer, buffer_size, formatString, args);
 
-  vsnprintf(buffer, buffer_size, format, args);
+  // Default logger -> write all to serial if connected
+  if (Serial) {
+    Serial.println(buffer);
+  }
 
-  size_t bytesSent = xMessageBufferSend(_messageBufferHandle, buffer, strnlen(buffer, buffer_size), 0);
-  if (bytesSent < strnlen(buffer, buffer_size)) {
+  size_t bytesSent = xMessageBufferSend(_messageBufferHandle, buffer, written, 0);
+
+  if (bytesSent < written) {
     ESP_LOGE("LogHandler", "Can not send log message. Not enough free space left in buffer.");
   }
+
   xSemaphoreGive(_logBufferMutex);
 }
 
-#if DEBUG_LOG_BUFFER_SIZE > 0
-void DebugInfo::append_logv(const char *format, va_list args) { DebugInfo::INSTANCE.append_logv_internal(format, args); }
-
-const std::string DebugInfo::get_and_clear_logs() { return DebugInfo::INSTANCE.get_and_clear_logs_internal(); }
-
-void DebugInfo::append_logv_internal(const char *format, va_list args) {
-  if (xSemaphoreTake(logBufferMutex, 0) == pdTRUE) {
-    int written = vsnprintf(logBuffer + logBufferLength, DEBUG_LOG_BUFFER_SIZE - logBufferLength, format, args);
-    SS2K_LOGD(DEBUG_INFO_LOG_TAG, "Wrote %d bytes to log", written);
-    if (written < 0 || logBufferLength + written > DEBUG_LOG_BUFFER_SIZE) {
-      logBufferLength = snprintf(logBuffer, DEBUG_LOG_BUFFER_SIZE, "...\n");
-    } else {
-      logBufferLength += written;
-    }
-    SS2K_LOGD(DEBUG_INFO_LOG_TAG, "Log buffer length %d of %d bytes", logBufferLength, DEBUG_LOG_BUFFER_SIZE);
-    xSemaphoreGive(logBufferMutex);
+char LogHandler::_logLevelToLetter(esp_log_level_t level) {
+  switch (level) {
+    case ESP_LOG_ERROR:
+      return 'E';
+    case ESP_LOG_WARN:
+      return 'W';
+    case ESP_LOG_INFO:
+      return 'I';
+    case ESP_LOG_DEBUG:
+      return 'D';
+    case ESP_LOG_VERBOSE:
+      return 'V';
   }
+  return ' ';
 }
-
-const std::string DebugInfo::get_and_clear_logs_internal() {
-  if (xSemaphoreTake(logBufferMutex, 0) == pdTRUE) {
-    const std::string debugLog = std::string(logBuffer, logBufferLength);
-    logBufferLength            = 0;
-    logBuffer[0]               = '\0';
-    xSemaphoreGive(logBufferMutex);
-    SS2K_LOGD(DEBUG_INFO_LOG_TAG, "Log buffer read %d bytes and cleared", logBufferLength);
-    return debugLog;
-  }
-  return "";
-}
-#else
-const std::string DebugInfo::get_and_clear_logs() { return ""; }
-#endif  // DEBUG_LOG_BUFFER_SIZE > 0
 
 void ss2k_remove_newlines(std::string *str) {
   std::string::size_type pos = 0;
@@ -114,24 +110,9 @@ int ss2k_log_hex_to_buffer(const byte *data, const size_t data_length, char *buf
   return written;
 }
 
-void ss2k_log_write(esp_log_level_t level, const char *format, ...) {
+void ss2k_log_write(esp_log_level_t level, const char *module, const char *format, ...) {
   va_list args;
   va_start(args, format);
-  ss2k_log_writev(level, format, args);
+  logHandler.writev(level, module, format, args);
   va_end(args);
-}
-
-void ss2k_log_writev(esp_log_level_t level, const char *format, va_list args) {
-  esp_log_writev(level, SS2K_LOG_TAG, format, args);
-  logHandler.writev(level, format, args);
-
-  // if (userConfig.getUdpLogEnabled()) {
-  //   UdpLogger::log(format, args);
-  // } else {
-  //   WebSocket::log(format, args);
-  // }
-
-  // #if DEBUG_LOG_BUFFER_SIZE > 0
-  //   DebugInfo::append_logv(format, args);
-  // #endif  // DEBUG_LOG_BUFFER_SIZE > 0
 }

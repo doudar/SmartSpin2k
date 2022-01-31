@@ -34,9 +34,6 @@ String RuntimeParameters::returnJSON(bool includeDebugLog) {
   doc["shifterPosition"]     = shifterPosition;
   doc["minStep"]             = minStep;
   doc["maxStep"]             = maxStep;
-  if (includeDebugLog) {
-    doc["debug"] = DebugInfo::get_and_clear_logs();
-  }
 
   String output;
   serializeJson(doc, output);
@@ -93,9 +90,6 @@ String userParameters::returnJSON(bool includeDebugLog) {
   doc["stepperDir"]            = stepperDir;
   doc["udpLogEnabled"]         = udpLogEnabled;
 
-  if (includeDebugLog) {
-    doc["debug"] = DebugInfo::get_and_clear_logs();
-  }
   String output;
   serializeJson(doc, output);
   return output;
