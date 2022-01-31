@@ -12,7 +12,7 @@
 #include <ArduinoJson.h>
 #include <SPIFFS.h>
 
-String RuntimeParameters::returnJSON(bool includeDebugLog) {
+String RuntimeParameters::returnJSON() {
   // Allocate a temporary JsonDocument
   // Don't forget to change the capacity to match your requirements.
   // Use arduinojson.org/assistant to compute the capacity.
@@ -63,7 +63,7 @@ void userParameters::setDefaults() {
 
 //---------------------------------------------------------------------------------
 //-- return all config as one a single JSON string
-String userParameters::returnJSON(bool includeDebugLog) {
+String userParameters::returnJSON() {
   // Allocate a temporary JsonDocument
   // Don't forget to change the capacity to match your requirements.
   // Use arduinojson.org/assistant to compute the capacity.

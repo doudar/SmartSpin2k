@@ -111,38 +111,18 @@
 </body>
 
 <script>
+  let updatePending = false;
+  let updateTimer = undefined;
+  
+  // logging
+  let websocket = undefined;
+  const logEntries = [];
+  const maxLogentries = 1000;
 
-  var debugElement = document.getElementById("debug");
-  var followElement = document.getElementById("follow");
-  var updatePending = false;
-  var updateTimer = undefined;
-  var udpLogEnabled = true;
-  var webServerAddress = "ws://";
-  webServerAddress = webServerAddress.concat(location.host, ":8080");
-  try {
-    var socket = new WebSocket(webServerAddress);
-  }
-  catch (e) {
-    alert("Could not connect to Websocket.");
-  }
-
-  try {
-    socket.onmessage = function (event) {
-      if (debugElement.innerHTML == "Loading") {
-        document.getElementById("debug").innerHTML = event.data;
-      } else {
-        document.getElementById("debug").innerHTML += event.data;
-      }
-      updateDebugView(event.data);
-    };
-  } catch (e) {
-    if (socket) {
-      socket = WebSocket(webServerAddress);
-    }
-    else {
-      socket = new WebSocket(webServerAddress);
-    }
-  }
+  document.addEventListener("visibilitychange", onVisibilityChanged, false);
+  document.addEventListener("mozvisibilitychange", onVisibilityChanged, false);
+  document.addEventListener("webkitvisibilitychange", onVisibilityChanged, false);
+  document.addEventListener("msvisibilitychange", onVisibilityChanged, false);
 
   function onVisibilityChanged() {
     if (document.hidden || document.mozHidden || document.webkitHidden || document.msHidden) {
@@ -152,16 +132,14 @@
     }
   }
 
-  document.addEventListener("visibilitychange", onVisibilityChanged, false);
-  document.addEventListener("mozvisibilitychange", onVisibilityChanged, false);
-  document.addEventListener("webkitvisibilitychange", onVisibilityChanged, false);
-  document.addEventListener("msvisibilitychange", onVisibilityChanged, false);
-
   function startUpdate() {
     //Update values on specified interval loading late because this tiny webserver hates frequent requests
     if (updateTimer === undefined) {
       updateTimer = setInterval(function () {
         requestRuntimeValues();
+        if (websocket == null) {
+          setupLogging();
+        }
       }, 2500);
     }
   }
@@ -169,12 +147,6 @@
   function stopUpdate() {
     clearInterval(updateTimer);
     updateTimer = undefined;
-  }
-
-  function updateDebugView(newContent) {
-    if (followElement.checked) {
-      debugElement.scrollTop = debugElement.scrollHeight - debugElement.clientHeight
-    }
   }
 
   function requestConfigValues() {
@@ -192,10 +164,6 @@
           document.getElementById("inclineMultiplier").value = obj.inclineMultiplier;
           //--- document.getElementById("ERGSensitivity").value = obj.ERGSensitivity; ---//
           document.getElementById("connectedPowerMeter").value = obj.connectedPowerMeter;
-          udpLogEnabled = obj.udpLogEnabled.value;
-          if (!udpLogEnabled) {       
-            document.getElementById("debug").innerHTML = "UDP logging is enabled in settings.<p>Please see the <a href='https://github.com/doudar/SmartSpin2k/wiki/Viewing-logs-via-UDP' style='color:white;'>SS2K Wiki</a><p>for more information.";
-          }
         }
       };
       xhttp.open("GET", "/configJSON", true);
@@ -219,10 +187,7 @@
           document.getElementById("simulatedCad").value = obj.simulatedCad;
         }
       };
-      if (socket.CLOSED) {
-        socket.OPEN;
-      }
-      xhttp.open("GET", !udpLogEnabled ? "/runtimeConfigJSON" : "/runtimeConfigJSON?includeDebugLog=true", true);
+      xhttp.open("GET", "/runtimeConfigJSON", true);
       xhttp.send();
     }
   }
@@ -240,9 +205,41 @@
   window.addEventListener('load', function () {
     setTimeout(loadCss, 100);
     requestConfigValues();
+    setupLogging();
     setTimeout(requestRuntimeValues(), 200);
     startUpdate();
   }, false);
+
+  function setupLogging() {
+    var debugElement = document.getElementById("debug");
+    var followElement = document.getElementById("follow");
+    var wsAddress = `ws://${document.location.host}:8080`;
+    try {
+      websocket = new WebSocket(wsAddress);
+      websocket.onmessage = (evt) => {
+        if (evt?.data == null) {
+          return;
+        }
+
+        logEntries.push(event.data);
+        if (logEntries.length > maxLogentries) {
+          logEntries = logEntries.slice(1, logEntries.length - 10);
+        }
+
+        debugElement.innerHTML = logEntries.join("<br>");
+        if (followElement.checked) {
+          debugElement.scrollTop = debugElement.scrollHeight - debugElement.clientHeight
+        }
+      }
+    } catch (e) {
+      console.error("Could not connect to Websocket.", e);
+      if (websocket != null) {
+        websocket.close();
+      }
+      websocket = undefined;
+    }
+  }
+
 </script>
 
 </html>
