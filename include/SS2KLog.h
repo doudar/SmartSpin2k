@@ -82,7 +82,7 @@ class DebugInfo {
 #endif
 };
 
-#define LOG_BUFFER_SIZE_BYTES 10000
+#define LOG_BUFFER_SIZE_BYTES 4096
 class LogHandler {
  public:
   LogHandler();

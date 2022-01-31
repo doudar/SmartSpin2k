@@ -13,7 +13,10 @@ LogHandler logHandler         = LogHandler();
 
 uint8_t LogHandler::_messageBuffer[LOG_BUFFER_SIZE_BYTES];
 
-LogHandler::LogHandler() { _messageBufferHandle = xMessageBufferCreateStatic(LOG_BUFFER_SIZE_BYTES, _messageBuffer, &_messageBufferStruct); }
+LogHandler::LogHandler() {
+  _logBufferMutex      = xSemaphoreCreateMutex();
+  _messageBufferHandle = xMessageBufferCreateStatic(LOG_BUFFER_SIZE_BYTES, _messageBuffer, &_messageBufferStruct);
+}
 
 void LogHandler::addAppender(ILogAppender *appender) { _appenders.push_back(appender); }
 
@@ -42,6 +45,10 @@ void LogHandler::writeLogs() {
 }
 
 void LogHandler::writev(esp_log_level_t level, const char *format, va_list args) {
+  if (xSemaphoreTake(_logBufferMutex, 0) == pdFALSE) {
+    return;
+  }
+
   if (_messageBufferHandle == NULL) {
     ESP_LOGE("LogHandler", "Can not send log message. Message Buffer is NULL");
   }
@@ -55,6 +62,7 @@ void LogHandler::writev(esp_log_level_t level, const char *format, va_list args)
   if (bytesSent < strnlen(buffer, buffer_size)) {
     ESP_LOGE("LogHandler", "Can not send log message. Not enough free space left in buffer.");
   }
+  xSemaphoreGive(_logBufferMutex);
 }
 
 #if DEBUG_LOG_BUFFER_SIZE > 0
