@@ -6,11 +6,12 @@
  */
 
 #include "UdpAppender.h"
+#include "main.h"
 
 void UdpAppender::Initialize() {}
 
 void UdpAppender::Log(const char *message) {
-  if (WiFi.status() == WL_CONNECTED) {
+  if (WiFi.status() == WL_CONNECTED && userConfig.getUdpLogEnabled()) {
     this->udp.beginPacket("255.255.255.255", this->port);
     this->udp.write((uint8_t *)message, strlen(message));
     this->udp.endPacket();
