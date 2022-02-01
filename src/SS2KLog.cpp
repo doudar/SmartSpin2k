@@ -21,7 +21,11 @@ void LogHandler::addAppender(ILogAppender *appender) { _appenders.push_back(appe
 
 void LogHandler::initialize() {
   for (ILogAppender *appender : _appenders) {
-    appender->Initialize();
+    try {
+      appender->Initialize();
+    } catch (...) {
+      SS2K_LOG(LOG_HANDLER_TAG, "Fatal error during initialize of log appender.");
+    }
   }
 }
 
@@ -40,21 +44,22 @@ void LogHandler::writeLogs() {
       try {
         appender->Log(buffer);
       } catch (...) {
-        ESP_LOGE("LogHandler", "Fatal error during writing to logs.");
+        SS2K_LOG(LOG_HANDLER_TAG, "Fatal error during writing to log appender.");
       }
     }
   }
-  ESP_LOGE("LogHandler", "Exit writeLogs(). Messages remaining in buffer.");
+  SS2K_LOG(LOG_HANDLER_TAG, "Exit writeLogs(). Messages remaining in buffer.");
 }
 
 void LogHandler::writev(esp_log_level_t level, const char *module, const char *format, va_list args) {
   if (xSemaphoreTake(_logBufferMutex, 10) == pdFALSE) {
-    ESP_LOGE("LogHandler", "Can not write log message. Write is blocke by other task.");
+    // Must use ESP_LOG here using of SSK_LOG creates dead lock
+    ESP_LOGE(LOG_HANDLER_TAG, "Can not write log message. Write is blocke by other task.");
     return;
   }
 
   if (_messageBufferHandle == NULL) {
-    ESP_LOGE("LogHandler", "Can not send log message. Message Buffer is NULL");
+    ESP_LOGE(LOG_HANDLER_TAG, "Can not send log message. Message Buffer is NULL");
     return;
   }
 
@@ -73,7 +78,7 @@ void LogHandler::writev(esp_log_level_t level, const char *module, const char *f
   size_t bytesSent = xMessageBufferSend(_messageBufferHandle, buffer, written, 0);
 
   if (bytesSent < written) {
-    ESP_LOGE("LogHandler", "Can not send log message. Not enough free space left in buffer.");
+    ESP_LOGE(LOG_HANDLER_TAG, "Can not send log message. Not enough free space left in buffer.");
   }
 
   xSemaphoreGive(_logBufferMutex);

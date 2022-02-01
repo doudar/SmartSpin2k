@@ -11,6 +11,7 @@
 void WebSocketAppender::Initialize() { _webSocketsServer.listen(WebSocketAppender::port); }
 void WebSocketAppender::Loop() {
   if (WiFi.status() == WL_CONNECTED && !_client.available()) {
+    _client.close();
     if (_webSocketsServer.poll() == false) {
       return;
     }

@@ -19,8 +19,8 @@
 #include "LogAppender.h"
 #include <vector>
 
-#define SS2K_LOG_TAG       "SS2K"
-#define DEBUG_INFO_LOG_TAG "DebugInfo"
+#define SS2K_LOG_TAG    "SS2K"
+#define LOG_HANDLER_TAG "Log_Handler"
 
 #ifndef DEBUG_LOG_BUFFER_SIZE
 #define DEBUG_LOG_BUFFER_SIZE 0

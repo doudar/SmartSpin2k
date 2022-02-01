@@ -116,7 +116,7 @@
   
   // logging
   let websocket = undefined;
-  const logEntries = [];
+  let logEntries = [];
   const maxLogentries = 1000;
 
   document.addEventListener("visibilitychange", onVisibilityChanged, false);
@@ -137,7 +137,7 @@
     if (updateTimer === undefined) {
       updateTimer = setInterval(function () {
         requestRuntimeValues();
-        if (websocket == null) {
+        if (websocket == null|| websocket?.readyState != 1 /*OPEN*/ ) {
           setupLogging();
         }
       }, 2500);
