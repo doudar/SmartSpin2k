@@ -90,7 +90,7 @@ class RuntimeParameters {
   void setMaxStep(int ms) { maxStep = ms; }
   int getMaxStep() { return maxStep; }
 
-  String returnJSON(bool includeDebugLog = false);
+  String returnJSON();
 };
 
 class userParameters {
@@ -154,7 +154,7 @@ class userParameters {
   void setFoundDevices(String fdev) { foundDevices = fdev; }
   const char* getFoundDevices() { return foundDevices.c_str(); }
 
-  String returnJSON(bool includeDebugLog = false);
+  String returnJSON();
   void saveToSPIFFS();
   void loadFromSPIFFS();
   void printFile();

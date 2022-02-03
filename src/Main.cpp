@@ -13,6 +13,8 @@
 #include <HardwareSerial.h>
 #include "FastAccelStepper.h"
 #include "ERG_Mode.h"
+#include "UdpAppender.h"
+#include "WebsocketAppender.h"
 
 HardwareSerial stepperSerial(2);
 TMC2208Stepper driver(&SERIAL_PORT, R_SENSE);  // Hardware Serial
@@ -28,6 +30,10 @@ SS2K ss2k;
 userParameters userConfig;
 RuntimeParameters rtConfig;
 physicalWorkingCapacity userPWC;
+
+///////////// Log Appender /////////////
+UdpAppender udpAppender;
+WebSocketAppender webSocketAppender;
 
 ///////////// BEGIN SETUP /////////////
 #ifndef UNIT_TEST
@@ -107,6 +113,11 @@ void setup() {
 
   startWifi();
 
+  // Configure and Initialize Logger
+  logHandler.addAppender(&webSocketAppender);
+  logHandler.addAppender(&udpAppender);
+  logHandler.initialize();
+
   // Check for firmware update. It's important that this stays before BLE &
   // HTTP setup because otherwise they use too much traffic and the device
   // fails to update which really sucks when it corrupts your settings.
@@ -125,7 +136,7 @@ void setup() {
 
   xTaskCreatePinnedToCore(SS2K::maintenanceLoop,     /* Task function. */
                           "maintenanceLoopFunction", /* name of task. */
-                          2500,                      /* Stack size of task */
+                          3500,                      /* Stack size of task */
                           NULL,                      /* parameter of the task */
                           1,                         /* priority of the task */
                           &maintenanceLoopTask,      /* Task handle to keep track of created task */
@@ -141,7 +152,6 @@ void SS2K::maintenanceLoop(void *pvParameters) {
   static unsigned long intervalTimer = millis();
   while (true) {
     vTaskDelay(200 / portTICK_RATE_MS);
-
     if (rtConfig.getShifterPosition() > ss2k.lastShifterPosition) {
       SS2K_LOG(MAIN_LOG_TAG, "Shift UP: %l", rtConfig.getShifterPosition());
       Serial.println(ss2k.targetPosition);
@@ -152,11 +162,12 @@ void SS2K::maintenanceLoop(void *pvParameters) {
       spinBLEServer.notifyShift();
     }
     ss2k.lastShifterPosition = rtConfig.getShifterPosition();
+    webSocketAppender.Loop();
 
-    if ((millis() - intervalTimer) > 10000) {  // add check here for when to restart WiFi
-                                               // maybe if in STA mode and 8.8.8.8 no ping return?
+    if ((millis() - intervalTimer) > 500) {  // add check here for when to restart WiFi
+                                             // maybe if in STA mode and 8.8.8.8 no ping return?
       // ss2k.restartWifi();
-     
+      logHandler.writeLogs();
       intervalTimer = millis();
     }
 
