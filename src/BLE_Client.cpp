@@ -78,6 +78,7 @@ bool SpinBLEClient::connectToServer() {
   int successful                = 0;
   BLEAdvertisedDevice *myDevice = nullptr;
   int device_number             = -1;
+
   for (size_t i = 0; i < NUM_BLE_DEVICES; i++) {
     if (spinBLEClient.myBLEDevices[i].doConnect == true) {   // Client wants to be connected
       if (spinBLEClient.myBLEDevices[i].advertisedDevice) {  // Client is assigned

@@ -28,6 +28,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Fixed possible infinite loop in ERG when stepper never reached target position due to being past min or max position.
 - When UDP logging is enabled, html will no longer request logging info. 
 - Increased remote server minimum packet delay to 325ms and max to 700ms. 
+- Updated Arduino_esp32 to the latest 2.0.2 version.
+- Fixed all libraries to static releases.
+- Reduced max_connect_retries from 10 to 3.
+- Increased max_scan_retries from 1 to 2. 
+- Now only send notifications for subscribed characteristics. 
+
+### Fixed
+- bluetoothscanner.html now lists fitness machine services in the PM list. 
 
 ### Hardware
 - Added Ultra Short Case mod which should allow as little as ~40mm from knob center to head tube. 

@@ -124,12 +124,12 @@
 #define LED_PIN 2
 
 // Max tries that BLE client will perform on reconnect
-#define MAX_RECONNECT_TRIES 10
+#define MAX_RECONNECT_TRIES 3
 
 // When quick reconnect fails ^^, we try to scan for the disconnected server.
 // Scans slow BLE & WiFi traffic so we don't want to do this forever.
 // Give up scanning for the lost connection after this many tries:
-#define MAX_SCAN_RETRIES 1
+#define MAX_SCAN_RETRIES 2
 
 // loop speed for the SmartSpin2k BLE communications
 #define BLE_NOTIFY_DELAY 700

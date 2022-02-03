@@ -18,6 +18,8 @@ SpinBLEServer spinBLEServer;
 
 NimBLEServer *pServer = nullptr;
 
+static MyCallbacks chrCallbacks;
+
 BLEService *pHeartService;
 BLECharacteristic *heartRateMeasurementCharacteristic;
 
@@ -144,8 +146,10 @@ void startBLEServer() {
 
   smartSpin2kCharacteristic->setValue(ss2kCustomCharacteristicValue, 3);
 
-  fitnessMachineControlPoint->setCallbacks(new MyCallbacks());
-
+  cyclingPowerMeasurementCharacteristic->setCallbacks(&chrCallbacks);
+  heartRateMeasurementCharacteristic->setCallbacks(&chrCallbacks);
+  fitnessMachineIndoorBikeData->setCallbacks(&chrCallbacks);
+  fitnessMachineControlPoint->setCallbacks(&chrCallbacks);
   smartSpin2kCharacteristic->setCallbacks(new ss2kCustomCharacteristicCallbacks());
 
   pHeartService->start();
@@ -203,6 +207,9 @@ bool spinDown() {
 }
 
 void updateIndoorBikeDataChar() {
+  if (!spinBLEServer.clientSubscribed.IndoorBikeData) {
+    return;
+  }
   float cadRaw = rtConfig.getSimulatedCad();
   int cad      = static_cast<int>(cadRaw * 2);
 
@@ -238,6 +245,9 @@ void updateIndoorBikeDataChar() {
 }
 
 void updateCyclingPowerMeasurementChar() {
+  if (!spinBLEServer.clientSubscribed.CyclingPowerMeasurement) {
+    return;
+  }
   int power = rtConfig.getSimulatedWatts().value;
   int remainder, quotient;
   quotient                   = power / 256;
@@ -273,6 +283,9 @@ void updateCyclingPowerMeasurementChar() {
 }
 
 void updateHeartRateMeasurementChar() {
+  if (!spinBLEServer.clientSubscribed.Heartrate) {
+    return;
+  }
   int hr                  = rtConfig.getSimulatedHr();
   heartRateMeasurement[1] = hr;
   heartRateMeasurementCharacteristic->setValue(heartRateMeasurement, 2);
@@ -286,7 +299,6 @@ void updateHeartRateMeasurementChar() {
 }
 
 // Creating Server Connection Callbacks
-
 void MyServerCallbacks::onConnect(BLEServer *pServer, ble_gap_conn_desc *desc) {
   SS2K_LOG(BLE_SERVER_LOG_TAG, "Bluetooth Remote Client Connected: %s Connected Clients: %d", NimBLEAddress(desc->peer_ota_addr).toString().c_str(), pServer->getConnectedCount());
   updateConnParametersFlag = true;
@@ -307,11 +319,44 @@ void MyServerCallbacks::onDisconnect(BLEServer *pServer) {
 
 void MyCallbacks::onWrite(BLECharacteristic *pCharacteristic) { FTMSWrite = pCharacteristic->getValue(); }
 
+void MyCallbacks::onSubscribe(NimBLECharacteristic *pCharacteristic, ble_gap_conn_desc *desc, uint16_t subValue) {
+  String str        = "Client ID: ";
+  NimBLEUUID pUUID = pCharacteristic->getUUID();
+  str += desc->conn_handle;
+  str += " Address: ";
+  str += std::string(NimBLEAddress(desc->peer_ota_addr)).c_str();
+  if (subValue == 0) {
+    str += " Unsubscribed to ";
+    spinBLEServer.setClientSubscribed(pUUID, false);
+  } else if (subValue == 1) {
+    str += " Subscribed to notifications for ";
+    spinBLEServer.setClientSubscribed(pUUID, true);
+  } else if (subValue == 2) {
+    str += " Subscribed to indications for ";
+    spinBLEServer.setClientSubscribed(pUUID, true);
+  } else if (subValue == 3) {
+    str += " Subscribed to notifications and indications for ";
+    spinBLEServer.setClientSubscribed(pUUID, true);
+  }
+  str += std::string(pCharacteristic->getUUID()).c_str();
+
+  SS2K_LOG(BLE_SERVER_LOG_TAG, "%s", str.c_str());
+}
+
+void SpinBLEServer::setClientSubscribed(NimBLEUUID pUUID, bool subscribe) {
+  if (pUUID == HEARTCHARACTERISTIC_UUID) {
+    spinBLEServer.clientSubscribed.Heartrate = subscribe;
+  } else if (pUUID == CYCLINGPOWERMEASUREMENT_UUID) {
+    spinBLEServer.clientSubscribed.CyclingPowerMeasurement = subscribe;
+  } else if (pUUID == FITNESSMACHINEINDOORBIKEDATA_UUID) {
+    spinBLEServer.clientSubscribed.IndoorBikeData = subscribe;
+  }
+}
+
 void processFTMSWrite() {
   if (FTMSWrite == "") {
     return;
   }
-
   BLECharacteristic *pCharacteristic = NimBLEDevice::getServer()->getServiceByUUID(FITNESSMACHINESERVICE_UUID)->getCharacteristic(FITNESSMACHINECONTROLPOINT_UUID);
 
   std::string rxValue = FTMSWrite;
@@ -585,7 +630,7 @@ void ss2kCustomCharacteristicCallbacks::onWrite(BLECharacteristic *pCharacterist
   uint8_t *pData = reinterpret_cast<uint8_t *>(&rxValue[0]);
   int length     = rxValue.length();
 
-  const int kLogBufCapacity = (rxValue.length() * 2) + 60; //needs to be bigger than the largest message.
+  const int kLogBufCapacity = (rxValue.length() * 2) + 60;  // needs to be bigger than the largest message.
   char logBuf[kLogBufCapacity];
   int logBufLength = ss2k_log_hex_to_buffer(pData, length, logBuf, 0, kLogBufCapacity);
 
@@ -598,12 +643,12 @@ void ss2kCustomCharacteristicCallbacks::onWrite(BLECharacteristic *pCharacterist
 
   switch (rxValue[1]) {
     case BLE_firmwareUpdateURL:  // 0x01
-      logBufLength   += snprintf(logBuf + logBufLength, kLogBufCapacity - logBufLength, "<-Firmware Update URL");
+      logBufLength += snprintf(logBuf + logBufLength, kLogBufCapacity - logBufLength, "<-Firmware Update URL");
       returnValue[0] = error;
       break;
 
     case BLE_incline: {  // 0x02
-      logBufLength   += snprintf(logBuf + logBufLength, kLogBufCapacity - logBufLength, "<-incline");
+      logBufLength += snprintf(logBuf + logBufLength, kLogBufCapacity - logBufLength, "<-incline");
       returnValue[0] = success;
       if (rxValue[0] == read) {
         int inc        = rtConfig.getTargetIncline() * 100;
@@ -618,7 +663,7 @@ void ss2kCustomCharacteristicCallbacks::onWrite(BLECharacteristic *pCharacterist
     } break;
 
     case BLE_simulatedWatts:  // 0x03
-      logBufLength   += snprintf(logBuf + logBufLength, kLogBufCapacity - logBufLength, "<-simulatedWatts");
+      logBufLength += snprintf(logBuf + logBufLength, kLogBufCapacity - logBufLength, "<-simulatedWatts");
       returnValue[0] = success;
       if (rxValue[0] == read) {
         returnValue[2] = (uint8_t)(rtConfig.getSimulatedWatts().value & 0xff);
@@ -632,7 +677,7 @@ void ss2kCustomCharacteristicCallbacks::onWrite(BLECharacteristic *pCharacterist
       break;
 
     case BLE_simulatedHr:  // 0x04
-      logBufLength   += snprintf(logBuf + logBufLength, kLogBufCapacity - logBufLength, "<-simulatedHr");
+      logBufLength += snprintf(logBuf + logBufLength, kLogBufCapacity - logBufLength, "<-simulatedHr");
       returnValue[0] = success;
       if (rxValue[0] == read) {
         returnValue[2] = (uint8_t)(rtConfig.getSimulatedHr() & 0xff);
@@ -646,7 +691,7 @@ void ss2kCustomCharacteristicCallbacks::onWrite(BLECharacteristic *pCharacterist
       break;
 
     case BLE_simulatedCad:  // 0x05
-      logBufLength   += snprintf(logBuf + logBufLength, kLogBufCapacity - logBufLength, "<-simulatedCad");
+      logBufLength += snprintf(logBuf + logBufLength, kLogBufCapacity - logBufLength, "<-simulatedCad");
       returnValue[0] = success;
       if (rxValue[0] == read) {
         returnValue[2] = (uint8_t)(rtConfig.getSimulatedCad() & 0xff);
@@ -660,7 +705,7 @@ void ss2kCustomCharacteristicCallbacks::onWrite(BLECharacteristic *pCharacterist
       break;
 
     case BLE_simulatedSpeed: {  // 0x06
-      logBufLength   += snprintf(logBuf + logBufLength, kLogBufCapacity - logBufLength, "<-simulatedSpeed");
+      logBufLength += snprintf(logBuf + logBufLength, kLogBufCapacity - logBufLength, "<-simulatedSpeed");
       returnValue[0] = success;
       int spd        = rtConfig.getSimulatedSpeed() * 10;
       if (rxValue[0] == read) {
@@ -680,7 +725,7 @@ void ss2kCustomCharacteristicCallbacks::onWrite(BLECharacteristic *pCharacterist
       break;
 
     case BLE_shiftStep:  // 0x08
-      logBufLength   += snprintf(logBuf + logBufLength, kLogBufCapacity - logBufLength, "<-shiftStep");
+      logBufLength += snprintf(logBuf + logBufLength, kLogBufCapacity - logBufLength, "<-shiftStep");
       returnValue[0] = success;
       if (rxValue[0] == read) {
         returnValue[2] = (uint8_t)(userConfig.getShiftStep() & 0xff);
@@ -694,7 +739,7 @@ void ss2kCustomCharacteristicCallbacks::onWrite(BLECharacteristic *pCharacterist
       break;
 
     case BLE_stepperPower:  // 0x09
-      logBufLength   += snprintf(logBuf + logBufLength, kLogBufCapacity - logBufLength, "<-stepperPower");
+      logBufLength += snprintf(logBuf + logBufLength, kLogBufCapacity - logBufLength, "<-stepperPower");
       returnValue[0] = success;
       if (rxValue[0] == read) {
         returnValue[2] = (uint8_t)(userConfig.getStepperPower() & 0xff);
@@ -709,7 +754,7 @@ void ss2kCustomCharacteristicCallbacks::onWrite(BLECharacteristic *pCharacterist
       break;
 
     case BLE_stealthchop:  // 0x0A
-      logBufLength   += snprintf(logBuf + logBufLength, kLogBufCapacity - logBufLength, "<-stealthchop");
+      logBufLength += snprintf(logBuf + logBufLength, kLogBufCapacity - logBufLength, "<-stealthchop");
       returnValue[0] = success;
       if (rxValue[0] == read) {
         returnValue[2] = (uint8_t)(userConfig.getStealthchop());
@@ -723,7 +768,7 @@ void ss2kCustomCharacteristicCallbacks::onWrite(BLECharacteristic *pCharacterist
       break;
 
     case BLE_inclineMultiplier: {  // 0x0B
-      logBufLength   += snprintf(logBuf + logBufLength, kLogBufCapacity - logBufLength, "<-inclineMultiplier");
+      logBufLength += snprintf(logBuf + logBufLength, kLogBufCapacity - logBufLength, "<-inclineMultiplier");
       returnValue[0] = success;
       int inc        = userConfig.getInclineMultiplier();
       if (rxValue[0] == read) {
@@ -738,7 +783,7 @@ void ss2kCustomCharacteristicCallbacks::onWrite(BLECharacteristic *pCharacterist
     } break;
 
     case BLE_powerCorrectionFactor: {  // 0x0C
-      logBufLength   += snprintf(logBuf + logBufLength, kLogBufCapacity - logBufLength, "<-powerCorrectionFactor");
+      logBufLength += snprintf(logBuf + logBufLength, kLogBufCapacity - logBufLength, "<-powerCorrectionFactor");
       returnValue[0] = success;
       int pcf        = userConfig.getPowerCorrectionFactor() * 10;
       if (rxValue[0] == read) {
@@ -753,7 +798,7 @@ void ss2kCustomCharacteristicCallbacks::onWrite(BLECharacteristic *pCharacterist
     } break;
 
     case BLE_simulateHr:  // 0x0D
-      logBufLength   += snprintf(logBuf + logBufLength, kLogBufCapacity - logBufLength, "<-simulateHr");
+      logBufLength += snprintf(logBuf + logBufLength, kLogBufCapacity - logBufLength, "<-simulateHr");
       returnValue[0] = success;
       if (rxValue[0] == read) {
         returnValue[2] = (uint8_t)(rtConfig.getSimulateHr());
@@ -766,7 +811,7 @@ void ss2kCustomCharacteristicCallbacks::onWrite(BLECharacteristic *pCharacterist
       break;
 
     case BLE_simulateWatts:  // 0x0E
-      logBufLength   += snprintf(logBuf + logBufLength, kLogBufCapacity - logBufLength, "<-simulateWatts");
+      logBufLength += snprintf(logBuf + logBufLength, kLogBufCapacity - logBufLength, "<-simulateWatts");
       returnValue[0] = success;
       if (rxValue[0] == read) {
         returnValue[2] = (uint8_t)(rtConfig.getSimulateWatts());
@@ -779,7 +824,7 @@ void ss2kCustomCharacteristicCallbacks::onWrite(BLECharacteristic *pCharacterist
       break;
 
     case BLE_simulateCad:  // 0x0F
-      logBufLength   += snprintf(logBuf + logBufLength, kLogBufCapacity - logBufLength, "<-simulateCad");
+      logBufLength += snprintf(logBuf + logBufLength, kLogBufCapacity - logBufLength, "<-simulateCad");
       returnValue[0] = success;
       if (rxValue[0] == read) {
         returnValue[2] = (uint8_t)(rtConfig.getSimulateCad());
@@ -792,7 +837,7 @@ void ss2kCustomCharacteristicCallbacks::onWrite(BLECharacteristic *pCharacterist
       break;
 
     case BLE_ERGMode:  // 0x10
-      logBufLength   += snprintf(logBuf + logBufLength, kLogBufCapacity - logBufLength, "<-ERGMode");
+      logBufLength += snprintf(logBuf + logBufLength, kLogBufCapacity - logBufLength, "<-ERGMode");
       returnValue[0] = success;
       if (rxValue[0] == read) {
         returnValue[2] = (uint8_t)(rtConfig.getERGMode());
@@ -825,27 +870,27 @@ void ss2kCustomCharacteristicCallbacks::onWrite(BLECharacteristic *pCharacterist
       break;
 
     case BLE_password:  // 0x13
-      logBufLength   += snprintf(logBuf + logBufLength, kLogBufCapacity - logBufLength, "<-password");
+      logBufLength += snprintf(logBuf + logBufLength, kLogBufCapacity - logBufLength, "<-password");
       returnValue[0] = error;
       break;
 
     case BLE_foundDevices:  // 0x14
-      logBufLength   += snprintf(logBuf + logBufLength, kLogBufCapacity - logBufLength, "<-foundDevices");
+      logBufLength += snprintf(logBuf + logBufLength, kLogBufCapacity - logBufLength, "<-foundDevices");
       returnValue[0] = error;
       break;
 
     case BLE_connectedPowerMeter:  // 0x15
-      logBufLength   += snprintf(logBuf + logBufLength, kLogBufCapacity - logBufLength, "<-connectedPowerMete");
+      logBufLength += snprintf(logBuf + logBufLength, kLogBufCapacity - logBufLength, "<-connectedPowerMete");
       returnValue[0] = error;
       break;
 
     case BLE_connectedHeartMonitor:  // 0x16
-      logBufLength   += snprintf(logBuf + logBufLength, kLogBufCapacity - logBufLength, "<-connectedHeartMonitor");
+      logBufLength += snprintf(logBuf + logBufLength, kLogBufCapacity - logBufLength, "<-connectedHeartMonitor");
       returnValue[0] = error;
       break;
 
     case BLE_shifterPosition:  // 0x17
-      logBufLength   += snprintf(logBuf + logBufLength, kLogBufCapacity - logBufLength, "<-shifterPosition");
+      logBufLength += snprintf(logBuf + logBufLength, kLogBufCapacity - logBufLength, "<-shifterPosition");
       returnValue[0] = success;
       if (rxValue[0] == read) {
         returnValue[2] = (uint8_t)(rtConfig.getShifterPosition() & 0xff);
@@ -867,7 +912,7 @@ void ss2kCustomCharacteristicCallbacks::onWrite(BLECharacteristic *pCharacterist
       break;
 
     case BLE_targetPosition:  // 0x19
-      logBufLength   += snprintf(logBuf + logBufLength, kLogBufCapacity - logBufLength, "<-targetPosition");
+      logBufLength += snprintf(logBuf + logBufLength, kLogBufCapacity - logBufLength, "<-targetPosition");
       returnValue[0] = success;
       if (rxValue[0] == read) {
         returnValue[2] = (uint8_t)(ss2k.targetPosition & 0xff);
@@ -878,12 +923,12 @@ void ss2kCustomCharacteristicCallbacks::onWrite(BLECharacteristic *pCharacterist
       }
       if (rxValue[0] == write) {
         ss2k.targetPosition = (int32_t((uint8_t)(rxValue[2]) << 0 | (uint8_t)(rxValue[3]) << 8 | (uint8_t)(rxValue[4]) << 16 | (uint8_t)(rxValue[5]) << 24));
-        logBufLength        += snprintf(logBuf + logBufLength, kLogBufCapacity - logBufLength, " (%f)", ss2k.targetPosition);
+        logBufLength += snprintf(logBuf + logBufLength, kLogBufCapacity - logBufLength, " (%f)", ss2k.targetPosition);
       }
       break;
 
     case BLE_externalControl:  // 0x1A
-      logBufLength   += snprintf(logBuf + logBufLength, kLogBufCapacity - logBufLength, "<-externalControl");
+      logBufLength += snprintf(logBuf + logBufLength, kLogBufCapacity - logBufLength, "<-externalControl");
       returnValue[0] = success;
       if (rxValue[0] == read) {
         returnValue[2] = (uint8_t)(ss2k.externalControl);
@@ -891,12 +936,12 @@ void ss2kCustomCharacteristicCallbacks::onWrite(BLECharacteristic *pCharacterist
       }
       if (rxValue[0] == write) {
         ss2k.externalControl = static_cast<bool>(rxValue[2]);
-        logBufLength         += snprintf(logBuf + logBufLength, kLogBufCapacity - logBufLength, "(%B)", ss2k.externalControl);
+        logBufLength += snprintf(logBuf + logBufLength, kLogBufCapacity - logBufLength, "(%B)", ss2k.externalControl);
       }
       break;
 
     case BLE_syncMode:  // 0x1B
-      logBufLength   += snprintf(logBuf + logBufLength, kLogBufCapacity - logBufLength, "<-syncMode");
+      logBufLength += snprintf(logBuf + logBufLength, kLogBufCapacity - logBufLength, "<-syncMode");
       returnValue[0] = success;
       if (rxValue[0] == read) {
         returnValue[2] = (uint8_t)(ss2k.syncMode);
@@ -904,7 +949,7 @@ void ss2kCustomCharacteristicCallbacks::onWrite(BLECharacteristic *pCharacterist
       }
       if (rxValue[0] == write) {
         ss2k.syncMode = static_cast<bool>(rxValue[2]);
-        logBufLength  += snprintf(logBuf + logBufLength, kLogBufCapacity - logBufLength, "(%s)", ss2k.syncMode ? "true" : "false");
+        logBufLength += snprintf(logBuf + logBufLength, kLogBufCapacity - logBufLength, "(%s)", ss2k.syncMode ? "true" : "false");
       }
       break;
   }

@@ -127,7 +127,8 @@
         optionPM.text = data.connectedPowerMeter;
         PMDropdown.add(optionPM);
         for (var key in data.connectedPowerMeter) {
-          if (data.connectedPowerMeter[key].UUID == '0x1818') {
+          var uuid = data.connectedPowerMeter[key].UUID
+          if ( uuid == '0x1818' || uuid == '0x1826') {
             optionPM = document.createElement('option');
             if (data.connectedPowerMeter[key].name) {
               optionPM.text = data.connectedPowerMeter[key].name;
@@ -142,7 +143,7 @@
           var t_obj = JSON.parse(data.foundDevices)
           {
             for (var key in t_obj) {
-              if (t_obj[key].UUID == '0x1818') {
+              if (t_obj[key].UUID == '0x1818' || t_obj[key].UUID == '0x1826') {
                 optionPM = document.createElement('option');
                 if (t_obj[key].name) {
                   optionPM.text = t_obj[key].name;
