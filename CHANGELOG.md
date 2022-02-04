@@ -33,6 +33,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Reduced max_connect_retries from 10 to 3.
 - Increased max_scan_retries from 1 to 2. 
 - Now only send notifications for subscribed characteristics. 
+- Increased JSON size for userConfig (hopefully fix config saving issues). 
+- Changed LOGE messages in spiffs logging to regular LOG messages so they will display via network logging. 
 
 ### Fixed
 - bluetoothscanner.html now lists fitness machine services in the PM list. 

@@ -67,7 +67,7 @@ void setup() {
   // Initialize SPIFFS
   SS2K_LOG(MAIN_LOG_TAG, "Mounting Filesystem");
   if (!SPIFFS.begin(true)) {
-    SS2K_LOGE(MAIN_LOG_TAG, "An Error has occurred while mounting SPIFFS");
+    SS2K_LOG(MAIN_LOG_TAG, "An Error has occurred while mounting SPIFFS");
     // TODO reset flash here
     return;
   }
@@ -152,7 +152,7 @@ void SS2K::maintenanceLoop(void *pvParameters) {
   static unsigned long intervalTimer = millis();
   static unsigned long intervalTimer2 = millis();
   static bool isScanning = false;
-  
+
   while (true) {
     vTaskDelay(200 / portTICK_RATE_MS);
     if (rtConfig.getShifterPosition() > ss2k.lastShifterPosition) {

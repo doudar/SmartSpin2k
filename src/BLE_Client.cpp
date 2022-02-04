@@ -120,12 +120,12 @@ bool SpinBLEClient::connectToServer() {
       charUUID    = HEARTCHARACTERISTIC_UUID;
       SS2K_LOG(BLE_CLIENT_LOG_TAG, "Trying to connect to HRM");
     } else {
-      SS2K_LOGE(BLE_CLIENT_LOG_TAG, "No advertised UUID found");
+      SS2K_LOG(BLE_CLIENT_LOG_TAG, "No advertised UUID found");
       spinBLEClient.myBLEDevices[device_number].reset();
       return false;
     }
   } else {
-    SS2K_LOGE(BLE_CLIENT_LOG_TAG, "Device has no Service UUID");
+    SS2K_LOG(BLE_CLIENT_LOG_TAG, "Device has no Service UUID");
     spinBLEClient.myBLEDevices[device_number].reset();
     spinBLEClient.serverScan(true);
     return false;
