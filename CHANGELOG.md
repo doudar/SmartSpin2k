@@ -13,6 +13,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Added Wiki links to most SS2K pages. [see #314](https://github.com/doudar/SmartSpin2k/issues/314)
 - Added WebSockets for logging [see #173](https://github.com/doudar/SmartSpin2k/issues/173)
 - Reworked logging to run log-appender outside the worker task (task no longer blocked by logger traffic).
+- WebsocketsAppender can handle multiple (up to 4) clients. Status.html will reconnect if connection to websockets server is disconnected.
 
 ### Changed
 - Refactored ERG.
