@@ -111,12 +111,19 @@
 </body>
 
 <script>
+  let updatePending = false;
+  let updateTimer = undefined;
+  let lastLogMessageTime = 0;
 
-  var debugElement = document.getElementById("debug");
-  var followElement = document.getElementById("follow");
-  var updatePending = false;
-  var updateTimer = undefined;
-  var udpLogEnabled = true;
+  // logging
+  let websocket = undefined;
+  let logEntries = [];
+  const maxLogentries = 1000;
+
+  document.addEventListener("visibilitychange", onVisibilityChanged, false);
+  document.addEventListener("mozvisibilitychange", onVisibilityChanged, false);
+  document.addEventListener("webkitvisibilitychange", onVisibilityChanged, false);
+  document.addEventListener("msvisibilitychange", onVisibilityChanged, false);
 
   function onVisibilityChanged() {
     if (document.hidden || document.mozHidden || document.webkitHidden || document.msHidden) {
@@ -126,17 +133,13 @@
     }
   }
 
-  document.addEventListener("visibilitychange", onVisibilityChanged, false);
-  document.addEventListener("mozvisibilitychange", onVisibilityChanged, false);
-  document.addEventListener("webkitvisibilitychange", onVisibilityChanged, false);
-  document.addEventListener("msvisibilitychange", onVisibilityChanged, false);
-
   function startUpdate() {
     //Update values on specified interval loading late because this tiny webserver hates frequent requests
     if (updateTimer === undefined) {
       updateTimer = setInterval(function () {
         requestRuntimeValues();
-      }, 1500);
+        setupLogging();
+      }, 2500);
     }
   }
 
@@ -145,19 +148,13 @@
     updateTimer = undefined;
   }
 
-  function updateDebugView(newContent) {
-    if (followElement.checked) {
-      debugElement.scrollTop = debugElement.scrollHeight - debugElement.clientHeight
-    }
-  }
-
   function requestConfigValues() {
     if (!updatePending) {
       updatePending = true
       var xhttp = new XMLHttpRequest();
       xhttp.onreadystatechange = function () {
         updatePending = false;
-        if (this.readyState == 4 && this.status == 200) {
+        if (this.readyState === 4 && this.status === 200) {
           var obj = JSON.parse(this.responseText);
           document.getElementById("ssid").value = obj.ssid;
           document.getElementById("connectedHeartMonitor").value = obj.connectedHeartMonitor;
@@ -166,9 +163,6 @@
           document.getElementById("inclineMultiplier").value = obj.inclineMultiplier;
           //--- document.getElementById("ERGSensitivity").value = obj.ERGSensitivity; ---//
           document.getElementById("connectedPowerMeter").value = obj.connectedPowerMeter;
-          if (obj.udpLogEnabled) {
-            udpLogEnabled = obj.udpLogEnabled.value;
-          }
         }
       };
       xhttp.open("GET", "/configJSON", true);
@@ -182,28 +176,19 @@
       var xhttp = new XMLHttpRequest();
       xhttp.onreadystatechange = function () {
         updatePending = false;
-        if (this.readyState == 4 && this.status == 200) {
-          var obj = JSON.parse(this.responseText);
-          document.getElementById("currentIncline").value = obj.currentIncline;
-          document.getElementById("targetIncline").value = obj.targetIncline;
-          document.getElementById("simulatedHr").value = obj.simulatedHr;
-          document.getElementById("simulatedWatts").value = obj.simulatedWatts;
-          document.getElementById("targetWatts").value = obj.targetWatts;
-          document.getElementById("simulatedCad").value = obj.simulatedCad;
-          if (obj.debug != null || !udpLogEnabled) {
-            if (debugElement.innerHTML == "Loading" && !udpLogEnabled) {
-              document.getElementById("debug").innerHTML = obj.debug;
-            } else if (!udpLogEnabled) {
-              document.getElementById("debug").innerHTML = "UDP logging is enabled in settings.<p>Please see the <a href='https://github.com/doudar/SmartSpin2k/wiki/Viewing-logs-via-UDP' style='color:white;'>SS2K Wiki</a><p>for more information.";
-            }
-            else {
-              document.getElementById("debug").innerHTML += obj.debug;
-            }
-            updateDebugView(obj.debug);
+        if (this.readyState === 4 /*DONE*/) {
+          if (this.status === 200) {
+            var obj = JSON.parse(this.responseText);
+            document.getElementById("currentIncline").value = obj.currentIncline;
+            document.getElementById("targetIncline").value = obj.targetIncline;
+            document.getElementById("simulatedHr").value = obj.simulatedHr;
+            document.getElementById("simulatedWatts").value = obj.simulatedWatts;
+            document.getElementById("targetWatts").value = obj.targetWatts;
+            document.getElementById("simulatedCad").value = obj.simulatedCad;
           }
         }
       };
-      xhttp.open("GET", !udpLogEnabled ? "/runtimeConfigJSON" : "/runtimeConfigJSON?includeDebugLog=true", true);
+      xhttp.open("GET", "/runtimeConfigJSON", true);
       xhttp.send();
     }
   }
@@ -221,9 +206,55 @@
   window.addEventListener('load', function () {
     setTimeout(loadCss, 100);
     requestConfigValues();
-    setTimeout(requestRuntimeValues(),200);
+    setupLogging();
+    setTimeout(requestRuntimeValues(), 200);
     startUpdate();
   }, false);
+
+  function setupLogging() {
+    var debugElement = document.getElementById("debug");
+    var followElement = document.getElementById("follow");
+    var wsAddress = `ws://${document.location.host}:8080`;
+
+    try {
+      if (websocket != null) {
+        if ((Date.now() - lastLogMessageTime) > 60_000) {
+          websocket.close();
+          websocket = null;
+        } else {
+          return;
+        }
+      }
+
+      // Set lastLogMessageTime to give time to connect to server
+      lastLogMessageTime = Date.now();
+      websocket = new WebSocket(wsAddress);
+
+      websocket.onmessage = (evt) => {
+        lastLogMessageTime = Date.now();
+        if (evt?.data == null) {
+          return;
+        }
+
+        logEntries.push(event.data);
+        if (logEntries.length > maxLogentries) {
+          logEntries = logEntries.slice(1, logEntries.length - 10);
+        }
+
+        debugElement.innerHTML = logEntries.join("<br>");
+        if (followElement.checked) {
+          debugElement.scrollTop = debugElement.scrollHeight - debugElement.clientHeight
+        }
+      }
+    } catch (e) {
+      console.error("Could not connect to Websocket.", e);
+      if (websocket != null) {
+        websocket.close();
+      }
+      websocket = undefined;
+    }
+  }
+
 </script>
 
 </html>

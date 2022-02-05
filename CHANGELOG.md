@@ -11,6 +11,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Added Additional logging to the custom characteristic.
 - Added option to enable/disable UDP logging. Default is disabled.
 - Added Wiki links to most SS2K pages. [see #314](https://github.com/doudar/SmartSpin2k/issues/314)
+- Added WebSockets for logging [see #173](https://github.com/doudar/SmartSpin2k/issues/173)
+- Reworked logging to run log-appender outside the worker task (task no longer blocked by logger traffic).
+- WebsocketsAppender can handle multiple (up to 4) clients. Status.html will reconnect if connection to websockets server is disconnected.
 
 ### Changed
 - Refactored ERG.
@@ -25,6 +28,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Disabled shifter ISR while ERG is running. 
 - Fixed possible infinite loop in ERG when stepper never reached target position due to being past min or max position.
 - When UDP logging is enabled, html will no longer request logging info. 
+- Increased remote server minimum packet delay to 325ms and max to 700ms. 
+- Fixed bug in external control. 
 
 ### Hardware
 - Added Ultra Short Case mod which should allow as little as ~40mm from knob center to head tube. 

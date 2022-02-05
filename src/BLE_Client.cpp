@@ -206,7 +206,7 @@ bool SpinBLEClient::connectToServer() {
   SS2K_LOG(BLE_CLIENT_LOG_TAG, " - Created client");
   pClient->setClientCallbacks(new MyClientCallback(), true);
   // Connect to the remove BLE Server.
-  pClient->setConnectionParams(60, 200, 0, 1000);
+  pClient->setConnectionParams(240, 560, 1, 1000);
   /** Set how long we are willing to wait for the connection to complete (seconds), default is 30. */
   pClient->setConnectTimeout(5);
   pClient->connect(myDevice->getAddress());  // if you pass BLEAdvertisedDevice instead of address, it will be recognized type of peer device address (public or private)

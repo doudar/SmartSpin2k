@@ -269,13 +269,13 @@ void HTTP_Server::start() {
 
   server.on("/configJSON", []() {
     String tString;
-    tString = userConfig.returnJSON(!server.arg("includeDebugLog").isEmpty());
+    tString = userConfig.returnJSON();
     server.send(200, "text/plain", tString);
   });
 
   server.on("/runtimeConfigJSON", []() {
     String tString;
-    tString = rtConfig.returnJSON(!server.arg("includeDebugLog").isEmpty());
+    tString = rtConfig.returnJSON();
     server.send(200, "text/plain", tString);
   });
 

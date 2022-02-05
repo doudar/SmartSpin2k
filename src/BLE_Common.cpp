@@ -58,7 +58,7 @@ void BLECommunications(void *pvParameters) {
 
                   const int kLogBufMaxLength = 250;
                   char logBuf[kLogBufMaxLength];
-                  SS2K_LOGD(BLE_COMMON_LOG_TAG, "Data length: %d", data.length());
+                  SS2K_LOGD(BLE_COMMON_LOG_TAG, "Data length: %d", length);
                   int logBufLength = ss2k_log_hex_to_buffer(pData, length, logBuf, 0, kLogBufMaxLength);
 
                   logBufLength += snprintf(logBuf + logBufLength, kLogBufMaxLength - logBufLength, "<- %.8s | %.8s", myAdvertisedDevice.serviceUUID.toString().c_str(),
@@ -146,7 +146,7 @@ void BLECommunications(void *pvParameters) {
 
       if (updateConnParametersFlag) {
         vTaskDelay(100 / portTICK_PERIOD_MS);
-        BLEDevice::getServer()->updateConnParams(bleConnDesc, 20, 100, 0, 2000);
+        BLEDevice::getServer()->updateConnParams(bleConnDesc, 300, 560, 0, 2000);
         updateConnParametersFlag = false;
       }
     }

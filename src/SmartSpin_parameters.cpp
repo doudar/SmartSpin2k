@@ -12,7 +12,7 @@
 #include <ArduinoJson.h>
 #include <SPIFFS.h>
 
-String RuntimeParameters::returnJSON(bool includeDebugLog) {
+String RuntimeParameters::returnJSON() {
   // Allocate a temporary JsonDocument
   // Don't forget to change the capacity to match your requirements.
   // Use arduinojson.org/assistant to compute the capacity.
@@ -34,9 +34,6 @@ String RuntimeParameters::returnJSON(bool includeDebugLog) {
   doc["shifterPosition"]     = shifterPosition;
   doc["minStep"]             = minStep;
   doc["maxStep"]             = maxStep;
-  if (includeDebugLog) {
-    doc["debug"] = DebugInfo::get_and_clear_logs();
-  }
 
   String output;
   serializeJson(doc, output);
@@ -66,7 +63,7 @@ void userParameters::setDefaults() {
 
 //---------------------------------------------------------------------------------
 //-- return all config as one a single JSON string
-String userParameters::returnJSON(bool includeDebugLog) {
+String userParameters::returnJSON() {
   // Allocate a temporary JsonDocument
   // Don't forget to change the capacity to match your requirements.
   // Use arduinojson.org/assistant to compute the capacity.
@@ -93,9 +90,6 @@ String userParameters::returnJSON(bool includeDebugLog) {
   doc["stepperDir"]            = stepperDir;
   doc["udpLogEnabled"]         = udpLogEnabled;
 
-  if (includeDebugLog) {
-    doc["debug"] = DebugInfo::get_and_clear_logs();
-  }
   String output;
   serializeJson(doc, output);
   return output;
