@@ -211,7 +211,6 @@ void SS2K::moveStepper(void *pvParameters) {
   while (1) {
     if (stepper) {
       ss2k.stepperIsRunning = stepper->isRunning();
-      ss2k.targetPosition   = rtConfig.getShifterPosition() * userConfig.getShiftStep();
       if (!ss2k.externalControl) {
         if (rtConfig.getERGMode()) {
           // ERG Mode
@@ -220,6 +219,7 @@ void SS2K::moveStepper(void *pvParameters) {
           ss2k.targetPosition = rtConfig.getTargetIncline();
         } else {
           // Simulation Mode
+          ss2k.targetPosition   = rtConfig.getShifterPosition() * userConfig.getShiftStep();
           ss2k.targetPosition += rtConfig.getTargetIncline() * userConfig.getInclineMultiplier();
         }
       }
