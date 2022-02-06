@@ -32,7 +32,7 @@ void SpinBLEClient::start() {
                           "BLEClientTask", /* name of task. */
                           4700,            /* Stack size of task */
                           NULL,            /* parameter of the task */
-                          0,               /* priority of the task  */
+                          1,               /* priority of the task  */
                           &BLEClientTask,  /* Task handle to keep track of created task */
                           1);
 }
@@ -194,7 +194,7 @@ bool SpinBLEClient::connectToServer() {
      *  connections. Timeout should be a multiple of the interval, minimum is 100ms.
      *  Min interval: 12 * 1.25ms = 15, Max interval: 12 * 1.25ms = 15, 0 latency, 51 * 10ms = 510ms timeout
      */
-    pClient->setConnectionParams(12, 12, 0, 51);
+    pClient->setConnectionParams(12, 12, 0, 100);
     /** Set how long we are willing to wait for the connection to complete (seconds), default is 30. */
     pClient->setConnectTimeout(5);
 

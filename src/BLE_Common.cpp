@@ -166,19 +166,6 @@ void BLECommunications(void *pvParameters) {
       SS2K_LOG(BLE_CLIENT_LOG_TAG, "Initiating Scan from Client Task:");
       spinBLEClient.scanProcess();
     }
-
-    /* Moved From BLE Client loop because of stack limitations in NimBLE
-    for (int x = 0; x < NUM_BLE_DEVICES; x++) {
-      if (spinBLEClient.myBLEDevices[x].doConnect == true) {
-        if (spinBLEClient.connectToServer()) {
-          SS2K_LOG(BLE_CLIENT_LOG_TAG, "We are now connected to the BLE Server.");
-          vTaskDelay(1000 / portTICK_PERIOD_MS);
-        } else {
-        }
-      }
-    }
-
-    // End of BLE Client loop */
     vTaskDelay((BLE_NOTIFY_DELAY) / portTICK_PERIOD_MS);
 #ifdef DEBUG_STACK
     Serial.printf("BLEComm: %d \n", uxTaskGetStackHighWaterMark(BLECommunicationTask));
