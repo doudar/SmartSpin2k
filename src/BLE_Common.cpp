@@ -97,12 +97,12 @@ void BLECommunications(void *pvParameters) {
                 }
               } else if (!pClient->isConnected()) {  // This shouldn't ever be
                                                      // called...
-                if (pClient->disconnect() == 0) {    // 0 is a successful disconnect
-                  BLEDevice::deleteClient(pClient);
-                  vTaskDelay(100 / portTICK_PERIOD_MS);
+                //if (pClient->disconnect() == 0) {    // 0 is a successful disconnect
+                //  BLEDevice::deleteClient(pClient);
+                //  vTaskDelay(100 / portTICK_PERIOD_MS);
                   SS2K_LOG(BLE_COMMON_LOG_TAG, "Workaround connect");
                   myAdvertisedDevice.doConnect = true;
-                }
+                //}
               }
             }
           }
@@ -146,7 +146,7 @@ void BLECommunications(void *pvParameters) {
 
       if (updateConnParametersFlag) {
         vTaskDelay(100 / portTICK_PERIOD_MS);
-        BLEDevice::getServer()->updateConnParams(bleConnDesc, 20, 100, 0, 2000);
+        BLEDevice::getServer()->updateConnParams(bleConnDesc, 300, 560, 0, 1000);
         updateConnParametersFlag = false;
       }
     }

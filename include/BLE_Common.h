@@ -222,8 +222,7 @@ class SpinBLEClient {
   // (false)
   void resetDevices();
   void postConnect(NimBLEClient *pClient);
-
- private:
+};
   class MyAdvertisedDeviceCallback : public NimBLEAdvertisedDeviceCallbacks {
    public:
     void onResult(NimBLEAdvertisedDevice *);
@@ -237,7 +236,6 @@ class SpinBLEClient {
     bool onConfirmPIN(uint32_t);
     void onAuthenticationComplete(ble_gap_conn_desc);
   };
-};
 
 extern SpinBLEClient spinBLEClient;
 

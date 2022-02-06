@@ -148,10 +148,10 @@ void loop() {  // Delete this task so we can make one that's more memory efficie
 }
 
 void SS2K::maintenanceLoop(void *pvParameters) {
-  static int loopCounter             = 0;
-  static unsigned long intervalTimer = millis();
+  static int loopCounter              = 0;
+  static unsigned long intervalTimer  = millis();
   static unsigned long intervalTimer2 = millis();
-  static bool isScanning = false;
+  static bool isScanning              = false;
 
   while (true) {
     vTaskDelay(200 / portTICK_RATE_MS);
@@ -173,7 +173,7 @@ void SS2K::maintenanceLoop(void *pvParameters) {
       logHandler.writeLogs();
       intervalTimer = millis();
     }
-    
+
     if ((millis() - intervalTimer2) > 6000) {
       if (NimBLEDevice::getScan()->isScanning()) {  // workaround to prevent occasional runaway scans
         if (isScanning == true) {
@@ -227,7 +227,6 @@ void SS2K::moveStepper(void *pvParameters) {
   while (1) {
     if (stepper) {
       ss2k.stepperIsRunning = stepper->isRunning();
-      ss2k.targetPosition   = rtConfig.getShifterPosition() * userConfig.getShiftStep();
       if (!ss2k.externalControl) {
         if (rtConfig.getERGMode()) {
           // ERG Mode
@@ -236,6 +235,7 @@ void SS2K::moveStepper(void *pvParameters) {
           ss2k.targetPosition = rtConfig.getTargetIncline();
         } else {
           // Simulation Mode
+          ss2k.targetPosition = rtConfig.getShifterPosition() * userConfig.getShiftStep();
           ss2k.targetPosition += rtConfig.getTargetIncline() * userConfig.getInclineMultiplier();
         }
       }

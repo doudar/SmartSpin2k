@@ -27,13 +27,15 @@ TaskHandle_t BLEClientTask;
 
 SpinBLEClient spinBLEClient;
 
+static MyClientCallback myClientCallback;
+
 void SpinBLEClient::start() {
   // Create the task for the BLE Client loop
   xTaskCreatePinnedToCore(bleClientTask,   /* Task function. */
                           "BLEClientTask", /* name of task. */
                           4700,            /* Stack size of task */
                           NULL,            /* parameter of the task */
-                          1,               /* priority of the task  */
+                          0,               /* priority of the task  */
                           &BLEClientTask,  /* Task handle to keep track of created task */
                           1);
 }
@@ -59,10 +61,11 @@ void bleClientTask(void *pvParameters) {
 #ifdef DEBUG_STACK
     Serial.printf("BLEClient: %d \n", uxTaskGetStackHighWaterMark(BLEClientTask));
 #endif  // DEBUG_STACK
-    for (size_t x = 0; x < NUM_BLE_DEVICES; x++) {
+    for (int x = 0; x < NUM_BLE_DEVICES; x++) {
       if (spinBLEClient.myBLEDevices[x].doConnect == true) {
         if (spinBLEClient.connectToServer()) {
           SS2K_LOG(BLE_CLIENT_LOG_TAG, "We are now connected to the BLE Server.");
+          vTaskDelay(5000 / portTICK_PERIOD_MS);
         } else {
         }
       }
@@ -79,11 +82,19 @@ bool SpinBLEClient::connectToServer() {
   BLEAdvertisedDevice *myDevice = nullptr;
   int device_number             = -1;
 
-  for (size_t i = 0; i < NUM_BLE_DEVICES; i++) {
+  for (int i = 0; i < NUM_BLE_DEVICES; i++) {
     if (spinBLEClient.myBLEDevices[i].doConnect == true) {   // Client wants to be connected
       if (spinBLEClient.myBLEDevices[i].advertisedDevice) {  // Client is assigned
-        myDevice      = spinBLEClient.myBLEDevices[i].advertisedDevice;
-        device_number = i;
+        if (spinBLEClient.myBLEDevices[i].advertisedDevice->isAdvertisingService(HEARTSERVICE_UUID) &&
+            (!spinBLEClient.myBLEDevices[i].advertisedDevice->isAdvertisingService(FITNESSMACHINESERVICE_UUID)) && (!connectedPM) &&
+            (spinBLEClient.myBLEDevices[i + 1].doConnect == true)) {
+          myDevice      = spinBLEClient.myBLEDevices[i + 1].advertisedDevice;
+          device_number = i + 1;
+          SS2K_LOG(BLE_CLIENT_LOG_TAG, "Connecting HRM last.");
+        } else {
+          myDevice      = spinBLEClient.myBLEDevices[i].advertisedDevice;
+          device_number = i;
+        }
         break;
       } else {
         SS2K_LOG(BLE_CLIENT_LOG_TAG, "doConnect and client out of alignment. Resetting device slot");
@@ -98,7 +109,7 @@ bool SpinBLEClient::connectToServer() {
     return false;
   }
   // FUTURE - Iterate through an array of UUID's we support instead of all the if checks.
-  if (myDevice->haveServiceUUID()) {
+  if (myDevice->getServiceUUIDCount() > 0) {
     if (myDevice->isAdvertisingService(FLYWHEEL_UART_SERVICE_UUID) && (myDevice->getName() == FLYWHEEL_BLE_NAME)) {
       serviceUUID = FLYWHEEL_UART_SERVICE_UUID;
       charUUID    = FLYWHEEL_UART_TX_UUID;
@@ -205,14 +216,14 @@ bool SpinBLEClient::connectToServer() {
   SS2K_LOG(BLE_CLIENT_LOG_TAG, "Forming a connection to: %s %s", t_name.c_str(), myDevice->getAddress().toString().c_str());
   pClient = NimBLEDevice::createClient();
   SS2K_LOG(BLE_CLIENT_LOG_TAG, " - Created client");
-  pClient->setClientCallbacks(new MyClientCallback(), true);
+  pClient->setClientCallbacks(&myClientCallback);
   // Connect to the remove BLE Server.
   pClient->setConnectionParams(240, 560, 1, 1000);
   /** Set how long we are willing to wait for the connection to complete (seconds), default is 30. */
   pClient->setConnectTimeout(5);
   pClient->connect(myDevice->getAddress());  // if you pass BLEAdvertisedDevice instead of address, it will be recognized type of peer device address (public or private)
   SS2K_LOG(BLE_CLIENT_LOG_TAG, " - Connected to server");
-  //SS2K_LOG(BLE_CLIENT_LOG_TAG, " - RSSI %d", pClient->getRssi());
+  // SS2K_LOG(BLE_CLIENT_LOG_TAG, " - RSSI %d", pClient->getRssi());
   // Obtain a reference to the service we are after in the remote BLE server.
   BLERemoteService *pRemoteService = pClient->getService(serviceUUID);
   if (pRemoteService == nullptr) {
@@ -268,11 +279,11 @@ bool SpinBLEClient::connectToServer() {
 /**  None of these are required as they will be handled by the library with defaults. **
  **                       Remove as you see fit for your needs                        */
 
-void SpinBLEClient::MyClientCallback::onConnect(NimBLEClient *pClient) {
+void MyClientCallback::onConnect(NimBLEClient *pClient) {
   // Currently Not Used
 }
 
-void SpinBLEClient::MyClientCallback::onDisconnect(NimBLEClient *pclient) {
+void MyClientCallback::onDisconnect(NimBLEClient *pclient) {
   SS2K_LOG(BLE_CLIENT_LOG_TAG, "Disconnect Called");
 
   if (spinBLEClient.intentionalDisconnect) {
@@ -308,23 +319,23 @@ void SpinBLEClient::MyClientCallback::onDisconnect(NimBLEClient *pclient) {
 
 /***************** New - Security handled here ********************
 ****** Note: these are the same return values as defaults ********/
-uint32_t SpinBLEClient::MyClientCallback::onPassKeyRequest() {
+uint32_t MyClientCallback::onPassKeyRequest() {
   SS2K_LOG(BLE_CLIENT_LOG_TAG, "Client PassKeyRequest");
   return 123456;
 }
-bool SpinBLEClient::MyClientCallback::onConfirmPIN(uint32_t pass_key) {
+bool MyClientCallback::onConfirmPIN(uint32_t pass_key) {
   SS2K_LOG(BLE_CLIENT_LOG_TAG, "The passkey YES/NO number: %ud", pass_key);
   return true;
 }
 
-void SpinBLEClient::MyClientCallback::onAuthenticationComplete(ble_gap_conn_desc desc) { SS2K_LOG(BLE_CLIENT_LOG_TAG, "Starting BLE work!"); }
+void MyClientCallback::onAuthenticationComplete(ble_gap_conn_desc desc) { SS2K_LOG(BLE_CLIENT_LOG_TAG, "Starting BLE work!"); }
 /*******************************************************************/
 
 /**
  * Scan for BLE servers and find the first one that advertises the service we are looking for.
  */
 
-void SpinBLEClient::MyAdvertisedDeviceCallback::onResult(BLEAdvertisedDevice *advertisedDevice) {
+void MyAdvertisedDeviceCallback::onResult(BLEAdvertisedDevice *advertisedDevice) {
   auto advertisedDeviceInfo = advertisedDevice->toString();
   ss2k_remove_newlines(&advertisedDeviceInfo);
   SS2K_LOG(BLE_CLIENT_LOG_TAG, "BLE Advertised Device found: %s", advertisedDeviceInfo.c_str());
@@ -518,48 +529,48 @@ void SpinBLEClient::postConnect(NimBLEClient *pClient) {
 
 bool SpinBLEAdvertisedDevice::enqueueData(uint8_t *data, size_t length) {
   NotifyData notifyData;
-  //Serial.println("enqueue Called");
+  // Serial.println("enqueue Called");
   if (!this->dataBufferQueue) {
-    //Serial.println("Creating queue");
+    // Serial.println("Creating queue");
     this->dataBufferQueue = xQueueCreate(6, sizeof(NotifyData));
     if (!this->dataBufferQueue) {
-      //Serial.println("Failed to create queue");
+      // Serial.println("Failed to create queue");
       return pdFALSE;
     }
   }
 
   if (!uxQueueSpacesAvailable(this->dataBufferQueue)) {
-    //Serial.println("No space available in queue. Skipping enqueue of data.");
+    // Serial.println("No space available in queue. Skipping enqueue of data.");
     return pdFALSE;
   }
 
   notifyData.length = length;
   for (size_t i = 0; i < length; i++) {
     notifyData.data[i] = data[i];
-    //Serial.printf("%02x ", notifyData.data[i]);
+    // Serial.printf("%02x ", notifyData.data[i]);
   }
-  //Serial.printf("\n");
- 
+  // Serial.printf("\n");
+
   if (xQueueSendToBack(this->dataBufferQueue, &notifyData, 10) == pdFALSE) {
-  //  Serial.println("Failed to enqueue data.  Freeing data.");
+    //  Serial.println("Failed to enqueue data.  Freeing data.");
     return pdFALSE;
   }
-  //Serial.printf("Successfully enqueued data. %d. \n", notifyData.length);
+  // Serial.printf("Successfully enqueued data. %d. \n", notifyData.length);
   return pdTRUE;
 }
 
 NotifyData SpinBLEAdvertisedDevice::dequeueData() {
   NotifyData receivedNotifyData;
   if (this->dataBufferQueue == nullptr) {
-  //  Serial.println("Queue not created.  Skipping dequeue of data.");
+    //  Serial.println("Queue not created.  Skipping dequeue of data.");
     receivedNotifyData.length = 0;
     return receivedNotifyData;
   }
   if (xQueueReceive(this->dataBufferQueue, &receivedNotifyData, 0) == pdTRUE) {
-  //  Serial.printf("Successfully dequeued data from queue. %d \n", receivedNotifyData.length);
+    //  Serial.printf("Successfully dequeued data from queue. %d \n", receivedNotifyData.length);
     return receivedNotifyData;
   }
-  //Serial.println("buffer was empty");
+  // Serial.println("buffer was empty");
   receivedNotifyData.length = 0;
   return receivedNotifyData;
 }
