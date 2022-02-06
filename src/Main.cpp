@@ -107,7 +107,7 @@ void setup() {
                           NULL,                  /* parameter of the task */
                           18,                    /* priority of the task */
                           &moveStepperTask,      /* Task handle to keep track of created task */
-                          0);                    /* pin task to core 0 */
+                          0);                    /* pin task to core */
 
   digitalWrite(LED_PIN, HIGH);
 
@@ -140,7 +140,7 @@ void setup() {
                           NULL,                      /* parameter of the task */
                           1,                         /* priority of the task */
                           &maintenanceLoopTask,      /* Task handle to keep track of created task */
-                          1);                        /* pin task to core 0 */
+                          1);                        /* pin task to core */
 }
 
 void loop() {  // Delete this task so we can make one that's more memory efficient.

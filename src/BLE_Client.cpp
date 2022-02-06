@@ -34,7 +34,7 @@ void SpinBLEClient::start() {
                           NULL,            /* parameter of the task */
                           1,               /* priority of the task  */
                           &BLEClientTask,  /* Task handle to keep track of created task */
-                          1);
+                          1);              /* pin task to core */
 }
 
 static void onNotify(BLERemoteCharacteristic *pBLERemoteCharacteristic, uint8_t *pData, size_t length, bool isNotify) {
@@ -76,7 +76,7 @@ bool SpinBLEClient::connectToServer() {
   NimBLEUUID charUUID;
 
   int successful                = 0;
-  BLEAdvertisedDevice* myDevice = nullptr;
+  BLEAdvertisedDevice *myDevice = nullptr;
   int device_number             = -1;
 
   for (int i = 0; i < NUM_BLE_DEVICES; i++) {
@@ -144,7 +144,7 @@ bool SpinBLEClient::connectToServer() {
   }
   SS2K_LOG(BLE_CLIENT_LOG_TAG, "Forming a connection to: %s %s", t_name.c_str(), myDevice->getAddress().toString().c_str());
 
-  NimBLEClient* pClient = nullptr;
+  NimBLEClient *pClient = nullptr;
 
   /** Check if we have a client we should reuse first **/
   if (NimBLEDevice::getClientListSize()) {
@@ -216,9 +216,9 @@ bool SpinBLEClient::connectToServer() {
   SS2K_LOG(BLE_CLIENT_LOG_TAG, "Connected to: %s RSSI %d", pClient->getPeerAddress().toString().c_str(), pClient->getRssi());
 
   /** Now we can read/write/subscribe the charateristics of the services we are interested in */
-  NimBLERemoteService* pSvc        = nullptr;
-  NimBLERemoteCharacteristic* pChr = nullptr;
-  NimBLERemoteDescriptor* pDsc     = nullptr;
+  NimBLERemoteService *pSvc        = nullptr;
+  NimBLERemoteCharacteristic *pChr = nullptr;
+  NimBLERemoteDescriptor *pDsc     = nullptr;
 
   pSvc = pClient->getService(serviceUUID);
   if (pSvc) { /** make sure it's not null */
@@ -262,10 +262,10 @@ bool SpinBLEClient::connectToServer() {
     }
 
   } else {
-     SS2K_LOG(BLE_CLIENT_LOG_TAG, "Failed to find service: %s", serviceUUID.toString().c_str());
+    SS2K_LOG(BLE_CLIENT_LOG_TAG, "Failed to find service: %s", serviceUUID.toString().c_str());
   }
 
-   SS2K_LOG(BLE_CLIENT_LOG_TAG, "Device Connected");
+  SS2K_LOG(BLE_CLIENT_LOG_TAG, "Device Connected");
   return true;
 }
 
@@ -390,8 +390,8 @@ void SpinBLEClient::scanProcess() {
 
   BLEScan *pBLEScan = BLEDevice::getScan();
   pBLEScan->setAdvertisedDeviceCallbacks(new MyAdvertisedDeviceCallback());
-  pBLEScan->setInterval(45); //45?
-  pBLEScan->setWindow(15); //15?
+  pBLEScan->setInterval(45);  // 45?
+  pBLEScan->setWindow(15);    // 15?
   pBLEScan->setDuplicateFilter(true);
   pBLEScan->setActiveScan(true);
   BLEScanResults foundDevices = pBLEScan->start(10, false);
@@ -439,8 +439,8 @@ void SpinBLEClient::serverScan(bool connectRequest) {
 
 // Shuts down all BLE processes.
 void SpinBLEClient::disconnect() {
-  this->scanRetries           = 0;
-  this->reconnectTries        = 0;
+  this->scanRetries     = 0;
+  this->reconnectTries  = 0;
   intentionalDisconnect = true;
   SS2K_LOG(BLE_CLIENT_LOG_TAG, "Shutting Down all BLE services");
   if (NimBLEDevice::getInitialized()) {

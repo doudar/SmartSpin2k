@@ -360,7 +360,7 @@ void HTTP_Server::start() {
                           NULL,                               /* parameter of the task */
                           1,                                  /* priority of the task  - 29 worked*/
                           &webClientTask,                     /* Task handle to keep track of created task */
-                          1);                                 /* pin task to core 1 */
+                          1);                                 /* pin task to core */
 
 #ifdef USE_TELEGRAM
   xTaskCreatePinnedToCore(telegramUpdate,   /* Task function. */
