@@ -14,14 +14,19 @@ using namespace websockets;
 
 class WebSocketAppender : public ILogAppender {
  public:
-  void Log(const char *message);
+  WebSocketAppender();
+  void Log(const char* message);
   void Loop();
 
  private:
-  static const uint16_t port = 8080;
+  static const uint16_t port      = 8080;
+  static const uint8_t maxClients = 4;
 
   void Initialize();
+  uint8_t GetClientsCount();
+  void AddClient(WebsocketsClient* client);
+  void CheckConnectedClients();
 
   WebsocketsServer _webSocketsServer;
-  WebsocketsClient _client;
+  WebsocketsClient* _clients[maxClients];
 };

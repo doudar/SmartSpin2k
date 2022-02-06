@@ -13,6 +13,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Added Wiki links to most SS2K pages. [see #314](https://github.com/doudar/SmartSpin2k/issues/314)
 - Added WebSockets for logging [see #173](https://github.com/doudar/SmartSpin2k/issues/173)
 - Reworked logging to run log-appender outside the worker task (task no longer blocked by logger traffic).
+- WebsocketsAppender can handle multiple (up to 4) clients. Status.html will reconnect if connection to websockets server is disconnected.
 
 ### Changed
 - Refactored ERG.
@@ -39,14 +40,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 - bluetoothscanner.html now lists fitness machine services in the PM list. 
+- Fixed bug in external control. 
 
 ### Hardware
 - Added Ultra Short Case mod which should allow as little as ~40mm from knob center to head tube. 
 - Revised shifter for easier printing.  Updated printing instructions.
 - moved original shifter design into Archive directory
 
-#### IC4 Mod
-- 
+#### Direct mount Mod
+- IC4 Mod renamed to Direct Mount Mod.  Several directories have changed.
+- bike mount and arm added for Echelon Connect Sport
+- Arm design revised for added stiffness
+- Case, arm and bike mount separated into individual CAD files for easier edits.
+- Arm and bike mount re-drawn in CAD.  It should be much easier to create designs for new bikes now.
 
 ## [1.12.30]
 

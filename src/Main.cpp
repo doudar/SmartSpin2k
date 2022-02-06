@@ -235,7 +235,7 @@ void SS2K::moveStepper(void *pvParameters) {
           ss2k.targetPosition = rtConfig.getTargetIncline();
         } else {
           // Simulation Mode
-          ss2k.targetPosition = rtConfig.getShifterPosition() * userConfig.getShiftStep();
+          ss2k.targetPosition   = rtConfig.getShifterPosition() * userConfig.getShiftStep();
           ss2k.targetPosition += rtConfig.getTargetIncline() * userConfig.getInclineMultiplier();
         }
       }

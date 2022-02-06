@@ -113,7 +113,8 @@
 <script>
   let updatePending = false;
   let updateTimer = undefined;
-  
+  let lastLogMessageTime = 0;
+
   // logging
   let websocket = undefined;
   let logEntries = [];
@@ -137,9 +138,7 @@
     if (updateTimer === undefined) {
       updateTimer = setInterval(function () {
         requestRuntimeValues();
-        if (websocket == null|| websocket?.readyState != 1 /*OPEN*/ ) {
-          setupLogging();
-        }
+        setupLogging();
       }, 2500);
     }
   }
@@ -155,7 +154,7 @@
       var xhttp = new XMLHttpRequest();
       xhttp.onreadystatechange = function () {
         updatePending = false;
-        if (this.readyState == 4 && this.status == 200) {
+        if (this.readyState === 4 && this.status === 200) {
           var obj = JSON.parse(this.responseText);
           document.getElementById("ssid").value = obj.ssid;
           document.getElementById("connectedHeartMonitor").value = obj.connectedHeartMonitor;
@@ -177,14 +176,16 @@
       var xhttp = new XMLHttpRequest();
       xhttp.onreadystatechange = function () {
         updatePending = false;
-        if (this.readyState == 4 && this.status == 200) {
-          var obj = JSON.parse(this.responseText);
-          document.getElementById("currentIncline").value = obj.currentIncline;
-          document.getElementById("targetIncline").value = obj.targetIncline;
-          document.getElementById("simulatedHr").value = obj.simulatedHr;
-          document.getElementById("simulatedWatts").value = obj.simulatedWatts;
-          document.getElementById("targetWatts").value = obj.targetWatts;
-          document.getElementById("simulatedCad").value = obj.simulatedCad;
+        if (this.readyState === 4 /*DONE*/) {
+          if (this.status === 200) {
+            var obj = JSON.parse(this.responseText);
+            document.getElementById("currentIncline").value = obj.currentIncline;
+            document.getElementById("targetIncline").value = obj.targetIncline;
+            document.getElementById("simulatedHr").value = obj.simulatedHr;
+            document.getElementById("simulatedWatts").value = obj.simulatedWatts;
+            document.getElementById("targetWatts").value = obj.targetWatts;
+            document.getElementById("simulatedCad").value = obj.simulatedCad;
+          }
         }
       };
       xhttp.open("GET", "/runtimeConfigJSON", true);
@@ -214,9 +215,23 @@
     var debugElement = document.getElementById("debug");
     var followElement = document.getElementById("follow");
     var wsAddress = `ws://${document.location.host}:8080`;
+
     try {
+      if (websocket != null) {
+        if ((Date.now() - lastLogMessageTime) > 60_000) {
+          websocket.close();
+          websocket = null;
+        } else {
+          return;
+        }
+      }
+
+      // Set lastLogMessageTime to give time to connect to server
+      lastLogMessageTime = Date.now();
       websocket = new WebSocket(wsAddress);
+
       websocket.onmessage = (evt) => {
+        lastLogMessageTime = Date.now();
         if (evt?.data == null) {
           return;
         }
