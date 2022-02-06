@@ -34,7 +34,7 @@ void SpinBLEClient::start() {
                           NULL,            /* parameter of the task */
                           1,               /* priority of the task  */
                           &BLEClientTask,  /* Task handle to keep track of created task */
-                          1);              /* pin task to core */
+                          0);              /* pin task to core */
 }
 
 static void onNotify(BLERemoteCharacteristic *pBLERemoteCharacteristic, uint8_t *pData, size_t length, bool isNotify) {
