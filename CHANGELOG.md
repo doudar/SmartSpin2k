@@ -35,6 +35,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Now only send notifications for subscribed characteristics. 
 - Increased JSON size for userConfig (hopefully fix config saving issues). 
 - Changed LOGE messages in spiffs logging to regular LOG messages so they will display via network logging. 
+- Complete BLE Client connection code rebase. 
 
 ### Fixed
 - bluetoothscanner.html now lists fitness machine services in the PM list. 

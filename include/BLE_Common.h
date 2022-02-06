@@ -80,8 +80,7 @@ class MyCallbacks : public NimBLECharacteristicCallbacks {
 class ss2kCustomCharacteristicCallbacks : public BLECharacteristicCallbacks {
   void onWrite(BLECharacteristic *);
 };
-extern int bleConnDesc;
-extern bool updateConnParametersFlag;
+
 extern std::string FTMSWrite;
 
 // TODO add the rest of the server to this class
@@ -96,9 +95,7 @@ class SpinBLEServer {
   void setClientSubscribed(NimBLEUUID pUUID, bool subscribe);
   void notifyShift();
 
-  SpinBLEServer() {
-  memset(&clientSubscribed, 0, sizeof(clientSubscribed));
-  }
+  SpinBLEServer() { memset(&clientSubscribed, 0, sizeof(clientSubscribed)); }
 };
 
 extern SpinBLEServer spinBLEServer;
@@ -204,6 +201,8 @@ class SpinBLEClient {
   int noReadingIn            = 0;
   int cscCumulativeCrankRev  = 0;
   int cscLastCrankEvtTime    = 0;
+  int scanRetries            = MAX_SCAN_RETRIES;
+  int reconnectTries         = MAX_RECONNECT_TRIES;
 
   BLERemoteCharacteristic *pRemoteCharacteristic = nullptr;
 
@@ -223,19 +222,19 @@ class SpinBLEClient {
   void resetDevices();
   void postConnect(NimBLEClient *pClient);
 };
-  class MyAdvertisedDeviceCallback : public NimBLEAdvertisedDeviceCallbacks {
-   public:
-    void onResult(NimBLEAdvertisedDevice *);
-  };
+class MyAdvertisedDeviceCallback : public NimBLEAdvertisedDeviceCallbacks {
+ public:
+  void onResult(NimBLEAdvertisedDevice *);
+};
 
-  class MyClientCallback : public NimBLEClientCallbacks {
-   public:
-    void onConnect(BLEClient *);
-    void onDisconnect(BLEClient *);
-    uint32_t onPassKeyRequest();
-    bool onConfirmPIN(uint32_t);
-    void onAuthenticationComplete(ble_gap_conn_desc);
-  };
+class MyClientCallback : public NimBLEClientCallbacks {
+ public:
+  void onConnect(BLEClient *);
+  void onDisconnect(BLEClient *);
+  uint32_t onPassKeyRequest();
+  bool onConfirmPIN(uint32_t);
+  void onAuthenticationComplete(ble_gap_conn_desc);
+};
 
 extern SpinBLEClient spinBLEClient;
 

@@ -301,8 +301,6 @@ void updateHeartRateMeasurementChar() {
 // Creating Server Connection Callbacks
 void MyServerCallbacks::onConnect(BLEServer *pServer, ble_gap_conn_desc *desc) {
   SS2K_LOG(BLE_SERVER_LOG_TAG, "Bluetooth Remote Client Connected: %s Connected Clients: %d", NimBLEAddress(desc->peer_ota_addr).toString().c_str(), pServer->getConnectedCount());
-  updateConnParametersFlag = true;
-  bleConnDesc              = desc->conn_handle;
 
   if (pServer->getConnectedCount() < CONFIG_BT_NIMBLE_MAX_CONNECTIONS - NUM_BLE_DEVICES) {
     BLEDevice::startAdvertising();

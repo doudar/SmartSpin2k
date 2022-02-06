@@ -13,9 +13,8 @@
 #include <sensors/SensorData.h>
 #include <sensors/SensorDataFactory.h>
 
-int bleConnDesc               = 1;
-bool updateConnParametersFlag = false;
-bool hr2p                     = false;
+bool hr2p = false;
+
 TaskHandle_t BLECommunicationTask;
 SensorDataFactory sensorDataFactory;
 
@@ -97,12 +96,12 @@ void BLECommunications(void *pvParameters) {
                 }
               } else if (!pClient->isConnected()) {  // This shouldn't ever be
                                                      // called...
-                //if (pClient->disconnect() == 0) {    // 0 is a successful disconnect
-                //  BLEDevice::deleteClient(pClient);
-                //  vTaskDelay(100 / portTICK_PERIOD_MS);
+                if (pClient->disconnect() == 0) {    // 0 is a successful disconnect
+                  BLEDevice::deleteClient(pClient);
+                  vTaskDelay(100 / portTICK_PERIOD_MS);
                   SS2K_LOG(BLE_COMMON_LOG_TAG, "Workaround connect");
                   myAdvertisedDevice.doConnect = true;
-                //}
+                }
               }
             }
           }
@@ -144,17 +143,11 @@ void BLECommunications(void *pvParameters) {
       processFTMSWrite();
       // computeERG();
 
-      if (updateConnParametersFlag) {
-        vTaskDelay(100 / portTICK_PERIOD_MS);
-        BLEDevice::getServer()->updateConnParams(bleConnDesc, 300, 560, 0, 1000);
-        updateConnParametersFlag = false;
-      }
-    }
-
-    if (BLEDevice::getAdvertising()) {
-      if (!(BLEDevice::getAdvertising()->isAdvertising()) && (BLEDevice::getServer()->getConnectedCount() < CONFIG_BT_NIMBLE_MAX_CONNECTIONS - NUM_BLE_DEVICES)) {
-        SS2K_LOG(BLE_COMMON_LOG_TAG, "Starting Advertising From Communication Loop");
-        BLEDevice::startAdvertising();
+      if (BLEDevice::getAdvertising()) {
+        if (!(BLEDevice::getAdvertising()->isAdvertising()) && (BLEDevice::getServer()->getConnectedCount() < CONFIG_BT_NIMBLE_MAX_CONNECTIONS - NUM_BLE_DEVICES)) {
+          SS2K_LOG(BLE_COMMON_LOG_TAG, "Starting Advertising From Communication Loop");
+          BLEDevice::startAdvertising();
+        }
       }
     }
 
@@ -168,7 +161,24 @@ void BLECommunications(void *pvParameters) {
     } else {
       digitalWrite(LED_PIN, HIGH);
     }
+    if (spinBLEClient.doScan && (spinBLEClient.scanRetries > 0)) {
+      spinBLEClient.scanRetries--;
+      SS2K_LOG(BLE_CLIENT_LOG_TAG, "Initiating Scan from Client Task:");
+      spinBLEClient.scanProcess();
+    }
 
+    /* Moved From BLE Client loop because of stack limitations in NimBLE
+    for (int x = 0; x < NUM_BLE_DEVICES; x++) {
+      if (spinBLEClient.myBLEDevices[x].doConnect == true) {
+        if (spinBLEClient.connectToServer()) {
+          SS2K_LOG(BLE_CLIENT_LOG_TAG, "We are now connected to the BLE Server.");
+          vTaskDelay(1000 / portTICK_PERIOD_MS);
+        } else {
+        }
+      }
+    }
+
+    // End of BLE Client loop */
     vTaskDelay((BLE_NOTIFY_DELAY) / portTICK_PERIOD_MS);
 #ifdef DEBUG_STACK
     Serial.printf("BLEComm: %d \n", uxTaskGetStackHighWaterMark(BLECommunicationTask));
