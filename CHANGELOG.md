@@ -29,6 +29,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Fixed possible infinite loop in ERG when stepper never reached target position due to being past min or max position.
 - When UDP logging is enabled, html will no longer request logging info. 
 - Increased remote server minimum packet delay to 325ms and max to 700ms. 
+- Updated Arduino_esp32 to the latest 2.0.2 version.
+- Fixed all libraries to static releases.
+- Reduced max_connect_retries from 10 to 3.
+- Increased max_scan_retries from 1 to 2. 
+- Now only send notifications for subscribed characteristics. 
+- Increased JSON size for userConfig (hopefully fix config saving issues). 
+- Changed LOGE messages in spiffs logging to regular LOG messages so they will display via network logging. 
+- Complete BLE Client connection code rebase. 
+
+### Fixed
+- bluetoothscanner.html now lists fitness machine services in the PM list. 
 - Fixed bug in external control. 
 
 ### Hardware
