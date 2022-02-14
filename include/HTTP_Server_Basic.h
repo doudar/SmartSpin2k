@@ -14,8 +14,6 @@
 class HTTP_Server {
  private:
  public:
-  bool internetConnection;
-
   void start();
   void stop();
   static void handleSpiffsFile();
@@ -23,10 +21,7 @@ class HTTP_Server {
   static void settingsProcessor();
   static void handleHrSlider();
   static void FirmwareUpdate();
-
   static void webClientUpdate(void *pvParameters);
-
-  HTTP_Server() { internetConnection = false; }
 };
 
 #ifdef USE_TELEGRAM
@@ -39,7 +34,15 @@ void telegramUpdate(void *pvParameters);
 #endif
 
 // wifi Function
-void startWifi();
-void stopWifi();
+class WiFi_Control {
+ private:
+ public:
+  bool internetConnection;
+  void start();
+  void stop();
+  static void maintain();
+  WiFi_Control() { internetConnection = false; }
+};
 
 extern HTTP_Server httpServer;
+extern WiFi_Control WiFiControl;

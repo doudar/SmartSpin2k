@@ -111,7 +111,7 @@ void setup() {
 
   digitalWrite(LED_PIN, HIGH);
 
-  startWifi();
+  WiFiControl.start();
 
   // Configure and Initialize Logger
   logHandler.addAppender(&webSocketAppender);
@@ -167,9 +167,7 @@ void SS2K::maintenanceLoop(void *pvParameters) {
     ss2k.lastShifterPosition = rtConfig.getShifterPosition();
     webSocketAppender.Loop();
 
-    if ((millis() - intervalTimer) > 500) {  // add check here for when to restart WiFi
-                                             // maybe if in STA mode and 8.8.8.8 no ping return?
-      // ss2k.restartWifi();
+    if ((millis() - intervalTimer) > 500) {
       logHandler.writeLogs();
       intervalTimer = millis();
     }
@@ -204,15 +202,6 @@ void SS2K::maintenanceLoop(void *pvParameters) {
 }
 #endif  // UNIT_TEST
 
-void SS2K::restartWifi() {
-  httpServer.stop();
-  vTaskDelay(100 / portTICK_RATE_MS);
-  stopWifi();
-  vTaskDelay(100 / portTICK_RATE_MS);
-  startWifi();
-  httpServer.start();
-}
-
 void SS2K::moveStepper(void *pvParameters) {
   engine.init();
   bool _stepperDir = userConfig.getStepperDir();
@@ -235,7 +224,7 @@ void SS2K::moveStepper(void *pvParameters) {
           ss2k.targetPosition = rtConfig.getTargetIncline();
         } else {
           // Simulation Mode
-          ss2k.targetPosition   = rtConfig.getShifterPosition() * userConfig.getShiftStep();
+          ss2k.targetPosition = rtConfig.getShifterPosition() * userConfig.getShiftStep();
           ss2k.targetPosition += rtConfig.getTargetIncline() * userConfig.getInclineMultiplier();
         }
       }

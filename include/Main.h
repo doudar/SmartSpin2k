@@ -41,7 +41,6 @@ class SS2K {
   void scanIfShiftersHeld();
   void startTasks();
   void stopTasks();
-  void restartWifi();
   void setupTMCStepperDriver();
   void updateStepperPower();
   void updateStealthchop();

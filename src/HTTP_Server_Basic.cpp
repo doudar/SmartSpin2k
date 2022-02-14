@@ -30,6 +30,7 @@ IPAddress myIP;
 const byte DNS_PORT = 53;
 DNSServer dnsServer;
 HTTP_Server httpServer;
+WiFi_Control WiFiControl;
 WiFiClientSecure client;
 WebServer server(80);
 
@@ -42,7 +43,7 @@ String telegramMessage = "";
 #endif  // USE_TELEGRAM
 
 // ********************************WIFI Setup*************************
-void startWifi() {
+void WiFi_Control::start() {
   int i = 0;
 
   // Trying Station mode first:
@@ -68,7 +69,7 @@ void startWifi() {
   }
   if (WiFi.status() == WL_CONNECTED) {
     myIP                          = WiFi.localIP();
-    httpServer.internetConnection = true;
+    this->internetConnection = true;
   }
 
   // Couldn't connect to existing network, Create SoftAP
@@ -114,9 +115,18 @@ void startWifi() {
   }
 }
 
-void stopWifi() {
+void WiFi_Control::stop() {
   SS2K_LOG(HTTP_SERVER_LOG_TAG, "Closing connection to: %s", userConfig.getSsid());
   WiFi.disconnect();
+}
+
+void WiFi_Control::maintain() {
+  if (WiFi.status() != WL_CONNECTED) {
+    Serial.print(millis());
+    Serial.println("Reconnecting to WiFi...");
+    WiFi.disconnect();
+    WiFi.reconnect();
+  }
 }
 
 void HTTP_Server::start() {
@@ -386,6 +396,7 @@ void HTTP_Server::webClientUpdate(void *pvParameters) {
     // Keep MDNS alive
     if ((millis() - mDnsTimer) > 30000) {
       MDNS.addServiceTxt("http", "_tcp", "lf", String(mDnsTimer));
+      WiFiControl.maintain();
       mDnsTimer = millis();
 #ifdef DEBUG_STACK
       Serial.printf("HttpServer: %d \n", uxTaskGetStackHighWaterMark(webClientTask));
@@ -607,10 +618,10 @@ void HTTP_Server::FirmwareUpdate() {
     payload = http.getString();    // save received version
     payload.trim();
     SS2K_LOG(HTTP_SERVER_LOG_TAG, "  - Server version: %s", payload.c_str());
-    httpServer.internetConnection = true;
+    WiFiControl.internetConnection = true;
   } else {
     SS2K_LOG(HTTP_SERVER_LOG_TAG, "error downloading %s %d", FW_VERSIONFILE, httpCode);
-    httpServer.internetConnection = false;
+    WiFiControl.internetConnection = false;
   }
 
   http.end();
