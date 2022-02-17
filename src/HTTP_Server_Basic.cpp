@@ -68,7 +68,7 @@ void WiFi_Control::start() {
     }
   }
   if (WiFi.status() == WL_CONNECTED) {
-    myIP                          = WiFi.localIP();
+    myIP                     = WiFi.localIP();
     this->internetConnection = true;
   }
 
@@ -121,7 +121,7 @@ void WiFi_Control::stop() {
 }
 
 void WiFi_Control::maintain() {
-  if (WiFi.status() != WL_CONNECTED) {
+  if (WiFi.getMode() == WIFI_STA && WiFi.status() == WL_DISCONNECTED) {
     Serial.print(millis());
     Serial.println("Reconnecting to WiFi...");
     WiFi.disconnect();
