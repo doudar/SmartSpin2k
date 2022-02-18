@@ -11,13 +11,23 @@
 
 #define HTTP_SERVER_LOG_TAG "HTTP_Server"
 
-void startHttpServer();
-void webClientUpdate(void *pvParameters);
-void handleSpiffsFile();
-void handleIndexFile();
-void settingsProcessor();
-void handleHrSlider();
-void FirmwareUpdate();
+class HTTP_Server {
+ private:
+ public:
+  bool internetConnection;
+
+  void start();
+  void stop();
+  static void handleSpiffsFile();
+  static void handleIndexFile();
+  static void settingsProcessor();
+  static void handleHrSlider();
+  static void FirmwareUpdate();
+
+  static void webClientUpdate(void *pvParameters);
+
+  HTTP_Server() { internetConnection = false; }
+};
 
 #ifdef USE_TELEGRAM
 #define SEND_TO_TELEGRAM(message) sendTelegram(message);
@@ -30,3 +40,6 @@ void telegramUpdate(void *pvParameters);
 
 // wifi Function
 void startWifi();
+void stopWifi();
+
+extern HTTP_Server httpServer;

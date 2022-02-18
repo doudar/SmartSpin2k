@@ -23,15 +23,13 @@
 File fsUploadFile;
 
 TaskHandle_t webClientTask;
-#define MAX_BUFFER_SIZE 20
 
 IPAddress myIP;
-bool internetConnection = false;
 
 // DNS server
 const byte DNS_PORT = 53;
 DNSServer dnsServer;
-
+HTTP_Server httpServer;
 WiFiClientSecure client;
 WebServer server(80);
 
@@ -41,7 +39,7 @@ TaskHandle_t telegramTask;
 bool telegramMessageWaiting = false;
 UniversalTelegramBot bot(TELEGRAM_TOKEN, client);
 String telegramMessage = "";
-#endif
+#endif  // USE_TELEGRAM
 
 // ********************************WIFI Setup*************************
 void startWifi() {
@@ -53,6 +51,7 @@ void startWifi() {
     WiFi.mode(WIFI_STA);
     WiFi.setTxPower(WIFI_POWER_19_5dBm);
     WiFi.begin(userConfig.getSsid(), userConfig.getPassword());
+    WiFi.setAutoReconnect(true);
   }
 
   while (WiFi.status() != WL_CONNECTED) {
@@ -68,8 +67,8 @@ void startWifi() {
     }
   }
   if (WiFi.status() == WL_CONNECTED) {
-    myIP               = WiFi.localIP();
-    internetConnection = true;
+    myIP                          = WiFi.localIP();
+    httpServer.internetConnection = true;
   }
 
   // Couldn't connect to existing network, Create SoftAP
@@ -96,7 +95,9 @@ void startWifi() {
   MDNS.addService("http", "_tcp", 80);
   MDNS.addServiceTxt("http", "_tcp", "lf", "0");
   SS2K_LOG(HTTP_SERVER_LOG_TAG, "Connected to %s IP address: %s", userConfig.getSsid(), myIP.toString().c_str());
+#ifdef USE_TELEGRAM
   SEND_TO_TELEGRAM("Connected to " + String(userConfig.getSsid()) + " IP address: " + myIP.toString());
+#endif
   SS2K_LOG(HTTP_SERVER_LOG_TAG, "Open http://%s.local/", userConfig.getDeviceName());
   WiFi.setTxPower(WIFI_POWER_19_5dBm);
 
@@ -110,11 +111,15 @@ void startWifi() {
       now = time(nullptr);
     }
     SS2K_LOG(HTTP_SERVER_LOG_TAG, "Clock synced to: %.f", difftime(now, (time_t)0));
-    Serial.println(now);
   }
 }
 
-void startHttpServer() {
+void stopWifi() {
+  SS2K_LOG(HTTP_SERVER_LOG_TAG, "Closing connection to: %s", userConfig.getSsid());
+  WiFi.disconnect();
+}
+
+void HTTP_Server::start() {
   server.onNotFound([]() { SS2K_LOG(HTTP_SERVER_LOG_TAG, "Link Not Found: %s", server.uri().c_str()); });
 
   /********************************************Begin
@@ -126,6 +131,7 @@ void startHttpServer() {
   server.on("/hotspot-detect.html", handleIndexFile);  // Apple captive portal
   server.on("/style.css", handleSpiffsFile);
   server.on("/btsimulator.html", handleSpiffsFile);
+  server.on("/shift.html", handleSpiffsFile);
   server.on("/settings.html", handleSpiffsFile);
   server.on("/status.html", handleSpiffsFile);
   server.on("/bluetoothscanner.html", handleSpiffsFile);
@@ -170,16 +176,16 @@ void startHttpServer() {
   server.on("/hrslider", []() {
     String value = server.arg("value");
     if (value == "enable") {
-      userConfig.setSimulateHr(true);
+      rtConfig.setSimulateHr(true);
       server.send(200, "text/plain", "OK");
       SS2K_LOG(HTTP_SERVER_LOG_TAG, "HR Simulator turned on");
     } else if (value == "disable") {
-      userConfig.setSimulateHr(false);
+      rtConfig.setSimulateHr(false);
       server.send(200, "text/plain", "OK");
       SS2K_LOG(HTTP_SERVER_LOG_TAG, "HR Simulator turned off");
     } else {
-      userConfig.setSimulatedHr(value.toInt());
-      SS2K_LOG(HTTP_SERVER_LOG_TAG, "HR is now: %d", userConfig.getSimulatedHr());
+      rtConfig.setSimulatedHr(value.toInt());
+      SS2K_LOG(HTTP_SERVER_LOG_TAG, "HR is now: %d", rtConfig.getSimulatedHr());
       server.send(200, "text/plain", "OK");
     }
   });
@@ -187,16 +193,16 @@ void startHttpServer() {
   server.on("/wattsslider", []() {
     String value = server.arg("value");
     if (value == "enable") {
-      userConfig.setSimulateWatts(true);
+      rtConfig.setSimulateWatts(true);
       server.send(200, "text/plain", "OK");
       SS2K_LOG(HTTP_SERVER_LOG_TAG, "Watt Simulator turned on");
     } else if (value == "disable") {
-      userConfig.setSimulateWatts(false);
+      rtConfig.setSimulateWatts(false);
       server.send(200, "text/plain", "OK");
       SS2K_LOG(HTTP_SERVER_LOG_TAG, "Watt Simulator turned off");
     } else {
-      userConfig.setSimulatedWatts(value.toInt());
-      SS2K_LOG(HTTP_SERVER_LOG_TAG, "Watts are now: %d", userConfig.getSimulatedWatts());
+      rtConfig.setSimulatedWatts(value.toInt());
+      SS2K_LOG(HTTP_SERVER_LOG_TAG, "Watts are now: %d", rtConfig.getSimulatedWatts().value);
       server.send(200, "text/plain", "OK");
     }
   });
@@ -204,23 +210,72 @@ void startHttpServer() {
   server.on("/cadslider", []() {
     String value = server.arg("value");
     if (value == "enable") {
-      userConfig.setSimulateCad(true);
+      rtConfig.setSimulateCad(true);
       server.send(200, "text/plain", "OK");
       SS2K_LOG(HTTP_SERVER_LOG_TAG, "CAD Simulator turned on");
     } else if (value == "disable") {
-      userConfig.setSimulateCad(false);
+      rtConfig.setSimulateCad(false);
       server.send(200, "text/plain", "OK");
       SS2K_LOG(HTTP_SERVER_LOG_TAG, "CAD Simulator turned off");
     } else {
-      userConfig.setSimulatedCad(value.toInt());
-      SS2K_LOG(HTTP_SERVER_LOG_TAG, "CAD is now: %f", userConfig.getSimulatedCad());
+      rtConfig.setSimulatedCad(value.toInt());
+      SS2K_LOG(HTTP_SERVER_LOG_TAG, "CAD is now: %d", rtConfig.getSimulatedCad());
+      server.send(200, "text/plain", "OK");
+    }
+  });
+
+  server.on("/ergmode", []() {
+    String value = server.arg("value");
+    if (value == "enable") {
+      rtConfig.setERGMode(true);
+      server.send(200, "text/plain", "OK");
+      SS2K_LOG(HTTP_SERVER_LOG_TAG, "ERG Mode turned on");
+    } else {
+      rtConfig.setERGMode(false);
+      server.send(200, "text/plain", "OK");
+      SS2K_LOG(HTTP_SERVER_LOG_TAG, "ERG Mode turned off");
+    }
+  });
+
+  server.on("/targetwattsslider", []() {
+    String value = server.arg("value");
+    if (value == "enable") {
+      rtConfig.setSimulateTargetWatts(true);
+      server.send(200, "text/plain", "OK");
+      SS2K_LOG(HTTP_SERVER_LOG_TAG, "Target Watts Simulator turned on");
+    } else if (value == "disable") {
+      rtConfig.setSimulateTargetWatts(false);
+      server.send(200, "text/plain", "OK");
+      SS2K_LOG(HTTP_SERVER_LOG_TAG, "Target Watts Simulator turned off");
+    } else {
+      rtConfig.setTargetWatts(value.toInt());
+      SS2K_LOG(HTTP_SERVER_LOG_TAG, "Target Watts are now: %d", rtConfig.getTargetWatts());
+      server.send(200, "text/plain", "OK");
+    }
+  });
+
+  server.on("/shift", []() {
+    int value = server.arg("value").toInt();
+    if ((value > -10) && (value < 10)) {
+      rtConfig.setShifterPosition(rtConfig.getShifterPosition() + value);
+      server.send(200, "text/plain", "OK");
+      SS2K_LOG(HTTP_SERVER_LOG_TAG, "Shift From HTML");
+    } else {
+      rtConfig.setShifterPosition(value);
+      SS2K_LOG(HTTP_SERVER_LOG_TAG, "Invalid HTML Shift");
       server.send(200, "text/plain", "OK");
     }
   });
 
   server.on("/configJSON", []() {
     String tString;
-    tString = userConfig.returnJSON(!server.arg("includeDebugLog").isEmpty());
+    tString = userConfig.returnJSON();
+    server.send(200, "text/plain", tString);
+  });
+
+  server.on("/runtimeConfigJSON", []() {
+    String tString;
+    tString = rtConfig.returnJSON();
     server.send(200, "text/plain", tString);
   });
 
@@ -253,6 +308,7 @@ void startHttpServer() {
         if (upload.filename == String("firmware.bin").c_str()) {
           if (upload.status == UPLOAD_FILE_START) {
             SS2K_LOG(HTTP_SERVER_LOG_TAG, "Update: %s", upload.filename.c_str());
+            ss2k.stopTasks();
             if (!Update.begin(UPDATE_SIZE_UNKNOWN)) {  // start with max
                                                        // available size
               Update.printError(Serial);
@@ -298,13 +354,13 @@ void startHttpServer() {
   /********************************************End Server
    * Handlers*******************************/
 
-  xTaskCreatePinnedToCore(webClientUpdate,                    /* Task function. */
+  xTaskCreatePinnedToCore(HTTP_Server::webClientUpdate,       /* Task function. */
                           "webClientUpdate",                  /* name of task. */
-                          4500 + (DEBUG_LOG_BUFFER_SIZE * 2), /* Stack size of task Used to be 3000*/
+                          5600 + (DEBUG_LOG_BUFFER_SIZE * 2), /* Stack size of task Used to be 3000*/
                           NULL,                               /* parameter of the task */
                           1,                                  /* priority of the task  - 29 worked*/
                           &webClientTask,                     /* Task handle to keep track of created task */
-                          1);                                 /* pin task to core 1 */
+                          1);                                 /* pin task to core */
 
 #ifdef USE_TELEGRAM
   xTaskCreatePinnedToCore(telegramUpdate,   /* Task function. */
@@ -314,12 +370,12 @@ void startHttpServer() {
                           1,                /* priority of the task  - higher number is higher priority*/
                           &telegramTask,    /* Task handle to keep track of created task */
                           1);               /* pin task to core 1 */
-#endif
+#endif                                      // USE_TELEGRAM
   server.begin();
   SS2K_LOG(HTTP_SERVER_LOG_TAG, "HTTP server started");
 }
 
-void webClientUpdate(void *pvParameters) {
+void HTTP_Server::webClientUpdate(void *pvParameters) {
   static unsigned long mDnsTimer = millis();  // NOLINT: There is no overload in String for uint64_t
   for (;;) {
     server.handleClient();
@@ -328,14 +384,17 @@ void webClientUpdate(void *pvParameters) {
       dnsServer.processNextRequest();
     }
     // Keep MDNS alive
-    if ((millis() - mDnsTimer) > 60000) {
+    if ((millis() - mDnsTimer) > 30000) {
       MDNS.addServiceTxt("http", "_tcp", "lf", String(mDnsTimer));
       mDnsTimer = millis();
+#ifdef DEBUG_STACK
+      Serial.printf("HttpServer: %d \n", uxTaskGetStackHighWaterMark(webClientTask));
+#endif  // DEBUG_STACK
     }
   }
 }
 
-void handleIndexFile() {
+void HTTP_Server::handleIndexFile() {
   String filename = "/index.html";
   if (SPIFFS.exists(filename)) {
     File file = SPIFFS.open(filename, FILE_READ);
@@ -348,7 +407,7 @@ void handleIndexFile() {
   }
 }
 
-void handleSpiffsFile() {
+void HTTP_Server::handleSpiffsFile() {
   String filename = server.uri();
   int dotPosition = filename.lastIndexOf(".");
   String fileType = filename.substring((dotPosition + 1), filename.length());
@@ -360,17 +419,20 @@ void handleSpiffsFile() {
     server.streamFile(file, "text/" + fileType);
     file.close();
     SS2K_LOG(HTTP_SERVER_LOG_TAG, "Served %s", filename.c_str());
+  } else if (!SPIFFS.exists("/index.html")) {
+    SS2K_LOG(HTTP_SERVER_LOG_TAG, "%s not found and no filesystem. Sending builting index.html", filename.c_str());
+    handleIndexFile();
   } else {
     SS2K_LOG(HTTP_SERVER_LOG_TAG, "%s not found. Sending 404.", filename.c_str());
-    server.send(404, "text/html",
-                "<html><body><h1>ERROR 404 <br> FILE NOT "
-                "FOUND!</h1></body></html>");
+    String outputhtml = "<html><body><h1>ERROR 404 <br> FILE NOT FOUND!" + filename + "</h1></body></html>";
+    server.send(404, "text/html", outputhtml);
   }
 }
 
-void settingsProcessor() {
+void HTTP_Server::settingsProcessor() {
   String tString;
-  bool wasBTUpdate = false;
+  bool wasBTUpdate       = false;
+  bool wasSettingsUpdate = false;
   if (!server.arg("ssid").isEmpty()) {
     tString = server.arg("ssid");
     tString.trim();
@@ -391,39 +453,65 @@ void settingsProcessor() {
     if (shiftStep >= 50 && shiftStep <= 6000) {
       userConfig.setShiftStep(shiftStep);
     }
+    wasSettingsUpdate = true;
   }
   if (!server.arg("stepperPower").isEmpty()) {
     uint64_t stepperPower = server.arg("stepperPower").toInt();
     if (stepperPower >= 500 && stepperPower <= 2000) {
       userConfig.setStepperPower(stepperPower);
-      updateStepperPower();
+      ss2k.updateStepperPower();
+    }
+  }
+  if (!server.arg("maxWatts").isEmpty()) {
+    uint64_t maxWatts = server.arg("maxWatts").toInt();
+    if (maxWatts >= 300 && maxWatts <= 2000) {
+      userConfig.setMaxWatts(maxWatts);
+    }
+  }
+  if (!server.arg("ERGSensitivity").isEmpty()) {
+    float ERGSensitivity = server.arg("ERGSensitivity").toFloat();
+    if (ERGSensitivity >= .5 && ERGSensitivity <= 20) {
+      userConfig.setERGSensitivity(ERGSensitivity);
     }
   }
   // checkboxes don't report off, so need to check using another parameter
   // that's always present on that page
-  if (!server.arg("stepperPower").isEmpty()) {
-    if (!server.arg("autoUpdate").isEmpty()) {
-      userConfig.setAutoUpdate(true);
-    } else {
-      userConfig.setAutoUpdate(false);
-    }
-    if (!server.arg("stealthchop").isEmpty()) {
-      userConfig.setStealthChop(true);
-      updateStealthchop();
-    } else {
-      userConfig.setStealthChop(false);
-      updateStealthchop();
-    }
+  if (!server.arg("autoUpdate").isEmpty()) {
+    userConfig.setAutoUpdate(true);
+  } else if (wasSettingsUpdate) {
+    userConfig.setAutoUpdate(false);
+  }
+  if (!server.arg("stepperDir").isEmpty()) {
+    userConfig.setStepperDir(true);
+  } else if (wasSettingsUpdate) {
+    userConfig.setStepperDir(false);
+  }
+  if (!server.arg("shifterDir").isEmpty()) {
+    userConfig.setShifterDir(true);
+  } else if (wasSettingsUpdate) {
+    userConfig.setShifterDir(false);
+  }
+  if (!server.arg("udpLogEnabled").isEmpty()) {
+    userConfig.setUdpLogEnabled(true);
+  } else if (wasSettingsUpdate) {
+    userConfig.setUdpLogEnabled(false);
+  }
+  if (!server.arg("stealthchop").isEmpty()) {
+    userConfig.setStealthChop(true);
+    ss2k.updateStealthchop();
+  } else if (wasSettingsUpdate) {
+    userConfig.setStealthChop(false);
+    ss2k.updateStealthchop();
   }
   if (!server.arg("inclineMultiplier").isEmpty()) {
     float inclineMultiplier = server.arg("inclineMultiplier").toFloat();
-    if (inclineMultiplier >= 1 && inclineMultiplier <= 5) {
+    if (inclineMultiplier >= 1 && inclineMultiplier <= 10) {
       userConfig.setInclineMultiplier(inclineMultiplier);
     }
   }
   if (!server.arg("powerCorrectionFactor").isEmpty()) {
     float powerCorrectionFactor = server.arg("powerCorrectionFactor").toFloat();
-    if (powerCorrectionFactor >= 0 && powerCorrectionFactor <= 2) {
+    if (powerCorrectionFactor >= MIN_PCF && powerCorrectionFactor <= MAX_PCF) {
       userConfig.setPowerCorrectionFactor(powerCorrectionFactor);
     }
   }
@@ -466,13 +554,19 @@ void settingsProcessor() {
   }
   String response = "<!DOCTYPE html><html><body><h2>";
 
-  if (wasBTUpdate) {  // Special BT update response
+  if (wasBTUpdate) {  // Special BT page update response
     response +=
         "Selections Saved!</h2></body><script> setTimeout(\"location.href "
         "= 'http://" +
         myIP.toString() + "/bluetoothscanner.html';\",1000);</script></html>";
     spinBLEClient.resetDevices();
     spinBLEClient.serverScan(true);
+  } else if (wasSettingsUpdate) {  // Special Settings Page update response
+    response +=
+        "Network settings will be applied at next reboot. <br> Everything "
+        "else is available immediately.</h2></body><script> "
+        "setTimeout(\"location.href = 'http://" +
+        myIP.toString() + "/settings.html';\",1000);</script></html>";
   } else {  // Normal response
     response +=
         "Network settings will be applied at next reboot. <br> Everything "
@@ -488,10 +582,16 @@ void settingsProcessor() {
   userPWC.printFile();
 }
 
+void HTTP_Server::stop() {
+  SS2K_LOG(HTTP_SERVER_LOG_TAG, "Stopping Http Server");
+  server.stop();
+  server.close();
+}
+
 // github fingerprint
 // 70:94:DE:DD:E6:C4:69:48:3A:92:70:A1:48:56:78:2D:18:64:E0:B7
 
-void FirmwareUpdate() {
+void HTTP_Server::FirmwareUpdate() {
   HTTPClient http;
   // WiFiClientSecure client;
 
@@ -507,10 +607,10 @@ void FirmwareUpdate() {
     payload = http.getString();    // save received version
     payload.trim();
     SS2K_LOG(HTTP_SERVER_LOG_TAG, "  - Server version: %s", payload.c_str());
-    internetConnection = true;
+    httpServer.internetConnection = true;
   } else {
     SS2K_LOG(HTTP_SERVER_LOG_TAG, "error downloading %s %d", FW_VERSIONFILE, httpCode);
-    internetConnection = false;
+    httpServer.internetConnection = false;
   }
 
   http.end();
@@ -550,19 +650,21 @@ void FirmwareUpdate() {
       }
 
       // Update Firmware
-      ret = httpUpdate.update(client, userConfig.getFirmwareUpdateURL() + String(FW_BINFILE));
-      switch (ret) {
-        case HTTP_UPDATE_FAILED:
-          SS2K_LOG(HTTP_SERVER_LOG_TAG, "HTTP_UPDATE_FAILED Error %d : %s", httpUpdate.getLastError(), httpUpdate.getLastErrorString().c_str());
-          break;
+      if ((availiableVer > currentVer) && (userConfig.getAutoUpdate())) {
+        ret = httpUpdate.update(client, userConfig.getFirmwareUpdateURL() + String(FW_BINFILE));
+        switch (ret) {
+          case HTTP_UPDATE_FAILED:
+            SS2K_LOG(HTTP_SERVER_LOG_TAG, "HTTP_UPDATE_FAILED Error %d : %s", httpUpdate.getLastError(), httpUpdate.getLastErrorString().c_str());
+            break;
 
-        case HTTP_UPDATE_NO_UPDATES:
-          SS2K_LOG(HTTP_SERVER_LOG_TAG, "HTTP_UPDATE_NO_UPDATES");
-          break;
+          case HTTP_UPDATE_NO_UPDATES:
+            SS2K_LOG(HTTP_SERVER_LOG_TAG, "HTTP_UPDATE_NO_UPDATES");
+            break;
 
-        case HTTP_UPDATE_OK:
-          SS2K_LOG(HTTP_SERVER_LOG_TAG, "HTTP_UPDATE_OK");
-          break;
+          case HTTP_UPDATE_OK:
+            SS2K_LOG(HTTP_SERVER_LOG_TAG, "HTTP_UPDATE_OK");
+            break;
+        }
       }
     } else {  // don't update
       SS2K_LOG(HTTP_SERVER_LOG_TAG, "  - Current Version: %s", FIRMWARE_VERSION);
@@ -592,7 +694,7 @@ void sendTelegram(String textToSend) {
 
 // Non blocking task to send telegram message
 void telegramUpdate(void *pvParameters) {
-  //client.setInsecure();
+  // client.setInsecure();
   client.setCACert(TELEGRAM_CERTIFICATE_ROOT);
   for (;;) {
     static int telegramFailures = 0;
@@ -616,8 +718,8 @@ void telegramUpdate(void *pvParameters) {
     Serial.printf("Telegram: %d \n", uxTaskGetStackHighWaterMark(telegramTask));
     Serial.printf("Web: %d \n", uxTaskGetStackHighWaterMark(webClientTask));
     Serial.printf("Free: %d \n", ESP.getFreeHeap());
-#endif
+#endif  // DEBUG_STACK
     vTaskDelay(4000 / portTICK_RATE_MS);
   }
 }
-#endif
+#endif  // USE_TELEGRAM

@@ -14,8 +14,11 @@
 #include <NimBLEDevice.h>
 
 // BLE Server Settings
+SpinBLEServer spinBLEServer;
 
 NimBLEServer *pServer = nullptr;
+
+static MyCallbacks chrCallbacks;
 
 BLEService *pHeartService;
 BLECharacteristic *heartRateMeasurementCharacteristic;
@@ -32,10 +35,12 @@ BLECharacteristic *fitnessMachineStatusCharacteristic;
 BLECharacteristic *fitnessMachineControlPoint;
 BLECharacteristic *fitnessMachineResistanceLevelRange;
 BLECharacteristic *fitnessMachinePowerRange;
+BLECharacteristic *fitnessMachineInclinationRange;
 BLECharacteristic *fitnessMachineTrainingStatus;
 
 BLEService *pSmartSpin2kService;
 BLECharacteristic *smartSpin2kCharacteristic;
+std::string FTMSWrite = "";
 
 /******** Bit field Flag Example ********/
 // 00000000000000000001 - 1   - 0x001 - Pedal Power Balance Present
@@ -63,21 +68,20 @@ byte cpFeature[1]               = {0b00100000};  // crank information present //
                                                  // byte is reported power
 
 // byte ftmsService[6]       = {0x00, 0x00, 0x00, 0b01, 0b0100000, 0x00};
-byte ftmsControlPoint[3]  = {0x00, 0x00, 0x00};                          // 0x08 we need to return a value of 1 for any successful change
-byte ftmsMachineStatus[7] = {0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00};  // 0x04 means started by the user
 
-struct FitnessMachineFeature ftmsFeature = {FitnessMachineFeatureFlags::Types::CadenceSupported | FitnessMachineFeatureFlags::Types::HeartRateMeasurementSupported |
-                                                FitnessMachineFeatureFlags::Types::PowerMeasurementSupported | FitnessMachineFeatureFlags::Types::InclinationSupported |
-                                                FitnessMachineFeatureFlags::Types::ResistanceLevelSupported,
-                                            FitnessMachineTargetFlags::PowerTargetSettingSupported | FitnessMachineTargetFlags::Types::InclinationTargetSettingSupported |
-                                                FitnessMachineTargetFlags::Types::ResistanceTargetSettingSupported |
-                                                FitnessMachineTargetFlags::Types::IndoorBikeSimulationParametersSupported |
-                                                FitnessMachineTargetFlags::Types::SpinDownControlSupported};
+struct FitnessMachineFeature ftmsFeature = {
+    FitnessMachineFeatureFlags::Types::CadenceSupported | FitnessMachineFeatureFlags::Types::HeartRateMeasurementSupported |
+        FitnessMachineFeatureFlags::Types::PowerMeasurementSupported | FitnessMachineFeatureFlags::Types::InclinationSupported |
+        FitnessMachineFeatureFlags::Types::ResistanceLevelSupported,
+    FitnessMachineTargetFlags::PowerTargetSettingSupported | FitnessMachineTargetFlags::Types::InclinationTargetSettingSupported |
+        FitnessMachineTargetFlags::Types::ResistanceTargetSettingSupported | FitnessMachineTargetFlags::Types::IndoorBikeSimulationParametersSupported |
+        FitnessMachineTargetFlags::Types::SpinDownControlSupported | FitnessMachineTargetFlags::Types::TargetedCadenceConfigurationSupported};
 
 uint8_t ftmsIndoorBikeData[14] = {0x44, 0x02, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0};  // 00000000100001010100 ISpeed, ICAD,
                                                                                                             // TDistance, IPower, ETime
-uint8_t ftmsResistanceLevelRange[6]      = {0x00, 0x00, 0x25, 0x00, 0x01, 0x00};                            // 25 increment 1
-uint8_t ftmsPowerRange[6]                = {0x00, 0x00, 0xA0, 0x0F, 0x01, 0x00};                            // 1-4000 watts
+uint8_t ftmsResistanceLevelRange[6]      = {0x00, 0x01, 0x25, 0x00, 0x01, 0x00};                            // 1:37 increment 1
+uint8_t ftmsPowerRange[6]                = {0x00, 0x01, 0xA0, 0x0F, 0x01, 0x00};                            // 1:4000 watts increment 1
+uint8_t ftmsInclinationRange[6]          = {0x38, 0xff, 0xc8, 0x00, 0x01, 0x00};                            // -20.0:20.0 increment .1
 uint8_t ftmsTrainingStatus[2]            = {0x08, 0x00};
 uint8_t ss2kCustomCharacteristicValue[3] = {0x00, 0x00, 0x00};
 
@@ -117,10 +121,12 @@ void startBLEServer() {
   fitnessMachineIndoorBikeData       = pFitnessMachineService->createCharacteristic(FITNESSMACHINEINDOORBIKEDATA_UUID, NIMBLE_PROPERTY::READ | NIMBLE_PROPERTY::NOTIFY);
   fitnessMachineResistanceLevelRange = pFitnessMachineService->createCharacteristic(FITNESSMACHINERESISTANCELEVELRANGE_UUID, NIMBLE_PROPERTY::READ);
   fitnessMachinePowerRange           = pFitnessMachineService->createCharacteristic(FITNESSMACHINEPOWERRANGE_UUID, NIMBLE_PROPERTY::READ);
+  fitnessMachineInclinationRange     = pFitnessMachineService->createCharacteristic(FITNESSMACHINEINCLINATIONRANGE_UUID, NIMBLE_PROPERTY::READ);
   fitnessMachineTrainingStatus       = pFitnessMachineService->createCharacteristic(FITNESSMACHINETRAININGSTATUS_UUID, NIMBLE_PROPERTY::NOTIFY);
 
-  pSmartSpin2kService       = pServer->createService(SMARTSPIN2K_SERVICE_UUID);
-  smartSpin2kCharacteristic = pSmartSpin2kService->createCharacteristic(SMARTSPIN2K_CHARACTERISTIC_UUID, NIMBLE_PROPERTY::WRITE | NIMBLE_PROPERTY::INDICATE);
+  pSmartSpin2kService = pServer->createService(SMARTSPIN2K_SERVICE_UUID);
+  smartSpin2kCharacteristic =
+      pSmartSpin2kService->createCharacteristic(SMARTSPIN2K_CHARACTERISTIC_UUID, NIMBLE_PROPERTY::WRITE | NIMBLE_PROPERTY::INDICATE | NIMBLE_PROPERTY::NOTIFY);
 
   pServer->setCallbacks(new MyServerCallbacks());
 
@@ -132,17 +138,18 @@ void startBLEServer() {
   sensorLocationCharacteristic->setValue(cpsLocation, 1);
 
   fitnessMachineFeature->setValue(ftmsFeature.bytes, sizeof(ftmsFeature));
-  fitnessMachineControlPoint->setValue(ftmsControlPoint, 3);
 
   fitnessMachineIndoorBikeData->setValue(ftmsIndoorBikeData, 14);
-  fitnessMachineStatusCharacteristic->setValue(ftmsMachineStatus, 7);
   fitnessMachineResistanceLevelRange->setValue(ftmsResistanceLevelRange, 6);
   fitnessMachinePowerRange->setValue(ftmsPowerRange, 6);
+  fitnessMachineInclinationRange->setValue(ftmsInclinationRange, 6);
 
   smartSpin2kCharacteristic->setValue(ss2kCustomCharacteristicValue, 3);
 
-  fitnessMachineControlPoint->setCallbacks(new MyCallbacks());
-
+  cyclingPowerMeasurementCharacteristic->setCallbacks(&chrCallbacks);
+  heartRateMeasurementCharacteristic->setCallbacks(&chrCallbacks);
+  fitnessMachineIndoorBikeData->setCallbacks(&chrCallbacks);
+  fitnessMachineControlPoint->setCallbacks(&chrCallbacks);
   smartSpin2kCharacteristic->setCallbacks(new ss2kCustomCharacteristicCallbacks());
 
   pHeartService->start();
@@ -199,66 +206,18 @@ bool spinDown() {
   return true;
 }
 
-// as a note, Trainer Road sends 50w target whenever the app is connected.
-void computeERG(int newSetPoint) {
-  if (userConfig.getERGMode() && spinBLEClient.connectedPM) {
-    // continue
-  } else {
-    return;
-  }
-
-  static int setPoint       = 0;
-  int currentWatts          = userConfig.getSimulatedWatts();
-  float incline             = userConfig.getIncline();
-  int cad                   = userConfig.getSimulatedCad();
-  int newIncline            = incline;
-  int amountToChangeIncline = 0;
-
-  if (newSetPoint > 0) {  // only update the value if value sent
-    setPoint = newSetPoint;
-    return;
-  }
-  if (setPoint == 0) {
-    return;
-  }
-
-  // only update if pedaling faster then 20rpm
-  if (cad > 20) {
-    // 30  is amount of watts per shift. Was 50, seemed like too much...
-    if (abs(currentWatts - setPoint) < 30) {
-      amountToChangeIncline = (currentWatts - setPoint) * 1;
-    }
-    if (abs(currentWatts - setPoint) > 30) {
-      amountToChangeIncline = amountToChangeIncline + ((currentWatts - setPoint)) * 1;
-    }
-    amountToChangeIncline = amountToChangeIncline / ((currentWatts / 100) + 1);
-
-    // limit to 5 shifts at a time
-    if (abs(amountToChangeIncline) > userConfig.getShiftStep() * 5) {
-      if (amountToChangeIncline > 0) {
-        amountToChangeIncline = userConfig.getShiftStep() * 5;
-      }
-      if (amountToChangeIncline < 0) {
-        amountToChangeIncline = -(userConfig.getShiftStep() * 5);
-      }
-    }
-  } else {
-    return;
-  }
-
-  newIncline = incline - amountToChangeIncline;  //  }
-  userConfig.setIncline(newIncline);
-}
-
 void updateIndoorBikeDataChar() {
-  float cadRaw = userConfig.getSimulatedCad();
+  if (!spinBLEServer.clientSubscribed.IndoorBikeData) {
+    return;
+  }
+  float cadRaw = rtConfig.getSimulatedCad();
   int cad      = static_cast<int>(cadRaw * 2);
 
-  int watts = userConfig.getSimulatedWatts();
-  int hr    = userConfig.getSimulatedHr();
+  int watts = rtConfig.getSimulatedWatts().value;
+  int hr    = rtConfig.getSimulatedHr();
 
   int speed      = 0;
-  float speedRaw = userConfig.getSimulatedSpeed();
+  float speedRaw = rtConfig.getSimulatedSpeed();
   if (speedRaw <= 0) {
     float gearRatio = 1;
     speed           = ((cad * 2.75 * 2.08 * 60 * gearRatio) / 10);
@@ -283,10 +242,13 @@ void updateIndoorBikeDataChar() {
   const size_t ftmsIndoorBikeDataLength = sizeof(ftmsIndoorBikeData) / sizeof(ftmsIndoorBikeData[0]);
   logCharacteristic(logBuf, kLogBufCapacity, ftmsIndoorBikeData, ftmsIndoorBikeDataLength, FITNESSMACHINESERVICE_UUID, fitnessMachineIndoorBikeData->getUUID(),
                     "FTMS(IBD)[ HR(%d) CD(%.2f) PW(%d) SD(%.2f) ]", hr % 1000, fmodf(cadRaw, 1000.0), watts % 10000, fmodf(speed, 1000.0));
-}  // ^^Using the New Way of setting Bytes.
+}
 
 void updateCyclingPowerMeasurementChar() {
-  int power = userConfig.getSimulatedWatts();
+  if (!spinBLEServer.clientSubscribed.CyclingPowerMeasurement) {
+    return;
+  }
+  int power = rtConfig.getSimulatedWatts().value;
   int remainder, quotient;
   quotient                   = power / 256;
   remainder                  = power % 256;
@@ -294,7 +256,7 @@ void updateCyclingPowerMeasurementChar() {
   cyclingPowerMeasurement[3] = quotient;
   cyclingPowerMeasurementCharacteristic->setValue(cyclingPowerMeasurement, 9);
 
-  float cadence = userConfig.getSimulatedCad();
+  float cadence = rtConfig.getSimulatedCad();
   if (cadence > 0) {
     float crankRevPeriod = (60 * 1024) / cadence;
     spinBLEClient.cscCumulativeCrankRev++;
@@ -308,7 +270,7 @@ void updateCyclingPowerMeasurementChar() {
     remainder                  = spinBLEClient.cscLastCrankEvtTime % 256;
     cyclingPowerMeasurement[7] = remainder;
     cyclingPowerMeasurement[8] = quotient;
-  }  // ^^Using the old way of setting bytes because I like it and it makes more sense to me looking at it.
+  }
 
   cyclingPowerMeasurementCharacteristic->notify();
 
@@ -321,7 +283,10 @@ void updateCyclingPowerMeasurementChar() {
 }
 
 void updateHeartRateMeasurementChar() {
-  int hr                  = userConfig.getSimulatedHr();
+  if (!spinBLEServer.clientSubscribed.Heartrate) {
+    return;
+  }
+  int hr                  = rtConfig.getSimulatedHr();
   heartRateMeasurement[1] = hr;
   heartRateMeasurementCharacteristic->setValue(heartRateMeasurement, 2);
   heartRateMeasurementCharacteristic->notify();
@@ -334,11 +299,8 @@ void updateHeartRateMeasurementChar() {
 }
 
 // Creating Server Connection Callbacks
-
 void MyServerCallbacks::onConnect(BLEServer *pServer, ble_gap_conn_desc *desc) {
   SS2K_LOG(BLE_SERVER_LOG_TAG, "Bluetooth Remote Client Connected: %s Connected Clients: %d", NimBLEAddress(desc->peer_ota_addr).toString().c_str(), pServer->getConnectedCount());
-  updateConnParametersFlag = true;
-  bleConnDesc              = desc->conn_handle;
 
   if (pServer->getConnectedCount() < CONFIG_BT_NIMBLE_MAX_CONNECTIONS - NUM_BLE_DEVICES) {
     BLEDevice::startAdvertising();
@@ -353,91 +315,159 @@ void MyServerCallbacks::onDisconnect(BLEServer *pServer) {
   BLEDevice::startAdvertising();
 }
 
-void MyCallbacks::onWrite(BLECharacteristic *pCharacteristic) {
-  std::string rxValue = pCharacteristic->getValue();
+void MyCallbacks::onWrite(BLECharacteristic *pCharacteristic) { FTMSWrite = pCharacteristic->getValue(); }
 
-  if (rxValue.length() > 1) {
+void MyCallbacks::onSubscribe(NimBLECharacteristic *pCharacteristic, ble_gap_conn_desc *desc, uint16_t subValue) {
+  String str        = "Client ID: ";
+  NimBLEUUID pUUID = pCharacteristic->getUUID();
+  str += desc->conn_handle;
+  str += " Address: ";
+  str += std::string(NimBLEAddress(desc->peer_ota_addr)).c_str();
+  if (subValue == 0) {
+    str += " Unsubscribed to ";
+    spinBLEServer.setClientSubscribed(pUUID, false);
+  } else if (subValue == 1) {
+    str += " Subscribed to notifications for ";
+    spinBLEServer.setClientSubscribed(pUUID, true);
+  } else if (subValue == 2) {
+    str += " Subscribed to indications for ";
+    spinBLEServer.setClientSubscribed(pUUID, true);
+  } else if (subValue == 3) {
+    str += " Subscribed to notifications and indications for ";
+    spinBLEServer.setClientSubscribed(pUUID, true);
+  }
+  str += std::string(pCharacteristic->getUUID()).c_str();
+
+  SS2K_LOG(BLE_SERVER_LOG_TAG, "%s", str.c_str());
+}
+
+void SpinBLEServer::setClientSubscribed(NimBLEUUID pUUID, bool subscribe) {
+  if (pUUID == HEARTCHARACTERISTIC_UUID) {
+    spinBLEServer.clientSubscribed.Heartrate = subscribe;
+  } else if (pUUID == CYCLINGPOWERMEASUREMENT_UUID) {
+    spinBLEServer.clientSubscribed.CyclingPowerMeasurement = subscribe;
+  } else if (pUUID == FITNESSMACHINEINDOORBIKEDATA_UUID) {
+    spinBLEServer.clientSubscribed.IndoorBikeData = subscribe;
+  }
+}
+
+void processFTMSWrite() {
+  if (FTMSWrite == "") {
+    return;
+  }
+  BLECharacteristic *pCharacteristic = NimBLEDevice::getServer()->getServiceByUUID(FITNESSMACHINESERVICE_UUID)->getCharacteristic(FITNESSMACHINECONTROLPOINT_UUID);
+
+  std::string rxValue = FTMSWrite;
+  std::vector<uint8_t> ftmsStatus;
+  if (rxValue.length() >= 1) {
     uint8_t *pData = reinterpret_cast<uint8_t *>(&rxValue[0]);
     int length     = rxValue.length();
 
     const int kLogBufCapacity = (rxValue.length() * 2) + 60;  // largest comment is 48 VV
     char logBuf[kLogBufCapacity];
-    int logBufLength = ss2k_log_hex_to_buffer(pData, length, logBuf, 0, kLogBufCapacity);
-
+    int logBufLength       = ss2k_log_hex_to_buffer(pData, length, logBuf, 0, kLogBufCapacity);
     int port               = 0;
-    uint8_t returnValue[3] = {0x80, (uint8_t)rxValue[0], 0x02};
+    uint8_t returnValue[3] = {FitnessMachineControlPointProcedure::ResponseCode, (uint8_t)rxValue[0], FitnessMachineControlPointResultCode::OpCodeNotSupported};
+
+    ftmsStatus = {FitnessMachineStatus::ReservedForFutureUse};
 
     switch ((uint8_t)rxValue[0]) {
-      case 0x00:  // request control
+      case FitnessMachineControlPointProcedure::RequestControl:
+        returnValue[2] = FitnessMachineControlPointResultCode::Success;  // 0x01;
+        pCharacteristic->setValue(returnValue, 3);
         logBufLength += snprintf(logBuf + logBufLength, kLogBufCapacity - logBufLength, "-> Control Request");
-        returnValue[2] = 0x01;
-        userConfig.setERGMode(false);
-        pCharacteristic->setValue(returnValue, 3);
-        ftmsTrainingStatus[1] = 0x01;
+        ftmsTrainingStatus[1] = FitnessMachineTrainingStatus::Idle;  // 0x01;
         fitnessMachineTrainingStatus->setValue(ftmsTrainingStatus, 2);
-        fitnessMachineTrainingStatus->notify();
-        pCharacteristic->setValue(returnValue, 3);
+        ftmsStatus = {FitnessMachineStatus::StartedOrResumedByUser};
         break;
 
-      case 0x03: {  // inclination level setting - differs from sim mode as no negative numbers
+      case FitnessMachineControlPointProcedure::Reset: {
+        returnValue[2] = FitnessMachineControlPointResultCode::Success;  // 0x01;
+        pCharacteristic->setValue(returnValue, 3);
+
+        logBufLength += snprintf(logBuf + logBufLength, kLogBufCapacity - logBufLength, "-> Reset");
+        ftmsTrainingStatus[1] = FitnessMachineTrainingStatus::Idle;  // 0x01;
+        ftmsStatus            = {FitnessMachineStatus::Reset};
+        fitnessMachineTrainingStatus->setValue(ftmsTrainingStatus, 2);
+      } break;
+
+      case FitnessMachineControlPointProcedure::SetTargetInclination: {
+        returnValue[2] = FitnessMachineControlPointResultCode::Success;  // 0x01;
+        pCharacteristic->setValue(returnValue, 3);
+
         port = (rxValue[2] << 8) + rxValue[1];
         port *= 10;
-        userConfig.setIncline(port);
-        userConfig.setERGMode(false);
-        logBufLength += snprintf(logBuf + logBufLength, kLogBufCapacity - logBufLength, "-> Incline Mode: %2f", userConfig.getIncline() / 100);
-        returnValue[2]           = 0x01;
-        uint8_t inclineStatus[3] = {0x06, (uint8_t)rxValue[1], (uint8_t)rxValue[2]};
-        fitnessMachineStatusCharacteristic->setValue(inclineStatus, 3);
-        pCharacteristic->setValue(returnValue, 3);
-        ftmsTrainingStatus[1] = 0x00;
+
+        rtConfig.setTargetIncline(port);
+        rtConfig.setERGMode(false);
+        logBufLength += snprintf(logBuf + logBufLength, kLogBufCapacity - logBufLength, "-> Incline Mode: %2f", rtConfig.getTargetIncline() / 100);
+
+        ftmsStatus            = {FitnessMachineStatus::TargetInclineChanged, (uint8_t)rxValue[1], (uint8_t)rxValue[2]};
+        ftmsTrainingStatus[1] = FitnessMachineTrainingStatus::Other;  // 0x00;
         fitnessMachineTrainingStatus->setValue(ftmsTrainingStatus, 2);
-        fitnessMachineTrainingStatus->notify();
       } break;
 
-      case 0x04: {  // Resistance level setting
-        int targetResistance = rxValue[1] * userConfig.getShiftStep();
-        userConfig.setShifterPosition(targetResistance);
-        userConfig.setERGMode(false);
-        logBufLength += snprintf(logBuf + logBufLength, kLogBufCapacity - logBufLength, "-> Resistance Mode: %ld", userConfig.getShifterPosition());
-        returnValue[2]              = 0x01;
-        uint8_t resistanceStatus[2] = {0x07, rxValue[1]};
-        fitnessMachineStatusCharacteristic->setValue(resistanceStatus, 3);
+      case FitnessMachineControlPointProcedure::SetTargetResistanceLevel: {
+        returnValue[2] = FitnessMachineControlPointResultCode::Success;  // 0x01;
         pCharacteristic->setValue(returnValue, 3);
-        ftmsTrainingStatus[1] = 0x00;
+
+        int targetResistance = rxValue[1];
+        rtConfig.setShifterPosition(targetResistance);
+        rtConfig.setERGMode(false);
+        logBufLength += snprintf(logBuf + logBufLength, kLogBufCapacity - logBufLength, "-> Resistance Mode: %d", rtConfig.getShifterPosition());
+
+        ftmsStatus            = {FitnessMachineStatus::TargetResistanceLevelChanged, rxValue[1]};
+        ftmsTrainingStatus[1] = FitnessMachineTrainingStatus::Other;  // 0x00;
         fitnessMachineTrainingStatus->setValue(ftmsTrainingStatus, 2);
-        fitnessMachineTrainingStatus->notify();
       } break;
 
-      case 0x05: {  // Power Level Mode
-        if (spinBLEClient.connectedPM || userConfig.getSimulateWatts()) {
+      case FitnessMachineControlPointProcedure::SetTargetPower: {
+        if (spinBLEClient.connectedPM || rtConfig.getSimulateWatts()) {
+          returnValue[2] = FitnessMachineControlPointResultCode::Success;  // 0x01;
+
           int targetWatts = bytes_to_u16(rxValue[2], rxValue[1]);
-          userConfig.setERGMode(true);
-          computeERG(targetWatts);
+          rtConfig.setERGMode(true);
+          rtConfig.setTargetWatts(targetWatts);
           logBufLength += snprintf(logBuf + logBufLength, kLogBufCapacity - logBufLength, "-> ERG Mode Target: %d Current: %d Incline: %2f", targetWatts,
-                                   userConfig.getSimulatedWatts(), userConfig.getIncline() / 100);
-          returnValue[2]       = 0x01;
-          uint8_t ERGStatus[3] = {0x08, (uint8_t)rxValue[1], 0x01};
-          fitnessMachineStatusCharacteristic->setValue(ERGStatus, 3);
-          ftmsTrainingStatus[1] = 0x0C;
+                                   rtConfig.getSimulatedWatts().value, rtConfig.getTargetIncline() / 100);
+
+          ftmsStatus            = {FitnessMachineStatus::TargetPowerChanged, (uint8_t)rxValue[1], (uint8_t)rxValue[2]};
+          ftmsTrainingStatus[1] = FitnessMachineTrainingStatus::WattControl;  // 0x0C;
           fitnessMachineTrainingStatus->setValue(ftmsTrainingStatus, 2);
-          fitnessMachineTrainingStatus->notify();
         } else {
-          returnValue[2] = 0x02;  // no power meter connected, so no ERG
+          returnValue[2] = FitnessMachineControlPointResultCode::OpCodeNotSupported;  // 0x02; no power meter connected, so no ERG
           logBufLength += snprintf(logBuf + logBufLength, kLogBufCapacity - logBufLength, "-> ERG Mode: No Power Meter Connected");
         }
         pCharacteristic->setValue(returnValue, 3);
       } break;
 
-      case 0x07:  // Start training
-        returnValue[2] = 0x01;
-        logBufLength += snprintf(logBuf + logBufLength, kLogBufCapacity - logBufLength, "-> Start Training");
+      case FitnessMachineControlPointProcedure::StartOrResume: {
+        returnValue[2] = FitnessMachineControlPointResultCode::Success;  // 0x01;
         pCharacteristic->setValue(returnValue, 3);
-        ftmsTrainingStatus[1] = 0x00;
-        fitnessMachineTrainingStatus->setValue(ftmsTrainingStatus, 2);
-        fitnessMachineTrainingStatus->notify();
-        break;
 
-      case 0x11: {  // sim mode
+        logBufLength += snprintf(logBuf + logBufLength, kLogBufCapacity - logBufLength, "-> Start Training");
+        ftmsTrainingStatus[1] = FitnessMachineTrainingStatus::Other;  // 0x00;
+        fitnessMachineTrainingStatus->setValue(ftmsTrainingStatus, 2);
+        ftmsStatus = {FitnessMachineStatus::StartedOrResumedByUser};
+      } break;
+
+      case FitnessMachineControlPointProcedure::StopOrPause: {
+        returnValue[2] = FitnessMachineControlPointResultCode::Success;  // 0x01;
+        pCharacteristic->setValue(returnValue, 3);
+        // rxValue[1] == 1 -> Stop, 2 -> Pause
+        // TODO: Move stepper to Min Position
+        logBufLength += snprintf(logBuf + logBufLength, kLogBufCapacity - logBufLength, "-> Stop Training");
+
+        ftmsStatus            = {FitnessMachineStatus::StoppedOrPausedByUser};
+        ftmsTrainingStatus[1] = FitnessMachineTrainingStatus::Other;  // 0x00;
+        fitnessMachineTrainingStatus->setValue(ftmsTrainingStatus, 2);
+
+      } break;
+
+      case FitnessMachineControlPointProcedure::SetIndoorBikeSimulationParameters: {  // sim mode
+        returnValue[2] = FitnessMachineControlPointResultCode::Success;               // 0x01;
+        pCharacteristic->setValue(returnValue, 3);
+
         signed char buf[2];
         // int16_t windSpeed        = (rxValue[2] << 8) + rxValue[1];
         buf[0] = rxValue[3];  // (Least significant byte)
@@ -445,46 +475,72 @@ void MyCallbacks::onWrite(BLECharacteristic *pCharacteristic) {
         // int8_t rollingResistance = rxValue[5];
         // int8_t windResistance    = rxValue[6];
         port = bytes_to_u16(buf[1], buf[0]);
-        userConfig.setIncline(port);
-        logBufLength += snprintf(logBuf + logBufLength, kLogBufCapacity - logBufLength, "-> Sim Mode Incline %2f", userConfig.getIncline() / 100);
-        userConfig.setERGMode(false);
-        returnValue[2]       = 0x01;
-        uint8_t simStatus[7] = {0x12, (uint8_t)rxValue[1], (uint8_t)rxValue[2], (uint8_t)rxValue[3], (uint8_t)rxValue[4], (uint8_t)rxValue[5], (uint8_t)rxValue[6]};
-        fitnessMachineStatusCharacteristic->setValue(simStatus, 7);
-        pCharacteristic->setValue(returnValue, 3);
-        ftmsTrainingStatus[1] = 0x00;
+        rtConfig.setTargetIncline(port);
+        logBufLength += snprintf(logBuf + logBufLength, kLogBufCapacity - logBufLength, "-> Sim Mode Incline %2f", rtConfig.getTargetIncline() / 100);
+        rtConfig.setERGMode(false);
+
+        ftmsStatus = {FitnessMachineStatus::IndoorBikeSimulationParametersChanged,
+                      (uint8_t)rxValue[1],
+                      (uint8_t)rxValue[2],
+                      (uint8_t)rxValue[3],
+                      (uint8_t)rxValue[4],
+                      (uint8_t)rxValue[5],
+                      (uint8_t)rxValue[6]};
+
+        ftmsTrainingStatus[1] = FitnessMachineTrainingStatus::Other;  // 0x00;
         fitnessMachineTrainingStatus->setValue(ftmsTrainingStatus, 2);
-        fitnessMachineTrainingStatus->notify();
       } break;
 
-      case 0x13: {  // Spin Down
-        logBufLength += snprintf(logBuf + logBufLength, kLogBufCapacity - logBufLength, "-> Spin Down Requested");
-        uint8_t spinStatus[2] = {0x14, 0x01};  // send low and high speed targets
-        fitnessMachineStatusCharacteristic->setValue(spinStatus, 2);
-        uint8_t controlPoint[6] = {0x80, 0x01, 0x24, 0x03, 0x96, 0x0e};  // send low and high speed targets
+      case FitnessMachineControlPointProcedure::SpinDownControl: {
+        uint8_t controlPoint[6] = {FitnessMachineControlPointProcedure::ResponseCode, 0x01, 0x24, 0x03, 0x96, 0x0e};  // send low and high speed targets
         pCharacteristic->setValue(controlPoint, 6);
-        ftmsTrainingStatus[1] = 0x00;
+        logBufLength += snprintf(logBuf + logBufLength, kLogBufCapacity - logBufLength, "-> Spin Down Requested");
+
+        ftmsStatus = {FitnessMachineStatus::SpinDownStatus, 0x01};  // send low and high speed targets
+
+        ftmsTrainingStatus[1] = FitnessMachineTrainingStatus::Other;  // 0x00;
         fitnessMachineTrainingStatus->setValue(ftmsTrainingStatus, 2);
-        fitnessMachineTrainingStatus->notify();
       } break;
 
-      default:
+      case FitnessMachineControlPointProcedure::SetTargetedCadence: {
+        returnValue[2] = FitnessMachineControlPointResultCode::Success;  // 0x01;
+        pCharacteristic->setValue(returnValue, 3);
+
+        int targetCadence = bytes_to_u16(rxValue[2], rxValue[1]);
+        // rtConfig.setTargetCadence(targetCadence);
+        logBufLength += snprintf(logBuf + logBufLength, kLogBufCapacity - logBufLength, "-> Target Cadence: %d ", targetCadence);
+
+        ftmsStatus = {FitnessMachineStatus::TargetedCadenceChanged, (uint8_t)rxValue[1], (uint8_t)rxValue[2]};
+
+        ftmsTrainingStatus[1] = FitnessMachineTrainingStatus::Other;  // 0x00;
+        fitnessMachineTrainingStatus->setValue(ftmsTrainingStatus, 2);
+      } break;
+
+      default: {
         logBufLength += snprintf(logBuf + logBufLength, kLogBufCapacity - logBufLength, "-> Unsupported FTMS Request");
         pCharacteristic->setValue(returnValue, 3);
+      }
     }
-    SS2K_LOG(BLE_SERVER_LOG_TAG, "%s", logBuf);
-    fitnessMachineStatusCharacteristic->notify();
+    SS2K_LOG(FMTS_SERVER_LOG_TAG, "%s", logBuf);
+
   } else {
-    SS2K_LOG(BLE_SERVER_LOG_TAG, "App wrote nothing ");
-    SS2K_LOG(BLE_SERVER_LOG_TAG, "assuming it's a Control request");
-    uint8_t controlPoint[3] = {0x80, 0x00, 0x01};
-    userConfig.setERGMode(true);
+    SS2K_LOG(FMTS_SERVER_LOG_TAG, "App wrote nothing ");
+    SS2K_LOG(FMTS_SERVER_LOG_TAG, "assuming it's a Control request");
+
+    uint8_t controlPoint[3] = {FitnessMachineControlPointProcedure::ResponseCode, 0x00, FitnessMachineControlPointResultCode::Success};
     pCharacteristic->setValue(controlPoint, 3);
-    ftmsTrainingStatus[1] = 0x01;
+    ftmsStatus            = {FitnessMachineStatus::StartedOrResumedByUser};
+    ftmsTrainingStatus[1] = FitnessMachineTrainingStatus::Other;  // 0x00;
     fitnessMachineTrainingStatus->setValue(ftmsTrainingStatus, 2);
-    fitnessMachineTrainingStatus->notify();
+    fitnessMachineTrainingStatus->notify(false);
   }
-  rxValue = pCharacteristic->getValue();
+  for (int i = 0; i < ftmsStatus.size(); i++) {
+  }
+  fitnessMachineStatusCharacteristic->setValue(ftmsStatus.data(), ftmsStatus.size());
+  pCharacteristic->indicate();
+  fitnessMachineTrainingStatus->notify(false);
+  fitnessMachineStatusCharacteristic->notify(false);
+  FTMSWrite = "";
 }
 
 void controlPointIndicate() { fitnessMachineControlPoint->indicate(); }
@@ -499,11 +555,11 @@ int connectedClientCount() {
 }
 
 void calculateInstPwrFromHR() {
-  static int oldHR    = userConfig.getSimulatedHr();
-  static int newHR    = userConfig.getSimulatedHr();
+  static int oldHR    = rtConfig.getSimulatedHr();
+  static int newHR    = rtConfig.getSimulatedHr();
   static double delta = 0;
   oldHR               = newHR;  // Copying HR from Last loop
-  newHR               = userConfig.getSimulatedHr();
+  newHR               = rtConfig.getSimulatedHr();
 
   delta = (newHR - oldHR) / (BLE_CLIENT_DELAY / 1000);
 
@@ -524,9 +580,9 @@ void calculateInstPwrFromHR() {
   }
 
 #ifndef DEBUG_HR_TO_PWR
-  userConfig.setSimulatedWatts(avgP);
-  userConfig.setSimulatedCad(90);
-#endif
+  rtConfig.setSimulatedWatts(avgP);
+  rtConfig.setSimulatedCad(90);
+#endif  // DEBUG_HR_TO_PWR
 
   SS2K_LOG(BLE_SERVER_LOG_TAG, "Power From HR: %d", avgP);
 }
@@ -547,15 +603,16 @@ Client Writes:
 (operator, variable, LSO, MSO)
 
 Server will then indicate:
-0x06, 0x07, 0x01
-(operator, LSO, MSO)
+0x80, 0x06, 0x07, 0x01
+(status, variable, LSO, MSO)
 
 Example to read (0x01) from simulatedSpeed (0x06)
 
 Client Writes:
 0x01, 0x06
 Server will then indicate:
-0x,80, 0x06, 0x07, 0x01 (simulatedSpeed),(0x07 0x01)
+0x80, 0x06, 0x07, 0x01
+success, simulatedSpeed,0x07,0x01
 
 Pay special attention to the float values below. Since they have to be transmitted as an int, some are converted *100, others are converted *10.
 True values are >00. False are 00.
@@ -567,6 +624,14 @@ void ss2kCustomCharacteristicCallbacks::onWrite(BLECharacteristic *pCharacterist
   uint8_t write       = 0x02;  // Value to request write operation
   uint8_t error       = 0xff;  // value server error/unable
   uint8_t success     = 0x80;  // value for success
+
+  uint8_t *pData = reinterpret_cast<uint8_t *>(&rxValue[0]);
+  int length     = rxValue.length();
+
+  const int kLogBufCapacity = (rxValue.length() * 2) + 60;  // needs to be bigger than the largest message.
+  char logBuf[kLogBufCapacity];
+  int logBufLength = ss2k_log_hex_to_buffer(pData, length, logBuf, 0, kLogBufCapacity);
+
   size_t returnLength = rxValue.length();
   uint8_t returnValue[returnLength];
   returnValue[0] = error;
@@ -574,219 +639,329 @@ void ss2kCustomCharacteristicCallbacks::onWrite(BLECharacteristic *pCharacterist
     returnValue[i] = rxValue[i];
   }
 
-  if (rxValue[0] == read) {  // read requests are shorter than writes but outupt is same length.
-    returnLength += 2;
-  }
-
-  SS2K_LOG(BLE_SERVER_LOG_TAG, "Custom Request Recieved");
   switch (rxValue[1]) {
     case BLE_firmwareUpdateURL:  // 0x01
+      logBufLength += snprintf(logBuf + logBufLength, kLogBufCapacity - logBufLength, "<-Firmware Update URL");
       returnValue[0] = error;
       break;
 
     case BLE_incline: {  // 0x02
+      logBufLength += snprintf(logBuf + logBufLength, kLogBufCapacity - logBufLength, "<-incline");
       returnValue[0] = success;
       if (rxValue[0] == read) {
-        int inc        = userConfig.getIncline() * 100;
+        int inc        = rtConfig.getTargetIncline() * 100;
         returnValue[2] = (uint8_t)(inc & 0xff);
         returnValue[3] = (uint8_t)(inc >> 8);
+        returnLength += 2;
       }
       if (rxValue[0] == write) {
-        userConfig.setIncline(bytes_to_u16(rxValue[3], rxValue[2]) / 100);
+        rtConfig.setTargetIncline(bytes_to_u16(rxValue[3], rxValue[2]) / 100);
+        logBufLength += snprintf(logBuf + logBufLength, kLogBufCapacity - logBufLength, "(%f)", rtConfig.getTargetIncline());
       }
     } break;
 
     case BLE_simulatedWatts:  // 0x03
+      logBufLength += snprintf(logBuf + logBufLength, kLogBufCapacity - logBufLength, "<-simulatedWatts");
       returnValue[0] = success;
       if (rxValue[0] == read) {
-        returnValue[2] = (uint8_t)(userConfig.getSimulatedWatts() & 0xff);
-        returnValue[3] = (uint8_t)(userConfig.getSimulatedWatts() >> 8);
+        returnValue[2] = (uint8_t)(rtConfig.getSimulatedWatts().value & 0xff);
+        returnValue[3] = (uint8_t)(rtConfig.getSimulatedWatts().value >> 8);
+        returnLength += 2;
       }
       if (rxValue[0] == write) {
-        userConfig.setSimulatedWatts(bytes_to_u16(rxValue[3], rxValue[2]));
+        rtConfig.setSimulatedWatts(bytes_to_u16(rxValue[3], rxValue[2]));
+        logBufLength += snprintf(logBuf + logBufLength, kLogBufCapacity - logBufLength, "(%d)", rtConfig.getSimulatedWatts());
       }
       break;
 
     case BLE_simulatedHr:  // 0x04
+      logBufLength += snprintf(logBuf + logBufLength, kLogBufCapacity - logBufLength, "<-simulatedHr");
       returnValue[0] = success;
       if (rxValue[0] == read) {
-        returnValue[2] = (uint8_t)(userConfig.getSimulatedHr() & 0xff);
-        returnValue[3] = (uint8_t)(userConfig.getSimulatedHr() >> 8);
+        returnValue[2] = (uint8_t)(rtConfig.getSimulatedHr() & 0xff);
+        returnValue[3] = (uint8_t)(rtConfig.getSimulatedHr() >> 8);
+        returnLength += 2;
       }
       if (rxValue[0] == write) {
-        userConfig.setSimulatedHr(bytes_to_u16(rxValue[3], rxValue[2]));
+        rtConfig.setSimulatedHr(bytes_to_u16(rxValue[3], rxValue[2]));
+        logBufLength += snprintf(logBuf + logBufLength, kLogBufCapacity - logBufLength, "(%d)", rtConfig.getSimulatedHr());
       }
       break;
 
     case BLE_simulatedCad:  // 0x05
+      logBufLength += snprintf(logBuf + logBufLength, kLogBufCapacity - logBufLength, "<-simulatedCad");
       returnValue[0] = success;
       if (rxValue[0] == read) {
-        returnValue[2] = (uint8_t)(userConfig.getSimulatedCad() & 0xff);
-        returnValue[3] = (uint8_t)(userConfig.getSimulatedCad() >> 8);
+        returnValue[2] = (uint8_t)(rtConfig.getSimulatedCad() & 0xff);
+        returnValue[3] = (uint8_t)(rtConfig.getSimulatedCad() >> 8);
+        returnLength += 2;
       }
       if (rxValue[0] == write) {
-        userConfig.setSimulatedCad(bytes_to_u16(rxValue[3], rxValue[2]));
+        rtConfig.setSimulatedCad(bytes_to_u16(rxValue[3], rxValue[2]));
+        logBufLength += snprintf(logBuf + logBufLength, kLogBufCapacity - logBufLength, "(%d)", rtConfig.getSimulatedCad());
       }
       break;
 
     case BLE_simulatedSpeed: {  // 0x06
+      logBufLength += snprintf(logBuf + logBufLength, kLogBufCapacity - logBufLength, "<-simulatedSpeed");
       returnValue[0] = success;
-      int spd        = userConfig.getSimulatedSpeed() * 10;
+      int spd        = rtConfig.getSimulatedSpeed() * 10;
       if (rxValue[0] == read) {
         returnValue[2] = (uint8_t)(spd & 0xff);
         returnValue[3] = (uint8_t)(spd >> 8);
+        returnLength += 2;
       }
       if (rxValue[0] == write) {
-        userConfig.setSimulatedSpeed(bytes_to_u16(rxValue[3], rxValue[2]) / 10);
+        rtConfig.setSimulatedSpeed(bytes_to_u16(rxValue[3], rxValue[2]) / 10);
+        logBufLength += snprintf(logBuf + logBufLength, kLogBufCapacity - logBufLength, "(%d)", rtConfig.getSimulatedSpeed());
       }
     } break;
 
     case BLE_deviceName:  // 0x07
+      logBufLength   = snprintf(logBuf + logBufLength, kLogBufCapacity - logBufLength, "<-deviceName");
       returnValue[0] = error;
       break;
 
     case BLE_shiftStep:  // 0x08
+      logBufLength += snprintf(logBuf + logBufLength, kLogBufCapacity - logBufLength, "<-shiftStep");
       returnValue[0] = success;
       if (rxValue[0] == read) {
         returnValue[2] = (uint8_t)(userConfig.getShiftStep() & 0xff);
         returnValue[3] = (uint8_t)(userConfig.getShiftStep() >> 8);
+        returnLength += 2;
       }
       if (rxValue[0] == write) {
         userConfig.setShiftStep(bytes_to_u16(rxValue[3], rxValue[2]));
+        logBufLength += snprintf(logBuf + logBufLength, kLogBufCapacity - logBufLength, "(%d)", userConfig.getShiftStep());
       }
       break;
 
     case BLE_stepperPower:  // 0x09
+      logBufLength += snprintf(logBuf + logBufLength, kLogBufCapacity - logBufLength, "<-stepperPower");
       returnValue[0] = success;
       if (rxValue[0] == read) {
         returnValue[2] = (uint8_t)(userConfig.getStepperPower() & 0xff);
         returnValue[3] = (uint8_t)(userConfig.getStepperPower() >> 8);
+        returnLength += 2;
       }
       if (rxValue[0] == write) {
         userConfig.setStepperPower(bytes_to_u16(rxValue[3], rxValue[2]));
+        ss2k.updateStepperPower();
+        logBufLength += snprintf(logBuf + logBufLength, kLogBufCapacity - logBufLength, "(%d)", userConfig.getStepperPower());
       }
       break;
 
     case BLE_stealthchop:  // 0x0A
+      logBufLength += snprintf(logBuf + logBufLength, kLogBufCapacity - logBufLength, "<-stealthchop");
       returnValue[0] = success;
       if (rxValue[0] == read) {
         returnValue[2] = (uint8_t)(userConfig.getStealthchop());
+        returnLength += 1;
       }
       if (rxValue[0] == write) {
-        userConfig.setStealthChop(bytes_to_u16(rxValue[3], rxValue[2]));
+        userConfig.setStealthChop(rxValue[2]);
+        ss2k.updateStealthchop();
+        logBufLength += snprintf(logBuf + logBufLength, kLogBufCapacity - logBufLength, "(%s)", userConfig.getStealthchop() ? "true" : "false");
       }
       break;
 
     case BLE_inclineMultiplier: {  // 0x0B
+      logBufLength += snprintf(logBuf + logBufLength, kLogBufCapacity - logBufLength, "<-inclineMultiplier");
       returnValue[0] = success;
       int inc        = userConfig.getInclineMultiplier();
       if (rxValue[0] == read) {
         returnValue[2] = (uint8_t)(inc & 0xff);
         returnValue[3] = (uint8_t)(inc >> 8);
+        returnLength += 2;
       }
       if (rxValue[0] == write) {
         userConfig.setInclineMultiplier(bytes_to_u16(rxValue[3], rxValue[2]));
+        logBufLength += snprintf(logBuf + logBufLength, kLogBufCapacity - logBufLength, "(%f)", userConfig.getInclineMultiplier());
       }
     } break;
 
     case BLE_powerCorrectionFactor: {  // 0x0C
+      logBufLength += snprintf(logBuf + logBufLength, kLogBufCapacity - logBufLength, "<-powerCorrectionFactor");
       returnValue[0] = success;
       int pcf        = userConfig.getPowerCorrectionFactor() * 10;
       if (rxValue[0] == read) {
         returnValue[2] = (uint8_t)(pcf & 0xff);
         returnValue[3] = (uint8_t)(pcf >> 8);
+        returnLength += 2;
       }
       if (rxValue[0] == write) {
         userConfig.setPowerCorrectionFactor(bytes_to_u16(rxValue[3], rxValue[2]) / 10);
+        logBufLength += snprintf(logBuf + logBufLength, kLogBufCapacity - logBufLength, "(%f)", userConfig.getPowerCorrectionFactor());
       }
     } break;
 
     case BLE_simulateHr:  // 0x0D
+      logBufLength += snprintf(logBuf + logBufLength, kLogBufCapacity - logBufLength, "<-simulateHr");
       returnValue[0] = success;
       if (rxValue[0] == read) {
-        returnValue[2] = (uint8_t)(userConfig.getSimulateHr());
+        returnValue[2] = (uint8_t)(rtConfig.getSimulateHr());
+        returnLength += 1;
       }
       if (rxValue[0] == write) {
-        userConfig.setSimulateHr(bytes_to_u16(rxValue[3], rxValue[2]));
+        rtConfig.setSimulateHr(rxValue[2]);
+        logBufLength += snprintf(logBuf + logBufLength, kLogBufCapacity - logBufLength, "(%s)", rtConfig.getSimulateHr() ? "true" : "false");
       }
       break;
 
     case BLE_simulateWatts:  // 0x0E
+      logBufLength += snprintf(logBuf + logBufLength, kLogBufCapacity - logBufLength, "<-simulateWatts");
       returnValue[0] = success;
       if (rxValue[0] == read) {
-        returnValue[2] = (uint8_t)(userConfig.getSimulateWatts());
+        returnValue[2] = (uint8_t)(rtConfig.getSimulateWatts());
+        returnLength += 1;
       }
       if (rxValue[0] == write) {
-        userConfig.setSimulateWatts(bytes_to_u16(rxValue[3], rxValue[2]));
+        rtConfig.setSimulateWatts(rxValue[2]);
+        logBufLength += snprintf(logBuf + logBufLength, kLogBufCapacity - logBufLength, "(%s)", rtConfig.getSimulateWatts() ? "true" : "false");
       }
       break;
 
     case BLE_simulateCad:  // 0x0F
+      logBufLength += snprintf(logBuf + logBufLength, kLogBufCapacity - logBufLength, "<-simulateCad");
       returnValue[0] = success;
       if (rxValue[0] == read) {
-        returnValue[2] = (uint8_t)(userConfig.getSimulateCad());
+        returnValue[2] = (uint8_t)(rtConfig.getSimulateCad());
+        returnLength += 1;
       }
       if (rxValue[0] == write) {
-        userConfig.setSimulateCad(bytes_to_u16(rxValue[3], rxValue[2]));
+        rtConfig.setSimulateCad(rxValue[2]);
+        logBufLength += snprintf(logBuf + logBufLength, kLogBufCapacity - logBufLength, "(%s)", rtConfig.getSimulateCad() ? "true" : "false");
       }
       break;
 
     case BLE_ERGMode:  // 0x10
+      logBufLength += snprintf(logBuf + logBufLength, kLogBufCapacity - logBufLength, "<-ERGMode");
       returnValue[0] = success;
       if (rxValue[0] == read) {
-        returnValue[2] = (uint8_t)(userConfig.getERGMode());
+        returnValue[2] = (uint8_t)(rtConfig.getERGMode());
+        returnLength += 1;
       }
       if (rxValue[0] == write) {
-        userConfig.setERGMode(bytes_to_u16(rxValue[3], rxValue[2]));
+        rtConfig.setERGMode(rxValue[2]);
+        logBufLength += snprintf(logBuf + logBufLength, kLogBufCapacity - logBufLength, "(%s)", rtConfig.getERGMode() ? "true" : "false");
       }
       break;
 
     case BLE_autoUpdate:  // 0x11
+      logBufLength += snprintf(logBuf + logBufLength, kLogBufCapacity - logBufLength, "<-autoUpdate");
+
       returnValue[0] = success;
       if (rxValue[0] == read) {
-        returnValue[2] = (uint8_t)(userConfig.getautoUpdate());
+        returnValue[2] = (uint8_t)(userConfig.getAutoUpdate());
+        returnLength += 1;
       }
       if (rxValue[0] == write) {
-        userConfig.setAutoUpdate(bytes_to_u16(rxValue[3], rxValue[2]));
+        userConfig.setAutoUpdate(rxValue[2]);
+        logBufLength += snprintf(logBuf + logBufLength, kLogBufCapacity - logBufLength, "(%s)", userConfig.getAutoUpdate() ? "true" : "false");
       }
       break;
 
     case BLE_ssid:  // 0x12
+      logBufLength += snprintf(logBuf + logBufLength, kLogBufCapacity - logBufLength, "<-ssid");
+
       returnValue[0] = error;
       break;
 
     case BLE_password:  // 0x13
+      logBufLength += snprintf(logBuf + logBufLength, kLogBufCapacity - logBufLength, "<-password");
       returnValue[0] = error;
       break;
 
     case BLE_foundDevices:  // 0x14
+      logBufLength += snprintf(logBuf + logBufLength, kLogBufCapacity - logBufLength, "<-foundDevices");
       returnValue[0] = error;
       break;
 
     case BLE_connectedPowerMeter:  // 0x15
+      logBufLength += snprintf(logBuf + logBufLength, kLogBufCapacity - logBufLength, "<-connectedPowerMete");
       returnValue[0] = error;
       break;
 
     case BLE_connectedHeartMonitor:  // 0x16
+      logBufLength += snprintf(logBuf + logBufLength, kLogBufCapacity - logBufLength, "<-connectedHeartMonitor");
       returnValue[0] = error;
       break;
 
     case BLE_shifterPosition:  // 0x17
+      logBufLength += snprintf(logBuf + logBufLength, kLogBufCapacity - logBufLength, "<-shifterPosition");
       returnValue[0] = success;
       if (rxValue[0] == read) {
-        returnValue[2] = (uint8_t)(userConfig.getShifterPosition() & 0xff);
-        returnValue[3] = (uint8_t)(userConfig.getShifterPosition() >> 8);
+        returnValue[2] = (uint8_t)(rtConfig.getShifterPosition() & 0xff);
+        returnValue[3] = (uint8_t)(rtConfig.getShifterPosition() >> 8);
+        returnLength += 2;
       }
       if (rxValue[0] == write) {
-        userConfig.setShifterPosition(bytes_to_u16(rxValue[3], rxValue[2]));
+        rtConfig.setShifterPosition(bytes_to_u16(rxValue[3], rxValue[2]));
+        logBufLength += snprintf(logBuf + logBufLength, kLogBufCapacity - logBufLength, "(%d)", rtConfig.getShifterPosition());
+        SS2K_LOG(CUSTOM_CHAR_LOG_TAG, "%s", logBuf);
+        return;  // Return here and let SpinBLEServer::notifyShift() handle the return to prevent duplicate notifications.
       }
       break;
 
     case BLE_saveToSpiffs:  // 0x18
+      logBufLength += snprintf(logBuf + logBufLength, kLogBufCapacity - logBufLength, "<-saveToSpiffs");
       userConfig.saveToSPIFFS();
+      returnValue[0] = success;
+      break;
+
+    case BLE_targetPosition:  // 0x19
+      logBufLength += snprintf(logBuf + logBufLength, kLogBufCapacity - logBufLength, "<-targetPosition");
+      returnValue[0] = success;
+      if (rxValue[0] == read) {
+        returnValue[2] = (uint8_t)(ss2k.targetPosition & 0xff);
+        returnValue[3] = (uint8_t)(ss2k.targetPosition >> 8);
+        returnValue[4] = (uint8_t)(ss2k.targetPosition >> 16);
+        returnValue[5] = (uint8_t)(ss2k.targetPosition >> 24);
+        returnLength += 4;
+      }
+      if (rxValue[0] == write) {
+        ss2k.targetPosition = (int32_t((uint8_t)(rxValue[2]) << 0 | (uint8_t)(rxValue[3]) << 8 | (uint8_t)(rxValue[4]) << 16 | (uint8_t)(rxValue[5]) << 24));
+        logBufLength += snprintf(logBuf + logBufLength, kLogBufCapacity - logBufLength, " (%f)", ss2k.targetPosition);
+      }
+      break;
+
+    case BLE_externalControl:  // 0x1A
+      logBufLength += snprintf(logBuf + logBufLength, kLogBufCapacity - logBufLength, "<-externalControl");
+      returnValue[0] = success;
+      if (rxValue[0] == read) {
+        returnValue[2] = (uint8_t)(ss2k.externalControl);
+        returnLength += 1;
+      }
+      if (rxValue[0] == write) {
+        ss2k.externalControl = static_cast<bool>(rxValue[2]);
+        logBufLength += snprintf(logBuf + logBufLength, kLogBufCapacity - logBufLength, "(%B)", ss2k.externalControl);
+      }
+      break;
+
+    case BLE_syncMode:  // 0x1B
+      logBufLength += snprintf(logBuf + logBufLength, kLogBufCapacity - logBufLength, "<-syncMode");
+      returnValue[0] = success;
+      if (rxValue[0] == read) {
+        returnValue[2] = (uint8_t)(ss2k.syncMode);
+        returnLength += 1;
+      }
+      if (rxValue[0] == write) {
+        ss2k.syncMode = static_cast<bool>(rxValue[2]);
+        logBufLength += snprintf(logBuf + logBufLength, kLogBufCapacity - logBufLength, "(%s)", ss2k.syncMode ? "true" : "false");
+      }
       break;
   }
-
+  SS2K_LOG(CUSTOM_CHAR_LOG_TAG, "%s", logBuf);
   pCharacteristic->setValue(returnValue, returnLength);
   pCharacteristic->indicate();
+}
+
+void SpinBLEServer::notifyShift() {
+  uint8_t returnValue[4];
+  returnValue[0] = 0x80;
+  returnValue[1] = BLE_shifterPosition;
+  returnValue[2] = (uint8_t)(rtConfig.getShifterPosition() & 0xff);
+  returnValue[3] = (uint8_t)(rtConfig.getShifterPosition() >> 8);
+  smartSpin2kCharacteristic->setValue(returnValue, 4);
+  smartSpin2kCharacteristic->notify(true);
 }

@@ -23,44 +23,102 @@
 
     <h2>Sim Heart Rate</h2>
     <p><span id="hrValue"></span></p>
-    <p><input type="range" onload="requestConfigValues()" onchange="updateHRSlider(this)" id="HRSlider" min="40"
-        max="250" value="0" step="1" class="slider2"></p>
+    <p><input type="range" onload="requestConfigValues()" onchange="updateHrSlider()" id="hrSlider" min="40" max="250"
+        value="0" step="1" class="slider2"></p>
     <p><label class="switch"><input type="checkbox" onload="toggleHRCheckbox(this, true)"
           onchange="toggleHRCheckbox(this,true)" id="hrOutput"><span class="slider"></span></label></p>
 
     <h2>Sim Power Output</h2>
-    <p><span id="wattsValue"></span></p>
-    <p><input type="range" onload="requestConfigValues()" onchange="updateWattsSlider(this)" id="WattsSlider" min="0"
-        max="2000" value="0" step="1" class="slider2"></p>
-    <p><label class="switch"><input type="checkbox" onload="toggleWattsCheckbox(this,true)"
-          onchange="toggleWattsCheckbox(this,true)" id="wattsOutput"><span class="slider"></span></label></p>
+    <div id="wattsInputContainer">
+      <p>
+        <span id="wattsValue"></span>
+        &nbsp;
+        <span>
+          <input type="checkbox" id="autoUpdateWatts" onclick="autoUpdateWattsClick()">
+          <label for="autoUpdateWatts">Auto Update</label>
+        </span>
+      </p>
+      <p>
+        <input type="range" onload="requestConfigValues()" onchange="updateWattsSlider()" id="wattsSlider" min="0"
+          max="600" value="0" step="1" class="slider2">
+      </p>
+    </div>
+    <p>
+      <label class="switch">
+        <input type="checkbox" onload="toggleWattsCheckbox(this,true)" onchange="toggleWattsCheckbox(this,true)"
+          id="wattsOutput">
+        <span class="slider"></span>
+      </label>
+    </p>
 
     <h2>Sim CAD Output</h2>
-    <p><span id="cadValue"></span></p>
-    <p><input type="range" onload="requestConfigValues()" onchange="updateCadSlider(this)" id="CadSlider" min="0"
-        max="180" value="0" step="1" class="slider2"></p>
-    <p><label class="switch"><input type="checkbox" onload="toggleCadCheckbox(this,true)"
-          onchange="toggleCadCheckbox(this,true)" id="cadOutput"><span class="slider"></span></label></p>
+    <div id="cadInputContainer">
+      <p>
+        <span id="cadValue"></span>
+        &nbsp;
+        <span>
+          <input type="checkbox" id="autoUpdateCadence" onclick="autoUpdateCadenceClick()">
+          <label for="autoUpdateCadence">Auto Update</label>
+        </span>
+      </p>
+      <p>
+        <input type="range" onload="requestConfigValues()" onchange="updateCadSlider()" id="cadSlider" min="0" max="180"
+          value="0" step="1" class="slider2">
+      </p>
+    </div>
+    <p>
+      <label class="switch">
+        <input type="checkbox" onload="toggleCadCheckbox(this,true)" onchange="toggleCadCheckbox(this,true)"
+          id="cadOutput">
+        <span class="slider"></span>
+      </label>
+    </p>
+
+    <h1>Trainer Simulator</h1>
+    <h2>Enable ERG</h2>
+    <p>
+      <label class="switch">
+        <input type="checkbox" onload="toggleEnableErgCheckbox(this)" onchange="toggleEnableErgCheckbox(this)"
+          id="enableErgCheckbox">
+        <span class="slider"></span>
+      </label>
+    </p>
+    <h2>ERG Target Watts</h2>
+    <p><span id="targetWattsValue"></span></p>
+    <p><input type="range" onload="requestConfigValues()" onchange="updateTargetWattsSlider()" id="targetWattsSlider"
+        min="0" max="600" value="0" step="1" class="slider2"></p>
+    <p>
+      <label class="switch">
+        <input type="checkbox" onload="toggleTargetWattsCheckbox(this,true)"
+          onchange="toggleTargetWattsCheckbox(this,true)" id="targetWattsOutput">
+        <span class="slider"></span>
+      </label>
+    </p>
 </body>
 <script>
+  //Update values on specified interval
+  setInterval(function () {
+    requestConfigValues();
+
+  }, 2000);
 
   function toggleHRCheckbox(element, updateServer) {
     if (element.checked) {
-      document.getElementById("HRSlider").hidden = false;
+      document.getElementById("hrSlider").hidden = false;
       document.getElementById("hrValue").hidden = false;
     }
     else {
-      document.getElementById("HRSlider").hidden = true;
+      document.getElementById("hrSlider").hidden = true;
       document.getElementById("hrValue").hidden = true;
     }
     if (updateServer) {
       var xhr = new XMLHttpRequest();
       if (element.checked) {
-        xhr.open("GET", "/hrslider?value=enable", true);
+        xhr.open("GET", "/hrSlider?value=enable", true);
         xhr.send();
       }
       else {
-        xhr.open("GET", "/hrslider?value=disable", true);
+        xhr.open("GET", "/hrSlider?value=disable", true);
         xhr.send();
       }
     }
@@ -68,12 +126,10 @@
 
   function toggleWattsCheckbox(element, updateServer) {
     if (element.checked) {
-      document.getElementById("WattsSlider").hidden = false;
-      document.getElementById("wattsValue").hidden = false;
+      document.getElementById("wattsInputContainer").hidden = false;
     }
     else {
-      document.getElementById("WattsSlider").hidden = true;
-      document.getElementById("wattsValue").hidden = true;
+      document.getElementById("wattsInputContainer").hidden = true;
     }
 
     if (updateServer) {
@@ -91,12 +147,10 @@
 
   function toggleCadCheckbox(element, updateServer) {
     if (element.checked) {
-      document.getElementById("CadSlider").hidden = false;
-      document.getElementById("cadValue").hidden = false;
+      document.getElementById("cadInputContainer").hidden = false;
     }
     else {
-      document.getElementById("CadSlider").hidden = true;
-      document.getElementById("cadValue").hidden = true;
+      document.getElementById("cadInputContainer").hidden = true;
     }
 
     if (updateServer) {
@@ -112,36 +166,72 @@
     }
   }
 
-  function updateHRSlider(element) {
-    var sliderValue = document.getElementById("HRSlider").value;
+  function updateHrSlider() {
+    var sliderValue = document.getElementById("hrSlider").value;
     document.getElementById("hrValue").innerHTML = sliderValue + " BPM";
     var xhr = new XMLHttpRequest();
-    xhr.open("GET", "/hrslider?value=" + sliderValue, true);
+    xhr.open("GET", "/hrSlider?value=" + sliderValue, true);
     xhr.send();
   }
 
-  function updateWattsSlider(element) {
-    var sliderValue = document.getElementById("WattsSlider").value;
+  function updateWattsSlider() {
+    var sliderValue = document.getElementById("wattsSlider").value;
     document.getElementById("wattsValue").innerHTML = sliderValue + " Watts";
     var xhr = new XMLHttpRequest();
     xhr.open("GET", "/wattsslider?value=" + sliderValue, true);
     xhr.send();
   }
 
-  function updateCadSlider(element) {
-    var sliderValue = document.getElementById("CadSlider").value;
+  function updateCadSlider() {
+    var sliderValue = document.getElementById("cadSlider").value;
     document.getElementById("cadValue").innerHTML = sliderValue + " RPM";
     var xhr = new XMLHttpRequest();
     xhr.open("GET", "/cadslider?value=" + sliderValue, true);
     xhr.send();
   }
 
-  //Update values on specified interval
-  setInterval(function () {
+  function updateTargetWattsSlider() {
+    var sliderValue = document.getElementById("targetWattsSlider").value;
+    document.getElementById("targetWattsValue").innerHTML = sliderValue + " Watts";
+    var xhr = new XMLHttpRequest();
+    xhr.open("GET", "/targetwattsslider?value=" + sliderValue, true);
+    xhr.send();
+  }
 
-    requestConfigValues();
+  function toggleTargetWattsCheckbox(element, updateServer) {
+    if (element.checked) {
+      document.getElementById("targetWattsSlider").hidden = false;
+      document.getElementById("targetWattsValue").hidden = false;
+    }
+    else {
+      document.getElementById("targetWattsSlider").hidden = true;
+      document.getElementById("targetWattsValue").hidden = true;
+    }
 
-  }, 2000);
+    if (updateServer) {
+      var xhr = new XMLHttpRequest();
+      if (element.checked) {
+        xhr.open("GET", "/targetwattsslider?value=enable", true);
+        xhr.send();
+      }
+      else {
+        xhr.open("GET", "/targetwattsslider?value=disable", true);
+        xhr.send();
+      }
+    }
+  }
+
+  function toggleEnableErgCheckbox(element) {
+    var xhr = new XMLHttpRequest();
+    if (element.checked) {
+      xhr.open("GET", "/ergmode?value=enable", true);
+      xhr.send();
+    }
+    else {
+      xhr.open("GET", "/ergmode?value=disable", true);
+      xhr.send();
+    }
+  }
 
   function requestConfigValues() {
     var xhttp = new XMLHttpRequest();
@@ -149,27 +239,38 @@
       if (this.readyState == 4 && this.status == 200) {
         var obj = JSON.parse(this.responseText);
         document.getElementById("wattsValue").innerHTML = obj.simulatedWatts + " Watts";
-        document.getElementById("WattsSlider").value = obj.simulatedWatts;
+        document.getElementById("wattsSlider").value = obj.simulatedWatts;
         document.getElementById("wattsOutput").checked = obj.simulateWatts;
-        document.getElementById("WattsSlider").hidden = !obj.simulateWatts;
-        document.getElementById("wattsValue").hidden = !obj.simulateWatts;
+        document.getElementById("wattsInputContainer").hidden = !obj.simulateWatts;
 
         document.getElementById("hrValue").innerHTML = obj.simulatedHr + " BPM";
-        document.getElementById("HRSlider").value = obj.simulatedHr;
+        document.getElementById("hrSlider").value = obj.simulatedHr;
         document.getElementById("hrOutput").checked = obj.simulateHr;
-        document.getElementById("HRSlider").hidden = !obj.simulateHr;
+        document.getElementById("hrSlider").hidden = !obj.simulateHr;
         document.getElementById("hrValue").hidden = !obj.simulateHr;
 
         document.getElementById("cadValue").innerHTML = obj.simulatedCad + " RPM";
-        document.getElementById("CadSlider").value = obj.simulatedCad;
+        document.getElementById("cadSlider").value = obj.simulatedCad;
         document.getElementById("cadOutput").checked = obj.simulateCad;
-        document.getElementById("CadSlider").hidden = !obj.simulateCad;
-        document.getElementById("cadValue").hidden = !obj.simulateCad;
+        document.getElementById("cadInputContainer").hidden = !obj.simulateCad;
 
-        setTimeout(function () { document.getElementById("loadingWatermark").remove(); }, 1000);
+        document.getElementById("enableErgCheckbox").checked = obj.ERGMode;
+
+        document.getElementById("targetWattsValue").innerHTML = obj.targetWatts + " Watts";
+        document.getElementById("targetWattsSlider").value = obj.targetWatts == null ? 0 : obj.targetWatts;
+        document.getElementById("targetWattsOutput").checked = obj.simulateTargetWatts;
+        document.getElementById("targetWattsSlider").hidden = !obj.simulateTargetWatts;
+        document.getElementById("targetWattsValue").hidden = !obj.simulateTargetWatts;
+
+        setTimeout(function () {
+          const watermark = document.getElementById("loadingWatermark");
+          if (!!watermark) {
+            document.getElementById("loadingWatermark")?.remove();
+          }
+        }, 1000);
       }
     };
-    xhttp.open("GET", "/configJSON", true);
+    xhttp.open("GET", "/runtimeConfigJSON", true);
     xhttp.send();
   }
 
@@ -187,6 +288,36 @@
     setTimeout(loadCss, 100);
     setTimeout(requestConfigValues, 500);
   }, false);
+
+  let updateWattsTimer = null;
+  function autoUpdateWattsClick() {
+    if (updateWattsTimer != null) {
+      clearInterval(updateTimer);
+      updateWattsTimer = null;
+    } else {
+      updateWattsTimer = setInterval(() => {
+        let offset = Math.random() * 10 - 5;
+        let value = parseInt(document.getElementById("wattsSlider").value, 10);
+        document.getElementById("wattsSlider").value = `${value + offset}`;
+        updateWattsSlider();
+      }, 1000)
+    }
+  }
+
+  let updateCadenceTimer = null;
+  function autoUpdateCadenceClick() {
+    if (updateCadenceTimer != null) {
+      clearInterval(updateTimer);
+      updateCadenceTimer = null;
+    } else {
+      updateCadenceTimer = setInterval(() => {
+        let offset = Math.random() * 6 - 3;
+        let value = parseInt(document.getElementById("cadSlider").value, 10);
+        document.getElementById("cadSlider").value = `${value + offset}`;
+        updateCadSlider();
+      }, 1000)
+    }
+  }
 
 </script>
 

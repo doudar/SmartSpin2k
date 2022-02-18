@@ -6,44 +6,99 @@
  */
 
 #include "SS2KLog.h"
+#include "Main.h"
 
-DebugInfo DebugInfo::INSTANCE = DebugInfo();
+LogHandler logHandler = LogHandler();
 
-#if DEBUG_LOG_BUFFER_SIZE > 0
-void DebugInfo::append_logv(const char *format, va_list args) { DebugInfo::INSTANCE.append_logv_internal(format, args); }
+uint8_t LogHandler::_messageBuffer[LOG_BUFFER_SIZE_BYTES];
 
-const std::string DebugInfo::get_and_clear_logs() { return DebugInfo::INSTANCE.get_and_clear_logs_internal(); }
+LogHandler::LogHandler() {
+  _logBufferMutex      = xSemaphoreCreateMutex();
+  _messageBufferHandle = xMessageBufferCreateStatic(LOG_BUFFER_SIZE_BYTES, _messageBuffer, &_messageBufferStruct);
+}
 
-void DebugInfo::append_logv_internal(const char *format, va_list args) {
-  if (xSemaphoreTake(logBufferMutex, 1000) == pdTRUE) {
-    int written = vsnprintf(logBuffer + logBufferLength, DEBUG_LOG_BUFFER_SIZE - logBufferLength, format, args);
-    SS2K_LOGD(DEBUG_INFO_LOG_TAG, "Wrote %d bytes to log", written);
-    if (written < 0 || logBufferLength + written > DEBUG_LOG_BUFFER_SIZE) {
-      logBufferLength = snprintf(logBuffer, DEBUG_LOG_BUFFER_SIZE, "...\n");
-    } else {
-      logBufferLength += written;
+void LogHandler::addAppender(ILogAppender *appender) { _appenders.push_back(appender); }
+
+void LogHandler::initialize() {
+  for (ILogAppender *appender : _appenders) {
+    try {
+      appender->Initialize();
+    } catch (...) {
+      SS2K_LOG(LOG_HANDLER_TAG, "Fatal error during initialize of log appender.");
     }
-    SS2K_LOGD(DEBUG_INFO_LOG_TAG, "Log buffer length %d of %d bytes", logBufferLength, DEBUG_LOG_BUFFER_SIZE);
-    xSemaphoreGive(logBufferMutex);
   }
 }
 
-const std::string DebugInfo::get_and_clear_logs_internal() {
-  if (xSemaphoreTake(logBufferMutex, 500) == pdTRUE) {
-    const std::string debugLog = std::string(logBuffer, logBufferLength);
-    logBufferLength            = 0;
-    logBuffer[0]               = '\0';
-    xSemaphoreGive(logBufferMutex);
-    SS2K_LOGD(DEBUG_INFO_LOG_TAG, "Log buffer read %d bytes and cleared", logBufferLength);
-    return debugLog;
-  }
-  return "";
-}
-#else
-void DebugInfo::append_logv_internal(const char *format, va_list args) {}
+void LogHandler::writeLogs() {
+  const size_t buffer_size = 512;
+  char buffer[buffer_size];
 
-String DebugInfo::get_and_clear_logs_internal() { return ""; }
-#endif
+  for (int index = 0; index < 100; index++) {
+    size_t receivedBytes = xMessageBufferReceive(_messageBufferHandle, &buffer, buffer_size - 1, 0);
+    if (receivedBytes == 0) {
+      return;
+    }
+    buffer[receivedBytes] = '\0';
+
+    for (ILogAppender *appender : _appenders) {
+      try {
+        appender->Log(buffer);
+      } catch (...) {
+        SS2K_LOG(LOG_HANDLER_TAG, "Fatal error during writing to log appender.");
+      }
+    }
+  }
+  SS2K_LOG(LOG_HANDLER_TAG, "Exit writeLogs(). Messages remaining in buffer.");
+}
+
+void LogHandler::writev(esp_log_level_t level, const char *module, const char *format, va_list args) {
+  if (xSemaphoreTake(_logBufferMutex, 10) == pdFALSE) {
+    // Must use ESP_LOG here using of SSK_LOG creates dead lock
+    ESP_LOGE(LOG_HANDLER_TAG, "Can not write log message. Write is blocke by other task.");
+    return;
+  }
+
+  if (_messageBufferHandle == NULL) {
+    ESP_LOGE(LOG_HANDLER_TAG, "Can not send log message. Message Buffer is NULL");
+    return;
+  }
+
+  char formatString[256];
+  sprintf(formatString, "[%6lu][%c](%s): %s", millis(), _logLevelToLetter(level), module, format);
+
+  const size_t buffer_size = 512;
+  char buffer[buffer_size];
+  int written = vsnprintf(buffer, buffer_size, formatString, args);
+
+  // Default logger -> write all to serial if connected
+  if (Serial) {
+    Serial.println(buffer);
+  }
+
+  size_t bytesSent = xMessageBufferSend(_messageBufferHandle, buffer, written, 0);
+
+  if (bytesSent < written) {
+    ESP_LOGE(LOG_HANDLER_TAG, "Can not send log message. Not enough free space left in buffer.");
+  }
+
+  xSemaphoreGive(_logBufferMutex);
+}
+
+char LogHandler::_logLevelToLetter(esp_log_level_t level) {
+  switch (level) {
+    case ESP_LOG_ERROR:
+      return 'E';
+    case ESP_LOG_WARN:
+      return 'W';
+    case ESP_LOG_INFO:
+      return 'I';
+    case ESP_LOG_DEBUG:
+      return 'D';
+    case ESP_LOG_VERBOSE:
+      return 'V';
+  }
+  return ' ';
+}
 
 void ss2k_remove_newlines(std::string *str) {
   std::string::size_type pos = 0;
@@ -60,36 +115,9 @@ int ss2k_log_hex_to_buffer(const byte *data, const size_t data_length, char *buf
   return written;
 }
 
-void ss2k_log_file_internal(const char *tag, File file) {
-  if (!file.available()) {
-    return;
-  }
-  char char_buffer[DEBUG_FILE_CHARS_PER_LINE + 1];
-  int bytes_cur_line;
-
-  while (file.available()) {
-    if (file.available() > DEBUG_FILE_CHARS_PER_LINE) {
-      bytes_cur_line = DEBUG_FILE_CHARS_PER_LINE;
-    } else {
-      bytes_cur_line = file.available();
-    }
-    for (int i = 0; i < bytes_cur_line; i++) {
-      sprintf(char_buffer + i, "%c", file.read());
-    }
-    SS2K_LOG(tag, "%s", char_buffer);
-  }
-}
-
-void ss2k_log_write(esp_log_level_t level, const char *format, ...) {
+void ss2k_log_write(esp_log_level_t level, const char *module, const char *format, ...) {
   va_list args;
   va_start(args, format);
-  ss2k_log_writev(level, format, args);
+  logHandler.writev(level, module, format, args);
   va_end(args);
-}
-
-void ss2k_log_writev(esp_log_level_t level, const char *format, va_list args) {
-  esp_log_writev(level, SS2K_LOG_TAG, format, args);
-#if DEBUG_LOG_BUFFER_SIZE > 0
-  DebugInfo::append_logv(format, args);
-#endif
 }
