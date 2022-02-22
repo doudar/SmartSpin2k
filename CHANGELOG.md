@@ -13,6 +13,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Pruned a couple unused functions from main.
 ### Fixed
 ### Hardware
+- Short Mod, increased screw hole size from 4.0mm to 4.2mm.
+- Short Mod, moved plug wall offset from 1.8mm to 2.0mm.
+- Increased shaft diameter of 40T hex gear by .15
+- Increased bolt head diameter of 40T hex gear by .15
 
 ## [2.2.8]
 
