@@ -15,6 +15,7 @@
 #include "ERG_Mode.h"
 #include "UdpAppender.h"
 #include "WebsocketAppender.h"
+#include "driver/rtc_io.h"
 
 HardwareSerial stepperSerial(2);
 TMC2208Stepper driver(&SERIAL_PORT, R_SENSE);  // Hardware Serial
@@ -235,7 +236,7 @@ void SS2K::moveStepper(void *pvParameters) {
           ss2k.targetPosition = rtConfig.getTargetIncline();
         } else {
           // Simulation Mode
-          ss2k.targetPosition   = rtConfig.getShifterPosition() * userConfig.getShiftStep();
+          ss2k.targetPosition = rtConfig.getShifterPosition() * userConfig.getShiftStep();
           ss2k.targetPosition += rtConfig.getTargetIncline() * userConfig.getInclineMultiplier();
         }
       }
@@ -413,4 +414,17 @@ void SS2K::motorStop(bool releaseTension) {
   if (releaseTension) {
     stepper->moveTo(ss2k.targetPosition - userConfig.getShiftStep() * 4);
   }
+}
+
+void SS2K::hibernate() {
+  SS2K_LOG(MAIN_LOG_TAG, "Go to hibernation mode. Bye ...")
+  stopTasks();  // stop ERG + BLE Tasks
+  httpServer.stop();
+
+  // gpio_num_t pin = (gpio_num_t)SHIFT_UP_PIN;
+  gpio_num_t pin = GPIO_NUM_33;
+  rtc_gpio_pullup_en(pin);
+  rtc_gpio_pulldown_dis(pin);
+  esp_sleep_enable_ext0_wakeup(pin, 0);
+  esp_deep_sleep_start();
 }

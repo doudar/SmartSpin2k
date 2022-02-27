@@ -3,26 +3,37 @@
 
 <head>
   <style type="text/css">
-html {
-  background-color: #03245c;
-} 
-    </style>
+    html {
+      background-color: #03245c;
+    }
+  </style>
 
   <title>SmartSpin2K Web Server</title>
   <meta name="viewport" content="width=device-width, initial-scale=1">
 </head>
-<fieldset><legend><a href="http://github.com/doudar/SmartSpin2k">http://github.com/doudar/SmartSpin2k</a></legend>
-<body>
-  <h1 style="text-align: center;"><strong>SmartSpin2k</strong></h1>
-  <h2>
-    <p style="text-align: center;"><strong><a href="shift.html">Web Shifter</a></strong></p>
-    <p style="text-align: center;"><strong><a href="hrtowatts.html">Heartrate to Watts Setup</a></strong></p>
-    <p style="text-align: center;"><strong><a href="settings.html">Settings</a></strong></p>
-    <p style="text-align: center;"><strong><a href="bluetoothscanner.html">Bluetooth Scanner</a></strong></p>
-    <p style="text-align: center;"><strong><a href="status.html">SmartSpin Debugging Info</a></strong></p>
-    <p style="text-align: center;"><strong><a href="login">Update Firmware</a></strong></p>
-    <p><a href=https://github.com/doudar/SmartSpin2k/wiki>SS2K Help</a></p>
-  </h2>
+<fieldset>
+  <legend><a href="http://github.com/doudar/SmartSpin2k">http://github.com/doudar/SmartSpin2k</a></legend>
+
+  <body>
+    <div>
+      <h1 style="text-align: center; display: inline-block;"><strong>SmartSpin2k</strong></h1>
+      <span style="display: flex; flex-direction: row; float: right;">
+        <span style="align-self: center; padding-right: 0.5em; font-size: large;">Off</span>
+        <div class="switch" onclick="hibernate()">
+          <input type="checkbox" name="switch-off" id="switch-off">
+          <span class="slider"></span>
+        </div>
+      </span>
+    </div>
+    <h2>
+      <p style="text-align: center;"><strong><a href="shift.html">Web Shifter</a></strong></p>
+      <p style="text-align: center;"><strong><a href="hrtowatts.html">Heartrate to Watts Setup</a></strong></p>
+      <p style="text-align: center;"><strong><a href="settings.html">Settings</a></strong></p>
+      <p style="text-align: center;"><strong><a href="bluetoothscanner.html">Bluetooth Scanner</a></strong></p>
+      <p style="text-align: center;"><strong><a href="status.html">SmartSpin Debugging Info</a></strong></p>
+      <p style="text-align: center;"><strong><a href="login">Update Firmware</a></strong></p>
+      <p><a href=https://github.com/doudar/SmartSpin2k/wiki>SS2K Help</a></p>
+    </h2>
 </fieldset>
 
 <p style="text-align: center; color: blanchedalmond;"><label id="firmwareVersion">loading</label></p>
@@ -33,7 +44,7 @@ html {
 
   //Update values on specified interval loading late because this tiny webserver hates frequent requests
   setInterval(function () {
-    if (document.getElementById("firmwareVersion").innerHTML == "loading"){
+    if (document.getElementById("firmwareVersion").innerHTML == "loading") {
       requestConfigValues();
     }
 
@@ -64,6 +75,20 @@ html {
   window.addEventListener('load', function () {
     setTimeout(loadCss, 100);
   }, false);
+
+  function hibernate() {
+    document.getElementById("switch-off").checked = true;
+
+    var xhr = new XMLHttpRequest();
+    xhr.open('POST', '/hibernate');
+    xhr.setRequestHeader("Content-Type", "application/x-www-form-urlencoded");
+    xhr.onreadystatechange = function () { // Call a function when the state changes.
+      if (this.readyState === XMLHttpRequest.DONE && this.status === 200) {
+        console.log("Entered hibernation mode.")
+      }
+    }
+    xhr.send({});
+  }
 
 
 </script>

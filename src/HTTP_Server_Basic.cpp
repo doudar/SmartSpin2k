@@ -296,6 +296,15 @@ void HTTP_Server::start() {
     server.send(200, "text/html", OTAServerIndex);
   });
 
+  server.on("/hibernate", HTTP_POST, []() {
+    SS2K_LOG(HTTP_SERVER_LOG_TAG, "hibernation mode requested");
+
+    server.sendHeader("Connection", "close");
+    server.send(200, "text/plain", "OK");
+
+    ss2k.hibernate();
+  });
+
   /*handling uploading firmware file */
   server.on(
       "/update", HTTP_POST,

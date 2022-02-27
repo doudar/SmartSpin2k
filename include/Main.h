@@ -47,6 +47,7 @@ class SS2K {
   void updateStealthchop();
   void checkDriverTemperature();
   void motorStop(bool releaseTension = false);
+  void hibernate();
 
   SS2K() {
     targetPosition         = 0;
