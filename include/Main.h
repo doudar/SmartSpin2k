@@ -14,6 +14,8 @@
 
 #define MAIN_LOG_TAG "Main"
 
+#define HIBERNATION_TIMEOUT 30 * 60 * 1000
+
 // Function Prototypes
 
 class SS2K {
@@ -50,17 +52,17 @@ class SS2K {
   void hibernate();
 
   SS2K() {
-    targetPosition         = 0;
-    currentPosition        = 0;
-    stepperIsRunning       = false;
-    externalControl        = false;
-    syncMode               = false;
-    lastDebounceTime       = 0;
-    debounceDelay          = DEBOUNCE_DELAY;
-    lastShifterPosition    = 0;
-    shiftersHoldForScan    = SHIFTERS_HOLD_FOR_SCAN;
-    scanDelayTime          = 10000;
-    scanDelayStart         = 0;
+    targetPosition      = 0;
+    currentPosition     = 0;
+    stepperIsRunning    = false;
+    externalControl     = false;
+    syncMode            = false;
+    lastDebounceTime    = 0;
+    debounceDelay       = DEBOUNCE_DELAY;
+    lastShifterPosition = 0;
+    shiftersHoldForScan = SHIFTERS_HOLD_FOR_SCAN;
+    scanDelayTime       = 10000;
+    scanDelayStart      = 0;
   }
 };
 

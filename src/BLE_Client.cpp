@@ -38,6 +38,8 @@ void SpinBLEClient::start() {
 }
 
 static void onNotify(BLERemoteCharacteristic *pBLERemoteCharacteristic, uint8_t *pData, size_t length, bool isNotify) {
+  rtConfig.updateLastBLEPackageTimestamp();
+
   for (size_t i = 0; i < NUM_BLE_DEVICES; i++) {
     if (pBLERemoteCharacteristic->getUUID() == spinBLEClient.myBLEDevices[i].charUUID) {
       spinBLEClient.myBLEDevices[i].enqueueData(pData, length);

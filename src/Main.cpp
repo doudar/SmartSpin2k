@@ -88,13 +88,15 @@ void setup() {
   pinMode(SHIFT_DOWN_PIN, INPUT_PULLUP);  // Push-Button with input Pullup
   pinMode(LED_PIN, OUTPUT);
   pinMode(ENABLE_PIN, OUTPUT);
-  pinMode(DIR_PIN, OUTPUT);   // Stepper Direction Pin
-  pinMode(STEP_PIN, OUTPUT);  // Stepper Step Pin
-  digitalWrite(ENABLE_PIN,
-               HIGH);  // Should be called a disable Pin - High Disables FETs
+  pinMode(DIR_PIN, OUTPUT);        // Stepper Direction Pin
+  pinMode(STEP_PIN, OUTPUT);       // Stepper Step Pin
+  digitalWrite(ENABLE_PIN, HIGH);  // Should be called a disable Pin - High Disables FETs
   digitalWrite(DIR_PIN, LOW);
   digitalWrite(STEP_PIN, LOW);
   digitalWrite(LED_PIN, LOW);
+
+  gpio_wakeup_disable((gpio_num_t)SHIFT_UP_PIN);
+  gpio_wakeup_disable((gpio_num_t)SHIFT_DOWN_PIN);
 
   ss2k.setupTMCStepperDriver();
 
@@ -173,6 +175,10 @@ void SS2K::maintenanceLoop(void *pvParameters) {
       // ss2k.restartWifi();
       logHandler.writeLogs();
       intervalTimer = millis();
+
+      if ((millis() - rtConfig.getLastBLEPackageTimestamp()) > HIBERNATION_TIMEOUT) {
+        ss2k.hibernate();
+      }
     }
 
     if ((millis() - intervalTimer2) > 6000) {
@@ -421,7 +427,7 @@ void SS2K::hibernate() {
   stopTasks();  // stop ERG + BLE Tasks
   httpServer.stop();
 
-  gpio_num_t shiftUpPin = (gpio_num_t)SHIFT_UP_PIN;
+  gpio_num_t shiftUpPin   = (gpio_num_t)SHIFT_UP_PIN;
   gpio_num_t shiftDownPin = (gpio_num_t)SHIFT_DOWN_PIN;
   // -- deep sleep --
   // wake up only works with RTC GPIOs

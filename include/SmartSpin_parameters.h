@@ -28,21 +28,22 @@ class Measurement {
 
 class RuntimeParameters {
  private:
-  float targetIncline        = 0.0;
-  float currentIncline       = 0.0;
-  int targetWatts            = 0;
-  Measurement simulatedWatts = Measurement(0);
-  int simulatedHr            = 0;
-  int simulatedCad           = 0;
-  float simulatedSpeed       = 0.0;
-  bool simulateHr            = false;
-  bool simulateWatts         = false;
-  bool simulateTargetWatts   = false;
-  bool simulateCad           = false;
-  bool ERGMode               = false;
-  int shifterPosition        = 0;
-  int minStep                = -200000000;
-  int maxStep                = 200000000;
+  float targetIncline          = 0.0;
+  float currentIncline         = 0.0;
+  int targetWatts              = 0;
+  Measurement simulatedWatts   = Measurement(0);
+  int simulatedHr              = 0;
+  int simulatedCad             = 0;
+  float simulatedSpeed         = 0.0;
+  bool simulateHr              = false;
+  bool simulateWatts           = false;
+  bool simulateTargetWatts     = false;
+  bool simulateCad             = false;
+  bool ERGMode                 = false;
+  int shifterPosition          = 0;
+  int minStep                  = -200000000;
+  int maxStep                  = 200000000;
+  long lastBLEPackageTimestamp = 0;
 
  public:
   void setTargetIncline(float inc) { targetIncline = inc; }
@@ -89,6 +90,9 @@ class RuntimeParameters {
 
   void setMaxStep(int ms) { maxStep = ms; }
   int getMaxStep() { return maxStep; }
+
+  void updateLastBLEPackageTimestamp() { lastBLEPackageTimestamp = millis(); }
+  long getLastBLEPackageTimestamp() { return lastBLEPackageTimestamp; }
 
   String returnJSON();
 };
