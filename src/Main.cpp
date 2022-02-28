@@ -417,14 +417,24 @@ void SS2K::motorStop(bool releaseTension) {
 }
 
 void SS2K::hibernate() {
-  SS2K_LOG(MAIN_LOG_TAG, "Go to hibernation mode. Bye ...")
+  SS2K_LOG(MAIN_LOG_TAG, "Sleeping now. Bye ...")
   stopTasks();  // stop ERG + BLE Tasks
   httpServer.stop();
 
-  // gpio_num_t pin = (gpio_num_t)SHIFT_UP_PIN;
-  gpio_num_t pin = GPIO_NUM_33;
-  rtc_gpio_pullup_en(pin);
-  rtc_gpio_pulldown_dis(pin);
-  esp_sleep_enable_ext0_wakeup(pin, 0);
-  esp_deep_sleep_start();
+  gpio_num_t shiftUpPin = (gpio_num_t)SHIFT_UP_PIN;
+  gpio_num_t shiftDownPin = (gpio_num_t)SHIFT_DOWN_PIN;
+  // -- deep sleep --
+  // wake up only works with RTC GPIOs
+  // rtc_gpio_pullup_en(pin);
+  // rtc_gpio_pulldown_dis(pin);
+  // esp_sleep_enable_ext0_wakeup(pin, 0);
+  // esp_deep_sleep_start();
+
+  // -- light sleep --
+  // wake up works with any GPIO
+  gpio_wakeup_enable(shiftUpPin, GPIO_INTR_LOW_LEVEL);
+  gpio_wakeup_enable(shiftDownPin, GPIO_INTR_LOW_LEVEL);
+  esp_sleep_enable_gpio_wakeup();
+  esp_sleep_pd_config(ESP_PD_DOMAIN_VDDSDIO, ESP_PD_OPTION_ON);
+  esp_light_sleep_start();
 }
