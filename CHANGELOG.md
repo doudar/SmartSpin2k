@@ -7,6 +7,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [2.2.8]
 
 ### Added
+- Added screenshot for wiki main page
 - Added functions to start and stop WiFi and Http server.
 - Added Additional logging to the custom characteristic.
 - Added option to enable/disable UDP logging. Default is disabled.
