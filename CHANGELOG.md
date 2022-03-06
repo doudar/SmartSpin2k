@@ -36,12 +36,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Revised shifter for easier printing.  Updated printing instructions.
 - moved original shifter design into Archive directory
 
+
 #### Direct mount Mod
 - IC4 Mod renamed to Direct Mount Mod.  Several directories have changed.
 - bike mount and arm added for Echelon Connect Sport
 - Arm design revised for added stiffness
 - Case, arm and bike mount separated into individual CAD files for easier edits.
 - Arm and bike mount re-drawn in CAD.  It should be much easier to create designs for new bikes now.
+- Added direct mount for Revmaster and Peloton bikes
+- New insert for Startrac
 
 ## [1.12.30]
 
