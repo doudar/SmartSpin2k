@@ -13,9 +13,8 @@
 #include <sensors/SensorData.h>
 #include <sensors/SensorDataFactory.h>
 
-int bleConnDesc               = 1;
-bool updateConnParametersFlag = false;
-bool hr2p                     = false;
+bool hr2p = false;
+
 TaskHandle_t BLECommunicationTask;
 SensorDataFactory sensorDataFactory;
 
@@ -135,7 +134,7 @@ void BLECommunications(void *pvParameters) {
       updateIndoorBikeDataChar();
       updateCyclingPowerMeasurementChar();
       updateHeartRateMeasurementChar();
-      //controlPointIndicate();
+      // controlPointIndicate();
 
       if (spinDown()) {
         // Possibly do something in the future. Right now we just fake the spindown.
@@ -144,17 +143,11 @@ void BLECommunications(void *pvParameters) {
       processFTMSWrite();
       // computeERG();
 
-      if (updateConnParametersFlag) {
-        vTaskDelay(100 / portTICK_PERIOD_MS);
-        BLEDevice::getServer()->updateConnParams(bleConnDesc, 300, 560, 0, 2000);
-        updateConnParametersFlag = false;
-      }
-    }
-
-    if (BLEDevice::getAdvertising()) {
-      if (!(BLEDevice::getAdvertising()->isAdvertising()) && (BLEDevice::getServer()->getConnectedCount() < CONFIG_BT_NIMBLE_MAX_CONNECTIONS - NUM_BLE_DEVICES)) {
-        SS2K_LOG(BLE_COMMON_LOG_TAG, "Starting Advertising From Communication Loop");
-        BLEDevice::startAdvertising();
+      if (BLEDevice::getAdvertising()) {
+        if (!(BLEDevice::getAdvertising()->isAdvertising()) && (BLEDevice::getServer()->getConnectedCount() < CONFIG_BT_NIMBLE_MAX_CONNECTIONS - NUM_BLE_DEVICES)) {
+          SS2K_LOG(BLE_COMMON_LOG_TAG, "Starting Advertising From Communication Loop");
+          BLEDevice::startAdvertising();
+        }
       }
     }
 
@@ -168,7 +161,11 @@ void BLECommunications(void *pvParameters) {
     } else {
       digitalWrite(LED_PIN, HIGH);
     }
-
+    if (spinBLEClient.doScan && (spinBLEClient.scanRetries > 0)) {
+      spinBLEClient.scanRetries--;
+      SS2K_LOG(BLE_CLIENT_LOG_TAG, "Initiating Scan from Client Task:");
+      spinBLEClient.scanProcess();
+    }
     vTaskDelay((BLE_NOTIFY_DELAY) / portTICK_PERIOD_MS);
 #ifdef DEBUG_STACK
     Serial.printf("BLEComm: %d \n", uxTaskGetStackHighWaterMark(BLECommunicationTask));

@@ -104,7 +104,7 @@ void userParameters::saveToSPIFFS() {
   SS2K_LOG(CONFIG_LOG_TAG, "Writing File: %s", configFILENAME);
   File file = SPIFFS.open(configFILENAME, FILE_WRITE);
   if (!file) {
-    SS2K_LOGE(CONFIG_LOG_TAG, "Failed to create file");
+    SS2K_LOG(CONFIG_LOG_TAG, "Failed to create file");
     return;
   }
 
@@ -137,7 +137,7 @@ void userParameters::saveToSPIFFS() {
 
   // Serialize JSON to file
   if (serializeJson(doc, file) == 0) {
-    SS2K_LOGE(CONFIG_LOG_TAG, "Failed to write to file");
+    SS2K_LOG(CONFIG_LOG_TAG, "Failed to write to file");
   }
   // Close the file
   file.close();
@@ -163,7 +163,7 @@ void userParameters::loadFromSPIFFS() {
   // Deserialize the JSON document
   DeserializationError error = deserializeJson(doc, file);
   if (error) {
-    SS2K_LOGE(CONFIG_LOG_TAG, "Failed to read file, using defaults");
+    SS2K_LOG(CONFIG_LOG_TAG, "Failed to read file, using defaults");
     return;
   }
 
@@ -212,7 +212,7 @@ void userParameters::printFile() {
   SS2K_LOG(CONFIG_LOG_TAG, "Contents of file: %s", configFILENAME);
   File file = SPIFFS.open(configFILENAME);
   if (!file) {
-    SS2K_LOGE(CONFIG_LOG_TAG, "Failed to read file");
+    SS2K_LOG(CONFIG_LOG_TAG, "Failed to read file");
     return;
   }
 
@@ -254,7 +254,7 @@ void physicalWorkingCapacity::saveToSPIFFS() {
   SS2K_LOG(CONFIG_LOG_TAG, "Writing File: %s", userPWCFILENAME);
   File file = SPIFFS.open(userPWCFILENAME, FILE_WRITE);
   if (!file) {
-    SS2K_LOGE(CONFIG_LOG_TAG, "Failed to create file");
+    SS2K_LOG(CONFIG_LOG_TAG, "Failed to create file");
     return;
   }
 
@@ -268,7 +268,7 @@ void physicalWorkingCapacity::saveToSPIFFS() {
 
   // Serialize JSON to file
   if (serializeJson(doc, file) == 0) {
-    SS2K_LOGE(CONFIG_LOG_TAG, "Failed to write to file");
+    SS2K_LOG(CONFIG_LOG_TAG, "Failed to write to file");
   }
   // Close the file
   file.close();
@@ -292,7 +292,7 @@ void physicalWorkingCapacity::loadFromSPIFFS() {
   // Deserialize the JSON document
   DeserializationError error = deserializeJson(doc, file);
   if (error) {
-    SS2K_LOGE(CONFIG_LOG_TAG, "Failed to read file, using default configuration");
+    SS2K_LOG(CONFIG_LOG_TAG, "Failed to read file, using default configuration");
     setDefaults();
     return;
   }
@@ -314,7 +314,7 @@ void physicalWorkingCapacity::printFile() {
   SS2K_LOG(CONFIG_LOG_TAG, "Contents of file: %s", userPWCFILENAME);
   File file = SPIFFS.open(userPWCFILENAME);
   if (!file) {
-    SS2K_LOGE(CONFIG_LOG_TAG, "Failed to read file");
+    SS2K_LOG(CONFIG_LOG_TAG, "Failed to read file");
     return;
   }
 

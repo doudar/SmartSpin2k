@@ -67,7 +67,7 @@ void setup() {
   // Initialize SPIFFS
   SS2K_LOG(MAIN_LOG_TAG, "Mounting Filesystem");
   if (!SPIFFS.begin(true)) {
-    SS2K_LOGE(MAIN_LOG_TAG, "An Error has occurred while mounting SPIFFS");
+    SS2K_LOG(MAIN_LOG_TAG, "An Error has occurred while mounting SPIFFS");
     // TODO reset flash here
     return;
   }
@@ -107,7 +107,7 @@ void setup() {
                           NULL,                  /* parameter of the task */
                           18,                    /* priority of the task */
                           &moveStepperTask,      /* Task handle to keep track of created task */
-                          0);                    /* pin task to core 0 */
+                          0);                    /* pin task to core */
 
   digitalWrite(LED_PIN, HIGH);
 
@@ -140,7 +140,7 @@ void setup() {
                           NULL,                      /* parameter of the task */
                           1,                         /* priority of the task */
                           &maintenanceLoopTask,      /* Task handle to keep track of created task */
-                          1);                        /* pin task to core 0 */
+                          1);                        /* pin task to core */
 }
 
 void loop() {  // Delete this task so we can make one that's more memory efficient.
@@ -148,8 +148,11 @@ void loop() {  // Delete this task so we can make one that's more memory efficie
 }
 
 void SS2K::maintenanceLoop(void *pvParameters) {
-  static int loopCounter             = 0;
-  static unsigned long intervalTimer = millis();
+  static int loopCounter              = 0;
+  static unsigned long intervalTimer  = millis();
+  static unsigned long intervalTimer2 = millis();
+  static bool isScanning              = false;
+
   while (true) {
     vTaskDelay(200 / portTICK_RATE_MS);
     if (rtConfig.getShifterPosition() > ss2k.lastShifterPosition) {
@@ -171,6 +174,19 @@ void SS2K::maintenanceLoop(void *pvParameters) {
       intervalTimer = millis();
     }
 
+    if ((millis() - intervalTimer2) > 6000) {
+      if (NimBLEDevice::getScan()->isScanning()) {  // workaround to prevent occasional runaway scans
+        if (isScanning == true) {
+          SS2K_LOG(MAIN_LOG_TAG, "Forcing Scan to stop.");
+          NimBLEDevice::getScan()->stop();
+          isScanning = false;
+        } else {
+          isScanning = true;
+        }
+      }
+
+      intervalTimer2 = millis();
+    }
     if (loopCounter > 4) {
       ss2k.scanIfShiftersHeld();
       ss2k.checkDriverTemperature();
