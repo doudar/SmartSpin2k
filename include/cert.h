@@ -5,12 +5,18 @@
  * SPDX-License-Identifier: GPL-2.0-only
  */
 
+/* 
+ * To update, search for ROOT CA Certificate used by raw.githubusercontent.com (Digicert)
+ * Sourced from: https://raw.githubusercontent.com/bagder/ca-bundle/master/ca-bundle.crt
+ * Worth pointing out that this is likely better to source direct from the source: 
+ * https://curl.se/docs/caextract.html - needs conversion to .crt to be text editor readable.
+ */
+
 
 #pragma once
 
 const char* rootCACertificate =
-/* ROOT CA Certificate used by raw.githubusercontent.com (Digicert)
- * https://raw.githubusercontent.com/bagder/ca-bundle/master/ca-bundle.crt */
+
     /* DigiCert Assured ID Root CA
      * ===========================*/
     "-----BEGIN CERTIFICATE-----\n"
