@@ -11,6 +11,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Changed
  - updated CA for OTA updates
 
+
+### Hardware
+ - added chamfer to screw posts in case body (direct mount mod)
+
 ## [2.2.8]
 
 ### Added

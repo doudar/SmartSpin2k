@@ -4,6 +4,9 @@ SmartSpin2k is an easy to build open source project that lets you turn any Spin 
 
 Since SmartSpin2k is easy to manufacture, build one for yourself, build some for your friends, or setup a print farm and build them for everybody - we're an open community and welcome all levels of involvement!
 
+## Important announcement for existing users
+We have identified an issue with auto updates.  After a factory reset, you will not be able to access the configuration screen.  We advise users to flash the latest version of the 2.2.8 firmware, [available here](https://github.com/doudar/SmartSpin2k/releases).  Flashing instructions are available on the [Wiki](https://github.com/doudar/SmartSpin2k/wiki/Loading-Software)
+
 ### Documentation
 Everything you need to know is in the [SS2K Wiki](https://github.com/doudar/SmartSpin2k/wiki)
 
