@@ -639,7 +639,7 @@ void HTTP_Server::FirmwareUpdate() {
       SS2K_LOG(HTTP_SERVER_LOG_TAG, "Upgrading from %s to %s", FIRMWARE_VERSION, payload.c_str());
 
       // Update Spiffs
-      httpUpdate.setLedPin(LED_BUILTIN, LOW);
+     // httpUpdate.setLedPin(LED_BUILTIN, LOW);
       SS2K_LOG(HTTP_SERVER_LOG_TAG, "Updating FileSystem");
       t_httpUpdate_return ret = httpUpdate.updateSpiffs(client, userConfig.getFirmwareUpdateURL() + String(FW_SPIFFSFILE));
       vTaskDelay(100 / portTICK_PERIOD_MS);
