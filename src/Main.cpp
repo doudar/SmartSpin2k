@@ -126,6 +126,7 @@ void setup() {
 
   ss2k.startTasks();
   httpServer.start();
+  dirconServer.start();
 
   ss2k.resetIfShiftersHeld();
   SS2K_LOG(MAIN_LOG_TAG, "Creating Shifter Interrupts");

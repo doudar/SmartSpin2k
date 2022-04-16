@@ -106,7 +106,8 @@ void startWifi() {
   const char *serialNumber = "212002644";
   MDNS.addService("_wahoo-fitness-tnp", "_tcp", 36866);
   MDNS.addServiceTxt("_wahoo-fitness-tnp", "_tcp", "ble-service-uuids", bleUUIDs);
-  MDNS.addServiceTxt("_wahoo-fitness-tnp", "_tcp", "mac-address", WiFi.macAddress());
+  //MDNS.addServiceTxt("_wahoo-fitness-tnp", "_tcp", "mac-address", WiFi.macAddress());
+  MDNS.addServiceTxt("_wahoo-fitness-tnp", "_tcp", "mac-address", "B4-6F-2D-00-09-67");
   MDNS.addServiceTxt("_wahoo-fitness-tnp", "_tcp", "serial-number", serialNumber);
 
   SS2K_LOG(HTTP_SERVER_LOG_TAG, "Connected to %s IP address: %s", userConfig.getSsid(), myIP.toString().c_str());
@@ -406,6 +407,7 @@ void HTTP_Server::webClientUpdate(void *pvParameters) {
       Serial.printf("HttpServer: %d \n", uxTaskGetStackHighWaterMark(webClientTask));
 #endif  // DEBUG_STACK
     }
+    dirconServer.checkForConnections();
   }
 }
 

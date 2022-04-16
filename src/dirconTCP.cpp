@@ -8,24 +8,31 @@
 #include "main.h"
 #include "dirconTCP.h"
 
-WiFiServer dirconServer(dirconPort);
-WiFiClient remoteDirconClient;
+WiFiServer dServer(dirconPort);
+WiFiClient remoteClient;
 DirconServer dirconServer;
 
-DirconServer::checkForConnections(){ 
-    if dirconServer.hasClient(){
-        if(remoteDirconClient.hasClient()){
+void DirconServer::start(){
+    Serial.println("Dircon Server Starting");
+    dServer.begin();
+} 
+
+void DirconServer::checkForConnections(){
+    if(dServer.hasClient()){
+        if(remoteClient.connected()){
             Serial.println("Connection Rejected");
-            dirconServer.available().stop();
+            dServer.available().stop();
         } else{
             Serial.println("Connection accepted");
-            remoteDirconClient = dirconServer.available();
+            remoteClient = dServer.available();
         }
     }
 }
 
 void DirconServer::sendValue(){
-    if(remoteDirconClient.connected()){
-        remoteDirconClient.write("This is a test message");
+    if(remoteClient.connected()){
+        remoteClient.write("This is a test message");
     }
 }
+
+

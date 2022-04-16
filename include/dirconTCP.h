@@ -8,19 +8,15 @@
 #pragma once
 
 #include <WiFi.h>
-#include <WiFi
 
-
+const uint dirconPort = 36866;
 
 class DirconServer {
-    private:
-    const uint dirconPort = 36866; 
-    public:
-    void checkForConnections();
-    void sendValue();
-    
+ private:
+ public:
+  void checkForConnections();
+  void sendValue();
+  void start();
+};
 
-
-
-
-}
+extern DirconServer dirconServer;
