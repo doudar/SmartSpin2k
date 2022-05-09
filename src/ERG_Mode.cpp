@@ -285,12 +285,12 @@ int32_t PowerTable::lookup(int watts, int cad) {
 }
 
 bool PowerTable::load() {
-  // load power table from spiffs
+  // load power table from littlefs
   return false;  // return unsuccessful
 }
 
 bool PowerTable::save() {
-  // save powertable from spiffs
+  // save powertable from littlefs
   return false;  // return unsuccessful
 }
 

@@ -58,10 +58,10 @@ class PowerTable {
   // returns incline for wattTarget. Null if not found.
   int32_t lookup(int watts, int cad);
 
-  // load power table from spiffs
+  // load power table from littlefs
   bool load();
 
-  // save powertable from spiffs
+  // save powertable from littlefs
   bool save();
 
   // Display power table in log
