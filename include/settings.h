@@ -30,9 +30,9 @@
 #define FW_BINFILE "firmware.bin"
 
 //Data directory Source
-#define DATA_UPDATEURL "https://raw.githubusercontent.com/doudar/SmartSpin2k/develop/data/"
+#define DATA_UPDATEURL "https://raw.githubusercontent.com/doudar/SmartSpin2k/LittleFS/data"
 
-#define DATA_FILELIST "list.json"
+#define DATA_FILELIST "/list.json"
 
 // name of local file to save configuration in LittleFS
 #define configFILENAME "/config.txt"

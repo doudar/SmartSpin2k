@@ -359,9 +359,9 @@ void HTTP_Server::start() {
                           "webClientUpdate",                  /* name of task. */
                           6000 + (DEBUG_LOG_BUFFER_SIZE * 2), /* Stack size of task Used to be 3000*/
                           NULL,                               /* parameter of the task */
-                          1,                                  /* priority of the task  - 29 worked*/
+                          2,                                  /* priority of the task */
                           &webClientTask,                     /* Task handle to keep track of created task */
-                          1);                                 /* pin task to core */
+                          0);                                 /* pin task to core */
 
 #ifdef USE_TELEGRAM
   xTaskCreatePinnedToCore(telegramUpdate,   /* Task function. */
@@ -380,7 +380,7 @@ void HTTP_Server::webClientUpdate(void *pvParameters) {
   static unsigned long mDnsTimer = millis();  // NOLINT: There is no overload in String for uint64_t
   for (;;) {
     server.handleClient();
-    vTaskDelay(WEBSERVER_DELAY / portTICK_RATE_MS);
+   // vTaskDelay(WEBSERVER_DELAY / portTICK_RATE_MS);
     if (WiFi.getMode() == WIFI_AP) {
       dnsServer.processNextRequest();
     }
@@ -651,35 +651,37 @@ void HTTP_Server::FirmwareUpdate() {
         SS2K_LOG(HTTP_SERVER_LOG_TAG, "error downloading %s %d", DATA_FILELIST, httpCode);
         httpServer.internetConnection = false;
       }
+      JsonArray files = doc.as<JsonArray>();
       // iterate through file list and download files individually
-      for (auto i : doc) {
-        http.begin(DATA_UPDATEURL + String(DOC[i]),
+      for (JsonVariant v : files) {
+        String fileName = "/" + v.as<String>();
+        http.begin(DATA_UPDATEURL + fileName,
                    rootCACertificate);  // check version URL
         delay(100);
-        httpCode = http.GET();  // get data from version file
+        httpCode = http.GET();
         delay(100);
-        if (httpCode == HTTP_CODE_OK) {  // if version received
+        if (httpCode == HTTP_CODE_OK) {
           String payload;
-          payload = http.getString();  // save received version
+          payload = http.getString();
           payload.trim();
-          LittleFS.remove(DOC[i]);
-          File file = LittleFS.open(DOC[i], FILE_WRITE);
+          LittleFS.remove(fileName);
+          File file = LittleFS.open(fileName, FILE_WRITE);
           if (!file) {
-            SS2K_LOG(HTTP_SERVER_LOG_TAG, "Failed to create file, %s", DOC[i]);
+            SS2K_LOG(HTTP_SERVER_LOG_TAG, "Failed to create file, %s", fileName);
             return;
           }
           file.print(payload);
           file.close();
           httpServer.internetConnection = true;
         } else {
-          SS2K_LOG(HTTP_SERVER_LOG_TAG, "error downloading %s %d", DOC[i], httpCode);
+          SS2K_LOG(HTTP_SERVER_LOG_TAG, "error downloading %s %d", fileName, httpCode);
           httpServer.internetConnection = false;
         }
       }
 
       //////// Update Firmware /////////
       if ((availiableVer > currentVer) && (userConfig.getAutoUpdate())) {
-        ret = httpUpdate.update(client, userConfig.getFirmwareUpdateURL() + String(FW_BINFILE));
+        t_httpUpdate_return ret = httpUpdate.update(client, userConfig.getFirmwareUpdateURL() + String(FW_BINFILE));
         switch (ret) {
           case HTTP_UPDATE_FAILED:
             SS2K_LOG(HTTP_SERVER_LOG_TAG, "HTTP_UPDATE_FAILED Error %d : %s", httpUpdate.getLastError(), httpUpdate.getLastErrorString().c_str());
