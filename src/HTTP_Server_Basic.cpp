@@ -380,7 +380,7 @@ void HTTP_Server::webClientUpdate(void *pvParameters) {
   static unsigned long mDnsTimer = millis();  // NOLINT: There is no overload in String for uint64_t
   for (;;) {
     server.handleClient();
-   // vTaskDelay(WEBSERVER_DELAY / portTICK_RATE_MS);
+    vTaskDelay(WEBSERVER_DELAY / portTICK_RATE_MS);
     if (WiFi.getMode() == WIFI_AP) {
       dnsServer.processNextRequest();
     }
