@@ -72,7 +72,7 @@ From BLE_common.h
 |BLE_connectedPowerMeter   |0x15   |     |Not Implemented                                    |
 |BLE_connectedHeartMonitor |0x16   |     |Not Implemented                                    |
 |BLE_shifterPosition       |0x17   |int  |That changes when a shift is preformed.            |
-|BLE_saveToSpiffs          |0x18   |bool |01 written will save to spiffs.                    |
+|BLE_saveToLittlefs          |0x18   |bool |01 written will save to spiffs.                    |
 |BLE_targetPosition        |0x19   |int36|Position (in steps) the motor is maintaining.      |
 |BLE_externalControl       |0x1A   |bool |01 disables internal calculation of targetPosition.|
 |BLE_syncMode              |0x1B   |bool |01 stops motor movement for external calibration   |

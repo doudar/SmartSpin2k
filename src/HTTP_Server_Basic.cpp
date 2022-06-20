@@ -14,11 +14,12 @@
 #include <WebServer.h>
 #include <HTTPClient.h>
 #include <HTTPUpdate.h>
-#include <SPIFFS.h>
+#include <LittleFS.h>
 #include <ESPmDNS.h>
 #include <WiFiClientSecure.h>
 #include <Update.h>
 #include <DNSServer.h>
+#include <ArduinoJson.h>
 
 File fsUploadFile;
 
@@ -129,16 +130,16 @@ void HTTP_Server::start() {
   server.on("/generate_204", handleIndexFile);         // Android captive portal
   server.on("/fwlink", handleIndexFile);               // Microsoft captive portal
   server.on("/hotspot-detect.html", handleIndexFile);  // Apple captive portal
-  server.on("/style.css", handleSpiffsFile);
-  server.on("/btsimulator.html", handleSpiffsFile);
-  server.on("/shift.html", handleSpiffsFile);
-  server.on("/settings.html", handleSpiffsFile);
-  server.on("/status.html", handleSpiffsFile);
-  server.on("/bluetoothscanner.html", handleSpiffsFile);
-  server.on("/hrtowatts.html", handleSpiffsFile);
-  server.on("/favicon.ico", handleSpiffsFile);
+  server.on("/style.css", handleLittleFSFile);
+  server.on("/btsimulator.html", handleLittleFSFile);
+  server.on("/shift.html", handleLittleFSFile);
+  server.on("/settings.html", handleLittleFSFile);
+  server.on("/status.html", handleLittleFSFile);
+  server.on("/bluetoothscanner.html", handleLittleFSFile);
+  server.on("/hrtowatts.html", handleLittleFSFile);
+  server.on("/favicon.ico", handleLittleFSFile);
   server.on("/send_settings", settingsProcessor);
-  server.on("/jquery.js.gz", handleSpiffsFile);
+  server.on("/jquery.js.gz", handleLittleFSFile);
 
   server.on("/BLEScan", []() {
     SS2K_LOG(HTTP_SERVER_LOG_TAG, "Scanning from web request");
@@ -153,9 +154,9 @@ void HTTP_Server::start() {
 
   server.on("/load_defaults.html", []() {
     SS2K_LOG(HTTP_SERVER_LOG_TAG, "Setting Defaults from Web Request");
-    SPIFFS.format();
+    LittleFS.format();
     userConfig.setDefaults();
-    userConfig.saveToSPIFFS();
+    userConfig.saveToLittleFS();
     String response =
         "<!DOCTYPE html><html><body><h1>Defaults have been "
         "loaded.</h1><p><br><br> Please reconnect to the device on WiFi "
@@ -335,7 +336,7 @@ void HTTP_Server::start() {
               filename = "/" + filename;
             }
             SS2K_LOG(HTTP_SERVER_LOG_TAG, "handleFileUpload Name: %s", filename.c_str());
-            fsUploadFile = SPIFFS.open(filename, "w");
+            fsUploadFile = LittleFS.open(filename, "w");
             filename     = String();
           } else if (upload.status == UPLOAD_FILE_WRITE) {
             if (fsUploadFile) {
@@ -358,9 +359,9 @@ void HTTP_Server::start() {
                           "webClientUpdate",                  /* name of task. */
                           6000 + (DEBUG_LOG_BUFFER_SIZE * 2), /* Stack size of task Used to be 3000*/
                           NULL,                               /* parameter of the task */
-                          1,                                  /* priority of the task  - 29 worked*/
+                          2,                                  /* priority of the task */
                           &webClientTask,                     /* Task handle to keep track of created task */
-                          1);                                 /* pin task to core */
+                          0);                                 /* pin task to core */
 
 #ifdef USE_TELEGRAM
   xTaskCreatePinnedToCore(telegramUpdate,   /* Task function. */
@@ -396,8 +397,8 @@ void HTTP_Server::webClientUpdate(void *pvParameters) {
 
 void HTTP_Server::handleIndexFile() {
   String filename = "/index.html";
-  if (SPIFFS.exists(filename)) {
-    File file = SPIFFS.open(filename, FILE_READ);
+  if (LittleFS.exists(filename)) {
+    File file = LittleFS.open(filename, FILE_READ);
     server.streamFile(file, "text/html");
     file.close();
     SS2K_LOG(HTTP_SERVER_LOG_TAG, "Served %s", filename.c_str());
@@ -407,19 +408,19 @@ void HTTP_Server::handleIndexFile() {
   }
 }
 
-void HTTP_Server::handleSpiffsFile() {
+void HTTP_Server::handleLittleFSFile() {
   String filename = server.uri();
   int dotPosition = filename.lastIndexOf(".");
   String fileType = filename.substring((dotPosition + 1), filename.length());
-  if (SPIFFS.exists(filename)) {
-    File file = SPIFFS.open(filename, FILE_READ);
+  if (LittleFS.exists(filename)) {
+    File file = LittleFS.open(filename, FILE_READ);
     if (fileType == "gz") {
       fileType = "html";  // no need to change content type as it's done automatically by .streamfile below VV
     }
     server.streamFile(file, "text/" + fileType);
     file.close();
     SS2K_LOG(HTTP_SERVER_LOG_TAG, "Served %s", filename.c_str());
-  } else if (!SPIFFS.exists("/index.html")) {
+  } else if (!LittleFS.exists("/index.html")) {
     SS2K_LOG(HTTP_SERVER_LOG_TAG, "%s not found and no filesystem. Sending builting index.html", filename.c_str());
     handleIndexFile();
   } else {
@@ -576,9 +577,9 @@ void HTTP_Server::settingsProcessor() {
   }
   server.send(200, "text/html", response);
   SS2K_LOG(HTTP_SERVER_LOG_TAG, "Config Updated From Web");
-  userConfig.saveToSPIFFS();
+  userConfig.saveToLittleFS();
   userConfig.printFile();
-  userPWC.saveToSPIFFS();
+  userPWC.saveToLittleFS();
   userPWC.printFile();
 }
 
@@ -616,7 +617,7 @@ void HTTP_Server::FirmwareUpdate() {
   http.end();
   if (httpCode == HTTP_CODE_OK) {  // if version received
     bool updateAnyway = false;
-    if (!SPIFFS.exists("/index.html")) {
+    if (!LittleFS.exists("/index.html")) {
       updateAnyway = true;
       SS2K_LOG(HTTP_SERVER_LOG_TAG, "  -index.html not found. Forcing update");
     }
@@ -627,31 +628,60 @@ void HTTP_Server::FirmwareUpdate() {
       SS2K_LOG(HTTP_SERVER_LOG_TAG, "New firmware detected!");
       SS2K_LOG(HTTP_SERVER_LOG_TAG, "Upgrading from %s to %s", FIRMWARE_VERSION, payload.c_str());
 
-      // Update Spiffs
-      httpUpdate.setLedPin(LED_BUILTIN, LOW);
+      //////////////// Update LittleFS//////////////
       SS2K_LOG(HTTP_SERVER_LOG_TAG, "Updating FileSystem");
-      t_httpUpdate_return ret = httpUpdate.updateSpiffs(client, userConfig.getFirmwareUpdateURL() + String(FW_SPIFFSFILE));
-      vTaskDelay(100 / portTICK_PERIOD_MS);
-      switch (ret) {
-        case HTTP_UPDATE_OK:
-          SS2K_LOG(HTTP_SERVER_LOG_TAG, "Saving Config.txt");
-          userConfig.saveToSPIFFS();
-          userPWC.saveToSPIFFS();
-          SS2K_LOG(HTTP_SERVER_LOG_TAG, "Updating Program");
-          break;
-
-        case HTTP_UPDATE_NO_UPDATES:
-          SS2K_LOG(HTTP_SERVER_LOG_TAG, "HTTP_UPDATE_NO_UPDATES");
-          break;
-
-        case HTTP_UPDATE_FAILED:
-          SS2K_LOG(HTTP_SERVER_LOG_TAG, "SPIFFS Update Failed: %d : %s", httpUpdate.getLastError(), httpUpdate.getLastErrorString().c_str());
-          break;
+      http.begin(DATA_UPDATEURL + String(DATA_FILELIST),
+                 rootCACertificate);  // check version URL
+      delay(100);
+      httpCode = http.GET();  // get data from version file
+      delay(100);
+      StaticJsonDocument<500> doc;
+      if (httpCode == HTTP_CODE_OK) {  // if version received
+        String payload;
+        payload = http.getString();  // save received version
+        payload.trim();
+        // Deserialize the JSON document
+        DeserializationError error = deserializeJson(doc, payload);
+        if (error) {
+          SS2K_LOG(HTTP_SERVER_LOG_TAG, "Failed to read file list");
+          return;
+        }
+        httpServer.internetConnection = true;
+      } else {
+        SS2K_LOG(HTTP_SERVER_LOG_TAG, "error downloading %s %d", DATA_FILELIST, httpCode);
+        httpServer.internetConnection = false;
+      }
+      JsonArray files = doc.as<JsonArray>();
+      // iterate through file list and download files individually
+      for (JsonVariant v : files) {
+        String fileName = "/" + v.as<String>();
+        http.begin(DATA_UPDATEURL + fileName,
+                   rootCACertificate);  // check version URL
+        delay(100);
+        httpCode = http.GET();
+        delay(100);
+        if (httpCode == HTTP_CODE_OK) {
+          String payload;
+          payload = http.getString();
+          payload.trim();
+          LittleFS.remove(fileName);
+          File file = LittleFS.open(fileName, FILE_WRITE);
+          if (!file) {
+            SS2K_LOG(HTTP_SERVER_LOG_TAG, "Failed to create file, %s", fileName);
+            return;
+          }
+          file.print(payload);
+          file.close();
+          httpServer.internetConnection = true;
+        } else {
+          SS2K_LOG(HTTP_SERVER_LOG_TAG, "error downloading %s %d", fileName, httpCode);
+          httpServer.internetConnection = false;
+        }
       }
 
-      // Update Firmware
+      //////// Update Firmware /////////
       if ((availiableVer > currentVer) && (userConfig.getAutoUpdate())) {
-        ret = httpUpdate.update(client, userConfig.getFirmwareUpdateURL() + String(FW_BINFILE));
+        t_httpUpdate_return ret = httpUpdate.update(client, userConfig.getFirmwareUpdateURL() + String(FW_BINFILE));
         switch (ret) {
           case HTTP_UPDATE_FAILED:
             SS2K_LOG(HTTP_SERVER_LOG_TAG, "HTTP_UPDATE_FAILED Error %d : %s", httpUpdate.getLastError(), httpUpdate.getLastErrorString().c_str());

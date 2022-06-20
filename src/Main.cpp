@@ -9,7 +9,7 @@
 #include "SS2KLog.h"
 #include <TMCStepper.h>
 #include <Arduino.h>
-#include <SPIFFS.h>
+#include <LittleFS.h>
 #include <HardwareSerial.h>
 #include "FastAccelStepper.h"
 #include "ERG_Mode.h"
@@ -64,23 +64,23 @@ void setup() {
   stepperSerial.begin(57600, SERIAL_8N2, STEPPERSERIAL_RX, STEPPERSERIAL_TX);
   SS2K_LOG(MAIN_LOG_TAG, "Compiled %s%s", __DATE__, __TIME__);
 
-  // Initialize SPIFFS
+  // Initialize LittleFS
   SS2K_LOG(MAIN_LOG_TAG, "Mounting Filesystem");
-  if (!SPIFFS.begin(true)) {
-    SS2K_LOG(MAIN_LOG_TAG, "An Error has occurred while mounting SPIFFS");
+  if (!LittleFS.begin(true)) {
+    SS2K_LOG(MAIN_LOG_TAG, "An Error has occurred while mounting LittleFS");
     // TODO reset flash here
     return;
   }
 
   // Load Config
-  userConfig.loadFromSPIFFS();
+  userConfig.loadFromLittleFS();
   userConfig.printFile();  // Print userConfig.contents to serial
-  userConfig.saveToSPIFFS();
+  userConfig.saveToLittleFS();
 
   // load PWC for HR to Pwr Calculation
-  userPWC.loadFromSPIFFS();
+  userPWC.loadFromLittleFS();
   userPWC.printFile();
-  userPWC.saveToSPIFFS();
+  userPWC.saveToLittleFS();
 
   pinMode(RADIO_PIN, INPUT_PULLUP);
   pinMode(SHIFT_UP_PIN, INPUT_PULLUP);    // Push-Button with input Pullup
@@ -318,7 +318,7 @@ void SS2K::resetIfShiftersHeld() {
     for (int i = 0; i < 20; i++) {
       userConfig.setDefaults();
       vTaskDelay(200 / portTICK_PERIOD_MS);
-      userConfig.saveToSPIFFS();
+      userConfig.saveToLittleFS();
       vTaskDelay(200 / portTICK_PERIOD_MS);
     }
     ESP.restart();
