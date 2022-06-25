@@ -11,6 +11,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Changed
  - updated CA for OTA updates
  - Converted filesystem from SPIFFS to LittleFS
+ - Added functions for automatic settings conversion from SPIFFS
 
 
 ### Hardware

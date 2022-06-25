@@ -75,7 +75,6 @@ void setup() {
     SS2K_LOG(MAIN_LOG_TAG, "An Error has occurred while mounting LittleFS.");
     // BEGIN FS UPGRADE SPECIFIC//
     upgrade.upgradeFS();
-    //LittleFS.begin();
     // END FS UPGRADE SPECIFIC//
   }
 

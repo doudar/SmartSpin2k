@@ -33,6 +33,7 @@ void FSUpgrader::upgradeFS() {
   }
   LittleFS.format();
   userConfig.saveToLittleFS();
+  userPWC.saveToLittleFS();
 }
 
 // Loads the JSON configuration from a file into a userParameters Object
@@ -96,4 +97,35 @@ void FSUpgrader::loadFromSPIFFS() {
 
   SS2K_LOG(FS_UPGRADER_LOG_TAG, "Config File Loaded: %s", configFILENAME);
   this->file.close();
+
+  // Loading USER PWC
+  SS2K_LOG(FS_UPGRADER_LOG_TAG, "Reading File: %s", userPWCFILENAME);
+  File file = SPIFFS.open(userPWCFILENAME);
+
+  // load defaults if filename doesn't exist
+  if (!file) {
+    SS2K_LOG(FS_UPGRADER_LOG_TAG, "Couldn't find configuration file. Loading Defaults");
+    userPWC.setDefaults();
+    return;
+  }
+
+  doc.clear();
+
+  // Deserialize the JSON document
+  DeserializationError errorTwo = deserializeJson(doc, file);
+  if (errorTwo) {
+    SS2K_LOG(FS_UPGRADER_LOG_TAG, "Failed to read file, using default configuration");
+    userPWC.setDefaults();
+    return;
+  }
+
+  // Copy values from the JsonDocument to the Config
+  userPWC.session1HR  = doc["session1HR"];
+  userPWC.session1Pwr = doc["session1Pwr"];
+  userPWC.session2HR  = doc["session2HR"];
+  userPWC.session2Pwr = doc["session2Pwr"];
+  userPWC.hr2Pwr      = doc["hr2Pwr"];
+
+  SS2K_LOG(FS_UPGRADER_LOG_TAG, "Config File Loaded: %s", userPWCFILENAME);
+  file.close();
 }
