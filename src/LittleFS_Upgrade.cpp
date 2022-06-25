@@ -7,32 +7,44 @@
 
 #include "LittleFS_Upgrade.h"
 #include "Main.h"
-#include <Arduino.h>
 #include <LittleFS.h>
-#include <SPIFFS.h>
+#include <arduinojson.h>
 
-void FSUpgrader::UpgradeFS() {
-  if (!SPIFFS.begin()) {
+void FSUpgrader::upgradeFS() {
+  SS2K_LOG(FS_UPGRADER_LOG_TAG, "Stopping LittleFS");
+  LittleFS.end();
+  if (!SPIFFS.begin(false)) {
     SS2K_LOG(FS_UPGRADER_LOG_TAG, "SPIFFS Not Found - Could not upgrade FS");
     SPIFFS.end();
-    LittleFS.begin();
-    LittleFS.format();
-    LittleFS.end();
+    vTaskDelay(100 / portTICK_PERIOD_MS);
+    LittleFS.begin(true);
     return;
   };
-  file = SPIFFS.open(configFILENAME, FILE_WRITE);
+  // attempt to recover data from old SPIFFS Config
+  this->loadFromSPIFFS();
+  // Cleanup
+  SPIFFS.end();
+  vTaskDelay(100 / portTICK_PERIOD_MS);
+  SS2K_LOG(FS_UPGRADER_LOG_TAG, "Upgrade Complete. Starting LittleFS");
+  if (!LittleFS.begin(true)) {
+    SS2K_LOG(FS_UPGRADER_LOG_TAG, "Starting LittleFS failed. Retrying");
+    vTaskDelay(100 / portTICK_PERIOD_MS);
+    LittleFS.begin(true);
+  }
+  LittleFS.format();
+  userConfig.saveToLittleFS();
 }
 
 // Loads the JSON configuration from a file into a userParameters Object
 void FSUpgrader::loadFromSPIFFS() {
   userConfig.setDefaults();
   // Open file for reading
-  SS2K_LOG(CONFIG_LOG_TAG, "Reading File: %s", configFILENAME);
-  File file = LittleFS.open(configFILENAME);
+  SS2K_LOG(FS_UPGRADER_LOG_TAG, "Upgrade starting. Reading File: %s", configFILENAME);
+  this->file = SPIFFS.open(configFILENAME);
 
   // load defaults if filename doesn't exist
-  if (!file) {
-    SS2K_LOG(CONFIG_LOG_TAG, "Couldn't find configuration file. using defaults");
+  if (!this->file) {
+    SS2K_LOG(FS_UPGRADER_LOG_TAG, "Couldn't upgrade filesystem. Using defaults");
     return;
   }
   // Allocate a temporary JsonDocument
@@ -43,59 +55,45 @@ void FSUpgrader::loadFromSPIFFS() {
   // Deserialize the JSON document
   DeserializationError error = deserializeJson(doc, file);
   if (error) {
-    SS2K_LOG(CONFIG_LOG_TAG, "Failed to read file, using defaults");
+    SS2K_LOG(FS_UPGRADER_LOG_TAG, "Failed to deserialize. Using defaults");
     return;
   }
 
   // Copy values from the JsonDocument to the Config
-  setFirmwareUpdateURL(doc["firmwareUpdateURL"]);
-  setDeviceName(doc["deviceName"]);
-  setShiftStep(doc["shiftStep"]);
-  setStepperPower(doc["stepperPower"]);
-  setStealthChop(doc["stealthchop"]);
-  setInclineMultiplier(doc["inclineMultiplier"]);
-  setAutoUpdate(doc["autoUpdate"]);
-  setSsid(doc["ssid"]);
-  setPassword(doc["password"]);
-  setConnectedPowerMeter(doc["connectedPowerMeter"]);
-  setConnectedHeartMonitor(doc["connectedHeartMonitor"]);
-  setFoundDevices(doc["foundDevices"]);
+  userConfig.setFirmwareUpdateURL(doc["firmwareUpdateURL"]);
+  userConfig.setDeviceName(doc["deviceName"]);
+  userConfig.setShiftStep(doc["shiftStep"]);
+  userConfig.setStepperPower(doc["stepperPower"]);
+  userConfig.setStealthChop(doc["stealthchop"]);
+  userConfig.setInclineMultiplier(doc["inclineMultiplier"]);
+  userConfig.setAutoUpdate(doc["autoUpdate"]);
+  userConfig.setSsid(doc["ssid"]);
+  userConfig.setPassword(doc["password"]);
+  userConfig.setConnectedPowerMeter(doc["connectedPowerMeter"]);
+  userConfig.setConnectedHeartMonitor(doc["connectedHeartMonitor"]);
+  userConfig.setFoundDevices(doc["foundDevices"]);
   if (doc["ERGSensitivity"]) {  // If statements to upgrade old versions of config.txt that didn't include these
-    setERGSensitivity(doc["ERGSensitivity"]);
+    userConfig.setERGSensitivity(doc["ERGSensitivity"]);
   }
   if (doc["maxWatts"]) {
-    setMaxWatts(doc["maxWatts"]);
+    userConfig.setMaxWatts(doc["maxWatts"]);
   }
   if (!doc["stepperDir"].isNull()) {
-    setStepperDir(doc["stepperDir"]);
+    userConfig.setStepperDir(doc["stepperDir"]);
   }
   if (!doc["shifterDir"].isNull()) {
-    setShifterDir(doc["shifterDir"]);
+    userConfig.setShifterDir(doc["shifterDir"]);
   }
   if (!doc["udpLogEnabled"].isNull()) {
-    setUdpLogEnabled(doc["udpLogEnabled"]);
+    userConfig.setUdpLogEnabled(doc["udpLogEnabled"]);
   }
   if (doc["powerCorrectionFactor"]) {
-    setPowerCorrectionFactor(doc["powerCorrectionFactor"]);
-    if ((getPowerCorrectionFactor() < MIN_PCF) || (getPowerCorrectionFactor() > MAX_PCF)) {
-      setPowerCorrectionFactor(1);
+    userConfig.setPowerCorrectionFactor(doc["powerCorrectionFactor"]);
+    if ((userConfig.getPowerCorrectionFactor() < MIN_PCF) || (userConfig.getPowerCorrectionFactor() > MAX_PCF)) {
+      userConfig.setPowerCorrectionFactor(1);
     }
   }
 
-  SS2K_LOG(CONFIG_LOG_TAG, "Config File Loaded: %s", configFILENAME);
-  file.close();
-}
-
-// Prints the content of a file to the Serial
-void userParameters::printFile() {
-  // Open file for reading
-  SS2K_LOG(CONFIG_LOG_TAG, "Contents of file: %s", configFILENAME);
-  File file = LittleFS.open(configFILENAME);
-  if (!file) {
-    SS2K_LOG(CONFIG_LOG_TAG, "Failed to read file");
-    return;
-  }
-
-  // Close the file
-  file.close();
+  SS2K_LOG(FS_UPGRADER_LOG_TAG, "Config File Loaded: %s", configFILENAME);
+  this->file.close();
 }
