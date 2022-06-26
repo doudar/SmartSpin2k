@@ -155,8 +155,8 @@ class userParameters {
   const char* getFoundDevices() { return foundDevices.c_str(); }
 
   String returnJSON();
-  void saveToSPIFFS();
-  void loadFromSPIFFS();
+  void saveToLittleFS();
+  void loadFromLittleFS();
   void printFile();
 };
 
@@ -170,7 +170,7 @@ class physicalWorkingCapacity {
 
   void setDefaults();
   String returnJSON();
-  void saveToSPIFFS();
-  void loadFromSPIFFS();
+  void saveToLittleFS();
+  void loadFromLittleFS();
   void printFile();
 };

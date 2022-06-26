@@ -903,9 +903,9 @@ void ss2kCustomCharacteristicCallbacks::onWrite(BLECharacteristic *pCharacterist
       }
       break;
 
-    case BLE_saveToSpiffs:  // 0x18
-      logBufLength += snprintf(logBuf + logBufLength, kLogBufCapacity - logBufLength, "<-saveToSpiffs");
-      userConfig.saveToSPIFFS();
+    case BLE_saveToLittleFS:  // 0x18
+      logBufLength += snprintf(logBuf + logBufLength, kLogBufCapacity - logBufLength, "<-saveToLittleFS");
+      userConfig.saveToLittleFS();
       returnValue[0] = success;
       break;
 
