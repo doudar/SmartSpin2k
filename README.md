@@ -1,6 +1,6 @@
 <img src="Pictures/ss2k_banner.png" alt="ss2k banner" width=100%>
 
-#2.6.26 Released implementing LittleFS and more app support. 
+## 2.6.26 Released implementing LittleFS and more app support. 
 
 SmartSpin2k is an easy to build open source project that lets you turn any Spin Bike into a Smart Trainer. SmartSpin2k uses an ESP32 and stepper motor to let fitness apps like Zwift automatically control spin bikes that have a resistance knob. The SmartSpin2k also has shifter buttons that allow the user to simulate shifting gears on the stationary bike. 
 
