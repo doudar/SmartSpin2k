@@ -35,6 +35,10 @@ physicalWorkingCapacity userPWC;
 UdpAppender udpAppender;
 WebSocketAppender webSocketAppender;
 
+///////////// FS Upgrader //////////////
+
+//^Remove this after a few OTA updates//
+
 ///////////// BEGIN SETUP /////////////
 #ifndef UNIT_TEST
 
@@ -66,10 +70,12 @@ void setup() {
 
   // Initialize LittleFS
   SS2K_LOG(MAIN_LOG_TAG, "Mounting Filesystem");
-  if (!LittleFS.begin(true)) {
-    SS2K_LOG(MAIN_LOG_TAG, "An Error has occurred while mounting LittleFS");
-    // TODO reset flash here
-    return;
+  if (!LittleFS.begin(false)) {
+    FSUpgrader upgrade;
+    SS2K_LOG(MAIN_LOG_TAG, "An Error has occurred while mounting LittleFS.");
+    // BEGIN FS UPGRADE SPECIFIC//
+    upgrade.upgradeFS();
+    // END FS UPGRADE SPECIFIC//
   }
 
   // Load Config
@@ -235,7 +241,7 @@ void SS2K::moveStepper(void *pvParameters) {
           ss2k.targetPosition = rtConfig.getTargetIncline();
         } else {
           // Simulation Mode
-          ss2k.targetPosition   = rtConfig.getShifterPosition() * userConfig.getShiftStep();
+          ss2k.targetPosition = rtConfig.getShifterPosition() * userConfig.getShiftStep();
           ss2k.targetPosition += rtConfig.getTargetIncline() * userConfig.getInclineMultiplier();
         }
       }

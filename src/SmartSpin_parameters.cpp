@@ -152,7 +152,7 @@ void userParameters::loadFromLittleFS() {
 
   // load defaults if filename doesn't exist
   if (!file) {
-    SS2K_LOG(CONFIG_LOG_TAG, "Couldn't find configuration file. using defaults");
+    SS2K_LOG(CONFIG_LOG_TAG, "Couldn't find configuration file.");
     return;
   }
   // Allocate a temporary JsonDocument
@@ -163,7 +163,7 @@ void userParameters::loadFromLittleFS() {
   // Deserialize the JSON document
   DeserializationError error = deserializeJson(doc, file);
   if (error) {
-    SS2K_LOG(CONFIG_LOG_TAG, "Failed to read file, using defaults");
+    SS2K_LOG(CONFIG_LOG_TAG, "Failed to deserialize. Using defaults");
     return;
   }
 
