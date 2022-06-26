@@ -35,10 +35,6 @@ physicalWorkingCapacity userPWC;
 UdpAppender udpAppender;
 WebSocketAppender webSocketAppender;
 
-///////////// FS Upgrader //////////////
-
-//^Remove this after a few OTA updates//
-
 ///////////// BEGIN SETUP /////////////
 #ifndef UNIT_TEST
 
