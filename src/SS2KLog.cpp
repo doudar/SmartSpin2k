@@ -54,7 +54,7 @@ void LogHandler::writeLogs() {
 void LogHandler::writev(esp_log_level_t level, const char *module, const char *format, va_list args) {
   if (xSemaphoreTake(_logBufferMutex, 10) == pdFALSE) {
     // Must use ESP_LOG here using of SSK_LOG creates dead lock
-    ESP_LOGE(LOG_HANDLER_TAG, "Can not write log message. Write is blocke by other task.");
+    ESP_LOGE(LOG_HANDLER_TAG, "Can not write log message. Write is blocked by other task.");
     return;
   }
 
