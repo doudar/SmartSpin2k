@@ -7,13 +7,23 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+- Added comment when files are written to LittleFS.
+- Added comment when firmware starts to update.
 
+### Changed
+- Updated Libraries to newest versions.
+
+### Hardware
+
+## [2.6.26]
+
+### Added
+- Added functions for automatic settings conversion from SPIFFS
+- 
 ### Changed
  - updated CA for OTA updates
  - Converted filesystem from SPIFFS to LittleFS
- - Added functions for automatic settings conversion from SPIFFS
  - Fixed endianness for ftmsPowerRange and ftmsPowerRange.
-
 
 ### Hardware
  - added chamfer to screw posts in case body (direct mount mod)
