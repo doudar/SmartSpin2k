@@ -27,6 +27,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Hardware
  - added chamfer to screw posts in case body (direct mount mod)
+ - minor tweak to shifter cable retainer.
 
 ## [2.2.8]
 
