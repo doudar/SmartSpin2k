@@ -9,9 +9,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Added
 - Added comment when files are written to LittleFS.
 - Added comment when firmware starts to update.
+- Added setting for minWatts
 
 ### Changed
 - Updated Libraries to newest versions.
+- Disabled setting of min/maxWatts if minWatts/maxWatts is 0.
 
 ### Hardware
 
