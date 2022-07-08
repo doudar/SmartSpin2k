@@ -114,7 +114,6 @@ void PowerTable::setStepperMinMax() {
 
   int minBreakWatts = userConfig.getMinWatts();
   if (minBreakWatts > 0) {
-    Serial.println("Check for min");
     _return = this->lookup(minBreakWatts, 90);
     if (_return != RETURN_ERROR) {
       rtConfig.setMinStep(_return);
@@ -124,7 +123,6 @@ void PowerTable::setStepperMinMax() {
 
   int maxBreakWatts = userConfig.getMaxWatts();
   if (maxBreakWatts > 0) {
-    Serial.println("Check for max");
     _return = this->lookup(maxBreakWatts, 90);
     if (_return != RETURN_ERROR) {
       rtConfig.setMaxStep(_return);
