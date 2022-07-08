@@ -465,8 +465,14 @@ void HTTP_Server::settingsProcessor() {
   }
   if (!server.arg("maxWatts").isEmpty()) {
     uint64_t maxWatts = server.arg("maxWatts").toInt();
-    if (maxWatts >= 300 && maxWatts <= 2000) {
+    if (maxWatts >= 0 && maxWatts <= 2000) {
       userConfig.setMaxWatts(maxWatts);
+    }
+  }
+  if (!server.arg("minWatts").isEmpty()) {
+    uint64_t minWatts = server.arg("minWatts").toInt();
+    if (minWatts >= 0 && minWatts <= 200) {
+      userConfig.setMinWatts(minWatts);
     }
   }
   if (!server.arg("ERGSensitivity").isEmpty()) {

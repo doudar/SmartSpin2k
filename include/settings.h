@@ -79,6 +79,9 @@
 // is obtained as closely as possible during each shift.
 #define WATTS_PER_SHIFT 30
 
+// Default Min Watts to stop stepper.
+#define DEFAULT_MIN_WATTS 50
+
 // Default Max Watts that the brake on the spin bike can absorb from the user.
 #define DEFAULT_MAX_WATTS 700
 

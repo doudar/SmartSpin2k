@@ -56,6 +56,7 @@ void userParameters::setDefaults() {
   connectedPowerMeter   = CONNECTED_POWER_METER;
   connectedHeartMonitor = CONNECTED_HEART_MONITOR;
   maxWatts              = DEFAULT_MAX_WATTS;
+  minWatts              = DEFAULT_MIN_WATTS;
   stepperDir            = true;
   shifterDir            = true;
   udpLogEnabled         = false;
@@ -86,6 +87,7 @@ String userParameters::returnJSON() {
   doc["connectedHeartMonitor"] = connectedHeartMonitor;
   doc["foundDevices"]          = foundDevices;
   doc["maxWatts"]              = maxWatts;
+  doc["minWatts"]              = minWatts;
   doc["shifterDir"]            = shifterDir;
   doc["stepperDir"]            = stepperDir;
   doc["udpLogEnabled"]         = udpLogEnabled;
@@ -131,6 +133,7 @@ void userParameters::saveToLittleFS() {
   doc["connectedHeartMonitor"] = connectedHeartMonitor;
   doc["foundDevices"]          = foundDevices;
   doc["maxWatts"]              = maxWatts;
+  doc["minWatts"]              = minWatts;
   doc["shifterDir"]            = shifterDir;
   doc["stepperDir"]            = stepperDir;
   doc["udpLogEnabled"]         = udpLogEnabled;
@@ -185,6 +188,9 @@ void userParameters::loadFromLittleFS() {
   }
   if (doc["maxWatts"]) {
     setMaxWatts(doc["maxWatts"]);
+  }
+  if (doc["minWatts"]) {
+    setMinWatts(doc["minWatts"]);
   }
   if (!doc["stepperDir"].isNull()) {
     setStepperDir(doc["stepperDir"]);
