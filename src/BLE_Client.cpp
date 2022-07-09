@@ -30,11 +30,11 @@ void SpinBLEClient::start() {
   // Create the task for the BLE Client loop
   xTaskCreatePinnedToCore(bleClientTask,   /* Task function. */
                           "BLEClientTask", /* name of task. */
-                          4700,            /* Stack size of task */
+                          5500,            /* Stack size of task */
                           NULL,            /* parameter of the task */
                           1,               /* priority of the task  */
                           &BLEClientTask,  /* Task handle to keep track of created task */
-                          0);              /* pin task to core */
+                          1);              /* pin task to core */
 }
 
 static void onNotify(BLERemoteCharacteristic *pBLERemoteCharacteristic, uint8_t *pData, size_t length, bool isNotify) {

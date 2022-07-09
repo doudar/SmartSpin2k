@@ -139,9 +139,28 @@
             </tr>
             <tr>
               <td>
+                <p class="tooltip">Min Bike<br />Brake Watts
+                  <span class="tooltiptext">
+                    Set the minimum watts until stepper stops.<br>0 disables check.
+                  </span>
+                </p>
+              </td>
+              <td>
+                <div style="font-size:large; color: rgb(250, 250, 250);">
+                  <span id="minWattsValue">0</span><span>W</span>
+                </div>
+                <input type='button' onclick="clickStep(document.getElementById('minWatts'), this.value)" value="-">
+                <input style="width:50%; position: relative; top: 5px;" type="range" id="minWatts" name="minWatts"
+                  min="0" max="200" value="0" step="5" class="slider1"
+                  onchange="updateSlider(this.value, document.getElementById('minWattsValue'))" />
+                <input type='button' onclick="clickStep(document.getElementById('minWatts'), this.value)" value="+">
+              </td>
+            </tr>
+            <tr>
+              <td>
                 <p class="tooltip">Max Bike<br />Brake Watts
                   <span class="tooltiptext">
-                    Set the most watts you've ever seen your bike absorb while you're pedaling
+                    Set the most watts you've ever seen your bike absorb while you're pedaling.<br>0 disables check.
                   </span>
                 </p>
               </td>
@@ -151,7 +170,7 @@
                 </div>
                 <input type='button' onclick="clickStep(document.getElementById('maxWatts'), this.value)" value="-">
                 <input style="width:50%; position: relative; top: 5px;" type="range" id="maxWatts" name="maxWatts"
-                  min="300" max="2000" value="0" step="25" class="slider1"
+                  min="0" max="2000" value="0" step="25" class="slider1"
                   onchange="updateSlider(this.value, document.getElementById('maxWattsValue'))" />
                 <input type='button' onclick="clickStep(document.getElementById('maxWatts'), this.value)" value="+">
               </td>
@@ -300,6 +319,7 @@
         document.getElementById("inclineMultiplier").value = obj.inclineMultiplier;
         document.getElementById("ERGSensitivity").value = obj.ERGSensitivity;
         document.getElementById("stepperPower").value = obj.stepperPower;
+        document.getElementById("minWatts").value = obj.minWatts;
         document.getElementById("maxWatts").value = obj.maxWatts;
         document.getElementById("stealthchop").checked = obj.stealthchop;
         document.getElementById("autoUpdate").checked = obj.autoUpdate;
@@ -310,6 +330,7 @@
         updateSlider(document.getElementById("inclineMultiplier").value, document.getElementById("inclineMultiplierValue"));
         updateSlider(document.getElementById("ERGSensitivity").value, document.getElementById("ERGSensitivityValue"));
         updateSlider(document.getElementById("stepperPower").value, document.getElementById("stepperPowerValue"));
+        updateSlider(document.getElementById("minWatts").value, document.getElementById("minWattsValue"));
         updateSlider(document.getElementById("maxWatts").value, document.getElementById("maxWattsValue"));
         document.getElementById("loadingWatermark").remove();
       } else {

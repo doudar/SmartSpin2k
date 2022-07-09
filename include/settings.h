@@ -29,13 +29,15 @@
 // Path to the latest Firmware
 #define FW_BINFILE "firmware.bin"
 
-// Path to the latest filesystem
-#define FW_SPIFFSFILE "spiffs.bin"
+//Data directory Source
+#define DATA_UPDATEURL "https://raw.githubusercontent.com/doudar/SmartSpin2k/LittleFS/data"
 
-// name of local file to save configuration in SPIFFS
+#define DATA_FILELIST "/list.json"
+
+// name of local file to save configuration in LittleFS
 #define configFILENAME "/config.txt"
 
-// name of local file to save Physical Working Capacity in Spiffs
+// name of local file to save Physical Working Capacity in LittleFS
 #define userPWCFILENAME "/userPWC.txt"
 
 // Default Incline Multiplier.
@@ -76,6 +78,9 @@
 // Number of watts per shift expected by ERG mode for it's calculation. The user should target this number by adjusting Shift Step until WATTS_PER_SHIFT
 // is obtained as closely as possible during each shift.
 #define WATTS_PER_SHIFT 30
+
+// Default Min Watts to stop stepper.
+#define DEFAULT_MIN_WATTS 50
 
 // Default Max Watts that the brake on the spin bike can absorb from the user.
 #define DEFAULT_MAX_WATTS 700

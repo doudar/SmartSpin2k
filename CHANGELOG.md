@@ -4,9 +4,37 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/)
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Added
+- Added comment when files are written to LittleFS.
+- Added comment when firmware starts to update.
+- Added setting for minWatts
+
+### Changed
+- Updated Libraries to newest versions.
+- Disabled setting of min/maxWatts if minWatts/maxWatts is 0.
+
+### Hardware
+
+## [2.6.26]
+
+### Added
+- Added functions for automatic settings conversion from SPIFFS
+- 
+### Changed
+ - updated CA for OTA updates
+ - Converted filesystem from SPIFFS to LittleFS
+ - Fixed endianness for ftmsPowerRange and ftmsPowerRange.
+
+### Hardware
+ - added chamfer to screw posts in case body (direct mount mod)
+ - minor tweak to shifter cable retainer.
+
 ## [2.2.8]
 
 ### Added
+- Added screenshot for wiki main page
 - Added functions to start and stop WiFi and Http server.
 - Added Additional logging to the custom characteristic.
 - Added option to enable/disable UDP logging. Default is disabled.
@@ -47,12 +75,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Revised shifter for easier printing.  Updated printing instructions.
 - moved original shifter design into Archive directory
 
+
 #### Direct mount Mod
 - IC4 Mod renamed to Direct Mount Mod.  Several directories have changed.
 - bike mount and arm added for Echelon Connect Sport
 - Arm design revised for added stiffness
 - Case, arm and bike mount separated into individual CAD files for easier edits.
 - Arm and bike mount re-drawn in CAD.  It should be much easier to create designs for new bikes now.
+- Added direct mount for Revmaster and Peloton bikes
+- New insert for Startrac
 
 ## [1.12.30]
 

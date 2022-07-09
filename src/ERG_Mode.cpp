@@ -38,6 +38,7 @@ void ergTaskLoop(void* pvParameters) {
   bool hasConnectedPowerMeter = false;
   bool simulationRunning      = false;
   int loopCounter             = 0;
+
   while (true) {
     vTaskDelay(ERG_MODE_DELAY / portTICK_PERIOD_MS);
 
@@ -109,16 +110,24 @@ void PowerTable::processPowerValue(PowerBuffer& powerBuffer, int cadence, Measur
 
 // Set min / max stepper position
 void PowerTable::setStepperMinMax() {
-  int _return = this->lookup(MIN_WATTS, 90);
-  if (_return != RETURN_ERROR) {
-    rtConfig.setMinStep(_return);
-    SS2K_LOG(ERG_MODE_LOG_TAG, "Min Position Set: %d", _return);
-  }
-  _return = this->lookup(userConfig.getMaxWatts(), 90);
+  int _return = RETURN_ERROR;
 
-  if (_return != RETURN_ERROR) {
-    rtConfig.setMaxStep(_return);
-    SS2K_LOG(ERG_MODE_LOG_TAG, "Max Position Set: %d", _return);
+  int minBreakWatts = userConfig.getMinWatts();
+  if (minBreakWatts > 0) {
+    _return = this->lookup(minBreakWatts, 90);
+    if (_return != RETURN_ERROR) {
+      rtConfig.setMinStep(_return);
+      SS2K_LOG(ERG_MODE_LOG_TAG, "Min Position Set: %d", _return);
+    } 
+  }
+
+  int maxBreakWatts = userConfig.getMaxWatts();
+  if (maxBreakWatts > 0) {
+    _return = this->lookup(maxBreakWatts, 90);
+    if (_return != RETURN_ERROR) {
+      rtConfig.setMaxStep(_return);
+      SS2K_LOG(ERG_MODE_LOG_TAG, "Max Position Set: %d", _return);
+    }
   }
 }
 
@@ -285,12 +294,12 @@ int32_t PowerTable::lookup(int watts, int cad) {
 }
 
 bool PowerTable::load() {
-  // load power table from spiffs
+  // load power table from littlefs
   return false;  // return unsuccessful
 }
 
 bool PowerTable::save() {
-  // save powertable from spiffs
+  // save powertable from littlefs
   return false;  // return unsuccessful
 }
 

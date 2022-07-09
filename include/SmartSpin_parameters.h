@@ -109,6 +109,7 @@ class userParameters {
   bool autoUpdate;
   int stepperPower;
   int maxWatts;
+  int minWatts;
   bool stepperDir;
   bool shifterDir;
   bool udpLogEnabled = false;
@@ -133,6 +134,7 @@ class userParameters {
   const char* getconnectedHeartMonitor() { return connectedHeartMonitor.c_str(); }
   int getStepperPower() { return stepperPower; }
   int getMaxWatts() { return maxWatts; }
+  int getMinWatts() { return minWatts; }
   bool getStepperDir() { return stepperDir; }
   bool getShifterDir() { return shifterDir; }
   bool getUdpLogEnabled() { return udpLogEnabled; }
@@ -152,6 +154,7 @@ class userParameters {
   void setConnectedHeartMonitor(String cHr) { connectedHeartMonitor = cHr; }
   void setStepperPower(int sp) { stepperPower = sp; }
   void setMaxWatts(int maxW) { maxWatts = maxW; }
+  void setMinWatts(int minW) { minWatts = minW; }
   void setStepperDir(bool sd) { stepperDir = sd; }
   void setShifterDir(bool shd) { shifterDir = shd; }
   void setUdpLogEnabled(bool enabled) { udpLogEnabled = enabled; }
@@ -159,8 +162,8 @@ class userParameters {
   const char* getFoundDevices() { return foundDevices.c_str(); }
 
   String returnJSON();
-  void saveToSPIFFS();
-  void loadFromSPIFFS();
+  void saveToLittleFS();
+  void loadFromLittleFS();
   void printFile();
 };
 
@@ -174,7 +177,7 @@ class physicalWorkingCapacity {
 
   void setDefaults();
   String returnJSON();
-  void saveToSPIFFS();
-  void loadFromSPIFFS();
+  void saveToLittleFS();
+  void loadFromLittleFS();
   void printFile();
 };

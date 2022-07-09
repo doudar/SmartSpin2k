@@ -2,6 +2,7 @@
 .vscode/c_cpp_properties.json
 .vscode/launch.json
 .vscode/ipch
+.vscode/extensions.json
 test/tmp_pio_test_transport.cpp
 data/config.txt
 include/telegram_token.h

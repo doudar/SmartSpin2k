@@ -18,12 +18,12 @@ class HTTP_Server {
 
   void start();
   void stop();
-  static void handleSpiffsFile();
+  static void handleLittleFSFile();
   static void handleIndexFile();
   static void settingsProcessor();
   static void handleHrSlider();
   static void FirmwareUpdate();
-
+  
   static void webClientUpdate(void *pvParameters);
 
   HTTP_Server() { internetConnection = false; }
@@ -41,5 +41,6 @@ void telegramUpdate(void *pvParameters);
 // wifi Function
 void startWifi();
 void stopWifi();
+
 
 extern HTTP_Server httpServer;
