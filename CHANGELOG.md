@@ -15,6 +15,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Driver Over Temp logging fixed.
 - Updated Libraries to newest versions.
 - Disabled setting of min/maxWatts if minWatts/maxWatts is 0.
+- Added a check to workaround a bug where a powertable pair member was zero.
 
 ### Hardware
 

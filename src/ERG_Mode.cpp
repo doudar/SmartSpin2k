@@ -118,7 +118,7 @@ void PowerTable::setStepperMinMax() {
     if (_return != RETURN_ERROR) {
       rtConfig.setMinStep(_return);
       SS2K_LOG(ERG_MODE_LOG_TAG, "Min Position Set: %d", _return);
-    } 
+    }
   }
 
   int maxBreakWatts = userConfig.getMaxWatts();
@@ -189,7 +189,7 @@ int32_t PowerTable::lookup(int watts, int cad) {
 
   int i         = round(watts / POWERTABLE_INCREMENT);  // find the closest entry
   float scale   = watts / POWERTABLE_INCREMENT - i;     // Should we look at the next higher or next lower index for comparison?
-  int indexPair = -1;                                   // The next closes index with data for interpolation
+  int indexPair = -1;                                   // The next closest index with data for interpolation
   entry above;
   entry below;
   above.power = 0;
@@ -272,6 +272,11 @@ int32_t PowerTable::lookup(int watts, int cad) {
     return (RETURN_ERROR);
   }
   SS2K_LOG(ERG_MODE_LOG_TAG, "PowerTable pairs [%d][%d]", i, indexPair);
+
+  if (!below.power || !above.power) {
+    SS2K_LOG(ERG_MODE_LOG_TAG, "One of the pair was zero. Calculation rejected.");
+    return (RETURN_ERROR);
+  }
 
   // @MarkusSchneider's data shows a linear relationship between CAD and Watts for a given resistance level.
   // It looks like for every 20 CAD increase there is ~50w increase in power. This may need to be adjusted later
