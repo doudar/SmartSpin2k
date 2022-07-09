@@ -9,7 +9,7 @@
 #include "SS2KLog.h"
 #include <TMCStepper.h>
 #include <Arduino.h>
-#include <SPIFFS.h>
+#include <LittleFS.h>
 #include <HardwareSerial.h>
 #include "FastAccelStepper.h"
 #include "ERG_Mode.h"
@@ -64,23 +64,25 @@ void setup() {
   stepperSerial.begin(57600, SERIAL_8N2, STEPPERSERIAL_RX, STEPPERSERIAL_TX);
   SS2K_LOG(MAIN_LOG_TAG, "Compiled %s%s", __DATE__, __TIME__);
 
-  // Initialize SPIFFS
+  // Initialize LittleFS
   SS2K_LOG(MAIN_LOG_TAG, "Mounting Filesystem");
-  if (!SPIFFS.begin(true)) {
-    SS2K_LOG(MAIN_LOG_TAG, "An Error has occurred while mounting SPIFFS");
-    // TODO reset flash here
-    return;
+  if (!LittleFS.begin(false)) {
+    FSUpgrader upgrade;
+    SS2K_LOG(MAIN_LOG_TAG, "An Error has occurred while mounting LittleFS.");
+    // BEGIN FS UPGRADE SPECIFIC//
+    upgrade.upgradeFS();
+    // END FS UPGRADE SPECIFIC//
   }
 
   // Load Config
-  userConfig.loadFromSPIFFS();
+  userConfig.loadFromLittleFS();
   userConfig.printFile();  // Print userConfig.contents to serial
-  userConfig.saveToSPIFFS();
+  userConfig.saveToLittleFS();
 
   // load PWC for HR to Pwr Calculation
-  userPWC.loadFromSPIFFS();
+  userPWC.loadFromLittleFS();
   userPWC.printFile();
-  userPWC.saveToSPIFFS();
+  userPWC.saveToLittleFS();
 
   pinMode(RADIO_PIN, INPUT_PULLUP);
   pinMode(SHIFT_UP_PIN, INPUT_PULLUP);    // Push-Button with input Pullup
@@ -235,7 +237,7 @@ void SS2K::moveStepper(void *pvParameters) {
           ss2k.targetPosition = rtConfig.getTargetIncline();
         } else {
           // Simulation Mode
-          ss2k.targetPosition   = rtConfig.getShifterPosition() * userConfig.getShiftStep();
+          ss2k.targetPosition = rtConfig.getShifterPosition() * userConfig.getShiftStep();
           ss2k.targetPosition += rtConfig.getTargetIncline() * userConfig.getInclineMultiplier();
         }
       }
@@ -318,7 +320,7 @@ void SS2K::resetIfShiftersHeld() {
     for (int i = 0; i < 20; i++) {
       userConfig.setDefaults();
       vTaskDelay(200 / portTICK_PERIOD_MS);
-      userConfig.saveToSPIFFS();
+      userConfig.saveToLittleFS();
       vTaskDelay(200 / portTICK_PERIOD_MS);
     }
     ESP.restart();
@@ -392,18 +394,18 @@ void SS2K::updateStealthchop() {
 
 // Checks the driver temperature and throttles power if above threshold.
 void SS2K::checkDriverTemperature() {
-  static bool overtemp = false;
+  static bool overTemp = false;
   if (static_cast<int>(temperatureRead()) > 72) {  // Start throttling driver power at 72C on the ESP32
     uint8_t throttledPower = (72 - static_cast<int>(temperatureRead())) + DRIVER_MAX_PWR_SCALER;
     driver.irun(throttledPower);
-    SS2K_LOGW(MAIN_LOG_TAG, "Overtemp! Driver is throttleing down! ESP32 @ %f C", temperatureRead());
-    overtemp = true;
+    SS2K_LOGW(MAIN_LOG_TAG, "Over temp! Driver is throttling down! ESP32 @ %f C", temperatureRead());
+    overTemp = true;
   } else if ((driver.cs_actual() < DRIVER_MAX_PWR_SCALER) && !driver.stst()) {
-    if (overtemp) {
+    if (overTemp) {
       SS2K_LOG(MAIN_LOG_TAG, "Temperature is now under control. Driver current reset.");
       driver.irun(DRIVER_MAX_PWR_SCALER);
     }
-    overtemp = false;
+    overTemp = false;
   }
 }
 

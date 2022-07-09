@@ -10,7 +10,7 @@
 #include "SmartSpin_parameters.h"
 
 #include <ArduinoJson.h>
-#include <SPIFFS.h>
+#include <LittleFS.h>
 
 String RuntimeParameters::returnJSON() {
   // Allocate a temporary JsonDocument
@@ -56,6 +56,7 @@ void userParameters::setDefaults() {
   connectedPowerMeter   = CONNECTED_POWER_METER;
   connectedHeartMonitor = CONNECTED_HEART_MONITOR;
   maxWatts              = DEFAULT_MAX_WATTS;
+  minWatts              = DEFAULT_MIN_WATTS;
   stepperDir            = true;
   shifterDir            = true;
   udpLogEnabled         = false;
@@ -86,6 +87,7 @@ String userParameters::returnJSON() {
   doc["connectedHeartMonitor"] = connectedHeartMonitor;
   doc["foundDevices"]          = foundDevices;
   doc["maxWatts"]              = maxWatts;
+  doc["minWatts"]              = minWatts;
   doc["shifterDir"]            = shifterDir;
   doc["stepperDir"]            = stepperDir;
   doc["udpLogEnabled"]         = udpLogEnabled;
@@ -95,14 +97,14 @@ String userParameters::returnJSON() {
   return output;
 }
 
-//-- Saves all parameters to SPIFFS
-void userParameters::saveToSPIFFS() {
+//-- Saves all parameters to LittleFS
+void userParameters::saveToLittleFS() {
   // Delete existing file, otherwise the configuration is appended to the file
-  SPIFFS.remove(configFILENAME);
+  LittleFS.remove(configFILENAME);
 
   // Open file for writing
   SS2K_LOG(CONFIG_LOG_TAG, "Writing File: %s", configFILENAME);
-  File file = SPIFFS.open(configFILENAME, FILE_WRITE);
+  File file = LittleFS.open(configFILENAME, FILE_WRITE);
   if (!file) {
     SS2K_LOG(CONFIG_LOG_TAG, "Failed to create file");
     return;
@@ -131,6 +133,7 @@ void userParameters::saveToSPIFFS() {
   doc["connectedHeartMonitor"] = connectedHeartMonitor;
   doc["foundDevices"]          = foundDevices;
   doc["maxWatts"]              = maxWatts;
+  doc["minWatts"]              = minWatts;
   doc["shifterDir"]            = shifterDir;
   doc["stepperDir"]            = stepperDir;
   doc["udpLogEnabled"]         = udpLogEnabled;
@@ -144,15 +147,15 @@ void userParameters::saveToSPIFFS() {
 }
 
 // Loads the JSON configuration from a file into a userParameters Object
-void userParameters::loadFromSPIFFS() {
+void userParameters::loadFromLittleFS() {
   setDefaults();
   // Open file for reading
   SS2K_LOG(CONFIG_LOG_TAG, "Reading File: %s", configFILENAME);
-  File file = SPIFFS.open(configFILENAME);
+  File file = LittleFS.open(configFILENAME);
 
   // load defaults if filename doesn't exist
   if (!file) {
-    SS2K_LOG(CONFIG_LOG_TAG, "Couldn't find configuration file. using defaults");
+    SS2K_LOG(CONFIG_LOG_TAG, "Couldn't find configuration file.");
     return;
   }
   // Allocate a temporary JsonDocument
@@ -163,7 +166,7 @@ void userParameters::loadFromSPIFFS() {
   // Deserialize the JSON document
   DeserializationError error = deserializeJson(doc, file);
   if (error) {
-    SS2K_LOG(CONFIG_LOG_TAG, "Failed to read file, using defaults");
+    SS2K_LOG(CONFIG_LOG_TAG, "Failed to deserialize. Using defaults");
     return;
   }
 
@@ -185,6 +188,9 @@ void userParameters::loadFromSPIFFS() {
   }
   if (doc["maxWatts"]) {
     setMaxWatts(doc["maxWatts"]);
+  }
+  if (doc["minWatts"]) {
+    setMinWatts(doc["minWatts"]);
   }
   if (!doc["stepperDir"].isNull()) {
     setStepperDir(doc["stepperDir"]);
@@ -210,7 +216,7 @@ void userParameters::loadFromSPIFFS() {
 void userParameters::printFile() {
   // Open file for reading
   SS2K_LOG(CONFIG_LOG_TAG, "Contents of file: %s", configFILENAME);
-  File file = SPIFFS.open(configFILENAME);
+  File file = LittleFS.open(configFILENAME);
   if (!file) {
     SS2K_LOG(CONFIG_LOG_TAG, "Failed to read file");
     return;
@@ -245,14 +251,13 @@ String physicalWorkingCapacity::returnJSON() {
   return output;
 }
 
-//-- Saves all parameters to SPIFFS
-void physicalWorkingCapacity::saveToSPIFFS() {
+//-- Saves all parameters to LittleFS
+void physicalWorkingCapacity::saveToLittleFS() {
   // Delete existing file, otherwise the configuration is appended to the file
-  SPIFFS.remove(userPWCFILENAME);
-
+  LittleFS.remove(userPWCFILENAME);
   // Open file for writing
   SS2K_LOG(CONFIG_LOG_TAG, "Writing File: %s", userPWCFILENAME);
-  File file = SPIFFS.open(userPWCFILENAME, FILE_WRITE);
+  File file = LittleFS.open(userPWCFILENAME, FILE_WRITE);
   if (!file) {
     SS2K_LOG(CONFIG_LOG_TAG, "Failed to create file");
     return;
@@ -275,10 +280,10 @@ void physicalWorkingCapacity::saveToSPIFFS() {
 }
 
 // Loads the JSON configuration from a file
-void physicalWorkingCapacity::loadFromSPIFFS() {
+void physicalWorkingCapacity::loadFromLittleFS() {
   // Open file for reading
   SS2K_LOG(CONFIG_LOG_TAG, "Reading File: %s", userPWCFILENAME);
-  File file = SPIFFS.open(userPWCFILENAME);
+  File file = LittleFS.open(userPWCFILENAME);
 
   // load defaults if filename doesn't exist
   if (!file) {
@@ -312,7 +317,7 @@ void physicalWorkingCapacity::loadFromSPIFFS() {
 void physicalWorkingCapacity::printFile() {
   // Open file for reading
   SS2K_LOG(CONFIG_LOG_TAG, "Contents of file: %s", userPWCFILENAME);
-  File file = SPIFFS.open(userPWCFILENAME);
+  File file = LittleFS.open(userPWCFILENAME);
   if (!file) {
     SS2K_LOG(CONFIG_LOG_TAG, "Failed to read file");
     return;
