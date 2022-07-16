@@ -7,6 +7,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+
+### Changed
+- Fixed a few compile issues for case sensitive operating systems.
+
+## [2.7.9]
+
+### Added
 - Added comment when files are written to LittleFS.
 - Added comment when firmware starts to update.
 - Added setting for minWatts

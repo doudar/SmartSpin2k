@@ -8,7 +8,7 @@
 #include "LittleFS_Upgrade.h"
 #include "Main.h"
 #include <LittleFS.h>
-#include <arduinojson.h>
+#include <ArduinoJson.h>
 
 void FSUpgrader::upgradeFS() {
   SS2K_LOG(FS_UPGRADER_LOG_TAG, "Stopping LittleFS");
