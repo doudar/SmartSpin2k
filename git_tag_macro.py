@@ -8,15 +8,16 @@ branch = (
 )
 
 try:
-    tag = (
-    subprocess.check_output(["git", "describe", "--tags"])
-    .strip()
-    .decode("utf-8")
-    )
-
+    subprocess.run(["git", "describe", "--tags"])
 except:
     tag = (
     subprocess.check_output(["git", "describe", "--abbrev=0" "--tags"])
+    .strip()
+    .decode("utf-8")
+    )
+else:
+    tag = (
+    subprocess.check_output(["git", "describe", "--tags"])
     .strip()
     .decode("utf-8")
     )
