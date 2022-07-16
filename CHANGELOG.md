@@ -7,6 +7,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+- Automatic build script for github.
 
 ### Changed
 - Fixed a few compile issues for case sensitive operating systems.
