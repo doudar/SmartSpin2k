@@ -1,6 +1,6 @@
 import subprocess
 
-subprocess.run(["git", "fetch", "--tags"])
+subprocess.run(["git", "fetch"])
 branch = (
     subprocess.check_output(["git", "rev-parse", "--abbrev-ref", "HEAD"])
     .strip()
