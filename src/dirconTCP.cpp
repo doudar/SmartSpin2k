@@ -5,7 +5,7 @@
  * SPDX-License-Identifier: GPL-2.0-only
  */
 
-#include "main.h"
+#include "Main.h"
 #include "dirconTCP.h"
 
 WiFiServer dServer(dirconPort);
