@@ -20,6 +20,7 @@
 #include <Update.h>
 #include <DNSServer.h>
 #include <ArduinoJson.h>
+#include "constants.h"
 
 File fsUploadFile;
 
@@ -89,12 +90,32 @@ void startWifi() {
     dnsServer.start(DNS_PORT, "*", myIP);
   }
 
-  if (!MDNS.begin(userConfig.getDeviceName())) {
+  const char *testName = "Wahoo-KICKR-50A4";
+  //if (!MDNS.begin(userConfig.getDeviceName())) {
+  if (!MDNS.begin(testName)) {
     SS2K_LOG(HTTP_SERVER_LOG_TAG, "Error setting up MDNS responder!");
   }
 
-  MDNS.addService("http", "_tcp", 80);
-  MDNS.addServiceTxt("http", "_tcp", "lf", "0");
+  //MDNS.addService("http", "_tcp", 80);
+  //MDNS.addServiceTxt("http", "_tcp", "lf", "0");
+
+  // DIRCON broadcast setup
+  std::string fullList = CYCLINGPOWERSERVICE_UUID.toString().c_str();
+  fullList += ",";
+  fullList += FITNESSMACHINESERVICE_UUID.toString().c_str();
+  const char *bleUUIDs = fullList.c_str();
+  //const char *bleUUIDs     = "00001826-0000-1000-8000-00805F9B34FB,000018180000-1000-8000-00805F9B34FB,00001816-0000-1000-8000-00805F9B34FB";
+  //const char *serialNumber = "0";
+  const char *serialNumber = "212002644";
+  MDNS.addService("_wahoo-fitness-tnp", "_tcp", 36866);
+  mdns_service_instance_name_set("_wahoo-fitness-tnp", "_tcp", "Wahoo KICKR 50A4");
+  //mdns_service_instance_name_set_for_host("_wahoo-fitness-tnp", "_tcp", NULL,"Wahoo KICKR 50A4");
+  // MDNS.addServiceTxt("_wahoo-fitness-tnp", "_tcp", "mac-address", WiFi.macAddress());
+  MDNS.addServiceTxt("_wahoo-fitness-tnp", "_tcp", "ble-service-uuids", bleUUIDs);
+  MDNS.addServiceTxt("_wahoo-fitness-tnp", "_tcp", "mac-address", "B4-6F-2D-00-04-4B");
+  MDNS.addServiceTxt("_wahoo-fitness-tnp", "_tcp", "serial-number", serialNumber);
+  
+
   SS2K_LOG(HTTP_SERVER_LOG_TAG, "Connected to %s IP address: %s", userConfig.getSsid(), myIP.toString().c_str());
 #ifdef USE_TELEGRAM
   SEND_TO_TELEGRAM("Connected to " + String(userConfig.getSsid()) + " IP address: " + myIP.toString());
@@ -357,7 +378,7 @@ void HTTP_Server::start() {
 
   xTaskCreatePinnedToCore(HTTP_Server::webClientUpdate,       /* Task function. */
                           "webClientUpdate",                  /* name of task. */
-                          6000 + (DEBUG_LOG_BUFFER_SIZE * 2), /* Stack size of task Used to be 3000*/
+                          6500 + (DEBUG_LOG_BUFFER_SIZE * 2), /* Stack size of task Used to be 3000*/
                           NULL,                               /* parameter of the task */
                           2,                                  /* priority of the task */
                           &webClientTask,                     /* Task handle to keep track of created task */
@@ -386,12 +407,13 @@ void HTTP_Server::webClientUpdate(void *pvParameters) {
     }
     // Keep MDNS alive
     if ((millis() - mDnsTimer) > 30000) {
-      MDNS.addServiceTxt("http", "_tcp", "lf", String(mDnsTimer));
+      //MDNS.addServiceTxt("http", "_tcp", "lf", String(mDnsTimer));
       mDnsTimer = millis();
 #ifdef DEBUG_STACK
       Serial.printf("HttpServer: %d \n", uxTaskGetStackHighWaterMark(webClientTask));
 #endif  // DEBUG_STACK
     }
+    dirconServer.checkForConnections();
   }
 }
 

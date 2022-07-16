@@ -12,6 +12,7 @@
 #include "SmartSpin_parameters.h"
 #include "BLE_Common.h"
 #include "LittleFS_Upgrade.h"
+#include "dirconTCP.h"
 
 #define MAIN_LOG_TAG "Main"
 
