@@ -29,13 +29,15 @@
 // Path to the latest Firmware
 #define FW_BINFILE "firmware.bin"
 
-// Path to the latest filesystem
-#define FW_SPIFFSFILE "spiffs.bin"
+// Data directory Source
+#define DATA_UPDATEURL "https://raw.githubusercontent.com/doudar/SmartSpin2k/master/data"
 
-// name of local file to save configuration in SPIFFS
+#define DATA_FILELIST "/list.json"
+
+// name of local file to save configuration in LittleFS
 #define configFILENAME "/config.txt"
 
-// name of local file to save Physical Working Capacity in Spiffs
+// name of local file to save Physical Working Capacity in LittleFS
 #define userPWCFILENAME "/userPWC.txt"
 
 // Default Incline Multiplier.
@@ -77,13 +79,16 @@
 // is obtained as closely as possible during each shift.
 #define WATTS_PER_SHIFT 30
 
+// Default Min Watts to stop stepper.
+#define DEFAULT_MIN_WATTS 50
+
 // Default Max Watts that the brake on the spin bike can absorb from the user.
 #define DEFAULT_MAX_WATTS 700
 
-// Wattage at which to automatically assume minimum brake resistance.  
+// Wattage at which to automatically assume minimum brake resistance.
 #define MIN_WATTS 50
 
-// Default debounce delay for shifters. Increase if you have false shifts. Decrease if shifting takes too long. 
+// Default debounce delay for shifters. Increase if you have false shifts. Decrease if shifting takes too long.
 #define DEBOUNCE_DELAY 400
 
 // Hardware pin for rocker Switch
@@ -166,14 +171,17 @@
 
 #define RUNTIMECONFIG_JSON_SIZE 512 + DEBUG_LOG_BUFFER_SIZE
 
-// Number of entries in the ERG Power Lookup Table
+/* Number of entries in the ERG Power Lookup Table
+ This is currently maintained as to keep memory usage lower and reduce the print output of the table.
+ It can be depreciated in the future should we decide to remove logging of the power table. Then it should be calculated in ERG_Mode.cpp
+ by dividing userConfig.getMaxWatts() by POWERTABLE_INCREMENT.  */
 #define POWERTABLE_SIZE 20
 
 // Size of increments (in watts) for the ERG Lookup Table. Needs to be one decimal place for proper calculations i.e. 50.0
 #define POWERTABLE_INCREMENT 50.0
 
-//Number of similar power samples to take before writing to the Power Table
-#define POWER_SAMPLES 5 
+// Number of similar power samples to take before writing to the Power Table
+#define POWER_SAMPLES 5
 
 // Uncomment to enable sending Telegram debug messages back to the chat
 // specified in telegram_token.h

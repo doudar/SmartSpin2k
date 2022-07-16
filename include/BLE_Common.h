@@ -45,7 +45,7 @@
 #define BLE_connectedPowerMeter   0x15
 #define BLE_connectedHeartMonitor 0x16
 #define BLE_shifterPosition       0x17
-#define BLE_saveToSpiffs          0x18
+#define BLE_saveToLittleFS          0x18
 #define BLE_targetPosition        0x19
 #define BLE_externalControl       0x1A
 #define BLE_syncMode              0x1B

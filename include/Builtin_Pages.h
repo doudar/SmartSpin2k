@@ -5,7 +5,7 @@
  * SPDX-License-Identifier: GPL-2.0-only
  */
 
-// OTA Update pages. Not stored in SPIFFS because we will use this to restore
+// OTA Update pages. Not stored in LittleFS because we will use this to restore
 // the webserver files if they get corrupt.
 /* Style */
 #pragma once

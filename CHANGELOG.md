@@ -7,13 +7,32 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+- Added comment when files are written to LittleFS.
+- Added comment when firmware starts to update.
+- Added setting for minWatts
 
 ### Changed
- - updated CA for OTA updates
+- Driver Over Temp logging fixed.
+- Updated Libraries to newest versions.
+- Disabled setting of min/maxWatts if minWatts/maxWatts is 0.
+- Added a check to workaround a bug where a powertable pair member was zero.
+- Fixed a bug where a powertable pair could be returned that was larger than the powertable size. 
 
+### Hardware
+
+## [2.6.26]
+
+### Added
+- Added functions for automatic settings conversion from SPIFFS
+- 
+### Changed
+ - updated CA for OTA updates
+ - Converted filesystem from SPIFFS to LittleFS
+ - Fixed endianness for ftmsPowerRange and ftmsPowerRange.
 
 ### Hardware
  - added chamfer to screw posts in case body (direct mount mod)
+ - minor tweak to shifter cable retainer.
 
 ## [2.2.8]
 
