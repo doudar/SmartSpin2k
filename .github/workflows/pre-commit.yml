@@ -24,8 +24,3 @@ jobs:
         uses: actions/setup-python@v2
       - name: Check pre-commit hooks
         uses: pre-commit/action@v2.0.0
-      - name: Run platformio build
-        if: steps.filter.outputs.software == 'true'
-        uses: docker://kadaan/platformio_esp32:latest
-        with:
-          args: --build=release
