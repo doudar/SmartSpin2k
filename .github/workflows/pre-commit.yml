@@ -48,7 +48,7 @@ jobs:
         run: platformio run --target buildfs
       - name: Create artifacts
         run: |
-          7z a SmartSpin2k.zip ./dist/*.*
+          7z a SmartSpin2k.zip .pio/build/release/*
       - name: Archive
         uses: actions/upload-artifact@v3
         with:
