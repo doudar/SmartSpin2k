@@ -1,22 +1,22 @@
 import subprocess
 
-subprocess.run(["git", "fetch"])
+subprocess.run(["git", "fetch", "--unshallow"])
 branch = (
     subprocess.check_output(["git", "rev-parse", "--abbrev-ref", "HEAD"])
     .strip()
     .decode("utf-8")
 )
 
-try:
-    subprocess.run(["git", "describe", "--tags"])
-except:
-    tag = (
-    subprocess.check_output(["git", "describe", "--abbrev=0" "--tags"])
-    .strip()
-    .decode("utf-8")
-    )
-else:
-    tag = (
+#try:
+#    subprocess.check_call(["git", "describe", "--tags"])
+#except:
+#    tag = (
+#    subprocess.check_output(["git", "describe", "--abbrev=0" "--tags"])
+#    .strip()
+#    .decode("utf-8")
+#    )
+#else:
+tag = (
     subprocess.check_output(["git", "describe", "--tags"])
     .strip()
     .decode("utf-8")
