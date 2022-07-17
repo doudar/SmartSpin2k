@@ -17,10 +17,10 @@ jobs:
         env:
           TAG_NAME: ${{ steps.date.outputs.date }}
           RELEASE_NAME: ${{ steps.date.outputs.date }}- 
-      -uses: rickstaa/action-create-tag@v1
+      - uses: rickstaa/action-create-tag@v1
         with:
           tag: ${{ steps.date.outputs.date }}
-          message: "Automatic release"${{ steps.date.outputs.date }}
+          message: "Automatic release ${{ steps.date.outputs.date }}"
       - uses: dorny/paths-filter@v2
         id: changes
         with:
