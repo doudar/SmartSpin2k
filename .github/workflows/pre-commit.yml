@@ -9,6 +9,18 @@ jobs:
       - uses: actions/checkout@v2
         with:
           fetch-depth: 0
+      - name: Get current date
+        id: date
+        run: echo "::set-output name=date::$(date +'%y.%-m.%-d')"
+      - name: Test with environment variables
+        run: echo $TAG_NAME - $RELEASE_NAME
+        env:
+          TAG_NAME: ${{ steps.date.outputs.date }}
+          RELEASE_NAME: ${{ steps.date.outputs.date }}- 
+      -uses: rickstaa/action-create-tag@v1
+        with:
+          tag: ${{ steps.date.outputs.date }}
+          message: "Automatic release"${{ steps.date.outputs.date }}
       - uses: dorny/paths-filter@v2
         id: changes
         with:
@@ -65,6 +77,7 @@ jobs:
           name: SmartSpin2k ${{ steps.tag_info.outputs.SOURCE_TAG }}
           draft: false
           prerelease: false
+          generate_release_notes: true
           body: ${{ github.event.head_commit.message }}
           files: |
             SmartSpin2k-*.zip
