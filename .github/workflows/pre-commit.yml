@@ -48,7 +48,7 @@ jobs:
         run: platformio run --target buildfs
       - name: Create artifacts
         run: |
-          7z a SmartSpin2k.zip .pio/build/release/*
+          7z a SmartSpin2k.zip .pio/build/release/*.bin
       - name: Archive
         uses: actions/upload-artifact@v3
         with:
@@ -73,7 +73,7 @@ jobs:
           generate_release_notes: true
           body: ${{ github.event.head_commit.message }}
           files: |
-            SmartSpin2k-*.zip
+            SmartSpin2k.zip
 
 
       
