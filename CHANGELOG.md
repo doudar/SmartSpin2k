@@ -12,7 +12,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 - Fixed a few compile issues for case sensitive operating systems.
-- release is now the default build option. 
+- Release is now the default build option. 
+- New release is drafted on pull requests.
 
 ## [2.7.9]
 

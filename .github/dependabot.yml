@@ -4,7 +4,6 @@ updates:
     directory: "/"
     schedule:
       interval: "daily"
-    ignore:
   - package-ecosystem: "github-actions"
     directory: "/"
     schedule:
