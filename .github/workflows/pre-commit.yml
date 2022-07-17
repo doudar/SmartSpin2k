@@ -60,7 +60,7 @@ jobs:
           name: all-artifacts
       - name: Get tag info
         id: tag_info
-        run: echo ::set-output name=SOURCE_TAG::${GITHUB_REF#refs/tags/}
+        run: echo ::set-output name=SOURCE_TAG::${{ steps.date.outputs.date }}
       - name: Create release
         uses: softprops/action-gh-release@v1
         env:
