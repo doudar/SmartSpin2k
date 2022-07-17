@@ -9,11 +9,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Added
 - Automatic build script for github.
 - Added dependabot.yml
+- Added changelog merge automation. 
 
 ### Changed
 - Fixed a few compile issues for case sensitive operating systems.
 - Release is now the default build option. 
-- New release is drafted on pull requests.
+- New release is automatically created on pull request merge.
 
 ## [2.7.9]
 
