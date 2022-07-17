@@ -8,9 +8,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 - Automatic build script for github.
+- Added dependabot.yml
 
 ### Changed
 - Fixed a few compile issues for case sensitive operating systems.
+- release is now the default build option. 
 
 ## [2.7.9]
 
