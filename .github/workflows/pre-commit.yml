@@ -53,7 +53,7 @@ jobs:
         uses: actions/upload-artifact@v3
         with:
           name: all-artifacts
-          path: .pio/build/*/SmartSpin2k.zip
+          path: SmartSpin2k.zip
       - name: Download Artifacts
         uses: actions/download-artifact@v2
         with:
