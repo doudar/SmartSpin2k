@@ -81,7 +81,7 @@ jobs:
       - name: Update changelog
         uses: thomaseizinger/keep-a-changelog-new-release@v1
         with:
-          tag: ${{ steps.date.outputs.date }}
+          version: ${{ steps.date.outputs.date }}
 
 
       
