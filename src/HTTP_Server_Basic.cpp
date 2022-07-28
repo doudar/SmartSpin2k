@@ -121,6 +121,7 @@ void stopWifi() {
 }
 
 void HTTP_Server::start() {
+  server.enableCORS(true);
   server.onNotFound([]() { SS2K_LOG(HTTP_SERVER_LOG_TAG, "Link Not Found: %s", server.uri().c_str()); });
 
   /********************************************Begin

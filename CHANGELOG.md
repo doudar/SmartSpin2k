@@ -15,6 +15,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Fixed a few compile issues for case sensitive operating systems.
 - Release is now the default build option. 
 - New release is automatically created on pull request merge.
+- Fixed HR in the hidden btsimulator.html
+- Enabled CORS for doudar/StreamFit 
 
 ## [2.7.9]
 

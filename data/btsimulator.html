@@ -114,11 +114,11 @@
     if (updateServer) {
       var xhr = new XMLHttpRequest();
       if (element.checked) {
-        xhr.open("GET", "/hrSlider?value=enable", true);
+        xhr.open("GET", "/hrslider?value=enable", true);
         xhr.send();
       }
       else {
-        xhr.open("GET", "/hrSlider?value=disable", true);
+        xhr.open("GET", "/hrslider?value=disable", true);
         xhr.send();
       }
     }
@@ -170,7 +170,7 @@
     var sliderValue = document.getElementById("hrSlider").value;
     document.getElementById("hrValue").innerHTML = sliderValue + " BPM";
     var xhr = new XMLHttpRequest();
-    xhr.open("GET", "/hrSlider?value=" + sliderValue, true);
+    xhr.open("GET", "/hrslider?value=" + sliderValue, true);
     xhr.send();
   }
 
