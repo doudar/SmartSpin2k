@@ -137,6 +137,7 @@ void HTTP_Server::start() {
   server.on("/settings.html", handleLittleFSFile);
   server.on("/status.html", handleLittleFSFile);
   server.on("/bluetoothscanner.html", handleLittleFSFile);
+  server.on("/streamfit.html", handleLittleFSFile);
   server.on("/hrtowatts.html", handleLittleFSFile);
   server.on("/favicon.ico", handleLittleFSFile);
   server.on("/send_settings", settingsProcessor);
