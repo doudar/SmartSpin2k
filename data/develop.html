@@ -1,0 +1,44 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+  <style type="text/css">
+html {
+  background-color: #03245c;
+} 
+    </style>
+
+  <title>SmartSpin2K Web Server</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+</head>
+<fieldset><legend><a href="http://github.com/doudar/SmartSpin2k">http://github.com/doudar/SmartSpin2k</a></legend>
+<body>
+  <h1 style="text-align: center;"><strong>Developer Tools</strong></h1>
+  <h2>
+    <p style="text-align: center;"><strong><a href="streamfit.html">Replay Fit File Over BLE</a></strong></p>
+    <p style="text-align: center;"><strong><a href="btsimulator.html">Manual BLE Simulator</a></strong></p>
+    <p style="text-align: center;"><strong><a href="status.html">SmartSpin Debugging Info</a></strong></p>
+    <p style="text-align: center;"><strong><a href="login">Update Firmware</a></strong></p>
+    <p><a href=https://github.com/doudar/SmartSpin2k/wiki>SS2K Help</a></p>
+  </h2>
+</fieldset>
+
+<script>
+
+  //define function to load css
+  var loadCss = function () {
+    var cssLink = document.createElement('link');
+    cssLink.rel = 'stylesheet';
+    cssLink.href = 'style.css';
+    var head = document.getElementsByTagName('head')[0];
+    head.parentNode.insertBefore(cssLink, head);
+  };
+
+  //Delay loading css to not swamp webserver
+  window.addEventListener('load', function () {
+    setTimeout(loadCss, 100);
+  }, false);
+
+</script>
+
+</html>

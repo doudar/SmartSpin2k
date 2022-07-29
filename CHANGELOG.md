@@ -10,11 +10,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Automatic build script for github.
 - Added dependabot.yml
 - Added changelog merge automation. 
+- Added StreamFit
+- Added developer tools html.
 
 ### Changed
 - Fixed a few compile issues for case sensitive operating systems.
 - Release is now the default build option. 
 - New release is automatically created on pull request merge.
+- Fixed HR in the hidden btsimulator.html
+- Enabled CORS for doudar/StreamFit.
+- Re-arranged index.html. 
 
 ## [2.7.9]
 

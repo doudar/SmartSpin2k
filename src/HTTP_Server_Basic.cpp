@@ -121,10 +121,10 @@ void stopWifi() {
 }
 
 void HTTP_Server::start() {
+  server.enableCORS(true);
   server.onNotFound([]() { SS2K_LOG(HTTP_SERVER_LOG_TAG, "Link Not Found: %s", server.uri().c_str()); });
 
-  /********************************************Begin
-   * Handlers***********************************/
+  /***************************Begin Handlers*******************/
   server.on("/", handleIndexFile);
   server.on("/index.html", handleIndexFile);
   server.on("/generate_204", handleIndexFile);         // Android captive portal
@@ -132,10 +132,12 @@ void HTTP_Server::start() {
   server.on("/hotspot-detect.html", handleIndexFile);  // Apple captive portal
   server.on("/style.css", handleLittleFSFile);
   server.on("/btsimulator.html", handleLittleFSFile);
+  server.on("/develop.html", handleLittleFSFile);
   server.on("/shift.html", handleLittleFSFile);
   server.on("/settings.html", handleLittleFSFile);
   server.on("/status.html", handleLittleFSFile);
   server.on("/bluetoothscanner.html", handleLittleFSFile);
+  server.on("/streamfit.html", handleLittleFSFile);
   server.on("/hrtowatts.html", handleLittleFSFile);
   server.on("/favicon.ico", handleLittleFSFile);
   server.on("/send_settings", settingsProcessor);
