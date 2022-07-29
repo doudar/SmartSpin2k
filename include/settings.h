@@ -30,7 +30,7 @@
 #define FW_BINFILE "firmware.bin"
 
 // Data directory Source
-#define DATA_UPDATEURL "https://raw.githubusercontent.com/doudar/SmartSpin2k/master/data"
+#define DATA_UPDATEURL "https://raw.githubusercontent.com/doudar/SmartSpin2k/develop/data"
 
 #define DATA_FILELIST "/list.json"
 
