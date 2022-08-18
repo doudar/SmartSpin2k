@@ -20,6 +20,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Fixed HR in the hidden btsimulator.html
 - Enabled CORS for doudar/StreamFit.
 - Re-arranged index.html. 
+- restored link to bluetooth scanner
 
 ## [2.7.9]
 
