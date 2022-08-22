@@ -21,6 +21,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Enabled CORS for doudar/StreamFit.
 - Re-arranged index.html. 
 
+### Hardware
+-Added new case design for upcoming integraded SMT PCB. 
+
 ## [2.7.9]
 
 ### Added
