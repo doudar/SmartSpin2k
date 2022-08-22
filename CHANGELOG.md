@@ -22,7 +22,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Re-arranged index.html. 
 
 ### Hardware
--Added new case design for upcoming integraded SMT PCB. 
+- Added new case design for upcoming integraded SMT PCB.
+- Added Initial KiCAD PCB Commit. 
 
 ## [2.7.9]
 
