@@ -21,6 +21,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Enabled CORS for doudar/StreamFit.
 - Re-arranged index.html. 
 - restored link to bluetooth scanner
+- Reverted conditional variable initialization in powertable lookup function.
 
 ## [2.7.9]
 

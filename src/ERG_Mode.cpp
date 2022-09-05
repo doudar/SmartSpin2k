@@ -187,9 +187,10 @@ int32_t PowerTable::lookup(int watts, int cad) {
     float cad;
   };
 
-  int i       = (POWERTABLE_SIZE < round(watts / POWERTABLE_INCREMENT)) ? round(watts / POWERTABLE_INCREMENT) : POWERTABLE_SIZE;  // find the closest entry. Cap at POWERTABLE_SIZE
-  float scale = (i == POWERTABLE_SIZE) ? POWERTABLE_SIZE - 1 : (watts / POWERTABLE_INCREMENT - i);  // Should we look at the next higher or next lower index for comparison?
-  int indexPair = -1;                                                                               // The next closest index with data for interpolation
+  int i         = round(watts / POWERTABLE_INCREMENT);  // find the closest entry
+  float scale   = watts / POWERTABLE_INCREMENT - i;     // Should we look at the next higher or next lower index for comparison?
+  int indexPair = -1;  // The next closest index with data for interpolation                                                                           // The next closest index
+                       // with data for interpolation
   entry above;
   entry below;
   above.power = 0;
