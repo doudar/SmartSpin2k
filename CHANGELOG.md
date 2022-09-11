@@ -12,6 +12,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Added changelog merge automation. 
 - Added StreamFit
 - Added developer tools html.
+- Added automatic board revision detection. 
 
 ### Changed
 - Fixed a few compile issues for case sensitive operating systems.
