@@ -97,7 +97,7 @@
 //////////// Defines for hardware Revision 1 ////////////
 
 //Board Name
-#define r1_NAME "Reversion One"
+#define r1_NAME "Revision One"
 
 // ID Voltage on pin 34. Values are 0-4095 (0-3.3v)
 #define r1_VERSION_VOLTAGE 0
@@ -126,7 +126,7 @@
 //////////// Defines for hardware Revision 2 ////////////
 
 //Board Name
-#define r2_NAME "Reversion Two"
+#define r2_NAME "Revision Two"
 
 // ID Voltage on pin 34. Values are 0-4095 (0-3.3v)
 #define r2_VERSION_VOLTAGE 4095
