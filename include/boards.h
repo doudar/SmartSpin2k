@@ -48,7 +48,7 @@ class Boards {
     rev1.auxSerialTxPin     = 0;
     rev1.auxSerialRxPin     = 0;
     // Rev 2
-    rev2.name          = r2_NAME;
+    rev2.name               = r2_NAME;
     rev2.versionVoltage     = r2_VERSION_VOLTAGE;
     rev2.shiftUpPin         = r2_SHIFT_UP_PIN;
     rev2.shiftDownPin       = r2_SHIFT_DOWN_PIN;
