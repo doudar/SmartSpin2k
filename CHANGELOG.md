@@ -22,6 +22,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Re-arranged index.html. 
 - restored link to bluetooth scanner
 
+### Hardware
+- Minor improvements to tolerances for direct mount mod
+- created peloton-specific arm for direct mount use.  IC4 model is usable, but a bit short.
+
 ## [2.7.9]
 
 ### Added
