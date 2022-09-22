@@ -25,6 +25,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Hardware
 - Minor improvements to tolerances for direct mount mod
 - created peloton-specific arm for direct mount use.  IC4 model is usable, but a bit short.
+- modified short case to include chamfers and fillets at the screw posts to improve thin wall printability in superslicer
 
 ## [2.7.9]
 
