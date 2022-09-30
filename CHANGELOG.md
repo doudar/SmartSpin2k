@@ -23,6 +23,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - restored link to bluetooth scanner
 - Reverted conditional variable initialization in powertable lookup function.
 
+### Hardware
+- Ultra Short Direct Mount case for use on bikes with limited space between knob and head tube
+- Direct mount and arm for Bowflex C7 - for use with Ultra Short Direct Mount
+
 ## [2.7.9]
 
 ### Added
