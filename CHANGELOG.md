@@ -20,8 +20,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Fixed HR in the hidden btsimulator.html
 - Enabled CORS for doudar/StreamFit.
 - Re-arranged index.html. 
-- restored link to bluetooth scanner
+- restored link to bluetooth scanner.
 - Reverted conditional variable initialization in powertable lookup function.
+- Simplified cadence compensation in powertable lookup.
+- Fixed issue where you couldn't set a ERG target less than 50W (MIN_WATTS wasn't being respected.) 
 
 ### Hardware
 - Ultra Short Direct Mount case for use on bikes with limited space between knob and head tube
