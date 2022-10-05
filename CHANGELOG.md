@@ -22,6 +22,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Re-arranged index.html. 
 - restored link to bluetooth scanner
 - Reverted conditional variable initialization in powertable lookup function.
+- Increased the BLE active scan window. 
+- BLE scan page now shows previous scan results.
+- BLE scan page duplicates bug fixed. 
+- BLE scan page dropdowns default to devices found during scan. 
 
 ### Hardware
 - Ultra Short Direct Mount case for use on bikes with limited space between knob and head tube
