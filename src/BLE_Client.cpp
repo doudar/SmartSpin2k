@@ -390,11 +390,11 @@ void SpinBLEClient::scanProcess() {
 
   BLEScan *pBLEScan = BLEDevice::getScan();
   pBLEScan->setAdvertisedDeviceCallbacks(new MyAdvertisedDeviceCallback());
-  pBLEScan->setInterval(45);  // 45?
-  pBLEScan->setWindow(15);    // 15?
+  pBLEScan->setInterval(97);  
+  pBLEScan->setWindow(67);   
   pBLEScan->setDuplicateFilter(true);
   pBLEScan->setActiveScan(true);
-  BLEScanResults foundDevices = pBLEScan->start(10, false);
+  BLEScanResults foundDevices = pBLEScan->start(10, true);
   // Load the scan into a Json String
   int count = foundDevices.getCount();
 
