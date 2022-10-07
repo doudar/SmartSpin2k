@@ -407,10 +407,10 @@ void SS2K::updateStealthchop() {
 // Checks the driver temperature and throttles power if above threshold.
 void SS2K::checkDriverTemperature() {
   static bool overTemp = false;
-  if (static_cast<int>(temperatureRead()) > 72) {  // Start throttling driver power at 72C on the ESP32
-    uint8_t throttledPower = (72 - static_cast<int>(temperatureRead())) + DRIVER_MAX_PWR_SCALER;
+  if (static_cast<int>(temperatureRead()) > THROTTLE_TEMP) {  // Start throttling driver power at 72C on the ESP32
+    uint8_t throttledPower = (THROTTLE_TEMP - static_cast<int>(temperatureRead())) + DRIVER_MAX_PWR_SCALER;
     driver.irun(throttledPower);
-    SS2K_LOGW(MAIN_LOG_TAG, "Over temp! Driver is throttling down! ESP32 @ %f C", temperatureRead());
+    SS2K_LOG(MAIN_LOG_TAG, "Over temp! Driver is throttling down! ESP32 @ %f C", temperatureRead());
     overTemp = true;
   } else if ((driver.cs_actual() < DRIVER_MAX_PWR_SCALER) && !driver.stst()) {
     if (overTemp) {
