@@ -7,7 +7,7 @@ jobs:
   pre-commit:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v2
+      - uses: actions/checkout@v3
         with:
           fetch-depth: 0
       - uses: dorny/paths-filter@v2
@@ -19,13 +19,8 @@ jobs:
             hardware:
               - 'Hardware/**'
       - name: Ensure changelog is updated
-        uses: dangoslen/changelog-enforcer@v2
+        uses: dangoslen/changelog-enforcer@v3.2.1
       - name: Setup python
-        uses: actions/setup-python@v2
+        uses: actions/setup-python@v4
       - name: Check pre-commit hooks
-        uses: pre-commit/action@v2.0.0
-      - name: Run platformio build
-        if: steps.filter.outputs.software == 'true'
-        uses: docker://kadaan/platformio_esp32:latest
-        with:
-          args: --build=release
+        uses: pre-commit/action@v3.0.0
