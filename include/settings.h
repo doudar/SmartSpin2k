@@ -227,6 +227,9 @@
 // Number of similar power samples to take before writing to the Power Table
 #define POWER_SAMPLES 5
 
+// Temperature of the ESP32 at which to start reducing the power output of the stepper motor driver.
+#define THROTTLE_TEMP 85
+
 // Uncomment to enable sending Telegram debug messages back to the chat
 // specified in telegram_token.h
 // #define USE_TELEGRAM

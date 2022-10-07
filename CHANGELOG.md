@@ -13,6 +13,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Added StreamFit
 - Added developer tools html.
 - Added automatic board revision detection. 
+- Added THROTTLE_TEMP to settings.h. The internal ESP32 temperature at which to reduce driver current. 
 
 ### Changed
 - Fixed a few compile issues for case sensitive operating systems.
@@ -29,6 +30,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - BLE scan page now shows previous scan results.
 - BLE scan page duplicates bug fixed. 
 - BLE scan page dropdowns default to devices found during scan. 
+- Increased THROTTLE_TEMP from 72c to 85c. 
 
 ### Hardware
 - Ultra Short Direct Mount case for use on bikes with limited space between knob and head tube
