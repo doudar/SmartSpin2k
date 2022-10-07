@@ -12,6 +12,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Added changelog merge automation. 
 - Added StreamFit
 - Added developer tools html.
+- Added automatic board revision detection. 
 
 ### Changed
 - Fixed a few compile issues for case sensitive operating systems.
@@ -24,6 +25,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Reverted conditional variable initialization in powertable lookup function.
 - Simplified cadence compensation in powertable lookup.
 - Fixed issue where you couldn't set a ERG target less than 50W (MIN_WATTS wasn't being respected.) 
+- Increased the BLE active scan window. 
+- BLE scan page now shows previous scan results.
+- BLE scan page duplicates bug fixed. 
+- BLE scan page dropdowns default to devices found during scan. 
 
 ### Hardware
 - Ultra Short Direct Mount case for use on bikes with limited space between knob and head tube
