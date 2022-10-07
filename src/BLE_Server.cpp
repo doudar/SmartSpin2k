@@ -318,7 +318,7 @@ void MyServerCallbacks::onDisconnect(BLEServer *pServer) {
 void MyCallbacks::onWrite(BLECharacteristic *pCharacteristic) { FTMSWrite = pCharacteristic->getValue(); }
 
 void MyCallbacks::onSubscribe(NimBLECharacteristic *pCharacteristic, ble_gap_conn_desc *desc, uint16_t subValue) {
-  String str        = "Client ID: ";
+  String str       = "Client ID: ";
   NimBLEUUID pUUID = pCharacteristic->getUUID();
   str += desc->conn_handle;
   str += " Address: ";

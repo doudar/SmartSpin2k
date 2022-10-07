@@ -279,20 +279,9 @@ int32_t PowerTable::lookup(int watts, int cad) {
     return (RETURN_ERROR);
   }
 
-  // @MarkusSchneider's data shows a linear relationship between CAD and Watts for a given resistance level.
-  // It looks like for every 20 CAD increase there is ~50w increase in power. This may need to be adjusted later
-  // as higher resistance levels have a steeper slope (bigger increase in power/cad) than low resistance levels.
+  // Cadence Adjustment
   float averageCAD = (below.cad + above.cad) / 2;
-  float deltaCAD   = abs(averageCAD - cad);
-
-  if (deltaCAD > 5) {
-    if (cad > averageCAD) {  // cad is higher than the table so we need to target a lower wattage (and targetPosition)
-      watts -= (deltaCAD / 20) * 50;
-    }
-    if (cad < averageCAD) {  // cad is lower than the table so we need to target a higher wattage (and targetPosition)
-      watts += (deltaCAD / 20) * 50;
-    }
-  }
+  watts            = ((watts * 2) * (averageCAD / (cad + 1)) / 2);
   // actual interpolation
   int32_t rTargetPosition = below.targetPosition + ((watts - below.power) / (above.power - below.power)) * (above.targetPosition - below.targetPosition);
 
@@ -355,10 +344,10 @@ void ErgMode::computErg() {
     return;
   }
 
-  // set minimum SetPoint to 50 watt if trainer sends setpoints lower than 50 watt.
-  if (newSetPoint < 50) {
+  // set minimum SetPoint to MIN_WATTS if app sends setpoints lower than MIN_WATTS.
+  if (newSetPoint < MIN_WATTS) {
     SS2K_LOG(ERG_MODE_LOG_TAG, "ERG Target Below Minumum Value.");
-    newSetPoint = 50;
+    newSetPoint = MIN_WATTS;
   }
 
   bool isUserSpinning = this->_userIsSpinning(newCadence, currentIncline);
@@ -394,7 +383,7 @@ void ErgMode::_setPointChangeState(int newSetPoint, int newCadence, Measurement&
   int i = 0;
   while (rtConfig.getTargetIncline() != rtConfig.getCurrentIncline()) {  // wait while the knob moves to target position.
     vTaskDelay(100 / portTICK_PERIOD_MS);
-    if (i > 50) {  // failsafe for infinate loop
+    if (i > 50) {  // failsafe for infinite loop
       SS2K_LOG(ERG_MODE_LOG_TAG, "Stepper didn't reach target position");
       break;
     }
