@@ -1,22 +1,13 @@
 <img src="Pictures/ss2k_banner.png" alt="ss2k banner" width=100%>
 
-## 2.7.9 has been released! If you're on an older release, you may need to manually update due to SSL changes. See below for more information. 
+SmartSpin2k (aka SS2K) adds automatic resistance control to any spin bike! It physically connects to your spin bike resistance control knob and then wirelessly to any apps like Zwift or Trainer Road via BLE. SS2k also has shifter buttons that allow the user to simulate shifting gears on the stationary bike and includes advanced trainer features like ERG mode! 
 
-SmartSpin2k is an easy to build open source project that lets you turn any Spin Bike into a Smart Trainer. SmartSpin2k uses an ESP32 and stepper motor to let fitness apps like Zwift automatically control spin bikes that have a resistance knob. The SmartSpin2k also has shifter buttons that allow the user to simulate shifting gears on the stationary bike. 
+One of the main primary design goals of SS2k is to keep the parts count low making it easy for makers to build for themselves. 
 
-Since SmartSpin2k is easy to manufacture, build one for yourself, build some for your friends, or setup a print farm and build them for everybody - we're an open community and welcome all levels of involvement!
-
-## Important announcement for existing users
-We have identified an issue with auto updates on releases <2.2.28.  After a factory reset, you will not be able to access the configuration screen.  We advise users to flash the latest version of the 2.7.9 firmware, [available here](https://github.com/doudar/SmartSpin2k/releases/download/2.7.9/firmware.bin).  Flashing instructions are available on the [Wiki](https://github.com/doudar/SmartSpin2k/wiki/Loading-Software)
+If you'd like to get involved in SS2K but don't want to build your own, a limited number of kits are available on sale by our community members.  [CLICK HERE](https://github.com/doudar/SmartSpin2k/wiki/Prebuilt-Kits) for more information.
 
 ### Documentation
 Everything you need to know is in the [SS2K Wiki](https://github.com/doudar/SmartSpin2k/wiki)
-
-If you'd like to get involved in SS2K but don't want to build your own, a limited number of kits are available on sale by our community members.  [Click here](https://github.com/doudar/SmartSpin2k/wiki/Prebuilt-Kits) for more information
-
-<img src="Pictures/Schwinn_IC4_MOD.png" alt="Hardware 2.0"/> 
-
-[_^^@eMadman's IC4 model_](https://github.com/doudar/SmartSpin2k/tree/develop/Hardware/MODS/Case%20V2%20-%20Schwinn%20IC4%20Mod)
 
 ## Contributing
 1. Install Microsoft Visual Code. https://code.visualstudio.com/
@@ -25,6 +16,13 @@ If you'd like to get involved in SS2K but don't want to build your own, a limite
 4. Install pre-push git hooks: `pre-commit install --hook-type pre-push`
 5. Open this project in PlatformIO.
 
+## Important announcement for existing users
+If you experience an issue after upgrading firmware, please follow these instructions in the Wiki. Flashing instructions are available [HERE.](https://github.com/doudar/SmartSpin2k/wiki/Loading-Software)
+
 ## Licensing
 The hardware designs in this project are licensed under the [CERN Open Hardware License Version 2 - Permissive license](Hardware/LICENSE).
 The software in this project is licensed under the [GNU GENERAL PUBLIC LICENSE Version 2, June 1991 license](LICENSE).
+
+<img src="Pictures/Schwinn_IC4_MOD.png" alt="Hardware 2.0"/> 
+
+[_^^@eMadman's IC4 model_](https://github.com/doudar/SmartSpin2k/tree/develop/Hardware/MODS/Case%20V2%20-%20Schwinn%20IC4%20Mod)
