@@ -153,10 +153,10 @@
 #define r2_STEPPERSERIAL_TX 19
 
 // TMC2209 SoftwareSerial receive pin
-#define r2_AUX_SERIAL_RX 21
+#define r2_AUX_SERIAL_RX 22
 
 // TMC2209 SoftwareSerial transmit pin
-#define r2_AUX_SERIAL_TX 22
+#define r2_AUX_SERIAL_TX 21
 ////////////////////////////////////////////////////////
 
 // TMC2208/TMC2224 HardwareSerial port

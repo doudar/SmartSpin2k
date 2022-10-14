@@ -65,6 +65,7 @@ class SS2K {
   }
 };
 
+void auxSerialRX();
 // Users Physical Working Capacity Calculation Parameters (heartrate to Power
 // calculation)
 extern physicalWorkingCapacity userPWC;
