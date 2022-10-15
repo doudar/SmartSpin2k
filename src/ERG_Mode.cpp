@@ -167,7 +167,7 @@ void PowerTable::newEntry(PowerBuffer& powerBuffer) {
   if (i > 0) {
     for (int j = i - 1; j > 0; j--) {
       if ((this->powerEntry[j].targetPosition != 0) && (this->powerEntry[j].targetPosition >= targetPosition)) {
-        SS2K_LOG(ERG_MODE_LOG_TAG, "PowerTable Input was less than expected");
+        SS2K_LOG(ERG_MODE_LOG_TAG, "PowerTable Input (%d) was less than previous (%d)", targetPosition, this->powerEntry[j].targetPosition);
         return;
       }
     }
@@ -176,7 +176,7 @@ void PowerTable::newEntry(PowerBuffer& powerBuffer) {
   if (i < POWERTABLE_SIZE) {
     for (int j = i + 1; j < POWERTABLE_SIZE; j++) {
       if ((this->powerEntry[j].targetPosition != 0) && (targetPosition >= this->powerEntry[j].targetPosition)) {
-        SS2K_LOG(ERG_MODE_LOG_TAG, "PowerTable Input was greater than expected");
+        SS2K_LOG(ERG_MODE_LOG_TAG, "PowerTable Input (%d) was greater than next (%d)", targetPosition, this->powerEntry[j].targetPosition);
         return;
       }
     }
