@@ -163,8 +163,23 @@ void PowerTable::newEntry(PowerBuffer& powerBuffer) {
   // To start working on the PowerTable, we need to calculate position in the table for the new entry
   int i = round(watts / POWERTABLE_INCREMENT);
 
-  if (i == 1) {  // set the minimum resistance level of the trainer.
-    rtConfig.setMinStep(this->powerEntry[i].targetPosition);
+  // Prohibit entries that are less than the number to the left
+  if (i > 0) {
+    for (int j = i - 1; j > 0; j--) {
+      if ((this->powerEntry[j].targetPosition != 0) && (this->powerEntry[j].targetPosition >= targetPosition)) {
+        SS2K_LOG(ERG_MODE_LOG_TAG, "PowerTable Input was less than expected");
+        return;
+      }
+    }
+  }
+  // Prohibit entries that are greater than the number to the right
+  if (i < POWERTABLE_SIZE) {
+    for (int j = i + 1; j < POWERTABLE_SIZE; j++) {
+      if ((this->powerEntry[j].targetPosition != 0) && (targetPosition >= this->powerEntry[j].targetPosition)) {
+        SS2K_LOG(ERG_MODE_LOG_TAG, "PowerTable Input was greater than expected");
+        return;
+      }
+    }
   }
 
   if (this->powerEntry[i].readings == 0) {  // if first reading in this entry
@@ -298,8 +313,8 @@ int32_t PowerTable::lookup(int watts, int cad) {
 
 int PowerTable::_adjustWattsForCadence(int watts, int cad) {
   if (cad > 0) {
- watts = (watts * (NORMAL_CAD / cad));
- return watts;
+    watts = (watts * (NORMAL_CAD / cad));
+    return watts;
   } else {
     return 0;
   }

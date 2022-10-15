@@ -170,10 +170,10 @@ void SS2K::maintenanceLoop(void *pvParameters) {
   while (true) {
     vTaskDelay(200 / portTICK_RATE_MS);
     if (rtConfig.getShifterPosition() > ss2k.lastShifterPosition) {
-      SS2K_LOG(MAIN_LOG_TAG, "Shift UP: %l tgt: %d min %d max %d", rtConfig.getShifterPosition(), ss2k.targetPosition, rtConfig.getMinStep(), rtConfig.getMaxStep());
+      SS2K_LOG(MAIN_LOG_TAG, "Shift UP: %d tgt: %d min %d max %d", rtConfig.getShifterPosition(), ss2k.targetPosition, rtConfig.getMinStep(), rtConfig.getMaxStep());
       spinBLEServer.notifyShift();
     } else if (rtConfig.getShifterPosition() < ss2k.lastShifterPosition) {
-      SS2K_LOG(MAIN_LOG_TAG, "Shift DOWN: %l tgt: %d min %d max %d", rtConfig.getShifterPosition(), ss2k.targetPosition, rtConfig.getMinStep(), rtConfig.getMaxStep());
+      SS2K_LOG(MAIN_LOG_TAG, "Shift DOWN: %d tgt: %d min %d max %d", rtConfig.getShifterPosition(), ss2k.targetPosition, rtConfig.getMinStep(), rtConfig.getMaxStep());
       spinBLEServer.notifyShift();
     }
     ss2k.lastShifterPosition = rtConfig.getShifterPosition();
