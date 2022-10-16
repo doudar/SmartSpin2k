@@ -116,6 +116,10 @@ void PowerTable::setStepperMinMax() {
   if (minBreakWatts > 0) {
     _return = this->lookup(minBreakWatts, NORMAL_CAD);
     if (_return != RETURN_ERROR) {
+      // never set less than one shift bewlow current incline.
+      if ((_return >= rtConfig.getCurrentIncline()) && (rtConfig.getSimulatedWatts().value > userConfig.getMinWatts())) {
+        _return = rtConfig.getCurrentIncline() - userConfig.getShiftStep();
+      }
       rtConfig.setMinStep(_return);
       SS2K_LOG(ERG_MODE_LOG_TAG, "Min Position Set: %d", _return);
     }
@@ -125,6 +129,10 @@ void PowerTable::setStepperMinMax() {
   if (maxBreakWatts > 0) {
     _return = this->lookup(maxBreakWatts, NORMAL_CAD);
     if (_return != RETURN_ERROR) {
+      // never set less than one shift above current incline.
+      if ((_return <= rtConfig.getCurrentIncline()) && (rtConfig.getSimulatedWatts().value < userConfig.getMaxWatts())) {
+        _return = rtConfig.getCurrentIncline() + userConfig.getShiftStep();
+      }
       rtConfig.setMaxStep(_return);
       SS2K_LOG(ERG_MODE_LOG_TAG, "Max Position Set: %d", _return);
     }
