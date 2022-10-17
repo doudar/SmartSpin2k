@@ -47,98 +47,104 @@ WebSocketAppender webSocketAppender;
 #ifndef UNIT_TEST
 
 void auxSerialRX() {
-  String buf = auxSerial.readString();
-  Serial.printf("rx: %s", buf);
+  // String buf = auxSerial.readString();
+  // Serial.printf("serial callback");
 
-  if (auxSerial.available())  // >= MESSAGE_BYTES)
-  {
-    if (auxSerial.read() == HEADER) {
-      int devID      = auxSerial.read();
-      int measDigits = auxSerial.read();  // not using this for now
-      if (devID == CAD_ID) {
-        char b3       = auxSerial.read();
-        int i3        = b3 - '0';
-        char b2       = auxSerial.read();
-        int i2        = b2 - '0';
-        char b1       = auxSerial.read();
-        int i1        = b1 - '0';
-        int val1      = 100 * i1 + 10 * i2 + i3;
-        byte checkSum = auxSerial.read();
-        byte sum      = b3 + b2 + b1 + measDigits + devID + HEADER;
-        if (sum != checkSum) {
-          //pAndC.cadenceValid = false;  // measurement is invalid
-        } else {
-          rtConfig.setSimulatedCad(val1);
-          //pAndC.cadenceValid = true;
-        }
-
-        int footer = auxSerial.read();
-
-        if (footer != FOOTER) {
-          //pAndC.cadenceValid = false;  // measurement is invalid
-        }
-      } else if (devID == POW_ID) {
-        char b5       = auxSerial.read();
-        int i5        = b5 - '0';
-        char b4       = auxSerial.read();
-        int i4        = b4 - '0';
-        char b3       = auxSerial.read();
-        int i3        = b3 - '0';
-        char b2       = auxSerial.read();
-        int i2        = b2 - '0';
-        char b1       = auxSerial.read();
-        int i1        = b1 - '0';
-        float val     = 1000 * i1 + 100 * i2 + 10 * i3 + i4 + 0.1 * i5;  // Use a float because the last value is a tenth for some reason
-        byte checkSum = auxSerial.read();
-        byte sum      = b5 + b4 + b3 + b2 + b1 + measDigits + devID + HEADER;
-        if (sum != checkSum) {
-          //pAndC.powerValid = false;  // measurement is invalid
-
-        } else {
-          rtConfig.setSimulatedWatts((int16_t)val);  // Convert it to an int
-          //pAndC.powerValid = true;
-        }
-
-        int footer = auxSerial.read();
-
-        if (footer != FOOTER) {
-          //pAndC.powerValid = false;
-        }
-      } else if (devID == RES_ID) {  // Read the resistance
-        char b4       = auxSerial.read();
-        int i4        = b4 - '0';
-        char b3       = auxSerial.read();
-        int i3        = b3 - '0';
-        char b2       = auxSerial.read();
-        int i2        = b2 - '0';
-        char b1       = auxSerial.read();
-        int i1        = b1 - '0';
-        int val1      = 1000 * i1 + 100 * i2 + 10 * i3 + i4;
-        byte checkSum = auxSerial.read();
-        byte sum      = b4 + b3 + b2 + b1 + measDigits + devID + HEADER;
-
-        if (sum != checkSum) {
-          //pAndC.resistanceValid = false;  // measurement is invalid
-        } else {
-          //rtConfig.setShifterPosition(val1);
-          //pAndC.resistanceValid = true;
-        }
-
-        int footer = auxSerial.read();
-
-        if (footer != FOOTER) {
-          //pAndC.resistanceValid = false;  // measurement is invalid
-        }
+  // if (auxSerial.available())  // >= MESSAGE_BYTES)
+  //{
+  if (auxSerial.read() == HEADER) {
+    int devID      = auxSerial.read();
+    int measDigits = auxSerial.read();  // not using this for now
+    if (devID == CAD_ID) {
+      char b3       = auxSerial.read();
+      int i3        = b3 - '0';
+      char b2       = auxSerial.read();
+      int i2        = b2 - '0';
+      char b1       = auxSerial.read();
+      int i1        = b1 - '0';
+      int val1      = 100 * i1 + 10 * i2 + i3;
+      byte checkSum = auxSerial.read();
+      byte sum      = b3 + b2 + b1 + measDigits + devID + HEADER;
+      if (sum != checkSum) {
+        Serial.printf("bad watt checksum %s", auxSerial.readString());
       } else {
-        // TODO - this may cause an infinite loop. Log when this happens and capture the bytes.
+        rtConfig.setSimulatedCad(val1);
+        rtConfig.setSimulateCad(true);
+        Serial.printf("Peloton CAD Set %d", val1);
+        // pAndC.cadenceValid = true;
       }
-      return;
+
+      int footer = auxSerial.read();
+
+      if (footer != FOOTER) {
+        // pAndC.cadenceValid = false;  // measurement is invalid
+      }
+    } else if (devID == POW_ID) {
+      char b5       = auxSerial.read();
+      int i5        = b5 - '0';
+      char b4       = auxSerial.read();
+      int i4        = b4 - '0';
+      char b3       = auxSerial.read();
+      int i3        = b3 - '0';
+      char b2       = auxSerial.read();
+      int i2        = b2 - '0';
+      char b1       = auxSerial.read();
+      int i1        = b1 - '0';
+      float val     = 1000 * i1 + 100 * i2 + 10 * i3 + i4 + 0.1 * i5;  // Use a float because the last value is a tenth for some reason
+      byte checkSum = auxSerial.read();
+      byte sum      = b5 + b4 + b3 + b2 + b1 + measDigits + devID + HEADER;
+      if (sum != checkSum) {
+        Serial.println("bad cad checksum");
+
+      } else {
+        rtConfig.setSimulatedWatts((int16_t)val);  // Convert it to an int
+        rtConfig.setSimulateWatts(true);
+      }
+
+      int footer = auxSerial.read();
+
+      if (footer != FOOTER) {
+        // pAndC.powerValid = false;
+      }
+    } else if (devID == RES_ID) {  // Read the resistance
+      char b4       = auxSerial.read();
+      int i4        = b4 - '0';
+      char b3       = auxSerial.read();
+      int i3        = b3 - '0';
+      char b2       = auxSerial.read();
+      int i2        = b2 - '0';
+      char b1       = auxSerial.read();
+      int i1        = b1 - '0';
+      int val1      = 1000 * i1 + 100 * i2 + 10 * i3 + i4;
+      byte checkSum = auxSerial.read();
+      byte sum      = b4 + b3 + b2 + b1 + measDigits + devID + HEADER;
+
+      if (sum != checkSum) {
+        Serial.println("bad resistance checksum");
+      } else {
+        // rtConfig.setShifterPosition(val1);
+        // pAndC.resistanceValid = true;
+      }
+
+      int footer = auxSerial.read();
+
+      if (footer != FOOTER) {
+        // pAndC.resistanceValid = false;  // measurement is invalid
+      }
     } else {
-      return;
+      //throw away leftover data
+      auxSerial.readString();
+      // TODO - this may cause an infinite loop. Log when this happens and capture the bytes.
     }
+    return;
   } else {
+    String buf = auxSerial.readString();
+    Serial.printf("bad watt checksum %s", buf);
     return;
   }
+  //} else {
+  //  return;
+  //}
 }
 
 void SS2K::startTasks() {
@@ -179,13 +185,13 @@ void setup() {
   stepperSerial.begin(57600, SERIAL_8N2, currentBoard.stepperSerialRxPin, currentBoard.stepperSerialTxPin);
   // initialize aux serial port
   if (currentBoard.auxSerialTxPin) {
-    auxSerial.setTxBufferSize(500);
-    auxSerial.setRxBufferSize(500);
-    auxSerial.begin(1200, SERIAL_8N1, currentBoard.auxSerialRxPin, currentBoard.auxSerialTxPin, false);
+    // auxSerial.setTxBufferSize(500);
+    // auxSerial.setRxBufferSize(500);
+    auxSerial.begin(19200, SERIAL_8N1, currentBoard.auxSerialRxPin, currentBoard.auxSerialTxPin, false);
     if (!auxSerial) {
       SS2K_LOG(MAIN_LOG_TAG, "Invalid Serial Pin Configuration");
     }
-    // auxSerial.onReceive(auxSerialRX, true);
+    // auxSerial.onReceive(auxSerialRX, true);  // setup callback
   }
   // Initialize LittleFS
   SS2K_LOG(MAIN_LOG_TAG, "Mounting Filesystem");
@@ -326,18 +332,23 @@ void SS2K::maintenanceLoop(void *pvParameters) {
 
     if (currentBoard.auxSerialTxPin) {
       // echo back aux serial on all interfaces
-      String buf = auxSerial.readString();
-      if (buf != "") {
-        // new line
-        auxSerial.print('\n');
-        SS2K_LOG(MAIN_LOG_TAG, "%s", buf);
-        auxSerial.print(buf);
-      }
-    }
+      // uint8_t buf[20] = {0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0};
+      // size_t len      = auxSerial.readBytes(buf, 20);
+      // if (len) {
+      // new line
+      // auxSerial.print('\n');
+      // for (int i = 0; i < len; i++) {
+      // Serial.print(buf[i], HEX);
+      // auxSerial.print(buf);
 
+      //}
+      // }
+      auxSerialRX();
+    }
     loopCounter++;
   }
 }
+
 #endif  // UNIT_TEST
 
 void SS2K::restartWifi() {
