@@ -46,9 +46,9 @@ WebSocketAppender webSocketAppender;
 ///////////// BEGIN SETUP /////////////
 #ifndef UNIT_TEST
 
-void auxSerialRX(){
-String buf = auxSerial.readString();
-Serial.printf("rx: %s", buf);
+void auxSerialRX() {
+  String buf = auxSerial.readString();
+  Serial.printf("rx: %s", buf);
 }
 
 void SS2K::startTasks() {
@@ -88,15 +88,15 @@ void setup() {
 
   stepperSerial.begin(57600, SERIAL_8N2, currentBoard.stepperSerialRxPin, currentBoard.stepperSerialTxPin);
   // initialize aux serial port
-  auxSerial.setTxBufferSize(500);
-  auxSerial.setRxBufferSize(500);
-  //I had to set the last setting to true below to invert the logic for testing because all I have are USB-TTL devices. 
-  auxSerial.begin(1200, SERIAL_8N1, currentBoard.auxSerialRxPin, currentBoard.auxSerialTxPin, true);
-  if(!auxSerial){
-    SS2K_LOG(MAIN_LOG_TAG, "Invalid Serial Pin Configuration");
+  if (currentBoard.auxSerialTxPin) {
+    auxSerial.setTxBufferSize(500);
+    auxSerial.setRxBufferSize(500);
+    auxSerial.begin(1200, SERIAL_8N1, currentBoard.auxSerialRxPin, currentBoard.auxSerialTxPin, false);
+    if (!auxSerial) {
+      SS2K_LOG(MAIN_LOG_TAG, "Invalid Serial Pin Configuration");
+    }
+    // auxSerial.onReceive(auxSerialRX, true);
   }
-  //auxSerial.onReceive(auxSerialRX, true);
-
   // Initialize LittleFS
   SS2K_LOG(MAIN_LOG_TAG, "Mounting Filesystem");
   if (!LittleFS.begin(false)) {
@@ -163,7 +163,7 @@ void setup() {
 
   ss2k.resetIfShiftersHeld();
   SS2K_LOG(MAIN_LOG_TAG, "Creating Shifter Interrupts");
-  // Setup Interrups so shifters work anytime
+  // Setup Interrupts so shifters work anytime
   attachInterrupt(digitalPinToInterrupt(currentBoard.shiftUpPin), ss2k.shiftUp, CHANGE);
   attachInterrupt(digitalPinToInterrupt(currentBoard.shiftDownPin), ss2k.shiftDown, CHANGE);
   digitalWrite(LED_PIN, HIGH);
@@ -233,16 +233,17 @@ void SS2K::maintenanceLoop(void *pvParameters) {
 #endif  // DEBUG_STACK
       loopCounter = 0;
     }
-    // read from auxSerial
-    //if (auxSerial.available()) {
-      //String buf = auxSerial.readStringUntil('\n');
-     //echo
-     //SS2K_LOG(MAIN_LOG_TAG, "aux_serial: %s", buf);
-     // auxSerial.write(buf.c_str());
-     //auxSerial.println(auxSerial.onReceive);
-    //}
-    auxSerial.print("Peloton Works!");
-    Serial.println(auxSerial.readString());
+
+    if (currentBoard.auxSerialTxPin) {
+      // echo back aux serial on all interfaces
+      String buf = auxSerial.readString();
+      if (buf) {
+        // new line
+        auxSerial.print('\n');
+        SS2K_LOG(MAIN_LOG_TAG, "%s", buf);
+        auxSerial.print(buf);
+      }
+    }
 
     loopCounter++;
   }
