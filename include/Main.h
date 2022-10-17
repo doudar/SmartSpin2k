@@ -51,19 +51,26 @@ class SS2K {
   void motorStop(bool releaseTension = false);
 
   SS2K() {
-    targetPosition         = 0;
-    currentPosition        = 0;
-    stepperIsRunning       = false;
-    externalControl        = false;
-    syncMode               = false;
-    lastDebounceTime       = 0;
-    debounceDelay          = DEBOUNCE_DELAY;
-    lastShifterPosition    = 0;
-    shiftersHoldForScan    = SHIFTERS_HOLD_FOR_SCAN;
-    scanDelayTime          = 10000;
-    scanDelayStart         = 0;
+    targetPosition      = 0;
+    currentPosition     = 0;
+    stepperIsRunning    = false;
+    externalControl     = false;
+    syncMode            = false;
+    lastDebounceTime    = 0;
+    debounceDelay       = DEBOUNCE_DELAY;
+    lastShifterPosition = 0;
+    shiftersHoldForScan = SHIFTERS_HOLD_FOR_SCAN;
+    scanDelayTime       = 10000;
+    scanDelayStart      = 0;
   }
 };
+
+// peloton Serial
+#define HEADER 0xF1
+#define FOOTER 0xF6
+#define CAD_ID 0x41
+#define RES_ID 0x4A
+#define POW_ID 0x44
 
 void auxSerialRX();
 // Users Physical Working Capacity Calculation Parameters (heartrate to Power
