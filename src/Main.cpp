@@ -66,16 +66,16 @@ void auxSerialRX() {
         byte checkSum = auxSerial.read();
         byte sum      = b3 + b2 + b1 + measDigits + devID + HEADER;
         if (sum != checkSum) {
-          pAndC.cadenceValid = false;  // measurement is invalid
+          //pAndC.cadenceValid = false;  // measurement is invalid
         } else {
-          rtConfig.getSimulatedCad(val1);
+          rtConfig.setSimulatedCad(val1);
           //pAndC.cadenceValid = true;
         }
 
         int footer = auxSerial.read();
 
         if (footer != FOOTER) {
-          pAndC.cadenceValid = false;  // measurement is invalid
+          //pAndC.cadenceValid = false;  // measurement is invalid
         }
       } else if (devID == POW_ID) {
         char b5       = auxSerial.read();
@@ -96,7 +96,7 @@ void auxSerialRX() {
 
         } else {
           rtConfig.setSimulatedWatts((int16_t)val);  // Convert it to an int
-          pAndC.powerValid = true;
+          //pAndC.powerValid = true;
         }
 
         int footer = auxSerial.read();
