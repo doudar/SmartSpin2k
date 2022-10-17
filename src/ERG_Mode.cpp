@@ -87,9 +87,11 @@ void PowerBuffer::reset() {
 }
 
 void PowerTable::processPowerValue(PowerBuffer& powerBuffer, int cadence, Measurement watts) {
-  if ((cadence >= (NORMAL_CAD - 20)) && (cadence <= (NORMAL_CAD + 20)) && (watts.value > 10) && (watts.value < POWERTABLE_SIZE * POWERTABLE_INCREMENT)) {
+  if ((cadence >= (NORMAL_CAD - 20)) && (cadence <= (NORMAL_CAD + 20)) && (watts.value > 10) && (watts.value < (POWERTABLE_SIZE * POWERTABLE_INCREMENT))) {
     if (powerBuffer.powerEntry[0].readings == 0) {
-      powerBuffer.set(0);  // Take Initial reading
+      // Take Initial reading
+      powerBuffer.set(0);
+      // Check that reading is within 25w of the initial reading
     } else if (abs(powerBuffer.powerEntry[0].watts - watts.value) < (POWERTABLE_INCREMENT / 2)) {
       for (int i = 1; i < POWER_SAMPLES; i++) {
         if (powerBuffer.powerEntry[i].readings == 0) {
@@ -147,7 +149,7 @@ void PowerTable::newEntry(PowerBuffer& powerBuffer) {
 
   for (int i = 0; i < POWER_SAMPLES; i++) {
     if (powerBuffer.powerEntry[i].readings == 0) {
-      // break if powerEntry is not set
+      // break if powerEntry is not set. This should never happen.
       break;
     }
 
@@ -167,6 +169,7 @@ void PowerTable::newEntry(PowerBuffer& powerBuffer) {
     targetPosition = (targetPosition + powerBuffer.powerEntry[i].targetPosition) / 2;
     cad            = (cad + powerBuffer.powerEntry[i].cad) / 2;
   }
+  // Done with powerBuffer
 
   // To start working on the PowerTable, we need to calculate position in the table for the new entry
   int i = round(watts / POWERTABLE_INCREMENT);
@@ -175,7 +178,7 @@ void PowerTable::newEntry(PowerBuffer& powerBuffer) {
   if (i > 0) {
     for (int j = i - 1; j > 0; j--) {
       if ((this->powerEntry[j].targetPosition != 0) && (this->powerEntry[j].targetPosition >= targetPosition)) {
-        SS2K_LOG(ERG_MODE_LOG_TAG, "PowerTable Input (%d) was less than previous (%d)", targetPosition, this->powerEntry[j].targetPosition);
+        SS2K_LOG(POWERTABLE_LOG_TAG, "Target Slot (%dw)(%d)(%d) was less than previous (%d)(%d)", watts, i, targetPosition, j, this->powerEntry[j].targetPosition);
         return;
       }
     }
@@ -184,7 +187,7 @@ void PowerTable::newEntry(PowerBuffer& powerBuffer) {
   if (i < POWERTABLE_SIZE) {
     for (int j = i + 1; j < POWERTABLE_SIZE; j++) {
       if ((this->powerEntry[j].targetPosition != 0) && (targetPosition >= this->powerEntry[j].targetPosition)) {
-        SS2K_LOG(ERG_MODE_LOG_TAG, "PowerTable Input (%d) was greater than next (%d)", targetPosition, this->powerEntry[j].targetPosition);
+        SS2K_LOG(POWERTABLE_LOG_TAG, "Target Slot (%dw)(%d)(%d) was greater than next (%d)(%d)", watts, i, targetPosition, j, this->powerEntry[j].targetPosition);
         return;
       }
     }
@@ -216,7 +219,7 @@ int32_t PowerTable::lookup(int watts, int cad) {
   };
 
   watts = _adjustWattsForCadence(watts, cad);
-  if (watts == 0) {
+  if (watts <= 0) {
     return -99;
   }
   cad = NORMAL_CAD;
@@ -399,7 +402,7 @@ void ErgMode::computErg() {
   // SetPoint changed
   if (this->setPoint != newSetPoint) {
     _setPointChangeState(newSetPoint, newCadence, newWatts, currentIncline);
-    SS2K_LOG(ERG_MODE_LOG_TAG, "SetPoint changed");
+    SS2K_LOG(ERG_MODE_LOG_TAG, "SetPoint changed: %dw", newSetPoint);
     return;
   }
 
