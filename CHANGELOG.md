@@ -35,7 +35,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Updated Libraries to newest versions.
 - Disabled setting of min/maxWatts if minWatts/maxWatts is 0.
 - Added a check to workaround a bug where a powertable pair member was zero.
-- Fixed a bug where a powertable pair could be returned that was larger than the powertable size. 
+- Fixed a bug where a powertable pair could be returned that was larger than the powertable size.
+- changes to default settings 
 
 ### Hardware
 
