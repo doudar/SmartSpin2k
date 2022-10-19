@@ -67,7 +67,7 @@ void setup() {
   Serial.begin(512000);
   SS2K_LOG(MAIN_LOG_TAG, "Compiled %s%s", __DATE__, __TIME__);
   pinMode(REV_PIN, INPUT);
-  int actualVoltage  = analogRead(REV_PIN);
+  int actualVoltage = analogRead(REV_PIN);
   if (actualVoltage - boards.rev1.versionVoltage >= boards.rev2.versionVoltage - actualVoltage) {
     currentBoard = boards.rev2;
   } else {
@@ -171,9 +171,17 @@ void SS2K::maintenanceLoop(void *pvParameters) {
     vTaskDelay(200 / portTICK_RATE_MS);
     if (rtConfig.getShifterPosition() > ss2k.lastShifterPosition) {
       SS2K_LOG(MAIN_LOG_TAG, "Shift UP: %d tgt: %d min %d max %d", rtConfig.getShifterPosition(), ss2k.targetPosition, rtConfig.getMinStep(), rtConfig.getMaxStep());
+      if (ss2k.targetPosition > rtConfig.getMaxStep()) {
+        SS2K_LOG(MAIN_LOG_TAG, "Shift Blocked By MaxStep");
+        rtConfig.setShifterPosition(ss2k.lastShifterPosition);
+      }
       spinBLEServer.notifyShift();
     } else if (rtConfig.getShifterPosition() < ss2k.lastShifterPosition) {
       SS2K_LOG(MAIN_LOG_TAG, "Shift DOWN: %d tgt: %d min %d max %d", rtConfig.getShifterPosition(), ss2k.targetPosition, rtConfig.getMinStep(), rtConfig.getMaxStep());
+      if (ss2k.targetPosition < rtConfig.getMinStep()) {
+        SS2K_LOG(MAIN_LOG_TAG, "Shift Blocked By MinStep");
+        rtConfig.setShifterPosition(ss2k.lastShifterPosition);
+      }
       spinBLEServer.notifyShift();
     }
     ss2k.lastShifterPosition = rtConfig.getShifterPosition();

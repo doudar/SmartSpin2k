@@ -6,8 +6,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+- Added blocking for shifts above or below min/max setpoints.
 
 ### Changed
+- PowerTable values are now adjusted to 90 RPM cad on input.
+- PowerTable entries are now validated against previous entries. 
 
 ### Hardware
 
@@ -38,7 +41,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - BLE scan page duplicates bug fixed. 
 - BLE scan page dropdowns default to devices found during scan. 
 - Increased THROTTLE_TEMP from 72c to 85c. 
-- PowerTable values are now adjusted to 90 RPM cad on input.
 
 ### Hardware
 - Ultra Short Direct Mount case for use on bikes with limited space between knob and head tube
