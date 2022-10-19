@@ -15,6 +15,7 @@
 #include "ERG_Mode.h"
 #include "UdpAppender.h"
 #include "WebsocketAppender.h"
+#include <Constants.h>
 
 // Stepper Motor Serial
 HardwareSerial stepperSerial(1);
@@ -22,6 +23,7 @@ TMC2208Stepper driver(&SERIAL_PORT, R_SENSE);  // Hardware Serial
 
 // Peloton Serial
 HardwareSerial auxSerial(2);
+AuxSerialBuffer auxSerialBuffer;
 
 FastAccelStepperEngine engine = FastAccelStepperEngine();
 FastAccelStepper *stepper     = NULL;
@@ -45,107 +47,6 @@ WebSocketAppender webSocketAppender;
 
 ///////////// BEGIN SETUP /////////////
 #ifndef UNIT_TEST
-
-void auxSerialRX() {
-  // String buf = auxSerial.readString();
-  // Serial.printf("serial callback");
-
-  // if (auxSerial.available())  // >= MESSAGE_BYTES)
-  //{
-  if (auxSerial.read() == HEADER) {
-    int devID      = auxSerial.read();
-    int measDigits = auxSerial.read();  // not using this for now
-    if (devID == CAD_ID) {
-      char b3       = auxSerial.read();
-      int i3        = b3 - '0';
-      char b2       = auxSerial.read();
-      int i2        = b2 - '0';
-      char b1       = auxSerial.read();
-      int i1        = b1 - '0';
-      int val1      = 100 * i1 + 10 * i2 + i3;
-      byte checkSum = auxSerial.read();
-      byte sum      = b3 + b2 + b1 + measDigits + devID + HEADER;
-      if (sum != checkSum) {
-        Serial.printf("bad watt checksum %s", auxSerial.readString());
-      } else {
-        rtConfig.setSimulatedCad(val1);
-        rtConfig.setSimulateCad(true);
-        Serial.printf("Peloton CAD Set %d", val1);
-        // pAndC.cadenceValid = true;
-      }
-
-      int footer = auxSerial.read();
-
-      if (footer != FOOTER) {
-        // pAndC.cadenceValid = false;  // measurement is invalid
-      }
-    } else if (devID == POW_ID) {
-      char b5       = auxSerial.read();
-      int i5        = b5 - '0';
-      char b4       = auxSerial.read();
-      int i4        = b4 - '0';
-      char b3       = auxSerial.read();
-      int i3        = b3 - '0';
-      char b2       = auxSerial.read();
-      int i2        = b2 - '0';
-      char b1       = auxSerial.read();
-      int i1        = b1 - '0';
-      float val     = 1000 * i1 + 100 * i2 + 10 * i3 + i4 + 0.1 * i5;  // Use a float because the last value is a tenth for some reason
-      byte checkSum = auxSerial.read();
-      byte sum      = b5 + b4 + b3 + b2 + b1 + measDigits + devID + HEADER;
-      if (sum != checkSum) {
-        Serial.println("bad cad checksum");
-
-      } else {
-        rtConfig.setSimulatedWatts((int16_t)val);  // Convert it to an int
-        rtConfig.setSimulateWatts(true);
-      }
-
-      int footer = auxSerial.read();
-
-      if (footer != FOOTER) {
-        // pAndC.powerValid = false;
-      }
-    } else if (devID == RES_ID) {  // Read the resistance
-      char b4       = auxSerial.read();
-      int i4        = b4 - '0';
-      char b3       = auxSerial.read();
-      int i3        = b3 - '0';
-      char b2       = auxSerial.read();
-      int i2        = b2 - '0';
-      char b1       = auxSerial.read();
-      int i1        = b1 - '0';
-      int val1      = 1000 * i1 + 100 * i2 + 10 * i3 + i4;
-      byte checkSum = auxSerial.read();
-      byte sum      = b4 + b3 + b2 + b1 + measDigits + devID + HEADER;
-
-      if (sum != checkSum) {
-        Serial.println("bad resistance checksum");
-      } else {
-        // rtConfig.setShifterPosition(val1);
-        // pAndC.resistanceValid = true;
-      }
-
-      int footer = auxSerial.read();
-
-      if (footer != FOOTER) {
-        // pAndC.resistanceValid = false;  // measurement is invalid
-      }
-    } else {
-      //throw away leftover data
-      auxSerial.readString();
-      // TODO - this may cause an infinite loop. Log when this happens and capture the bytes.
-    }
-    return;
-  } else {
-    String buf = auxSerial.readString();
-    Serial.printf("bad watt checksum %s", buf);
-    return;
-  }
-  //} else {
-  //  return;
-  //}
-}
 
 void SS2K::startTasks() {
   SS2K_LOG(MAIN_LOG_TAG, "Start BLE + ERG Tasks");
@@ -185,8 +86,8 @@ void setup() {
   stepperSerial.begin(57600, SERIAL_8N2, currentBoard.stepperSerialRxPin, currentBoard.stepperSerialTxPin);
   // initialize aux serial port
   if (currentBoard.auxSerialTxPin) {
-    // auxSerial.setTxBufferSize(500);
-    // auxSerial.setRxBufferSize(500);
+    auxSerial.setTxBufferSize(500);
+    auxSerial.setRxBufferSize(500);
     auxSerial.begin(19200, SERIAL_8N1, currentBoard.auxSerialRxPin, currentBoard.auxSerialTxPin, false);
     if (!auxSerial) {
       SS2K_LOG(MAIN_LOG_TAG, "Invalid Serial Pin Configuration");
@@ -330,20 +231,32 @@ void SS2K::maintenanceLoop(void *pvParameters) {
       loopCounter = 0;
     }
 
+    // Monitor serial port for data
     if (currentBoard.auxSerialTxPin) {
-      // echo back aux serial on all interfaces
-      // uint8_t buf[20] = {0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0};
-      // size_t len      = auxSerial.readBytes(buf, 20);
-      // if (len) {
-      // new line
-      // auxSerial.print('\n');
-      // for (int i = 0; i < len; i++) {
-      // Serial.print(buf[i], HEX);
-      // auxSerial.print(buf);
-
-      //}
-      // }
-      auxSerialRX();
+      if (auxSerial.available() >= 8) {  // if at least 8 bytes are available to read from the serial port
+        int i               = 0;
+        int k               = 0;
+        auxSerialBuffer.len = auxSerial.readBytes(auxSerialBuffer.data, AUX_BUF_SIZE);
+        // pre-process Peloton Data. If we get more serial devices we will have to move this into sensor data factory.
+        // This is done here to prevent a lot of extra logging.
+        for (i = 0; i < auxSerialBuffer.len; i++) {  // Find start of data string
+          if (auxSerialBuffer.data[i] == HEADER) {
+            for (k = i; k < auxSerialBuffer.len; k++) {  // Find end of data string
+              if (auxSerialBuffer.data[k] == FOOTER) {
+                k++;
+                break;
+              }
+            }
+            size_t newLen = k - i;  // find length of sub data
+            uint8_t newBuf[newLen];
+            for (int j = i; j < k; j++) {
+              newBuf[j - i] = auxSerialBuffer.data[j];
+            }
+            collectAndSet(PELOTON_DATA_UUID, PELOTON_DATA_UUID, PELOTON_ADDRESS, newBuf, newLen);
+            break;
+          }
+        }
+      }
     }
     loopCounter++;
   }

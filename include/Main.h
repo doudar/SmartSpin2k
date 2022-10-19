@@ -13,6 +13,7 @@
 #include "BLE_Common.h"
 #include "LittleFS_Upgrade.h"
 #include "boards.h"
+#include "SensorCollector.h"
 
 #define MAIN_LOG_TAG "Main"
 
@@ -65,14 +66,19 @@ class SS2K {
   }
 };
 
-// peloton Serial
-#define HEADER 0xF1
-#define FOOTER 0xF6
-#define CAD_ID 0x41
-#define RES_ID 0x4A
-#define POW_ID 0x44
+class AuxSerialBuffer {
+ public:
+  uint8_t data[20];
+  size_t len;
 
-void auxSerialRX();
+  AuxSerialBuffer() {
+    for (int i = 0; i < AUX_BUF_SIZE; i++) {
+      this->data[i] = 0;
+    }
+    this->len = 0;
+  }
+};
+
 // Users Physical Working Capacity Calculation Parameters (heartrate to Power
 // calculation)
 extern physicalWorkingCapacity userPWC;
