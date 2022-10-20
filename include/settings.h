@@ -96,7 +96,7 @@
 
 //////////// Defines for hardware Revision 1 ////////////
 
-//Board Name
+// Board Name
 #define r1_NAME "Revision One"
 
 // ID Voltage on pin 34. Values are 0-4095 (0-3.3v)
@@ -125,7 +125,7 @@
 ////////////////////////////////////////////////////////
 //////////// Defines for hardware Revision 2 ////////////
 
-//Board Name
+// Board Name
 #define r2_NAME "Revision Two"
 
 // ID Voltage on pin 34. Values are 0-4095 (0-3.3v)
@@ -226,6 +226,9 @@
 
 // Number of similar power samples to take before writing to the Power Table
 #define POWER_SAMPLES 5
+
+// Normal cadence value (used in power table and other areas)
+#define NORMAL_CAD 90
 
 // Temperature of the ESP32 at which to start reducing the power output of the stepper motor driver.
 #define THROTTLE_TEMP 85

@@ -87,9 +87,11 @@ void PowerBuffer::reset() {
 }
 
 void PowerTable::processPowerValue(PowerBuffer& powerBuffer, int cadence, Measurement watts) {
-  if ((cadence > 70) && (cadence < 100) && (watts.value > 10) && (watts.value < POWERTABLE_SIZE * POWERTABLE_INCREMENT)) {
+  if ((cadence >= (NORMAL_CAD - 20)) && (cadence <= (NORMAL_CAD + 20)) && (watts.value > 10) && (watts.value < (POWERTABLE_SIZE * POWERTABLE_INCREMENT))) {
     if (powerBuffer.powerEntry[0].readings == 0) {
-      powerBuffer.set(0);  // Take Initial reading
+      // Take Initial reading
+      powerBuffer.set(0);
+      // Check that reading is within 25w of the initial reading
     } else if (abs(powerBuffer.powerEntry[0].watts - watts.value) < (POWERTABLE_INCREMENT / 2)) {
       for (int i = 1; i < POWER_SAMPLES; i++) {
         if (powerBuffer.powerEntry[i].readings == 0) {
@@ -114,8 +116,12 @@ void PowerTable::setStepperMinMax() {
 
   int minBreakWatts = userConfig.getMinWatts();
   if (minBreakWatts > 0) {
-    _return = this->lookup(minBreakWatts, 90);
+    _return = this->lookup(minBreakWatts, NORMAL_CAD);
     if (_return != RETURN_ERROR) {
+      // never set less than one shift bewlow current incline.
+      if ((_return >= rtConfig.getCurrentIncline()) && (rtConfig.getSimulatedWatts().value > userConfig.getMinWatts())) {
+        _return = rtConfig.getCurrentIncline() - userConfig.getShiftStep();
+      }
       rtConfig.setMinStep(_return);
       SS2K_LOG(ERG_MODE_LOG_TAG, "Min Position Set: %d", _return);
     }
@@ -123,8 +129,12 @@ void PowerTable::setStepperMinMax() {
 
   int maxBreakWatts = userConfig.getMaxWatts();
   if (maxBreakWatts > 0) {
-    _return = this->lookup(maxBreakWatts, 90);
+    _return = this->lookup(maxBreakWatts, NORMAL_CAD);
     if (_return != RETURN_ERROR) {
+      // never set less than one shift above current incline.
+      if ((_return <= rtConfig.getCurrentIncline()) && (rtConfig.getSimulatedWatts().value < userConfig.getMaxWatts())) {
+        _return = rtConfig.getCurrentIncline() + userConfig.getShiftStep();
+      }
       rtConfig.setMaxStep(_return);
       SS2K_LOG(ERG_MODE_LOG_TAG, "Max Position Set: %d", _return);
     }
@@ -139,9 +149,13 @@ void PowerTable::newEntry(PowerBuffer& powerBuffer) {
 
   for (int i = 0; i < POWER_SAMPLES; i++) {
     if (powerBuffer.powerEntry[i].readings == 0) {
-      // break if powerEntry is not set
+      // break if powerEntry is not set. This should never happen.
       break;
     }
+
+    // Adjust input watts to an cadence of NORMAL_CAD
+    powerBuffer.powerEntry[i].watts = _adjustWattsForCadence(powerBuffer.powerEntry[i].watts, powerBuffer.powerEntry[i].cad);
+    powerBuffer.powerEntry[i].cad   = NORMAL_CAD;
 
     if (i == 0) {  // first loop -> assign values
       watts          = powerBuffer.powerEntry[i].watts;
@@ -155,11 +169,28 @@ void PowerTable::newEntry(PowerBuffer& powerBuffer) {
     targetPosition = (targetPosition + powerBuffer.powerEntry[i].targetPosition) / 2;
     cad            = (cad + powerBuffer.powerEntry[i].cad) / 2;
   }
+  // Done with powerBuffer
 
+  // To start working on the PowerTable, we need to calculate position in the table for the new entry
   int i = round(watts / POWERTABLE_INCREMENT);
 
-  if (i == 1) {  // set the minimum resistance level of the trainer.
-    rtConfig.setMinStep(this->powerEntry[i].targetPosition);
+  // Prohibit entries that are less than the number to the left
+  if (i > 0) {
+    for (int j = i - 1; j > 0; j--) {
+      if ((this->powerEntry[j].targetPosition != 0) && (this->powerEntry[j].targetPosition >= targetPosition)) {
+        SS2K_LOG(POWERTABLE_LOG_TAG, "Target Slot (%dw)(%d)(%d) was less than previous (%d)(%d)", watts, i, targetPosition, j, this->powerEntry[j].targetPosition);
+        return;
+      }
+    }
+  }
+  // Prohibit entries that are greater than the number to the right
+  if (i < POWERTABLE_SIZE) {
+    for (int j = i + 1; j < POWERTABLE_SIZE; j++) {
+      if ((this->powerEntry[j].targetPosition != 0) && (targetPosition >= this->powerEntry[j].targetPosition)) {
+        SS2K_LOG(POWERTABLE_LOG_TAG, "Target Slot (%dw)(%d)(%d) was greater than next (%d)(%d)", watts, i, targetPosition, j, this->powerEntry[j].targetPosition);
+        return;
+      }
+    }
   }
 
   if (this->powerEntry[i].readings == 0) {  // if first reading in this entry
@@ -186,6 +217,12 @@ int32_t PowerTable::lookup(int watts, int cad) {
     int32_t targetPosition;
     float cad;
   };
+
+  watts = _adjustWattsForCadence(watts, cad);
+  if (watts <= 0) {
+    return -99;
+  }
+  cad = NORMAL_CAD;
 
   int i         = round(watts / POWERTABLE_INCREMENT);  // find the closest entry
   float scale   = watts / POWERTABLE_INCREMENT - i;     // Should we look at the next higher or next lower index for comparison?
@@ -279,13 +316,19 @@ int32_t PowerTable::lookup(int watts, int cad) {
     return (RETURN_ERROR);
   }
 
-  // Cadence Adjustment
-  float averageCAD = (below.cad + above.cad) / 2;
-  watts            = ((watts * 2) * (averageCAD / (cad + 1)) / 2);
   // actual interpolation
   int32_t rTargetPosition = below.targetPosition + ((watts - below.power) / (above.power - below.power)) * (above.targetPosition - below.targetPosition);
 
   return rTargetPosition;
+}
+
+int PowerTable::_adjustWattsForCadence(int watts, int cad) {
+  if (cad > 0) {
+    watts = (watts * (NORMAL_CAD / cad));
+    return watts;
+  } else {
+    return 0;
+  }
 }
 
 bool PowerTable::load() {
@@ -359,7 +402,7 @@ void ErgMode::computErg() {
   // SetPoint changed
   if (this->setPoint != newSetPoint) {
     _setPointChangeState(newSetPoint, newCadence, newWatts, currentIncline);
-    SS2K_LOG(ERG_MODE_LOG_TAG, "SetPoint changed");
+    SS2K_LOG(ERG_MODE_LOG_TAG, "SetPoint changed: %dw", newSetPoint);
     return;
   }
 
