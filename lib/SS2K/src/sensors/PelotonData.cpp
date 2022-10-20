@@ -26,7 +26,7 @@ int PelotonData::getPower() { return this->power; }
 float PelotonData::getSpeed() { return nanf(""); }
 
 void PelotonData::decode(uint8_t *data, size_t length) {
-  float value                    = 0.0;
+  float value                  = 0.0;
   const uint8_t payload_length = data[2];
   for (uint8_t i = 2 + payload_length; i > 2; i--) {
     // -30 = Convert from ASCII to numeric
@@ -40,9 +40,10 @@ void PelotonData::decode(uint8_t *data, size_t length) {
   hasData = true;
   switch (data[1]) {
     case POW_ID:
-      power = value/10;
+      power = value / 10;
+
       break;
-    
+
     case CAD_ID:
       cadence = value;
       break;
@@ -52,8 +53,8 @@ void PelotonData::decode(uint8_t *data, size_t length) {
       break;
 
     default:
-      cadence = nanf("");
-      power   = INT_MIN;
-      hasData = false;
+      //   cadence = nanf("");
+      //   power   = INT_MIN;
+      //   hasData = false;
   }
 }
