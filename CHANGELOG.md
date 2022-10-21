@@ -8,6 +8,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Added
 
 ### Changed
+- changes to default settings for better rideability.  raised incline multiplier and erg sensitivity, increased incline multiplier and max brake watts.
 
 ### Hardware
 
