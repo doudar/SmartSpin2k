@@ -22,7 +22,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Re-arranged index.html. 
 - restored link to bluetooth scanner
 - Reverted conditional variable initialization in powertable lookup function.
-- changes to default settings for better rideability.  raised incline multiplier and erg sensitivity, increased incline multiplier and max brake watts.
 
 ## [2.7.9]
 
@@ -37,6 +36,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Disabled setting of min/maxWatts if minWatts/maxWatts is 0.
 - Added a check to workaround a bug where a powertable pair member was zero.
 - Fixed a bug where a powertable pair could be returned that was larger than the powertable size.
+- changes to default settings 
 
 ### Hardware
 
