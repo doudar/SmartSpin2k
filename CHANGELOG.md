@@ -43,6 +43,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Ultra Short Direct Mount case for use on bikes with limited space between knob and head tube
 - Direct mount and arm for Bowflex C7 - for use with Ultra Short Direct Mount
 
+### Hardware
+- Minor improvements to tolerances for direct mount mod
+- created peloton-specific arm for direct mount use.  IC4 model is usable, but a bit short.
+- modified short case to include chamfers and fillets at the screw posts to improve thin wall printability in superslicer
+- beefier arm for direct mount
+- NEW: Direct Mount short case for bikes with reduced clearance in front of knob.  
+- NEW: Bolt through short case for direct mount use with Generic Bike http://smile.amazon.com/gp/product/B07S3YWSNM
+- NEW: Direct mount for Life Fitness IC7
+
+
 ## [2.7.9]
 
 ### Added
