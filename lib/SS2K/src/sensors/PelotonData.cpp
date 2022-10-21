@@ -53,6 +53,7 @@ void PelotonData::decode(uint8_t *data, size_t length) {
       break;
 
     default:
+      break;
       //   cadence = nanf("");
       //   power   = INT_MIN;
       //   hasData = false;
