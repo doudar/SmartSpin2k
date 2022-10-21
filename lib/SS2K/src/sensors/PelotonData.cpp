@@ -40,7 +40,11 @@ void PelotonData::decode(uint8_t *data, size_t length) {
   hasData = true;
   switch (data[1]) {
     case POW_ID:
-      power = value / 10;
+      if (value >= 0) {
+        power = value / 10;
+      } else {
+        power = 0;
+      }
 
       break;
 
