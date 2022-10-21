@@ -18,12 +18,16 @@
 
 HardwareSerial stepperSerial(2);
 TMC2208Stepper driver(&SERIAL_PORT, R_SENSE);  // Hardware Serial
+
 FastAccelStepperEngine engine = FastAccelStepperEngine();
 FastAccelStepper *stepper     = NULL;
 // Setup a task so the stepper will run on a different core than the main code
 // to prevent stuttering
 TaskHandle_t moveStepperTask;
 TaskHandle_t maintenanceLoopTask;
+
+Boards boards;
+Board currentBoard;
 
 ///////////// Initialize the Config /////////////
 SS2K ss2k;
@@ -61,8 +65,17 @@ void SS2K::stopTasks() {
 void setup() {
   // Serial port for debugging purposes
   Serial.begin(512000);
-  stepperSerial.begin(57600, SERIAL_8N2, STEPPERSERIAL_RX, STEPPERSERIAL_TX);
   SS2K_LOG(MAIN_LOG_TAG, "Compiled %s%s", __DATE__, __TIME__);
+  pinMode(REV_PIN, INPUT);
+  int actualVoltage  = analogRead(REV_PIN);
+  if (actualVoltage - boards.rev1.versionVoltage >= boards.rev2.versionVoltage - actualVoltage) {
+    currentBoard = boards.rev2;
+  } else {
+    currentBoard = boards.rev1;
+  }
+  SS2K_LOG(MAIN_LOG_TAG, "Current Board Revision is: %s", currentBoard.name);
+
+  stepperSerial.begin(57600, SERIAL_8N2, currentBoard.stepperSerialRxPin, currentBoard.stepperSerialTxPin);
 
   // Initialize LittleFS
   SS2K_LOG(MAIN_LOG_TAG, "Mounting Filesystem");
@@ -84,17 +97,16 @@ void setup() {
   userPWC.printFile();
   userPWC.saveToLittleFS();
 
-  pinMode(RADIO_PIN, INPUT_PULLUP);
-  pinMode(SHIFT_UP_PIN, INPUT_PULLUP);    // Push-Button with input Pullup
-  pinMode(SHIFT_DOWN_PIN, INPUT_PULLUP);  // Push-Button with input Pullup
+  pinMode(currentBoard.shiftUpPin, INPUT_PULLUP);    // Push-Button with input Pullup
+  pinMode(currentBoard.shiftDownPin, INPUT_PULLUP);  // Push-Button with input Pullup
   pinMode(LED_PIN, OUTPUT);
-  pinMode(ENABLE_PIN, OUTPUT);
-  pinMode(DIR_PIN, OUTPUT);   // Stepper Direction Pin
-  pinMode(STEP_PIN, OUTPUT);  // Stepper Step Pin
-  digitalWrite(ENABLE_PIN,
+  pinMode(currentBoard.enablePin, OUTPUT);
+  pinMode(currentBoard.dirPin, OUTPUT);   // Stepper Direction Pin
+  pinMode(currentBoard.stepPin, OUTPUT);  // Stepper Step Pin
+  digitalWrite(currentBoard.enablePin,
                HIGH);  // Should be called a disable Pin - High Disables FETs
-  digitalWrite(DIR_PIN, LOW);
-  digitalWrite(STEP_PIN, LOW);
+  digitalWrite(currentBoard.dirPin, LOW);
+  digitalWrite(currentBoard.stepPin, LOW);
   digitalWrite(LED_PIN, LOW);
 
   ss2k.setupTMCStepperDriver();
@@ -132,8 +144,8 @@ void setup() {
   ss2k.resetIfShiftersHeld();
   SS2K_LOG(MAIN_LOG_TAG, "Creating Shifter Interrupts");
   // Setup Interrups so shifters work anytime
-  attachInterrupt(digitalPinToInterrupt(SHIFT_UP_PIN), ss2k.shiftUp, CHANGE);
-  attachInterrupt(digitalPinToInterrupt(SHIFT_DOWN_PIN), ss2k.shiftDown, CHANGE);
+  attachInterrupt(digitalPinToInterrupt(currentBoard.shiftUpPin), ss2k.shiftUp, CHANGE);
+  attachInterrupt(digitalPinToInterrupt(currentBoard.shiftDownPin), ss2k.shiftDown, CHANGE);
   digitalWrite(LED_PIN, HIGH);
 
   xTaskCreatePinnedToCore(SS2K::maintenanceLoop,     /* Task function. */
@@ -218,9 +230,9 @@ void SS2K::restartWifi() {
 void SS2K::moveStepper(void *pvParameters) {
   engine.init();
   bool _stepperDir = userConfig.getStepperDir();
-  stepper          = engine.stepperConnectToPin(STEP_PIN);
-  stepper->setDirectionPin(DIR_PIN, _stepperDir);
-  stepper->setEnablePin(ENABLE_PIN);
+  stepper          = engine.stepperConnectToPin(currentBoard.stepPin);
+  stepper->setDirectionPin(currentBoard.dirPin, _stepperDir);
+  stepper->setEnablePin(currentBoard.enablePin);
   stepper->setAutoEnable(true);
   stepper->setSpeedInHz(STEPPER_SPEED);
   stepper->setAcceleration(STEPPER_ACCELERATION);
@@ -272,7 +284,7 @@ void SS2K::moveStepper(void *pvParameters) {
         while (stepper->isMotorRunning()) {
           vTaskDelay(100 / portTICK_PERIOD_MS);
         }
-        stepper->setDirectionPin(DIR_PIN, _stepperDir);
+        stepper->setDirectionPin(currentBoard.dirPin, _stepperDir);
       }
     }
   }
@@ -291,7 +303,7 @@ bool IRAM_ATTR SS2K::deBounce() {
 ///////////// Interrupt Functions /////////////
 void IRAM_ATTR SS2K::shiftUp() {  // Handle the shift up interrupt IRAM_ATTR is to keep the interrput code in ram always
   if (ss2k.deBounce() && !rtConfig.getERGMode()) {
-    if (!digitalRead(SHIFT_UP_PIN)) {  // double checking to make sure the interrupt wasn't triggered by emf
+    if (!digitalRead(currentBoard.shiftUpPin)) {  // double checking to make sure the interrupt wasn't triggered by emf
       rtConfig.setShifterPosition(rtConfig.getShifterPosition() - 1 + userConfig.getShifterDir() * 2);
     } else {
       ss2k.lastDebounceTime = 0;
@@ -301,7 +313,7 @@ void IRAM_ATTR SS2K::shiftUp() {  // Handle the shift up interrupt IRAM_ATTR is 
 
 void IRAM_ATTR SS2K::shiftDown() {  // Handle the shift down interrupt
   if (ss2k.deBounce() && !rtConfig.getERGMode()) {
-    if (!digitalRead(SHIFT_DOWN_PIN)) {  // double checking to make sure the interrupt wasn't triggered by emf
+    if (!digitalRead(currentBoard.shiftDownPin)) {  // double checking to make sure the interrupt wasn't triggered by emf
       rtConfig.setShifterPosition(rtConfig.getShifterPosition() + 1 - userConfig.getShifterDir() * 2);
     } else {
       ss2k.lastDebounceTime = 0;
@@ -310,7 +322,7 @@ void IRAM_ATTR SS2K::shiftDown() {  // Handle the shift down interrupt
 }
 
 void SS2K::resetIfShiftersHeld() {
-  if ((digitalRead(SHIFT_UP_PIN) == LOW) && (digitalRead(SHIFT_DOWN_PIN) == LOW)) {
+  if ((digitalRead(currentBoard.shiftUpPin) == LOW) && (digitalRead(currentBoard.shiftDownPin) == LOW)) {
     SS2K_LOG(MAIN_LOG_TAG, "Resetting to defaults via shifter buttons.");
     for (int x = 0; x < 10; x++) {  // blink fast to acknowledge
       digitalWrite(LED_PIN, HIGH);
@@ -328,7 +340,7 @@ void SS2K::resetIfShiftersHeld() {
 }
 
 void SS2K::scanIfShiftersHeld() {
-  if ((digitalRead(SHIFT_UP_PIN) == LOW) && (digitalRead(SHIFT_DOWN_PIN) == LOW)) {  // are both shifters held?
+  if ((digitalRead(currentBoard.shiftUpPin) == LOW) && (digitalRead(currentBoard.shiftDownPin) == LOW)) {  // are both shifters held?
     SS2K_LOG(MAIN_LOG_TAG, "Shifters Held %d", shiftersHoldForScan);
     if (shiftersHoldForScan < 1) {  // have they been held for enough loops?
       SS2K_LOG(MAIN_LOG_TAG, "Shifters Held < 1 %d", shiftersHoldForScan);
@@ -395,10 +407,10 @@ void SS2K::updateStealthchop() {
 // Checks the driver temperature and throttles power if above threshold.
 void SS2K::checkDriverTemperature() {
   static bool overTemp = false;
-  if (static_cast<int>(temperatureRead()) > 72) {  // Start throttling driver power at 72C on the ESP32
-    uint8_t throttledPower = (72 - static_cast<int>(temperatureRead())) + DRIVER_MAX_PWR_SCALER;
+  if (static_cast<int>(temperatureRead()) > THROTTLE_TEMP) {  // Start throttling driver power at 72C on the ESP32
+    uint8_t throttledPower = (THROTTLE_TEMP - static_cast<int>(temperatureRead())) + DRIVER_MAX_PWR_SCALER;
     driver.irun(throttledPower);
-    SS2K_LOGW(MAIN_LOG_TAG, "Over temp! Driver is throttling down! ESP32 @ %f C", temperatureRead());
+    SS2K_LOG(MAIN_LOG_TAG, "Over temp! Driver is throttling down! ESP32 @ %f C", temperatureRead());
     overTemp = true;
   } else if ((driver.cs_actual() < DRIVER_MAX_PWR_SCALER) && !driver.stst()) {
     if (overTemp) {
