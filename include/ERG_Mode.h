@@ -66,6 +66,10 @@ class PowerTable {
 
   // Display power table in log
   void toLog();
+
+ private:
+  // Adjust Watts For Cadence
+  int _adjustWattsForCadence(int watts, int cad);
 };
 
 class ErgMode {

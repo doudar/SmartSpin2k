@@ -581,7 +581,7 @@ void calculateInstPwrFromHR() {
 
 #ifndef DEBUG_HR_TO_PWR
   rtConfig.setSimulatedWatts(avgP);
-  rtConfig.setSimulatedCad(90);
+  rtConfig.setSimulatedCad(NORMAL_CAD);
 #endif  // DEBUG_HR_TO_PWR
 
   SS2K_LOG(BLE_SERVER_LOG_TAG, "Power From HR: %d", avgP);
