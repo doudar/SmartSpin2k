@@ -24,6 +24,12 @@ TMC2208Stepper driver(&SERIAL_PORT, R_SENSE);  // Hardware Serial
 // Peloton Serial
 HardwareSerial auxSerial(2);
 AuxSerialBuffer auxSerialBuffer;
+// should we interrogate the bike for cadence and power?
+#define PELOTON_TX      true
+#define PELOTON_RQ_SIZE 4
+const uint8_t peloton_rq_watts[]{0xF5, 0x44, 0x39, 0xF6};
+const uint8_t peloton_rq_cad[]{0xF5, 0x41, 0x36, 0xF6};
+const uint8_t peloton_rq_res[]{0xF5, 0x4A, 0x3F, 0xF6};
 
 FastAccelStepperEngine engine = FastAccelStepperEngine();
 FastAccelStepper *stepper     = NULL;
@@ -262,6 +268,19 @@ void SS2K::maintenanceLoop(void *pvParameters) {
             break;
           }
         }
+      }
+      if (PELOTON_TX) {
+        static bool alternate = false;
+        if (alternate) {
+          for (int i = 0; i < PELOTON_RQ_SIZE; i++) {
+            auxSerial.write(peloton_rq_watts[i]);
+          }
+        } else {
+          for (int i = 0; i < PELOTON_RQ_SIZE; i++) {
+            auxSerial.write(peloton_rq_cad[i]);
+          }
+        }
+        alternate = !alternate;
       }
     }
     loopCounter++;
