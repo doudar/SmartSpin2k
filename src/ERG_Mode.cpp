@@ -324,7 +324,7 @@ int32_t PowerTable::lookup(int watts, int cad) {
 
 int PowerTable::_adjustWattsForCadence(int watts, int cad) {
   if (cad > 0) {
-    watts = (watts * (NORMAL_CAD / cad));
+    watts = (watts * (((NORMAL_CAD / cad)+1)/2));
     return watts;
   } else {
     return 0;
