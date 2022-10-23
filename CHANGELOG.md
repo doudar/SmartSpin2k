@@ -12,6 +12,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Changed
 - PowerTable values are now adjusted to 90 RPM cad on input.
 - PowerTable entries are now validated against previous entries. 
+- changes to default settings for better rideability.  raised incline multiplier and erg sensitivity, increased incline multiplier and max brake watts.
 
 ### Hardware
 
@@ -47,6 +48,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Ultra Short Direct Mount case for use on bikes with limited space between knob and head tube
 - Direct mount and arm for Bowflex C7 - for use with Ultra Short Direct Mount
 
+### Hardware
+- Minor improvements to tolerances for direct mount mod
+- created peloton-specific arm for direct mount use.  IC4 model is usable, but a bit short.
+- modified short case to include chamfers and fillets at the screw posts to improve thin wall printability in superslicer
+- beefier arm for direct mount
+- NEW: Direct Mount short case for bikes with reduced clearance in front of knob.  
+- NEW: Bolt through short case for direct mount use with Generic Bike http://smile.amazon.com/gp/product/B07S3YWSNM
+- NEW: Direct mount for Life Fitness IC7
+
+
 ## [2.7.9]
 
 ### Added
@@ -59,7 +70,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Updated Libraries to newest versions.
 - Disabled setting of min/maxWatts if minWatts/maxWatts is 0.
 - Added a check to workaround a bug where a powertable pair member was zero.
-- Fixed a bug where a powertable pair could be returned that was larger than the powertable size. 
+- Fixed a bug where a powertable pair could be returned that was larger than the powertable size.
+- changes to default settings 
 
 ### Hardware
 
