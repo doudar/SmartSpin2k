@@ -30,7 +30,7 @@ void setupERG() {
 }
 
 void ergTaskLoop(void* pvParameters) {
-  ErgMode ergMode = ErgMode(&powerTable);
+  ErgMode ergMode = ErgMode(&powerTable);   
   PowerBuffer powerBuffer;
 
   ergMode._writeLogHeader();
@@ -143,7 +143,7 @@ void PowerTable::setStepperMinMax() {
 
 // Accepts new data into the table and averages input by number of readings in the power entry.
 void PowerTable::newEntry(PowerBuffer& powerBuffer) {
-  int watts              = 0;
+  float watts              = 0;
   int cad                = 0;
   int32_t targetPosition = 0;
 
@@ -165,9 +165,9 @@ void PowerTable::newEntry(PowerBuffer& powerBuffer) {
     }
 
     // calculate average
-    watts          = (watts + powerBuffer.powerEntry[i].watts) / 2;
-    targetPosition = (targetPosition + powerBuffer.powerEntry[i].targetPosition) / 2;
-    cad            = (cad + powerBuffer.powerEntry[i].cad) / 2;
+    watts          = (watts + powerBuffer.powerEntry[i].watts) / 2.0;
+    targetPosition = (targetPosition + powerBuffer.powerEntry[i].targetPosition) / 2.0;
+    cad            = (cad + powerBuffer.powerEntry[i].cad) / 2.0;
   }
   // Done with powerBuffer
 
@@ -199,9 +199,9 @@ void PowerTable::newEntry(PowerBuffer& powerBuffer) {
     this->powerEntry[i].targetPosition = targetPosition;
     this->powerEntry[i].readings       = 1;
   } else {  // Average and update the readings.
-    this->powerEntry[i].watts          = (watts + (this->powerEntry[i].watts * this->powerEntry[i].readings)) / (this->powerEntry[i].readings + 1);
-    this->powerEntry[i].cad            = (cad + (this->powerEntry[i].cad * this->powerEntry[i].readings)) / (this->powerEntry[i].readings + 1);
-    this->powerEntry[i].targetPosition = (targetPosition + (this->powerEntry[i].targetPosition * this->powerEntry[i].readings)) / (this->powerEntry[i].readings + 1);
+    this->powerEntry[i].watts          = (watts + (this->powerEntry[i].watts * this->powerEntry[i].readings)) / (this->powerEntry[i].readings + 1.0);
+    this->powerEntry[i].cad            = (cad + (this->powerEntry[i].cad * this->powerEntry[i].readings)) / (this->powerEntry[i].readings + 1.0);
+    this->powerEntry[i].targetPosition = (targetPosition + (this->powerEntry[i].targetPosition * this->powerEntry[i].readings)) / (this->powerEntry[i].readings + 1.0);
     this->powerEntry[i].readings++;
     if (this->powerEntry[i].readings > 10) {
       this->powerEntry[i].readings = 10;  // keep from diluting recent readings too far.

@@ -69,7 +69,7 @@ class PowerTable {
 
  private:
   // Adjust Watts For Cadence
-  int _adjustWattsForCadence(int watts, int cad);
+  int _adjustWattsForCadence(int watts, float cad);
 };
 
 class ErgMode {
