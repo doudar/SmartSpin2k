@@ -33,9 +33,9 @@
         "other_text_thickness": 0.15,
         "other_text_upright": false,
         "pads": {
-          "drill": 1.2,
-          "height": 1.2,
-          "width": 1.2
+          "drill": 0.0,
+          "height": 0.8,
+          "width": 1.0
         },
         "silk_line_width": 0.12,
         "silk_text_italic": false,
@@ -425,8 +425,8 @@
       "idf": "",
       "netlist": "SmartSpin2k.net",
       "specctra_dsn": "SmartSpin2k.dsn",
-      "step": "../PCB CAD Models/SmartSpin2k.step",
-      "vrml": "../PCB CAD Models/SmartSpin2k.wrl"
+      "step": "../../../SmartSpin2k/Hardware/Integrated PCB/SmartSpin2k.step",
+      "vrml": "../../../SmartSpin2k/Hardware/Integrated PCB/SmartSpin2k.wrl"
     },
     "page_layout_descr_file": ""
   },
