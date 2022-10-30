@@ -123,8 +123,8 @@
 // TMC2208/TMC2224 SoftwareSerial transmit pin
 #define r1_STEPPERSERIAL_TX 12
 
-// Reduce current setting by this divisor
-#define r1_PWR_SCALER 4
+// Reduce current setting by this divisor (0-31)
+#define r1_PWR_SCALER 31
 ////////////////////////////////////////////////////////
 //////////// Defines for hardware Revision 2 ////////////
 
@@ -161,8 +161,8 @@
 // TMC2209 SoftwareSerial transmit pin
 #define r2_AUX_SERIAL_TX 21
 
-// Reduce current setting by this divisor
-#define r2_PWR_SCALER 4
+// Reduce current setting by this divisor (0-31)
+#define r2_PWR_SCALER 12
 ////////////////////////////////////////////////////////
 
 // TMC2208/TMC2224 HardwareSerial port
@@ -170,9 +170,6 @@
 
 // Match to your driver
 #define R_SENSE 0.11f
-
-// Maximum scaling of the driver output power 0-31
-#define DRIVER_MAX_PWR_SCALER 31
 
 // Hardware pin for indicator LED *note* internal LED on esp32 Dev board is pin
 // 2

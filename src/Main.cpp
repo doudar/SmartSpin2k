@@ -397,22 +397,13 @@ void SS2K::setupTMCStepperDriver() {
   driver.pdn_disable(true);
   driver.mstep_reg_select(true);
 
-  uint16_t msread = driver.microsteps();
-  // Possibly we should use irun power scaler here instead but there's a note to keep it above 16/31
-  uint16_t rmsPwr = ((float)userConfig.getStepperPower() / (float)currentBoard.pwrScaler);
-  SS2K_LOG(MAIN_LOG_TAG, " read:ms=%ud", msread);
-
-  driver.rms_current(userConfig.getStepperPower());  // Set motor RMS current
-  driver.microsteps(4);                              // Set microsteps to 1/8th
-  driver.irun(DRIVER_MAX_PWR_SCALER);
-  driver.ihold((uint8_t)(DRIVER_MAX_PWR_SCALER * .65));  // hold current % 0-DRIVER_MAX_PWR_SCALER
+  ss2k.updateStepperPower();
+  driver.microsteps(4);  // Set microsteps to 1/8th
+  driver.irun(currentBoard.pwrScaler);
+  driver.ihold((uint8_t)(currentBoard.pwrScaler * .5));  // hold current % 0-DRIVER_MAX_PWR_SCALER
   driver.iholddelay(10);                                 // Controls the number of clock cycles for motor
                                                          // power down after standstill is detected
   driver.TPOWERDOWN(128);
-  msread               = driver.microsteps();
-  uint16_t currentread = driver.cs_actual();
-  SS2K_LOG(MAIN_LOG_TAG, " read:current=%ud", currentread);
-  SS2K_LOG(MAIN_LOG_TAG, " read:ms=%ud", msread);
 
   driver.toff(5);
   bool t_bool = userConfig.getStealthchop();
@@ -423,8 +414,10 @@ void SS2K::setupTMCStepperDriver() {
 
 // Applies current power to driver
 void SS2K::updateStepperPower() {
-  SS2K_LOG(MAIN_LOG_TAG, "Stepper power is now %d", userConfig.getStepperPower());
-  driver.rms_current(userConfig.getStepperPower());
+  uint16_t rmsPwr = (userConfig.getStepperPower());
+  driver.rms_current(rmsPwr);
+  uint16_t current = driver.cs_actual();
+  SS2K_LOG(MAIN_LOG_TAG, "Stepper power is now %d.  read:cs=%U", userConfig.getStepperPower(), current);
 }
 
 // Applies current Stealthchop to driver
@@ -440,14 +433,14 @@ void SS2K::updateStealthchop() {
 void SS2K::checkDriverTemperature() {
   static bool overTemp = false;
   if (static_cast<int>(temperatureRead()) > THROTTLE_TEMP) {  // Start throttling driver power at 72C on the ESP32
-    uint8_t throttledPower = (THROTTLE_TEMP - static_cast<int>(temperatureRead())) + DRIVER_MAX_PWR_SCALER;
+    uint8_t throttledPower = (THROTTLE_TEMP - static_cast<int>(temperatureRead())) + currentBoard.pwrScaler;
     driver.irun(throttledPower);
     SS2K_LOG(MAIN_LOG_TAG, "Over temp! Driver is throttling down! ESP32 @ %f C", temperatureRead());
     overTemp = true;
-  } else if ((driver.cs_actual() < DRIVER_MAX_PWR_SCALER) && !driver.stst()) {
+  } else if (static_cast<int>(temperatureRead()) < THROTTLE_TEMP) {
     if (overTemp) {
       SS2K_LOG(MAIN_LOG_TAG, "Temperature is now under control. Driver current reset.");
-      driver.irun(DRIVER_MAX_PWR_SCALER);
+      driver.irun(currentBoard.pwrScaler);
     }
     overTemp = false;
   }
