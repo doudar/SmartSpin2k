@@ -17,6 +17,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Fixed a bug in the new cadence compensation where an int should have been a float. 
 
 ### Hardware
+- removed duplicate directory in direct mount folder
 
 ## [22.10.8]
 
