@@ -10,6 +10,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Added Peloton serial decoder to sensor factory.
 - Added blocking for shifts above or below min/max set points.
 - Added power scaler for new board.
+- Added Main Index link to develop.html.
 
 ### Changed
 - PowerTable values are now adjusted to 90 RPM cad on input.
