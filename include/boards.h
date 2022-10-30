@@ -27,6 +27,7 @@ class Board {
   int stepperSerialRxPin;
   int auxSerialTxPin;
   int auxSerialRxPin;
+  int pwrScaler;
 };
 
 class Boards {
@@ -47,6 +48,7 @@ class Boards {
     rev1.stepperSerialRxPin = r1_STEPPERSERIAL_RX;
     rev1.auxSerialTxPin     = 0;
     rev1.auxSerialRxPin     = 0;
+    rev1.pwrScaler          = r1_PWR_SCALER;
     // Rev 2
     rev2.name               = r2_NAME;
     rev2.versionVoltage     = r2_VERSION_VOLTAGE;
@@ -59,5 +61,6 @@ class Boards {
     rev2.stepperSerialRxPin = r2_STEPPERSERIAL_RX;
     rev2.auxSerialTxPin     = r2_AUX_SERIAL_TX;
     rev2.auxSerialRxPin     = r2_AUX_SERIAL_RX;
+    rev2.pwrScaler          = r2_PWR_SCALER;
   }
 };

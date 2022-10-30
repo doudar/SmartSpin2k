@@ -50,6 +50,7 @@ class SS2K {
   void updateStealthchop();
   void checkDriverTemperature();
   void motorStop(bool releaseTension = false);
+  void checkSerial();
 
   SS2K() {
     targetPosition      = 0;
@@ -87,3 +88,10 @@ extern SS2K ss2k;
 // Main program variable that stores most everything
 extern userParameters userConfig;
 extern RuntimeParameters rtConfig;
+
+//Peloton Specific Parameters
+#define PELOTON_TX      true
+#define PELOTON_RQ_SIZE 4
+const uint8_t peloton_rq_watts[]{0xF5, 0x44, 0x39, 0xF6};
+const uint8_t peloton_rq_cad[]{0xF5, 0x41, 0x36, 0xF6};
+const uint8_t peloton_rq_res[]{0xF5, 0x4A, 0x3F, 0xF6};

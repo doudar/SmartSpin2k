@@ -122,6 +122,9 @@
 
 // TMC2208/TMC2224 SoftwareSerial transmit pin
 #define r1_STEPPERSERIAL_TX 12
+
+// Reduce current setting by this divisor
+#define r1_PWR_SCALER 4
 ////////////////////////////////////////////////////////
 //////////// Defines for hardware Revision 2 ////////////
 
@@ -157,6 +160,9 @@
 
 // TMC2209 SoftwareSerial transmit pin
 #define r2_AUX_SERIAL_TX 21
+
+// Reduce current setting by this divisor
+#define r2_PWR_SCALER 4
 ////////////////////////////////////////////////////////
 
 // TMC2208/TMC2224 HardwareSerial port

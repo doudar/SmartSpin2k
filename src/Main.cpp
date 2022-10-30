@@ -25,11 +25,6 @@ TMC2208Stepper driver(&SERIAL_PORT, R_SENSE);  // Hardware Serial
 HardwareSerial auxSerial(2);
 AuxSerialBuffer auxSerialBuffer;
 // should we interrogate the bike for cadence and power?
-#define PELOTON_TX      true
-#define PELOTON_RQ_SIZE 4
-const uint8_t peloton_rq_watts[]{0xF5, 0x44, 0x39, 0xF6};
-const uint8_t peloton_rq_cad[]{0xF5, 0x41, 0x36, 0xF6};
-const uint8_t peloton_rq_res[]{0xF5, 0x4A, 0x3F, 0xF6};
 
 FastAccelStepperEngine engine = FastAccelStepperEngine();
 FastAccelStepper *stepper     = NULL;
@@ -245,43 +240,7 @@ void SS2K::maintenanceLoop(void *pvParameters) {
 
     // Monitor serial port for data
     if (currentBoard.auxSerialTxPin) {
-      if (auxSerial.available() >= 8) {  // if at least 8 bytes are available to read from the serial port
-        int i               = 0;
-        int k               = 0;
-        auxSerialBuffer.len = auxSerial.readBytes(auxSerialBuffer.data, AUX_BUF_SIZE);
-        // pre-process Peloton Data. If we get more serial devices we will have to move this into sensor data factory.
-        // This is done here to prevent a lot of extra logging.
-        for (i = 0; i < auxSerialBuffer.len; i++) {  // Find start of data string
-          if (auxSerialBuffer.data[i] == HEADER) {
-            for (k = i; k < auxSerialBuffer.len; k++) {  // Find end of data string
-              if (auxSerialBuffer.data[k] == FOOTER) {
-                k++;
-                break;
-              }
-            }
-            size_t newLen = k - i;  // find length of sub data
-            uint8_t newBuf[newLen];
-            for (int j = i; j < k; j++) {
-              newBuf[j - i] = auxSerialBuffer.data[j];
-            }
-            collectAndSet(PELOTON_DATA_UUID, PELOTON_DATA_UUID, PELOTON_ADDRESS, newBuf, newLen);
-            break;
-          }
-        }
-      }
-      if (PELOTON_TX) {
-        static bool alternate = false;
-        if (alternate) {
-          for (int i = 0; i < PELOTON_RQ_SIZE; i++) {
-            auxSerial.write(peloton_rq_watts[i]);
-          }
-        } else {
-          for (int i = 0; i < PELOTON_RQ_SIZE; i++) {
-            auxSerial.write(peloton_rq_cad[i]);
-          }
-        }
-        alternate = !alternate;
-      }
+      ss2k.checkSerial();
     }
     loopCounter++;
   }
@@ -439,6 +398,8 @@ void SS2K::setupTMCStepperDriver() {
   driver.mstep_reg_select(true);
 
   uint16_t msread = driver.microsteps();
+  // Possibly we should use irun power scaler here instead but there's a note to keep it above 16/31
+  uint16_t rmsPwr = ((float)userConfig.getStepperPower() / (float)currentBoard.pwrScaler);
   SS2K_LOG(MAIN_LOG_TAG, " read:ms=%ud", msread);
 
   driver.rms_current(userConfig.getStepperPower());  // Set motor RMS current
@@ -497,5 +458,45 @@ void SS2K::motorStop(bool releaseTension) {
   stepper->setCurrentPosition(ss2k.targetPosition);
   if (releaseTension) {
     stepper->moveTo(ss2k.targetPosition - userConfig.getShiftStep() * 4);
+  }
+}
+
+void SS2K::checkSerial() {
+  if (auxSerial.available() >= 8) {  // if at least 8 bytes are available to read from the serial port
+    int i               = 0;
+    int k               = 0;
+    auxSerialBuffer.len = auxSerial.readBytes(auxSerialBuffer.data, AUX_BUF_SIZE);
+    // pre-process Peloton Data. If we get more serial devices we will have to move this into sensor data factory.
+    // This is done here to prevent a lot of extra logging.
+    for (i = 0; i < auxSerialBuffer.len; i++) {  // Find start of data string
+      if (auxSerialBuffer.data[i] == HEADER) {
+        for (k = i; k < auxSerialBuffer.len; k++) {  // Find end of data string
+          if (auxSerialBuffer.data[k] == FOOTER) {
+            k++;
+            break;
+          }
+        }
+        size_t newLen = k - i;  // find length of sub data
+        uint8_t newBuf[newLen];
+        for (int j = i; j < k; j++) {
+          newBuf[j - i] = auxSerialBuffer.data[j];
+        }
+        collectAndSet(PELOTON_DATA_UUID, PELOTON_DATA_UUID, PELOTON_ADDRESS, newBuf, newLen);
+        break;
+      }
+    }
+  }
+  if (PELOTON_TX) {
+    static bool alternate = false;
+    if (alternate) {
+      for (int i = 0; i < PELOTON_RQ_SIZE; i++) {
+        auxSerial.write(peloton_rq_watts[i]);
+      }
+    } else {
+      for (int i = 0; i < PELOTON_RQ_SIZE; i++) {
+        auxSerial.write(peloton_rq_cad[i]);
+      }
+    }
+    alternate = !alternate;
   }
 }
