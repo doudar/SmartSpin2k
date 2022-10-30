@@ -45,7 +45,7 @@
 // into actual stepper steps that move the stepper motor. It takes 2,181.76 steps to rotate the knob 1 full revolution. with hardware version 1.
 // Incline_Multiplier may be able to be removed in the future by dividing ShiftSteps by ~200 to get this value but we're not quite ready
 // to make that commitment yet.
-#define INCLINE_MULTIPLIER 3.0
+#define INCLINE_MULTIPLIER 6.0
 
 // Minumum value for power correction factor user setting
 #define MIN_PCF .5
@@ -55,7 +55,7 @@
 
 // Default Stepper Power.
 // Stepper peak current in ma. This is hardware restricted to a maximum of 2000ma on the TMC2225. RMS current is less.
-#define DEFAULT_STEPPER_POWER 1500
+#define DEFAULT_STEPPER_POWER 900
 
 // Default Shift Step. THe amount to move the stepper motor for a shift press.
 #define DEFAULT_SHIFT_STEP 1000
@@ -73,7 +73,7 @@
 // I.E. If the difference between ERG target and Current watts were 30, and the Shift step is defined as 600 steps,
 // and ERG_Sensitivity were 1.0, ERG mode would move the stepper motor 600 steps to compensate. With an ERG_Sensitivity of 2.0, the stepper
 // would move 1200 steps to compensate, however ERG_Sensitivity values much different than 1.0 imply shiftStep has been improperly configured.
-#define ERG_SENSITIVITY 1.0
+#define ERG_SENSITIVITY 5.0
 
 // Number of watts per shift expected by ERG mode for it's calculation. The user should target this number by adjusting Shift Step until WATTS_PER_SHIFT
 // is obtained as closely as possible during each shift.
@@ -83,7 +83,7 @@
 #define DEFAULT_MIN_WATTS 50
 
 // Default Max Watts that the brake on the spin bike can absorb from the user.
-#define DEFAULT_MAX_WATTS 700
+#define DEFAULT_MAX_WATTS 800
 
 // Wattage at which to automatically assume minimum brake resistance.
 #define MIN_WATTS 50
@@ -91,29 +91,73 @@
 // Default debounce delay for shifters. Increase if you have false shifts. Decrease if shifting takes too long.
 #define DEBOUNCE_DELAY 400
 
-// Hardware pin for rocker Switch
-#define RADIO_PIN 27
+// Hardware Revision check pin
+#define REV_PIN 34
+
+//////////// Defines for hardware Revision 1 ////////////
+
+// Board Name
+#define r1_NAME "Revision One"
+
+// ID Voltage on pin 34. Values are 0-4095 (0-3.3v)
+#define r1_VERSION_VOLTAGE 0
 
 // Hardware pin for Shift Up
-#define SHIFT_UP_PIN 19
+#define r1_SHIFT_UP_PIN 19
 
 // Hardware pin for Shift Down
-#define SHIFT_DOWN_PIN 18
+#define r1_SHIFT_DOWN_PIN 18
 
 // Hardware pin for stepper Enable
-#define ENABLE_PIN 13
+#define r1_ENABLE_PIN 13
 
 // Hardware pin for stepper step
-#define STEP_PIN 25
+#define r1_STEP_PIN 25
 
 // Hardware pin for stepper dir
-#define DIR_PIN 33
+#define r1_DIR_PIN 33
 
 // TMC2208/TMC2224 SoftwareSerial receive pin
-#define STEPPERSERIAL_RX 14
+#define r1_STEPPERSERIAL_RX 14
 
 // TMC2208/TMC2224 SoftwareSerial transmit pin
-#define STEPPERSERIAL_TX 12
+#define r1_STEPPERSERIAL_TX 12
+////////////////////////////////////////////////////////
+//////////// Defines for hardware Revision 2 ////////////
+
+// Board Name
+#define r2_NAME "Revision Two"
+
+// ID Voltage on pin 34. Values are 0-4095 (0-3.3v)
+#define r2_VERSION_VOLTAGE 4095
+
+// Hardware pin for Shift Up
+#define r2_SHIFT_UP_PIN 26
+
+// Hardware pin for Shift Down
+#define r2_SHIFT_DOWN_PIN 32
+
+// Hardware pin for stepper Enable
+#define r2_ENABLE_PIN 27
+
+// Hardware pin for stepper step
+#define r2_STEP_PIN 25
+
+// Hardware pin for stepper dir
+#define r2_DIR_PIN 33
+
+// TMC2209 SoftwareSerial receive pin
+#define r2_STEPPERSERIAL_RX 18
+
+// TMC2209 SoftwareSerial transmit pin
+#define r2_STEPPERSERIAL_TX 19
+
+// TMC2209 SoftwareSerial receive pin
+#define r2_AUX_SERIAL_RX 21
+
+// TMC2209 SoftwareSerial transmit pin
+#define r2_AUX_SERIAL_TX 22
+////////////////////////////////////////////////////////
 
 // TMC2208/TMC2224 HardwareSerial port
 #define SERIAL_PORT stepperSerial
@@ -182,6 +226,12 @@
 
 // Number of similar power samples to take before writing to the Power Table
 #define POWER_SAMPLES 5
+
+// Normal cadence value (used in power table and other areas)
+#define NORMAL_CAD 90
+
+// Temperature of the ESP32 at which to start reducing the power output of the stepper motor driver.
+#define THROTTLE_TEMP 85
 
 // Uncomment to enable sending Telegram debug messages back to the chat
 // specified in telegram_token.h

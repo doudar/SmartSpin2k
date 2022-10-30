@@ -3,8 +3,21 @@ All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/)
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
-
 ## [Unreleased]
+
+### Added
+- Added blocking for shifts above or below min/max set points.
+
+### Changed
+- PowerTable values are now adjusted to 90 RPM cad on input.
+- PowerTable entries are now validated against previous entries. 
+- Changes to default settings for better ride-ability.  raised incline multiplier and erg sensitivity, increased incline multiplier and max brake watts.
+- Fixed a bug in the new cadence compensation where an int should have been a float. 
+
+### Hardware
+- removed duplicate directory in direct mount folder
+
+## [22.10.8]
 
 ### Added
 - Automatic build script for github.
@@ -12,6 +25,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Added changelog merge automation. 
 - Added StreamFit
 - Added developer tools html.
+- Added automatic board revision detection. 
+- Added THROTTLE_TEMP to settings.h. The internal ESP32 temperature at which to reduce driver current. 
 
 ### Changed
 - Fixed a few compile issues for case sensitive operating systems.
@@ -20,6 +35,29 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Fixed HR in the hidden btsimulator.html
 - Enabled CORS for doudar/StreamFit.
 - Re-arranged index.html. 
+- restored link to bluetooth scanner.
+- Reverted conditional variable initialization in powertable lookup function.
+- Simplified cadence compensation in powertable lookup.
+- Fixed issue where you couldn't set a ERG target less than 50W (MIN_WATTS wasn't being respected.) 
+- Increased the BLE active scan window. 
+- BLE scan page now shows previous scan results.
+- BLE scan page duplicates bug fixed. 
+- BLE scan page dropdowns default to devices found during scan. 
+- Increased THROTTLE_TEMP from 72c to 85c. 
+
+### Hardware
+- Ultra Short Direct Mount case for use on bikes with limited space between knob and head tube
+- Direct mount and arm for Bowflex C7 - for use with Ultra Short Direct Mount
+
+### Hardware
+- Minor improvements to tolerances for direct mount mod
+- created peloton-specific arm for direct mount use.  IC4 model is usable, but a bit short.
+- modified short case to include chamfers and fillets at the screw posts to improve thin wall printability in superslicer
+- beefier arm for direct mount
+- NEW: Direct Mount short case for bikes with reduced clearance in front of knob.  
+- NEW: Bolt through short case for direct mount use with Generic Bike http://smile.amazon.com/gp/product/B07S3YWSNM
+- NEW: Direct mount for Life Fitness IC7
+
 
 ### Hardware
 - Added new case design for upcoming integraded SMT PCB.
@@ -37,7 +75,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Updated Libraries to newest versions.
 - Disabled setting of min/maxWatts if minWatts/maxWatts is 0.
 - Added a check to workaround a bug where a powertable pair member was zero.
-- Fixed a bug where a powertable pair could be returned that was larger than the powertable size. 
+- Fixed a bug where a powertable pair could be returned that was larger than the powertable size.
+- changes to default settings 
 
 ### Hardware
 
