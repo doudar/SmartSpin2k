@@ -455,7 +455,9 @@ void SS2K::motorStop(bool releaseTension) {
 }
 
 void SS2K::checkSerial() {
+  static int txCheck = TX_CHECK_INTERVAL;
   if (auxSerial.available() >= 8) {  // if at least 8 bytes are available to read from the serial port
+    txCheck             = TX_CHECK_INTERVAL;
     int i               = 0;
     int k               = 0;
     auxSerialBuffer.len = auxSerial.readBytes(auxSerialBuffer.data, AUX_BUF_SIZE);
@@ -479,7 +481,7 @@ void SS2K::checkSerial() {
       }
     }
   }
-  if (PELOTON_TX) {
+  if (PELOTON_TX && (txCheck >= TX_CHECK_INTERVAL)) {
     static bool alternate = false;
     if (alternate) {
       for (int i = 0; i < PELOTON_RQ_SIZE; i++) {
@@ -491,5 +493,8 @@ void SS2K::checkSerial() {
       }
     }
     alternate = !alternate;
+    txCheck   = 0;
+  } else if (PELOTON_TX) {
+    txCheck++;
   }
 }

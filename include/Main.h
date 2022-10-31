@@ -90,7 +90,6 @@ extern userParameters userConfig;
 extern RuntimeParameters rtConfig;
 
 //Peloton Specific Parameters
-#define PELOTON_TX      true
 #define PELOTON_RQ_SIZE 4
 const uint8_t peloton_rq_watts[]{0xF5, 0x44, 0x39, 0xF6};
 const uint8_t peloton_rq_cad[]{0xF5, 0x41, 0x36, 0xF6};

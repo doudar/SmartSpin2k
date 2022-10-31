@@ -239,6 +239,12 @@
 // Size of the Aux Serial Buffer for Peloton
 #define AUX_BUF_SIZE 20
 
+// Interrogate Peloton bike for data?
+#define PELOTON_TX true
+
+// If not receiving Peleton Messages, how long to wait before next TX attempt is
+#define TX_CHECK_INTERVAL 20
+
 // Uncomment to enable sending Telegram debug messages back to the chat
 // specified in telegram_token.h
 // #define USE_TELEGRAM
