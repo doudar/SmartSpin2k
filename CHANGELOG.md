@@ -18,6 +18,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Changes to default settings for better ride-ability.  raised incline multiplier and erg sensitivity, increased incline multiplier and max brake watts.
 - Fixed a bug in the new cadence compensation where an int should have been a float. 
 - Moved serial checking to own function. 
+- Reduced verbosity of ERG logging.
 
 ### Hardware
 - removed duplicate directory in direct mount folder
