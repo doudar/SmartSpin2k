@@ -425,8 +425,8 @@
       "idf": "",
       "netlist": "SmartSpin2k.net",
       "specctra_dsn": "SmartSpin2k.dsn",
-      "step": "../../../SmartSpin2k/Hardware/Integrated PCB/SmartSpin2k.step",
-      "vrml": "../../../SmartSpin2k/Hardware/Integrated PCB/SmartSpin2k.wrl"
+      "step": "../SmartSpin2k.step",
+      "vrml": "../SmartSpin2k.wrl"
     },
     "page_layout_descr_file": ""
   },
