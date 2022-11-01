@@ -11,7 +11,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Changed
 - PowerTable values are now adjusted to 90 RPM cad on input.
 - PowerTable entries are now validated against previous entries. 
-- Changes to default settings for better ride-ability.  raised incline multiplier and erg sensitivity, increased incline multiplier and max brake watts.
+- Changes to default settings for better ride-ability.  Raised incline multiplier and erg sensitivity, increased incline multiplier and max brake watts.
 - Fixed a bug in the new cadence compensation where an int should have been a float. 
 
 ### Hardware
