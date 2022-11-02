@@ -13,6 +13,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - PowerTable entries are now validated against previous entries. 
 - Changes to default settings for better ride-ability.  Raised incline multiplier and erg sensitivity, increased incline multiplier and max brake watts.
 - Fixed a bug in the new cadence compensation where an int should have been a float. 
+- Fixed broken pre-commit on my local dev machine. 
 
 ### Hardware
 - Removed duplicate directory in direct mount folder.
