@@ -13,6 +13,7 @@
 #include "BLE_Common.h"
 #include "LittleFS_Upgrade.h"
 #include "boards.h"
+#include "SensorCollector.h"
 
 #define MAIN_LOG_TAG "Main"
 
@@ -49,19 +50,33 @@ class SS2K {
   void updateStealthchop();
   void checkDriverTemperature();
   void motorStop(bool releaseTension = false);
+  void checkSerial();
 
   SS2K() {
-    targetPosition         = 0;
-    currentPosition        = 0;
-    stepperIsRunning       = false;
-    externalControl        = false;
-    syncMode               = false;
-    lastDebounceTime       = 0;
-    debounceDelay          = DEBOUNCE_DELAY;
-    lastShifterPosition    = 0;
-    shiftersHoldForScan    = SHIFTERS_HOLD_FOR_SCAN;
-    scanDelayTime          = 10000;
-    scanDelayStart         = 0;
+    targetPosition      = 0;
+    currentPosition     = 0;
+    stepperIsRunning    = false;
+    externalControl     = false;
+    syncMode            = false;
+    lastDebounceTime    = 0;
+    debounceDelay       = DEBOUNCE_DELAY;
+    lastShifterPosition = 0;
+    shiftersHoldForScan = SHIFTERS_HOLD_FOR_SCAN;
+    scanDelayTime       = 10000;
+    scanDelayStart      = 0;
+  }
+};
+
+class AuxSerialBuffer {
+ public:
+  uint8_t data[20];
+  size_t len;
+
+  AuxSerialBuffer() {
+    for (int i = 0; i < AUX_BUF_SIZE; i++) {
+      this->data[i] = 0;
+    }
+    this->len = 0;
   }
 };
 
@@ -73,3 +88,9 @@ extern SS2K ss2k;
 // Main program variable that stores most everything
 extern userParameters userConfig;
 extern RuntimeParameters rtConfig;
+
+//Peloton Specific Parameters
+#define PELOTON_RQ_SIZE 4
+const uint8_t peloton_rq_watts[]{0xF5, 0x44, 0x39, 0xF6};
+const uint8_t peloton_rq_cad[]{0xF5, 0x41, 0x36, 0xF6};
+const uint8_t peloton_rq_res[]{0xF5, 0x4A, 0x3F, 0xF6};

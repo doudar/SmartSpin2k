@@ -30,7 +30,7 @@ void setupERG() {
 }
 
 void ergTaskLoop(void* pvParameters) {
-  ErgMode ergMode = ErgMode(&powerTable);   
+  ErgMode ergMode = ErgMode(&powerTable);
   PowerBuffer powerBuffer;
 
   ergMode._writeLogHeader();
@@ -143,7 +143,7 @@ void PowerTable::setStepperMinMax() {
 
 // Accepts new data into the table and averages input by number of readings in the power entry.
 void PowerTable::newEntry(PowerBuffer& powerBuffer) {
-  float watts              = 0;
+  float watts            = 0;
   int cad                = 0;
   int32_t targetPosition = 0;
 
@@ -163,14 +163,14 @@ void PowerTable::newEntry(PowerBuffer& powerBuffer) {
       cad            = powerBuffer.powerEntry[i].cad;
       continue;
     }
-
+    SS2K_LOGW(POWERTABLE_LOG_TAG, "Buf[%d](%dw)(%dpos)(%dcad)", i, powerBuffer.powerEntry[i].watts, powerBuffer.powerEntry[i].targetPosition, powerBuffer.powerEntry[i].cad);
     // calculate average
-    watts          = (watts + powerBuffer.powerEntry[i].watts) / 2.0;
-    targetPosition = (targetPosition + powerBuffer.powerEntry[i].targetPosition) / 2.0;
-    cad            = (cad + powerBuffer.powerEntry[i].cad) / 2.0;
+    watts          = (watts + powerBuffer.powerEntry[i].watts) / 2;
+    targetPosition = (targetPosition + powerBuffer.powerEntry[i].targetPosition) / 2;
+    cad            = (cad + powerBuffer.powerEntry[i].cad) / 2;
   }
+  SS2K_LOG(POWERTABLE_LOG_TAG, "Avg:(%dw)(%dpos)(%dcad)", (int)watts, targetPosition, cad);
   // Done with powerBuffer
-
   // To start working on the PowerTable, we need to calculate position in the table for the new entry
   int i = round(watts / POWERTABLE_INCREMENT);
 
@@ -178,7 +178,8 @@ void PowerTable::newEntry(PowerBuffer& powerBuffer) {
   if (i > 0) {
     for (int j = i - 1; j > 0; j--) {
       if ((this->powerEntry[j].targetPosition != 0) && (this->powerEntry[j].targetPosition >= targetPosition)) {
-        SS2K_LOG(POWERTABLE_LOG_TAG, "Target Slot (%dw)(%d)(%d) was less than previous (%d)(%d)", watts, i, targetPosition, j, this->powerEntry[j].targetPosition);
+        SS2K_LOG(POWERTABLE_LOG_TAG, "Target Slot (%dw)(%d)(%d) was less than previous (%d)(%d)", (int)watts, i, targetPosition, j, this->powerEntry[j].targetPosition);
+        this->powerEntry[j].readings = 1;  // Make previous slot easier to round/faster to change.
         return;
       }
     }
@@ -187,7 +188,8 @@ void PowerTable::newEntry(PowerBuffer& powerBuffer) {
   if (i < POWERTABLE_SIZE) {
     for (int j = i + 1; j < POWERTABLE_SIZE; j++) {
       if ((this->powerEntry[j].targetPosition != 0) && (targetPosition >= this->powerEntry[j].targetPosition)) {
-        SS2K_LOG(POWERTABLE_LOG_TAG, "Target Slot (%dw)(%d)(%d) was greater than next (%d)(%d)", watts, i, targetPosition, j, this->powerEntry[j].targetPosition);
+        SS2K_LOG(POWERTABLE_LOG_TAG, "Target Slot (%dw)(%d)(%d) was greater than next (%d)(%d)", (int)watts, i, targetPosition, j, this->powerEntry[j].targetPosition);
+        this->powerEntry[j].readings = 1;  // Make next slot easier to round/faster to change.
         return;
       }
     }
@@ -324,7 +326,7 @@ int32_t PowerTable::lookup(int watts, int cad) {
 
 int PowerTable::_adjustWattsForCadence(int watts, float cad) {
   if (cad > 0) {
-    watts = (watts * (((NORMAL_CAD / cad)+1)/2));
+    watts = (watts * (((NORMAL_CAD / cad) + 1) / 2));
     return watts;
   } else {
     return 0;
@@ -361,12 +363,15 @@ void PowerTable::toLog() {
   }
   SS2K_LOG(POWERTABLE_LOG_TAG, "%s|", oString.c_str());
   oString = "";
-  for (int i = 0; i < POWERTABLE_SIZE; i++) {
-    sprintf(buffer, oFormat, this->powerEntry[i].cad);
-    oString += buffer;
-  }
-  SS2K_LOG(POWERTABLE_LOG_TAG, "%s|", oString.c_str());
-  oString = "";
+
+  // Currently not using CAD in the Power Table.
+  // for (int i = 0; i < POWERTABLE_SIZE; i++) {
+  //  sprintf(buffer, oFormat, this->powerEntry[i].cad);
+  //  oString += buffer;
+  //}
+  // SS2K_LOG(POWERTABLE_LOG_TAG, "%s|", oString.c_str());
+  // oString = "";
+
   for (int i = 0; i < POWERTABLE_SIZE; i++) {
     sprintf(buffer, oFormat, this->powerEntry[i].targetPosition);
     oString += buffer;
@@ -383,7 +388,7 @@ void ErgMode::computErg() {
 
   // check for new power value or new setpoint, if watts < 10 treat as faulty
   if ((this->watts.timestamp == newWatts.timestamp && this->setPoint == newSetPoint) || newWatts.value < 10) {
-    SS2K_LOG(ERG_MODE_LOG_TAG, "Watts were old.");
+    SS2K_LOGW(ERG_MODE_LOG_TAG, "Watts were old.");
     return;
   }
 
@@ -402,7 +407,6 @@ void ErgMode::computErg() {
   // SetPoint changed
   if (this->setPoint != newSetPoint) {
     _setPointChangeState(newSetPoint, newCadence, newWatts, currentIncline);
-    SS2K_LOG(ERG_MODE_LOG_TAG, "SetPoint changed: %dw", newSetPoint);
     return;
   }
 
@@ -420,7 +424,7 @@ void ErgMode::_setPointChangeState(int newSetPoint, int newCadence, Measurement&
     tableResult     = currentIncline + (wattChange * factor);
   }
 
-  SS2K_LOG(ERG_MODE_LOG_TAG, "Using PowerTable Result %d", tableResult);
+  SS2K_LOG(ERG_MODE_LOG_TAG, "SetPoint changed:%dw PowerTable Result: %d", newSetPoint, tableResult);
   _updateValues(newSetPoint, newCadence, newWatts, currentIncline, tableResult);
 
   int i = 0;
@@ -478,11 +482,11 @@ bool ErgMode::_userIsSpinning(int cadence, float incline) {
 }
 
 void ErgMode::_writeLogHeader() {
-  SS2K_LOG(ERG_MODE_LOG_CSV_TAG, "cycles;current incline;new incline;current setpoint;new setpoint;current watts;new watts;current cadence;new cadence;");
+  SS2K_LOGW(ERG_MODE_LOG_CSV_TAG, "cycles;current incline;new incline;current setpoint;new setpoint;current watts;new watts;current cadence;new cadence;");
 }
 
 void ErgMode::_writeLog(int cycles, float currentIncline, float newIncline, int currentSetPoint, int newSetPoint, int currentWatts, int newWatts, int currentCadence,
                         int newCadence) {
-  SS2K_LOG(ERG_MODE_LOG_CSV_TAG, "%d;%.2f;%.2f;%d;%d;%d;%d;%d;%d", cycles, currentIncline, newIncline, currentSetPoint, newSetPoint, currentWatts, newWatts, currentCadence,
-           newCadence);
+  SS2K_LOGW(ERG_MODE_LOG_CSV_TAG, "%d;%.2f;%.2f;%d;%d;%d;%d;%d;%d", cycles, currentIncline, newIncline, currentSetPoint, newSetPoint, currentWatts, newWatts, currentCadence,
+            newCadence);
 }
