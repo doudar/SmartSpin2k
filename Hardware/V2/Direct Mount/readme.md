@@ -36,19 +36,24 @@ For the bike mount, you have two options: VHB tape or something similar OR if yo
 - body-left.stl
 - body-right.stl
 
-## [Bike Mount]
+## [Short Case]
+- use for bikes with minimal knob clearance like the Bowflex C7
+- body-left.stl
+- body-right.stl
+
+## [[Bike Mount](../../Common%20Assets/Bike%20Mount/)]
 -Choose the one you need.  IC4 design works with most square profile head tubes.
 
-## [Arm]
+## [[Arm](../../Common%20Assets/Arm/)]
 - _arm hook.stl (mandatory)
 - Choose the one you need.  
 -- IC4 arm is designed for a center of knob to head tube distance of approx 130-150mm
 -- Echelon arm suits a distance of approx  160-180mm
 
 ## [Knob cup and insert]
-- [Knob Cup](../../KnobCups)
-- [Choose the insert for your bike](../../Inserts)
-Stock cup and insert from the main project.  Mix and match inserts to suit your bike.  
+- [Knob Cup](../../Common%20Assets/KnobCups)
+- [Choose the insert for your bike](../../Common%20Assets/Inserts/)
+Mix and match inserts to suit your bike.  
 
 ## [Gears]
-- [Source from main project](../../Case Version2/Gears)
+- [Source from main project](../../Common%20Assets/Gears/)

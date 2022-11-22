@@ -8,7 +8,7 @@ The .3mf file is the PrusaSlicer profile that includes everything arranged on a 
 
 -Body_Right.stl
 
-## [Gears]
+## [[Gears](../../Common%20Assets/Gears/)]
 -SS2K_40T_Mod1_Spur_Gear.STL
 
 -Spur gear 1M 11T.STL
@@ -16,10 +16,10 @@ The .3mf file is the PrusaSlicer profile that includes everything arranged on a 
 ## [MountingStrap]
 -Mounting_For_New_Case.STL
 
-## [KnobCups]
+## [[KnobCups](../../Common%20Assets/KnobCups/)]
 Knob_Cup_Large_HEX.STL
 
-## [Inserts]
+## [[Inserts](../../Common%20Assets/Inserts/)]
 -The insert for your bike.
 
 ## Please see below for how the new HEX shaft is installed. 
