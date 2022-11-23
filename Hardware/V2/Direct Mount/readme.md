@@ -55,5 +55,4 @@ For the bike mount, you have two options: VHB tape or something similar OR if yo
 - [Choose the insert for your bike](/Hardware/Common%20Assets/Inserts/)
 Mix and match inserts to suit your bike.  
 
-## [Gears]
-- [Source from main project](/Hardware/Common%20Assets/Gears/)
+## [[Gears](/Hardware/Common%20Assets/Gears/)]
