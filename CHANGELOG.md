@@ -18,6 +18,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Hardware
 - Removed duplicate directory in direct mount folder.
 - New case for the new PCB :)
+- Revised directory structure in /hardware
 
 ## [22.10.8]
 
