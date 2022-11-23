@@ -41,7 +41,7 @@ For the bike mount, you have two options: VHB tape or something similar OR if yo
 - body-left.stl
 - body-right.stl
 
-## [[Bike Mount](../../Common%20Assets/Bike%20Mount/)]
+## [[Bike Mount](/Hardware/Common%20Assets/Bike%20Mount/)]
 -Choose the one you need.  IC4 design works with most square profile head tubes.
 
 ## [[Arm](../../Common%20Assets/Arm/)]
@@ -51,9 +51,9 @@ For the bike mount, you have two options: VHB tape or something similar OR if yo
 -- Echelon arm suits a distance of approx  160-180mm
 
 ## [Knob cup and insert]
-- [Knob Cup](../../Common%20Assets/KnobCups)
-- [Choose the insert for your bike](../../Common%20Assets/Inserts/)
+- [Knob Cup](/Hardware/Common%20Assets/KnobCups)
+- [Choose the insert for your bike](/Hardware/Common%20Assets/Inserts/)
 Mix and match inserts to suit your bike.  
 
 ## [Gears]
-- [Source from main project](../../Common%20Assets/Gears/)
+- [Source from main project](/Hardware/Common%20Assets/Gears/)

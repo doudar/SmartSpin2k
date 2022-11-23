@@ -9,7 +9,7 @@ WARNING: It's advisable to print this with ABS or PETG due to their higher melti
 - Insert capacitors and resistors directly into the PCB.  
 - Insert the JST connectors, Recom, and stepper motor controller into their respective slots.  Be mindful of orientation.
 - Apply PCB over the soldering jig
-- Soldering
+- Solder PCB
 
 ![image](../../../Pictures/solder_jig_assembly.jpg)
 ![image](../../../Pictures/solder_jig_mounted.jpg)
