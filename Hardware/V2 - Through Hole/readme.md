@@ -1,3 +1,4 @@
+<img src="Pictures/Version2.0.jpg" alt="Hardware 2.0"/> 
 # [Description]
 This version of SmartSpin2K is designed with DIY in mind.  The PCB can be hand soldered using readily available components.  
 
