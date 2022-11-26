@@ -1,7 +1,5 @@
-<img src="Pictures/ss2k_banner.png" alt="ss2k banner" width=100%>
-
 ### Version 3 Now Availiable!
-<img src="/Pictures/SS2K_Integrated_Spin.gif" alt="Hardware 3.0"/> 
+<img src="/Pictures/Version3.jpg" alt="Hardware 3.0"/> 
 
 SmartSpin2k adds automatic resistance control to any spin bike! It physically connects to your spin bike resistance control knob and then wirelessly to any apps like Zwift or Trainer Road via BLE. SS2k also has shifter buttons that allow the user to simulate shifting gears on the stationary bike and includes advanced trainer features like ERG mode! 
 
