@@ -6,7 +6,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+- Added blocking for shifts above or below min/max setpoints.
+- Added Peloton serial decoder to sensor factory.
 - Added blocking for shifts above or below min/max set points.
+- Added power scaler for new board.
+- Added Main Index link to develop.html.
 
 ### Changed
 - PowerTable values are now adjusted to 90 RPM cad on input.
@@ -14,11 +18,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Changes to default settings for better ride-ability.  Raised incline multiplier and erg sensitivity, increased incline multiplier and max brake watts.
 - Fixed a bug in the new cadence compensation where an int should have been a float. 
 - Fixed broken pre-commit on my local dev machine. 
+- Moved serial checking to own function. 
+- Reduced verbosity of ERG logging.
 
 ### Hardware
 - Removed duplicate directory in direct mount folder.
 - New case for the new PCB :)
 - Revised directory structure in /hardware
+- updated Bowflex C7 mount for improved usability
 
 ## [22.10.8]
 

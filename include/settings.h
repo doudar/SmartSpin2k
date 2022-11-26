@@ -122,6 +122,9 @@
 
 // TMC2208/TMC2224 SoftwareSerial transmit pin
 #define r1_STEPPERSERIAL_TX 12
+
+// Reduce current setting by this divisor (0-31)
+#define r1_PWR_SCALER 31
 ////////////////////////////////////////////////////////
 //////////// Defines for hardware Revision 2 ////////////
 
@@ -153,10 +156,13 @@
 #define r2_STEPPERSERIAL_TX 19
 
 // TMC2209 SoftwareSerial receive pin
-#define r2_AUX_SERIAL_RX 21
+#define r2_AUX_SERIAL_RX 22
 
 // TMC2209 SoftwareSerial transmit pin
-#define r2_AUX_SERIAL_TX 22
+#define r2_AUX_SERIAL_TX 21
+
+// Reduce current setting by this divisor (0-31)
+#define r2_PWR_SCALER 12
 ////////////////////////////////////////////////////////
 
 // TMC2208/TMC2224 HardwareSerial port
@@ -164,9 +170,6 @@
 
 // Match to your driver
 #define R_SENSE 0.11f
-
-// Maximum scaling of the driver output power 0-31
-#define DRIVER_MAX_PWR_SCALER 31
 
 // Hardware pin for indicator LED *note* internal LED on esp32 Dev board is pin
 // 2
@@ -232,6 +235,15 @@
 
 // Temperature of the ESP32 at which to start reducing the power output of the stepper motor driver.
 #define THROTTLE_TEMP 85
+
+// Size of the Aux Serial Buffer for Peloton
+#define AUX_BUF_SIZE 20
+
+// Interrogate Peloton bike for data?
+#define PELOTON_TX true
+
+// If not receiving Peleton Messages, how long to wait before next TX attempt is
+#define TX_CHECK_INTERVAL 20
 
 // Uncomment to enable sending Telegram debug messages back to the chat
 // specified in telegram_token.h

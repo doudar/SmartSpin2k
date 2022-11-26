@@ -15,9 +15,16 @@
 #include "ERG_Mode.h"
 #include "UdpAppender.h"
 #include "WebsocketAppender.h"
+#include <Constants.h>
 
-HardwareSerial stepperSerial(2);
+// Stepper Motor Serial
+HardwareSerial stepperSerial(1);
 TMC2208Stepper driver(&SERIAL_PORT, R_SENSE);  // Hardware Serial
+
+// Peloton Serial
+HardwareSerial auxSerial(2);
+AuxSerialBuffer auxSerialBuffer;
+// should we interrogate the bike for cadence and power?
 
 FastAccelStepperEngine engine = FastAccelStepperEngine();
 FastAccelStepper *stepper     = NULL;
@@ -75,8 +82,19 @@ void setup() {
   }
   SS2K_LOG(MAIN_LOG_TAG, "Current Board Revision is: %s", currentBoard.name);
 
-  stepperSerial.begin(57600, SERIAL_8N2, currentBoard.stepperSerialRxPin, currentBoard.stepperSerialTxPin);
+  // initialize Stepper serial port
 
+  stepperSerial.begin(57600, SERIAL_8N2, currentBoard.stepperSerialRxPin, currentBoard.stepperSerialTxPin);
+  // initialize aux serial port
+  if (currentBoard.auxSerialTxPin) {
+    auxSerial.setTxBufferSize(500);
+    auxSerial.setRxBufferSize(500);
+    auxSerial.begin(19200, SERIAL_8N1, currentBoard.auxSerialRxPin, currentBoard.auxSerialTxPin, false);
+    if (!auxSerial) {
+      SS2K_LOG(MAIN_LOG_TAG, "Invalid Serial Pin Configuration");
+    }
+    // auxSerial.onReceive(auxSerialRX, true);  // setup callback
+  }
   // Initialize LittleFS
   SS2K_LOG(MAIN_LOG_TAG, "Mounting Filesystem");
   if (!LittleFS.begin(false)) {
@@ -143,7 +161,7 @@ void setup() {
 
   ss2k.resetIfShiftersHeld();
   SS2K_LOG(MAIN_LOG_TAG, "Creating Shifter Interrupts");
-  // Setup Interrups so shifters work anytime
+  // Setup Interrupts so shifters work anytime
   attachInterrupt(digitalPinToInterrupt(currentBoard.shiftUpPin), ss2k.shiftUp, CHANGE);
   attachInterrupt(digitalPinToInterrupt(currentBoard.shiftDownPin), ss2k.shiftDown, CHANGE);
   digitalWrite(LED_PIN, HIGH);
@@ -219,9 +237,15 @@ void SS2K::maintenanceLoop(void *pvParameters) {
 #endif  // DEBUG_STACK
       loopCounter = 0;
     }
+
+    // Monitor serial port for data
+    if (currentBoard.auxSerialTxPin) {
+      ss2k.checkSerial();
+    }
     loopCounter++;
   }
 }
+
 #endif  // UNIT_TEST
 
 void SS2K::restartWifi() {
@@ -373,20 +397,13 @@ void SS2K::setupTMCStepperDriver() {
   driver.pdn_disable(true);
   driver.mstep_reg_select(true);
 
-  uint16_t msread = driver.microsteps();
-  SS2K_LOG(MAIN_LOG_TAG, " read:ms=%ud", msread);
-
-  driver.rms_current(userConfig.getStepperPower());  // Set motor RMS current
-  driver.microsteps(4);                              // Set microsteps to 1/8th
-  driver.irun(DRIVER_MAX_PWR_SCALER);
-  driver.ihold((uint8_t)(DRIVER_MAX_PWR_SCALER * .65));  // hold current % 0-DRIVER_MAX_PWR_SCALER
+  ss2k.updateStepperPower();
+  driver.microsteps(4);  // Set microsteps to 1/8th
+  driver.irun(currentBoard.pwrScaler);
+  driver.ihold((uint8_t)(currentBoard.pwrScaler * .5));  // hold current % 0-DRIVER_MAX_PWR_SCALER
   driver.iholddelay(10);                                 // Controls the number of clock cycles for motor
                                                          // power down after standstill is detected
   driver.TPOWERDOWN(128);
-  msread               = driver.microsteps();
-  uint16_t currentread = driver.cs_actual();
-  SS2K_LOG(MAIN_LOG_TAG, " read:current=%ud", currentread);
-  SS2K_LOG(MAIN_LOG_TAG, " read:ms=%ud", msread);
 
   driver.toff(5);
   bool t_bool = userConfig.getStealthchop();
@@ -397,8 +414,10 @@ void SS2K::setupTMCStepperDriver() {
 
 // Applies current power to driver
 void SS2K::updateStepperPower() {
-  SS2K_LOG(MAIN_LOG_TAG, "Stepper power is now %d", userConfig.getStepperPower());
-  driver.rms_current(userConfig.getStepperPower());
+  uint16_t rmsPwr = (userConfig.getStepperPower());
+  driver.rms_current(rmsPwr);
+  uint16_t current = driver.cs_actual();
+  SS2K_LOG(MAIN_LOG_TAG, "Stepper power is now %d.  read:cs=%U", userConfig.getStepperPower(), current);
 }
 
 // Applies current Stealthchop to driver
@@ -414,14 +433,14 @@ void SS2K::updateStealthchop() {
 void SS2K::checkDriverTemperature() {
   static bool overTemp = false;
   if (static_cast<int>(temperatureRead()) > THROTTLE_TEMP) {  // Start throttling driver power at 72C on the ESP32
-    uint8_t throttledPower = (THROTTLE_TEMP - static_cast<int>(temperatureRead())) + DRIVER_MAX_PWR_SCALER;
+    uint8_t throttledPower = (THROTTLE_TEMP - static_cast<int>(temperatureRead())) + currentBoard.pwrScaler;
     driver.irun(throttledPower);
     SS2K_LOG(MAIN_LOG_TAG, "Over temp! Driver is throttling down! ESP32 @ %f C", temperatureRead());
     overTemp = true;
-  } else if ((driver.cs_actual() < DRIVER_MAX_PWR_SCALER) && !driver.stst()) {
+  } else if (static_cast<int>(temperatureRead()) < THROTTLE_TEMP) {
     if (overTemp) {
       SS2K_LOG(MAIN_LOG_TAG, "Temperature is now under control. Driver current reset.");
-      driver.irun(DRIVER_MAX_PWR_SCALER);
+      driver.irun(currentBoard.pwrScaler);
     }
     overTemp = false;
   }
@@ -432,5 +451,50 @@ void SS2K::motorStop(bool releaseTension) {
   stepper->setCurrentPosition(ss2k.targetPosition);
   if (releaseTension) {
     stepper->moveTo(ss2k.targetPosition - userConfig.getShiftStep() * 4);
+  }
+}
+
+void SS2K::checkSerial() {
+  static int txCheck = TX_CHECK_INTERVAL;
+  if (auxSerial.available() >= 8) {  // if at least 8 bytes are available to read from the serial port
+    txCheck             = TX_CHECK_INTERVAL;
+    int i               = 0;
+    int k               = 0;
+    auxSerialBuffer.len = auxSerial.readBytes(auxSerialBuffer.data, AUX_BUF_SIZE);
+    // pre-process Peloton Data. If we get more serial devices we will have to move this into sensor data factory.
+    // This is done here to prevent a lot of extra logging.
+    for (i = 0; i < auxSerialBuffer.len; i++) {  // Find start of data string
+      if (auxSerialBuffer.data[i] == HEADER) {
+        for (k = i; k < auxSerialBuffer.len; k++) {  // Find end of data string
+          if (auxSerialBuffer.data[k] == FOOTER) {
+            k++;
+            break;
+          }
+        }
+        size_t newLen = k - i;  // find length of sub data
+        uint8_t newBuf[newLen];
+        for (int j = i; j < k; j++) {
+          newBuf[j - i] = auxSerialBuffer.data[j];
+        }
+        collectAndSet(PELOTON_DATA_UUID, PELOTON_DATA_UUID, PELOTON_ADDRESS, newBuf, newLen);
+        break;
+      }
+    }
+  }
+  if (PELOTON_TX && (txCheck >= TX_CHECK_INTERVAL)) {
+    static bool alternate = false;
+    if (alternate) {
+      for (int i = 0; i < PELOTON_RQ_SIZE; i++) {
+        auxSerial.write(peloton_rq_watts[i]);
+      }
+    } else {
+      for (int i = 0; i < PELOTON_RQ_SIZE; i++) {
+        auxSerial.write(peloton_rq_cad[i]);
+      }
+    }
+    alternate = !alternate;
+    txCheck   = 0;
+  } else if (PELOTON_TX) {
+    txCheck++;
   }
 }
