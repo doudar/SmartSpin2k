@@ -1,1 +1,1 @@
-<img src="Pictures/Version1.jpg" alt="Hardware 1.0"/> 
+<img src="/Pictures/install_step_3.jpg" alt="Hardware 1.0"/> 

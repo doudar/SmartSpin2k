@@ -1,4 +1,4 @@
-<img src="Pictures/Version2.0.jpg" alt="Hardware 2.0"/> 
+<img src="/Pictures/Version2.0.jpg" alt="Hardware 2.0"/> 
 # [Description]
 This version of SmartSpin2K is designed with DIY in mind.  The PCB can be hand soldered using readily available components.  
 
@@ -23,3 +23,4 @@ This directory contains the gerber files necessary to source your own PCB
 
 # [Soldering Jig]
 - This tool is useful for aligning all the through-hole components for the PCB in order to make soldering easier.  
+<img src="/Pictures/solder_jig_assembly.jpg" alt="Solder Jig"/> 
