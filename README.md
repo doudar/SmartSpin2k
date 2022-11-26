@@ -1,4 +1,4 @@
-### Rev 3 Now Availiable!
+### Rev 3 Now Availiable!!!
 <img src="/Pictures/Version3.jpg" alt="Hardware 3.0"/> 
 
 ### Updates
