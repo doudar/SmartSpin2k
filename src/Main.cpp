@@ -502,15 +502,12 @@ void SS2K::checkSerial() {
 
 void SS2K::checkBLEReconnect() {
   static int bleCheck = BLE_RECONNECT_INTERVAL;
-  if (bleCheck >= BLE_RECONNECT_INTERVAL) {
+  if ((userConfig.getconnectedHeartMonitor() != "any" && !spinBLEClient.connectedHR) ||
+      (userConfig.getconnectedPowerMeter() != "any" && !spinBLEClient.connectedPM) &&
+          (userConfig.getconnectedPowerMeter() != "none" && userConfig.getconnectedHeartMonitor() != "none") && (bleCheck >= BLE_RECONNECT_INTERVAL)) {
     bleCheck = 0;
-    if ((userConfig.getconnectedHeartMonitor() != "any" && !spinBLEClient.connectedHR) ||
-        (userConfig.getconnectedPowerMeter() != "any" && !spinBLEClient.connectedPM) &&
-            (userConfig.getconnectedPowerMeter() != "none" && userConfig.getconnectedHeartMonitor() != "none")) {
-      spinBLEClient.resetDevices();
-      spinBLEClient.serverScan(true);
-    } else {
-      bleCheck++;
-    }
+    spinBLEClient.resetDevices();
+    spinBLEClient.serverScan(true);
   }
+  bleCheck++;
 }
