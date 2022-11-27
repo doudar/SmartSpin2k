@@ -228,6 +228,7 @@ void SS2K::maintenanceLoop(void *pvParameters) {
     if (loopCounter > 4) {
       ss2k.scanIfShiftersHeld();
       ss2k.checkDriverTemperature();
+      ss2k.checkBLEReconnect();
 
 #ifdef DEBUG_STACK
       Serial.printf("Step Task: %d \n", uxTaskGetStackHighWaterMark(moveStepperTask));
@@ -496,5 +497,20 @@ void SS2K::checkSerial() {
     txCheck   = 0;
   } else if (PELOTON_TX) {
     txCheck++;
+  }
+}
+
+void SS2K::checkBLEReconnect() {
+  static int bleCheck = BLE_RECONNECT_INTERVAL;
+  if (bleCheck >= BLE_RECONNECT_INTERVAL) {
+    bleCheck = 0;
+    if ((userConfig.getconnectedHeartMonitor() != "any" && !spinBLEClient.connectedHR) ||
+        (userConfig.getconnectedPowerMeter() != "any" && !spinBLEClient.connectedPM) &&
+            (userConfig.getconnectedPowerMeter() != "none" && userConfig.getconnectedHeartMonitor() != "none")) {
+      spinBLEClient.resetDevices();
+      spinBLEClient.serverScan(true);
+    } else {
+      bleCheck++;
+    }
   }
 }

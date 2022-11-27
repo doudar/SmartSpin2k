@@ -163,13 +163,17 @@ void PowerTable::newEntry(PowerBuffer& powerBuffer) {
       cad            = powerBuffer.powerEntry[i].cad;
       continue;
     }
+#ifdef DEBUG_POWERTABLE
     SS2K_LOGW(POWERTABLE_LOG_TAG, "Buf[%d](%dw)(%dpos)(%dcad)", i, powerBuffer.powerEntry[i].watts, powerBuffer.powerEntry[i].targetPosition, powerBuffer.powerEntry[i].cad);
+#endif
     // calculate average
     watts          = (watts + powerBuffer.powerEntry[i].watts) / 2;
     targetPosition = (targetPosition + powerBuffer.powerEntry[i].targetPosition) / 2;
     cad            = (cad + powerBuffer.powerEntry[i].cad) / 2;
   }
+#ifdef DEBUG_POWERTABLE
   SS2K_LOG(POWERTABLE_LOG_TAG, "Avg:(%dw)(%dpos)(%dcad)", (int)watts, targetPosition, cad);
+#endif
   // Done with powerBuffer
   // To start working on the PowerTable, we need to calculate position in the table for the new entry
   int i = round(watts / POWERTABLE_INCREMENT);

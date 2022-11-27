@@ -51,6 +51,7 @@ class SS2K {
   void checkDriverTemperature();
   void motorStop(bool releaseTension = false);
   void checkSerial();
+  void checkBLEReconnect();
 
   SS2K() {
     targetPosition      = 0;
