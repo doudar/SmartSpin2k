@@ -248,6 +248,12 @@
 // If ble devices are both setup, how often to attempt a reconnect.  
 #define BLE_RECONNECT_INTERVAL 40
 
+// Initial and web scan duration.  
+#define DEFAULT_SCAN_DURATION 10
+
+// BLE automatic reconnect duration. Set this low to avoid interruption. 
+#define BLE_RECONNECT_SCAN_DURATION 3
+
 // Uncomment to enable sending Telegram debug messages back to the chat
 // specified in telegram_token.h
 // #define USE_TELEGRAM
