@@ -23,7 +23,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Hardware
 - removed duplicate directory in direct mount folder
 - updated Bowflex C7 mount for improved usability
-- updated echelon bike inserts for durability
 
 ## [22.10.8]
 
