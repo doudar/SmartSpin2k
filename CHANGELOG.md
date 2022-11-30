@@ -26,6 +26,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - New case for the new PCB :)
 - Revised directory structure in /hardware
 - updated Bowflex C7 mount for improved usability
+- updated Echelon knob insert for durability
 
 ## [22.10.8]
 
