@@ -152,18 +152,24 @@
           }
         }
 
-        optionPM = document.createElement('option');
-        optionPM.text = 'none';
-        PMDropdown.add(optionPM);
-        optionHR = document.createElement('option');
-        optionHR.text = 'none';
-        HRDropdown.add(optionHR);
-        let defaultOptionPM = document.createElement('option');
-        defaultOptionPM.text = 'any';
-        let defaultOptionHR = document.createElement('option');
-        defaultOptionHR.text = 'any';
-        PMDropdown.add(defaultOptionPM);
-        HRDropdown.add(defaultOptionHR);
+        let noneOptionPM = document.createElement('option');
+        noneOptionPM.text = 'none';
+        let noneOptionHR = document.createElement('option');
+        noneOptionHR.text = 'none';
+        PMDropdown.add(noneOptionPM);
+        HRDropdown.add(noneOptionHR);
+        let anyOptionPM = document.createElement('option');
+        anyOptionPM.text = 'any';
+        let anyOptionHR = document.createElement('option');
+        anyOptionHR.text = 'any';
+        PMDropdown.add(anyOptionPM);
+        HRDropdown.add(anyOptionHR);
+        let connectedOptionPM = document.createElement('option');
+        connectedOptionPM.text = data.connectedPowerMeter;
+        let connectedOptionHR = document.createElement('option');
+        connectedOptionHR.text = data.connectedHeartMonitor;
+        PMDropdown.add(connectedOptionPM);
+        HRDropdown.add(connectedOptionHR);
         document.getElementById("connectedPowerMeter").innerHTML = data.connectedPowerMeter;
         document.getElementById("connectedHeartMonitor").innerHTML = data.connectedHeartMonitor;
         document.getElementById("powerCorrectionFactorValue").innerHTML = data.powerCorrectionFactor;
