@@ -123,7 +123,7 @@
           var t_obj = JSON.parse(data.foundDevices)
           {
             for (var key in t_obj) {
-              if (t_obj[key].UUID == '0x1818' || t_obj[key].UUID == '0x1826') {
+              if (t_obj[key].UUID == '0x1818' || t_obj[key].UUID == '0x1826' || t_obj[key].UUID == '6e400001-b5a3-f393-e0a9-e50e24dcca9e' || t_obj[key].UUID == '0bf669f0-45f2-11e7-9598-0800200c9a66') {
                 optionPM = document.createElement('option');
                 if (t_obj[key].name) {
                   optionPM.text = t_obj[key].name;
