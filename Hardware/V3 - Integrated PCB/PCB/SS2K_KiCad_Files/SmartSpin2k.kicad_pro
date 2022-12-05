@@ -425,7 +425,7 @@
       "idf": "",
       "netlist": "SmartSpin2k.net",
       "specctra_dsn": "SmartSpin2k.dsn",
-      "step": "../SmartSpin2k.step",
+      "step": "../SolidWorks/SmartSpin2k.step",
       "vrml": "../SmartSpin2k.wrl"
     },
     "page_layout_descr_file": ""
