@@ -436,6 +436,7 @@ void HTTP_Server::settingsProcessor() {
   String tString;
   bool wasBTUpdate       = false;
   bool wasSettingsUpdate = false;
+  bool reboot            = false;
   if (!server.arg("ssid").isEmpty()) {
     tString = server.arg("ssid");
     tString.trim();
@@ -528,7 +529,9 @@ void HTTP_Server::settingsProcessor() {
     wasBTUpdate = true;
     if (server.arg("blePMDropdown")) {
       tString = server.arg("blePMDropdown");
-      userConfig.setConnectedPowerMeter(server.arg("blePMDropdown"));
+      if (tString != userConfig.getConnectedPowerMeter()) {
+        reboot = true;
+      }
     } else {
       userConfig.setConnectedPowerMeter("any");
     }
@@ -536,13 +539,16 @@ void HTTP_Server::settingsProcessor() {
   if (!server.arg("bleHRDropdown").isEmpty()) {
     wasBTUpdate = true;
     if (server.arg("bleHRDropdown")) {
-      tString = server.arg("bleHRDropdown");
+      bool reset = false;
+      tString    = server.arg("bleHRDropdown");
+      if (tString != userConfig.getConnectedHeartMonitor()) {
+        reboot = true;
+      }
       userConfig.setConnectedHeartMonitor(server.arg("bleHRDropdown"));
     } else {
       userConfig.setConnectedHeartMonitor("any");
     }
   }
-
   if (!server.arg("session1HR").isEmpty()) {  // Needs checking for unrealistic numbers.
     userPWC.session1HR = server.arg("session1HR").toInt();
   }
@@ -579,7 +585,7 @@ void HTTP_Server::settingsProcessor() {
   } else {  // Normal response
     response +=
         "Network settings will be applied at next reboot. <br> Everything "
-        "else is availiable immediately.</h2></body><script> "
+        "else is available immediately.</h2></body><script> "
         "setTimeout(\"location.href = 'http://" +
         myIP.toString() + "/index.html';\",1000);</script></html>";
   }
@@ -589,6 +595,10 @@ void HTTP_Server::settingsProcessor() {
   userConfig.printFile();
   userPWC.saveToLittleFS();
   userPWC.printFile();
+  if (reboot) {
+    vTaskDelay(100 / portTICK_PERIOD_MS);
+    ESP.restart();
+  }
 }
 
 void HTTP_Server::stop() {
