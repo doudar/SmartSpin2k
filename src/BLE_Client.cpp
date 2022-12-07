@@ -347,24 +347,24 @@ void MyAdvertisedDeviceCallback::onResult(BLEAdvertisedDevice *advertisedDevice)
     // not specified.
     SS2K_LOG(BLE_CLIENT_LOG_TAG, "Matching Device Name: %s", aDevName.c_str());
     if (advertisedDevice->getServiceUUID() == HEARTSERVICE_UUID) {
-      if (String(userConfig.getconnectedHeartMonitor()) == "any") {
+      if (String(userConfig.getConnectedHeartMonitor()) == "any") {
         SS2K_LOG(BLE_CLIENT_LOG_TAG, "HR String Matched Any");
         // continue
-      } else if (aDevName != String(userConfig.getconnectedHeartMonitor()) || (String(userConfig.getconnectedHeartMonitor()) == "none")) {
-        SS2K_LOG(BLE_CLIENT_LOG_TAG, "Skipping non-selected HRM |%s|%s", aDevName.c_str(), userConfig.getconnectedHeartMonitor());
+      } else if (aDevName != String(userConfig.getConnectedHeartMonitor()) || (String(userConfig.getConnectedHeartMonitor()) == "none")) {
+        SS2K_LOG(BLE_CLIENT_LOG_TAG, "Skipping non-selected HRM |%s|%s", aDevName.c_str(), userConfig.getConnectedHeartMonitor());
         return;
-      } else if (aDevName == String(userConfig.getconnectedHeartMonitor())) {
+      } else if (aDevName == String(userConfig.getConnectedHeartMonitor())) {
         SS2K_LOG(BLE_CLIENT_LOG_TAG, "HR String Matched %s", aDevName.c_str());
       }
     } else {  // Already tested -->((advertisedDevice->getServiceUUID()(CYCLINGPOWERSERVICE_UUID) || advertisedDevice->getServiceUUID()(FLYWHEEL_UART_SERVICE_UUID) ||
               // advertisedDevice->getServiceUUID()(FITNESSMACHINESERVICE_UUID)))
-      if (String(userConfig.getconnectedPowerMeter()) == "any") {
+      if (String(userConfig.getConnectedPowerMeter()) == "any") {
         SS2K_LOG(BLE_CLIENT_LOG_TAG, "PM String Matched Any");
         // continue
-      } else if (aDevName != String(userConfig.getconnectedPowerMeter()) || (String(userConfig.getconnectedPowerMeter()) == "none")) {
-        SS2K_LOG(BLE_CLIENT_LOG_TAG, "Skipping non-selected PM |%s|%s", aDevName.c_str(), userConfig.getconnectedPowerMeter());
+      } else if (aDevName != String(userConfig.getConnectedPowerMeter()) || (String(userConfig.getConnectedPowerMeter()) == "none")) {
+        SS2K_LOG(BLE_CLIENT_LOG_TAG, "Skipping non-selected PM |%s|%s", aDevName.c_str(), userConfig.getConnectedPowerMeter());
         return;
-      } else if (aDevName == String(userConfig.getconnectedPowerMeter())) {
+      } else if (aDevName == String(userConfig.getConnectedPowerMeter())) {
         SS2K_LOG(BLE_CLIENT_LOG_TAG, "PM String Matched %s", aDevName.c_str());
       }
     }

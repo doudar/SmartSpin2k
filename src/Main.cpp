@@ -502,9 +502,9 @@ void SS2K::checkSerial() {
 
 void SS2K::checkBLEReconnect() {
   static int bleCheck = 0;
-  if (((userConfig.getconnectedHeartMonitor() != "any" && !spinBLEClient.connectedHR) || (userConfig.getconnectedPowerMeter() != "any" && !spinBLEClient.connectedPM)) && (bleCheck >= BLE_RECONNECT_INTERVAL)) {
+  if (((userConfig.getConnectedHeartMonitor() != "any" && !spinBLEClient.connectedHR) || (userConfig.getConnectedPowerMeter() != "any" && !spinBLEClient.connectedPM)) && (bleCheck >= BLE_RECONNECT_INTERVAL)) {
     bleCheck = 0;
-    if (((userConfig.getconnectedPowerMeter() == "none") && (userConfig.getconnectedHeartMonitor() == "none"))){
+    if (((userConfig.getConnectedPowerMeter() == "none") && (userConfig.getConnectedHeartMonitor() == "none"))){
       return;
     }
     if (!NimBLEDevice::getScan()->isScanning()) {
