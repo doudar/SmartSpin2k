@@ -530,7 +530,8 @@ void HTTP_Server::settingsProcessor() {
     if (server.arg("blePMDropdown")) {
       tString = server.arg("blePMDropdown");
       if (tString != userConfig.getConnectedPowerMeter()) {
-        reboot = true;
+        userConfig.setConnectedPowerMeter(tString);
+        reboot = true;    
       }
     } else {
       userConfig.setConnectedPowerMeter("any");

@@ -20,6 +20,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Fixed a bug in the new cadence compensation where an int should have been a float. 
 - Moved serial checking to own function. 
 - Reduced verbosity of ERG logging.
+- Fixed instance of BLE PM dropdown not being saved correctly. 
 
 ### Hardware
 - removed duplicate directory in direct mount folder
