@@ -5,4 +5,4 @@ introduces the newest PCB with a serial interface specifically designed for inte
 
 The case is suitable for bikes with a minimum of 90mm of space between the center of the knob and the head tube.  It has been tested on the Peloton Bike and clearance for fit is confirmed on Bowflex C6, Echelon Connect Sport, and Peloton Bike.
 
-<img src="/Pictures/Version3.jpg" alt="Hardware 3.0"/> 
+<img src="/Pictures/Version3_OnBike.jpg" alt="Hardware 3.0"/> 
