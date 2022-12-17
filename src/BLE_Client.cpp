@@ -111,14 +111,14 @@ bool SpinBLEClient::connectToServer() {
       serviceUUID = FLYWHEEL_UART_SERVICE_UUID;
       charUUID    = FLYWHEEL_UART_TX_UUID;
       SS2K_LOG(BLE_CLIENT_LOG_TAG, "trying to connect to Flywheel Bike");
-    } else if (myDevice->isAdvertisingService(CYCLINGPOWERSERVICE_UUID)) {
-      serviceUUID = CYCLINGPOWERSERVICE_UUID;
-      charUUID    = CYCLINGPOWERMEASUREMENT_UUID;
-      SS2K_LOG(BLE_CLIENT_LOG_TAG, "trying to connect to PM");
     } else if (myDevice->isAdvertisingService(FITNESSMACHINESERVICE_UUID)) {
       serviceUUID = FITNESSMACHINESERVICE_UUID;
       charUUID    = FITNESSMACHINEINDOORBIKEDATA_UUID;
       SS2K_LOG(BLE_CLIENT_LOG_TAG, "trying to connect to Fitness machine service");
+    } else if (myDevice->isAdvertisingService(CYCLINGPOWERSERVICE_UUID)) {
+      serviceUUID = CYCLINGPOWERSERVICE_UUID;
+      charUUID    = CYCLINGPOWERMEASUREMENT_UUID;
+      SS2K_LOG(BLE_CLIENT_LOG_TAG, "trying to connect to PM");
     } else if (myDevice->isAdvertisingService(ECHELON_DEVICE_UUID)) {
       serviceUUID = ECHELON_SERVICE_UUID;
       charUUID    = ECHELON_DATA_UUID;
@@ -230,10 +230,6 @@ bool SpinBLEClient::connectToServer() {
         SS2K_LOG(BLE_CLIENT_LOG_TAG, "The characteristic value was: %s", value.c_str());
       }
 
-      /** registerForNotify() has been deprecated and replaced with subscribe() / unsubscribe().
-       *  Subscribe parameter defaults are: notifications=true, notifyCallback=nullptr, response=false.
-       *  Unsubscribe parameter defaults are: response=false.
-       */
       if (pChr->canNotify()) {
         // if(!pChr->registerForNotify(notifyCB)) {
         if (!pChr->subscribe(true, onNotify)) {
@@ -390,8 +386,8 @@ void SpinBLEClient::scanProcess(int duration) {
 
   BLEScan *pBLEScan = BLEDevice::getScan();
   pBLEScan->setAdvertisedDeviceCallbacks(new MyAdvertisedDeviceCallback());
-  pBLEScan->setInterval(97);  
-  pBLEScan->setWindow(67);   
+  pBLEScan->setInterval(97);
+  pBLEScan->setWindow(67);
   pBLEScan->setDuplicateFilter(true);
   pBLEScan->setActiveScan(true);
   BLEScanResults foundDevices = pBLEScan->start(duration, true);
@@ -484,6 +480,23 @@ void SpinBLEClient::resetDevices() {
   for (size_t i = 0; i < NUM_BLE_DEVICES; i++) {
     tBLEd = this->myBLEDevices[i];
     tBLEd.reset();
+  }
+}
+
+void SpinBLEClient::FTMSControlPointWrite(const uint8_t *pData, int length) {
+  NimBLEClient *pClient = nullptr;
+  for (int i = 0; i < NimBLEDevice::getClientListSize(); i++) {
+    if (NimBLEDevice::getClientByID(i)->getService(FITNESSMACHINESERVICE_UUID)) {
+      pClient = NimBLEDevice::getClientByID(i);
+      break;
+    }
+  }
+  if (pClient) {
+    NimBLERemoteCharacteristic *writeCharacteristic = pClient->getService(FITNESSMACHINESERVICE_UUID)->getCharacteristic(FITNESSMACHINECONTROLPOINT_UUID);
+    if (writeCharacteristic) {
+      writeCharacteristic->writeValue(pData, length);
+      SS2K_LOG(BLE_CLIENT_LOG_TAG, "Sent FTMS");
+    }
   }
 }
 

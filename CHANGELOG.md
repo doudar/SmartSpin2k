@@ -12,6 +12,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Added power scaler for new board.
 - Added Main Index link to develop.html.
 - Added feature to automatically reconnect BLE devices if both are specified.
+- Added ftms passthrough. FTMS messages from the client app are now passed to a connected FTMS device.
 
 ### Changed
 - PowerTable values are now adjusted to 90 RPM cad on input.

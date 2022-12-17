@@ -362,6 +362,7 @@ void processFTMSWrite() {
   if (rxValue.length() >= 1) {
     uint8_t *pData = reinterpret_cast<uint8_t *>(&rxValue[0]);
     int length     = rxValue.length();
+    spinBLEClient.FTMSControlPointWrite(pData, length);
 
     const int kLogBufCapacity = (rxValue.length() * 2) + 60;  // largest comment is 48 VV
     char logBuf[kLogBufCapacity];

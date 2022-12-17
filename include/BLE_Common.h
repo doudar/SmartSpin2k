@@ -221,6 +221,7 @@ class SpinBLEClient {
   // (false)
   void resetDevices();
   void postConnect(NimBLEClient *pClient);
+  void FTMSControlPointWrite(const uint8_t *pData, int length);
 };
 class MyAdvertisedDeviceCallback : public NimBLEAdvertisedDeviceCallbacks {
  public:
