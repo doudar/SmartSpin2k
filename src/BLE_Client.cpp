@@ -252,9 +252,8 @@ bool SpinBLEClient::connectToServer() {
       spinBLEClient.myBLEDevices[device_number].doConnect = false;
       this->reconnectTries                                = MAX_RECONNECT_TRIES;
       spinBLEClient.myBLEDevices[device_number].set(myDevice, pClient->getConnId(), serviceUUID, charUUID);
-      // vTaskDelay(100 / portTICK_PERIOD_MS); //Give time for connection to finalize.
+
       removeDuplicates(pClient);
-      postConnect(pClient);
     }
 
   } else {
@@ -485,10 +484,12 @@ void SpinBLEClient::resetDevices() {
 
 void SpinBLEClient::FTMSControlPointWrite(const uint8_t *pData, int length) {
   NimBLEClient *pClient = nullptr;
-  for (int i = 0; i < NimBLEDevice::getClientListSize(); i++) {
-    if (NimBLEDevice::getClientByID(i)->getService(FITNESSMACHINESERVICE_UUID)) {
-      pClient = NimBLEDevice::getClientByID(i);
-      break;
+  for (int i = 0; i < NUM_BLE_DEVICES; i++) {
+    if (myBLEDevices[i].postConnected && (myBLEDevices[i].serviceUUID == FITNESSMACHINESERVICE_UUID)) {
+      if (NimBLEDevice::getClientByPeerAddress(myBLEDevices[i].peerAddress)->getService(FITNESSMACHINESERVICE_UUID)) {
+        pClient = NimBLEDevice::getClientByPeerAddress(myBLEDevices[i].peerAddress);
+        break;
+      }
     }
   }
   if (pClient) {
@@ -500,36 +501,48 @@ void SpinBLEClient::FTMSControlPointWrite(const uint8_t *pData, int length) {
   }
 }
 
-void SpinBLEClient::postConnect(NimBLEClient *pClient) {
-  for (size_t i = 0; i < NUM_BLE_DEVICES; i++) {
-    if (pClient->getPeerAddress() == this->myBLEDevices[i].peerAddress) {
-      if ((this->myBLEDevices[i].charUUID == CYCLINGPOWERMEASUREMENT_UUID) || (this->myBLEDevices[i].charUUID == FITNESSMACHINEINDOORBIKEDATA_UUID) ||
-          (this->myBLEDevices[i].charUUID == FLYWHEEL_UART_RX_UUID) || (this->myBLEDevices[i].charUUID == ECHELON_DATA_UUID)) {
-        this->connectedPM = true;
-        SS2K_LOG(BLE_CLIENT_LOG_TAG, "Registered PM on Connect");
-        if (this->myBLEDevices[i].charUUID == ECHELON_DATA_UUID) {
-          NimBLERemoteCharacteristic *writeCharacteristic = pClient->getService(ECHELON_SERVICE_UUID)->getCharacteristic(ECHELON_WRITE_UUID);
-          if (writeCharacteristic == nullptr) {
-            SS2K_LOG(BLE_CLIENT_LOG_TAG, "Failed to find Echelon write characteristic UUID: %s", ECHELON_WRITE_UUID.toString().c_str());
-            pClient->disconnect();
-            return;
+void SpinBLEClient::postConnect() {
+  for (int i = 0; i < NUM_BLE_DEVICES; i++) {
+    if (!myBLEDevices[i].postConnected) {
+      if (NimBLEDevice::getClientByPeerAddress(myBLEDevices[i].peerAddress)) {
+        myBLEDevices[i].postConnected = true;
+        NimBLEClient *pClient         = NimBLEDevice::getClientByPeerAddress(myBLEDevices[i].peerAddress);
+        if ((this->myBLEDevices[i].charUUID == CYCLINGPOWERMEASUREMENT_UUID) || (this->myBLEDevices[i].charUUID == FITNESSMACHINEINDOORBIKEDATA_UUID) ||
+            (this->myBLEDevices[i].charUUID == FLYWHEEL_UART_RX_UUID) || (this->myBLEDevices[i].charUUID == ECHELON_DATA_UUID)) {
+          this->connectedPM = true;
+          SS2K_LOG(BLE_CLIENT_LOG_TAG, "Registered PM on Connect");
+
+          if (this->myBLEDevices[i].charUUID == ECHELON_DATA_UUID) {
+            NimBLERemoteCharacteristic *writeCharacteristic = pClient->getService(ECHELON_SERVICE_UUID)->getCharacteristic(ECHELON_WRITE_UUID);
+            if (writeCharacteristic == nullptr) {
+              SS2K_LOG(BLE_CLIENT_LOG_TAG, "Failed to find Echelon write characteristic UUID: %s", ECHELON_WRITE_UUID.toString().c_str());
+              pClient->disconnect();
+              return;
+            }
+            // Enable device notifications
+            byte message[] = {0xF0, 0xB0, 0x01, 0x01, 0xA2};
+            writeCharacteristic->writeValue(message, 5);
+            SS2K_LOG(BLE_CLIENT_LOG_TAG, "Activated Echelon callbacks.");
           }
-          // Enable device notifications
-          byte message[] = {0xF0, 0xB0, 0x01, 0x01, 0xA2};
-          writeCharacteristic->writeValue(message, 5);
-          SS2K_LOG(BLE_CLIENT_LOG_TAG, "Activated Echelon callbacks.");
+
+          if (this->myBLEDevices[i].charUUID == FITNESSMACHINEINDOORBIKEDATA_UUID) {
+            NimBLERemoteCharacteristic *writeCharacteristic = pClient->getService(FITNESSMACHINESERVICE_UUID)->getCharacteristic(FITNESSMACHINECONTROLPOINT_UUID);
+            if (writeCharacteristic == nullptr) {
+              SS2K_LOG(BLE_CLIENT_LOG_TAG, "Failed to find FTMS control characteristic UUID: %s", FITNESSMACHINECONTROLPOINT_UUID.toString().c_str());
+              return;
+            }
+            // Start Training
+            writeCharacteristic->writeValue(FitnessMachineControlPointProcedure::RequestControl, 1);
+            vTaskDelay(BLE_NOTIFY_DELAY / portTICK_PERIOD_MS);
+            writeCharacteristic->writeValue(FitnessMachineControlPointProcedure::StartOrResume, 1);
+            SS2K_LOG(BLE_CLIENT_LOG_TAG, "Activated FTMS Training.");
+          }
         }
-        // spinBLEClient.removeDuplicates(pclient);
+        if ((this->myBLEDevices[i].charUUID == HEARTCHARACTERISTIC_UUID)) {
+          this->connectedHR = true;
+          SS2K_LOG(BLE_CLIENT_LOG_TAG, "Registered HRM on Connect");
+        }
         BLEDevice::getServer()->updateConnParams(pClient->getConnId(), 400, 400, 2, 1000);
-        return;
-      }
-      if ((this->myBLEDevices[i].charUUID == HEARTCHARACTERISTIC_UUID)) {
-        this->connectedHR = true;
-        SS2K_LOG(BLE_CLIENT_LOG_TAG, "Registered HRM on Connect");
-        BLEDevice::getServer()->updateConnParams(pClient->getConnId(), 400, 400, 2, 1000);
-        return;
-      } else {
-        SS2K_LOG(BLE_CLIENT_LOG_TAG, "These did not match|%s|%s|", pClient->getPeerAddress().toString().c_str(), this->myBLEDevices[i].peerAddress.toString().c_str());
       }
     }
   }

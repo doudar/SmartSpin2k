@@ -22,6 +22,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Moved serial checking to own function. 
 - Reduced verbosity of ERG logging.
 - Fixed instance of BLE PM dropdown not being saved correctly. 
+- Moved post connect handling to the ble communication loop. (improves startup stability)
 
 ### Hardware
 - removed duplicate directory in direct mount folder
