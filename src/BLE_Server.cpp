@@ -74,7 +74,7 @@ struct FitnessMachineFeature ftmsFeature = {
         FitnessMachineTargetFlags::Types::ResistanceTargetSettingSupported | FitnessMachineTargetFlags::Types::IndoorBikeSimulationParametersSupported |
         FitnessMachineTargetFlags::Types::SpinDownControlSupported | FitnessMachineTargetFlags::Types::TargetedCadenceConfigurationSupported};
 
-uint8_t ftmsIndoorBikeData[11] = {0x65, 0x08, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0};  // 100001100101 ISpeed, ICAD,
+uint8_t ftmsIndoorBikeData[11] = {0x64, 0x02, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0};  // 1001100100 ISpeed, ICAD,
                                                                                                             // Resistance, IPower, HeartRate 
 uint8_t ftmsResistanceLevelRange[6]      = {0x01, 0x00, 0x64, 0x00, 0x01, 0x00};                            // 1:100 increment 1
 uint8_t ftmsPowerRange[6]                = {0x01, 0x00, 0xA0, 0x0F, 0x01, 0x00};                            // 1:4000 watts increment 1
