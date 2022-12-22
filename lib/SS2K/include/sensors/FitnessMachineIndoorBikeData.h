@@ -21,10 +21,12 @@ class FitnessMachineIndoorBikeData : public SensorData {
   bool hasCadence();
   bool hasPower();
   bool hasSpeed();
+  bool hasResistance();
   int getHeartRate();
   float getCadence();
   int getPower();
   float getSpeed();
+  int getResistance();
   void decode(uint8_t *data, size_t length);
 
   enum Types : uint8_t {

@@ -70,7 +70,7 @@ class SS2K {
 
 class AuxSerialBuffer {
  public:
-  uint8_t data[20];
+  uint8_t data[AUX_BUF_SIZE];
   size_t len;
 
   AuxSerialBuffer() {

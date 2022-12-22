@@ -40,10 +40,12 @@ class SensorDataFactory {
     virtual bool hasCadence();
     virtual bool hasPower();
     virtual bool hasSpeed();
+    virtual bool hasResistance();
     virtual int getHeartRate();
     virtual float getCadence();
     virtual int getPower();
     virtual float getSpeed();
+    virtual int getResistance();
     virtual void decode(uint8_t *data, size_t length);
   };
 

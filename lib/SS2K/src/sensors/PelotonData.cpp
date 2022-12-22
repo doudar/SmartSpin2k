@@ -17,6 +17,8 @@ bool PelotonData::hasPower() { return this->hasData; }
 
 bool PelotonData::hasSpeed() { return false; }
 
+bool PelotonData::hasResistance() {return true;}
+
 int PelotonData::getHeartRate() { return INT_MIN; }
 
 float PelotonData::getCadence() { return this->cadence; }
@@ -24,6 +26,8 @@ float PelotonData::getCadence() { return this->cadence; }
 int PelotonData::getPower() { return this->power; }
 
 float PelotonData::getSpeed() { return nanf(""); }
+
+int PelotonData::getResistance() {return this->resistance;}
 
 void PelotonData::decode(uint8_t *data, size_t length) {
   float value                  = 0.0;
@@ -53,7 +57,7 @@ void PelotonData::decode(uint8_t *data, size_t length) {
       break;
 
     case RES_ID:
-      // we don't use resistance
+      resistance = value;
       break;
 
     default:

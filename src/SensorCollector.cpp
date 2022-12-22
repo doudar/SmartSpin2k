@@ -19,8 +19,7 @@ void collectAndSet(NimBLEUUID charUUID, NimBLEUUID serviceUUID, NimBLEAddress ad
   SS2K_LOGD(BLE_COMMON_LOG_TAG, "Data length: %d", length);
   int logBufLength = ss2k_log_hex_to_buffer(pData, length, logBuf, 0, kLogBufMaxLength);
 
-  logBufLength += snprintf(logBuf + logBufLength, kLogBufMaxLength - logBufLength, "<- %.8s | %.8s", serviceUUID.toString().c_str(),
-                           charUUID.toString().c_str());
+  logBufLength += snprintf(logBuf + logBufLength, kLogBufMaxLength - logBufLength, "<- %.8s | %.8s", serviceUUID.toString().c_str(), charUUID.toString().c_str());
 
   std::shared_ptr<SensorData> sensorData = sensorDataFactory.getSensorData(charUUID, (uint64_t)address, pData, length);
 
@@ -47,6 +46,11 @@ void collectAndSet(NimBLEUUID charUUID, NimBLEUUID serviceUUID, NimBLEAddress ad
     float speed = sensorData->getSpeed();
     rtConfig.setSimulatedSpeed(speed);
     logBufLength += snprintf(logBuf + logBufLength, kLogBufMaxLength - logBufLength, " SD(%.2f)", fmodf(speed, 1000.0));
+  }
+  if (sensorData->hasResistance()) {
+    int resistance = sensorData->getResistance();
+    rtConfig.setSimulatedResistance(resistance);
+    logBufLength += snprintf(logBuf + logBufLength, kLogBufMaxLength - logBufLength, " RS(%d)", resistance % 1000);
   }
   strncat(logBuf + logBufLength, " ]", kLogBufMaxLength - logBufLength);
   SS2K_LOG(BLE_COMMON_LOG_TAG, "%s", logBuf);

@@ -57,10 +57,7 @@ std::string FTMSWrite = "";
 // 00000000100000000000 - Accumulated Energy Present (bit 11)
 // 00000001000000000000 - Offset Compensation Indicator (bit 12)
 // 98765432109876543210 - bit placement helper :)
-// 00000000001001000000
-// 00000101000010000110
-// 00000000100001010100
-//               100000
+
 byte heartRateMeasurement[2]    = {0x00, 0x00};
 byte cyclingPowerMeasurement[9] = {0b0000000100011, 0, 200, 0, 0, 0, 0, 0, 0};
 byte cpsLocation[1]             = {0b000};       // sensor location 5 == left crank
@@ -77,9 +74,9 @@ struct FitnessMachineFeature ftmsFeature = {
         FitnessMachineTargetFlags::Types::ResistanceTargetSettingSupported | FitnessMachineTargetFlags::Types::IndoorBikeSimulationParametersSupported |
         FitnessMachineTargetFlags::Types::SpinDownControlSupported | FitnessMachineTargetFlags::Types::TargetedCadenceConfigurationSupported};
 
-uint8_t ftmsIndoorBikeData[14] = {0x44, 0x02, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0};  // 00000000100001010100 ISpeed, ICAD,
-                                                                                                            // TDistance, IPower, ETime
-uint8_t ftmsResistanceLevelRange[6]      = {0x01, 0x00, 0x25, 0x00, 0x01, 0x00};                            // 1:37 increment 1
+uint8_t ftmsIndoorBikeData[11] = {0x65, 0x08, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0};  // 100001100101 ISpeed, ICAD,
+                                                                                                            // Resistance, IPower, HeartRate 
+uint8_t ftmsResistanceLevelRange[6]      = {0x01, 0x00, 0x64, 0x00, 0x01, 0x00};                            // 1:100 increment 1
 uint8_t ftmsPowerRange[6]                = {0x01, 0x00, 0xA0, 0x0F, 0x01, 0x00};                            // 1:4000 watts increment 1
 uint8_t ftmsInclinationRange[6]          = {0x38, 0xff, 0xc8, 0x00, 0x01, 0x00};                            // -20.0:20.0 increment .1
 uint8_t ftmsTrainingStatus[2]            = {0x08, 0x00};
@@ -210,14 +207,14 @@ void updateIndoorBikeDataChar() {
   if (!spinBLEServer.clientSubscribed.IndoorBikeData) {
     return;
   }
-  float cadRaw = rtConfig.getSimulatedCad();
-  int cad      = static_cast<int>(cadRaw * 2);
-
-  int watts = rtConfig.getSimulatedWatts().value;
-  int hr    = rtConfig.getSimulatedHr();
-
+  float cadRaw   = rtConfig.getSimulatedCad();
+  int cad        = static_cast<int>(cadRaw * 2);
+  int watts      = rtConfig.getSimulatedWatts().value;
+  int hr         = rtConfig.getSimulatedHr();
+  int res        = rtConfig.getSimulatedResistance();
   int speed      = 0;
   float speedRaw = rtConfig.getSimulatedSpeed();
+
   if (speedRaw <= 0) {
     float gearRatio = 1;
     speed           = ((cad * 2.75 * 2.08 * 60 * gearRatio) / 10);
@@ -226,14 +223,19 @@ void updateIndoorBikeDataChar() {
   }
   ftmsIndoorBikeData[2] = (uint8_t)(speed & 0xff);
   ftmsIndoorBikeData[3] = (uint8_t)(speed >> 8);
-  ftmsIndoorBikeData[4] = (uint8_t)(cad & 0xff);
-  ftmsIndoorBikeData[5] = (uint8_t)(cad >> 8);  // cadence value
-  ftmsIndoorBikeData[6] = (uint8_t)(watts & 0xff);
-  ftmsIndoorBikeData[7] = (uint8_t)(watts >> 8);  // power value, constrained to avoid negative values,
-                                                  // although the specification allows for a sint16
-  ftmsIndoorBikeData[8] = (uint8_t)hr;
 
-  fitnessMachineIndoorBikeData->setValue(ftmsIndoorBikeData, 9);
+  ftmsIndoorBikeData[4] = (uint8_t)(cad & 0xff);
+  ftmsIndoorBikeData[5] = (uint8_t)(cad >> 8);
+
+  ftmsIndoorBikeData[6] = (uint8_t)(res & 0xff);
+  ftmsIndoorBikeData[7] = (uint8_t)(res >> 8);
+
+  ftmsIndoorBikeData[8] = (uint8_t)(watts & 0xff);
+  ftmsIndoorBikeData[9] = (uint8_t)(watts >> 8);
+
+  ftmsIndoorBikeData[10] = (uint8_t)hr;
+
+  fitnessMachineIndoorBikeData->setValue(ftmsIndoorBikeData, 11);
   fitnessMachineIndoorBikeData->notify();
 
   const int kLogBufCapacity = 200;  // Data(30), Sep(data/2), Arrow(3), CharId(37), Sep(3), CharId(37), Sep(3), Name(10), Prefix(2), HR(7), SEP(1), CD(10), SEP(1), PW(8), SEP(1),

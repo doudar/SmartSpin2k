@@ -89,7 +89,7 @@ void setup() {
   if (currentBoard.auxSerialTxPin) {
     auxSerial.setTxBufferSize(500);
     auxSerial.setRxBufferSize(500);
-    auxSerial.begin(19200, SERIAL_8N1, currentBoard.auxSerialRxPin, currentBoard.auxSerialTxPin, false);
+    auxSerial.begin(19200, SERIAL_8N1, currentBoard.auxSerialRxPin, currentBoard.auxSerialTxPin, false); //////////////////////////////////change to false after testing!!!
     if (!auxSerial) {
       SS2K_LOG(MAIN_LOG_TAG, "Invalid Serial Pin Configuration");
     }

@@ -180,7 +180,7 @@ class SpinBLEAdvertisedDevice {
     userSelectedCT    = false;  // Controllable Trainer
     doConnect         = false;  // Initiate connection flag
     if (dataBufferQueue != nullptr) {
-      Serial.println("Resetting queue");
+      //Serial.println("Resetting queue");
       xQueueReset(dataBufferQueue);
     }
   }
