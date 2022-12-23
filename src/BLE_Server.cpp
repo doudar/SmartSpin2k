@@ -219,7 +219,7 @@ void updateIndoorBikeDataChar() {
     float gearRatio = 1;
     speed           = ((cad * 2.75 * 2.08 * 60 * gearRatio) / 10);
   } else {
-    speed = static_cast<int>(speedRaw * 100);
+    speed = static_cast<int>(speedRaw * .35);
   }
   ftmsIndoorBikeData[2] = (uint8_t)(speed & 0xff);
   ftmsIndoorBikeData[3] = (uint8_t)(speed >> 8);
