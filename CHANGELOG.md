@@ -17,6 +17,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Added Resistance capture to Flywheel.
 - Added Resistance Capture to Peloton.
 - Added Resistance capture to FTMS.
+- Added scanning when devices are not connected. 
 
 ### Changed
 - PowerTable values are now adjusted to 90 RPM cad on input.

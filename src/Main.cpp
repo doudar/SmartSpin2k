@@ -89,7 +89,7 @@ void setup() {
   if (currentBoard.auxSerialTxPin) {
     auxSerial.setTxBufferSize(500);
     auxSerial.setRxBufferSize(500);
-    auxSerial.begin(19200, SERIAL_8N1, currentBoard.auxSerialRxPin, currentBoard.auxSerialTxPin, false); //////////////////////////////////change to false after testing!!!
+    auxSerial.begin(19200, SERIAL_8N1, currentBoard.auxSerialRxPin, currentBoard.auxSerialTxPin, false);  //////////////////////////////////change to false after testing!!!
     if (!auxSerial) {
       SS2K_LOG(MAIN_LOG_TAG, "Invalid Serial Pin Configuration");
     }
@@ -502,11 +502,20 @@ void SS2K::checkSerial() {
 
 void SS2K::checkBLEReconnect() {
   static int bleCheck = 0;
-  if (((userConfig.getConnectedHeartMonitor() != "any" && !spinBLEClient.connectedHR) || (userConfig.getConnectedPowerMeter() != "any" && !spinBLEClient.connectedPM)) && (bleCheck >= BLE_RECONNECT_INTERVAL)) {
+  if (((userConfig.getConnectedPowerMeter() == "none") && (userConfig.getConnectedHeartMonitor() == "none"))) {  // Exit immediately if "none" and "none"
+  bleCheck = 0;
+    return;
+  }
+  if (((userConfig.getConnectedPowerMeter() == "none") && (spinBLEClient.connectedHR))) {  // Exit if "none" PM and HR is connected
     bleCheck = 0;
-    if (((userConfig.getConnectedPowerMeter() == "none") && (userConfig.getConnectedHeartMonitor() == "none"))){
-      return;
-    }
+    return;
+  }
+  if (((userConfig.getConnectedHeartMonitor() == "none") && (spinBLEClient.connectedPM))) {  // Exit if "none" HR and PM is connected
+    bleCheck = 0;
+    return;
+  }
+  if(bleCheck >= BLE_RECONNECT_INTERVAL) {
+    bleCheck = 0;
     if (!NimBLEDevice::getScan()->isScanning()) {
       SS2K_LOG(MAIN_LOG_TAG, "Scanning from Check BLE Reconnect %d", bleCheck);
       spinBLEClient.resetDevices();
