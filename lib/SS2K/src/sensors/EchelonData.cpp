@@ -15,11 +15,15 @@ bool EchelonData::hasPower() { return this->cadence >= 0 && this->resistance >= 
 
 bool EchelonData::hasSpeed() { return false; }
 
+bool EchelonData::hasResistance() { return true; }
+
 int EchelonData::getHeartRate() { return INT_MIN; }
 
 float EchelonData::getCadence() { return this->cadence; }
 
 int EchelonData::getPower() { return this->power; }
+
+int EchelonData::getResistance() { return this->resistance; }
 
 float EchelonData::getSpeed() { return nanf(""); }
 

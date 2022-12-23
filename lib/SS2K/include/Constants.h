@@ -55,5 +55,5 @@
 #define HEADER 0xF1
 #define FOOTER 0xF6
 #define CAD_ID 0x41
-#define RES_ID 0x4A
+#define RES_ID 0x49
 #define POW_ID 0x44

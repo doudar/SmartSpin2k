@@ -35,10 +35,12 @@ class RuntimeParameters {
   int simulatedHr            = 0;
   int simulatedCad           = 0;
   float simulatedSpeed       = 0.0;
+  int simulatedResistance    = 0;
   bool simulateHr            = false;
   bool simulateWatts         = false;
   bool simulateTargetWatts   = false;
   bool simulateCad           = false;
+  bool simulateResistance    = false;
   bool ERGMode               = false;
   int shifterPosition        = 0;
   int minStep                = -200000000;
@@ -65,6 +67,9 @@ class RuntimeParameters {
 
   void setSimulatedSpeed(float spd) { simulatedSpeed = spd; }
   float getSimulatedSpeed() { return simulatedSpeed; }
+
+  void setSimulatedResistance(int res) { simulatedResistance = res; }
+  int getSimulatedResistance() { return simulatedResistance; }
 
   void setSimulateHr(bool shr) { simulateHr = shr; }
   bool getSimulateHr() { return simulateHr; }
@@ -116,47 +121,64 @@ class userParameters {
   String foundDevices          = " ";
 
  public:
+  void setFirmwareUpdateURL(String fURL) { firmwareUpdateURL = fURL; }
   const char* getFirmwareUpdateURL() { return firmwareUpdateURL.c_str(); }
+
+  void setDeviceName(String dvcn) { deviceName = dvcn; }
   const char* getDeviceName() { return deviceName.c_str(); }
+
+  void setShiftStep(int ss) { shiftStep = ss; }
   int getShiftStep() { return shiftStep; }
+
+  void setStealthChop(bool sc) { stealthchop = sc; }
   bool getStealthchop() { return stealthchop; }
+
+  void setInclineMultiplier(float im) { inclineMultiplier = im; }
   float getInclineMultiplier() { return inclineMultiplier; }
+
+  void setPowerCorrectionFactor(float pcf) { powerCorrectionFactor = pcf; }
   float getPowerCorrectionFactor() { return powerCorrectionFactor; }
+
   float getERGSensitivity() { return ERGSensitivity; }
+  void setERGSensitivity(float ergS) { ERGSensitivity = ergS; }
+
+  void setAutoUpdate(bool atupd) { autoUpdate = atupd; }
   bool getAutoUpdate() { return autoUpdate; }
+
+  void setSsid(String sid) { ssid = sid; }
   const char* getSsid() { return ssid.c_str(); }
+
+  void setPassword(String pwd) { password = pwd; }
   const char* getPassword() { return password.c_str(); }
+
+  void setConnectedPowerMeter(String cpm) { connectedPowerMeter = cpm; }
   const char* getConnectedPowerMeter() { return connectedPowerMeter.c_str(); }
+
+  void setConnectedHeartMonitor(String cHr) { connectedHeartMonitor = cHr; }
   const char* getConnectedHeartMonitor() { return connectedHeartMonitor.c_str(); }
+
+  void setStepperPower(int sp) { stepperPower = sp; }
   int getStepperPower() { return stepperPower; }
+
+  void setMaxWatts(int maxW) { maxWatts = maxW; }
   int getMaxWatts() { return maxWatts; }
+
+  void setMinWatts(int minW) { minWatts = minW; }
   int getMinWatts() { return minWatts; }
+
+  void setStepperDir(bool sd) { stepperDir = sd; }
   bool getStepperDir() { return stepperDir; }
+
+  void setShifterDir(bool shd) { shifterDir = shd; }
   bool getShifterDir() { return shifterDir; }
+
+  void setUdpLogEnabled(bool enabled) { udpLogEnabled = enabled; }
   bool getUdpLogEnabled() { return udpLogEnabled; }
 
-  void setDefaults();
-  void setFirmwareUpdateURL(String fURL) { firmwareUpdateURL = fURL; }
-  void setDeviceName(String dvcn) { deviceName = dvcn; }
-  void setShiftStep(int ss) { shiftStep = ss; }
-  void setStealthChop(bool sc) { stealthchop = sc; }
-  void setInclineMultiplier(float im) { inclineMultiplier = im; }
-  void setPowerCorrectionFactor(float pm) { powerCorrectionFactor = pm; }
-  void setERGSensitivity(float ergS) { ERGSensitivity = ergS; }
-  void setAutoUpdate(bool atupd) { autoUpdate = atupd; }
-  void setSsid(String sid) { ssid = sid; }
-  void setPassword(String pwd) { password = pwd; }
-  void setConnectedPowerMeter(String cpm) { connectedPowerMeter = cpm; }
-  void setConnectedHeartMonitor(String cHr) { connectedHeartMonitor = cHr; }
-  void setStepperPower(int sp) { stepperPower = sp; }
-  void setMaxWatts(int maxW) { maxWatts = maxW; }
-  void setMinWatts(int minW) { minWatts = minW; }
-  void setStepperDir(bool sd) { stepperDir = sd; }
-  void setShifterDir(bool shd) { shifterDir = shd; }
-  void setUdpLogEnabled(bool enabled) { udpLogEnabled = enabled; }
   void setFoundDevices(String fdev) { foundDevices = fdev; }
   const char* getFoundDevices() { return foundDevices.c_str(); }
 
+  void setDefaults();
   String returnJSON();
   void saveToLittleFS();
   void loadFromLittleFS();

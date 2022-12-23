@@ -182,7 +182,7 @@ class SpinBLEAdvertisedDevice {
     doConnect         = false;  // Initiate connection flag
     postConnected     = false;  // Has Cost Connect Been Run?
     if (dataBufferQueue != nullptr) {
-      Serial.println("Resetting queue");
+      //Serial.println("Resetting queue");
       xQueueReset(dataBufferQueue);
     }
   }
