@@ -12,6 +12,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Added power scaler for new board.
 - Added Main Index link to develop.html.
 - Added feature to automatically reconnect BLE devices if both are specified.
+- Added ftms passthrough. FTMS messages from the client app are now passed to a connected FTMS device.
 - Added resistance capture to Echelon.
 - Added Resistance capture to Flywheel.
 - Added Resistance Capture to Peloton.
@@ -25,6 +26,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Moved serial checking to own function. 
 - Reduced verbosity of ERG logging.
 - Fixed instance of BLE PM dropdown not being saved correctly. 
+- Moved post connect handling to the ble communication loop. (improves startup stability)
 
 ### Hardware
 - removed duplicate directory in direct mount folder

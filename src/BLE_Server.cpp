@@ -436,6 +436,10 @@ void processFTMSWrite() {
           ftmsStatus            = {FitnessMachineStatus::TargetPowerChanged, (uint8_t)rxValue[1], (uint8_t)rxValue[2]};
           ftmsTrainingStatus[1] = FitnessMachineTrainingStatus::Other;  // 0x0C;
           fitnessMachineTrainingStatus->setValue(ftmsTrainingStatus, 2);
+          // Adjust set point for powerCorrectionFactor and send to FTMS server (if connected)
+          int adjustedTarget         = targetWatts / userConfig.getPowerCorrectionFactor();
+          const uint8_t translated[] = {FitnessMachineControlPointProcedure::SetTargetPower, (uint8_t)(adjustedTarget % 256), (uint8_t)(adjustedTarget / 256)};
+          spinBLEClient.FTMSControlPointWrite(translated, 3);
         } else {
           returnValue[2] = FitnessMachineControlPointResultCode::OpCodeNotSupported;  // 0x02; no power meter connected, so no ERG
           logBufLength += snprintf(logBuf + logBufLength, kLogBufCapacity - logBufLength, "-> ERG Mode: No Power Meter Connected");
@@ -467,7 +471,8 @@ void processFTMSWrite() {
       } break;
 
       case FitnessMachineControlPointProcedure::SetIndoorBikeSimulationParameters: {  // sim mode
-        returnValue[2] = FitnessMachineControlPointResultCode::Success;               // 0x01;
+        spinBLEClient.FTMSControlPointWrite(pData, length);
+        returnValue[2] = FitnessMachineControlPointResultCode::Success;  // 0x01;
         pCharacteristic->setValue(returnValue, 3);
 
         signed char buf[2];

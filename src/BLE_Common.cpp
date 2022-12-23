@@ -103,7 +103,7 @@ void BLECommunications(void *pvParameters) {
       }
 
       processFTMSWrite();
-      // computeERG();
+      spinBLEClient.postConnect();
 
       if (BLEDevice::getAdvertising()) {
         if (!(BLEDevice::getAdvertising()->isAdvertising()) && (BLEDevice::getServer()->getConnectedCount() < CONFIG_BT_NIMBLE_MAX_CONNECTIONS - NUM_BLE_DEVICES)) {
