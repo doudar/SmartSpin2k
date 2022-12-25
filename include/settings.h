@@ -80,13 +80,12 @@
 #define WATTS_PER_SHIFT 30
 
 // Default Min Watts to stop stepper.
+//This is used to set the lower travel limit for the motor.
 #define DEFAULT_MIN_WATTS 50
 
 // Default Max Watts that the brake on the spin bike can absorb from the user.
+//This is used to set the upper travel limit for the motor.
 #define DEFAULT_MAX_WATTS 800
-
-// Wattage at which to automatically assume minimum brake resistance.
-#define MIN_WATTS 50
 
 // Default debounce delay for shifters. Increase if you have false shifts. Decrease if shifting takes too long.
 #define DEBOUNCE_DELAY 400

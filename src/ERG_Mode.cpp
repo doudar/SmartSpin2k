@@ -390,13 +390,13 @@ void ErgMode::computErg() {
   int newCadence       = rtConfig.getSimulatedCad();
   int newSetPoint      = rtConfig.getTargetWatts();
 
-  // check for new power value or new setpoint, if watts < 10 treat as faulty
+  // check for new power value or new set point, if watts < 10 treat as faulty
   if ((this->watts.timestamp == newWatts.timestamp && this->setPoint == newSetPoint) || newWatts.value < 10) {
     SS2K_LOGW(ERG_MODE_LOG_TAG, "Watts were old.");
     return;
   }
 
-  // set minimum SetPoint to MIN_WATTS if app sends setpoints lower than MIN_WATTS.
+  // set minimum set point to minimum bike watts if app sends set point lower than minimum bike watts.
   if (newSetPoint < userConfig.getMinWatts()) {
     SS2K_LOG(ERG_MODE_LOG_TAG, "ERG Target Below Minumum Value.");
     newSetPoint = userConfig.getMinWatts();
