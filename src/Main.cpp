@@ -506,6 +506,10 @@ void SS2K::checkBLEReconnect() {
   bleCheck = 0;
     return;
   }
+    if (((spinBLEClient.connectedHR) && (spinBLEClient.connectedPM))) {  // Exit if both are connected
+    bleCheck = 0;
+    return;
+  }
   if (((userConfig.getConnectedPowerMeter() == "none") && (spinBLEClient.connectedHR))) {  // Exit if "none" PM and HR is connected
     bleCheck = 0;
     return;

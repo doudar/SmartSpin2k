@@ -28,6 +28,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Reduced verbosity of ERG logging.
 - Fixed instance of BLE PM dropdown not being saved correctly. 
 - Moved post connect handling to the ble communication loop. (improves startup stability)
+- Fixed bug submitted by @flo100 where MIN_WATTS in ERG should have been userConfig.getMinWatts();
 
 ### Hardware
 - removed duplicate directory in direct mount folder

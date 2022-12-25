@@ -397,9 +397,9 @@ void ErgMode::computErg() {
   }
 
   // set minimum SetPoint to MIN_WATTS if app sends setpoints lower than MIN_WATTS.
-  if (newSetPoint < MIN_WATTS) {
+  if (newSetPoint < userConfig.getMinWatts()) {
     SS2K_LOG(ERG_MODE_LOG_TAG, "ERG Target Below Minumum Value.");
-    newSetPoint = MIN_WATTS;
+    newSetPoint = userConfig.getMinWatts();
   }
 
   bool isUserSpinning = this->_userIsSpinning(newCadence, currentIncline);
