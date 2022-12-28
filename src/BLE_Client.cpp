@@ -114,11 +114,11 @@ bool SpinBLEClient::connectToServer() {
     } else if (myDevice->isAdvertisingService(FITNESSMACHINESERVICE_UUID)) {
       serviceUUID = FITNESSMACHINESERVICE_UUID;
       charUUID    = FITNESSMACHINEINDOORBIKEDATA_UUID;
-      SS2K_LOG(BLE_CLIENT_LOG_TAG, "trying to connect to Fitness machine service");
+      SS2K_LOG(BLE_CLIENT_LOG_TAG, "trying to connect to Fitness Machine Service");
     } else if (myDevice->isAdvertisingService(CYCLINGPOWERSERVICE_UUID)) {
       serviceUUID = CYCLINGPOWERSERVICE_UUID;
       charUUID    = CYCLINGPOWERMEASUREMENT_UUID;
-      SS2K_LOG(BLE_CLIENT_LOG_TAG, "trying to connect to PM");
+      SS2K_LOG(BLE_CLIENT_LOG_TAG, "trying to connect to Cycling Power Service");
     } else if (myDevice->isAdvertisingService(ECHELON_DEVICE_UUID)) {
       serviceUUID = ECHELON_SERVICE_UUID;
       charUUID    = ECHELON_DATA_UUID;
