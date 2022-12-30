@@ -36,6 +36,7 @@ class RuntimeParameters {
   int simulatedCad           = 0;
   float simulatedSpeed       = 0.0;
   int simulatedResistance    = 0;
+  int targetResistance       = 0;
   bool simulateHr            = false;
   bool simulateWatts         = false;
   bool simulateTargetWatts   = false;
@@ -71,6 +72,9 @@ class RuntimeParameters {
   void setSimulatedResistance(int res) { simulatedResistance = res; }
   int getSimulatedResistance() { return simulatedResistance; }
 
+  void setTargetResistance(int res) { targetResistance = res; }
+  int getTargetResistance() { return targetResistance; }
+
   void setSimulateHr(bool shr) { simulateHr = shr; }
   bool getSimulateHr() { return simulateHr; }
 
@@ -84,7 +88,7 @@ class RuntimeParameters {
   bool getSimulateCad() { return simulateCad; }
 
   void setFTMSMode(uint8_t mde) { FTMSMode = mde; }
-  bool getFTMSMode() { return FTMSMode; }
+  uint8_t getFTMSMode() { return FTMSMode; }
 
   void setShifterPosition(int sp) { shifterPosition = sp; }
   int getShifterPosition() { return shifterPosition; }
@@ -130,8 +134,8 @@ class userParameters {
   void setShiftStep(int ss) { shiftStep = ss; }
   int getShiftStep() { return shiftStep; }
 
-  void setStealthChop(bool sc) { stealthchop = sc; }
-  bool getStealthChop() { return stealthchop; }
+  void setStealthChop(bool sc) { stealthChop = sc; }
+  bool getStealthChop() { return stealthChop; }
 
   void setInclineMultiplier(float im) { inclineMultiplier = im; }
   float getInclineMultiplier() { return inclineMultiplier; }

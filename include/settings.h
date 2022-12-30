@@ -245,7 +245,7 @@
 #define TX_CHECK_INTERVAL 20
 
 // If ble devices are both setup, how often to attempt a reconnect.  
-#define BLE_RECONNECT_INTERVAL 40
+#define BLE_RECONNECT_INTERVAL 15
 
 // Initial and web scan duration.  
 #define DEFAULT_SCAN_DURATION 10

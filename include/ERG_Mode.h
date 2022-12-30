@@ -85,6 +85,7 @@ class ErgMode {
   bool initialized     = false;
   int setPoint         = 0;
   int offsetMultiplier = 0;
+  int resistance       = 0;
   Measurement watts    = Measurement(0);
   int cadence          = 0;
   PowerTable* powerTable;

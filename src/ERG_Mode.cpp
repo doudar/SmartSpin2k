@@ -55,7 +55,7 @@ void ergTaskLoop(void* pvParameters) {
     if ((rtConfig.getFTMSMode() == FitnessMachineControlPointProcedure::SetTargetPower) && (hasConnectedPowerMeter || simulationRunning)) {
       ergMode.computeErg();
     }
-    if (rtConfig.getFTMSMode() == FitnessMachineControlPointProcedure::SetTargetResistanceLevel && rtConfig.){
+    if ((rtConfig.getFTMSMode() == FitnessMachineControlPointProcedure::SetTargetResistanceLevel) && (rtConfig.getSimulatedResistance())) {
       ergMode.computeResistance();
     }
 
@@ -386,13 +386,42 @@ void PowerTable::toLog() {
 }
 
 // compute position for resistance control mode
-void ErgMode::computeResistance(){
-    static int oldTarget = 0;
-    if(this->setPoint == oldTarget){ //Set Point didn't change
+void ErgMode::computeResistance() {
+  static int stepChangePerResistance = userConfig.getShiftStep();
+  static bool firstRun               = false;
+  static int targetResistance        = 0;
+  static int targetDelta             = 0;
 
-    }else { //set Point changed
+  int newSetPoint = rtConfig.getTargetResistance();
+  int actualDelta = rtConfig.getTargetResistance() - rtConfig.getSimulatedResistance();
 
+  if (rtConfig.getCurrentIncline() == rtConfig.getTargetIncline()) {  // stepper done moving
+    if (this->setPoint == newSetPoint) {                              // Set Point didn't change
+      if (abs(actualDelta) > 1) {
+        // recalculate step change per resistance
+        stepChangePerResistance = ((abs(targetDelta)) / (abs(actualDelta))) * stepChangePerResistance;
+        rtConfig.setCurrentIncline(rtConfig.getTargetResistance() * stepChangePerResistance);
+      } else if (abs(actualDelta) == 1) {
+        // move a small amount because we are close.
+        rtConfig.setTargetIncline(rtConfig.getTargetIncline() + (actualDelta * (userConfig.getShiftStep() / 10)));
+      }
+      // do nothing - everything matches
+    } else {           // set Point changed
+      if (firstRun) {  // If first run we need to determine how much to adjust the knob to move one resistance level. We will do this by moving one shift step.
+        if (actualDelta > 0) {
+          rtConfig.setTargetIncline(rtConfig.getTargetIncline() + userConfig.getShiftStep());
+        }
+        if (actualDelta < 0) {
+          rtConfig.setTargetIncline(rtConfig.getTargetIncline() - userConfig.getShiftStep());
+        }
+        firstRun = false;
+      } else {
+        rtConfig.setCurrentIncline(rtConfig.getTargetResistance() * stepChangePerResistance);
+      }
     }
+    targetDelta      = actualDelta;
+    targetResistance = newSetPoint;
+  }
 }
 
 // as a note, Trainer Road sends 50w target whenever the app is connected.
@@ -491,11 +520,9 @@ bool ErgMode::_userIsSpinning(int cadence, float incline) {
 }
 
 void ErgMode::_writeLogHeader() {
-  SS2K_LOGW(ERG_MODE_LOG_CSV_TAG, "cycles;current incline;new incline;current setpoint;new setpoint;current watts;new watts;current cadence;new cadence;");
+  SS2K_LOGW(ERG_MODE_LOG_CSV_TAG, "current incline;new incline;current setpoint;new setpoint;current watts;new watts;current cadence;new cadence;");
 }
 
-void ErgMode::_writeLog(int cycles, float currentIncline, float newIncline, int currentSetPoint, int newSetPoint, int currentWatts, int newWatts, int currentCadence,
-                        int newCadence) {
-  SS2K_LOGW(ERG_MODE_LOG_CSV_TAG, "%d;%.2f;%.2f;%d;%d;%d;%d;%d;%d", cycles, currentIncline, newIncline, currentSetPoint, newSetPoint, currentWatts, newWatts, currentCadence,
-            newCadence);
+void ErgMode::_writeLog(float currentIncline, float newIncline, int currentSetPoint, int newSetPoint, int currentWatts, int newWatts, int currentCadence, int newCadence) {
+  SS2K_LOGW(ERG_MODE_LOG_CSV_TAG, "%d;%.2f;%.2f;%d;%d;%d;%d;%d;%d", currentIncline, newIncline, currentSetPoint, newSetPoint, currentWatts, newWatts, currentCadence, newCadence);
 }

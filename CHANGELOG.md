@@ -17,7 +17,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Added Resistance capture to Flywheel.
 - Added Resistance Capture to Peloton.
 - Added Resistance capture to FTMS.
-- Added scanning when devices are not connected. 
+- Added scanning when devices are not connected.  
 
 ### Changed
 - PowerTable values are now adjusted to 90 RPM cad on input.
@@ -29,6 +29,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Fixed instance of BLE PM dropdown not being saved correctly. 
 - Moved post connect handling to the ble communication loop. (improves startup stability)
 - Fixed bug submitted by @flo100 where MIN_WATTS in ERG should have been userConfig.getMinWatts();
+- FTMS resistance mode now changes the attached bike resistance with feedback. (i.e. setting resistance to 50 with a Peloton attached will set 50 on the Peloton)
 
 ### Hardware
 - removed duplicate directory in direct mount folder

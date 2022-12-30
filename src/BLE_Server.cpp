@@ -401,7 +401,7 @@ void processFTMSWrite() {
         port *= 10;
 
         rtConfig.setTargetIncline(port);
-        
+
         logBufLength += snprintf(logBuf + logBufLength, kLogBufCapacity - logBufLength, "-> Incline Mode: %2f", rtConfig.getTargetIncline() / 100);
 
         ftmsStatus            = {FitnessMachineStatus::TargetInclineChanged, (uint8_t)rxValue[1], (uint8_t)rxValue[2]};
@@ -414,8 +414,8 @@ void processFTMSWrite() {
         pCharacteristic->setValue(returnValue, 3);
 
         int targetResistance = rxValue[1];
-        rtConfig.setShifterPosition(targetResistance);
-        logBufLength += snprintf(logBuf + logBufLength, kLogBufCapacity - logBufLength, "-> Resistance Mode: %d", rtConfig.getShifterPosition());
+        rtConfig.setTargetResistance(targetResistance);
+        logBufLength += snprintf(logBuf + logBufLength, kLogBufCapacity - logBufLength, "-> Resistance Mode: %d", rtConfig.getTargetResistance());
 
         ftmsStatus            = {FitnessMachineStatus::TargetResistanceLevelChanged, rxValue[1]};
         ftmsTrainingStatus[1] = FitnessMachineTrainingStatus::Other;  // 0x00;
@@ -847,7 +847,7 @@ void ss2kCustomCharacteristicCallbacks::onWrite(BLECharacteristic *pCharacterist
       }
       if (rxValue[0] == write) {
         rtConfig.setFTMSMode(rxValue[2]);
-        logBufLength += snprintf(logBuf + logBufLength, kLogBufCapacity - logBufLength, rtConfig.getFTMSMode());
+        logBufLength += snprintf(logBuf + logBufLength, kLogBufCapacity - logBufLength, "(%hhu)", rtConfig.getFTMSMode());
       }
       break;
 

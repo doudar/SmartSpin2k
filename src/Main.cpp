@@ -168,7 +168,7 @@ void setup() {
 
   xTaskCreatePinnedToCore(SS2K::maintenanceLoop,     /* Task function. */
                           "maintenanceLoopFunction", /* name of task. */
-                          4000,                      /* Stack size of task */
+                          4500,                      /* Stack size of task */
                           NULL,                      /* parameter of the task */
                           1,                         /* priority of the task */
                           &maintenanceLoopTask,      /* Task handle to keep track of created task */
@@ -222,7 +222,6 @@ void SS2K::maintenanceLoop(void *pvParameters) {
           isScanning = true;
         }
       }
-
       intervalTimer2 = millis();
     }
     if (loopCounter > 4) {
@@ -503,10 +502,10 @@ void SS2K::checkSerial() {
 void SS2K::checkBLEReconnect() {
   static int bleCheck = 0;
   if (((userConfig.getConnectedPowerMeter() == "none") && (userConfig.getConnectedHeartMonitor() == "none"))) {  // Exit immediately if "none" and "none"
-  bleCheck = 0;
+    bleCheck = 0;
     return;
   }
-    if (((spinBLEClient.connectedHR) && (spinBLEClient.connectedPM))) {  // Exit if both are connected
+  if (((spinBLEClient.connectedHR) && (spinBLEClient.connectedPM))) {  // Exit if both are connected
     bleCheck = 0;
     return;
   }
@@ -518,7 +517,7 @@ void SS2K::checkBLEReconnect() {
     bleCheck = 0;
     return;
   }
-  if(bleCheck >= BLE_RECONNECT_INTERVAL) {
+  if (bleCheck >= BLE_RECONNECT_INTERVAL) {
     bleCheck = 0;
     if (!NimBLEDevice::getScan()->isScanning()) {
       SS2K_LOG(MAIN_LOG_TAG, "Scanning from Check BLE Reconnect %d", bleCheck);
