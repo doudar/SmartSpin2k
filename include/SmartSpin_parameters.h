@@ -41,7 +41,7 @@ class RuntimeParameters {
   bool simulateTargetWatts   = false;
   bool simulateCad           = false;
   bool simulateResistance    = false;
-  bool ERGMode               = false;
+  uint8_t FTMSMode           = 0x00;
   int shifterPosition        = 0;
   int minStep                = -200000000;
   int maxStep                = 200000000;
@@ -83,8 +83,8 @@ class RuntimeParameters {
   void setSimulateCad(bool scd) { simulateCad = scd; }
   bool getSimulateCad() { return simulateCad; }
 
-  void setERGMode(bool erg) { ERGMode = erg; }
-  bool getERGMode() { return ERGMode; }
+  void setFTMSMode(uint8_t mde) { FTMSMode = mde; }
+  bool getFTMSMode() { return FTMSMode; }
 
   void setShifterPosition(int sp) { shifterPosition = sp; }
   int getShifterPosition() { return shifterPosition; }
@@ -103,7 +103,7 @@ class userParameters {
   String firmwareUpdateURL;
   String deviceName;
   int shiftStep;
-  bool stealthchop;
+  bool stealthChop;
   float inclineMultiplier;
   float powerCorrectionFactor;
   float ERGSensitivity;
@@ -131,7 +131,7 @@ class userParameters {
   int getShiftStep() { return shiftStep; }
 
   void setStealthChop(bool sc) { stealthchop = sc; }
-  bool getStealthchop() { return stealthchop; }
+  bool getStealthChop() { return stealthchop; }
 
   void setInclineMultiplier(float im) { inclineMultiplier = im; }
   float getInclineMultiplier() { return inclineMultiplier; }

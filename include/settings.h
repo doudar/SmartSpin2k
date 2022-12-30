@@ -206,7 +206,7 @@
 // initiated.
 #define SHIFTERS_HOLD_FOR_SCAN 2
 
-// stealthchop enabled by default
+// stealthChop enabled by default
 #define STEALTHCHOP true
 
 // how long to try STA mode before falling back to AP mode

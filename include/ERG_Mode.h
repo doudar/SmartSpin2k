@@ -75,15 +75,15 @@ class PowerTable {
 class ErgMode {
  public:
   ErgMode(PowerTable* powerTable) { this->powerTable = powerTable; }
-  void computErg();
+  void computeErg();
+  void computeResistance();
   void _writeLogHeader();
-  void _writeLog(int cycles, float currentIncline, float newIncline, int currentSetPoint, int newSetPoint, int currentWatts, int newWatts, int currentCadence, int newCadence);
+  void _writeLog(float currentIncline, float newIncline, int currentSetPoint, int newSetPoint, int currentWatts, int newWatts, int currentCadence, int newCadence);
 
  private:
   bool engineStopped   = false;
   bool initialized     = false;
   int setPoint         = 0;
-  int cycle            = 0;
   int offsetMultiplier = 0;
   Measurement watts    = Measurement(0);
   int cadence          = 0;

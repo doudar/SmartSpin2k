@@ -363,7 +363,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 * WiFi Fallback to AP mode is now 10 seconds.
 * WiFi AP mode Fallback SSID is now device name (MDNS name), and the password is whatever you have set.
 * ERG Mode slightly more aggressive.
-* Stealthchop 2 now selectable in settings.
+* StealthChop 2 now selectable in settings.
 * Holding both shifters at boot resets the unit to defaults and erases filesystem. (firmware remains intact)
 * Holding both shifters for 3 seconds after boot preforms a BLE device scan/reconnect.
 

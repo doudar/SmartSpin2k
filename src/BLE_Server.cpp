@@ -371,6 +371,7 @@ void processFTMSWrite() {
     uint8_t returnValue[3] = {FitnessMachineControlPointProcedure::ResponseCode, (uint8_t)rxValue[0], FitnessMachineControlPointResultCode::OpCodeNotSupported};
 
     ftmsStatus = {FitnessMachineStatus::ReservedForFutureUse};
+    rtConfig.setFTMSMode((uint8_t)rxValue[0]);
 
     switch ((uint8_t)rxValue[0]) {
       case FitnessMachineControlPointProcedure::RequestControl:
@@ -400,7 +401,7 @@ void processFTMSWrite() {
         port *= 10;
 
         rtConfig.setTargetIncline(port);
-        rtConfig.setERGMode(false);
+        
         logBufLength += snprintf(logBuf + logBufLength, kLogBufCapacity - logBufLength, "-> Incline Mode: %2f", rtConfig.getTargetIncline() / 100);
 
         ftmsStatus            = {FitnessMachineStatus::TargetInclineChanged, (uint8_t)rxValue[1], (uint8_t)rxValue[2]};
@@ -414,7 +415,6 @@ void processFTMSWrite() {
 
         int targetResistance = rxValue[1];
         rtConfig.setShifterPosition(targetResistance);
-        rtConfig.setERGMode(false);
         logBufLength += snprintf(logBuf + logBufLength, kLogBufCapacity - logBufLength, "-> Resistance Mode: %d", rtConfig.getShifterPosition());
 
         ftmsStatus            = {FitnessMachineStatus::TargetResistanceLevelChanged, rxValue[1]};
@@ -427,7 +427,6 @@ void processFTMSWrite() {
           returnValue[2] = FitnessMachineControlPointResultCode::Success;  // 0x01;
 
           int targetWatts = bytes_to_u16(rxValue[2], rxValue[1]);
-          rtConfig.setERGMode(true);
           rtConfig.setTargetWatts(targetWatts);
           logBufLength += snprintf(logBuf + logBufLength, kLogBufCapacity - logBufLength, "-> ERG Mode Target: %d Current: %d Incline: %2f", targetWatts,
                                    rtConfig.getSimulatedWatts().value, rtConfig.getTargetIncline() / 100);
@@ -483,7 +482,6 @@ void processFTMSWrite() {
         port = bytes_to_u16(buf[1], buf[0]);
         rtConfig.setTargetIncline(port);
         logBufLength += snprintf(logBuf + logBufLength, kLogBufCapacity - logBufLength, "-> Sim Mode Incline %2f", rtConfig.getTargetIncline() / 100);
-        rtConfig.setERGMode(false);
 
         ftmsStatus = {FitnessMachineStatus::IndoorBikeSimulationParametersChanged,
                       (uint8_t)rxValue[1],
@@ -757,17 +755,17 @@ void ss2kCustomCharacteristicCallbacks::onWrite(BLECharacteristic *pCharacterist
       }
       break;
 
-    case BLE_stealthchop:  // 0x0A
-      logBufLength += snprintf(logBuf + logBufLength, kLogBufCapacity - logBufLength, "<-stealthchop");
+    case BLE_stealthChop:  // 0x0A
+      logBufLength += snprintf(logBuf + logBufLength, kLogBufCapacity - logBufLength, "<-stealthChop");
       returnValue[0] = success;
       if (rxValue[0] == read) {
-        returnValue[2] = (uint8_t)(userConfig.getStealthchop());
+        returnValue[2] = (uint8_t)(userConfig.getStealthChop());
         returnLength += 1;
       }
       if (rxValue[0] == write) {
         userConfig.setStealthChop(rxValue[2]);
-        ss2k.updateStealthchop();
-        logBufLength += snprintf(logBuf + logBufLength, kLogBufCapacity - logBufLength, "(%s)", userConfig.getStealthchop() ? "true" : "false");
+        ss2k.updateStealthChop();
+        logBufLength += snprintf(logBuf + logBufLength, kLogBufCapacity - logBufLength, "(%s)", userConfig.getStealthChop() ? "true" : "false");
       }
       break;
 
@@ -840,16 +838,16 @@ void ss2kCustomCharacteristicCallbacks::onWrite(BLECharacteristic *pCharacterist
       }
       break;
 
-    case BLE_ERGMode:  // 0x10
-      logBufLength += snprintf(logBuf + logBufLength, kLogBufCapacity - logBufLength, "<-ERGMode");
+    case BLE_FTMSMode:  // 0x10
+      logBufLength += snprintf(logBuf + logBufLength, kLogBufCapacity - logBufLength, "<-FTMSMode");
       returnValue[0] = success;
       if (rxValue[0] == read) {
-        returnValue[2] = (uint8_t)(rtConfig.getERGMode());
+        returnValue[2] = (uint8_t)(rtConfig.getFTMSMode());
         returnLength += 1;
       }
       if (rxValue[0] == write) {
-        rtConfig.setERGMode(rxValue[2]);
-        logBufLength += snprintf(logBuf + logBufLength, kLogBufCapacity - logBufLength, "(%s)", rtConfig.getERGMode() ? "true" : "false");
+        rtConfig.setFTMSMode(rxValue[2]);
+        logBufLength += snprintf(logBuf + logBufLength, kLogBufCapacity - logBufLength, rtConfig.getFTMSMode());
       }
       break;
 

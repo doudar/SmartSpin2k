@@ -47,7 +47,7 @@ class SS2K {
   void restartWifi();
   void setupTMCStepperDriver();
   void updateStepperPower();
-  void updateStealthchop();
+  void updateStealthChop();
   void checkDriverTemperature();
   void motorStop(bool releaseTension = false);
   void checkSerial();

@@ -273,11 +273,11 @@ void SS2K::moveStepper(void *pvParameters) {
     if (stepper) {
       ss2k.stepperIsRunning = stepper->isRunning();
       if (!ss2k.externalControl) {
-        if (rtConfig.getERGMode()) {
+        if (rtConfig.getFTMSMode() == FitnessMachineControlPointProcedure::SetTargetPower) {
           // ERG Mode
-          // Shifter not used.
           stepper->setSpeedInHz(STEPPER_ERG_SPEED);
-          ss2k.targetPosition = rtConfig.getTargetIncline();
+          ss2k.targetPosition = rtConfig.getShifterPosition() * userConfig.getShiftStep();
+          ss2k.targetPosition += rtConfig.getTargetIncline();
         } else {
           // Simulation Mode
           ss2k.targetPosition = rtConfig.getShifterPosition() * userConfig.getShiftStep();
@@ -333,7 +333,7 @@ bool IRAM_ATTR SS2K::deBounce() {
 
 ///////////// Interrupt Functions /////////////
 void IRAM_ATTR SS2K::shiftUp() {  // Handle the shift up interrupt IRAM_ATTR is to keep the interrput code in ram always
-  if (ss2k.deBounce() && !rtConfig.getERGMode()) {
+  if (ss2k.deBounce()) {
     if (!digitalRead(currentBoard.shiftUpPin)) {  // double checking to make sure the interrupt wasn't triggered by emf
       rtConfig.setShifterPosition(rtConfig.getShifterPosition() - 1 + userConfig.getShifterDir() * 2);
     } else {
@@ -343,7 +343,7 @@ void IRAM_ATTR SS2K::shiftUp() {  // Handle the shift up interrupt IRAM_ATTR is 
 }
 
 void IRAM_ATTR SS2K::shiftDown() {  // Handle the shift down interrupt
-  if (ss2k.deBounce() && !rtConfig.getERGMode()) {
+  if (ss2k.deBounce()) {
     if (!digitalRead(currentBoard.shiftDownPin)) {  // double checking to make sure the interrupt wasn't triggered by emf
       rtConfig.setShifterPosition(rtConfig.getShifterPosition() + 1 - userConfig.getShifterDir() * 2);
     } else {
@@ -407,7 +407,7 @@ void SS2K::setupTMCStepperDriver() {
   driver.TPOWERDOWN(128);
 
   driver.toff(5);
-  bool t_bool = userConfig.getStealthchop();
+  bool t_bool = userConfig.getStealthChop();
   driver.en_spreadCycle(!t_bool);
   driver.pwm_autoscale(t_bool);
   driver.pwm_autograd(t_bool);
@@ -421,13 +421,13 @@ void SS2K::updateStepperPower() {
   SS2K_LOG(MAIN_LOG_TAG, "Stepper power is now %d.  read:cs=%U", userConfig.getStepperPower(), current);
 }
 
-// Applies current Stealthchop to driver
-void SS2K::updateStealthchop() {
-  bool t_bool = userConfig.getStealthchop();
+// Applies current StealthChop to driver
+void SS2K::updateStealthChop() {
+  bool t_bool = userConfig.getStealthChop();
   driver.en_spreadCycle(!t_bool);
   driver.pwm_autoscale(t_bool);
   driver.pwm_autograd(t_bool);
-  SS2K_LOG(MAIN_LOG_TAG, "Stealthchop is now %d", t_bool);
+  SS2K_LOG(MAIN_LOG_TAG, "StealthChop is now %d", t_bool);
 }
 
 // Checks the driver temperature and throttles power if above threshold.

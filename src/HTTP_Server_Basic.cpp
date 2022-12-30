@@ -230,11 +230,11 @@ void HTTP_Server::start() {
   server.on("/ergmode", []() {
     String value = server.arg("value");
     if (value == "enable") {
-      rtConfig.setERGMode(true);
+      rtConfig.setFTMSMode(FitnessMachineControlPointProcedure::SetTargetPower);
       server.send(200, "text/plain", "OK");
       SS2K_LOG(HTTP_SERVER_LOG_TAG, "ERG Mode turned on");
     } else {
-      rtConfig.setERGMode(false);
+      rtConfig.setFTMSMode(FitnessMachineControlPointProcedure::RequestControl);
       server.send(200, "text/plain", "OK");
       SS2K_LOG(HTTP_SERVER_LOG_TAG, "ERG Mode turned off");
     }
@@ -506,12 +506,12 @@ void HTTP_Server::settingsProcessor() {
   } else if (wasSettingsUpdate) {
     userConfig.setUdpLogEnabled(false);
   }
-  if (!server.arg("stealthchop").isEmpty()) {
+  if (!server.arg("stealthChop").isEmpty()) {
     userConfig.setStealthChop(true);
-    ss2k.updateStealthchop();
+    ss2k.updateStealthChop();
   } else if (wasSettingsUpdate) {
     userConfig.setStealthChop(false);
-    ss2k.updateStealthchop();
+    ss2k.updateStealthChop();
   }
   if (!server.arg("inclineMultiplier").isEmpty()) {
     float inclineMultiplier = server.arg("inclineMultiplier").toFloat();

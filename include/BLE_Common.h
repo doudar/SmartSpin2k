@@ -31,13 +31,13 @@
 #define BLE_deviceName            0x07
 #define BLE_shiftStep             0x08
 #define BLE_stepperPower          0x09
-#define BLE_stealthchop           0x0A
+#define BLE_stealthChop           0x0A
 #define BLE_inclineMultiplier     0x0B
 #define BLE_powerCorrectionFactor 0x0C
 #define BLE_simulateHr            0x0D
 #define BLE_simulateWatts         0x0E
 #define BLE_simulateCad           0x0F
-#define BLE_ERGMode               0x10
+#define BLE_FTMSMode              0x10
 #define BLE_autoUpdate            0x11
 #define BLE_ssid                  0x12
 #define BLE_password              0x13

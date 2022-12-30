@@ -253,8 +253,11 @@
         document.getElementById("cadSlider").value = obj.simulatedCad;
         document.getElementById("cadOutput").checked = obj.simulateCad;
         document.getElementById("cadInputContainer").hidden = !obj.simulateCad;
-
-        document.getElementById("enableErgCheckbox").checked = obj.ERGMode;
+        var ergMode = false;
+        if (obj.FTMSMode = "0x05"){
+          ergMode = true;
+        }
+        document.getElementById("enableErgCheckbox").checked = ergMode;
 
         document.getElementById("targetWattsValue").innerHTML = obj.targetWatts + " Watts";
         document.getElementById("targetWattsSlider").value = obj.targetWatts == null ? 0 : obj.targetWatts;

@@ -30,7 +30,7 @@ String RuntimeParameters::returnJSON() {
   doc["simulateWatts"]       = simulateWatts;
   doc["simulateTargetWatts"] = simulateTargetWatts;
   doc["simulateCad"]         = simulateCad;
-  doc["ERGMode"]             = ERGMode;
+  doc["FTMSMode"]             = FTMSMode;
   doc["shifterPosition"]     = shifterPosition;
   doc["minStep"]             = minStep;
   doc["maxStep"]             = maxStep;
@@ -45,7 +45,7 @@ void userParameters::setDefaults() {
   firmwareUpdateURL     = FW_UPDATEURL;
   deviceName            = DEVICE_NAME;
   shiftStep             = DEFAULT_SHIFT_STEP;
-  stealthchop           = STEALTHCHOP;
+  stealthChop           = STEALTHCHOP;
   stepperPower          = DEFAULT_STEPPER_POWER;
   inclineMultiplier     = 3.0;
   powerCorrectionFactor = 1.0;
@@ -76,7 +76,7 @@ String userParameters::returnJSON() {
   doc["deviceName"]            = deviceName;
   doc["shiftStep"]             = shiftStep;
   doc["stepperPower"]          = stepperPower;
-  doc["stealthchop"]           = stealthchop;
+  doc["stealthChop"]           = stealthChop;
   doc["inclineMultiplier"]     = inclineMultiplier;
   doc["powerCorrectionFactor"] = powerCorrectionFactor;
   doc["ERGSensitivity"]        = ERGSensitivity;
@@ -122,7 +122,7 @@ void userParameters::saveToLittleFS() {
   doc["deviceName"]            = deviceName;
   doc["shiftStep"]             = shiftStep;
   doc["stepperPower"]          = stepperPower;
-  doc["stealthchop"]           = stealthchop;
+  doc["stealthChop"]           = stealthChop;
   doc["inclineMultiplier"]     = inclineMultiplier;
   doc["powerCorrectionFactor"] = powerCorrectionFactor;
   doc["ERGSensitivity"]        = ERGSensitivity;
@@ -175,7 +175,7 @@ void userParameters::loadFromLittleFS() {
   setDeviceName(doc["deviceName"]);
   setShiftStep(doc["shiftStep"]);
   setStepperPower(doc["stepperPower"]);
-  setStealthChop(doc["stealthchop"]);
+  setStealthChop(doc["stealthChop"]);
   setInclineMultiplier(doc["inclineMultiplier"]);
   setAutoUpdate(doc["autoUpdate"]);
   setSsid(doc["ssid"]);
