@@ -55,7 +55,8 @@ void ergTaskLoop(void* pvParameters) {
     if ((rtConfig.getFTMSMode() == FitnessMachineControlPointProcedure::SetTargetPower) && (hasConnectedPowerMeter || simulationRunning)) {
       ergMode.computeErg();
     }
-    if ((rtConfig.getFTMSMode() == FitnessMachineControlPointProcedure::SetTargetResistanceLevel) && (rtConfig.getSimulatedResistance())) {
+    // if ((rtConfig.getFTMSMode() == FitnessMachineControlPointProcedure::SetTargetResistanceLevel) && (rtConfig.getSimulatedResistance())) {
+    if ((rtConfig.getFTMSMode() == FitnessMachineControlPointProcedure::SetTargetResistanceLevel)) {
       ergMode.computeResistance();
     }
 
@@ -388,40 +389,46 @@ void PowerTable::toLog() {
 // compute position for resistance control mode
 void ErgMode::computeResistance() {
   static int stepChangePerResistance = userConfig.getShiftStep();
-  static bool firstRun               = false;
-  static int targetResistance        = 0;
+  static bool firstRun               = true;
+  static int oldSetPoint             = 0;
   static int targetDelta             = 0;
 
   int newSetPoint = rtConfig.getTargetResistance();
   int actualDelta = rtConfig.getTargetResistance() - rtConfig.getSimulatedResistance();
 
   if (rtConfig.getCurrentIncline() == rtConfig.getTargetIncline()) {  // stepper done moving
-    if (this->setPoint == newSetPoint) {                              // Set Point didn't change
+    if (oldSetPoint == newSetPoint) {                                 // Set Point didn't change
       if (abs(actualDelta) > 1) {
         // recalculate step change per resistance
         stepChangePerResistance = ((abs(targetDelta)) / (abs(actualDelta))) * stepChangePerResistance;
         rtConfig.setCurrentIncline(rtConfig.getTargetResistance() * stepChangePerResistance);
+        SS2K_LOG(ERG_MODE_LOG_TAG, "RES mode adjust step change: %d -> %d", stepChangePerResistance, actualDelta);
       } else if (abs(actualDelta) == 1) {
         // move a small amount because we are close.
         rtConfig.setTargetIncline(rtConfig.getTargetIncline() + (actualDelta * (userConfig.getShiftStep() / 10)));
+        SS2K_LOG(ERG_MODE_LOG_TAG, "RES mode close float");
       }
       // do nothing - everything matches
     } else {           // set Point changed
       if (firstRun) {  // If first run we need to determine how much to adjust the knob to move one resistance level. We will do this by moving one shift step.
         if (actualDelta > 0) {
           rtConfig.setTargetIncline(rtConfig.getTargetIncline() + userConfig.getShiftStep());
+          SS2K_LOG(ERG_MODE_LOG_TAG, "RES mode first run shift up");
         }
         if (actualDelta < 0) {
           rtConfig.setTargetIncline(rtConfig.getTargetIncline() - userConfig.getShiftStep());
+          SS2K_LOG(ERG_MODE_LOG_TAG, "RES mode first run shift down");
         }
         firstRun = false;
       } else {
         rtConfig.setCurrentIncline(rtConfig.getTargetResistance() * stepChangePerResistance);
+        SS2K_LOG(ERG_MODE_LOG_TAG, "RES mode normal adjustment %d", stepChangePerResistance);
       }
     }
-    targetDelta      = actualDelta;
-    targetResistance = newSetPoint;
+    targetDelta = actualDelta;
+    oldSetPoint = newSetPoint;
   }
+  SS2K_LOG(ERG_MODE_LOG_TAG, "RES mode done");
 }
 
 // as a note, Trainer Road sends 50w target whenever the app is connected.
