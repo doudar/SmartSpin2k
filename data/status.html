@@ -181,10 +181,10 @@
             var obj = JSON.parse(this.responseText);
             document.getElementById("currentIncline").value = obj.currentIncline;
             document.getElementById("targetIncline").value = obj.targetIncline;
-            document.getElementById("simulatedHr").value = obj.simulatedHr;
-            document.getElementById("simulatedWatts").value = obj.simulatedWatts;
+            document.getElementById("simulatedHr").value = obj.hr;
+            document.getElementById("simulatedWatts").value = obj.watts;
             document.getElementById("targetWatts").value = obj.targetWatts;
-            document.getElementById("simulatedCad").value = obj.simulatedCad;
+            document.getElementById("simulatedCad").value = obj.cad;
           }
         }
       };

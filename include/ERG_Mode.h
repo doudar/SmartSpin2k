@@ -86,19 +86,20 @@ class ErgMode {
   int setPoint         = 0;
   int offsetMultiplier = 0;
   int resistance       = 0;
-  Measurement watts    = Measurement(0);
   int cadence          = 0;
+
+  Measurement watts;
   PowerTable* powerTable;
 
   // check if user is spinning, reset incline if user stops spinning
   bool _userIsSpinning(int cadence, float incline);
 
   // calculate incline if setpoint (from Zwift) changes
-  void _setPointChangeState(int newSetPoint, int newCadence, Measurement& newWatts, float currentIncline);
+  void _setPointChangeState(int newCadence, Measurement& newWatts);
 
   // calculate incline if setpoint is unchanged
-  void _inSetpointState(int newSetPoint, int newCadence, Measurement& newWatts, float currentIncline);
+  void _inSetpointState(int newCadence, Measurement& newWatts);
 
   // update localvalues + incline, creates a log
-  void _updateValues(int newSetPoint, int newCadence, Measurement& newWatts, float currentIncline, float newIncline);
+  void _updateValues(int newCadence, Measurement& newWatts, float newIncline);
 };

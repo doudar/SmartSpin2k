@@ -207,11 +207,11 @@ void updateIndoorBikeDataChar() {
   if (!spinBLEServer.clientSubscribed.IndoorBikeData) {
     return;
   }
-  float cadRaw   = rtConfig.getSimulatedCad();
+  float cadRaw   = rtConfig.cad.getValue();
   int cad        = static_cast<int>(cadRaw * 2);
-  int watts      = rtConfig.getSimulatedWatts().value;
-  int hr         = rtConfig.getSimulatedHr();
-  int res        = rtConfig.getSimulatedResistance();
+  int watts      = rtConfig.watts.getValue();
+  int hr         = rtConfig.hr.getValue();
+  int res        = rtConfig.resistance.getValue();
   int speed      = 0;
   float speedRaw = rtConfig.getSimulatedSpeed();
 
@@ -249,7 +249,7 @@ void updateCyclingPowerMeasurementChar() {
   if (!spinBLEServer.clientSubscribed.CyclingPowerMeasurement) {
     return;
   }
-  int power = rtConfig.getSimulatedWatts().value;
+  int power = rtConfig.watts.getValue();
   int remainder, quotient;
   quotient                   = power / 256;
   remainder                  = power % 256;
@@ -257,7 +257,7 @@ void updateCyclingPowerMeasurementChar() {
   cyclingPowerMeasurement[3] = quotient;
   cyclingPowerMeasurementCharacteristic->setValue(cyclingPowerMeasurement, 9);
 
-  float cadence = rtConfig.getSimulatedCad();
+  float cadence = rtConfig.cad.getValue();
   if (cadence > 0) {
     float crankRevPeriod = (60 * 1024) / cadence;
     spinBLEClient.cscCumulativeCrankRev++;
@@ -287,7 +287,7 @@ void updateHeartRateMeasurementChar() {
   if (!spinBLEServer.clientSubscribed.Heartrate) {
     return;
   }
-  int hr                  = rtConfig.getSimulatedHr();
+  int hr                  = rtConfig.hr.getValue();
   heartRateMeasurement[1] = hr;
   heartRateMeasurementCharacteristic->setValue(heartRateMeasurement, 2);
   heartRateMeasurementCharacteristic->notify();
@@ -413,9 +413,8 @@ void processFTMSWrite() {
         returnValue[2] = FitnessMachineControlPointResultCode::Success;  // 0x01;
         pCharacteristic->setValue(returnValue, 3);
 
-        int targetResistance = rxValue[1];
-        rtConfig.setTargetResistance(targetResistance);
-        logBufLength += snprintf(logBuf + logBufLength, kLogBufCapacity - logBufLength, "-> Resistance Mode: %d", rtConfig.getTargetResistance());
+        rtConfig.resistance.setTarget((int)rxValue[1]);
+        logBufLength += snprintf(logBuf + logBufLength, kLogBufCapacity - logBufLength, "-> Resistance Mode: %d", rtConfig.resistance.getTarget());
 
         ftmsStatus            = {FitnessMachineStatus::TargetResistanceLevelChanged, rxValue[1]};
         ftmsTrainingStatus[1] = FitnessMachineTrainingStatus::Other;  // 0x00;
@@ -423,19 +422,18 @@ void processFTMSWrite() {
       } break;
 
       case FitnessMachineControlPointProcedure::SetTargetPower: {
-        if (spinBLEClient.connectedPM || rtConfig.getSimulateWatts()) {
+        if (spinBLEClient.connectedPM || rtConfig.watts.getSimulate()) {
           returnValue[2] = FitnessMachineControlPointResultCode::Success;  // 0x01;
 
-          int targetWatts = bytes_to_u16(rxValue[2], rxValue[1]);
-          rtConfig.setTargetWatts(targetWatts);
-          logBufLength += snprintf(logBuf + logBufLength, kLogBufCapacity - logBufLength, "-> ERG Mode Target: %d Current: %d Incline: %2f", targetWatts,
-                                   rtConfig.getSimulatedWatts().value, rtConfig.getTargetIncline() / 100);
+          rtConfig.watts.setTarget(bytes_to_u16(rxValue[2], rxValue[1]));
+          logBufLength += snprintf(logBuf + logBufLength, kLogBufCapacity - logBufLength, "-> ERG Mode Target: %d Current: %d Incline: %2f", rtConfig.watts.getTarget(),
+                                   rtConfig.watts.getValue(), rtConfig.getTargetIncline() / 100);
 
           ftmsStatus            = {FitnessMachineStatus::TargetPowerChanged, (uint8_t)rxValue[1], (uint8_t)rxValue[2]};
           ftmsTrainingStatus[1] = FitnessMachineTrainingStatus::Other;  // 0x0C;
           fitnessMachineTrainingStatus->setValue(ftmsTrainingStatus, 2);
           // Adjust set point for powerCorrectionFactor and send to FTMS server (if connected)
-          int adjustedTarget         = targetWatts / userConfig.getPowerCorrectionFactor();
+          int adjustedTarget         = rtConfig.watts.getTarget() / userConfig.getPowerCorrectionFactor();
           const uint8_t translated[] = {FitnessMachineControlPointProcedure::SetTargetPower, (uint8_t)(adjustedTarget % 256), (uint8_t)(adjustedTarget / 256)};
           spinBLEClient.FTMSControlPointWrite(translated, 3);
         } else {
@@ -559,11 +557,11 @@ int connectedClientCount() {
 }
 
 void calculateInstPwrFromHR() {
-  static int oldHR    = rtConfig.getSimulatedHr();
-  static int newHR    = rtConfig.getSimulatedHr();
+  static int oldHR    = rtConfig.hr.getValue();
+  static int newHR    = rtConfig.hr.getValue();
   static double delta = 0;
   oldHR               = newHR;  // Copying HR from Last loop
-  newHR               = rtConfig.getSimulatedHr();
+  newHR               = rtConfig.hr.getValue();
 
   delta = (newHR - oldHR) / (BLE_CLIENT_DELAY / 1000);
 
@@ -584,8 +582,8 @@ void calculateInstPwrFromHR() {
   }
 
 #ifndef DEBUG_HR_TO_PWR
-  rtConfig.setSimulatedWatts(avgP);
-  rtConfig.setSimulatedCad(NORMAL_CAD);
+  rtConfig.watts.setValue(avgP);
+  rtConfig.cad.setValue(NORMAL_CAD);
 #endif  // DEBUG_HR_TO_PWR
 
   SS2K_LOG(BLE_SERVER_LOG_TAG, "Power From HR: %d", avgP);
@@ -668,13 +666,13 @@ void ss2kCustomCharacteristicCallbacks::onWrite(BLECharacteristic *pCharacterist
       logBufLength += snprintf(logBuf + logBufLength, kLogBufCapacity - logBufLength, "<-simulatedWatts");
       returnValue[0] = success;
       if (rxValue[0] == read) {
-        returnValue[2] = (uint8_t)(rtConfig.getSimulatedWatts().value & 0xff);
-        returnValue[3] = (uint8_t)(rtConfig.getSimulatedWatts().value >> 8);
+        returnValue[2] = (uint8_t)(rtConfig.watts.getValue() & 0xff);
+        returnValue[3] = (uint8_t)(rtConfig.watts.getValue() >> 8);
         returnLength += 2;
       }
       if (rxValue[0] == write) {
-        rtConfig.setSimulatedWatts(bytes_to_u16(rxValue[3], rxValue[2]));
-        logBufLength += snprintf(logBuf + logBufLength, kLogBufCapacity - logBufLength, "(%d)", rtConfig.getSimulatedWatts());
+        rtConfig.watts.setValue(bytes_to_u16(rxValue[3], rxValue[2]));
+        logBufLength += snprintf(logBuf + logBufLength, kLogBufCapacity - logBufLength, "(%d)", rtConfig.watts.getValue());
       }
       break;
 
@@ -682,13 +680,13 @@ void ss2kCustomCharacteristicCallbacks::onWrite(BLECharacteristic *pCharacterist
       logBufLength += snprintf(logBuf + logBufLength, kLogBufCapacity - logBufLength, "<-simulatedHr");
       returnValue[0] = success;
       if (rxValue[0] == read) {
-        returnValue[2] = (uint8_t)(rtConfig.getSimulatedHr() & 0xff);
-        returnValue[3] = (uint8_t)(rtConfig.getSimulatedHr() >> 8);
+        returnValue[2] = (uint8_t)(rtConfig.hr.getValue() & 0xff);
+        returnValue[3] = (uint8_t)(rtConfig.hr.getValue() >> 8);
         returnLength += 2;
       }
       if (rxValue[0] == write) {
-        rtConfig.setSimulatedHr(bytes_to_u16(rxValue[3], rxValue[2]));
-        logBufLength += snprintf(logBuf + logBufLength, kLogBufCapacity - logBufLength, "(%d)", rtConfig.getSimulatedHr());
+        rtConfig.hr.setValue(bytes_to_u16(rxValue[3], rxValue[2]));
+        logBufLength += snprintf(logBuf + logBufLength, kLogBufCapacity - logBufLength, "(%d)", rtConfig.hr.getValue());
       }
       break;
 
@@ -696,13 +694,13 @@ void ss2kCustomCharacteristicCallbacks::onWrite(BLECharacteristic *pCharacterist
       logBufLength += snprintf(logBuf + logBufLength, kLogBufCapacity - logBufLength, "<-simulatedCad");
       returnValue[0] = success;
       if (rxValue[0] == read) {
-        returnValue[2] = (uint8_t)(rtConfig.getSimulatedCad() & 0xff);
-        returnValue[3] = (uint8_t)(rtConfig.getSimulatedCad() >> 8);
+        returnValue[2] = (uint8_t)(rtConfig.cad.getValue() & 0xff);
+        returnValue[3] = (uint8_t)(rtConfig.cad.getValue() >> 8);
         returnLength += 2;
       }
       if (rxValue[0] == write) {
-        rtConfig.setSimulatedCad(bytes_to_u16(rxValue[3], rxValue[2]));
-        logBufLength += snprintf(logBuf + logBufLength, kLogBufCapacity - logBufLength, "(%d)", rtConfig.getSimulatedCad());
+        rtConfig.cad.setValue(bytes_to_u16(rxValue[3], rxValue[2]));
+        logBufLength += snprintf(logBuf + logBufLength, kLogBufCapacity - logBufLength, "(%d)", rtConfig.cad.getValue());
       }
       break;
 
@@ -803,12 +801,12 @@ void ss2kCustomCharacteristicCallbacks::onWrite(BLECharacteristic *pCharacterist
       logBufLength += snprintf(logBuf + logBufLength, kLogBufCapacity - logBufLength, "<-simulateHr");
       returnValue[0] = success;
       if (rxValue[0] == read) {
-        returnValue[2] = (uint8_t)(rtConfig.getSimulateHr());
+        returnValue[2] = (uint8_t)(rtConfig.hr.getSimulate());
         returnLength += 1;
       }
       if (rxValue[0] == write) {
-        rtConfig.setSimulateHr(rxValue[2]);
-        logBufLength += snprintf(logBuf + logBufLength, kLogBufCapacity - logBufLength, "(%s)", rtConfig.getSimulateHr() ? "true" : "false");
+        rtConfig.hr.setSimulate(rxValue[2]);
+        logBufLength += snprintf(logBuf + logBufLength, kLogBufCapacity - logBufLength, "(%s)", rtConfig.hr.getSimulate() ? "true" : "false");
       }
       break;
 
@@ -816,12 +814,12 @@ void ss2kCustomCharacteristicCallbacks::onWrite(BLECharacteristic *pCharacterist
       logBufLength += snprintf(logBuf + logBufLength, kLogBufCapacity - logBufLength, "<-simulateWatts");
       returnValue[0] = success;
       if (rxValue[0] == read) {
-        returnValue[2] = (uint8_t)(rtConfig.getSimulateWatts());
+        returnValue[2] = (uint8_t)(rtConfig.watts.getSimulate());
         returnLength += 1;
       }
       if (rxValue[0] == write) {
-        rtConfig.setSimulateWatts(rxValue[2]);
-        logBufLength += snprintf(logBuf + logBufLength, kLogBufCapacity - logBufLength, "(%s)", rtConfig.getSimulateWatts() ? "true" : "false");
+        rtConfig.watts.setSimulate(rxValue[2]);
+        logBufLength += snprintf(logBuf + logBufLength, kLogBufCapacity - logBufLength, "(%s)", rtConfig.watts.getSimulate() ? "true" : "false");
       }
       break;
 
@@ -829,12 +827,12 @@ void ss2kCustomCharacteristicCallbacks::onWrite(BLECharacteristic *pCharacterist
       logBufLength += snprintf(logBuf + logBufLength, kLogBufCapacity - logBufLength, "<-simulateCad");
       returnValue[0] = success;
       if (rxValue[0] == read) {
-        returnValue[2] = (uint8_t)(rtConfig.getSimulateCad());
+        returnValue[2] = (uint8_t)(rtConfig.cad.getSimulate());
         returnLength += 1;
       }
       if (rxValue[0] == write) {
-        rtConfig.setSimulateCad(rxValue[2]);
-        logBufLength += snprintf(logBuf + logBufLength, kLogBufCapacity - logBufLength, "(%s)", rtConfig.getSimulateCad() ? "true" : "false");
+        rtConfig.cad.setSimulate(rxValue[2]);
+        logBufLength += snprintf(logBuf + logBufLength, kLogBufCapacity - logBufLength, "(%s)", rtConfig.cad.getSimulate() ? "true" : "false");
       }
       break;
 

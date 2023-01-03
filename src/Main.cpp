@@ -155,7 +155,6 @@ void setup() {
   // fails to update which really sucks when it corrupts your settings.
 
   httpServer.FirmwareUpdate();
-
   ss2k.startTasks();
   httpServer.start();
 
@@ -228,6 +227,7 @@ void SS2K::maintenanceLoop(void *pvParameters) {
       ss2k.scanIfShiftersHeld();
       ss2k.checkDriverTemperature();
       ss2k.checkBLEReconnect();
+      //SS2K_LOG(MAIN_LOG_TAG, "target %f  current %f", rtConfig.getTargetIncline(), rtConfig.getCurrentIncline());
 
 #ifdef DEBUG_STACK
       Serial.printf("Step Task: %d \n", uxTaskGetStackHighWaterMark(moveStepperTask));
@@ -272,11 +272,9 @@ void SS2K::moveStepper(void *pvParameters) {
     if (stepper) {
       ss2k.stepperIsRunning = stepper->isRunning();
       if (!ss2k.externalControl) {
-        if (rtConfig.getFTMSMode() == FitnessMachineControlPointProcedure::SetTargetPower) {
-          // ERG Mode
-          stepper->setSpeedInHz(STEPPER_ERG_SPEED);
-          ss2k.targetPosition = rtConfig.getShifterPosition() * userConfig.getShiftStep();
-          ss2k.targetPosition += rtConfig.getTargetIncline();
+        if ((rtConfig.getFTMSMode() == FitnessMachineControlPointProcedure::SetTargetPower) ||
+            (rtConfig.getFTMSMode() == FitnessMachineControlPointProcedure::SetTargetResistanceLevel)) {
+          ss2k.targetPosition = rtConfig.getTargetIncline();
         } else {
           // Simulation Mode
           ss2k.targetPosition = rtConfig.getShifterPosition() * userConfig.getShiftStep();
@@ -291,12 +289,23 @@ void SS2K::moveStepper(void *pvParameters) {
         vTaskDelay(100 / portTICK_PERIOD_MS);
       }
 
-      if ((ss2k.targetPosition >= rtConfig.getMinStep()) && (ss2k.targetPosition <= rtConfig.getMaxStep())) {
-        stepper->moveTo(ss2k.targetPosition);
-      } else if (ss2k.targetPosition <= rtConfig.getMinStep()) {  // Limit Stepper to Min Position
-        stepper->moveTo(rtConfig.getMinStep());
-      } else {  // Limit Stepper to Max Position
-        stepper->moveTo(rtConfig.getMaxStep());
+      if (rtConfig.resistance.getValue()) {
+        if ((ss2k.targetPosition > rtConfig.getMinResistance()) && (ss2k.targetPosition < rtConfig.getMaxResistance())) {
+          stepper->moveTo(ss2k.targetPosition);
+        } else if (ss2k.targetPosition < rtConfig.getMinStep()) {  // Limit Stepper to Min Resistance
+          stepper->moveTo(stepper->getCurrentPosition()+50);
+        } else {  // Limit Stepper to Max Resistance
+          stepper->moveTo(stepper->getCurrentPosition()-50);
+        }
+
+      } else {
+        if ((ss2k.targetPosition >= rtConfig.getMinStep()) && (ss2k.targetPosition <= rtConfig.getMaxStep())) {
+          stepper->moveTo(ss2k.targetPosition);
+        } else if (ss2k.targetPosition <= rtConfig.getMinStep()) {  // Limit Stepper to Min Position
+          stepper->moveTo(rtConfig.getMinStep());
+        } else {  // Limit Stepper to Max Position
+          stepper->moveTo(rtConfig.getMaxStep());
+        }
       }
 
       vTaskDelay(100 / portTICK_PERIOD_MS);
@@ -311,7 +320,7 @@ void SS2K::moveStepper(void *pvParameters) {
 
       if (_stepperDir != userConfig.getStepperDir()) {  // User changed the config direction of the stepper wires
         _stepperDir = userConfig.getStepperDir();
-        while (stepper->isMotorRunning()) {
+        while (stepper->isMotorRunning()) {  // Wait until the motor stops running
           vTaskDelay(100 / portTICK_PERIOD_MS);
         }
         stepper->setDirectionPin(currentBoard.dirPin, _stepperDir);
@@ -456,8 +465,8 @@ void SS2K::motorStop(bool releaseTension) {
 
 void SS2K::checkSerial() {
   static int txCheck = TX_CHECK_INTERVAL;
-  if (auxSerial.available() >= 8) {  // if at least 8 bytes are available to read from the serial port
-    txCheck             = TX_CHECK_INTERVAL;
+  if (auxSerial.available() >= 8) {           // if at least 8 bytes are available to read from the serial port
+    txCheck             = TX_CHECK_INTERVAL;  // Data received so write to serial port.
     int i               = 0;
     int k               = 0;
     auxSerialBuffer.len = auxSerial.readBytes(auxSerialBuffer.data, AUX_BUF_SIZE);
@@ -476,24 +485,37 @@ void SS2K::checkSerial() {
         for (int j = i; j < k; j++) {
           newBuf[j - i] = auxSerialBuffer.data[j];
         }
+        rtConfig.setMinResistance(MIN_PELOTON_RESISTANCE);
+        rtConfig.setMaxResistance(MAX_PELOTON_RESISTANCE);
+        stepper->setSpeedInHz(STEPPER_PELOTON_SPEED);
         collectAndSet(PELOTON_DATA_UUID, PELOTON_DATA_UUID, PELOTON_ADDRESS, newBuf, newLen);
         break;
       }
     }
   }
   if (PELOTON_TX && (txCheck >= TX_CHECK_INTERVAL)) {
-    static bool alternate = false;
-    if (alternate) {
-      for (int i = 0; i < PELOTON_RQ_SIZE; i++) {
-        auxSerial.write(peloton_rq_watts[i]);
-      }
-    } else {
-      for (int i = 0; i < PELOTON_RQ_SIZE; i++) {
-        auxSerial.write(peloton_rq_cad[i]);
-      }
+    static int alternate = 0;
+    switch (alternate) {
+      case 0:
+        for (int i = 0; i < PELOTON_RQ_SIZE; i++) {
+          auxSerial.write(peloton_rq_watts[i]);
+          alternate++;
+        }
+        break;
+      case 1:
+        for (int i = 0; i < PELOTON_RQ_SIZE; i++) {
+          auxSerial.write(peloton_rq_cad[i]);
+          alternate++;
+        }
+        break;
+      case 2:
+        for (int i = 0; i < PELOTON_RQ_SIZE; i++) {
+          auxSerial.write(peloton_rq_res[i]);
+          alternate = 0;
+        }
+        break;
     }
-    alternate = !alternate;
-    txCheck   = 0;
+    txCheck = 0;
   } else if (PELOTON_TX) {
     txCheck++;
   }

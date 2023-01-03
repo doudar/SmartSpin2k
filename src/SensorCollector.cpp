@@ -24,21 +24,21 @@ void collectAndSet(NimBLEUUID charUUID, NimBLEUUID serviceUUID, NimBLEAddress ad
   std::shared_ptr<SensorData> sensorData = sensorDataFactory.getSensorData(charUUID, (uint64_t)address, pData, length);
 
   logBufLength += snprintf(logBuf + logBufLength, kLogBufMaxLength - logBufLength, " | %s[", sensorData->getId().c_str());
-  if (sensorData->hasHeartRate() && !rtConfig.getSimulateHr()) {
+  if (sensorData->hasHeartRate() && !rtConfig.hr.getSimulate()) {
     int heartRate = sensorData->getHeartRate();
-    rtConfig.setSimulatedHr(heartRate);
+    rtConfig.hr.setValue(heartRate);
     spinBLEClient.connectedHR |= true;
     logBufLength += snprintf(logBuf + logBufLength, kLogBufMaxLength - logBufLength, " HR(%d)", heartRate % 1000);
   }
-  if (sensorData->hasCadence() && !rtConfig.getSimulateCad()) {
+  if (sensorData->hasCadence() && !rtConfig.cad.getSimulate()) {
     float cadence = sensorData->getCadence();
-    rtConfig.setSimulatedCad(cadence);
+    rtConfig.cad.setValue(cadence);
     spinBLEClient.connectedCD |= true;
     logBufLength += snprintf(logBuf + logBufLength, kLogBufMaxLength - logBufLength, " CD(%.2f)", fmodf(cadence, 1000.0));
   }
-  if (sensorData->hasPower() && !rtConfig.getSimulateWatts()) {
+  if (sensorData->hasPower() && !rtConfig.watts.getSimulate()) {
     int power = sensorData->getPower() * userConfig.getPowerCorrectionFactor();
-    rtConfig.setSimulatedWatts(power);
+    rtConfig.watts.setValue(power);
     spinBLEClient.connectedPM |= true;
     logBufLength += snprintf(logBuf + logBufLength, kLogBufMaxLength - logBufLength, " PW(%d)", power % 10000);
   }
@@ -49,7 +49,7 @@ void collectAndSet(NimBLEUUID charUUID, NimBLEUUID serviceUUID, NimBLEAddress ad
   }
   if (sensorData->hasResistance()) {
     int resistance = sensorData->getResistance();
-    rtConfig.setSimulatedResistance(resistance);
+    rtConfig.resistance.setValue(resistance);
     logBufLength += snprintf(logBuf + logBufLength, kLogBufMaxLength - logBufLength, " RS(%d)", resistance % 1000);
   }
   strncat(logBuf + logBufLength, " ]", kLogBufMaxLength - logBufLength);

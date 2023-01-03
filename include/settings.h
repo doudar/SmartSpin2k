@@ -66,9 +66,6 @@
 // Stepper Max Speed in steps/s
 #define STEPPER_SPEED 1500
 
-// Stepper Max Speed in ERG Mode steps/s
-#define STEPPER_ERG_SPEED 1500
-
 // Default ERG Sensitivity. Predicated on # of Shifts (further defined by shift steps) per 30 watts of resistance change.
 // I.E. If the difference between ERG target and Current watts were 30, and the Shift step is defined as 600 steps,
 // and ERG_Sensitivity were 1.0, ERG mode would move the stepper motor 600 steps to compensate. With an ERG_Sensitivity of 2.0, the stepper
@@ -86,6 +83,21 @@
 // Default Max Watts that the brake on the spin bike can absorb from the user.
 //This is used to set the upper travel limit for the motor.
 #define DEFAULT_MAX_WATTS 800
+
+// Minimum resistance on a Peloton Bike.
+//This is used to set the lower travel limit for the motor.
+#define MIN_PELOTON_RESISTANCE 5
+
+// Maximum resistance on a Peloton Bike.
+//This is used to set the upper travel limit for the motor.
+#define MAX_PELOTON_RESISTANCE 99
+
+// Stepper Max Speed in ERG Mode steps/s
+#define STEPPER_PELOTON_SPEED 2500
+
+// Default +- Stepper Travel Limit
+//This is used until the PowerTable has enough data to compute travel limits
+#define DEFAULT_STEPPER_TRAVEL 200000000
 
 // Default debounce delay for shifters. Increase if you have false shifts. Decrease if shifting takes too long.
 #define DEBOUNCE_DELAY 400
@@ -183,7 +195,7 @@
 #define MAX_SCAN_RETRIES 2
 
 // loop speed for the SmartSpin2k BLE communications
-#define BLE_NOTIFY_DELAY 700
+#define BLE_NOTIFY_DELAY 500
 
 // loop speed for the SmartSpin2k BLE Client reconnect
 #define BLE_CLIENT_DELAY 1000
@@ -236,7 +248,7 @@
 #define THROTTLE_TEMP 85
 
 // Size of the Aux Serial Buffer for Peloton
-#define AUX_BUF_SIZE 20
+#define AUX_BUF_SIZE 60
 
 // Interrogate Peloton bike for data?
 #define PELOTON_TX true

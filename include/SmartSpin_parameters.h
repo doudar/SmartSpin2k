@@ -16,76 +16,68 @@
 #define CONFIG_LOG_TAG "Config"
 
 class Measurement {
- public:
+ private:
+  bool simulate;
   int value;
-  long timestamp;
+  int target;
+  unsigned long timestamp;
 
-  Measurement(int value) {
-    this->value     = value;
+ public:
+  void setSimulate(bool sim) {
+    simulate        = sim;
+    this->timestamp = millis();
+  }
+  bool getSimulate() { return simulate; }
+
+  void setValue(int val) {
+    value           = val;
+    this->timestamp = millis();
+  }
+  int getValue() { return value; }
+
+  void setTarget(int tar) {
+    target          = tar;
+    this->timestamp = millis();
+  }
+  int getTarget() { return target; }
+
+  long getTimestamp() { return timestamp; }
+
+  Measurement() {
+    this->simulate  = false;
+    this->value     = 0;
+    this->target    = 0;
     this->timestamp = millis();
   }
 };
 
 class RuntimeParameters {
  private:
-  float targetIncline        = 0.0;
-  float currentIncline       = 0.0;
-  int targetWatts            = 0;
-  Measurement simulatedWatts = Measurement(0);
-  int simulatedHr            = 0;
-  int simulatedCad           = 0;
-  float simulatedSpeed       = 0.0;
-  int simulatedResistance    = 0;
-  int targetResistance       = 0;
-  bool simulateHr            = false;
-  bool simulateWatts         = false;
-  bool simulateTargetWatts   = false;
-  bool simulateCad           = false;
-  bool simulateResistance    = false;
-  uint8_t FTMSMode           = 0x00;
-  int shifterPosition        = 0;
-  int minStep                = -200000000;
-  int maxStep                = 200000000;
+  float targetIncline  = 0.0;
+  float currentIncline = 0.0;
+  float simulatedSpeed = 0.0;
+  uint8_t FTMSMode     = 0x00;
+  int shifterPosition  = 0;
+  int minStep          = -DEFAULT_STEPPER_TRAVEL;
+  int maxStep          = DEFAULT_STEPPER_TRAVEL;
+  int minResistance    = -1;
+  int maxResistance    = -1;
+  bool simTargetWatts  = false;
 
  public:
+  Measurement watts;
+  Measurement hr;
+  Measurement cad;
+  Measurement resistance;
+
   void setTargetIncline(float inc) { targetIncline = inc; }
   float getTargetIncline() { return targetIncline; }
 
   void setCurrentIncline(float inc) { currentIncline = inc; }
   float getCurrentIncline() { return currentIncline; }
 
-  void setTargetWatts(int w) { targetWatts = w; }
-  int getTargetWatts() { return targetWatts; }
-
-  void setSimulatedWatts(int w) { simulatedWatts = Measurement(w); }
-  Measurement getSimulatedWatts() { return simulatedWatts; }
-
-  void setSimulatedHr(int hr) { simulatedHr = hr; }
-  int getSimulatedHr() { return simulatedHr; }
-
-  void setSimulatedCad(float cad) { simulatedCad = cad; }
-  int getSimulatedCad() { return simulatedCad; }
-
   void setSimulatedSpeed(float spd) { simulatedSpeed = spd; }
   float getSimulatedSpeed() { return simulatedSpeed; }
-
-  void setSimulatedResistance(int res) { simulatedResistance = res; }
-  int getSimulatedResistance() { return simulatedResistance; }
-
-  void setTargetResistance(int res) { targetResistance = res; }
-  int getTargetResistance() { return targetResistance; }
-
-  void setSimulateHr(bool shr) { simulateHr = shr; }
-  bool getSimulateHr() { return simulateHr; }
-
-  void setSimulateWatts(bool swt) { simulateWatts = swt; }
-  bool getSimulateWatts() { return simulateWatts; }
-
-  void setSimulateTargetWatts(bool swt) { simulateTargetWatts = swt; }
-  bool getSimulateTargetWatts() { return simulateTargetWatts; }
-
-  void setSimulateCad(bool scd) { simulateCad = scd; }
-  bool getSimulateCad() { return simulateCad; }
 
   void setFTMSMode(uint8_t mde) { FTMSMode = mde; }
   uint8_t getFTMSMode() { return FTMSMode; }
@@ -98,6 +90,15 @@ class RuntimeParameters {
 
   void setMaxStep(int ms) { maxStep = ms; }
   int getMaxStep() { return maxStep; }
+
+  void setSimTargetWatts(int tgt) { simTargetWatts = tgt; }
+  bool getSimTargetWatts() { return simTargetWatts; }
+
+  void setMinResistance(int min) { minResistance = min; }
+  int getMinResistance() { return minResistance; }
+
+  void setMaxResistance(int max) { maxResistance = max; }
+  int getMaxResistance() { return maxResistance; }
 
   String returnJSON();
 };

@@ -19,21 +19,25 @@ String RuntimeParameters::returnJSON() {
   StaticJsonDocument<RUNTIMECONFIG_JSON_SIZE> doc;
   // Set the values in the document
 
-  doc["targetIncline"]       = targetIncline;
-  doc["currentIncline"]      = currentIncline;
-  doc["targetWatts"]         = targetWatts;
-  doc["simulatedWatts"]      = simulatedWatts.value;
-  doc["simulatedHr"]         = simulatedHr;
-  doc["simulatedCad"]        = simulatedCad;
-  doc["simulatedSpeed"]      = simulatedSpeed;
-  doc["simulateHr"]          = simulateHr;
-  doc["simulateWatts"]       = simulateWatts;
-  doc["simulateTargetWatts"] = simulateTargetWatts;
-  doc["simulateCad"]         = simulateCad;
-  doc["FTMSMode"]             = FTMSMode;
-  doc["shifterPosition"]     = shifterPosition;
-  doc["minStep"]             = minStep;
-  doc["maxStep"]             = maxStep;
+  doc["watts"]            = this->watts.getValue();
+  doc["targetWatts"]      = this->watts.getTarget();
+  doc["simWatts"]         = this->watts.getSimulate();
+  doc["hr"]               = this->hr.getValue();
+  doc["simHr"]            = this->hr.getSimulate();
+  doc["cad"]              = this->cad.getValue();
+  doc["simCad"]           = this->cad.getSimulate();
+  doc["resistance"]       = this->resistance.getValue();
+  doc["targetResistance"] = this->resistance.getTarget();
+  doc["targetIncline"]    = targetIncline;
+  doc["currentIncline"]   = currentIncline;
+  doc["speed"]            = simulatedSpeed;
+  doc["simTargetWatts"]   = simTargetWatts;
+  doc["FTMSMode"]         = FTMSMode;
+  doc["shifterPosition"]  = shifterPosition;
+  doc["minStep"]          = minStep;
+  doc["maxStep"]          = maxStep;
+  doc["minResistance"]    = minResistance;
+  doc["maxResistance"]    = maxResistance;
 
   String output;
   serializeJson(doc, output);
