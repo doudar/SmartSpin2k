@@ -57,7 +57,7 @@ void ergTaskLoop(void* pvParameters) {
     }
 
     // resistance mode
-    if ((rtConfig.getFTMSMode() == FitnessMachineControlPointProcedure::SetTargetResistanceLevel) && (rtConfig.resistance.getValue())) {
+    if ((rtConfig.getFTMSMode() == FitnessMachineControlPointProcedure::SetTargetResistanceLevel) && (rtConfig.getMaxResistance()>0)) {
       ergMode.computeResistance();
     }
 
@@ -119,9 +119,10 @@ void PowerTable::setStepperMinMax() {
   int _return = RETURN_ERROR;
 
   // if the FTMS device reports resistance feedback, skip estimating min_max
-  if (rtConfig.resistance.getValue()) {
+  if (rtConfig.resistance.getValue()>0) {
     rtConfig.setMinStep(-DEFAULT_STEPPER_TRAVEL);
     rtConfig.setMaxStep(DEFAULT_STEPPER_TRAVEL);
+    SS2K_LOG(ERG_MODE_LOG_TAG, "Set FTMS Resistance Mode Travel Limits");
     return;
   }
 

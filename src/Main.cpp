@@ -227,7 +227,7 @@ void SS2K::maintenanceLoop(void *pvParameters) {
       ss2k.scanIfShiftersHeld();
       ss2k.checkDriverTemperature();
       ss2k.checkBLEReconnect();
-      //SS2K_LOG(MAIN_LOG_TAG, "target %f  current %f", rtConfig.getTargetIncline(), rtConfig.getCurrentIncline());
+      // SS2K_LOG(MAIN_LOG_TAG, "target %f  current %f", rtConfig.getTargetIncline(), rtConfig.getCurrentIncline());
 
 #ifdef DEBUG_STACK
       Serial.printf("Step Task: %d \n", uxTaskGetStackHighWaterMark(moveStepperTask));
@@ -289,13 +289,13 @@ void SS2K::moveStepper(void *pvParameters) {
         vTaskDelay(100 / portTICK_PERIOD_MS);
       }
 
-      if (rtConfig.resistance.getValue()) {
-        if ((ss2k.targetPosition > rtConfig.getMinResistance()) && (ss2k.targetPosition < rtConfig.getMaxResistance())) {
+      if (rtConfig.getMaxResistance() > 0) {
+        if ((rtConfig.resistance.getValue() > rtConfig.getMinResistance()) && (rtConfig.resistance.getValue() < rtConfig.getMaxResistance())) {
           stepper->moveTo(ss2k.targetPosition);
-        } else if (ss2k.targetPosition < rtConfig.getMinStep()) {  // Limit Stepper to Min Resistance
-          stepper->moveTo(stepper->getCurrentPosition()+50);
+        } else if (rtConfig.resistance.getValue() < rtConfig.getMinResistance()) {  // Limit Stepper to Min Resistance
+          stepper->moveTo(stepper->getCurrentPosition() + 50);
         } else {  // Limit Stepper to Max Resistance
-          stepper->moveTo(stepper->getCurrentPosition()-50);
+          stepper->moveTo(stepper->getCurrentPosition() - 50);
         }
 
       } else {
@@ -518,6 +518,8 @@ void SS2K::checkSerial() {
     txCheck = 0;
   } else if (PELOTON_TX) {
     txCheck++;
+    rtConfig.setMinResistance(0);
+    rtConfig.setMaxResistance(0);
   }
 }
 
