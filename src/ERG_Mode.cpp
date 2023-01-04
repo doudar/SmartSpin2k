@@ -397,9 +397,12 @@ void PowerTable::toLog() {
 // compute position for resistance control mode
 void ErgMode::computeResistance() {
   static int stepChangePerResistance = userConfig.getShiftStep();
-  static bool firstRun               = true;
-  static int oldSetPoint             = 0;
-  static int targetDelta             = 0;
+  static Measurement oldResistance;
+
+  if (rtConfig.resistance.getTimestamp() == oldResistance.getTimestamp()) {
+    SS2K_LOG(ERG_MODE_LOG_TAG, "Resistance was old");
+    return;
+  }
 
   int newSetPoint = rtConfig.resistance.getTarget();
   int actualDelta = rtConfig.resistance.getTarget() - rtConfig.resistance.getValue();
@@ -422,8 +425,7 @@ void ErgMode::computeResistance() {
     rtConfig.setTargetIncline(rtConfig.getCurrentIncline());
     // SS2K_LOG(ERG_MODE_LOG_TAG, "Set point Reached - stopping");
   }
-  targetDelta = actualDelta;
-  oldSetPoint = newSetPoint;
+  oldResistance = rtConfig.resistance;
 }
 //}
 
