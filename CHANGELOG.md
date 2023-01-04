@@ -145,6 +145,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Complete BLE Client connection code rebase. 
 - Refactored rtConfig to use more measurement class. 
 - Increased stepper speed when a Peloton is connected. (very light resistance)
+- Updated libraries to latest
 
 ### Fixed
 - bluetoothscanner.html now lists fitness machine services in the PM list. 

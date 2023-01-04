@@ -320,7 +320,7 @@ void SS2K::moveStepper(void *pvParameters) {
 
       if (_stepperDir != userConfig.getStepperDir()) {  // User changed the config direction of the stepper wires
         _stepperDir = userConfig.getStepperDir();
-        while (stepper->isMotorRunning()) {  // Wait until the motor stops running
+        while (stepper->isRunning()) {  // Wait until the motor stops running
           vTaskDelay(100 / portTICK_PERIOD_MS);
         }
         stepper->setDirectionPin(currentBoard.dirPin, _stepperDir);
