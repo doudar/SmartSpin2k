@@ -400,7 +400,7 @@ void ErgMode::computeResistance() {
   static Measurement oldResistance;
 
   if (rtConfig.resistance.getTimestamp() == oldResistance.getTimestamp()) {
-    SS2K_LOG(ERG_MODE_LOG_TAG, "Resistance was old");
+    SS2K_LOG(ERG_MODE_LOG_TAG, "Resistance previously processed.");
     return;
   }
 
@@ -436,7 +436,7 @@ void ErgMode::computeErg() {
 
   // check for new power value or new set point, if watts < 10 treat as faulty
   if ((this->watts.getTimestamp() == newWatts.getTimestamp() && this->setPoint == newWatts.getTarget()) || newWatts.getValue() < 10) {
-    SS2K_LOGW(ERG_MODE_LOG_TAG, "Watts were old.");
+    SS2K_LOGW(ERG_MODE_LOG_TAG, "Watts previously processed.");
     return;
   }
 
