@@ -18,6 +18,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Added Resistance Capture to Peloton.
 - Added Resistance capture to FTMS.
 - Added scanning when devices are not connected.  
+- Added ability to set travel limits based on resistance feedback from a bike.
+- Added shifting in ERG mode (changes watt target).
+- Added shifting in resistance mode (changes resistance target.)
 
 ### Changed
 - PowerTable values are now adjusted to 90 RPM cad on input.
@@ -30,6 +33,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Moved post connect handling to the ble communication loop. (improves startup stability)
 - Fixed bug submitted by @flo100 where MIN_WATTS in ERG should have been userConfig.getMinWatts();
 - FTMS resistance mode now changes the attached bike resistance with feedback. (i.e. setting resistance to 50 with a Peloton attached will set 50 on the Peloton)
+- Refactored rtConfig to use more measurement class. 
+- Increased stepper speed when a Peloton is connected. (very light resistance)
+- Updated libraries to latest
 
 ### Hardware
 - removed duplicate directory in direct mount folder
@@ -119,7 +125,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Added WebSockets for logging [see #173](https://github.com/doudar/SmartSpin2k/issues/173)
 - Reworked logging to run log-appender outside the worker task (task no longer blocked by logger traffic).
 - WebsocketsAppender can handle multiple (up to 4) clients. Status.html will reconnect if connection to websockets server is disconnected.
-- Added ability to set travel limits based on resistance feedback from a bike.
 
 ### Changed
 - Refactored ERG.
@@ -143,9 +148,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Increased JSON size for userConfig (hopefully fix config saving issues). 
 - Changed LOGE messages in spiffs logging to regular LOG messages so they will display via network logging. 
 - Complete BLE Client connection code rebase. 
-- Refactored rtConfig to use more measurement class. 
-- Increased stepper speed when a Peloton is connected. (very light resistance)
-- Updated libraries to latest
 
 ### Fixed
 - bluetoothscanner.html now lists fitness machine services in the PM list. 

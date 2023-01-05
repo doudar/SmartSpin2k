@@ -57,7 +57,7 @@ void ergTaskLoop(void* pvParameters) {
     }
 
     // resistance mode
-    if ((rtConfig.getFTMSMode() == FitnessMachineControlPointProcedure::SetTargetResistanceLevel) && (rtConfig.getMaxResistance()>0)) {
+    if ((rtConfig.getFTMSMode() == FitnessMachineControlPointProcedure::SetTargetResistanceLevel) && (rtConfig.getMaxResistance() != DEFAULT_RESISTANCE_RANGE)) {
       ergMode.computeResistance();
     }
 
@@ -119,10 +119,10 @@ void PowerTable::setStepperMinMax() {
   int _return = RETURN_ERROR;
 
   // if the FTMS device reports resistance feedback, skip estimating min_max
-  if (rtConfig.resistance.getValue()>0) {
+  if (rtConfig.resistance.getValue() > 0) {
     rtConfig.setMinStep(-DEFAULT_STEPPER_TRAVEL);
     rtConfig.setMaxStep(DEFAULT_STEPPER_TRAVEL);
-    SS2K_LOG(ERG_MODE_LOG_TAG, "Set FTMS Resistance Mode Travel Limits");
+    SS2K_LOG(ERG_MODE_LOG_TAG, "Using Resistance Travel Limits");
     return;
   }
 
@@ -266,7 +266,7 @@ int32_t PowerTable::lookup(int watts, int cad) {
         }
       }
       if ((i - x <= 0) && (i + x >= POWERTABLE_SIZE)) {
-        SS2K_LOG(ERG_MODE_LOG_TAG, "No data found in powertable.");
+        SS2K_LOG(ERG_MODE_LOG_TAG, "No data found in Power Table.");
         return RETURN_ERROR;
       }
     }
@@ -320,7 +320,7 @@ int32_t PowerTable::lookup(int watts, int cad) {
       above.cad            = this->powerEntry[indexPair].cad;
     }
     if (below.targetPosition >= above.targetPosition) {
-      SS2K_LOG(ERG_MODE_LOG_TAG, "Reverse/No Delta in PowerTable");
+      SS2K_LOG(ERG_MODE_LOG_TAG, "Reverse/No Delta in Power Table");
       return (RETURN_ERROR);
     }
   } else {  // Not enough data
@@ -350,12 +350,12 @@ int PowerTable::_adjustWattsForCadence(int watts, float cad) {
 }
 
 bool PowerTable::load() {
-  // load power table from littlefs
+  // load power table from littleFs
   return false;  // return unsuccessful
 }
 
 bool PowerTable::save() {
-  // save powertable from littlefs
+  // save power table from littleFs
   return false;  // return unsuccessful
 }
 
@@ -410,18 +410,18 @@ void ErgMode::computeResistance() {
   // SS2K_LOG(ERG_MODE_LOG_TAG, "StepChange %d TargetDelta %d ActualDelta %d OldSetPoint %d NewSetPoint %d", stepChangePerResistance, targetDelta, actualDelta, oldSetPoint,
   // newSetPoint);
 
-  if (rtConfig.getCurrentIncline() == rtConfig.getTargetIncline()) {
-    if (actualDelta > 0) {
-      rtConfig.setTargetIncline(rtConfig.getTargetIncline() + (100 * actualDelta));
-      // SS2K_LOG(ERG_MODE_LOG_TAG, "adjusting target up");
-      //  SS2K_LOG(ERG_MODE_LOG_TAG, "First run shift up");
-    }
-    if (actualDelta < 0) {
-      rtConfig.setTargetIncline(rtConfig.getTargetIncline() + (100 * actualDelta));
-      // SS2K_LOG(ERG_MODE_LOG_TAG, "adjusting target down");
-      // SS2K_LOG(ERG_MODE_LOG_TAG, "First run shift down");
-    }
-  }
+  // if (rtConfig.getCurrentIncline() == rtConfig.getTargetIncline()) {
+  //  if (actualDelta > 0) {
+  //    rtConfig.setTargetIncline(rtConfig.getTargetIncline() + (100 * actualDelta));
+  // SS2K_LOG(ERG_MODE_LOG_TAG, "adjusting target up");
+  //  SS2K_LOG(ERG_MODE_LOG_TAG, "First run shift up");
+  //}
+  //   if (actualDelta < 0) {
+  rtConfig.setTargetIncline(rtConfig.getTargetIncline() + (100 * actualDelta));
+  // SS2K_LOG(ERG_MODE_LOG_TAG, "adjusting target down");
+  // SS2K_LOG(ERG_MODE_LOG_TAG, "First run shift down");
+  // }
+  //}
   if (actualDelta = 0) {
     rtConfig.setTargetIncline(rtConfig.getCurrentIncline());
     // SS2K_LOG(ERG_MODE_LOG_TAG, "Set point Reached - stopping");

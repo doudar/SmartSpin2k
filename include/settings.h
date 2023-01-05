@@ -76,27 +76,33 @@
 // is obtained as closely as possible during each shift.
 #define WATTS_PER_SHIFT 30
 
+// Amount to change watt target per shift in ERG mode.
+#define ERG_PER_SHIFT 10
+
 // Default Min Watts to stop stepper.
-//This is used to set the lower travel limit for the motor.
+// This is used to set the lower travel limit for the motor.
 #define DEFAULT_MIN_WATTS 50
 
 // Default Max Watts that the brake on the spin bike can absorb from the user.
-//This is used to set the upper travel limit for the motor.
+// This is used to set the upper travel limit for the motor.
 #define DEFAULT_MAX_WATTS 800
 
 // Minimum resistance on a Peloton Bike.
-//This is used to set the lower travel limit for the motor.
+// This is used to set the lower travel limit for the motor.
 #define MIN_PELOTON_RESISTANCE 5
 
 // Maximum resistance on a Peloton Bike.
-//This is used to set the upper travel limit for the motor.
+// This is used to set the upper travel limit for the motor.
 #define MAX_PELOTON_RESISTANCE 99
+
+// Resistance range when no bike with resistance is connected.
+#define DEFAULT_RESISTANCE_RANGE 2000
 
 // Stepper Max Speed in ERG Mode steps/s
 #define STEPPER_PELOTON_SPEED 2500
 
 // Default +- Stepper Travel Limit
-//This is used until the PowerTable has enough data to compute travel limits
+// This is used until the PowerTable has enough data to compute travel limits
 #define DEFAULT_STEPPER_TRAVEL 200000000
 
 // Default debounce delay for shifters. Increase if you have false shifts. Decrease if shifting takes too long.
@@ -129,10 +135,10 @@
 #define r1_DIR_PIN 33
 
 // TMC2208/TMC2224 SoftwareSerial receive pin
-#define r1_STEPPERSERIAL_RX 14
+#define r1_STEPPER_SERIAL_RX 14
 
 // TMC2208/TMC2224 SoftwareSerial transmit pin
-#define r1_STEPPERSERIAL_TX 12
+#define r1_STEPPER_SERIAL_TX 12
 
 // Reduce current setting by this divisor (0-31)
 #define r1_PWR_SCALER 31
@@ -161,10 +167,10 @@
 #define r2_DIR_PIN 33
 
 // TMC2209 SoftwareSerial receive pin
-#define r2_STEPPERSERIAL_RX 18
+#define r2_STEPPER_SERIAL_RX 18
 
 // TMC2209 SoftwareSerial transmit pin
-#define r2_STEPPERSERIAL_TX 19
+#define r2_STEPPER_SERIAL_TX 19
 
 // TMC2209 SoftwareSerial receive pin
 #define r2_AUX_SERIAL_RX 22
@@ -253,16 +259,16 @@
 // Interrogate Peloton bike for data?
 #define PELOTON_TX true
 
-// If not receiving Peleton Messages, how long to wait before next TX attempt is
+// If not receiving Peloton Messages, how long to wait before next TX attempt is
 #define TX_CHECK_INTERVAL 20
 
-// If ble devices are both setup, how often to attempt a reconnect.  
+// If ble devices are both setup, how often to attempt a reconnect.
 #define BLE_RECONNECT_INTERVAL 15
 
-// Initial and web scan duration.  
+// Initial and web scan duration.
 #define DEFAULT_SCAN_DURATION 10
 
-// BLE automatic reconnect duration. Set this low to avoid interruption. 
+// BLE automatic reconnect duration. Set this low to avoid interruption.
 #define BLE_RECONNECT_SCAN_DURATION 3
 
 // Uncomment to enable sending Telegram debug messages back to the chat
@@ -270,10 +276,10 @@
 // #define USE_TELEGRAM
 
 // Uncomment to enable stack size debugging info
-//#define DEBUG_STACK
+// #define DEBUG_STACK
 
 // Uncomment to enable HR->PWR debugging info. Always displays HR->PWR
-// Calculation. Never sets userConfig.setSimulatedPower(); 
+// Calculation. Never sets userConfig.setSimulatedPower();
 // #define DEBUG_HR_TO_PWR
 
 // Uncomment to enable HR->PWR enhanced powertable debugging.

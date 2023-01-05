@@ -186,22 +186,7 @@ void SS2K::maintenanceLoop(void *pvParameters) {
 
   while (true) {
     vTaskDelay(200 / portTICK_RATE_MS);
-    if (rtConfig.getShifterPosition() > ss2k.lastShifterPosition) {
-      SS2K_LOG(MAIN_LOG_TAG, "Shift UP: %d tgt: %d min %d max %d", rtConfig.getShifterPosition(), ss2k.targetPosition, rtConfig.getMinStep(), rtConfig.getMaxStep());
-      if (ss2k.targetPosition > rtConfig.getMaxStep()) {
-        SS2K_LOG(MAIN_LOG_TAG, "Shift Blocked By MaxStep");
-        rtConfig.setShifterPosition(ss2k.lastShifterPosition);
-      }
-      spinBLEServer.notifyShift();
-    } else if (rtConfig.getShifterPosition() < ss2k.lastShifterPosition) {
-      SS2K_LOG(MAIN_LOG_TAG, "Shift DOWN: %d tgt: %d min %d max %d", rtConfig.getShifterPosition(), ss2k.targetPosition, rtConfig.getMinStep(), rtConfig.getMaxStep());
-      if (ss2k.targetPosition < rtConfig.getMinStep()) {
-        SS2K_LOG(MAIN_LOG_TAG, "Shift Blocked By MinStep");
-        rtConfig.setShifterPosition(ss2k.lastShifterPosition);
-      }
-      spinBLEServer.notifyShift();
-    }
-    ss2k.lastShifterPosition = rtConfig.getShifterPosition();
+    ss2k.FTMSModeShiftModifier();
     webSocketAppender.Loop();
 
     if ((millis() - intervalTimer) > 500) {  // add check here for when to restart WiFi
@@ -248,6 +233,55 @@ void SS2K::maintenanceLoop(void *pvParameters) {
 
 #endif  // UNIT_TEST
 
+void SS2K::FTMSModeShiftModifier() {
+  int shiftDelta = rtConfig.getShifterPosition() - ss2k.lastShifterPosition;
+  if (shiftDelta) {
+    switch (rtConfig.getFTMSMode()) {
+      case FitnessMachineControlPointProcedure::SetTargetPower:
+
+        rtConfig.setShifterPosition(ss2k.lastShifterPosition);  // reset shifter position because we're remapping it to ERG target
+        if ((rtConfig.watts.getTarget() + (shiftDelta * ERG_PER_SHIFT) < userConfig.getMinWatts()) ||
+            (rtConfig.watts.getTarget() + (shiftDelta * ERG_PER_SHIFT) > userConfig.getMaxWatts())) {
+          SS2K_LOG(MAIN_LOG_TAG, "Shift to %dw blocked", rtConfig.watts.getTarget() + shiftDelta);
+          break;
+        }
+
+        rtConfig.watts.setTarget(rtConfig.watts.getTarget() + (ERG_PER_SHIFT * shiftDelta));
+        SS2K_LOG(MAIN_LOG_TAG, "ERG Shift. New Target: %dw", rtConfig.watts.getTarget());
+        break;
+
+      case FitnessMachineControlPointProcedure::SetTargetResistanceLevel:
+
+        if (rtConfig.getMaxResistance() != DEFAULT_RESISTANCE_RANGE) {
+          if ((rtConfig.resistance.getTarget() + shiftDelta < rtConfig.getMinResistance()) || (rtConfig.resistance.getTarget() + shiftDelta > rtConfig.getMaxResistance())) {
+            SS2K_LOG(MAIN_LOG_TAG, "Shift to %d blocked", rtConfig.resistance.getTarget() + shiftDelta);
+            break;
+          }
+
+          rtConfig.setShifterPosition(ss2k.lastShifterPosition);  // reset shifter position because we're remapping it to resistance target
+          rtConfig.resistance.setTarget(rtConfig.resistance.getTarget() + shiftDelta);
+          SS2K_LOG(MAIN_LOG_TAG, "Resistance Shift. New Target: %d", rtConfig.resistance.getTarget());
+
+          break;
+        }
+
+      default:
+
+        SS2K_LOG(MAIN_LOG_TAG, "Shift %+d pos %d tgt %d min %d max %d r_min %d r_max %d", shiftDelta, rtConfig.getShifterPosition(), ss2k.targetPosition, rtConfig.getMinStep(),
+                 rtConfig.getMaxStep(), rtConfig.getMinResistance(), rtConfig.getMaxResistance());
+
+        if ((ss2k.targetPosition > rtConfig.getMaxStep()) || (rtConfig.resistance.getTarget() > rtConfig.getMaxResistance()) || (ss2k.targetPosition < rtConfig.getMinStep()) ||
+            (rtConfig.resistance.getTarget() < rtConfig.getMinResistance())) {
+          SS2K_LOG(MAIN_LOG_TAG, "Shift Blocked by limits.");
+          rtConfig.setShifterPosition(ss2k.lastShifterPosition);
+
+          spinBLEServer.notifyShift();
+        }
+    }
+    ss2k.lastShifterPosition = rtConfig.getShifterPosition();
+  }
+}
+
 void SS2K::restartWifi() {
   httpServer.stop();
   vTaskDelay(100 / portTICK_RATE_MS);
@@ -289,13 +323,13 @@ void SS2K::moveStepper(void *pvParameters) {
         vTaskDelay(100 / portTICK_PERIOD_MS);
       }
 
-      if (rtConfig.getMaxResistance() > 0) {
+      if (rtConfig.getMaxResistance() != DEFAULT_RESISTANCE_RANGE) {
         if ((rtConfig.resistance.getValue() > rtConfig.getMinResistance()) && (rtConfig.resistance.getValue() < rtConfig.getMaxResistance())) {
           stepper->moveTo(ss2k.targetPosition);
         } else if (rtConfig.resistance.getValue() < rtConfig.getMinResistance()) {  // Limit Stepper to Min Resistance
-          stepper->moveTo(stepper->getCurrentPosition() + 50);
+          stepper->moveTo(stepper->getCurrentPosition() + 10);
         } else {  // Limit Stepper to Max Resistance
-          stepper->moveTo(stepper->getCurrentPosition() - 50);
+          stepper->moveTo(stepper->getCurrentPosition() - 10);
         }
 
       } else {
@@ -340,7 +374,7 @@ bool IRAM_ATTR SS2K::deBounce() {
 }
 
 ///////////// Interrupt Functions /////////////
-void IRAM_ATTR SS2K::shiftUp() {  // Handle the shift up interrupt IRAM_ATTR is to keep the interrput code in ram always
+void IRAM_ATTR SS2K::shiftUp() {  // Handle the shift up interrupt IRAM_ATTR is to keep the interrupt code in ram always
   if (ss2k.deBounce()) {
     if (!digitalRead(currentBoard.shiftUpPin)) {  // double checking to make sure the interrupt wasn't triggered by emf
       rtConfig.setShifterPosition(rtConfig.getShifterPosition() - 1 + userConfig.getShifterDir() * 2);
@@ -518,8 +552,8 @@ void SS2K::checkSerial() {
     txCheck = 0;
   } else if (PELOTON_TX) {
     txCheck++;
-    rtConfig.setMinResistance(0);
-    rtConfig.setMaxResistance(0);
+    rtConfig.setMinResistance(-DEFAULT_RESISTANCE_RANGE);
+    rtConfig.setMaxResistance(DEFAULT_RESISTANCE_RANGE);
   }
 }
 

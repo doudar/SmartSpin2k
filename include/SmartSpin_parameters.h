@@ -60,8 +60,8 @@ class RuntimeParameters {
   int shifterPosition  = 0;
   int minStep          = -DEFAULT_STEPPER_TRAVEL;
   int maxStep          = DEFAULT_STEPPER_TRAVEL;
-  int minResistance    = -1;
-  int maxResistance    = -1;
+  int minResistance    = -DEFAULT_RESISTANCE_RANGE;
+  int maxResistance    = DEFAULT_RESISTANCE_RANGE;
   bool simTargetWatts  = false;
 
  public:
@@ -129,7 +129,7 @@ class userParameters {
   void setFirmwareUpdateURL(String fURL) { firmwareUpdateURL = fURL; }
   const char* getFirmwareUpdateURL() { return firmwareUpdateURL.c_str(); }
 
-  void setDeviceName(String dvcn) { deviceName = dvcn; }
+  void setDeviceName(String dvn) { deviceName = dvn; }
   const char* getDeviceName() { return deviceName.c_str(); }
 
   void setShiftStep(int ss) { shiftStep = ss; }
@@ -147,7 +147,7 @@ class userParameters {
   float getERGSensitivity() { return ERGSensitivity; }
   void setERGSensitivity(float ergS) { ERGSensitivity = ergS; }
 
-  void setAutoUpdate(bool atupd) { autoUpdate = atupd; }
+  void setAutoUpdate(bool atd) { autoUpdate = atd; }
   bool getAutoUpdate() { return autoUpdate; }
 
   void setSsid(String sid) { ssid = sid; }
@@ -180,7 +180,7 @@ class userParameters {
   void setUdpLogEnabled(bool enabled) { udpLogEnabled = enabled; }
   bool getUdpLogEnabled() { return udpLogEnabled; }
 
-  void setFoundDevices(String fdev) { foundDevices = fdev; }
+  void setFoundDevices(String fdv) { foundDevices = fdv; }
   const char* getFoundDevices() { return foundDevices.c_str(); }
 
   void setDefaults();

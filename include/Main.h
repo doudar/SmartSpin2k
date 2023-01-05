@@ -52,6 +52,7 @@ class SS2K {
   void motorStop(bool releaseTension = false);
   void checkSerial();
   void checkBLEReconnect();
+  void FTMSModeShiftModifier();
 
   SS2K() {
     targetPosition      = 0;
@@ -81,7 +82,7 @@ class AuxSerialBuffer {
   }
 };
 
-// Users Physical Working Capacity Calculation Parameters (heartrate to Power
+// Users Physical Working Capacity Calculation Parameters (heart rate to Power
 // calculation)
 extern physicalWorkingCapacity userPWC;
 extern SS2K ss2k;
