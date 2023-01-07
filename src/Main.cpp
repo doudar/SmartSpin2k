@@ -270,8 +270,8 @@ void SS2K::FTMSModeShiftModifier() {
         SS2K_LOG(MAIN_LOG_TAG, "Shift %+d pos %d tgt %d min %d max %d r_min %d r_max %d", shiftDelta, rtConfig.getShifterPosition(), ss2k.targetPosition, rtConfig.getMinStep(),
                  rtConfig.getMaxStep(), rtConfig.getMinResistance(), rtConfig.getMaxResistance());
 
-        if ((ss2k.targetPosition > rtConfig.getMaxStep()) || (rtConfig.resistance.getTarget() > rtConfig.getMaxResistance()) || (ss2k.targetPosition < rtConfig.getMinStep()) ||
-            (rtConfig.resistance.getTarget() < rtConfig.getMinResistance())) {
+        if ((ss2k.targetPosition > rtConfig.getMaxStep()) || (rtConfig.resistance.getValue() > rtConfig.getMaxResistance()) || (ss2k.targetPosition < rtConfig.getMinStep()) ||
+            (rtConfig.resistance.getValue() < rtConfig.getMinResistance())) {
           SS2K_LOG(MAIN_LOG_TAG, "Shift Blocked by limits.");
           rtConfig.setShifterPosition(ss2k.lastShifterPosition);
 
@@ -324,7 +324,7 @@ void SS2K::moveStepper(void *pvParameters) {
       }
 
       if (rtConfig.getMaxResistance() != DEFAULT_RESISTANCE_RANGE) {
-        if ((rtConfig.resistance.getValue() > rtConfig.getMinResistance()) && (rtConfig.resistance.getValue() < rtConfig.getMaxResistance())) {
+        if ((rtConfig.resistance.getValue() => rtConfig.getMinResistance()) && (rtConfig.resistance.getValue() <= rtConfig.getMaxResistance())) {
           stepper->moveTo(ss2k.targetPosition);
         } else if (rtConfig.resistance.getValue() < rtConfig.getMinResistance()) {  // Limit Stepper to Min Resistance
           stepper->moveTo(stepper->getCurrentPosition() + 10);

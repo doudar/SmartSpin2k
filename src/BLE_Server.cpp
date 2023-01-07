@@ -410,16 +410,27 @@ void processFTMSWrite() {
       } break;
 
       case FitnessMachineControlPointProcedure::SetTargetResistanceLevel: {
-        returnValue[2] = FitnessMachineControlPointResultCode::Success;  // 0x01;
-        pCharacteristic->setValue(returnValue, 3);
-
-        rtConfig.resistance.setTarget((int)rxValue[1]);
-        logBufLength += snprintf(logBuf + logBufLength, kLogBufCapacity - logBufLength, "-> Resistance Mode: %d", rtConfig.resistance.getTarget());
-
-        ftmsStatus            = {FitnessMachineStatus::TargetResistanceLevelChanged, rxValue[1]};
-        ftmsTrainingStatus[1] = FitnessMachineTrainingStatus::Other;  // 0x00;
+        returnValue[2]        = FitnessMachineControlPointResultCode::Success;  // 0x01;
+        ftmsTrainingStatus[1] = FitnessMachineTrainingStatus::Other;            // 0x00;
         fitnessMachineTrainingStatus->setValue(ftmsTrainingStatus, 2);
-      } break;
+        if ((int)rxValue[1] >= rtConfig.getMinResistance() && (int)rxValue[1] <= rtConfig.getMaxResistance()) {
+          rtConfig.resistance.setTarget((int)rxValue[1]);
+          returnValue[2] = FitnessMachineControlPointResultCode::Success;
+
+          logBufLength += snprintf(logBuf + logBufLength, kLogBufCapacity - logBufLength, "-> Resistance Mode: %d", rtConfig.resistance.getTarget());
+        } else if ((int)rxValue[1] > rtConfig.getMinResistance()) {
+          rtConfig.resistance.setTarget(rtConfig.getMaxResistance());
+          returnValue[2] = FitnessMachineControlPointResultCode::InvalidParameter;
+        } else {
+          rtConfig.resistance.setTarget(rtConfig.getMinResistance());
+          returnValue[2] = FitnessMachineControlPointResultCode::InvalidParameter;
+        }
+        ftmsStatus = {FitnessMachineStatus::TargetResistanceLevelChanged, (uint8_t)(rtConfig.resistance.getTarget() % 256)};
+        rtConfig.resistance.setTarget(rtConfig.resistance.getTarget());
+        logBufLength += snprintf(logBuf + logBufLength, kLogBufCapacity - logBufLength, "-> Resistance Request %d beyond limits", (int)rxValue[1]);
+        pCharacteristic->setValue(returnValue, 3);
+      }
+      break;
 
       case FitnessMachineControlPointProcedure::SetTargetPower: {
         if (spinBLEClient.connectedPM || rtConfig.watts.getSimulate()) {
@@ -524,7 +535,6 @@ void processFTMSWrite() {
       }
     }
     SS2K_LOG(FMTS_SERVER_LOG_TAG, "%s", logBuf);
-
   } else {
     SS2K_LOG(FMTS_SERVER_LOG_TAG, "App wrote nothing ");
     SS2K_LOG(FMTS_SERVER_LOG_TAG, "assuming it's a Control request");
