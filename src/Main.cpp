@@ -324,7 +324,7 @@ void SS2K::moveStepper(void *pvParameters) {
       }
 
       if (rtConfig.getMaxResistance() != DEFAULT_RESISTANCE_RANGE) {
-        if ((rtConfig.resistance.getValue() => rtConfig.getMinResistance()) && (rtConfig.resistance.getValue() <= rtConfig.getMaxResistance())) {
+        if ((rtConfig.resistance.getValue() >= rtConfig.getMinResistance()) && (rtConfig.resistance.getValue() <= rtConfig.getMaxResistance())) {
           stepper->moveTo(ss2k.targetPosition);
         } else if (rtConfig.resistance.getValue() < rtConfig.getMinResistance()) {  // Limit Stepper to Min Resistance
           stepper->moveTo(stepper->getCurrentPosition() + 10);
