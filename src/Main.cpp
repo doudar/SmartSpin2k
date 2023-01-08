@@ -559,19 +559,19 @@ void SS2K::checkSerial() {
 
 void SS2K::checkBLEReconnect() {
   static int bleCheck = 0;
-  if (((userConfig.getConnectedPowerMeter() == "none") && (userConfig.getConnectedHeartMonitor() == "none"))) {  // Exit immediately if "none" and "none"
+  if ((String(userConfig.getConnectedPowerMeter()) == "none") && ((String(userConfig.getConnectedPowerMeter()) == "none"))) {  // Exit immediately if "none" and "none"
     bleCheck = 0;
     return;
   }
-  if (((spinBLEClient.connectedHR) && (spinBLEClient.connectedPM))) {  // Exit if both are connected
+  if ((spinBLEClient.connectedHR) && (spinBLEClient.connectedPM)) {  // Exit if both are connected
     bleCheck = 0;
     return;
   }
-  if (((userConfig.getConnectedPowerMeter() == "none") && (spinBLEClient.connectedHR))) {  // Exit if "none" PM and HR is connected
+  if (((String(userConfig.getConnectedPowerMeter()) == "none") && (spinBLEClient.connectedHR))) {  // Exit if "none" PM and HR is connected
     bleCheck = 0;
     return;
   }
-  if (((userConfig.getConnectedHeartMonitor() == "none") && (spinBLEClient.connectedPM))) {  // Exit if "none" HR and PM is connected
+  if (((String(userConfig.getConnectedPowerMeter()) == "none") && (spinBLEClient.connectedPM))) {  // Exit if "none" HR and PM is connected
     bleCheck = 0;
     return;
   }
