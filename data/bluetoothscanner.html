@@ -2,6 +2,7 @@
 <html>
 
 <head>
+  <link rel="stylesheet" href="style.css">
   <style type="text/css">
     html {
       background-color: #03245c;
@@ -93,12 +94,11 @@
   PMDropdown.length = 0;
   HRDropdown.length = 0;
 
-  //Update values on specified interval loading late because this tiny webserver hates frequent requests
   setInterval(function () {
     if (document.getElementById("connectedPowerMeter").innerHTML == "loading") {
       requestConfigValues();
     }
-  }, 1000);
+  }, 100);
 
   function updateSlider(x, valueElement) {
     valueElement.innerHTML = x;
@@ -112,7 +112,6 @@
     }
     updateSlider(element.value, document.getElementById(element.name + 'Value'));
   }
-
 
   function requestConfigValues() {
     var xhttp = new XMLHttpRequest();
@@ -175,27 +174,12 @@
         document.getElementById("powerCorrectionFactorValue").innerHTML = data.powerCorrectionFactor;
         document.getElementById("powerCorrectionFactor").value = data.powerCorrectionFactor;
         document.getElementById("loadingWatermark").opacity = 0;
-        setTimeout(function () { document.getElementById("loadingWatermark").remove(); }, 1000);
+        setTimeout(function () { document.getElementById("loadingWatermark").remove(); }, 150);
       }
     };
     xhttp.open('GET', "/configJSON", true);
     xhttp.send();
   }
 
-  //define function to load css
-  var loadCss = function () {
-    var cssLink = document.createElement('link');
-    cssLink.rel = 'stylesheet';
-    cssLink.href = 'style.css';
-    var head = document.getElementsByTagName('head')[0];
-    head.parentNode.insertBefore(cssLink, head);
-  };
-
-  //Delay loading css to not swamp webserver
-  window.addEventListener('load', function () {
-    setTimeout(loadCss, 100);
-  }, false);
-
 </script>
-
 </html>

@@ -2,6 +2,7 @@
 <html>
 
 <head>
+  <link rel="stylesheet" href="style.css">
   <style type="text/css">
     html {
       background-color: #03245c;
@@ -26,23 +27,6 @@
         <p><a href=https://github.com/doudar/SmartSpin2k/wiki>SS2K Help</a></p>
       </h2>
 </fieldset>
-
 <script>
-
-  //define function to load css
-  var loadCss = function () {
-    var cssLink = document.createElement('link');
-    cssLink.rel = 'stylesheet';
-    cssLink.href = 'style.css';
-    var head = document.getElementsByTagName('head')[0];
-    head.parentNode.insertBefore(cssLink, head);
-  };
-
-  //Delay loading css to not swamp webserver
-  window.addEventListener('load', function () {
-    setTimeout(loadCss, 100);
-  }, false);
-
 </script>
-
 </html>
