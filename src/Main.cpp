@@ -533,20 +533,20 @@ void SS2K::checkSerial() {
       case 0:
         for (int i = 0; i < PELOTON_RQ_SIZE; i++) {
           auxSerial.write(peloton_rq_watts[i]);
-          alternate++;
         }
+        alternate++;
         break;
       case 1:
         for (int i = 0; i < PELOTON_RQ_SIZE; i++) {
           auxSerial.write(peloton_rq_cad[i]);
-          alternate++;
         }
+        alternate++;
         break;
       case 2:
         for (int i = 0; i < PELOTON_RQ_SIZE; i++) {
           auxSerial.write(peloton_rq_res[i]);
-          alternate = 0;
         }
+        alternate = 0;
         break;
     }
     txCheck = 0;
