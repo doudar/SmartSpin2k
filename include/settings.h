@@ -93,7 +93,7 @@
 
 // Maximum resistance on a Peloton Bike.
 // This is used to set the upper travel limit for the motor.
-#define MAX_PELOTON_RESISTANCE 99
+#define MAX_PELOTON_RESISTANCE 98
 
 // Resistance range when no bike with resistance is connected.
 #define DEFAULT_RESISTANCE_RANGE 2000
