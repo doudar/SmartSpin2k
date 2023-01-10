@@ -590,16 +590,21 @@ void HTTP_Server::settingsProcessor() {
         "setTimeout(\"location.href = 'http://" +
         myIP.toString() + "/index.html';\",1000);</script></html>";
   }
-  server.send(200, "text/html", response);
   SS2K_LOG(HTTP_SERVER_LOG_TAG, "Config Updated From Web");
   userConfig.saveToLittleFS();
   userConfig.printFile();
   userPWC.saveToLittleFS();
   userPWC.printFile();
   if (reboot) {
+        response +=
+        "Please wait while your settings are saved and SmartSpin2k reboots.</h2></body><script> "
+        "setTimeout(\"location.href = 'http://" +
+        myIP.toString() + "/bluetoothscanner.html';\",5000);</script></html>";
+        server.send(200, "text/html", response);
     vTaskDelay(100 / portTICK_PERIOD_MS);
     ESP.restart();
   }
+  server.send(200, "text/html", response);
 }
 
 void HTTP_Server::stop() {
