@@ -270,7 +270,7 @@ void SS2K::FTMSModeShiftModifier() {
         SS2K_LOG(MAIN_LOG_TAG, "Shift %+d pos %d tgt %d min %d max %d r_min %d r_max %d", shiftDelta, rtConfig.getShifterPosition(), ss2k.targetPosition, rtConfig.getMinStep(),
                  rtConfig.getMaxStep(), rtConfig.getMinResistance(), rtConfig.getMaxResistance());
 
-        if ((ss2k.targetPosition > rtConfig.getMaxStep()) || (rtConfig.resistance.getValue() => rtConfig.getMaxResistance()) || (ss2k.targetPosition < rtConfig.getMinStep()) ||
+        if ((ss2k.targetPosition > rtConfig.getMaxStep()) || (rtConfig.resistance.getValue() >= rtConfig.getMaxResistance()) || (ss2k.targetPosition < rtConfig.getMinStep()) ||
             (rtConfig.resistance.getValue() <= rtConfig.getMinResistance())) {
           SS2K_LOG(MAIN_LOG_TAG, "Shift Blocked by limits.");
           rtConfig.setShifterPosition(ss2k.lastShifterPosition);
