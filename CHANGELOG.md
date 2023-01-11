@@ -27,6 +27,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Revised directory structure in /hardware
 - updated Bowflex C7 mount for improved usability
 - updated Echelon knob insert for durability
+- Peloton bike mount updated for improved usability
 
 ## [22.10.8]
 
