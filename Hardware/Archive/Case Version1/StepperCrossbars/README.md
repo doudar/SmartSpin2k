@@ -1,1 +1,0 @@
-The stepper crossbar is a small mount that attaches the front two screws of the stepper motor to the case. 

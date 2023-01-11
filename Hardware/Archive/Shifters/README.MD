@@ -1,1 +1,0 @@
-These covers are designed to be printed in TPU.

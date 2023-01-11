@@ -16,15 +16,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Changed
 - PowerTable values are now adjusted to 90 RPM cad on input.
 - PowerTable entries are now validated against previous entries. 
-- Changes to default settings for better ride-ability.  raised incline multiplier and erg sensitivity, increased incline multiplier and max brake watts.
+- Changes to default settings for better ride-ability.  Raised incline multiplier and erg sensitivity, increased incline multiplier and max brake watts.
 - Fixed a bug in the new cadence compensation where an int should have been a float. 
+- Fixed broken pre-commit on my local dev machine. 
 - Moved serial checking to own function. 
 - Reduced verbosity of ERG logging.
 - Fixed instance of BLE PM dropdown not being saved correctly. 
 
 ### Hardware
-- removed duplicate directory in direct mount folder
+- Removed duplicate directory in direct mount folder.
+- New case for the new PCB :)
+- Revised directory structure in /hardware
 - updated Bowflex C7 mount for improved usability
+- updated Echelon knob insert for durability
 
 ## [22.10.8]
 
@@ -67,6 +71,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - NEW: Bolt through short case for direct mount use with Generic Bike http://smile.amazon.com/gp/product/B07S3YWSNM
 - NEW: Direct mount for Life Fitness IC7
 
+
+### Hardware
+- Added new case design for upcoming integraded SMT PCB.
+- Added Initial KiCAD PCB Commit. 
 
 ## [2.7.9]
 
