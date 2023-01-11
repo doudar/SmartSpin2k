@@ -29,6 +29,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Revised directory structure in /hardware
 - updated Bowflex C7 mount for improved usability
 - updated Echelon knob insert for durability
+- Updated arm folder to procedurally generated arms ov various lengths.
+- Updated C7 bike mount to use hook style arms. 
 
 ## [22.10.8]
 
