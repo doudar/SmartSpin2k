@@ -2,7 +2,7 @@
 <img src="/Pictures/Version3.jpg" alt="Hardware 3.0"/> 
 
 ### Updates
-After many months of work, we're proud to finally introduce SmartSpin2k hardware revision 3.0! This new hardware revision incorporates a brand new SMT PCB for much easier and more reliable building. It is able to be ordered directly from an automated manufacturer (like JLCPCB or PCBWAY) with all of the components already soldered in place. We have also designed a pre-fabricated cable management solution as well making this newest revision easier than ever to build. It's truly "Print", "Plug" & "Play! 
+After many months of work, we're proud to finally introduce SmartSpin2k hardware revision 3.0! This new hardware revision incorporates a brand new SMT PCB for much easier and more reliable building. It is able to be ordered directly from an automated manufacturer (like JLCPCB or PCBWAY) or from [EmadMan](https://www.etsy.com/shop/eMadmanMakes) with all of the components already soldered in place. We have also designed a pre-fabricated cable management solution as well making this newest revision easier than ever to build. It's truly "Print", "Plug" & "Play! 
 
 In Addition to being easier to build, we've incorporated a Peloton serial interface into rev 3 so you can plug your Peloton bike directly into the SS2K and recieve cadence and power data directly from the bike. If you have your bike in developer mode, you can even unplug the Peloton head unit from the bike and Zwift on the main screen without being in a Peloton workout. 
 
