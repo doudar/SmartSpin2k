@@ -507,9 +507,9 @@ void SS2K::checkSerial() {
     // pre-process Peloton Data. If we get more serial devices we will have to move this into sensor data factory.
     // This is done here to prevent a lot of extra logging.
     for (i = 0; i < auxSerialBuffer.len; i++) {  // Find start of data string
-      if (auxSerialBuffer.data[i] == HEADER) {
+      if (auxSerialBuffer.data[i] == PELOTON_HEADER) {
         for (k = i; k < auxSerialBuffer.len; k++) {  // Find end of data string
-          if (auxSerialBuffer.data[k] == FOOTER) {
+          if (auxSerialBuffer.data[k] == PELOTON_FOOTER) {
             k++;
             break;
           }
@@ -529,20 +529,21 @@ void SS2K::checkSerial() {
   }
   if (PELOTON_TX && (txCheck >= TX_CHECK_INTERVAL)) {
     static int alternate = 0;
-    byte buf[]           = {REQUEST, 0, 0, FOOTER};
+    // {tx type, request type, checksum, end tx}
+    byte buf[]           = {PELOTON_REQUEST, 0, 0, PELOTON_FOOTER};
     int _request_pos     = 1;
     int _checksum_pos    = 2;
     switch (alternate) {
       case 0:
-        buf[_request_pos] = POW_ID;
+        buf[_request_pos] = PELOTON_POW_ID;
         alternate++;
         break;
       case 1:
-        buf[_request_pos] = CAD_ID;
+        buf[_request_pos] = PELOTON_CAD_ID;
         alternate++;
         break;
       case 2:
-        buf[_request_pos] = RES_ID;
+        buf[_request_pos] = PELOTON_RES_ID;
         alternate         = 0;
         break;
     }

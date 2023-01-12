@@ -43,7 +43,7 @@ void PelotonData::decode(uint8_t *data, size_t length) {
   }
   hasData = true;
   switch (data[1]) {
-    case POW_ID:
+    case PELOTON_POW_ID:
       if (value >= 0) {
         power = value / 10;
       } else {
@@ -52,11 +52,11 @@ void PelotonData::decode(uint8_t *data, size_t length) {
 
       break;
 
-    case CAD_ID:
+    case PELOTON_CAD_ID:
       cadence = value;
       break;
 
-    case RES_ID:
+    case PELOTON_RES_ID:
       resistance = value;
       break;
 

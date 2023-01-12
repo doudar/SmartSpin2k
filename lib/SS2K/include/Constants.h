@@ -52,9 +52,10 @@
 #define PELOTON_DATA_UUID NimBLEUUID("00000000-0000-0000-0000-0000000000321")
 #define PELOTON_ADDRESS   NimBLEAddress("00:00:00:00:00:00:00")
 // peloton Serial
-#define HEADER  0xF1
-#define REQUEST 0xF5
-#define FOOTER  0xF6
-#define CAD_ID  0x41
-#define RES_ID  0x49
-#define POW_ID  0x44
+#define PELOTON_RQ_SIZE 4
+#define PELOTON_HEADER  0xF1
+#define PELOTON_REQUEST 0xF5
+#define PELOTON_FOOTER  0xF6
+#define PELOTON_CAD_ID  0x41
+#define PELOTON_RES_ID  0x49
+#define PELOTON_POW_ID  0x44
