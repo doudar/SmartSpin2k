@@ -126,8 +126,8 @@ class userParameters {
   bool getAutoUpdate() { return autoUpdate; }
   const char* getSsid() { return ssid.c_str(); }
   const char* getPassword() { return password.c_str(); }
-  const char* getconnectedPowerMeter() { return connectedPowerMeter.c_str(); }
-  const char* getconnectedHeartMonitor() { return connectedHeartMonitor.c_str(); }
+  const char* getConnectedPowerMeter() { return connectedPowerMeter.c_str(); }
+  const char* getConnectedHeartMonitor() { return connectedHeartMonitor.c_str(); }
   int getStepperPower() { return stepperPower; }
   int getMaxWatts() { return maxWatts; }
   int getMinWatts() { return minWatts; }

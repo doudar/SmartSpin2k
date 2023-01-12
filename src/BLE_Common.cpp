@@ -123,7 +123,7 @@ void BLECommunications(void *pvParameters) {
     } else {
       digitalWrite(LED_PIN, HIGH);
     }
-    if (spinBLEClient.doScan && (spinBLEClient.scanRetries > 0)) {
+    if (spinBLEClient.doScan && (spinBLEClient.scanRetries > 0) && !NimBLEDevice::getScan()->isScanning()) {
       spinBLEClient.scanRetries--;
       SS2K_LOG(BLE_CLIENT_LOG_TAG, "Initiating Scan from Client Task:");
       spinBLEClient.scanProcess();

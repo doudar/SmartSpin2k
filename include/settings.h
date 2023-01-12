@@ -245,6 +245,15 @@
 // If not receiving Peleton Messages, how long to wait before next TX attempt is
 #define TX_CHECK_INTERVAL 20
 
+// If ble devices are both setup, how often to attempt a reconnect.  
+#define BLE_RECONNECT_INTERVAL 40
+
+// Initial and web scan duration.  
+#define DEFAULT_SCAN_DURATION 10
+
+// BLE automatic reconnect duration. Set this low to avoid interruption. 
+#define BLE_RECONNECT_SCAN_DURATION 3
+
 // Uncomment to enable sending Telegram debug messages back to the chat
 // specified in telegram_token.h
 // #define USE_TELEGRAM
@@ -253,8 +262,11 @@
 //#define DEBUG_STACK
 
 // Uncomment to enable HR->PWR debugging info. Always displays HR->PWR
-// Calculation. Never sets userConfig.setSimulatedPower(); #define
-// DEBUG_HR_TO_PWR
+// Calculation. Never sets userConfig.setSimulatedPower(); 
+// #define DEBUG_HR_TO_PWR
+
+// Uncomment to enable HR->PWR enhanced powertable debugging.
+// #define DEBUG_POWERTABLE
 
 #ifdef USE_TELEGRAM
 // Max number of telegram messages to send per session

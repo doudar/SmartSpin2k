@@ -48,7 +48,7 @@ static void onNotify(BLERemoteCharacteristic *pBLERemoteCharacteristic, uint8_t 
 // BLE Client loop task
 void bleClientTask(void *pvParameters) {
   for (;;) {
-    if (spinBLEClient.doScan && (spinBLEClient.scanRetries > 0)) {
+    if (spinBLEClient.doScan && (spinBLEClient.scanRetries > 0) && !NimBLEDevice::getScan()->isScanning()) {
       spinBLEClient.scanRetries--;
       SS2K_LOG(BLE_CLIENT_LOG_TAG, "Initiating Scan from Client Task:");
       spinBLEClient.scanProcess();
@@ -347,24 +347,24 @@ void MyAdvertisedDeviceCallback::onResult(BLEAdvertisedDevice *advertisedDevice)
     // not specified.
     SS2K_LOG(BLE_CLIENT_LOG_TAG, "Matching Device Name: %s", aDevName.c_str());
     if (advertisedDevice->getServiceUUID() == HEARTSERVICE_UUID) {
-      if (String(userConfig.getconnectedHeartMonitor()) == "any") {
+      if (String(userConfig.getConnectedHeartMonitor()) == "any") {
         SS2K_LOG(BLE_CLIENT_LOG_TAG, "HR String Matched Any");
         // continue
-      } else if (aDevName != String(userConfig.getconnectedHeartMonitor()) || (String(userConfig.getconnectedHeartMonitor()) == "none")) {
-        SS2K_LOG(BLE_CLIENT_LOG_TAG, "Skipping non-selected HRM |%s|%s", aDevName.c_str(), userConfig.getconnectedHeartMonitor());
+      } else if (aDevName != String(userConfig.getConnectedHeartMonitor()) || (String(userConfig.getConnectedHeartMonitor()) == "none")) {
+        SS2K_LOG(BLE_CLIENT_LOG_TAG, "Skipping non-selected HRM |%s|%s", aDevName.c_str(), userConfig.getConnectedHeartMonitor());
         return;
-      } else if (aDevName == String(userConfig.getconnectedHeartMonitor())) {
+      } else if (aDevName == String(userConfig.getConnectedHeartMonitor())) {
         SS2K_LOG(BLE_CLIENT_LOG_TAG, "HR String Matched %s", aDevName.c_str());
       }
     } else {  // Already tested -->((advertisedDevice->getServiceUUID()(CYCLINGPOWERSERVICE_UUID) || advertisedDevice->getServiceUUID()(FLYWHEEL_UART_SERVICE_UUID) ||
               // advertisedDevice->getServiceUUID()(FITNESSMACHINESERVICE_UUID)))
-      if (String(userConfig.getconnectedPowerMeter()) == "any") {
+      if (String(userConfig.getConnectedPowerMeter()) == "any") {
         SS2K_LOG(BLE_CLIENT_LOG_TAG, "PM String Matched Any");
         // continue
-      } else if (aDevName != String(userConfig.getconnectedPowerMeter()) || (String(userConfig.getconnectedPowerMeter()) == "none")) {
-        SS2K_LOG(BLE_CLIENT_LOG_TAG, "Skipping non-selected PM |%s|%s", aDevName.c_str(), userConfig.getconnectedPowerMeter());
+      } else if (aDevName != String(userConfig.getConnectedPowerMeter()) || (String(userConfig.getConnectedPowerMeter()) == "none")) {
+        SS2K_LOG(BLE_CLIENT_LOG_TAG, "Skipping non-selected PM |%s|%s", aDevName.c_str(), userConfig.getConnectedPowerMeter());
         return;
-      } else if (aDevName == String(userConfig.getconnectedPowerMeter())) {
+      } else if (aDevName == String(userConfig.getConnectedPowerMeter())) {
         SS2K_LOG(BLE_CLIENT_LOG_TAG, "PM String Matched %s", aDevName.c_str());
       }
     }
@@ -384,7 +384,7 @@ void MyAdvertisedDeviceCallback::onResult(BLEAdvertisedDevice *advertisedDevice)
   }
 }
 
-void SpinBLEClient::scanProcess() {
+void SpinBLEClient::scanProcess(int duration) {
   this->doScan = false;  // Confirming we did the scan
   SS2K_LOG(BLE_CLIENT_LOG_TAG, "Scanning for BLE servers and putting them into a list...");
 
@@ -394,7 +394,7 @@ void SpinBLEClient::scanProcess() {
   pBLEScan->setWindow(67);   
   pBLEScan->setDuplicateFilter(true);
   pBLEScan->setActiveScan(true);
-  BLEScanResults foundDevices = pBLEScan->start(10, true);
+  BLEScanResults foundDevices = pBLEScan->start(duration, true);
   // Load the scan into a Json String
   int count = foundDevices.getCount();
 
@@ -507,13 +507,13 @@ void SpinBLEClient::postConnect(NimBLEClient *pClient) {
           SS2K_LOG(BLE_CLIENT_LOG_TAG, "Activated Echelon callbacks.");
         }
         // spinBLEClient.removeDuplicates(pclient);
-        BLEDevice::getServer()->updateConnParams(pClient->getConnId(), 400, 400, 0, 250);
+        BLEDevice::getServer()->updateConnParams(pClient->getConnId(), 400, 400, 2, 1000);
         return;
       }
       if ((this->myBLEDevices[i].charUUID == HEARTCHARACTERISTIC_UUID)) {
         this->connectedHR = true;
         SS2K_LOG(BLE_CLIENT_LOG_TAG, "Registered HRM on Connect");
-        BLEDevice::getServer()->updateConnParams(pClient->getConnId(), 400, 400, 0, 250);
+        BLEDevice::getServer()->updateConnParams(pClient->getConnId(), 400, 400, 2, 1000);
         return;
       } else {
         SS2K_LOG(BLE_CLIENT_LOG_TAG, "These did not match|%s|%s|", pClient->getPeerAddress().toString().c_str(), this->myBLEDevices[i].peerAddress.toString().c_str());

@@ -168,7 +168,7 @@ void setup() {
 
   xTaskCreatePinnedToCore(SS2K::maintenanceLoop,     /* Task function. */
                           "maintenanceLoopFunction", /* name of task. */
-                          3500,                      /* Stack size of task */
+                          4000,                      /* Stack size of task */
                           NULL,                      /* parameter of the task */
                           1,                         /* priority of the task */
                           &maintenanceLoopTask,      /* Task handle to keep track of created task */
@@ -228,6 +228,7 @@ void SS2K::maintenanceLoop(void *pvParameters) {
     if (loopCounter > 4) {
       ss2k.scanIfShiftersHeld();
       ss2k.checkDriverTemperature();
+      ss2k.checkBLEReconnect();
 
 #ifdef DEBUG_STACK
       Serial.printf("Step Task: %d \n", uxTaskGetStackHighWaterMark(moveStepperTask));
@@ -496,5 +497,25 @@ void SS2K::checkSerial() {
     txCheck   = 0;
   } else if (PELOTON_TX) {
     txCheck++;
+  }
+}
+
+void SS2K::checkBLEReconnect() {
+  static int bleCheck = 0;
+  if (((userConfig.getConnectedHeartMonitor() != "any" && !spinBLEClient.connectedHR) || (userConfig.getConnectedPowerMeter() != "any" && !spinBLEClient.connectedPM)) && (bleCheck >= BLE_RECONNECT_INTERVAL)) {
+    bleCheck = 0;
+    if (((userConfig.getConnectedPowerMeter() == "none") && (userConfig.getConnectedHeartMonitor() == "none"))){
+      return;
+    }
+    if (!NimBLEDevice::getScan()->isScanning()) {
+      SS2K_LOG(MAIN_LOG_TAG, "Scanning from Check BLE Reconnect %d", bleCheck);
+      spinBLEClient.resetDevices();
+      spinBLEClient.scanProcess(BLE_RECONNECT_SCAN_DURATION);
+    }
+  }
+  if (NimBLEDevice::getScan()->isScanning()) {
+    bleCheck = 0;
+  } else {
+    bleCheck++;
   }
 }

@@ -1,0 +1,122 @@
+
+(rules PCB SmartSpin2k
+  (snap_angle 
+    fortyfive_degree
+  )
+  (autoroute_settings
+    (fanout off)
+    (autoroute on)
+    (postroute on)
+    (vias on)
+    (via_costs 50)
+    (plane_via_costs 5)
+    (start_ripup_costs 100)
+    (start_pass_no 816)
+    (layer_rule F.Cu
+      (active on)
+      (preferred_direction vertical)
+      (preferred_direction_trace_costs 1.0)
+      (against_preferred_direction_trace_costs 2.1)
+    )
+    (layer_rule B.Cu
+      (active on)
+      (preferred_direction horizontal)
+      (preferred_direction_trace_costs 1.0)
+      (against_preferred_direction_trace_costs 1.9)
+    )
+  )
+  (rule
+    (width 250.0)
+    (clear 200.0)
+    (clear 125.0 (type smd_to_turn_gap))
+  )
+  (padstack "Via[0-1]_800:400_um"
+    (shape
+      (circle F.Cu 800.0 0.0 0.0)
+    )
+    (shape
+      (circle B.Cu 800.0 0.0 0.0)
+    )
+    (attach off)
+  )
+  (via 
+    "Via[0-1]_800:400_um" "Via[0-1]_800:400_um" default
+  )
+  (via 
+    "Via[0-1]_800:400_um-kicad_default" "Via[0-1]_800:400_um" "kicad_default"
+  )
+  (via 
+    "Via[0-1]_800:400_um-Adapter" "Via[0-1]_800:400_um" Adapter
+  )
+  (via 
+    "Via[0-1]_800:400_um-Stepper" "Via[0-1]_800:400_um" Stepper
+  )
+  (via_rule
+    default "Via[0-1]_800:400_um"
+  )
+  (via_rule
+    "kicad_default" "Via[0-1]_800:400_um-kicad_default"
+  )
+  (via_rule
+    Adapter "Via[0-1]_800:400_um-Adapter"
+  )
+  (via_rule
+    Stepper "Via[0-1]_800:400_um-Stepper"
+  )
+  (class default
+    "Net-(C3-Pad1)" "Net-(C4-Pad1)" "Net-(C4-Pad2)" "Net-(C5-Pad1)" "Net-(C10-Pad1)" "Net-(C10-Pad2)" /3V3 "Net-(C14-Pad2)"
+    "Net-(D2-Pad2)" "Net-(C17-Pad1)" "Net-(C17-Pad2)" "Net-(C18-Pad2)" "Net-(C18-Pad1)" "Net-(D3-Pad2)" "Net-(D10-Pad2)" "Net-(R6-Pad2)"
+    /5V /VBUS /ShiftDown /ShiftUp /RS232OUT1 /RS232IN1 "unconnected-(J3-Pad4)" /D+
+    "/D-" "/IO0_BOOT" /DTR /EN /RTS /TMCUART2 /TMCUART1 /TXD0
+    /RXD0 "unconnected-(U1-Pad25)" /DriverDIR /DriverSTEP "unconnected-(U1-Pad12)" "unconnected-(U1-Pad11)" "unconnected-(U1-Pad10)" "unconnected-(U1-Pad9)"
+    "unconnected-(U1-Pad7)" /DriverEN "unconnected-(U2-Pad5)" "unconnected-(U2-Pad3)" "unconnected-(U2-Pad2)" "unconnected-(U3-Pad4)" "unconnected-(U3-Pad5)" "unconnected-(U3-Pad7)"
+    "unconnected-(U3-Pad17)" "unconnected-(U3-Pad18)" "unconnected-(U3-Pad19)" "unconnected-(U3-Pad20)" "unconnected-(U3-Pad21)" "unconnected-(U3-Pad22)" "unconnected-(U3-Pad26)" "unconnected-(U3-Pad27)"
+    "unconnected-(U3-Pad28)" "unconnected-(U3-Pad29)" /T1IN /R1OUT "unconnected-(U3-Pad37)" "unconnected-(U4-Pad27)" "unconnected-(U4-Pad23)" "unconnected-(U4-Pad22)"
+    "unconnected-(U4-Pad21)" "unconnected-(U4-Pad20)" "Net-(R11-Pad2)" "unconnected-(U4-Pad19)" "unconnected-(U4-Pad18)" "Net-(D11-Pad2)" "/REG_5V" "Net-(C22-Pad1)"
+    "unconnected-(U4-Pad17)" "Net-(Q3-Pad2)" "unconnected-(U4-Pad16)" "Net-(Q4-Pad2)" "unconnected-(U4-Pad15)" "Net-(D4-Pad2)" "Net-(R20-Pad1)" "Net-(R18-Pad1)"
+    "unconnected-(U4-Pad14)" "unconnected-(U4-Pad13)" "Net-(D12-Pad1)" "Net-(D4-Pad1)" "Net-(C20-Pad1)" "Net-(D5-Pad2)" "Net-(R19-Pad2)" "unconnected-(U4-Pad12)"
+    "Net-(D13-Pad1)" "unconnected-(U4-Pad10)" "unconnected-(U4-Pad2)" "unconnected-(U4-Pad1)" "unconnected-(U5-Pad10)" "unconnected-(U5-Pad9)" "unconnected-(U5-Pad8)" "unconnected-(U5-Pad7)"
+    "Net-(J4-Pad1)" "unconnected-(U3-Pad32)" "Net-(J4-Pad2)" "Net-(J4-Pad3)" "Net-(J4-Pad4)" "Net-(R14-Pad2)" "Net-(R17-Pad1)" "Net-(R22-Pad2)"
+    "Net-(Q1-Pad3)" "Net-(Q2-Pad3)"
+    (clearance_class default)
+    (via_rule default)
+    (rule
+      (width 250.0)
+    )
+    (circuit 
+      (use_layer F.Cu B.Cu)
+    )
+  )
+  (class "kicad_default"
+    (clearance_class "kicad_default")
+    (via_rule "kicad_default")
+    (rule
+      (width 250.0)
+    )
+    (circuit 
+      (use_layer F.Cu B.Cu)
+    )
+  )
+  (class Adapter
+    GND /VDC
+    (clearance_class Adapter)
+    (via_rule Adapter)
+    (rule
+      (width 500.0)
+    )
+    (circuit 
+      (use_layer F.Cu B.Cu)
+    )
+  )
+  (class Stepper
+    /A1 /A2 /B1 /B2 /BRA /BRB
+    (clearance_class Stepper)
+    (via_rule Stepper)
+    (rule
+      (width 500.0)
+    )
+    (circuit 
+      (use_layer F.Cu B.Cu)
+    )
+  )
+)

@@ -1,5 +1,14 @@
-<img src="Pictures/ss2k_banner.png" alt="ss2k banner" width=100%>
+### Rev 3 Now Availiable!!!
+<img src="/Pictures/Version3.jpg" alt="Hardware 3.0"/> 
 
+### Updates
+After many months of work, we're proud to finally introduce SmartSpin2k hardware revision 3.0! This new hardware revision incorporates a brand new SMT PCB for much easier and more reliable building. It is able to be ordered directly from an automated manufacturer (like JLCPCB or PCBWAY) or from [EmadMan](https://www.etsy.com/shop/eMadmanMakes) with all of the components already soldered in place. We have also designed a pre-fabricated cable management solution as well making this newest revision easier than ever to build. It's truly "Print", "Plug" & "Play! 
+
+In Addition to being easier to build, we've incorporated a Peloton serial interface into rev 3 so you can plug your Peloton bike directly into the SS2K and recieve cadence and power data directly from the bike. If you have your bike in developer mode, you can even unplug the Peloton head unit from the bike and Zwift on the main screen without being in a Peloton workout. 
+
+Further, we've incorporated a more powerful and capable stepper driver into the board. It completely removes any of the past issues with motor torque (on friction bikes) and will also allow us to detect hardware endstops in future firmware upgrades.
+
+### Introduction
 SmartSpin2k adds automatic resistance control to any spin bike! It physically connects to your spin bike resistance control knob and then wirelessly to any apps like Zwift or Trainer Road via BLE. SS2k also has shifter buttons that allow the user to simulate shifting gears on the stationary bike and includes advanced trainer features like ERG mode! 
 
 One of the main primary design goals of SS2k is to keep the parts count low making it easy for makers to build for themselves. 

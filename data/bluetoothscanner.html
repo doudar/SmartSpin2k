@@ -123,7 +123,7 @@
           var t_obj = JSON.parse(data.foundDevices)
           {
             for (var key in t_obj) {
-              if (t_obj[key].UUID == '0x1818' || t_obj[key].UUID == '0x1826') {
+              if (t_obj[key].UUID == '0x1818' || t_obj[key].UUID == '0x1826' || t_obj[key].UUID == '6e400001-b5a3-f393-e0a9-e50e24dcca9e' || t_obj[key].UUID == '0bf669f0-45f2-11e7-9598-0800200c9a66') {
                 optionPM = document.createElement('option');
                 if (t_obj[key].name) {
                   optionPM.text = t_obj[key].name;
@@ -152,18 +152,24 @@
           }
         }
 
-        optionPM = document.createElement('option');
-        optionPM.text = 'none';
-        PMDropdown.add(optionPM);
-        optionHR = document.createElement('option');
-        optionHR.text = 'none';
-        HRDropdown.add(optionHR);
-        let defaultOptionPM = document.createElement('option');
-        defaultOptionPM.text = 'any';
-        let defaultOptionHR = document.createElement('option');
-        defaultOptionHR.text = 'any';
-        PMDropdown.add(defaultOptionPM);
-        HRDropdown.add(defaultOptionHR);
+        let connectedOptionPM = document.createElement('option');
+        connectedOptionPM.text = data.connectedPowerMeter;
+        let connectedOptionHR = document.createElement('option');
+        connectedOptionHR.text = data.connectedHeartMonitor;
+        PMDropdown.add(connectedOptionPM);
+        HRDropdown.add(connectedOptionHR);
+        let anyOptionPM = document.createElement('option');
+        anyOptionPM.text = 'any';
+        let anyOptionHR = document.createElement('option');
+        anyOptionHR.text = 'any';
+        PMDropdown.add(anyOptionPM);
+        HRDropdown.add(anyOptionHR);
+        let noneOptionPM = document.createElement('option');
+        noneOptionPM.text = 'none';
+        let noneOptionHR = document.createElement('option');
+        noneOptionHR.text = 'none';
+        PMDropdown.add(noneOptionPM);
+        HRDropdown.add(noneOptionHR);
         document.getElementById("connectedPowerMeter").innerHTML = data.connectedPowerMeter;
         document.getElementById("connectedHeartMonitor").innerHTML = data.connectedHeartMonitor;
         document.getElementById("powerCorrectionFactorValue").innerHTML = data.powerCorrectionFactor;

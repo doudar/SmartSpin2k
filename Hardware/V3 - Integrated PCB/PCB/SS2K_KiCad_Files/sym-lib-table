@@ -1,0 +1,4 @@
+(sym_lib_table
+  (lib (name "Transistor_BJT")(type "KiCad")(uri "${KIPRJMOD}/Library/Transistor_BJT.kicad_sym")(options "")(descr ""))
+  (lib (name "JS102011")(type "KiCad")(uri "${KIPRJMOD}/Library/JS102011SAQN.kicad_sym")(options "")(descr ""))
+)
