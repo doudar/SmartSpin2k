@@ -529,26 +529,26 @@ void SS2K::checkSerial() {
   }
   if (PELOTON_TX && (txCheck >= TX_CHECK_INTERVAL)) {
     static int alternate = 0;
+    byte buf[]           = {REQUEST, 0, 0, FOOTER};
+    int _request_pos     = 1;
+    int _checksum_pos    = 2;
     switch (alternate) {
       case 0:
-        for (int i = 0; i < PELOTON_RQ_SIZE; i++) {
-          auxSerial.write(peloton_rq_watts[i]);
-        }
+        buf[_request_pos] = POW_ID;
         alternate++;
         break;
       case 1:
-        for (int i = 0; i < PELOTON_RQ_SIZE; i++) {
-          auxSerial.write(peloton_rq_cad[i]);
-        }
+        buf[_request_pos] = CAD_ID;
         alternate++;
         break;
       case 2:
-        for (int i = 0; i < PELOTON_RQ_SIZE; i++) {
-          auxSerial.write(peloton_rq_res[i]);
-        }
-        alternate = 0;
+        buf[_request_pos] = RES_ID;
+        alternate         = 0;
         break;
     }
+    // calculate checksum
+    buf[_checksum_pos] = (buf[0] + buf[1]) % 256;
+    auxSerial.write(buf, PELOTON_RQ_SIZE);
     txCheck = 0;
   } else if (PELOTON_TX) {
     txCheck++;
