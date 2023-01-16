@@ -55,7 +55,7 @@ class SS2K {
   void FTMSModeShiftModifier();
   static void rxSerial(void);
   void txSerial();
-  void setTxCheck(){txCheck = TX_CHECK_INTERVAL;}
+  void pelotonConnected();
 
   SS2K() {
     targetPosition      = 0;

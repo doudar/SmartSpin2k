@@ -208,7 +208,7 @@ void SS2K::maintenanceLoop(void *pvParameters) {
       }
       intervalTimer2 = millis();
     }
-    if (loopCounter > 8) {
+    if (loopCounter > 10) {
       ss2k.scanIfShiftersHeld();
       ss2k.checkDriverTemperature();
       ss2k.checkBLEReconnect();
@@ -232,7 +232,7 @@ void SS2K::FTMSModeShiftModifier() {
   int shiftDelta = rtConfig.getShifterPosition() - ss2k.lastShifterPosition;
   if (shiftDelta) {  // Shift detected
     switch (rtConfig.getFTMSMode()) {
-      case FitnessMachineControlPointProcedure::SetTargetPower:
+      case FitnessMachineControlPointProcedure::SetTargetPower:  // ERG Mode
 
         rtConfig.setShifterPosition(ss2k.lastShifterPosition);  // reset shifter position because we're remapping it to ERG target
         if ((rtConfig.watts.getTarget() + (shiftDelta * ERG_PER_SHIFT) < userConfig.getMinWatts()) ||
@@ -244,7 +244,7 @@ void SS2K::FTMSModeShiftModifier() {
         SS2K_LOG(MAIN_LOG_TAG, "ERG Shift. New Target: %dw", rtConfig.watts.getTarget());
         break;
 
-      case FitnessMachineControlPointProcedure::SetTargetResistanceLevel:
+      case FitnessMachineControlPointProcedure::SetTargetResistanceLevel:  // Resistance Mode
 
         rtConfig.setShifterPosition(ss2k.lastShifterPosition);  // reset shifter position because we're remapping it to resistance target
         if (rtConfig.getMaxResistance() != DEFAULT_RESISTANCE_RANGE) {
@@ -261,12 +261,13 @@ void SS2K::FTMSModeShiftModifier() {
           SS2K_LOG(MAIN_LOG_TAG, "Resistance Shift. New Target: %d", rtConfig.resistance.getTarget());
         }
 
-      default:
+      default:  // Sim Mode
 
         SS2K_LOG(MAIN_LOG_TAG, "Shift %+d pos %d tgt %d min %d max %d r_min %d r_max %d", shiftDelta, rtConfig.getShifterPosition(), ss2k.targetPosition, rtConfig.getMinStep(),
                  rtConfig.getMaxStep(), rtConfig.getMinResistance(), rtConfig.getMaxResistance());
 
-        if ((ss2k.targetPosition > rtConfig.getMaxStep()) || (ss2k.targetPosition < rtConfig.getMinStep())) {
+        if (((ss2k.targetPosition + shiftDelta * userConfig.getShiftStep()) < rtConfig.getMinStep()) ||
+            ((ss2k.targetPosition + shiftDelta * userConfig.getShiftStep()) > rtConfig.getMaxStep())) {
           SS2K_LOG(MAIN_LOG_TAG, "Shift Blocked by stepper limits.");
           rtConfig.setShifterPosition(ss2k.lastShifterPosition);
         } else if ((rtConfig.resistance.getValue() < rtConfig.getMinResistance()) && (shiftDelta > 0)) {
@@ -536,9 +537,15 @@ void SS2K::txSerial() {  // Serial.printf(" Before TX ");
   }
 }
 
+void SS2K::pelotonConnected(){
+txCheck = TX_CHECK_INTERVAL;
+rtConfig.setMinResistance(MIN_PELOTON_RESISTANCE);
+rtConfig.setMaxResistance(MAX_PELOTON_RESISTANCE);
+}
+
 void SS2K::rxSerial(void) {
   while (auxSerial.available()) {
-    ss2k.setTxCheck();
+    ss2k.pelotonConnected();
     auxSerialBuffer.len = auxSerial.readBytesUntil(PELOTON_FOOTER, auxSerialBuffer.data, AUX_BUF_SIZE);
     for (int i = 0; i < auxSerialBuffer.len; i++) {  // Find start of data string
       if (auxSerialBuffer.data[i] == PELOTON_HEADER) {
@@ -548,13 +555,6 @@ void SS2K::rxSerial(void) {
           newBuf[j - i] = auxSerialBuffer.data[j];
         }
         collectAndSet(PELOTON_DATA_UUID, PELOTON_DATA_UUID, PELOTON_ADDRESS, newBuf, newLen);
-        // else {
-        //   Serial.printf("Data Dropped: ");
-        //   for (int i = 0; i < auxSerialBuffer.len; i++) {
-        //     Serial.printf(" %02x ", auxSerialBuffer.data[i]);
-        //   }
-        //   Serial.printf("\n");
-        // }
       }
     }
   }
