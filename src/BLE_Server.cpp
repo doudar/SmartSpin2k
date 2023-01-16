@@ -92,7 +92,9 @@ void logCharacteristic(char *buffer, const size_t bufferCapacity, const byte *da
   va_end(args);
 
   SS2K_LOG(BLE_SERVER_LOG_TAG, "%s", buffer);
+  #ifdef USE_TELEGRAM
   SEND_TO_TELEGRAM(String(buffer));
+  #endif
 }
 
 void startBLEServer() {
@@ -237,8 +239,14 @@ void updateIndoorBikeDataChar() {
   fitnessMachineIndoorBikeData->setValue(ftmsIndoorBikeData, 11);
   fitnessMachineIndoorBikeData->notify();
 
-  const int kLogBufCapacity = 200;  // Data(30), Sep(data/2), Arrow(3), CharId(37), Sep(3), CharId(37), Sep(3), Name(10), Prefix(2), HR(7), SEP(1), CD(10), SEP(1), PW(8), SEP(1),
-                                    // SD(7), Suffix(2), Nul(1), rounded up
+  //ftmsResistanceLevelRange[0] = (uint8_t)rtConfig.getMinResistance() & 0xff;
+  //ftmsResistanceLevelRange[1] = (uint8_t)rtConfig.getMinResistance() >> 8;
+  //ftmsResistanceLevelRange[2] = (uint8_t)rtConfig.getMaxResistance() & 0xff;
+  //ftmsResistanceLevelRange[3] = (uint8_t)rtConfig.getMaxResistance() >> 8;
+  //ftmsResistanceLevelRange.setValue(ftmsResistanceLevelRange, 6);
+
+  const int kLogBufCapacity = 200;  // Data(30), Sep(data/2), Arrow(3), CharId(37), Sep(3), CharId(37), Sep(3), Name(10), Prefix(2), HR(7), SEP(1), CD(10), SEP(1), PW(8),
+                                    // SEP(1), SD(7), Suffix(2), Nul(1), rounded up
   char logBuf[kLogBufCapacity];
   const size_t ftmsIndoorBikeDataLength = sizeof(ftmsIndoorBikeData) / sizeof(ftmsIndoorBikeData[0]);
   logCharacteristic(logBuf, kLogBufCapacity, ftmsIndoorBikeData, ftmsIndoorBikeDataLength, FITNESSMACHINESERVICE_UUID, fitnessMachineIndoorBikeData->getUUID(),
@@ -421,16 +429,16 @@ void processFTMSWrite() {
         } else if ((int)rxValue[1] > rtConfig.getMinResistance()) {
           rtConfig.resistance.setTarget(rtConfig.getMaxResistance());
           returnValue[2] = FitnessMachineControlPointResultCode::InvalidParameter;
+          logBufLength += snprintf(logBuf + logBufLength, kLogBufCapacity - logBufLength, "-> Resistance Request %d beyond limits", (int)rxValue[1]);
         } else {
           rtConfig.resistance.setTarget(rtConfig.getMinResistance());
           returnValue[2] = FitnessMachineControlPointResultCode::InvalidParameter;
+          logBufLength += snprintf(logBuf + logBufLength, kLogBufCapacity - logBufLength, "-> Resistance Request %d beyond limits", (int)rxValue[1]);
         }
         ftmsStatus = {FitnessMachineStatus::TargetResistanceLevelChanged, (uint8_t)(rtConfig.resistance.getTarget() % 256)};
         rtConfig.resistance.setTarget(rtConfig.resistance.getTarget());
-        logBufLength += snprintf(logBuf + logBufLength, kLogBufCapacity - logBufLength, "-> Resistance Request %d beyond limits", (int)rxValue[1]);
         pCharacteristic->setValue(returnValue, 3);
-      }
-      break;
+      } break;
 
       case FitnessMachineControlPointProcedure::SetTargetPower: {
         if (spinBLEClient.connectedPM || rtConfig.watts.getSimulate()) {
@@ -579,8 +587,8 @@ void calculateInstPwrFromHR() {
   int avgP = ((userPWC.session1Pwr * userPWC.session2HR) - (userPWC.session2Pwr * userPWC.session1HR)) / (userPWC.session2HR - userPWC.session1HR) +
              (newHR * ((userPWC.session1Pwr - userPWC.session2Pwr) / (userPWC.session1HR - userPWC.session2HR)));
 
-  if (avgP < 50) {
-    avgP = 50;
+  if (avgP < DEFAULT_MIN_WATTS) {
+    avgP = DEFAULT_MIN_WATTS;
   }
 
   if (delta < 0) {

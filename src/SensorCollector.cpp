@@ -54,5 +54,7 @@ void collectAndSet(NimBLEUUID charUUID, NimBLEUUID serviceUUID, NimBLEAddress ad
   }
   strncat(logBuf + logBufLength, " ]", kLogBufMaxLength - logBufLength);
   SS2K_LOG(BLE_COMMON_LOG_TAG, "%s", logBuf);
+  #ifdef USE_TELEGRAM
   SEND_TO_TELEGRAM(String(logBuf));
+  #endif
 }

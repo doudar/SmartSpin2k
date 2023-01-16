@@ -48,13 +48,12 @@ static void onNotify(BLERemoteCharacteristic *pBLERemoteCharacteristic, uint8_t 
 // BLE Client loop task
 void bleClientTask(void *pvParameters) {
   for (;;) {
+      vTaskDelay(BLE_CLIENT_DELAY / portTICK_PERIOD_MS);  // Delay a second between loops.
     if (spinBLEClient.doScan && (spinBLEClient.scanRetries > 0) && !NimBLEDevice::getScan()->isScanning()) {
       spinBLEClient.scanRetries--;
       SS2K_LOG(BLE_CLIENT_LOG_TAG, "Initiating Scan from Client Task:");
       spinBLEClient.scanProcess();
     }
-
-    vTaskDelay(BLE_CLIENT_DELAY / portTICK_PERIOD_MS);  // Delay a second between loops.
 #ifdef DEBUG_STACK
     Serial.printf("BLEClient: %d \n", uxTaskGetStackHighWaterMark(BLEClientTask));
 #endif  // DEBUG_STACK
@@ -523,6 +522,8 @@ void SpinBLEClient::postConnect() {
             byte message[] = {0xF0, 0xB0, 0x01, 0x01, 0xA2};
             writeCharacteristic->writeValue(message, 5);
             SS2K_LOG(BLE_CLIENT_LOG_TAG, "Activated Echelon callbacks.");
+            rtConfig.setMinResistance(MIN_ECHELON_RESISTANCE);
+            rtConfig.setMaxResistance(MAX_ECHELON_RESISTANCE);
           }
 
           if (this->myBLEDevices[i].charUUID == FITNESSMACHINEINDOORBIKEDATA_UUID) {

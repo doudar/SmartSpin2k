@@ -18,18 +18,16 @@
 #include <Constants.h>
 
 // Stepper Motor Serial
-HardwareSerial stepperSerial(1);
+HardwareSerial stepperSerial(2);
 TMC2208Stepper driver(&SERIAL_PORT, R_SENSE);  // Hardware Serial
 
 // Peloton Serial
-HardwareSerial auxSerial(2);
+HardwareSerial auxSerial(1);
 AuxSerialBuffer auxSerialBuffer;
-// should we interrogate the bike for cadence and power?
 
 FastAccelStepperEngine engine = FastAccelStepperEngine();
 FastAccelStepper *stepper     = NULL;
-// Setup a task so the stepper will run on a different core than the main code
-// to prevent stuttering
+
 TaskHandle_t moveStepperTask;
 TaskHandle_t maintenanceLoopTask;
 
@@ -85,15 +83,13 @@ void setup() {
   // initialize Stepper serial port
 
   stepperSerial.begin(57600, SERIAL_8N2, currentBoard.stepperSerialRxPin, currentBoard.stepperSerialTxPin);
-  // initialize aux serial port
+  // initialize aux serial port (Peloton)
   if (currentBoard.auxSerialTxPin) {
-    auxSerial.setTxBufferSize(500);
-    auxSerial.setRxBufferSize(500);
     auxSerial.begin(19200, SERIAL_8N1, currentBoard.auxSerialRxPin, currentBoard.auxSerialTxPin, false);  //////////////////////////////////change to false after testing!!!
     if (!auxSerial) {
       SS2K_LOG(MAIN_LOG_TAG, "Invalid Serial Pin Configuration");
     }
-    // auxSerial.onReceive(auxSerialRX, true);  // setup callback
+    auxSerial.onReceive(SS2K::rxSerial, false);  // setup callback
   }
   // Initialize LittleFS
   SS2K_LOG(MAIN_LOG_TAG, "Mounting Filesystem");
@@ -135,7 +131,7 @@ void setup() {
 
   xTaskCreatePinnedToCore(SS2K::moveStepper,     /* Task function. */
                           "moveStepperFunction", /* name of task. */
-                          1500,                  /* Stack size of task */
+                          1700,                  /* Stack size of task */
                           NULL,                  /* parameter of the task */
                           18,                    /* priority of the task */
                           &moveStepperTask,      /* Task handle to keep track of created task */
@@ -169,7 +165,7 @@ void setup() {
                           "maintenanceLoopFunction", /* name of task. */
                           4500,                      /* Stack size of task */
                           NULL,                      /* parameter of the task */
-                          1,                         /* priority of the task */
+                          20,                        /* priority of the task */
                           &maintenanceLoopTask,      /* Task handle to keep track of created task */
                           1);                        /* pin task to core */
 }
@@ -185,14 +181,18 @@ void SS2K::maintenanceLoop(void *pvParameters) {
   static bool isScanning              = false;
 
   while (true) {
-    vTaskDelay(200 / portTICK_RATE_MS);
+    vTaskDelay(75 / portTICK_RATE_MS);
     ss2k.FTMSModeShiftModifier();
-    webSocketAppender.Loop();
+
+    if (currentBoard.auxSerialTxPin) {
+      ss2k.txSerial();
+    }
 
     if ((millis() - intervalTimer) > 500) {  // add check here for when to restart WiFi
                                              // maybe if in STA mode and 8.8.8.8 no ping return?
       // ss2k.restartWifi();
       logHandler.writeLogs();
+      webSocketAppender.Loop();
       intervalTimer = millis();
     }
 
@@ -208,7 +208,7 @@ void SS2K::maintenanceLoop(void *pvParameters) {
       }
       intervalTimer2 = millis();
     }
-    if (loopCounter > 4) {
+    if (loopCounter > 8) {
       ss2k.scanIfShiftersHeld();
       ss2k.checkDriverTemperature();
       ss2k.checkBLEReconnect();
@@ -222,11 +222,6 @@ void SS2K::maintenanceLoop(void *pvParameters) {
 #endif  // DEBUG_STACK
       loopCounter = 0;
     }
-
-    // Monitor serial port for data
-    if (currentBoard.auxSerialTxPin) {
-      ss2k.checkSerial();
-    }
     loopCounter++;
   }
 }
@@ -235,7 +230,7 @@ void SS2K::maintenanceLoop(void *pvParameters) {
 
 void SS2K::FTMSModeShiftModifier() {
   int shiftDelta = rtConfig.getShifterPosition() - ss2k.lastShifterPosition;
-  if (shiftDelta) {
+  if (shiftDelta) {  // Shift detected
     switch (rtConfig.getFTMSMode()) {
       case FitnessMachineControlPointProcedure::SetTargetPower:
 
@@ -245,24 +240,25 @@ void SS2K::FTMSModeShiftModifier() {
           SS2K_LOG(MAIN_LOG_TAG, "Shift to %dw blocked", rtConfig.watts.getTarget() + shiftDelta);
           break;
         }
-
         rtConfig.watts.setTarget(rtConfig.watts.getTarget() + (ERG_PER_SHIFT * shiftDelta));
         SS2K_LOG(MAIN_LOG_TAG, "ERG Shift. New Target: %dw", rtConfig.watts.getTarget());
         break;
 
       case FitnessMachineControlPointProcedure::SetTargetResistanceLevel:
 
+        rtConfig.setShifterPosition(ss2k.lastShifterPosition);  // reset shifter position because we're remapping it to resistance target
         if (rtConfig.getMaxResistance() != DEFAULT_RESISTANCE_RANGE) {
-          if ((rtConfig.resistance.getTarget() + shiftDelta < rtConfig.getMinResistance()) || (rtConfig.resistance.getTarget() + shiftDelta > rtConfig.getMaxResistance())) {
-            SS2K_LOG(MAIN_LOG_TAG, "Shift to %d blocked", rtConfig.resistance.getTarget() + shiftDelta);
+          if (rtConfig.resistance.getTarget() + shiftDelta < rtConfig.getMinResistance()) {
+            rtConfig.resistance.setTarget(rtConfig.getMinResistance());
+            SS2K_LOG(MAIN_LOG_TAG, "Resistance shift less than min %d", rtConfig.getMinResistance());
+            break;
+          } else if (rtConfig.resistance.getTarget() + shiftDelta > rtConfig.getMaxResistance()) {
+            rtConfig.resistance.setTarget(rtConfig.getMaxResistance());
+            SS2K_LOG(MAIN_LOG_TAG, "Resistance shift exceeded max %d", rtConfig.getMaxResistance());
             break;
           }
-
-          rtConfig.setShifterPosition(ss2k.lastShifterPosition);  // reset shifter position because we're remapping it to resistance target
           rtConfig.resistance.setTarget(rtConfig.resistance.getTarget() + shiftDelta);
           SS2K_LOG(MAIN_LOG_TAG, "Resistance Shift. New Target: %d", rtConfig.resistance.getTarget());
-
-          break;
         }
 
       default:
@@ -270,15 +266,23 @@ void SS2K::FTMSModeShiftModifier() {
         SS2K_LOG(MAIN_LOG_TAG, "Shift %+d pos %d tgt %d min %d max %d r_min %d r_max %d", shiftDelta, rtConfig.getShifterPosition(), ss2k.targetPosition, rtConfig.getMinStep(),
                  rtConfig.getMaxStep(), rtConfig.getMinResistance(), rtConfig.getMaxResistance());
 
-        if ((ss2k.targetPosition > rtConfig.getMaxStep()) || (rtConfig.resistance.getValue() >= rtConfig.getMaxResistance()) || (ss2k.targetPosition < rtConfig.getMinStep()) ||
-            (rtConfig.resistance.getValue() <= rtConfig.getMinResistance())) {
-          SS2K_LOG(MAIN_LOG_TAG, "Shift Blocked by limits.");
+        if ((ss2k.targetPosition > rtConfig.getMaxStep()) || (ss2k.targetPosition < rtConfig.getMinStep())) {
+          SS2K_LOG(MAIN_LOG_TAG, "Shift Blocked by stepper limits.");
           rtConfig.setShifterPosition(ss2k.lastShifterPosition);
-
-          spinBLEServer.notifyShift();
+        } else if ((rtConfig.resistance.getValue() < rtConfig.getMinResistance()) && (shiftDelta > 0)) {
+          // User Shifted in the proper direction - allow
+        } else if ((rtConfig.resistance.getValue() > rtConfig.getMaxResistance()) && (shiftDelta < 0)) {
+          // User Shifted in the proper direction - allow
+        } else if ((rtConfig.resistance.getValue() > rtConfig.getMinResistance()) && (rtConfig.resistance.getValue() < rtConfig.getMaxResistance())) {
+          // User Shifted in bounds - allow
+        } else {
+          // User tried shifting further into the limit - block.
+          SS2K_LOG(MAIN_LOG_TAG, "Shift Blocked by resistance limit.");
+          rtConfig.setShifterPosition(ss2k.lastShifterPosition);
         }
     }
     ss2k.lastShifterPosition = rtConfig.getShifterPosition();
+    spinBLEServer.notifyShift();
   }
 }
 
@@ -497,64 +501,62 @@ void SS2K::motorStop(bool releaseTension) {
   }
 }
 
-void SS2K::checkSerial() {
-  static int txCheck = TX_CHECK_INTERVAL;
-  if (auxSerial.available() >= 8) {           // if at least 8 bytes are available to read from the serial port
-    txCheck             = TX_CHECK_INTERVAL;  // Data received so write to serial port.
-    int i               = 0;
-    int k               = 0;
-    auxSerialBuffer.len = auxSerial.readBytes(auxSerialBuffer.data, AUX_BUF_SIZE);
-    // pre-process Peloton Data. If we get more serial devices we will have to move this into sensor data factory.
-    // This is done here to prevent a lot of extra logging.
-    for (i = 0; i < auxSerialBuffer.len; i++) {  // Find start of data string
-      if (auxSerialBuffer.data[i] == PELOTON_HEADER) {
-        for (k = i; k < auxSerialBuffer.len; k++) {  // Find end of data string
-          if (auxSerialBuffer.data[k] == PELOTON_FOOTER) {
-            k++;
-            break;
-          }
-        }
-        size_t newLen = k - i;  // find length of sub data
-        uint8_t newBuf[newLen];
-        for (int j = i; j < k; j++) {
-          newBuf[j - i] = auxSerialBuffer.data[j];
-        }
-        rtConfig.setMinResistance(MIN_PELOTON_RESISTANCE);
-        rtConfig.setMaxResistance(MAX_PELOTON_RESISTANCE);
-        stepper->setSpeedInHz(STEPPER_PELOTON_SPEED);
-        collectAndSet(PELOTON_DATA_UUID, PELOTON_DATA_UUID, PELOTON_ADDRESS, newBuf, newLen);
-        break;
-      }
-    }
-  }
-  if (PELOTON_TX && (txCheck >= TX_CHECK_INTERVAL)) {
+void SS2K::txSerial() {  // Serial.printf(" Before TX ");
+  if (PELOTON_TX && (txCheck >= 1)) {
     static int alternate = 0;
-    // {tx type, request type, checksum, end tx}
-    byte buf[]           = {PELOTON_REQUEST, 0, 0, PELOTON_FOOTER};
-    int _request_pos     = 1;
-    int _checksum_pos    = 2;
+    byte buf[4]          = {PELOTON_REQUEST, 0x00, 0x00, PELOTON_FOOTER};
     switch (alternate) {
       case 0:
-        buf[_request_pos] = PELOTON_POW_ID;
+        buf[PELOTON_REQ_POS] = PELOTON_POW_ID;
         alternate++;
         break;
       case 1:
-        buf[_request_pos] = PELOTON_CAD_ID;
+        buf[PELOTON_REQ_POS] = PELOTON_CAD_ID;
         alternate++;
         break;
       case 2:
-        buf[_request_pos] = PELOTON_RES_ID;
-        alternate         = 0;
+        buf[PELOTON_REQ_POS] = PELOTON_RES_ID;
+        alternate            = 0;
+        txCheck--;
         break;
     }
-    // calculate checksum
-    buf[_checksum_pos] = (buf[0] + buf[1]) % 256;
-    auxSerial.write(buf, PELOTON_RQ_SIZE);
-    txCheck = 0;
-  } else if (PELOTON_TX) {
-    txCheck++;
+    buf[PELOTON_CHECKSUM_POS] = (buf[0] + buf[1]) % 256;
+    if (auxSerial.availableForWrite() >= PELOTON_RQ_SIZE) {
+      auxSerial.write(buf, PELOTON_RQ_SIZE);
+    }
+  } else if (PELOTON_TX && txCheck <= 0) {
+    if (txCheck == 0) {
+      txCheck = -TX_CHECK_INTERVAL;
+    } else if (txCheck == -1) {
+      txCheck = 1;
+    }
     rtConfig.setMinResistance(-DEFAULT_RESISTANCE_RANGE);
     rtConfig.setMaxResistance(DEFAULT_RESISTANCE_RANGE);
+    txCheck++;
+  }
+}
+
+void SS2K::rxSerial(void) {
+  while (auxSerial.available()) {
+    ss2k.setTxCheck();
+    auxSerialBuffer.len = auxSerial.readBytesUntil(PELOTON_FOOTER, auxSerialBuffer.data, AUX_BUF_SIZE);
+    for (int i = 0; i < auxSerialBuffer.len; i++) {  // Find start of data string
+      if (auxSerialBuffer.data[i] == PELOTON_HEADER) {
+        size_t newLen = auxSerialBuffer.len - i;  // find length of sub data
+        uint8_t newBuf[newLen];
+        for (int j = i; j < auxSerialBuffer.len; j++) {
+          newBuf[j - i] = auxSerialBuffer.data[j];
+        }
+        collectAndSet(PELOTON_DATA_UUID, PELOTON_DATA_UUID, PELOTON_ADDRESS, newBuf, newLen);
+        // else {
+        //   Serial.printf("Data Dropped: ");
+        //   for (int i = 0; i < auxSerialBuffer.len; i++) {
+        //     Serial.printf(" %02x ", auxSerialBuffer.data[i]);
+        //   }
+        //   Serial.printf("\n");
+        // }
+      }
+    }
   }
 }
 

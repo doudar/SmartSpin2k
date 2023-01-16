@@ -95,6 +95,14 @@
 // This is used to set the upper travel limit for the motor.
 #define MAX_PELOTON_RESISTANCE 98
 
+// Minimum resistance on a Peloton Bike.
+// This is used to set the lower travel limit for the motor.
+#define MIN_ECHELON_RESISTANCE 5
+
+// Maximum resistance on a Peloton Bike.
+// This is used to set the upper travel limit for the motor.
+#define MAX_ECHELON_RESISTANCE 30
+
 // Resistance range when no bike with resistance is connected.
 #define DEFAULT_RESISTANCE_RANGE 2000
 
@@ -254,7 +262,7 @@
 #define THROTTLE_TEMP 85
 
 // Size of the Aux Serial Buffer for Peloton
-#define AUX_BUF_SIZE 60
+#define AUX_BUF_SIZE 10
 
 // Interrogate Peloton bike for data?
 #define PELOTON_TX true
