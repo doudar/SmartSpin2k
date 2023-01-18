@@ -55,7 +55,11 @@
           "width": 0.0
         }
       ],
-      "drc_exclusions": [],
+      "drc_exclusions": [
+        "silk_overlap|168358571|115770472|f556cce0-cd33-484d-b55b-81405beb857d|bb258125-831d-4b68-8f4f-3c4c6a914401",
+        "silk_overlap|168965714|125161904|6112af23-20ee-47fa-a350-960321cb9eb2|f2a327bd-0cc2-45f9-83fb-8faedc074c0a",
+        "silk_overlap|169591000|111389521|c6343e31-bde6-4417-811e-3b8777f8ca0c|e0002741-d517-4887-9f18-79ddfe0be27c"
+      ],
       "meta": {
         "filename": "board_design_settings.json",
         "version": 2
