@@ -7,7 +7,7 @@ assignees: ''
 
 ---
 <!--
-Do you want to ask a question? Are you looking for support? Please don't post here. Instead please use the discussion page instead at https://github.com/doudar/SmartSpin2k/discussions
+Do you want to ask a question? Are you looking for support? Please don't post here. Instead please use the discussion page instead at https://github.com/iandhawes/SmartSpin2k/discussions
 
 Type your responses after the bolded description, steps to reproduce and behavior tags. 
 -->

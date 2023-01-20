@@ -7,7 +7,7 @@ Fusion 360 exports and generic STEP files are both provided
 
 
 ## Assembly Instructions
-- [See Shifter Assembly video linked in Wiki](https://github.com/doudar/SmartSpin2k/wiki/Building-How-To)
+- [See Shifter Assembly video linked in Wiki](https://github.com/iandhawes/SmartSpin2k/wiki/Building-How-To)
 
 ## Setup
 - In case you need to flip the orientation of the shifter, you can easily do so in the SmartSpin2K User Interface.  Navigate to [http://SmartSpin2K.local/](http://SmartSpin2K.local).  Here, you can toggle the Shifter Direction button until the device shifts in the right direction and save your settings.  You can verify your settings in the [Web Shifter](http://smartspin2k.local/shift.html)
@@ -15,7 +15,7 @@ Fusion 360 exports and generic STEP files are both provided
 ## BOM
 - Momentary microswitches
 - 1 RCA to 3.5mm audio cable
-See [Recommended Hardware in Wiki](https://github.com/doudar/SmartSpin2k/wiki/Recommended-Hardware) for examples and sourcing information
+See [Recommended Hardware in Wiki](https://github.com/iandhawes/SmartSpin2k/wiki/Recommended-Hardware) for examples and sourcing information
 
 ## Printing instructions
 The bridging layers on this print are tricky to get right with TPU.  It is important to minimize gaps in the bridging layers and ensure it is well sealed against sweat and water.  The instructions listed here have worked well in Superslicer or Prusaslicer. With good cooling and a slow print speed, this print is very achievable. 

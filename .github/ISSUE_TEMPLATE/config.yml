@@ -1,8 +1,8 @@
 blank_issues_enabled : flase
 contact_links:
   - name: SmartSpin2K Wiki
-    url: https://github.com/doudar/SmartSpin2k/wiki
+    url: https://github.com/iandhawes/SmartSpin2k/wiki
     about: Please check here first if you have questions.
   - name: SmartSpin Discussions
-    url: https://github.com/doudar/SmartSpin2k/discussions
+    url: https://github.com/iandhawes/SmartSpin2k/discussions
     about: Please ask and answer questions here.
