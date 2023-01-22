@@ -44,8 +44,8 @@ class Boards {
     rev1.enablePin          = r1_ENABLE_PIN;
     rev1.stepPin            = r1_STEP_PIN;
     rev1.dirPin             = r1_DIR_PIN;
-    rev1.stepperSerialTxPin = r1_STEPPERSERIAL_TX;
-    rev1.stepperSerialRxPin = r1_STEPPERSERIAL_RX;
+    rev1.stepperSerialTxPin = r1_STEPPER_SERIAL_TX;
+    rev1.stepperSerialRxPin = r1_STEPPER_SERIAL_RX;
     rev1.auxSerialTxPin     = 0;
     rev1.auxSerialRxPin     = 0;
     rev1.pwrScaler          = r1_PWR_SCALER;
@@ -57,8 +57,8 @@ class Boards {
     rev2.enablePin          = r2_ENABLE_PIN;
     rev2.stepPin            = r2_STEP_PIN;
     rev2.dirPin             = r2_DIR_PIN;
-    rev2.stepperSerialTxPin = r2_STEPPERSERIAL_TX;
-    rev2.stepperSerialRxPin = r2_STEPPERSERIAL_RX;
+    rev2.stepperSerialTxPin = r2_STEPPER_SERIAL_TX;
+    rev2.stepperSerialRxPin = r2_STEPPER_SERIAL_RX;
     rev2.auxSerialTxPin     = r2_AUX_SERIAL_TX;
     rev2.auxSerialRxPin     = r2_AUX_SERIAL_RX;
     rev2.pwrScaler          = r2_PWR_SCALER;

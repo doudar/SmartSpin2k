@@ -72,7 +72,7 @@ void BLECommunications(void *pvParameters) {
     }
 
     // ***********************************SERVER**************************************
-    if ((spinBLEClient.connectedHR || rtConfig.getSimulateHr()) && !spinBLEClient.connectedPM && !rtConfig.getSimulateWatts() && (rtConfig.getSimulatedHr() > 0) &&
+    if ((spinBLEClient.connectedHR || rtConfig.hr.getSimulate()) && !spinBLEClient.connectedPM && !rtConfig.watts.getSimulate() && (rtConfig.hr.getValue() > 0) &&
         userPWC.hr2Pwr) {
       calculateInstPwrFromHR();
       hr2p = true;
@@ -83,12 +83,12 @@ void BLECommunications(void *pvParameters) {
     calculateInstPwrFromHR();
 #endif  // DEBUG_HR_TO_PWR
 
-    if (!spinBLEClient.connectedPM && !hr2p && !rtConfig.getSimulateWatts() && !rtConfig.getSimulateCad()) {
-      rtConfig.setSimulatedCad(0);
-      rtConfig.setSimulatedWatts(0);
+    if (!spinBLEClient.connectedPM && !hr2p && !rtConfig.watts.getSimulate() && !rtConfig.cad.getSimulate()) {
+      rtConfig.cad.setValue(0);
+      rtConfig.watts.setValue(0);
     }
-    if (!spinBLEClient.connectedHR && !rtConfig.getSimulateHr()) {
-      rtConfig.setSimulatedHr(0);
+    if (!spinBLEClient.connectedHR && !rtConfig.hr.getSimulate()) {
+      rtConfig.hr.setValue(0);
     }
 
     if (connectedClientCount() > 0) {
@@ -103,7 +103,7 @@ void BLECommunications(void *pvParameters) {
       }
 
       processFTMSWrite();
-      // computeERG();
+      spinBLEClient.postConnect();
 
       if (BLEDevice::getAdvertising()) {
         if (!(BLEDevice::getAdvertising()->isAdvertising()) && (BLEDevice::getServer()->getConnectedCount() < CONFIG_BT_NIMBLE_MAX_CONNECTIONS - NUM_BLE_DEVICES)) {

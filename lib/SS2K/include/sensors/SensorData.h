@@ -50,6 +50,12 @@ class SensorData {
   virtual bool hasSpeed() = 0;
 
   /**
+   * @brief Does this sensor have Resistance data?
+   * @return True if there is Resistance data present.
+   */
+  virtual bool hasResistance() = 0;
+
+  /**
    * @brief Get the Heartrate data.
    * @details hasHeartRateData must be called first to check for the availability of data.
    * @return The Heartrate data or INT_MIN if the data is not present.
@@ -76,6 +82,13 @@ class SensorData {
    * @return The Speed data or NAN if the data is not present.
    */
   virtual float getSpeed() = 0;
+
+  /**
+   * @brief Get the resistance data.
+   * @details hasResistanceData must be called first to check for the availability of data.
+   * @return The Resistance data or INT_MIN if the data is not present.
+   */
+  virtual int getResistance() = 0;
 
   /**
    * @brief Decodes the sensor data and stores the parsed Heartrate, Cadence, Power and Speed.

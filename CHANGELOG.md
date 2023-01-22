@@ -12,6 +12,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Added power scaler for new board.
 - Added Main Index link to develop.html.
 - Added feature to automatically reconnect BLE devices if both are specified.
+- Added ftms passthrough. FTMS messages from the client app are now passed to a connected FTMS device.
+- Added resistance capture to Echelon.
+- Added Resistance capture to Flywheel.
+- Added Resistance Capture to Peloton.
+- Added Resistance capture to FTMS.
+- Added scanning when devices are not connected.  
+- Added ability to set travel limits based on resistance feedback from a bike.
+- Added shifting in ERG mode (changes watt target).
+- Added shifting in resistance mode (changes resistance target.)
 
 ### Changed
 - PowerTable values are now adjusted to 90 RPM cad on input.
@@ -22,6 +31,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Moved serial checking to own function. 
 - Reduced verbosity of ERG logging.
 - Fixed instance of BLE PM dropdown not being saved correctly. 
+- Moved post connect handling to the ble communication loop. (improves startup stability)
+- Fixed bug submitted by @flo100 where MIN_WATTS in ERG should have been userConfig.getMinWatts();
+- FTMS resistance mode now changes the attached bike resistance with feedback. (i.e. setting resistance to 50 with a Peloton attached will set 50 on the Peloton)
+- Refactored rtConfig to use more measurement class. 
+- Increased stepper speed when a Peloton is connected. (very light resistance)
+- Updated libraries to latest
 
 ### Hardware
 - Removed duplicate directory in direct mount folder.
@@ -364,7 +379,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 * WiFi Fallback to AP mode is now 10 seconds.
 * WiFi AP mode Fallback SSID is now device name (MDNS name), and the password is whatever you have set.
 * ERG Mode slightly more aggressive.
-* Stealthchop 2 now selectable in settings.
+* StealthChop 2 now selectable in settings.
 * Holding both shifters at boot resets the unit to defaults and erases filesystem. (firmware remains intact)
 * Holding both shifters for 3 seconds after boot preforms a BLE device scan/reconnect.
 
