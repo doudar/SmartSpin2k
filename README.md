@@ -13,6 +13,7 @@ SmartSpin2k adds automatic resistance control to any spin bike! It physically co
 
 One of the main primary design goals of SS2k is to keep the parts count low making it easy for makers to build for themselves. 
 
+### Pre-Built Kits!
 If you'd like to get involved in SS2K but don't want to build your own, a limited number of kits are available on sale by our community members.  [CLICK HERE](https://github.com/doudar/SmartSpin2k/wiki/Prebuilt-Kits) for more information.
 
 ### Documentation

@@ -17,6 +17,8 @@ bool CyclePowerData::hasPower() { return this->power != INT_MIN; }
 
 bool CyclePowerData::hasSpeed() { return false; }
 
+bool CyclePowerData::hasResistance() { return false; }
+
 int CyclePowerData::getHeartRate() { return INT_MIN; }
 
 float CyclePowerData::getCadence() { return this->cadence; }
@@ -24,6 +26,8 @@ float CyclePowerData::getCadence() { return this->cadence; }
 int CyclePowerData::getPower() { return this->power; }
 
 float CyclePowerData::getSpeed() { return nanf(""); }
+
+int CyclePowerData::getResistance() { return INT_MIN; }
 
 void CyclePowerData::decode(uint8_t *data, size_t length) {
   uint8_t flags = data[0];

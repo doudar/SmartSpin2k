@@ -65,7 +65,7 @@ void FSUpgrader::loadFromSPIFFS() {
   userConfig.setDeviceName(doc["deviceName"]);
   userConfig.setShiftStep(doc["shiftStep"]);
   userConfig.setStepperPower(doc["stepperPower"]);
-  userConfig.setStealthChop(doc["stealthchop"]);
+  userConfig.setStealthChop(doc["stealthChop"]);
   userConfig.setInclineMultiplier(doc["inclineMultiplier"]);
   userConfig.setAutoUpdate(doc["autoUpdate"]);
   userConfig.setSsid(doc["ssid"]);

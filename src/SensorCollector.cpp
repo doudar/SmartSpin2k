@@ -19,27 +19,26 @@ void collectAndSet(NimBLEUUID charUUID, NimBLEUUID serviceUUID, NimBLEAddress ad
   SS2K_LOGD(BLE_COMMON_LOG_TAG, "Data length: %d", length);
   int logBufLength = ss2k_log_hex_to_buffer(pData, length, logBuf, 0, kLogBufMaxLength);
 
-  logBufLength += snprintf(logBuf + logBufLength, kLogBufMaxLength - logBufLength, "<- %.8s | %.8s", serviceUUID.toString().c_str(),
-                           charUUID.toString().c_str());
+  logBufLength += snprintf(logBuf + logBufLength, kLogBufMaxLength - logBufLength, "<- %.8s | %.8s", serviceUUID.toString().c_str(), charUUID.toString().c_str());
 
   std::shared_ptr<SensorData> sensorData = sensorDataFactory.getSensorData(charUUID, (uint64_t)address, pData, length);
 
   logBufLength += snprintf(logBuf + logBufLength, kLogBufMaxLength - logBufLength, " | %s[", sensorData->getId().c_str());
-  if (sensorData->hasHeartRate() && !rtConfig.getSimulateHr()) {
+  if (sensorData->hasHeartRate() && !rtConfig.hr.getSimulate()) {
     int heartRate = sensorData->getHeartRate();
-    rtConfig.setSimulatedHr(heartRate);
+    rtConfig.hr.setValue(heartRate);
     spinBLEClient.connectedHR |= true;
     logBufLength += snprintf(logBuf + logBufLength, kLogBufMaxLength - logBufLength, " HR(%d)", heartRate % 1000);
   }
-  if (sensorData->hasCadence() && !rtConfig.getSimulateCad()) {
+  if (sensorData->hasCadence() && !rtConfig.cad.getSimulate()) {
     float cadence = sensorData->getCadence();
-    rtConfig.setSimulatedCad(cadence);
+    rtConfig.cad.setValue(cadence);
     spinBLEClient.connectedCD |= true;
     logBufLength += snprintf(logBuf + logBufLength, kLogBufMaxLength - logBufLength, " CD(%.2f)", fmodf(cadence, 1000.0));
   }
-  if (sensorData->hasPower() && !rtConfig.getSimulateWatts()) {
+  if (sensorData->hasPower() && !rtConfig.watts.getSimulate()) {
     int power = sensorData->getPower() * userConfig.getPowerCorrectionFactor();
-    rtConfig.setSimulatedWatts(power);
+    rtConfig.watts.setValue(power);
     spinBLEClient.connectedPM |= true;
     logBufLength += snprintf(logBuf + logBufLength, kLogBufMaxLength - logBufLength, " PW(%d)", power % 10000);
   }
@@ -48,7 +47,14 @@ void collectAndSet(NimBLEUUID charUUID, NimBLEUUID serviceUUID, NimBLEAddress ad
     rtConfig.setSimulatedSpeed(speed);
     logBufLength += snprintf(logBuf + logBufLength, kLogBufMaxLength - logBufLength, " SD(%.2f)", fmodf(speed, 1000.0));
   }
+  if (sensorData->hasResistance()) {
+    int resistance = sensorData->getResistance();
+    rtConfig.resistance.setValue(resistance);
+    logBufLength += snprintf(logBuf + logBufLength, kLogBufMaxLength - logBufLength, " RS(%d)", resistance % 1000);
+  }
   strncat(logBuf + logBufLength, " ]", kLogBufMaxLength - logBufLength);
   SS2K_LOG(BLE_COMMON_LOG_TAG, "%s", logBuf);
+  #ifdef USE_TELEGRAM
   SEND_TO_TELEGRAM(String(logBuf));
+  #endif
 }
