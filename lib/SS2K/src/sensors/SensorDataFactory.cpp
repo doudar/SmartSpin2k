@@ -61,6 +61,8 @@ bool SensorDataFactory::NullData::hasPower() { return false; }
 
 bool SensorDataFactory::NullData::hasSpeed() { return false; }
 
+bool SensorDataFactory::NullData::hasResistance() { return false; }
+
 int SensorDataFactory::NullData::getHeartRate() { return INT_MIN; }
 
 float SensorDataFactory::NullData::getCadence() { return nanf(""); }
@@ -68,6 +70,8 @@ float SensorDataFactory::NullData::getCadence() { return nanf(""); }
 int SensorDataFactory::NullData::getPower() { return INT_MIN; }
 
 float SensorDataFactory::NullData::getSpeed() { return nanf(""); }
+
+int SensorDataFactory::NullData::getResistance() { return INT_MIN; }
 
 void SensorDataFactory::NullData::decode(uint8_t *data, size_t length) {}
 

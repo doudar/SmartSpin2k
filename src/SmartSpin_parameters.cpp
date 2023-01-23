@@ -19,21 +19,25 @@ String RuntimeParameters::returnJSON() {
   StaticJsonDocument<RUNTIMECONFIG_JSON_SIZE> doc;
   // Set the values in the document
 
-  doc["targetIncline"]       = targetIncline;
-  doc["currentIncline"]      = currentIncline;
-  doc["targetWatts"]         = targetWatts;
-  doc["simulatedWatts"]      = simulatedWatts.value;
-  doc["simulatedHr"]         = simulatedHr;
-  doc["simulatedCad"]        = simulatedCad;
-  doc["simulatedSpeed"]      = simulatedSpeed;
-  doc["simulateHr"]          = simulateHr;
-  doc["simulateWatts"]       = simulateWatts;
-  doc["simulateTargetWatts"] = simulateTargetWatts;
-  doc["simulateCad"]         = simulateCad;
-  doc["ERGMode"]             = ERGMode;
-  doc["shifterPosition"]     = shifterPosition;
-  doc["minStep"]             = minStep;
-  doc["maxStep"]             = maxStep;
+  doc["watts"]            = this->watts.getValue();
+  doc["targetWatts"]      = this->watts.getTarget();
+  doc["simWatts"]         = this->watts.getSimulate();
+  doc["hr"]               = this->hr.getValue();
+  doc["simHr"]            = this->hr.getSimulate();
+  doc["cad"]              = this->cad.getValue();
+  doc["simCad"]           = this->cad.getSimulate();
+  doc["resistance"]       = this->resistance.getValue();
+  doc["targetResistance"] = this->resistance.getTarget();
+  doc["targetIncline"]    = targetIncline;
+  doc["currentIncline"]   = currentIncline;
+  doc["speed"]            = simulatedSpeed;
+  doc["simTargetWatts"]   = simTargetWatts;
+  doc["FTMSMode"]         = FTMSMode;
+  doc["shifterPosition"]  = shifterPosition;
+  doc["minStep"]          = minStep;
+  doc["maxStep"]          = maxStep;
+  doc["minResistance"]    = minResistance;
+  doc["maxResistance"]    = maxResistance;
 
   String output;
   serializeJson(doc, output);
@@ -45,7 +49,7 @@ void userParameters::setDefaults() {
   firmwareUpdateURL     = FW_UPDATEURL;
   deviceName            = DEVICE_NAME;
   shiftStep             = DEFAULT_SHIFT_STEP;
-  stealthchop           = STEALTHCHOP;
+  stealthChop           = STEALTHCHOP;
   stepperPower          = DEFAULT_STEPPER_POWER;
   inclineMultiplier     = 3.0;
   powerCorrectionFactor = 1.0;
@@ -76,7 +80,7 @@ String userParameters::returnJSON() {
   doc["deviceName"]            = deviceName;
   doc["shiftStep"]             = shiftStep;
   doc["stepperPower"]          = stepperPower;
-  doc["stealthchop"]           = stealthchop;
+  doc["stealthChop"]           = stealthChop;
   doc["inclineMultiplier"]     = inclineMultiplier;
   doc["powerCorrectionFactor"] = powerCorrectionFactor;
   doc["ERGSensitivity"]        = ERGSensitivity;
@@ -122,7 +126,7 @@ void userParameters::saveToLittleFS() {
   doc["deviceName"]            = deviceName;
   doc["shiftStep"]             = shiftStep;
   doc["stepperPower"]          = stepperPower;
-  doc["stealthchop"]           = stealthchop;
+  doc["stealthChop"]           = stealthChop;
   doc["inclineMultiplier"]     = inclineMultiplier;
   doc["powerCorrectionFactor"] = powerCorrectionFactor;
   doc["ERGSensitivity"]        = ERGSensitivity;
@@ -175,7 +179,7 @@ void userParameters::loadFromLittleFS() {
   setDeviceName(doc["deviceName"]);
   setShiftStep(doc["shiftStep"]);
   setStepperPower(doc["stepperPower"]);
-  setStealthChop(doc["stealthchop"]);
+  setStealthChop(doc["stealthChop"]);
   setInclineMultiplier(doc["inclineMultiplier"]);
   setAutoUpdate(doc["autoUpdate"]);
   setSsid(doc["ssid"]);
