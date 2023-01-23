@@ -10,7 +10,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Changed
 -
 ### Hardware
--
+- Updated PCB switch placement
+- Updated PCB Inductor
+- Updated PCB Motor Connector
+- Updated PCB Back Side Silkscreen Layer
 
 ## [23.1.22]
 ### Added
@@ -53,10 +56,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - updated Bowflex C7 mount for improved usability
 - updated Echelon knob insert for durability
 - Peloton bike mount updated for improved usability
-- Updated PCB switch placement
-- Updated PCB Inductor
-- Updated PCB Motor Connector
-- Updated PCB Back Side Silkscreen Layer
 
 ## [22.10.8]
 
