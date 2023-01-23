@@ -21,7 +21,7 @@
 // default URL To get Updates From.
 // If changed you'll also need to get a root certificate from the new server
 // and put it in /include/cert.h
-#define FW_UPDATEURL "https://raw.githubusercontent.com/doudar/OTAUpdates/main/"
+#define FW_UPDATEURL "https://raw.githubusercontent.com/iandhawes/OTAUpdates/main/"
 
 // File that contains Version info
 #define FW_VERSIONFILE "version.txt"
@@ -30,7 +30,7 @@
 #define FW_BINFILE "firmware.bin"
 
 // Data directory Source
-#define DATA_UPDATEURL "https://raw.githubusercontent.com/doudar/SmartSpin2k/develop/data"
+#define DATA_UPDATEURL "https://raw.githubusercontent.com/iandhawes/SmartSpin2k/develop/data"
 
 #define DATA_FILELIST "/list.json"
 
