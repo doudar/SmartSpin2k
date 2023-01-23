@@ -10,7 +10,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Changed
 -
 ### Hardware
--
+-Revised an old shifter cover for more options.
 
 ## [23.1.22]
 ### Added
