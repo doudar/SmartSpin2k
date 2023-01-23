@@ -8,7 +8,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Added
 -
 ### Changed
--
+-Disregard Peloton serial power and cadence if user has a BLE power Meter selected. 
 ### Hardware
 -
 

@@ -7,6 +7,7 @@
 
 #include "Main.h"
 #include "SS2KLog.h"
+#include "Constants.h"
 
 #include <sensors/SensorData.h>
 #include <sensors/SensorDataFactory.h>
@@ -31,16 +32,26 @@ void collectAndSet(NimBLEUUID charUUID, NimBLEUUID serviceUUID, NimBLEAddress ad
     logBufLength += snprintf(logBuf + logBufLength, kLogBufMaxLength - logBufLength, " HR(%d)", heartRate % 1000);
   }
   if (sensorData->hasCadence() && !rtConfig.cad.getSimulate()) {
-    float cadence = sensorData->getCadence();
-    rtConfig.cad.setValue(cadence);
-    spinBLEClient.connectedCD |= true;
-    logBufLength += snprintf(logBuf + logBufLength, kLogBufMaxLength - logBufLength, " CD(%.2f)", fmodf(cadence, 1000.0));
+    if ((charUUID == PELOTON_DATA_UUID && (String(userConfig.getConnectedPowerMeter() != "none") || String(userConfig.getConnectedPowerMeter() != "any"))) ||
+        charUUID != PELOTON_DATA_UUID) {
+      float cadence = sensorData->getCadence();
+      rtConfig.cad.setValue(cadence);
+      spinBLEClient.connectedCD |= true;
+      logBufLength += snprintf(logBuf + logBufLength, kLogBufMaxLength - logBufLength, " CD(%.2f)", fmodf(cadence, 1000.0));
+    } else {
+      // Peloton connected but using BLE Power Meter.
+    }
   }
   if (sensorData->hasPower() && !rtConfig.watts.getSimulate()) {
-    int power = sensorData->getPower() * userConfig.getPowerCorrectionFactor();
-    rtConfig.watts.setValue(power);
-    spinBLEClient.connectedPM |= true;
-    logBufLength += snprintf(logBuf + logBufLength, kLogBufMaxLength - logBufLength, " PW(%d)", power % 10000);
+    if ((charUUID == PELOTON_DATA_UUID && (String(userConfig.getConnectedPowerMeter() != "none") || String(userConfig.getConnectedPowerMeter() != "any"))) ||
+        charUUID != PELOTON_DATA_UUID) {
+      int power = sensorData->getPower() * userConfig.getPowerCorrectionFactor();
+      rtConfig.watts.setValue(power);
+      spinBLEClient.connectedPM |= true;
+      logBufLength += snprintf(logBuf + logBufLength, kLogBufMaxLength - logBufLength, " PW(%d)", power % 10000);
+    } else {
+      // Peloton connected but using BLE Power Meter.
+    }
   }
   if (sensorData->hasSpeed()) {
     float speed = sensorData->getSpeed();
@@ -54,7 +65,7 @@ void collectAndSet(NimBLEUUID charUUID, NimBLEUUID serviceUUID, NimBLEAddress ad
   }
   strncat(logBuf + logBufLength, " ]", kLogBufMaxLength - logBufLength);
   SS2K_LOG(BLE_COMMON_LOG_TAG, "%s", logBuf);
-  #ifdef USE_TELEGRAM
+#ifdef USE_TELEGRAM
   SEND_TO_TELEGRAM(String(logBuf));
-  #endif
+#endif
 }
