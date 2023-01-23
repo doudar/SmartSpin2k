@@ -15,6 +15,8 @@ bool HeartRateData::hasPower() { return false; }
 
 bool HeartRateData::hasSpeed() { return false; }
 
+bool HeartRateData::hasResistance() { return false; }
+
 int HeartRateData::getHeartRate() { return this->heartrate; }
 
 float HeartRateData::getCadence() { return nanf(""); }
@@ -22,5 +24,7 @@ float HeartRateData::getCadence() { return nanf(""); }
 int HeartRateData::getPower() { return INT_MIN; }
 
 float HeartRateData::getSpeed() { return nanf(""); }
+
+int HeartRateData::getResistance() { return INT_MIN; }
 
 void HeartRateData::decode(uint8_t *data, size_t length) { this->heartrate = static_cast<int>(data[1]); }

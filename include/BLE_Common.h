@@ -31,13 +31,13 @@
 #define BLE_deviceName            0x07
 #define BLE_shiftStep             0x08
 #define BLE_stepperPower          0x09
-#define BLE_stealthchop           0x0A
+#define BLE_stealthChop           0x0A
 #define BLE_inclineMultiplier     0x0B
 #define BLE_powerCorrectionFactor 0x0C
 #define BLE_simulateHr            0x0D
 #define BLE_simulateWatts         0x0E
 #define BLE_simulateCad           0x0F
-#define BLE_ERGMode               0x10
+#define BLE_FTMSMode              0x10
 #define BLE_autoUpdate            0x11
 #define BLE_ssid                  0x12
 #define BLE_password              0x13
@@ -45,7 +45,7 @@
 #define BLE_connectedPowerMeter   0x15
 #define BLE_connectedHeartMonitor 0x16
 #define BLE_shifterPosition       0x17
-#define BLE_saveToLittleFS          0x18
+#define BLE_saveToLittleFS        0x18
 #define BLE_targetPosition        0x19
 #define BLE_externalControl       0x1A
 #define BLE_syncMode              0x1B
@@ -158,6 +158,7 @@ class SpinBLEAdvertisedDevice {
   bool userSelectedCSC  = false;
   bool userSelectedCT   = false;
   bool doConnect        = false;
+  bool postConnected    = false;
 
   void set(BLEAdvertisedDevice *device, int id = BLE_HS_CONN_HANDLE_NONE, BLEUUID inserviceUUID = (uint16_t)0x0000, BLEUUID incharUUID = (uint16_t)0x0000) {
     advertisedDevice  = device;
@@ -179,8 +180,9 @@ class SpinBLEAdvertisedDevice {
     userSelectedCSC   = false;  // Cycling Speed/Cadence
     userSelectedCT    = false;  // Controllable Trainer
     doConnect         = false;  // Initiate connection flag
+    postConnected     = false;  // Has Cost Connect Been Run?
     if (dataBufferQueue != nullptr) {
-      Serial.println("Resetting queue");
+      //Serial.println("Resetting queue");
       xQueueReset(dataBufferQueue);
     }
   }
@@ -220,7 +222,8 @@ class SpinBLEClient {
   // Reset devices in myBLEDevices[]. Bool All (true) or only connected ones
   // (false)
   void resetDevices();
-  void postConnect(NimBLEClient *pClient);
+  void postConnect();
+  void FTMSControlPointWrite(const uint8_t *pData, int length);
 };
 class MyAdvertisedDeviceCallback : public NimBLEAdvertisedDeviceCallbacks {
  public:

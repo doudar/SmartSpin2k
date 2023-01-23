@@ -58,13 +58,13 @@ From BLE_common.h
 |BLE_deviceName            |0x07   |     |Not Implemented                                    |
 |BLE_shiftStep             |0x08   |int  |Stepper steps per shifter button press             |
 |BLE_stepperPower          |0x09   |int  |Stepper power in ma                                |
-|BLE_stealthchop           |0x0A   |bool |Stepper stealthchop on/off                         |
+|BLE_stealthChop           |0x0A   |bool |Stepper stealthChop on/off                         |
 |BLE_inclineMultiplier     |0x0B   |float|- multiplied by incline to get steps per % gradient|
 |BLE_powerCorrectionFactor |0x0C   |float|.5 - 2.0 to calibrate power output                 |
 |BLE_simulateHr            |0x0D   |bool |                                                   |
 |BLE_simulateWatts         |0x0E   |bool |                                                   |    
 |BLE_simulateCad           |0x0F   |bool |                                                   |
-|BLE_ERGMode               |0x10   |bool |                                                   |
+|BLE_FTMSMode               |0x10   |bool |                                                   |
 |BLE_autoUpdate            |0x11   |bool |updates on (01) or off (00)                        |
 |BLE_ssid                  |0x12   |     |Not Implemented                                    |
 |BLE_password              |0x13   |     |Not Implemented                                    |

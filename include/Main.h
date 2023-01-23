@@ -34,6 +34,7 @@ class SS2K {
   bool stepperIsRunning;
   bool externalControl;
   bool syncMode;
+  int txCheck;
 
   bool IRAM_ATTR deBounce();
   static void IRAM_ATTR moveStepper(void* pvParameters);
@@ -47,11 +48,14 @@ class SS2K {
   void restartWifi();
   void setupTMCStepperDriver();
   void updateStepperPower();
-  void updateStealthchop();
+  void updateStealthChop();
   void checkDriverTemperature();
   void motorStop(bool releaseTension = false);
-  void checkSerial();
   void checkBLEReconnect();
+  void FTMSModeShiftModifier();
+  static void rxSerial(void);
+  void txSerial();
+  void pelotonConnected();
 
   SS2K() {
     targetPosition      = 0;
@@ -65,12 +69,13 @@ class SS2K {
     shiftersHoldForScan = SHIFTERS_HOLD_FOR_SCAN;
     scanDelayTime       = 10000;
     scanDelayStart      = 0;
+    txCheck             = TX_CHECK_INTERVAL;
   }
 };
 
 class AuxSerialBuffer {
  public:
-  uint8_t data[20];
+  uint8_t data[AUX_BUF_SIZE];
   size_t len;
 
   AuxSerialBuffer() {
@@ -81,7 +86,7 @@ class AuxSerialBuffer {
   }
 };
 
-// Users Physical Working Capacity Calculation Parameters (heartrate to Power
+// Users Physical Working Capacity Calculation Parameters (heart rate to Power
 // calculation)
 extern physicalWorkingCapacity userPWC;
 extern SS2K ss2k;
@@ -90,8 +95,7 @@ extern SS2K ss2k;
 extern userParameters userConfig;
 extern RuntimeParameters rtConfig;
 
-//Peloton Specific Parameters
-#define PELOTON_RQ_SIZE 4
-const uint8_t peloton_rq_watts[]{0xF5, 0x44, 0x39, 0xF6};
-const uint8_t peloton_rq_cad[]{0xF5, 0x41, 0x36, 0xF6};
-const uint8_t peloton_rq_res[]{0xF5, 0x4A, 0x3F, 0xF6};
+// Peloton Specific Parameters
+// const uint8_t peloton_rq_watts[]{0xF5, 0x44, 0x39, 0xF6};
+// const uint8_t peloton_rq_cad[]{0xF5, 0x41, 0x36, 0xF6};
+// const uint8_t peloton_rq_res[]{0xF5, 0x49, 0x3F, 0xF6};

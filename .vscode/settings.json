@@ -62,6 +62,25 @@
     },
     "C_Cpp.errorSquiggles": "Disabled",
     "cSpell.words": [
-        "endianness"
+        "Appender",
+        "Baranick",
+        "BINFILE",
+        "Doud",
+        "endianness",
+        "IRAM",
+        "LOGW",
+        "MDNS",
+        "millis",
+        "Peloton",
+        "POWERTABLE",
+        "PWCFILENAME",
+        "RUNTIMECONFIG",
+        "ssid",
+        "STEALTHCHOP",
+        "UPDATEURL",
+        "Upgrader",
+        "userconfig",
+        "VERSIONFILE",
+        "WEBSERVER"
     ]
 }
