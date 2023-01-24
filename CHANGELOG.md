@@ -9,6 +9,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 -
 ### Changed
 - Holding shifter buttons on boot now erases LittleFS as well as resetting settings.
+- Fixed bug where "none" hr still scanned. Credit to @xpectnil for discovering. 
 ### Hardware
 -
 
