@@ -9,6 +9,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 -
 ### Changed
 -Disregard Peloton serial power and cadence if user has a BLE power Meter selected. 
+- Fixed bug where "none" hr still scanned. Credit to @xpectnil for discovering. 
+- Simplified Platform Packages to work better with newest version of PlatformIO.
 ### Hardware
 -
 
