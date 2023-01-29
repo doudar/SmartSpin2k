@@ -8,7 +8,7 @@
 #include "Main.h"
 #include "SS2KLog.h"
 #include "BLE_Common.h"
-
+#include <Constants.h>
 #include <math.h>
 #include <sensors/SensorData.h>
 #include <sensors/SensorDataFactory.h>
@@ -18,6 +18,7 @@ bool hr2p = false;
 TaskHandle_t BLECommunicationTask;
 
 void BLECommunications(void *pvParameters) {
+  unsigned long last_battery_update = millis(); //-BATTERY_UPDATE_INTERVAL_MILLIS;
   for (;;) {
     // **********************************Client***************************************
     for (size_t x = 0; x < NUM_BLE_DEVICES; x++) {  // loop through discovered devices
@@ -54,8 +55,31 @@ void BLECommunications(void *pvParameters) {
                     pData[i] = incomingNotifyData.data[i];
                   }
                   collectAndSet(pRemoteBLECharacteristic->getUUID(), myAdvertisedDevice.serviceUUID, pRemoteBLECharacteristic->getRemoteService()->getClient()->getPeerAddress(), pData, length);
-
                 }
+
+                if(millis() - last_battery_update >= BATTERY_UPDATE_INTERVAL_MILLIS){ 
+                  last_battery_update = millis();
+                  if(spinBLEClient.myBLEDevices[x].charUUID == HEARTCHARACTERISTIC_UUID){
+                    BLERemoteCharacteristic *battCharacteristic = pClient->getService(BATTERYSERVICE_UUID)->getCharacteristic(BATTERYCHARACTERISTIC_UUID);
+                    if (battCharacteristic != nullptr) {
+                      SS2K_LOG(BLE_COMMON_LOG_TAG, "Updating HRM battery");
+                      std::string value = battCharacteristic->readValue();
+                      rtConfig.hr_batt.setValue((uint8_t)value[0]);
+                    } else {
+                      rtConfig.hr_batt.setValue(0);
+                    }
+                  } else if(spinBLEClient.myBLEDevices[x].charUUID == CYCLINGPOWERMEASUREMENT_UUID || spinBLEClient.myBLEDevices[x].charUUID == CYCLINGPOWERSERVICE_UUID) {
+                    BLERemoteCharacteristic *battCharacteristic = pClient->getService(BATTERYSERVICE_UUID)->getCharacteristic(BATTERYCHARACTERISTIC_UUID);
+                    if (battCharacteristic != nullptr) {
+                      SS2K_LOG(BLE_COMMON_LOG_TAG, "Updating PM battery");
+                      std::string value = battCharacteristic->readValue();
+                      rtConfig.pm_batt.setValue((uint8_t)value[0]);
+                    } else {
+                      rtConfig.pm_batt.setValue(0);
+                    }
+                  }
+                }
+                
               } else if (!pClient->isConnected()) {  // This shouldn't ever be
                                                      // called...
                 if (pClient->disconnect() == 0) {    // 0 is a successful disconnect

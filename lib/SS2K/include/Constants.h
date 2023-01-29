@@ -17,6 +17,10 @@
 #define HEARTSERVICE_UUID        NimBLEUUID((uint16_t)0x180D)
 #define HEARTCHARACTERISTIC_UUID NimBLEUUID((uint16_t)0x2A37)
 
+//BatteryLevel Service
+#define BATTERYSERVICE_UUID NimBLEUUID((uint16_t)0x180F) // heart rate sensor service uuid, as defined in gatt specifications
+#define BATTERYCHARACTERISTIC_UUID NimBLEUUID ((uint16_t)0x2A19)
+
 // Cycling Power Service
 #define CSCSERVICE_UUID              NimBLEUUID((uint16_t)0x1816)
 #define CSCMEASUREMENT_UUID          NimBLEUUID((uint16_t)0x2A5B)
