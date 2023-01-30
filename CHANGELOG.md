@@ -6,7 +6,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 ### Added
--
+- Added battery monitoring of BLE devices by @Flo100.
 ### Changed
 - Fixed bug where "none" hr still scanned. Credit to @xpectnil for discovering. 
 - Simplified Platform Packages to work better with newest version of PlatformIO.
