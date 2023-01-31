@@ -17,14 +17,17 @@ class FlywheelData : public SensorData {
   bool hasCadence();
   bool hasPower();
   bool hasSpeed();
+  bool hasResistance();
   int getHeartRate();
   float getCadence();
   int getPower();
   float getSpeed();
+  int getResistance();
   void decode(uint8_t *data, size_t length);
 
  private:
   bool hasData  = false;
   float cadence = nanf("");
   int power     = INT_MIN;
+  int resistance = INT_MIN;
 };

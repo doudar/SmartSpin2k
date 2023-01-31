@@ -179,16 +179,16 @@ void HTTP_Server::start() {
   server.on("/hrslider", []() {
     String value = server.arg("value");
     if (value == "enable") {
-      rtConfig.setSimulateHr(true);
+      rtConfig.hr.setSimulate(true);
       server.send(200, "text/plain", "OK");
       SS2K_LOG(HTTP_SERVER_LOG_TAG, "HR Simulator turned on");
     } else if (value == "disable") {
-      rtConfig.setSimulateHr(false);
+      rtConfig.hr.setSimulate(false);
       server.send(200, "text/plain", "OK");
       SS2K_LOG(HTTP_SERVER_LOG_TAG, "HR Simulator turned off");
     } else {
-      rtConfig.setSimulatedHr(value.toInt());
-      SS2K_LOG(HTTP_SERVER_LOG_TAG, "HR is now: %d", rtConfig.getSimulatedHr());
+      rtConfig.hr.setValue(value.toInt());
+      SS2K_LOG(HTTP_SERVER_LOG_TAG, "HR is now: %d", rtConfig.hr.getValue());
       server.send(200, "text/plain", "OK");
     }
   });
@@ -196,16 +196,16 @@ void HTTP_Server::start() {
   server.on("/wattsslider", []() {
     String value = server.arg("value");
     if (value == "enable") {
-      rtConfig.setSimulateWatts(true);
+      rtConfig.watts.setSimulate(true);
       server.send(200, "text/plain", "OK");
       SS2K_LOG(HTTP_SERVER_LOG_TAG, "Watt Simulator turned on");
     } else if (value == "disable") {
-      rtConfig.setSimulateWatts(false);
+      rtConfig.watts.setSimulate(false);
       server.send(200, "text/plain", "OK");
       SS2K_LOG(HTTP_SERVER_LOG_TAG, "Watt Simulator turned off");
     } else {
-      rtConfig.setSimulatedWatts(value.toInt());
-      SS2K_LOG(HTTP_SERVER_LOG_TAG, "Watts are now: %d", rtConfig.getSimulatedWatts().value);
+      rtConfig.watts.setValue(value.toInt());
+      SS2K_LOG(HTTP_SERVER_LOG_TAG, "Watts are now: %d", rtConfig.watts.getValue());
       server.send(200, "text/plain", "OK");
     }
   });
@@ -213,16 +213,16 @@ void HTTP_Server::start() {
   server.on("/cadslider", []() {
     String value = server.arg("value");
     if (value == "enable") {
-      rtConfig.setSimulateCad(true);
+      rtConfig.cad.setSimulate(true);
       server.send(200, "text/plain", "OK");
       SS2K_LOG(HTTP_SERVER_LOG_TAG, "CAD Simulator turned on");
     } else if (value == "disable") {
-      rtConfig.setSimulateCad(false);
+      rtConfig.cad.setSimulate(false);
       server.send(200, "text/plain", "OK");
       SS2K_LOG(HTTP_SERVER_LOG_TAG, "CAD Simulator turned off");
     } else {
-      rtConfig.setSimulatedCad(value.toInt());
-      SS2K_LOG(HTTP_SERVER_LOG_TAG, "CAD is now: %d", rtConfig.getSimulatedCad());
+      rtConfig.cad.setValue(value.toInt());
+      SS2K_LOG(HTTP_SERVER_LOG_TAG, "CAD is now: %d", rtConfig.cad.getValue());
       server.send(200, "text/plain", "OK");
     }
   });
@@ -230,11 +230,11 @@ void HTTP_Server::start() {
   server.on("/ergmode", []() {
     String value = server.arg("value");
     if (value == "enable") {
-      rtConfig.setERGMode(true);
+      rtConfig.setFTMSMode(FitnessMachineControlPointProcedure::SetTargetPower);
       server.send(200, "text/plain", "OK");
       SS2K_LOG(HTTP_SERVER_LOG_TAG, "ERG Mode turned on");
     } else {
-      rtConfig.setERGMode(false);
+      rtConfig.setFTMSMode(FitnessMachineControlPointProcedure::RequestControl);
       server.send(200, "text/plain", "OK");
       SS2K_LOG(HTTP_SERVER_LOG_TAG, "ERG Mode turned off");
     }
@@ -243,16 +243,16 @@ void HTTP_Server::start() {
   server.on("/targetwattsslider", []() {
     String value = server.arg("value");
     if (value == "enable") {
-      rtConfig.setSimulateTargetWatts(true);
+      rtConfig.setSimTargetWatts(true);
       server.send(200, "text/plain", "OK");
       SS2K_LOG(HTTP_SERVER_LOG_TAG, "Target Watts Simulator turned on");
     } else if (value == "disable") {
-      rtConfig.setSimulateTargetWatts(false);
+      rtConfig.setSimTargetWatts(false);
       server.send(200, "text/plain", "OK");
       SS2K_LOG(HTTP_SERVER_LOG_TAG, "Target Watts Simulator turned off");
     } else {
-      rtConfig.setTargetWatts(value.toInt());
-      SS2K_LOG(HTTP_SERVER_LOG_TAG, "Target Watts are now: %d", rtConfig.getTargetWatts());
+      rtConfig.watts.setTarget(value.toInt());
+      SS2K_LOG(HTTP_SERVER_LOG_TAG, "Target Watts are now: %d", rtConfig.watts.getTarget());
       server.send(200, "text/plain", "OK");
     }
   });
@@ -423,7 +423,7 @@ void HTTP_Server::handleLittleFSFile() {
     file.close();
     SS2K_LOG(HTTP_SERVER_LOG_TAG, "Served %s", filename.c_str());
   } else if (!LittleFS.exists("/index.html")) {
-    SS2K_LOG(HTTP_SERVER_LOG_TAG, "%s not found and no filesystem. Sending builting index.html", filename.c_str());
+    SS2K_LOG(HTTP_SERVER_LOG_TAG, "%s not found and no filesystem. Sending builtin index.html", filename.c_str());
     handleIndexFile();
   } else {
     SS2K_LOG(HTTP_SERVER_LOG_TAG, "%s not found. Sending 404.", filename.c_str());
@@ -506,12 +506,12 @@ void HTTP_Server::settingsProcessor() {
   } else if (wasSettingsUpdate) {
     userConfig.setUdpLogEnabled(false);
   }
-  if (!server.arg("stealthchop").isEmpty()) {
+  if (!server.arg("stealthChop").isEmpty()) {
     userConfig.setStealthChop(true);
-    ss2k.updateStealthchop();
+    ss2k.updateStealthChop();
   } else if (wasSettingsUpdate) {
     userConfig.setStealthChop(false);
-    ss2k.updateStealthchop();
+    ss2k.updateStealthChop();
   }
   if (!server.arg("inclineMultiplier").isEmpty()) {
     float inclineMultiplier = server.arg("inclineMultiplier").toFloat();
@@ -590,16 +590,21 @@ void HTTP_Server::settingsProcessor() {
         "setTimeout(\"location.href = 'http://" +
         myIP.toString() + "/index.html';\",1000);</script></html>";
   }
-  server.send(200, "text/html", response);
   SS2K_LOG(HTTP_SERVER_LOG_TAG, "Config Updated From Web");
   userConfig.saveToLittleFS();
   userConfig.printFile();
   userPWC.saveToLittleFS();
   userPWC.printFile();
   if (reboot) {
+        response +=
+        "Please wait while your settings are saved and SmartSpin2k reboots.</h2></body><script> "
+        "setTimeout(\"location.href = 'http://" +
+        myIP.toString() + "/bluetoothscanner.html';\",5000);</script></html>";
+        server.send(200, "text/html", response);
     vTaskDelay(100 / portTICK_PERIOD_MS);
     ESP.restart();
   }
+  server.send(200, "text/html", response);
 }
 
 void HTTP_Server::stop() {

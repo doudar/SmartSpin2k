@@ -25,6 +25,8 @@ bool FitnessMachineIndoorBikeData::hasPower() { return !std::isnan(values[Types:
 
 bool FitnessMachineIndoorBikeData::hasSpeed() { return !std::isnan(values[Types::InstantaneousSpeed]); }
 
+bool FitnessMachineIndoorBikeData::hasResistance() { return !std::isnan(values[Types::ResistanceLevel]); }
+
 int FitnessMachineIndoorBikeData::getHeartRate() {
   double_t value = values[Types::HeartRate];
   if (std::isnan(value) || value == 0) {
@@ -55,6 +57,14 @@ float FitnessMachineIndoorBikeData::getSpeed() {
     return nanf("");
   }
   return static_cast<float>(value);
+}
+
+int FitnessMachineIndoorBikeData::getResistance() {
+  double_t value = values[Types::ResistanceLevel];
+  if (std::isnan(value)) {
+    return INT_MIN;
+  }
+  return static_cast<int>(value);
 }
 
 void FitnessMachineIndoorBikeData::decode(uint8_t *data, size_t length) {

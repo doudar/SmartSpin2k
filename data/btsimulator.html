@@ -238,29 +238,32 @@
     xhttp.onreadystatechange = function () {
       if (this.readyState == 4 && this.status == 200) {
         var obj = JSON.parse(this.responseText);
-        document.getElementById("wattsValue").innerHTML = obj.simulatedWatts + " Watts";
-        document.getElementById("wattsSlider").value = obj.simulatedWatts;
-        document.getElementById("wattsOutput").checked = obj.simulateWatts;
-        document.getElementById("wattsInputContainer").hidden = !obj.simulateWatts;
+        document.getElementById("wattsValue").innerHTML = obj.watts + " Watts";
+        document.getElementById("wattsSlider").value = obj.watts;
+        document.getElementById("wattsOutput").checked = obj.simWatts;
+        document.getElementById("wattsInputContainer").hidden = !obj.simWatts;
 
-        document.getElementById("hrValue").innerHTML = obj.simulatedHr + " BPM";
-        document.getElementById("hrSlider").value = obj.simulatedHr;
-        document.getElementById("hrOutput").checked = obj.simulateHr;
-        document.getElementById("hrSlider").hidden = !obj.simulateHr;
-        document.getElementById("hrValue").hidden = !obj.simulateHr;
+        document.getElementById("hrValue").innerHTML = obj.hr + " BPM";
+        document.getElementById("hrSlider").value = obj.hr;
+        document.getElementById("hrOutput").checked = obj.simHr;
+        document.getElementById("hrSlider").hidden = !obj.simHr;
+        document.getElementById("hrValue").hidden = !obj.simHr;
 
-        document.getElementById("cadValue").innerHTML = obj.simulatedCad + " RPM";
-        document.getElementById("cadSlider").value = obj.simulatedCad;
-        document.getElementById("cadOutput").checked = obj.simulateCad;
-        document.getElementById("cadInputContainer").hidden = !obj.simulateCad;
-
-        document.getElementById("enableErgCheckbox").checked = obj.ERGMode;
+        document.getElementById("cadValue").innerHTML = obj.cad + " RPM";
+        document.getElementById("cadSlider").value = obj.cad;
+        document.getElementById("cadOutput").checked = obj.simCad;
+        document.getElementById("cadInputContainer").hidden = !obj.simCad;
+        var ergMode = false;
+        if (obj.FTMSMode == "0x05"){
+          ergMode = true;
+        }
+        document.getElementById("enableErgCheckbox").checked = ergMode;
 
         document.getElementById("targetWattsValue").innerHTML = obj.targetWatts + " Watts";
         document.getElementById("targetWattsSlider").value = obj.targetWatts == null ? 0 : obj.targetWatts;
-        document.getElementById("targetWattsOutput").checked = obj.simulateTargetWatts;
-        document.getElementById("targetWattsSlider").hidden = !obj.simulateTargetWatts;
-        document.getElementById("targetWattsValue").hidden = !obj.simulateTargetWatts;
+        document.getElementById("targetWattsOutput").checked = obj.simTargetWatts;
+        document.getElementById("targetWattsSlider").hidden = !obj.simTargetWatts;
+        document.getElementById("targetWattsValue").hidden = !obj.simTargetWatts;
 
         setTimeout(function () {
           const watermark = document.getElementById("loadingWatermark");
