@@ -267,20 +267,22 @@ bool SpinBLEClient::connectToServer() {
  **                       Remove as you see fit for your needs                        */
 
 void MyClientCallback::onConnect(NimBLEClient *pClient) {
-  // additional characteristic subscriptions.
-  // spinBLEClient.handleBattInfo(pClient);
 }
 
-void MyClientCallback::onDisconnect(NimBLEClient *pclient) {
+void MyClientCallback::onDisconnect(NimBLEClient *pClient) {
   SS2K_LOG(BLE_CLIENT_LOG_TAG, "Disconnect Called");
+  //zero battery info
+  spinBLEClient.handleBattInfo(pClient);
 
   if (spinBLEClient.intentionalDisconnect) {
     SS2K_LOG(BLE_CLIENT_LOG_TAG, "Intentional Disconnect");
     spinBLEClient.intentionalDisconnect = false;
     return;
   }
-  if (!pclient->isConnected()) {
-    NimBLEAddress addr = pclient->getPeerAddress();
+  
+  //cleanup spinBLE.myDevices
+  if (!pClient->isConnected()) {
+    NimBLEAddress addr = pClient->getPeerAddress();
     // auto addr = BLEDevice::getDisconnectedClient()->getPeerAddress();
     SS2K_LOG(BLE_CLIENT_LOG_TAG, "This disconnected client Address %s", addr.toString().c_str());
     for (size_t i = 0; i < NUM_BLE_DEVICES; i++) {
@@ -292,13 +294,11 @@ void MyClientCallback::onDisconnect(NimBLEClient *pclient) {
             (spinBLEClient.myBLEDevices[i].charUUID == FLYWHEEL_UART_RX_UUID) || (spinBLEClient.myBLEDevices[i].charUUID == ECHELON_SERVICE_UUID) ||
             (spinBLEClient.myBLEDevices[i].charUUID == CYCLINGPOWERSERVICE_UUID)) {
           SS2K_LOG(BLE_CLIENT_LOG_TAG, "Deregistered PM on Disconnect");
-          rtConfig.pm_batt.setValue(0);
           spinBLEClient.connectedPM = false;
           break;
         }
         if ((spinBLEClient.myBLEDevices[i].charUUID == HEARTCHARACTERISTIC_UUID)) {
           SS2K_LOG(BLE_CLIENT_LOG_TAG, "Deregistered HR on Disconnect");
-          rtConfig.hr_batt.setValue(0);
           spinBLEClient.connectedHR = false;
           break;
         }
