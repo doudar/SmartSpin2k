@@ -506,6 +506,11 @@ void HTTP_Server::settingsProcessor() {
   } else if (wasSettingsUpdate) {
     userConfig.setUdpLogEnabled(false);
   }
+  if (!server.arg("logComm").isEmpty()) {
+    userConfig.setLogComm(true);
+  } else if (wasSettingsUpdate) {
+    userConfig.setLogComm(false);
+  }
   if (!server.arg("stealthChop").isEmpty()) {
     userConfig.setStealthChop(true);
     ss2k.updateStealthChop();
@@ -531,7 +536,7 @@ void HTTP_Server::settingsProcessor() {
       tString = server.arg("blePMDropdown");
       if (tString != userConfig.getConnectedPowerMeter()) {
         userConfig.setConnectedPowerMeter(tString);
-        reboot = true;    
+        reboot = true;
       }
     } else {
       userConfig.setConnectedPowerMeter("any");
@@ -596,11 +601,11 @@ void HTTP_Server::settingsProcessor() {
   userPWC.saveToLittleFS();
   userPWC.printFile();
   if (reboot) {
-        response +=
+    response +=
         "Please wait while your settings are saved and SmartSpin2k reboots.</h2></body><script> "
         "setTimeout(\"location.href = 'http://" +
         myIP.toString() + "/bluetoothscanner.html';\",5000);</script></html>";
-        server.send(200, "text/html", response);
+    server.send(200, "text/html", response);
     vTaskDelay(100 / portTICK_PERIOD_MS);
     ESP.restart();
   }

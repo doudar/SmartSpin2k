@@ -119,6 +119,7 @@ class userParameters {
   bool stepperDir;
   bool shifterDir;
   bool udpLogEnabled = false;
+  bool logComm       = false;
   String ssid;
   String password;
   String connectedPowerMeter   = "any";
@@ -179,6 +180,9 @@ class userParameters {
 
   void setUdpLogEnabled(bool enabled) { udpLogEnabled = enabled; }
   bool getUdpLogEnabled() { return udpLogEnabled; }
+
+  void setLogComm(bool lgcm) { logComm = lgcm; }
+  bool getLogComm() { return logComm; }
 
   void setFoundDevices(String fdv) { foundDevices = fdv; }
   const char* getFoundDevices() { return foundDevices.c_str(); }
