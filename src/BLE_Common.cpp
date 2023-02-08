@@ -56,7 +56,7 @@ void BLECommunications(void *pvParameters) {
                   collectAndSet(pRemoteBLECharacteristic->getUUID(), myAdvertisedDevice.serviceUUID, pRemoteBLECharacteristic->getRemoteService()->getClient()->getPeerAddress(), pData, length);
                 }
 
-                spinBLEClient.handleBattInfo(pClient);
+                spinBLEClient.handleBattInfo(pClient, false);
                 
               } else if (!pClient->isConnected()) {  // This shouldn't ever be
                                                      // called...

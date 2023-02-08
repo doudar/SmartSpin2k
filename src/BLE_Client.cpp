@@ -267,12 +267,12 @@ bool SpinBLEClient::connectToServer() {
  **                       Remove as you see fit for your needs                        */
 
 void MyClientCallback::onConnect(NimBLEClient *pClient) {
+    // additional characteristic subscriptions.
+    spinBLEClient.handleBattInfo(pClient, true);
 }
 
 void MyClientCallback::onDisconnect(NimBLEClient *pClient) {
   SS2K_LOG(BLE_CLIENT_LOG_TAG, "Disconnect Called");
-  //zero battery info
-  spinBLEClient.handleBattInfo(pClient);
 
   if (spinBLEClient.intentionalDisconnect) {
     SS2K_LOG(BLE_CLIENT_LOG_TAG, "Intentional Disconnect");
@@ -294,11 +294,13 @@ void MyClientCallback::onDisconnect(NimBLEClient *pClient) {
             (spinBLEClient.myBLEDevices[i].charUUID == FLYWHEEL_UART_RX_UUID) || (spinBLEClient.myBLEDevices[i].charUUID == ECHELON_SERVICE_UUID) ||
             (spinBLEClient.myBLEDevices[i].charUUID == CYCLINGPOWERSERVICE_UUID)) {
           SS2K_LOG(BLE_CLIENT_LOG_TAG, "Deregistered PM on Disconnect");
+          rtConfig.pm_batt.setValue(0);
           spinBLEClient.connectedPM = false;
           break;
         }
         if ((spinBLEClient.myBLEDevices[i].charUUID == HEARTCHARACTERISTIC_UUID)) {
           SS2K_LOG(BLE_CLIENT_LOG_TAG, "Deregistered HR on Disconnect");
+          rtConfig.hr_batt.setValue(0);
           spinBLEClient.connectedHR = false;
           break;
         }
@@ -620,9 +622,9 @@ void SpinBLEAdvertisedDevice::print() {
 }
 
 // Poll BLE devices for battCharacteristic if available and read value.
-void SpinBLEClient::handleBattInfo(NimBLEClient *pClient) {
+void SpinBLEClient::handleBattInfo(NimBLEClient *pClient, bool updateNow=false) {
   static unsigned long last_battery_update = 0;
-  if ((millis() - last_battery_update >= BATTERY_UPDATE_INTERVAL_MILLIS) || (last_battery_update == 0)) {
+  if ((millis() - last_battery_update >= BATTERY_UPDATE_INTERVAL_MILLIS) || (last_battery_update == 0) || updateNow) {
     last_battery_update = millis();
     if (pClient->getService(HEARTSERVICE_UUID)) {  // get battery level at first connect
       BLERemoteCharacteristic *battCharacteristic = pClient->getService(BATTERYSERVICE_UUID)->getCharacteristic(BATTERYCHARACTERISTIC_UUID);
