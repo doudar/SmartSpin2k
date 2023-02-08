@@ -209,7 +209,7 @@ void userParameters::loadFromLittleFS() {
     setUdpLogEnabled(doc["udpLogEnabled"]);
   }
   if (!doc["logComm"].isNull()) {
-    setUdpLogEnabled(doc["logComm"]);
+    setLogComm(doc["logComm"]);
   }
   if (doc["powerCorrectionFactor"]) {
     setPowerCorrectionFactor(doc["powerCorrectionFactor"]);
