@@ -32,7 +32,7 @@ void collectAndSet(NimBLEUUID charUUID, NimBLEUUID serviceUUID, NimBLEAddress ad
     logBufLength += snprintf(logBuf + logBufLength, kLogBufMaxLength - logBufLength, " HR(%d)", heartRate % 1000);
   }
   if (sensorData->hasCadence() && !rtConfig.cad.getSimulate()) {
-    if ((charUUID == PELOTON_DATA_UUID) && ((String(userConfig.getConnectedPowerMeter()) != "none") || (String(userConfig.getConnectedPowerMeter()) != "any"))) {
+    if ((charUUID == PELOTON_DATA_UUID) && !((String(userConfig.getConnectedPowerMeter()) == "none") || (String(userConfig.getConnectedPowerMeter()) == "any"))) {
       // Peloton connected but using BLE Power Meter. So skip cad for Peloton UUID.
     } else {
       float cadence = sensorData->getCadence();
@@ -42,7 +42,7 @@ void collectAndSet(NimBLEUUID charUUID, NimBLEUUID serviceUUID, NimBLEAddress ad
     }
   }
   if (sensorData->hasPower() && !rtConfig.watts.getSimulate()) {
-    if ((charUUID == PELOTON_DATA_UUID) && ((String(userConfig.getConnectedPowerMeter()) != "none") || (String(userConfig.getConnectedPowerMeter()) != "any"))) {
+    if ((charUUID == PELOTON_DATA_UUID) && !((String(userConfig.getConnectedPowerMeter()) == "none") || (String(userConfig.getConnectedPowerMeter()) == "any"))) {
       // Peloton connected but using BLE Power Meter. So skip power for Peloton UUID.
     } else {
       int power = sensorData->getPower() * userConfig.getPowerCorrectionFactor();
