@@ -537,10 +537,10 @@ void SS2K::txSerial() {  // Serial.printf(" Before TX ");
   }
 }
 
-void SS2K::pelotonConnected(){
-txCheck = TX_CHECK_INTERVAL;
-rtConfig.setMinResistance(MIN_PELOTON_RESISTANCE);
-rtConfig.setMaxResistance(MAX_PELOTON_RESISTANCE);
+void SS2K::pelotonConnected() {
+  txCheck = TX_CHECK_INTERVAL;
+  rtConfig.setMinResistance(MIN_PELOTON_RESISTANCE);
+  rtConfig.setMaxResistance(MAX_PELOTON_RESISTANCE);
 }
 
 void SS2K::rxSerial(void) {
@@ -561,34 +561,36 @@ void SS2K::rxSerial(void) {
 }
 
 void SS2K::checkBLEReconnect() {
-  static int bleCheck = 0;
-  if ((String(userConfig.getConnectedHeartMonitor()) == "none") && ((String(userConfig.getConnectedPowerMeter()) == "none"))) {  // Exit immediately if "none" and "none"
-    bleCheck = 0;
-    return;
-  }
-  if ((spinBLEClient.connectedHR) && (spinBLEClient.connectedPM)) {  // Exit if both are connected
-    bleCheck = 0;
-    return;
-  }
-  if (((String(userConfig.getConnectedPowerMeter()) == "none") && (spinBLEClient.connectedHR))) {  // Exit if "none" PM and HR is connected
-    bleCheck = 0;
-    return;
-  }
-  if (((String(userConfig.getConnectedHeartMonitor()) == "none") && (spinBLEClient.connectedPM))) {  // Exit if "none" HR and PM is connected
-    bleCheck = 0;
-    return;
-  }
-  if (bleCheck >= BLE_RECONNECT_INTERVAL) {
-    bleCheck = 0;
-    if (!NimBLEDevice::getScan()->isScanning()) {
-      SS2K_LOG(MAIN_LOG_TAG, "Scanning from Check BLE Reconnect %d", bleCheck);
-      spinBLEClient.resetDevices();
-      spinBLEClient.scanProcess(BLE_RECONNECT_SCAN_DURATION);
+  if (BLECommunicationTask != NULL) { //check that BLE communication isn't suspended
+    static int bleCheck = 0;
+    if ((String(userConfig.getConnectedHeartMonitor()) == "none") && ((String(userConfig.getConnectedPowerMeter()) == "none"))) {  // Exit immediately if "none" and "none"
+      bleCheck = 0;
+      return;
     }
-  }
-  if (NimBLEDevice::getScan()->isScanning()) {
-    bleCheck = 0;
-  } else {
-    bleCheck++;
+    if ((spinBLEClient.connectedHR) && (spinBLEClient.connectedPM)) {  // Exit if both are connected
+      bleCheck = 0;
+      return;
+    }
+    if (((String(userConfig.getConnectedPowerMeter()) == "none") && (spinBLEClient.connectedHR))) {  // Exit if "none" PM and HR is connected
+      bleCheck = 0;
+      return;
+    }
+    if (((String(userConfig.getConnectedHeartMonitor()) == "none") && (spinBLEClient.connectedPM))) {  // Exit if "none" HR and PM is connected
+      bleCheck = 0;
+      return;
+    }
+    if (bleCheck >= BLE_RECONNECT_INTERVAL) {
+      bleCheck = 0;
+      if (!NimBLEDevice::getScan()->isScanning()) {
+        SS2K_LOG(MAIN_LOG_TAG, "Scanning from Check BLE Reconnect %d", bleCheck);
+        spinBLEClient.resetDevices();
+        spinBLEClient.scanProcess(BLE_RECONNECT_SCAN_DURATION);
+      }
+    }
+    if (NimBLEDevice::getScan()->isScanning()) {
+      bleCheck = 0;
+    } else {
+      bleCheck++;
+    }
   }
 }
