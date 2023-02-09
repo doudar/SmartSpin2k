@@ -14,7 +14,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Hardware
 - Added fixed length arms. 
 - Added R3 assembly instructions.
-- Added back a modified version of the single button shifter. 
+- Added back a modified version of the single button shifter.
+- Changed Logo font and position.
+- Increased material around the top screw hole. 
 
 ## [23.1.22]
 ### Added
