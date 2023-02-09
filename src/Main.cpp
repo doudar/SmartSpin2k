@@ -562,7 +562,7 @@ void SS2K::rxSerial(void) {
 
 void SS2K::checkBLEReconnect() {
   static int bleCheck = 0;
-  if ((String(userConfig.getConnectedPowerMeter()) == "none") && ((String(userConfig.getConnectedPowerMeter()) == "none"))) {  // Exit immediately if "none" and "none"
+  if ((String(userConfig.getConnectedHeartMonitor()) == "none") && ((String(userConfig.getConnectedPowerMeter()) == "none"))) {  // Exit immediately if "none" and "none"
     bleCheck = 0;
     return;
   }
@@ -574,7 +574,7 @@ void SS2K::checkBLEReconnect() {
     bleCheck = 0;
     return;
   }
-  if (((String(userConfig.getConnectedPowerMeter()) == "none") && (spinBLEClient.connectedPM))) {  // Exit if "none" HR and PM is connected
+  if (((String(userConfig.getConnectedHeartMonitor()) == "none") && (spinBLEClient.connectedPM))) {  // Exit if "none" HR and PM is connected
     bleCheck = 0;
     return;
   }
