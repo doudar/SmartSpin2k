@@ -17,6 +17,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Added back a modified version of the single button shifter.
 - Changed Logo font and position.
 - Increased material around the top screw hole. 
+- Made shifter plugs slightly smaller.
+- Increased diameter of shifter strain relief.
 
 ## [23.1.22]
 ### Added
