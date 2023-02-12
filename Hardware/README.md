@@ -1,4 +1,4 @@
-# [SmartSpin2K Hardware]
+# SmartSpin2K Hardware
 V3 is the brand spanking new version where we've gone to a more rigid mount and designed a completly custom PCB with SMT components which can be manufactured using automated techniques. THe newest PCB sports a uart->serial driver to allow direct communication with Peloton bikes. 
 
 V2 prints easier, is smaller and uses less hardware. It has a much better gear ratio than V1 and supports a carrier board PCB onto which the devkits mount for easy wiring/soldering.  A rigid mount referred to as Direct Mount is available for stable mounting.
@@ -9,7 +9,7 @@ Hardware is available in two primary versions.  V2 - The Through-Hole soldered v
 
 There's additional information in each folder to help you determine what parts might work best for you. 
 
-# [Directory]
+# Directories
 ## [V2 - Through-Hole Soldered](https://github.com/doudar/SmartSpin2k/tree/develop/Hardware/V2%20-%20Through%20Hole)
 Available in many case versions.  The direct mount mod is the recommended solution for new builders and DIYers.  It is supported on various bikes and is easily adapted to other form factors.  
 
