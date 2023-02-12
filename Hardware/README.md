@@ -10,38 +10,38 @@ Hardware is available in two primary versions.  V2 - The Through-Hole soldered v
 There's additional information in each folder to help you determine what parts might work best for you. 
 
 # [Directory]
-## [V2 - Through-Hole Soldered]
+## [V2 - Through-Hole Soldered](https://github.com/doudar/SmartSpin2k/tree/develop/Hardware/V2%20-%20Through%20Hole)
 Available in many case versions.  The direct mount mod is the recommended solution for new builders and DIYers.  It is supported on various bikes and is easily adapted to other form factors.  
 
-## [V3 - Integrated PCB]
+## [V3 - Integrated PCB](https://github.com/doudar/SmartSpin2k/tree/develop/Hardware/V3%20-%20Integrated%20PCB)
 Use with the SMT manufaactured PCB and for compatibility with Peloton bikes.
 
-## [Common Assets]
-### [Arm]
+## [Common Assets](https://github.com/doudar/SmartSpin2k/tree/develop/Hardware/Common%20Assets)
+### [Arm](https://github.com/doudar/SmartSpin2k/tree/develop/Hardware/Common%20Assets/Arm)
 The Arm is used to connect the SmartSpin2K to the bike mount.  See Readme for sizing and fitment information.
 
 Required for V3 and V2 Direct Mount.
 
-### [Bike Mount]
+### [Bike Mount](https://github.com/doudar/SmartSpin2k/tree/develop/Hardware/Common%20Assets/Bike%20Mount)
 Attaches to the head tube of your bike and provides an attachment point for the arm.
 
 Required for V3 and V2 Direct Mount
 
-### [Gears]
+### [Gears](https://github.com/doudar/SmartSpin2k/tree/develop/Hardware/Common%20Assets/Bike%20Mount)
 Internal drive gears for the SmartSpin2K.  11:40t gearing.
 
 Required for all V2 and V3 variations
 
-### [Inserts]
+### [Inserts](https://github.com/doudar/SmartSpin2k/tree/develop/Hardware/Common%20Assets/Inserts)
 Choose the appropriate insert for your bike.  There are some generic knob designs that apply to several no-name models.  Browse the directory - your bike may already be covered.
 
 Required for all V2 and V3 variations
  
 
-### [KnobCup]
+### [KnobCup](https://github.com/doudar/SmartSpin2k/tree/develop/Hardware/Common%20Assets/KnobCups)
 Knob Cup retains the insert and connects to the internal gearbox of the SmartSpin2K
 
 Required for all V2 and V3 variations
 
-### [Shifters]
+### [Shifters](https://github.com/doudar/SmartSpin2k/tree/develop/Hardware/Common%20Assets/Shifters)
 You'll want shifters to do sim rides with.  Print this in TPU.
