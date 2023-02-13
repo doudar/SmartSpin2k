@@ -68,6 +68,7 @@ class MyServerCallbacks : public NimBLEServerCallbacks {
  public:
   void onConnect(BLEServer *, ble_gap_conn_desc *desc);
   void onDisconnect(BLEServer *);
+  bool onConnParamsUpdateRequest(NimBLEClient *pClient, const ble_gap_upd_params *params);
 };
 
 class MyCallbacks : public NimBLECharacteristicCallbacks {
@@ -76,7 +77,6 @@ class MyCallbacks : public NimBLECharacteristicCallbacks {
   void onSubscribe(NimBLECharacteristic *pCharacteristic, ble_gap_conn_desc *desc, uint16_t subValue);
 };
 
-// static void onNotify(NimBLECharacteristic *pCharacteristic, uint8_t *pData);
 class ss2kCustomCharacteristicCallbacks : public BLECharacteristicCallbacks {
   void onWrite(BLECharacteristic *);
 };
@@ -182,7 +182,7 @@ class SpinBLEAdvertisedDevice {
     doConnect         = false;  // Initiate connection flag
     postConnected     = false;  // Has Cost Connect Been Run?
     if (dataBufferQueue != nullptr) {
-      //Serial.println("Resetting queue");
+      // Serial.println("Resetting queue");
       xQueueReset(dataBufferQueue);
     }
   }
@@ -224,7 +224,9 @@ class SpinBLEClient {
   void resetDevices();
   void postConnect();
   void FTMSControlPointWrite(const uint8_t *pData, int length);
+  void connectBLE_HID(NimBLEClient *pClient);
 };
+
 class MyAdvertisedDeviceCallback : public NimBLEAdvertisedDeviceCallbacks {
  public:
   void onResult(NimBLEAdvertisedDevice *);

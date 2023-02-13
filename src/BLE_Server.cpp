@@ -92,9 +92,9 @@ void logCharacteristic(char *buffer, const size_t bufferCapacity, const byte *da
   va_end(args);
 
   SS2K_LOG(BLE_SERVER_LOG_TAG, "%s", buffer);
-  #ifdef USE_TELEGRAM
+#ifdef USE_TELEGRAM
   SEND_TO_TELEGRAM(String(buffer));
-  #endif
+#endif
 }
 
 void startBLEServer() {
@@ -239,11 +239,11 @@ void updateIndoorBikeDataChar() {
   fitnessMachineIndoorBikeData->setValue(ftmsIndoorBikeData, 11);
   fitnessMachineIndoorBikeData->notify();
 
-  //ftmsResistanceLevelRange[0] = (uint8_t)rtConfig.getMinResistance() & 0xff;
-  //ftmsResistanceLevelRange[1] = (uint8_t)rtConfig.getMinResistance() >> 8;
-  //ftmsResistanceLevelRange[2] = (uint8_t)rtConfig.getMaxResistance() & 0xff;
-  //ftmsResistanceLevelRange[3] = (uint8_t)rtConfig.getMaxResistance() >> 8;
-  //ftmsResistanceLevelRange.setValue(ftmsResistanceLevelRange, 6);
+  // ftmsResistanceLevelRange[0] = (uint8_t)rtConfig.getMinResistance() & 0xff;
+  // ftmsResistanceLevelRange[1] = (uint8_t)rtConfig.getMinResistance() >> 8;
+  // ftmsResistanceLevelRange[2] = (uint8_t)rtConfig.getMaxResistance() & 0xff;
+  // ftmsResistanceLevelRange[3] = (uint8_t)rtConfig.getMaxResistance() >> 8;
+  // ftmsResistanceLevelRange.setValue(ftmsResistanceLevelRange, 6);
 
   const int kLogBufCapacity = 200;  // Data(30), Sep(data/2), Arrow(3), CharId(37), Sep(3), CharId(37), Sep(3), Name(10), Prefix(2), HR(7), SEP(1), CD(10), SEP(1), PW(8),
                                     // SEP(1), SD(7), Suffix(2), Nul(1), rounded up
@@ -323,6 +323,12 @@ void MyServerCallbacks::onDisconnect(BLEServer *pServer) {
   SS2K_LOG(BLE_SERVER_LOG_TAG, "Bluetooth Remote Client Disconnected. Remaining Clients: %d", pServer->getConnectedCount());
   BLEDevice::startAdvertising();
 }
+
+bool MyServerCallbacks::onConnParamsUpdateRequest(NimBLEClient *pClient, const ble_gap_upd_params *params) {
+  // Failing to accept parameters may result in the remote device
+  // disconnecting.
+  return true;
+};
 
 void MyCallbacks::onWrite(BLECharacteristic *pCharacteristic) { FTMSWrite = pCharacteristic->getValue(); }
 

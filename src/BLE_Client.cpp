@@ -38,6 +38,24 @@ void SpinBLEClient::start() {
 }
 
 static void onNotify(BLERemoteCharacteristic *pBLERemoteCharacteristic, uint8_t *pData, size_t length, bool isNotify) {
+  if (pBLERemoteCharacteristic->getRemoteService()->getUUID() == HID_SERVICE_UUID) {
+    // Serial.print(str.c_str());
+    // Serial.print(pRemoteCharacteristic->getHandle());
+    Serial.print("Remote Value = ");
+    Serial.print(pData[0], HEX);
+    if (pData[0] == 0x04) {
+      rtConfig.setShifterPosition(rtConfig.getShifterPosition()+1);
+    }
+    if (pData[0] == 0x08) {
+      rtConfig.setShifterPosition(rtConfig.getShifterPosition()-1);
+    }
+    // for (size_t i = 0; i < length; i++) {
+    //   Serial.print(pData[i], HEX);
+    //   Serial.print(',');
+    // }
+    // Serial.print(' ');
+  }
+  // enqueue data
   for (size_t i = 0; i < NUM_BLE_DEVICES; i++) {
     if (pBLERemoteCharacteristic->getUUID() == spinBLEClient.myBLEDevices[i].charUUID) {
       spinBLEClient.myBLEDevices[i].enqueueData(pData, length);
@@ -48,7 +66,7 @@ static void onNotify(BLERemoteCharacteristic *pBLERemoteCharacteristic, uint8_t 
 // BLE Client loop task
 void bleClientTask(void *pvParameters) {
   for (;;) {
-      vTaskDelay(BLE_CLIENT_DELAY / portTICK_PERIOD_MS);  // Delay a second between loops.
+    vTaskDelay(BLE_CLIENT_DELAY / portTICK_PERIOD_MS);  // Delay a second between loops.
     if (spinBLEClient.doScan && (spinBLEClient.scanRetries > 0) && !NimBLEDevice::getScan()->isScanning()) {
       spinBLEClient.scanRetries--;
       SS2K_LOG(BLE_CLIENT_LOG_TAG, "Initiating Scan from Client Task:");
@@ -126,6 +144,9 @@ bool SpinBLEClient::connectToServer() {
       serviceUUID = HEARTSERVICE_UUID;
       charUUID    = HEARTCHARACTERISTIC_UUID;
       SS2K_LOG(BLE_CLIENT_LOG_TAG, "Trying to connect to HRM");
+    } else if (myDevice->isAdvertisingService(HID_SERVICE_UUID)) {
+      serviceUUID = HID_SERVICE_UUID;
+      SS2K_LOG(BLE_CLIENT_LOG_TAG, "Trying to connect to BLE HID remote");
     } else {
       SS2K_LOG(BLE_CLIENT_LOG_TAG, "No advertised UUID found");
       spinBLEClient.myBLEDevices[device_number].reset();
@@ -214,7 +235,19 @@ bool SpinBLEClient::connectToServer() {
 
   SS2K_LOG(BLE_CLIENT_LOG_TAG, "Connected to: %s RSSI %d", pClient->getPeerAddress().toString().c_str(), pClient->getRssi());
 
-  /** Now we can read/write/subscribe the charateristics of the services we are interested in */
+  if (serviceUUID == HID_SERVICE_UUID) {
+    connectBLE_HID(pClient);
+    this->reconnectTries = MAX_RECONNECT_TRIES;
+    this->scanRetries    = MAX_SCAN_RETRIES;
+    SS2K_LOG(BLE_CLIENT_LOG_TAG, "Successful remote subscription.");
+    spinBLEClient.myBLEDevices[device_number].doConnect = false;
+    this->reconnectTries                                = MAX_RECONNECT_TRIES;
+    spinBLEClient.myBLEDevices[device_number].set(myDevice, pClient->getConnId(), serviceUUID, charUUID);
+    removeDuplicates(pClient);
+    return true;
+  }
+
+  /** Now we can read/write/subscribe the characteristics of the services we are interested in */
   NimBLERemoteService *pSvc        = nullptr;
   NimBLERemoteCharacteristic *pChr = nullptr;
   NimBLERemoteDescriptor *pDsc     = nullptr;
@@ -268,6 +301,8 @@ bool SpinBLEClient::connectToServer() {
 
 void MyClientCallback::onConnect(NimBLEClient *pClient) {
   // Currently Not Used
+  pClient->updateConnParams(120, 120, 0, 60);
+  // Testing^^ remove this^^
 }
 
 void MyClientCallback::onDisconnect(NimBLEClient *pclient) {
@@ -335,12 +370,11 @@ void MyAdvertisedDeviceCallback::onResult(BLEAdvertisedDevice *advertisedDevice)
   if ((advertisedDevice->haveServiceUUID()) &&
       (advertisedDevice->isAdvertisingService(CYCLINGPOWERSERVICE_UUID) || (advertisedDevice->isAdvertisingService(FLYWHEEL_UART_SERVICE_UUID) && aDevName == FLYWHEEL_BLE_NAME) ||
        advertisedDevice->isAdvertisingService(FITNESSMACHINESERVICE_UUID) || advertisedDevice->isAdvertisingService(HEARTSERVICE_UUID) ||
-       advertisedDevice->isAdvertisingService(ECHELON_DEVICE_UUID))) {
-    // if ((aDevName == c_PM) || (advertisedDevice->getAddress().toString().c_str() == c_PM) || (aDevName == c_HR) || (advertisedDevice->getAddress().toString().c_str() == c_HR) ||
-    // (String(c_PM) == ("any")) || (String(c_HR) == ("any"))) { //notice the subtle difference vv getServiceUUID(int) returns the index of the service in the list or the 0 slot if
-    // not specified.
+       advertisedDevice->isAdvertisingService(ECHELON_DEVICE_UUID) || advertisedDevice->isAdvertisingService(HID_SERVICE_UUID))) {
     SS2K_LOG(BLE_CLIENT_LOG_TAG, "Matching Device Name: %s", aDevName.c_str());
-    if (advertisedDevice->getServiceUUID() == HEARTSERVICE_UUID) {
+    if (advertisedDevice->getServiceUUID() == HID_SERVICE_UUID) {
+      SS2K_LOG(BLE_CLIENT_LOG_TAG, "Setting Up BLE HID Remote");
+    } else if (advertisedDevice->getServiceUUID() == HEARTSERVICE_UUID) {
       if (String(userConfig.getConnectedHeartMonitor()) == "any") {
         SS2K_LOG(BLE_CLIENT_LOG_TAG, "HR String Matched Any");
         // continue
@@ -350,8 +384,7 @@ void MyAdvertisedDeviceCallback::onResult(BLEAdvertisedDevice *advertisedDevice)
       } else if (aDevName == String(userConfig.getConnectedHeartMonitor())) {
         SS2K_LOG(BLE_CLIENT_LOG_TAG, "HR String Matched %s", aDevName.c_str());
       }
-    } else {  // Already tested -->((advertisedDevice->getServiceUUID()(CYCLINGPOWERSERVICE_UUID) || advertisedDevice->getServiceUUID()(FLYWHEEL_UART_SERVICE_UUID) ||
-              // advertisedDevice->getServiceUUID()(FITNESSMACHINESERVICE_UUID)))
+    } else {
       if (String(userConfig.getConnectedPowerMeter()) == "any") {
         SS2K_LOG(BLE_CLIENT_LOG_TAG, "PM String Matched Any");
         // continue
@@ -399,7 +432,7 @@ void SpinBLEClient::scanProcess(int duration) {
   for (int i = 0; i < count; i++) {
     BLEAdvertisedDevice d = foundDevices.getDevice(i);
     if (d.isAdvertisingService(CYCLINGPOWERSERVICE_UUID) || d.isAdvertisingService(HEARTSERVICE_UUID) || d.isAdvertisingService(FLYWHEEL_UART_SERVICE_UUID) ||
-        d.isAdvertisingService(FITNESSMACHINESERVICE_UUID) || d.isAdvertisingService(ECHELON_DEVICE_UUID)) {
+        d.isAdvertisingService(FITNESSMACHINESERVICE_UUID) || d.isAdvertisingService(ECHELON_DEVICE_UUID) || d.isAdvertisingService(HID_SERVICE_UUID)) {
       device                     = "device " + String(i);
       devices[device]["address"] = d.getAddress().toString();
 
@@ -612,4 +645,81 @@ void SpinBLEAdvertisedDevice::print() {
   logBufP += sprintf(logBufP, " doConnect: (%s)", doConnect ? "true" : "false");
   strcat(logBufP, "|");
   SS2K_LOG(BLE_CLIENT_LOG_TAG, "%s", String(logBuf));
+}
+
+/** Notification / Indication receiving handler callback */
+// Notification from 4c:75:25:xx:yy:zz: Service = 0x1812, Characteristic = 0x2a4d, Value = 1,0,0,0,0,
+void notifyCB(NimBLERemoteCharacteristic *pRemoteCharacteristic, uint8_t *pData, size_t length, bool isNotify) {
+  std::string str = (isNotify == true) ? "Notification" : "Indication";
+  str += " from ";
+  /** NimBLEAddress and NimBLEUUID have std::string operators */
+  str += std::string(pRemoteCharacteristic->getRemoteService()->getClient()->getPeerAddress());
+  str += ": Service = " + std::string(pRemoteCharacteristic->getRemoteService()->getUUID());
+  str += ", Characteristic = " + std::string(pRemoteCharacteristic->getUUID());
+  str += ", Handle = 0x";
+  Serial.print(str.c_str());
+  Serial.print(pRemoteCharacteristic->getHandle());
+  Serial.print(", Value = ");
+  for (size_t i = 0; i < length; i++) {
+    Serial.print(pData[i], HEX);
+    Serial.print(',');
+  }
+  Serial.print(' ');
+
+  Serial.println();
+}
+
+void SpinBLEClient::connectBLE_HID(NimBLEClient *pClient) {
+  NimBLERemoteService *pSvc        = nullptr;
+  NimBLERemoteCharacteristic *pChr = nullptr;
+  pSvc                             = pClient->getService(HID_SERVICE_UUID);
+  if (pSvc) { /** make sure it's not null */
+    if (true) {
+      // This returns the HID report descriptor like this
+      // HID_REPORT_MAP 0x2a4b Value: 5,1,9,2,A1,1,9,1,A1,0,5,9,19,1,29,5,15,0,25,1,75,1,
+      // Copy and paste the value digits to http://eleccelerator.com/usbdescreqparser/
+      // to see the decoded report descriptor.
+      pChr = pSvc->getCharacteristic(HID_REPORT_MAP_UUID);
+      if (pChr) { /** make sure it's not null */
+        Serial.print("HID_REPORT_MAP ");
+        if (pChr->canRead()) {
+          std::string value = pChr->readValue();
+          Serial.print(pChr->getUUID().toString().c_str());
+          Serial.print(" Value: ");
+          uint8_t *p = (uint8_t *)value.data();
+          for (size_t i = 0; i < value.length(); i++) {
+            Serial.print(p[i], HEX);
+            Serial.print(',');
+          }
+          Serial.println();
+        }
+      } else {
+        Serial.println("HID REPORT MAP char not found.");
+      }
+    }
+
+    // Subscribe to characteristics HID_REPORT_DATA.
+    // One real device reports 2 with the same UUID but
+    // different handles. Using getCharacteristic() results
+    // in subscribing to only one.
+    std::vector<NimBLERemoteCharacteristic *> *charVector;
+    charVector = pSvc->getCharacteristics(true);
+    for (auto &it : *charVector) {
+      if (it->getUUID() == NimBLEUUID(HID_REPORT_DATA_UUID)) {
+        Serial.println(it->toString().c_str());
+        if (it->canNotify()) {
+          if (!it->subscribe(true, onNotify)) {
+            /** Disconnect if subscribe failed */
+            Serial.println("subscribe notification failed");
+            pClient->disconnect();
+            return;  // false;
+          } else {
+            Serial.println("subscribed");
+          }
+        }
+      }
+    }
+  }
+  Serial.println("Done with this device!");
+  return;  // true;
 }

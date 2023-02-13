@@ -8,6 +8,7 @@
 #include "Main.h"
 #include "SS2KLog.h"
 #include "BLE_Common.h"
+#include "Constants.h"
 
 #include <math.h>
 #include <sensors/SensorData.h>
@@ -21,6 +22,9 @@ void BLECommunications(void *pvParameters) {
   for (;;) {
     // **********************************Client***************************************
     for (size_t x = 0; x < NUM_BLE_DEVICES; x++) {  // loop through discovered devices
+    if(spinBLEClient.myBLEDevices[x].serviceUUID == HID_SERVICE_UUID){
+      break; //Skip Remote Service here
+    }
       if (spinBLEClient.myBLEDevices[x].connectedClientID != BLE_HS_CONN_HANDLE_NONE) {
         SS2K_LOGD(BLE_COMMON_LOG_TAG, "Address: (%s) Client ID: (%d) SerUUID: (%s) CharUUID: (%s) HRM: (%s) PM: (%s) CSC: (%s) CT: (%s) doConnect: (%s)",
                   spinBLEClient.myBLEDevices[x].peerAddress.toString().c_str(), spinBLEClient.myBLEDevices[x].connectedClientID,
