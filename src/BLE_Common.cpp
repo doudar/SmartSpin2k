@@ -22,9 +22,6 @@ void BLECommunications(void *pvParameters) {
   for (;;) {
     // **********************************Client***************************************
     for (size_t x = 0; x < NUM_BLE_DEVICES; x++) {  // loop through discovered devices
-    if(spinBLEClient.myBLEDevices[x].serviceUUID == HID_SERVICE_UUID){
-      break; //Skip Remote Service here
-    }
       if (spinBLEClient.myBLEDevices[x].connectedClientID != BLE_HS_CONN_HANDLE_NONE) {
         SS2K_LOGD(BLE_COMMON_LOG_TAG, "Address: (%s) Client ID: (%d) SerUUID: (%s) CharUUID: (%s) HRM: (%s) PM: (%s) CSC: (%s) CT: (%s) doConnect: (%s)",
                   spinBLEClient.myBLEDevices[x].peerAddress.toString().c_str(), spinBLEClient.myBLEDevices[x].connectedClientID,
@@ -40,12 +37,14 @@ void BLECommunications(void *pvParameters) {
               // Client connected with a valid UUID registered
               if ((myAdvertisedDevice.serviceUUID != BLEUUID((uint16_t)0x0000)) && (pClient->isConnected())) {
                 BLERemoteCharacteristic *pRemoteBLECharacteristic = pClient->getService(myAdvertisedDevice.serviceUUID)->getCharacteristic(myAdvertisedDevice.charUUID);
-                // std::string data                                  = pRemoteBLECharacteristic->getValue();
-                // uint8_t *pData                                    = reinterpret_cast<uint8_t *>(&data[0]);
-                // int length                                        = data.length();
-                // 250 == Data(60), Spaces(Data/2), Arrow(4), SvrUUID(37), Sep(3), ChrUUID(37), Sep(3),
-                //        Name(10), Prefix(2), HR(8), SEP(1), CD(10), SEP(1), PW(8), SEP(1), SP(7), Suffix(2), Nul(1) - 225 rounded up
 
+                // Handle BLE HID Remotes
+                if (spinBLEClient.myBLEDevices[x].serviceUUID == HID_SERVICE_UUID) {
+                  spinBLEClient.keepAliveBLE_HID(pClient);
+                  break;  // There is not data that needs to be dequeued for the remote, so got to the next device.
+                }
+
+                // Dequeue sensor data we stored during notifications
                 while (pdTRUE) {
                   NotifyData incomingNotifyData = myAdvertisedDevice.dequeueData();
                   if (incomingNotifyData.length == 0) {
@@ -57,8 +56,8 @@ void BLECommunications(void *pvParameters) {
                   for (size_t i = 0; i < length; i++) {
                     pData[i] = incomingNotifyData.data[i];
                   }
-                  collectAndSet(pRemoteBLECharacteristic->getUUID(), myAdvertisedDevice.serviceUUID, pRemoteBLECharacteristic->getRemoteService()->getClient()->getPeerAddress(), pData, length);
-
+                  collectAndSet(pRemoteBLECharacteristic->getUUID(), myAdvertisedDevice.serviceUUID, pRemoteBLECharacteristic->getRemoteService()->getClient()->getPeerAddress(),
+                                pData, length);
                 }
               } else if (!pClient->isConnected()) {  // This shouldn't ever be
                                                      // called...
@@ -76,8 +75,7 @@ void BLECommunications(void *pvParameters) {
     }
 
     // ***********************************SERVER**************************************
-    if ((spinBLEClient.connectedHR || rtConfig.hr.getSimulate()) && !spinBLEClient.connectedPM && !rtConfig.watts.getSimulate() && (rtConfig.hr.getValue() > 0) &&
-        userPWC.hr2Pwr) {
+    if ((spinBLEClient.connectedHR || rtConfig.hr.getSimulate()) && !spinBLEClient.connectedPM && !rtConfig.watts.getSimulate() && (rtConfig.hr.getValue() > 0) && userPWC.hr2Pwr) {
       calculateInstPwrFromHR();
       hr2p = true;
     } else {

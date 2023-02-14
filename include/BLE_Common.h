@@ -225,6 +225,7 @@ class SpinBLEClient {
   void postConnect();
   void FTMSControlPointWrite(const uint8_t *pData, int length);
   void connectBLE_HID(NimBLEClient *pClient);
+  void keepAliveBLE_HID(NimBLEClient *pClient);
 };
 
 class MyAdvertisedDeviceCallback : public NimBLEAdvertisedDeviceCallbacks {

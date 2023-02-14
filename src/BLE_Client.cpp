@@ -38,24 +38,18 @@ void SpinBLEClient::start() {
 }
 
 static void onNotify(BLERemoteCharacteristic *pBLERemoteCharacteristic, uint8_t *pData, size_t length, bool isNotify) {
+  // Parse BLE shifter info.
   if (pBLERemoteCharacteristic->getRemoteService()->getUUID() == HID_SERVICE_UUID) {
-    // Serial.print(str.c_str());
-    // Serial.print(pRemoteCharacteristic->getHandle());
-    Serial.print("Remote Value = ");
     Serial.print(pData[0], HEX);
     if (pData[0] == 0x04) {
-      rtConfig.setShifterPosition(rtConfig.getShifterPosition()+1);
+      rtConfig.setShifterPosition(rtConfig.getShifterPosition() + 1);
     }
     if (pData[0] == 0x08) {
-      rtConfig.setShifterPosition(rtConfig.getShifterPosition()-1);
+      rtConfig.setShifterPosition(rtConfig.getShifterPosition() - 1);
     }
-    // for (size_t i = 0; i < length; i++) {
-    //   Serial.print(pData[i], HEX);
-    //   Serial.print(',');
-    // }
-    // Serial.print(' ');
   }
-  // enqueue data
+
+  // enqueue sensor data
   for (size_t i = 0; i < NUM_BLE_DEVICES; i++) {
     if (pBLERemoteCharacteristic->getUUID() == spinBLEClient.myBLEDevices[i].charUUID) {
       spinBLEClient.myBLEDevices[i].enqueueData(pData, length);
@@ -146,6 +140,7 @@ bool SpinBLEClient::connectToServer() {
       SS2K_LOG(BLE_CLIENT_LOG_TAG, "Trying to connect to HRM");
     } else if (myDevice->isAdvertisingService(HID_SERVICE_UUID)) {
       serviceUUID = HID_SERVICE_UUID;
+      charUUID = HID_REPORT_DATA_UUID;
       SS2K_LOG(BLE_CLIENT_LOG_TAG, "Trying to connect to BLE HID remote");
     } else {
       SS2K_LOG(BLE_CLIENT_LOG_TAG, "No advertised UUID found");
@@ -214,7 +209,7 @@ bool SpinBLEClient::connectToServer() {
      *  connections. Timeout should be a multiple of the interval, minimum is 100ms.
      *  Min interval: 12 * 1.25ms = 15, Max interval: 12 * 1.25ms = 15, 0 latency, 51 * 10ms = 510ms timeout
      */
-    pClient->setConnectionParams(12, 12, 0, 100);
+    //pClient->setConnectionParams(12, 12, 0, 100);
     /** Set how long we are willing to wait for the connection to complete (seconds), default is 30. */
     pClient->setConnectTimeout(5);
 
@@ -647,55 +642,31 @@ void SpinBLEAdvertisedDevice::print() {
   SS2K_LOG(BLE_CLIENT_LOG_TAG, "%s", String(logBuf));
 }
 
-/** Notification / Indication receiving handler callback */
-// Notification from 4c:75:25:xx:yy:zz: Service = 0x1812, Characteristic = 0x2a4d, Value = 1,0,0,0,0,
-void notifyCB(NimBLERemoteCharacteristic *pRemoteCharacteristic, uint8_t *pData, size_t length, bool isNotify) {
-  std::string str = (isNotify == true) ? "Notification" : "Indication";
-  str += " from ";
-  /** NimBLEAddress and NimBLEUUID have std::string operators */
-  str += std::string(pRemoteCharacteristic->getRemoteService()->getClient()->getPeerAddress());
-  str += ": Service = " + std::string(pRemoteCharacteristic->getRemoteService()->getUUID());
-  str += ", Characteristic = " + std::string(pRemoteCharacteristic->getUUID());
-  str += ", Handle = 0x";
-  Serial.print(str.c_str());
-  Serial.print(pRemoteCharacteristic->getHandle());
-  Serial.print(", Value = ");
-  for (size_t i = 0; i < length; i++) {
-    Serial.print(pData[i], HEX);
-    Serial.print(',');
-  }
-  Serial.print(' ');
-
-  Serial.println();
-}
-
 void SpinBLEClient::connectBLE_HID(NimBLEClient *pClient) {
   NimBLERemoteService *pSvc        = nullptr;
   NimBLERemoteCharacteristic *pChr = nullptr;
   pSvc                             = pClient->getService(HID_SERVICE_UUID);
   if (pSvc) { /** make sure it's not null */
-    if (true) {
-      // This returns the HID report descriptor like this
-      // HID_REPORT_MAP 0x2a4b Value: 5,1,9,2,A1,1,9,1,A1,0,5,9,19,1,29,5,15,0,25,1,75,1,
-      // Copy and paste the value digits to http://eleccelerator.com/usbdescreqparser/
-      // to see the decoded report descriptor.
-      pChr = pSvc->getCharacteristic(HID_REPORT_MAP_UUID);
-      if (pChr) { /** make sure it's not null */
-        Serial.print("HID_REPORT_MAP ");
-        if (pChr->canRead()) {
-          std::string value = pChr->readValue();
-          Serial.print(pChr->getUUID().toString().c_str());
-          Serial.print(" Value: ");
-          uint8_t *p = (uint8_t *)value.data();
-          for (size_t i = 0; i < value.length(); i++) {
-            Serial.print(p[i], HEX);
-            Serial.print(',');
-          }
-          Serial.println();
+    // This returns the HID report descriptor like this
+    // HID_REPORT_MAP 0x2a4b Value: 5,1,9,2,A1,1,9,1,A1,0,5,9,19,1,29,5,15,0,25,1,75,1,
+    // Copy and paste the value digits to http://eleccelerator.com/usbdescreqparser/
+    // to see the decoded report descriptor.
+    pChr = pSvc->getCharacteristic(HID_REPORT_MAP_UUID);
+    if (pChr) { /** make sure it's not null */
+      Serial.print("HID_REPORT_MAP ");
+      if (pChr->canRead()) {
+        std::string value = pChr->readValue();
+        Serial.print(pChr->getUUID().toString().c_str());
+        Serial.print(" Value: ");
+        uint8_t *p = (uint8_t *)value.data();
+        for (size_t i = 0; i < value.length(); i++) {
+          Serial.print(p[i], HEX);
+          Serial.print(',');
         }
-      } else {
-        Serial.println("HID REPORT MAP char not found.");
+        Serial.println();
       }
+    } else {
+      Serial.println("HID REPORT MAP char not found.");
     }
 
     // Subscribe to characteristics HID_REPORT_DATA.
@@ -722,4 +693,24 @@ void SpinBLEClient::connectBLE_HID(NimBLEClient *pClient) {
   }
   Serial.println("Done with this device!");
   return;  // true;
+}
+
+void SpinBLEClient::keepAliveBLE_HID(NimBLEClient *pClient) {
+  static int intervalTimer = millis();
+  if ((millis() - intervalTimer) < 6000) {
+    return;
+  }
+  NimBLERemoteService *pSvc        = nullptr;
+  NimBLERemoteCharacteristic *pChr = nullptr;
+  pSvc                             = pClient->getService(HID_SERVICE_UUID);
+  if (pSvc) { /** make sure it's not null */
+    pChr = pSvc->getCharacteristic(HID_REPORT_MAP_UUID);
+    if (pChr) {
+      SS2K_LOG(BLE_CLIENT_LOG_TAG, "BLE HID Keep Alive");
+      pClient->setConnectionParams(12, 12, 0, 3200);
+      intervalTimer = millis();
+    } else {
+      SS2K_LOG(BLE_CLIENT_LOG_TAG, "Keep Alive failed");
+    }
+  }
 }
