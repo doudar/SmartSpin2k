@@ -13,6 +13,7 @@
 #include <math.h>
 #include <sensors/SensorData.h>
 #include <sensors/SensorDataFactory.h>
+#include <NimBLEDevice.h>
 
 bool hr2p = false;
 
@@ -20,6 +21,9 @@ TaskHandle_t BLECommunicationTask;
 
 void BLECommunications(void *pvParameters) {
   for (;;) {
+    if (!spinBLEClient.dontBlockScan) {
+      NimBLEDevice::getScan()->stop();  // stop routine scans
+    }
     // **********************************Client***************************************
     for (size_t x = 0; x < NUM_BLE_DEVICES; x++) {  // loop through discovered devices
       if (spinBLEClient.myBLEDevices[x].connectedClientID != BLE_HS_CONN_HANDLE_NONE) {
@@ -40,7 +44,7 @@ void BLECommunications(void *pvParameters) {
 
                 // Handle BLE HID Remotes
                 if (spinBLEClient.myBLEDevices[x].serviceUUID == HID_SERVICE_UUID) {
-                  spinBLEClient.keepAliveBLE_HID(pClient);
+                  // spinBLEClient.keepAliveBLE_HID(pClient); //keep alive doesn't seem to help :(
                   break;  // There is not data that needs to be dequeued for the remote, so got to the next device.
                 }
 
@@ -124,11 +128,6 @@ void BLECommunications(void *pvParameters) {
       }
     } else {
       digitalWrite(LED_PIN, HIGH);
-    }
-    if (spinBLEClient.doScan && (spinBLEClient.scanRetries > 0) && !NimBLEDevice::getScan()->isScanning()) {
-      spinBLEClient.scanRetries--;
-      SS2K_LOG(BLE_CLIENT_LOG_TAG, "Initiating Scan from Client Task:");
-      spinBLEClient.scanProcess();
     }
     vTaskDelay((BLE_NOTIFY_DELAY) / portTICK_PERIOD_MS);
 #ifdef DEBUG_STACK

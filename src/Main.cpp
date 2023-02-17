@@ -181,7 +181,7 @@ void SS2K::maintenanceLoop(void *pvParameters) {
   static bool isScanning              = false;
 
   while (true) {
-    vTaskDelay(75 / portTICK_RATE_MS);
+    vTaskDelay(73 / portTICK_RATE_MS);
     ss2k.FTMSModeShiftModifier();
 
     if (currentBoard.auxSerialTxPin) {
@@ -199,7 +199,7 @@ void SS2K::maintenanceLoop(void *pvParameters) {
     if ((millis() - intervalTimer2) > 6000) {
       if (NimBLEDevice::getScan()->isScanning()) {  // workaround to prevent occasional runaway scans
         if (isScanning == true) {
-          SS2K_LOG(MAIN_LOG_TAG, "Forcing Scan to stop.");
+          SS2K_LOGW(MAIN_LOG_TAG, "Forcing Scan to stop.");
           NimBLEDevice::getScan()->stop();
           isScanning = false;
         } else {
@@ -209,9 +209,8 @@ void SS2K::maintenanceLoop(void *pvParameters) {
       intervalTimer2 = millis();
     }
     if (loopCounter > 10) {
-      ss2k.scanIfShiftersHeld();
       ss2k.checkDriverTemperature();
-      ss2k.checkBLEReconnect();
+      // ss2k.checkBLEReconnect();
       // SS2K_LOG(MAIN_LOG_TAG, "target %f  current %f", rtConfig.getTargetIncline(), rtConfig.getCurrentIncline());
 
 #ifdef DEBUG_STACK
@@ -417,29 +416,6 @@ void SS2K::resetIfShiftersHeld() {
   }
 }
 
-void SS2K::scanIfShiftersHeld() {
-  if ((digitalRead(currentBoard.shiftUpPin) == LOW) && (digitalRead(currentBoard.shiftDownPin) == LOW)) {  // are both shifters held?
-    SS2K_LOG(MAIN_LOG_TAG, "Shifters Held %d", shiftersHoldForScan);
-    if (shiftersHoldForScan < 1) {  // have they been held for enough loops?
-      SS2K_LOG(MAIN_LOG_TAG, "Shifters Held < 1 %d", shiftersHoldForScan);
-      if ((millis() - scanDelayStart) >= scanDelayTime) {  // Has this already been done within 10 seconds?
-        scanDelayStart += scanDelayTime;
-        spinBLEClient.resetDevices();
-        spinBLEClient.serverScan(true);
-        shiftersHoldForScan = SHIFTERS_HOLD_FOR_SCAN;
-        digitalWrite(LED_PIN, LOW);
-        SS2K_LOG(MAIN_LOG_TAG, "Scan From Buttons");
-      } else {
-        SS2K_LOG(MAIN_LOG_TAG, "Shifters Held but timer not up %d", (millis() - scanDelayStart) >= scanDelayTime);
-        shiftersHoldForScan = SHIFTERS_HOLD_FOR_SCAN;
-        return;
-      }
-    } else {
-      shiftersHoldForScan--;
-    }
-  }
-}
-
 void SS2K::setupTMCStepperDriver() {
   driver.begin();
   driver.pdn_disable(true);
@@ -560,35 +536,3 @@ void SS2K::rxSerial(void) {
   }
 }
 
-void SS2K::checkBLEReconnect() {
-  static int bleCheck = 0;
-  if ((String(userConfig.getConnectedHeartMonitor()) == "none") && ((String(userConfig.getConnectedPowerMeter()) == "none"))) {  // Exit immediately if "none" and "none"
-    bleCheck = 0;
-    return;
-  }
-  if ((spinBLEClient.connectedHR) && (spinBLEClient.connectedPM)) {  // Exit if both are connected
-    bleCheck = 0;
-    return;
-  }
-  if (((String(userConfig.getConnectedPowerMeter()) == "none") && (spinBLEClient.connectedHR))) {  // Exit if "none" PM and HR is connected
-    bleCheck = 0;
-    return;
-  }
-  if (((String(userConfig.getConnectedHeartMonitor()) == "none") && (spinBLEClient.connectedPM))) {  // Exit if "none" HR and PM is connected
-    bleCheck = 0;
-    return;
-  }
-  if (bleCheck >= BLE_RECONNECT_INTERVAL) {
-    bleCheck = 0;
-    if (!NimBLEDevice::getScan()->isScanning()) {
-      SS2K_LOG(MAIN_LOG_TAG, "Scanning from Check BLE Reconnect %d", bleCheck);
-      spinBLEClient.resetDevices();
-      spinBLEClient.scanProcess(BLE_RECONNECT_SCAN_DURATION);
-    }
-  }
-  if (NimBLEDevice::getScan()->isScanning()) {
-    bleCheck = 0;
-  } else {
-    bleCheck++;
-  }
-}

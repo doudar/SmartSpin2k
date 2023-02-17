@@ -150,7 +150,7 @@ void HTTP_Server::start() {
         "15 seconds.</body><script> setTimeout(\"location.href = 'http://" +
         myIP.toString() + "/bluetoothscanner.html';\",15000);</script></html>";
     spinBLEClient.resetDevices();
-    spinBLEClient.serverScan(true);
+    //spinBLEClient.serverScan(true);
     server.send(200, "text/html", response);
   });
 
@@ -576,7 +576,7 @@ void HTTP_Server::settingsProcessor() {
         "= 'http://" +
         myIP.toString() + "/bluetoothscanner.html';\",1000);</script></html>";
     spinBLEClient.resetDevices();
-    spinBLEClient.serverScan(true);
+    //spinBLEClient.serverScan(true);
   } else if (wasSettingsUpdate) {  // Special Settings Page update response
     response +=
         "Network settings will be applied at next reboot. <br> Everything "

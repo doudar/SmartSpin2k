@@ -203,22 +203,20 @@
 // Max tries that BLE client will perform on reconnect
 #define MAX_RECONNECT_TRIES 3
 
-// When quick reconnect fails ^^, we try to scan for the disconnected server.
-// Scans slow BLE & WiFi traffic so we don't want to do this forever.
-// Give up scanning for the lost connection after this many tries:
-#define MAX_SCAN_RETRIES 2
+// Time in seconds for a scan
+#define DEFAULT_SCAN_DURATION 1
 
 // loop speed for the SmartSpin2k BLE communications
-#define BLE_NOTIFY_DELAY 500
+#define BLE_NOTIFY_DELAY 503
 
 // loop speed for the SmartSpin2k BLE Client reconnect
-#define BLE_CLIENT_DELAY 1000
+#define BLE_CLIENT_DELAY 101
 
 // Number of devices that can be connected to the Client (myBLEDevices size)
 #define NUM_BLE_DEVICES 4
 
 // loop speed for the Webserver
-#define WEBSERVER_DELAY 60
+#define WEBSERVER_DELAY 61
 
 // Name of default Power Meter. any connects to anything, none connects to
 // nothing.
@@ -271,13 +269,10 @@
 #define TX_CHECK_INTERVAL 20
 
 // If ble devices are both setup, how often to attempt a reconnect.
-#define BLE_RECONNECT_INTERVAL 15
-
-// Initial and web scan duration.
-#define DEFAULT_SCAN_DURATION 10
+#define BLE_RECONNECT_INTERVAL 1
 
 // BLE automatic reconnect duration. Set this low to avoid interruption.
-#define BLE_RECONNECT_SCAN_DURATION 3
+#define BLE_RECONNECT_SCAN_DURATION 1
 
 // Uncomment to enable sending Telegram debug messages back to the chat
 // specified in telegram_token.h

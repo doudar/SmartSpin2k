@@ -42,7 +42,6 @@ class SS2K {
   static void IRAM_ATTR shiftUp();
   static void IRAM_ATTR shiftDown();
   void resetIfShiftersHeld();
-  void scanIfShiftersHeld();
   void startTasks();
   void stopTasks();
   void restartWifi();
@@ -51,7 +50,6 @@ class SS2K {
   void updateStealthChop();
   void checkDriverTemperature();
   void motorStop(bool releaseTension = false);
-  void checkBLEReconnect();
   void FTMSModeShiftModifier();
   static void rxSerial(void);
   void txSerial();

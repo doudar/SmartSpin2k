@@ -102,8 +102,6 @@ extern SpinBLEServer spinBLEServer;
 
 void startBLEServer();
 bool spinDown();
-// void computeERG(int = 0);
-void computeCSC();
 void logCharacteristic(char *buffer, const size_t bufferCapacity, const byte *data, const size_t dataLength, const NimBLEUUID serviceUUID, const NimBLEUUID charUUID,
                        const char *format, ...);
 void updateIndoorBikeDataChar();
@@ -199,11 +197,11 @@ class SpinBLEClient {
   boolean connectedHR        = false;
   boolean connectedCD        = false;
   boolean doScan             = false;
+  bool dontBlockScan         = true;
   bool intentionalDisconnect = false;
   int noReadingIn            = 0;
   int cscCumulativeCrankRev  = 0;
   int cscLastCrankEvtTime    = 0;
-  int scanRetries            = MAX_SCAN_RETRIES;
   int reconnectTries         = MAX_RECONNECT_TRIES;
 
   BLERemoteCharacteristic *pRemoteCharacteristic = nullptr;
@@ -212,20 +210,19 @@ class SpinBLEClient {
   SpinBLEAdvertisedDevice myBLEDevices[NUM_BLE_DEVICES];
 
   void start();
-  void serverScan(bool connectRequest);
+  //void serverScan(bool connectRequest);
   bool connectToServer();
   void scanProcess(int duration = DEFAULT_SCAN_DURATION);
   void disconnect();
   // Check for duplicate services of BLEClient and remove the previously
   // connected one.
   void removeDuplicates(NimBLEClient *pClient);
-  // Reset devices in myBLEDevices[]. Bool All (true) or only connected ones
-  // (false)
   void resetDevices();
   void postConnect();
   void FTMSControlPointWrite(const uint8_t *pData, int length);
   void connectBLE_HID(NimBLEClient *pClient);
   void keepAliveBLE_HID(NimBLEClient *pClient);
+  void checkBLEReconnect();
 };
 
 class MyAdvertisedDeviceCallback : public NimBLEAdvertisedDeviceCallbacks {
