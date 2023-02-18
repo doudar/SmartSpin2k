@@ -32,6 +32,6 @@ void setupBLE() {  // Common BLE setup for both client and server
     spinBLEClient.serverScan(true);
     SS2K_LOG(BLE_SETUP_LOG_TAG, "Scanning");
   }*/
-  SS2K_LOG(BLE_SETUP_LOG_TAG, "%s %s", userConfig.getConnectedPowerMeter(), userConfig.getConnectedHeartMonitor());
+  SS2K_LOG(BLE_SETUP_LOG_TAG, "%s %s %s", userConfig.getConnectedPowerMeter(), userConfig.getConnectedHeartMonitor(), userConfig.getConnectedRemote());
   SS2K_LOG(BLE_SETUP_LOG_TAG, "End BLE Setup");
 }

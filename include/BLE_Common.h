@@ -60,6 +60,7 @@
 // Setup
 void setupBLE();
 extern TaskHandle_t BLECommunicationTask;
+extern TaskHandle_t BLEClientTask;
 // ***********************Common**********************************
 void BLECommunications(void *pvParameters);
 
@@ -213,7 +214,6 @@ class SpinBLEClient {
   //void serverScan(bool connectRequest);
   bool connectToServer();
   void scanProcess(int duration = DEFAULT_SCAN_DURATION);
-  void disconnect();
   // Check for duplicate services of BLEClient and remove the previously
   // connected one.
   void removeDuplicates(NimBLEClient *pClient);

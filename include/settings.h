@@ -226,6 +226,10 @@
 // nothing.
 #define CONNECTED_HEART_MONITOR "any"
 
+// Name of default remote. any connects to anything, none connects to
+// nothing.
+#define CONNECTED_REMOTE "any"
+
 // number of main loops the shifters need to be held before a BLE scan is
 // initiated.
 #define SHIFTERS_HOLD_FOR_SCAN 2
@@ -237,7 +241,7 @@
 #define WIFI_CONNECT_TIMEOUT 10
 
 // Max size of userconfig
-#define USERCONFIG_JSON_SIZE 1024 + DEBUG_LOG_BUFFER_SIZE
+#define USERCONFIG_JSON_SIZE 1524 + DEBUG_LOG_BUFFER_SIZE
 
 #define RUNTIMECONFIG_JSON_SIZE 512 + DEBUG_LOG_BUFFER_SIZE
 

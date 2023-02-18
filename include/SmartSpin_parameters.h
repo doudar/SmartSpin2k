@@ -123,6 +123,7 @@ class userParameters {
   String password;
   String connectedPowerMeter   = "any";
   String connectedHeartMonitor = "any";
+  String connectedRemote    = "any";
   String foundDevices          = " ";
 
  public:
@@ -161,6 +162,9 @@ class userParameters {
 
   void setConnectedHeartMonitor(String cHr) { connectedHeartMonitor = cHr; }
   const char* getConnectedHeartMonitor() { return connectedHeartMonitor.c_str(); }
+
+  void setConnectedRemote(String cRemote) { connectedRemote = cRemote; }
+  const char* getConnectedRemote() { return connectedRemote.c_str();}
 
   void setStepperPower(int sp) { stepperPower = sp; }
   int getStepperPower() { return stepperPower; }

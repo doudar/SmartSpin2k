@@ -58,12 +58,25 @@ void SS2K::startTasks() {
 }
 
 void SS2K::stopTasks() {
+  spinBLEClient.reconnectTries        = 0;
+  spinBLEClient.intentionalDisconnect = true;
+  SS2K_LOG(BLE_CLIENT_LOG_TAG, "Shutting Down all BLE services");
+  if (NimBLEDevice::getInitialized()) {
+    NimBLEDevice::deinit();
+    ss2k.stopTasks();
+  }
   SS2K_LOG(MAIN_LOG_TAG, "Stop BLE + ERG Tasks");
   if (BLECommunicationTask != NULL) {
     vTaskDelete(BLECommunicationTask);
+    BLECommunicationTask = NULL;
   }
   if (ErgTask != NULL) {
     vTaskDelete(ErgTask);
+    ErgTask = NULL;
+  }
+  if (BLEClientTask != NULL) {
+    vTaskDelete(BLEClientTask);
+    BLEClientTask = NULL;
   }
 }
 
@@ -513,10 +526,10 @@ void SS2K::txSerial() {  // Serial.printf(" Before TX ");
   }
 }
 
-void SS2K::pelotonConnected(){
-txCheck = TX_CHECK_INTERVAL;
-rtConfig.setMinResistance(MIN_PELOTON_RESISTANCE);
-rtConfig.setMaxResistance(MAX_PELOTON_RESISTANCE);
+void SS2K::pelotonConnected() {
+  txCheck = TX_CHECK_INTERVAL;
+  rtConfig.setMinResistance(MIN_PELOTON_RESISTANCE);
+  rtConfig.setMaxResistance(MAX_PELOTON_RESISTANCE);
 }
 
 void SS2K::rxSerial(void) {
@@ -535,4 +548,3 @@ void SS2K::rxSerial(void) {
     }
   }
 }
-

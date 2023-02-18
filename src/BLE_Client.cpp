@@ -183,7 +183,6 @@ bool SpinBLEClient::connectToServer() {
           NimBLEDevice::getScan()->erase(pClient->getPeerAddress());
           NimBLEDevice::deleteClient(pClient);
           // spinBLEClient.myBLEDevices[device_number].doConnect = false;
-          connectedPM = false;
           // serverScan(false);
         }
         return false;
@@ -221,8 +220,11 @@ bool SpinBLEClient::connectToServer() {
 
     if (!pClient->connect(myDevice->getAddress())) {
       /** Created a client but failed to connect, don't need to keep it as it has no data */
+      spinBLEClient.myBLEDevices[device_number].reset();
+      pClient->deleteServices();
+      pClient->disconnect();
+      NimBLEDevice::getScan()->erase(pClient->getPeerAddress());
       NimBLEDevice::deleteClient(pClient);
-      SS2K_LOG(BLE_CLIENT_LOG_TAG, "Failed to connect, deleted client");
       return false;
     }
   }
@@ -266,7 +268,11 @@ bool SpinBLEClient::connectToServer() {
         // if(!pChr->registerForNotify(notifyCB)) {
         if (!pChr->subscribe(true, onNotify)) {
           /** Disconnect if subscribe failed */
+          spinBLEClient.myBLEDevices[device_number].reset();
+          pClient->deleteServices();
           pClient->disconnect();
+          NimBLEDevice::getScan()->erase(pClient->getPeerAddress());
+          NimBLEDevice::deleteClient(pClient);
           return false;
         }
       } else if (pChr->canIndicate()) {
@@ -274,7 +280,10 @@ bool SpinBLEClient::connectToServer() {
         // if(!pChr->registerForNotify(notifyCB, false)) {
         if (!pChr->subscribe(false, onNotify)) {
           /** Disconnect if subscribe failed */
+          spinBLEClient.myBLEDevices[device_number].reset();
+          pClient->deleteServices();
           pClient->disconnect();
+          NimBLEDevice::getScan()->erase(pClient->getPeerAddress());
           NimBLEDevice::deleteClient(pClient);
           return false;
         }
@@ -372,7 +381,15 @@ void MyAdvertisedDeviceCallback::onResult(BLEAdvertisedDevice *advertisedDevice)
        advertisedDevice->isAdvertisingService(ECHELON_DEVICE_UUID) || advertisedDevice->isAdvertisingService(HID_SERVICE_UUID))) {
     SS2K_LOG(BLE_CLIENT_LOG_TAG, "Matching Device Name: %s", aDevName.c_str());
     if (advertisedDevice->getServiceUUID() == HID_SERVICE_UUID) {
-      SS2K_LOG(BLE_CLIENT_LOG_TAG, "Setting Up BLE HID Remote");
+      if (String(userConfig.getConnectedRemote()) == "any") {
+        SS2K_LOG(BLE_CLIENT_LOG_TAG, "Remote String Matched Any");
+        // continue
+      } else if (aDevName != String(userConfig.getConnectedRemote()) || (String(userConfig.getConnectedRemote()) == "none")) {
+        SS2K_LOG(BLE_CLIENT_LOG_TAG, "Skipping non-selected Remote |%s|%s", aDevName.c_str(), userConfig.getConnectedRemote());
+        return;
+      } else if (aDevName == String(userConfig.getConnectedRemote())) {
+        SS2K_LOG(BLE_CLIENT_LOG_TAG, "Remote String Matched %s", aDevName.c_str());
+      }
     } else if (advertisedDevice->getServiceUUID() == HEARTSERVICE_UUID) {
       if (String(userConfig.getConnectedHeartMonitor()) == "any") {
         SS2K_LOG(BLE_CLIENT_LOG_TAG, "HR String Matched Any");
@@ -464,17 +481,6 @@ void SpinBLEClient::serverScan(bool connectRequest) {
   }
   this->doScan = true;
 }*/
-
-// Shuts down all BLE processes.
-void SpinBLEClient::disconnect() {
-  this->reconnectTries  = 0;
-  intentionalDisconnect = true;
-  SS2K_LOG(BLE_CLIENT_LOG_TAG, "Shutting Down all BLE services");
-  if (NimBLEDevice::getInitialized()) {
-    NimBLEDevice::deinit();
-    vTaskDelay(100 / portTICK_RATE_MS);
-  }
-}
 
 // remove the last connected BLE Power Meter
 void SpinBLEClient::removeDuplicates(NimBLEClient *pClient) {
@@ -728,20 +734,20 @@ void SpinBLEClient::keepAliveBLE_HID(NimBLEClient *pClient) {
 void SpinBLEClient::checkBLEReconnect() {
   static int bleCheck = 0;
   if ((String(userConfig.getConnectedHeartMonitor()) == "none") && ((String(userConfig.getConnectedPowerMeter()) == "none"))) {  // Exit immediately if "none" and "none"
-    // bleCheck = 0;  //These are all commented out for testing BLE_HID reconnect so we scan continuously.
-    // return;
+    bleCheck = 0;  // These are all commented out for testing BLE_HID reconnect so we scan continuously.
+    return;
   }
   if ((spinBLEClient.connectedHR) && (spinBLEClient.connectedPM)) {  // Exit if both are connected
-    // bleCheck = 0;
-    // return;
+    bleCheck = 0;
+    return;
   }
   if (((String(userConfig.getConnectedPowerMeter()) == "none") && (spinBLEClient.connectedHR))) {  // Exit if "none" PM and HR is connected
-    // bleCheck = 0;
-    // return;
+    bleCheck = 0;
+    return;
   }
   if (((String(userConfig.getConnectedHeartMonitor()) == "none") && (spinBLEClient.connectedPM))) {  // Exit if "none" HR and PM is connected
-    // bleCheck = 0;
-    // return;
+    bleCheck = 0;
+    return;
   }
   if (bleCheck >= BLE_RECONNECT_INTERVAL) {
     bleCheck = 0;

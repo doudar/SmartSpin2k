@@ -150,7 +150,7 @@ void HTTP_Server::start() {
         "15 seconds.</body><script> setTimeout(\"location.href = 'http://" +
         myIP.toString() + "/bluetoothscanner.html';\",15000);</script></html>";
     spinBLEClient.resetDevices();
-    //spinBLEClient.serverScan(true);
+    // spinBLEClient.serverScan(true);
     server.send(200, "text/html", response);
   });
 
@@ -294,7 +294,7 @@ void HTTP_Server::start() {
   });
 
   server.on("/OTAIndex", HTTP_GET, []() {
-    spinBLEClient.disconnect();
+    ss2k.stopTasks();
     server.sendHeader("Connection", "close");
     server.send(200, "text/html", OTAServerIndex);
   });
@@ -311,7 +311,6 @@ void HTTP_Server::start() {
         if (upload.filename == String("firmware.bin").c_str()) {
           if (upload.status == UPLOAD_FILE_START) {
             SS2K_LOG(HTTP_SERVER_LOG_TAG, "Update: %s", upload.filename.c_str());
-            ss2k.stopTasks();
             if (!Update.begin(UPDATE_SIZE_UNKNOWN)) {  // start with max
                                                        // available size
               Update.printError(Serial);
@@ -531,7 +530,7 @@ void HTTP_Server::settingsProcessor() {
       tString = server.arg("blePMDropdown");
       if (tString != userConfig.getConnectedPowerMeter()) {
         userConfig.setConnectedPowerMeter(tString);
-        reboot = true;    
+        reboot = true;
       }
     } else {
       userConfig.setConnectedPowerMeter("any");
@@ -548,6 +547,19 @@ void HTTP_Server::settingsProcessor() {
       userConfig.setConnectedHeartMonitor(server.arg("bleHRDropdown"));
     } else {
       userConfig.setConnectedHeartMonitor("any");
+    }
+  }
+  if (!server.arg("bleRemoteDropdown").isEmpty()) {
+    wasBTUpdate = true;
+    if (server.arg("bleRemoteDropdown")) {
+      bool reset = false;
+      tString    = server.arg("bleRemoteDropdown");
+      if (tString != userConfig.getConnectedRemote()) {
+        reboot = true;
+      }
+      userConfig.setConnectedRemote(server.arg("bleRemoteDropdown"));
+    } else {
+      userConfig.setConnectedRemote("any");
     }
   }
   if (!server.arg("session1HR").isEmpty()) {  // Needs checking for unrealistic numbers.
@@ -576,7 +588,7 @@ void HTTP_Server::settingsProcessor() {
         "= 'http://" +
         myIP.toString() + "/bluetoothscanner.html';\",1000);</script></html>";
     spinBLEClient.resetDevices();
-    //spinBLEClient.serverScan(true);
+    // spinBLEClient.serverScan(true);
   } else if (wasSettingsUpdate) {  // Special Settings Page update response
     response +=
         "Network settings will be applied at next reboot. <br> Everything "
@@ -596,11 +608,11 @@ void HTTP_Server::settingsProcessor() {
   userPWC.saveToLittleFS();
   userPWC.printFile();
   if (reboot) {
-        response +=
+    response +=
         "Please wait while your settings are saved and SmartSpin2k reboots.</h2></body><script> "
         "setTimeout(\"location.href = 'http://" +
         myIP.toString() + "/bluetoothscanner.html';\",5000);</script></html>";
-        server.send(200, "text/html", response);
+    server.send(200, "text/html", response);
     vTaskDelay(100 / portTICK_PERIOD_MS);
     ESP.restart();
   }
