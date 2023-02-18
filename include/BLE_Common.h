@@ -152,40 +152,15 @@ class SpinBLEAdvertisedDevice {
   int connectedClientID = BLE_HS_CONN_HANDLE_NONE;
   BLEUUID serviceUUID   = (uint16_t)0x0000;
   BLEUUID charUUID      = (uint16_t)0x0000;
-  bool userSelectedHR   = false;
-  bool userSelectedPM   = false;
-  bool userSelectedCSC  = false;
-  bool userSelectedCT   = false;
+  bool isHRM            = false;
+  bool isPM             = false;
+  bool isCSC            = false;
+  bool isCT             = false;
+  bool isRemote         = false;
   bool doConnect        = false;
   bool postConnected    = false;
-
-  void set(BLEAdvertisedDevice *device, int id = BLE_HS_CONN_HANDLE_NONE, BLEUUID inserviceUUID = (uint16_t)0x0000, BLEUUID incharUUID = (uint16_t)0x0000) {
-    advertisedDevice  = device;
-    peerAddress       = device->getAddress();
-    connectedClientID = id;
-    serviceUUID       = BLEUUID(inserviceUUID);
-    charUUID          = BLEUUID(incharUUID);
-    dataBufferQueue   = xQueueCreate(6, sizeof(NotifyData));
-  }
-
-  void reset() {
-    advertisedDevice = nullptr;
-    // NimBLEAddress peerAddress;
-    connectedClientID = BLE_HS_CONN_HANDLE_NONE;
-    serviceUUID       = (uint16_t)0x0000;
-    charUUID          = (uint16_t)0x0000;
-    userSelectedHR    = false;  // Heart Rate Monitor
-    userSelectedPM    = false;  // Power Meter
-    userSelectedCSC   = false;  // Cycling Speed/Cadence
-    userSelectedCT    = false;  // Controllable Trainer
-    doConnect         = false;  // Initiate connection flag
-    postConnected     = false;  // Has Cost Connect Been Run?
-    if (dataBufferQueue != nullptr) {
-      // Serial.println("Resetting queue");
-      xQueueReset(dataBufferQueue);
-    }
-  }
-
+  void set(BLEAdvertisedDevice *device, int id = BLE_HS_CONN_HANDLE_NONE, BLEUUID inServiceUUID = (uint16_t)0x0000, BLEUUID inCharUUID = (uint16_t)0x0000);
+  void reset();
   void print();
   bool enqueueData(uint8_t data[25], size_t length);
   NotifyData dequeueData();
@@ -195,8 +170,10 @@ class SpinBLEClient {
  public:  // Not all of these need to be public. This should be cleaned up
           // later.
   boolean connectedPM        = false;
-  boolean connectedHR        = false;
+  boolean connectedHRM       = false;
   boolean connectedCD        = false;
+  boolean connectedCT        = false;
+  boolean connectedRemote    = false;
   boolean doScan             = false;
   bool dontBlockScan         = true;
   bool intentionalDisconnect = false;
@@ -211,13 +188,13 @@ class SpinBLEClient {
   SpinBLEAdvertisedDevice myBLEDevices[NUM_BLE_DEVICES];
 
   void start();
-  //void serverScan(bool connectRequest);
+  // void serverScan(bool connectRequest);
   bool connectToServer();
   void scanProcess(int duration = DEFAULT_SCAN_DURATION);
   // Check for duplicate services of BLEClient and remove the previously
   // connected one.
   void removeDuplicates(NimBLEClient *pClient);
-  void resetDevices();
+  void resetDevices(NimBLEClient *pclient);
   void postConnect();
   void FTMSControlPointWrite(const uint8_t *pData, int length);
   void connectBLE_HID(NimBLEClient *pClient);

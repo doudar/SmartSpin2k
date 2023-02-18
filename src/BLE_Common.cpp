@@ -30,8 +30,8 @@ void BLECommunications(void *pvParameters) {
         SS2K_LOGD(BLE_COMMON_LOG_TAG, "Address: (%s) Client ID: (%d) SerUUID: (%s) CharUUID: (%s) HRM: (%s) PM: (%s) CSC: (%s) CT: (%s) doConnect: (%s)",
                   spinBLEClient.myBLEDevices[x].peerAddress.toString().c_str(), spinBLEClient.myBLEDevices[x].connectedClientID,
                   spinBLEClient.myBLEDevices[x].serviceUUID.toString().c_str(), spinBLEClient.myBLEDevices[x].charUUID.toString().c_str(),
-                  spinBLEClient.myBLEDevices[x].userSelectedHR ? "true" : "false", spinBLEClient.myBLEDevices[x].userSelectedPM ? "true" : "false",
-                  spinBLEClient.myBLEDevices[x].userSelectedCSC ? "true" : "false", spinBLEClient.myBLEDevices[x].userSelectedCT ? "true" : "false",
+                  spinBLEClient.myBLEDevices[x].isHRM ? "true" : "false", spinBLEClient.myBLEDevices[x].isPM ? "true" : "false",
+                  spinBLEClient.myBLEDevices[x].isCSC? "true" : "false", spinBLEClient.myBLEDevices[x].isCT ? "true" : "false",
                   spinBLEClient.myBLEDevices[x].doConnect ? "true" : "false");
         if (spinBLEClient.myBLEDevices[x].advertisedDevice) {  // is device registered?
           SpinBLEAdvertisedDevice myAdvertisedDevice = spinBLEClient.myBLEDevices[x];
@@ -79,7 +79,7 @@ void BLECommunications(void *pvParameters) {
     }
 
     // ***********************************SERVER**************************************
-    if ((spinBLEClient.connectedHR || rtConfig.hr.getSimulate()) && !spinBLEClient.connectedPM && !rtConfig.watts.getSimulate() && (rtConfig.hr.getValue() > 0) && userPWC.hr2Pwr) {
+    if ((spinBLEClient.connectedHRM|| rtConfig.hr.getSimulate()) && !spinBLEClient.connectedPM && !rtConfig.watts.getSimulate() && (rtConfig.hr.getValue() > 0) && userPWC.hr2Pwr) {
       calculateInstPwrFromHR();
       hr2p = true;
     } else {
@@ -93,7 +93,7 @@ void BLECommunications(void *pvParameters) {
       rtConfig.cad.setValue(0);
       rtConfig.watts.setValue(0);
     }
-    if (!spinBLEClient.connectedHR && !rtConfig.hr.getSimulate()) {
+    if (!spinBLEClient.connectedHRM&& !rtConfig.hr.getSimulate()) {
       rtConfig.hr.setValue(0);
     }
 

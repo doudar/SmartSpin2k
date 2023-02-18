@@ -149,7 +149,7 @@ void HTTP_Server::start() {
         "<!DOCTYPE html><html><body>Scanning for BLE Devices. Please wait "
         "15 seconds.</body><script> setTimeout(\"location.href = 'http://" +
         myIP.toString() + "/bluetoothscanner.html';\",15000);</script></html>";
-    spinBLEClient.resetDevices();
+    // spinBLEClient.resetDevices();
     // spinBLEClient.serverScan(true);
     server.send(200, "text/html", response);
   });
@@ -587,7 +587,7 @@ void HTTP_Server::settingsProcessor() {
         "Selections Saved!</h2></body><script> setTimeout(\"location.href "
         "= 'http://" +
         myIP.toString() + "/bluetoothscanner.html';\",1000);</script></html>";
-    spinBLEClient.resetDevices();
+    // spinBLEClient.resetDevices();
     // spinBLEClient.serverScan(true);
   } else if (wasSettingsUpdate) {  // Special Settings Page update response
     response +=
