@@ -25,6 +25,7 @@ TaskHandle_t BLEClientTask;
 SpinBLEClient spinBLEClient;
 
 static MyClientCallback myClientCallback;
+static MyAdvertisedDeviceCallback myAdvertisedDeviceCallbacks;
 
 void SpinBLEClient::start() {
   // Create the task for the BLE Client loop
@@ -428,7 +429,7 @@ void SpinBLEClient::scanProcess(int duration) {
   SS2K_LOGW(BLE_CLIENT_LOG_TAG, "Scanning for BLE servers and putting them into a list...");
 
   BLEScan *pBLEScan = BLEDevice::getScan();
-  pBLEScan->setAdvertisedDeviceCallbacks(new MyAdvertisedDeviceCallback());
+  pBLEScan->setAdvertisedDeviceCallbacks(&myAdvertisedDeviceCallbacks);
   pBLEScan->setInterval(49);  // 97
   pBLEScan->setWindow(33);    // 67
   pBLEScan->setDuplicateFilter(true);
@@ -577,15 +578,6 @@ void SpinBLEClient::postConnect() {
 
 bool SpinBLEAdvertisedDevice::enqueueData(uint8_t *data, size_t length) {
   NotifyData notifyData;
-  // Serial.println("enqueue Called");
-  if (!this->dataBufferQueue) {
-    // Serial.println("Creating queue");
-    this->dataBufferQueue = xQueueCreate(6, sizeof(NotifyData));
-    if (!this->dataBufferQueue) {
-      // Serial.println("Failed to create queue");
-      return pdFALSE;
-    }
-  }
 
   if (!uxQueueSpacesAvailable(this->dataBufferQueue)) {
     // Serial.println("No space available in queue. Skipping enqueue of data.");
@@ -715,7 +707,7 @@ void SpinBLEClient::keepAliveBLE_HID(NimBLEClient *pClient) {
 
 void SpinBLEClient::checkBLEReconnect() {
   bool scan = false;
-  if ((String(userConfig.getConnectedHeartMonitor()) != "none") && !(spinBLEClient.connectedRemote)) {
+  if ((String(userConfig.getConnectedHeartMonitor()) != "none") && !(spinBLEClient.connectedHRM)) {
     scan = true;
   }
   if ((String(userConfig.getConnectedPowerMeter()) != "none") && !(spinBLEClient.connectedPM)) {
@@ -727,6 +719,7 @@ void SpinBLEClient::checkBLEReconnect() {
   if (scan) {
     if (!NimBLEDevice::getScan()->isScanning()) {
       spinBLEClient.scanProcess(BLE_RECONNECT_SCAN_DURATION);
+      Serial.println("scan");
     }
   }
 }
