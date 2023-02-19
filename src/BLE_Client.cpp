@@ -313,6 +313,9 @@ void MyClientCallback::onConnect(NimBLEClient *pClient) {
 }
 
 void MyClientCallback::onDisconnect(NimBLEClient *pClient) {
+  NimBLEDevice::getScan()->stop();
+  NimBLEDevice::getScan()->clearResults();
+  NimBLEDevice::getScan()->clearDuplicateCache();
   SS2K_LOG(BLE_CLIENT_LOG_TAG, "Disconnect Called");
   if (spinBLEClient.intentionalDisconnect) {
     SS2K_LOG(BLE_CLIENT_LOG_TAG, "Intentional Disconnect");
@@ -423,7 +426,6 @@ void MyAdvertisedDeviceCallback::onResult(BLEAdvertisedDevice *advertisedDevice)
     //}
   }
 }
-
 void SpinBLEClient::scanProcess(int duration) {
   this->doScan = false;  // Confirming we did the scan
   SS2K_LOGW(BLE_CLIENT_LOG_TAG, "Scanning for BLE servers and putting them into a list...");
@@ -719,7 +721,7 @@ void SpinBLEClient::checkBLEReconnect() {
   if (scan) {
     if (!NimBLEDevice::getScan()->isScanning()) {
       spinBLEClient.scanProcess(BLE_RECONNECT_SCAN_DURATION);
-      Serial.println("scan");
+      //Serial.println("scan");
     }
   }
 }

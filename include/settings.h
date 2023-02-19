@@ -216,7 +216,7 @@
 #define NUM_BLE_DEVICES 4
 
 // loop speed for the Webserver
-#define WEBSERVER_DELAY 61
+#define WEBSERVER_DELAY 7
 
 // Name of default Power Meter. any connects to anything, none connects to
 // nothing.

@@ -311,8 +311,8 @@ void HTTP_Server::start() {
         if (upload.filename == String("firmware.bin").c_str()) {
           if (upload.status == UPLOAD_FILE_START) {
             SS2K_LOG(HTTP_SERVER_LOG_TAG, "Update: %s", upload.filename.c_str());
-            if (!Update.begin(UPDATE_SIZE_UNKNOWN)) {  // start with max
-                                                       // available size
+            if (!Update.begin(UPDATE_SIZE_UNKNOWN, U_FLASH)) {  // start with max
+                                                                // available size
               Update.printError(Serial);
             }
           } else if (upload.status == UPLOAD_FILE_WRITE) {
@@ -324,7 +324,30 @@ void HTTP_Server::start() {
             if (Update.end(true)) {  // true to set the size to the
                                      // current progress
               server.send(200, "text/plain", "Firmware Uploaded Successfully. Rebooting...");
-              vTaskDelay(2000 / portTICK_PERIOD_MS);
+              ESP.restart();
+            } else {
+              Update.printError(Serial);
+            }
+          }
+        } else if (upload.filename == String("littlefs.bin").c_str()) {
+          if (upload.status == UPLOAD_FILE_START) {
+            SS2K_LOG(HTTP_SERVER_LOG_TAG, "Update: %s", upload.filename.c_str());
+            if (!Update.begin(UPDATE_SIZE_UNKNOWN, U_SPIFFS)) {  // start with max
+                                                                // available size
+              Update.printError(Serial);
+            }
+          } else if (upload.status == UPLOAD_FILE_WRITE) {
+            /* flashing firmware to ESP*/
+            if (Update.write(upload.buf, upload.currentSize) != upload.currentSize) {
+              Update.printError(Serial);
+            }
+          } else if (upload.status == UPLOAD_FILE_END) {
+            if (Update.end(true)) {  // true to set the size to the
+                                     // current progress
+              server.send(200, "text/plain", "Spiffs Uploaded Successfully. Rebooting...");
+              userConfig.saveToLittleFS();
+              userPWC.saveToLittleFS();
+              vTaskDelay(100);
               ESP.restart();
             } else {
               Update.printError(Serial);
@@ -360,7 +383,7 @@ void HTTP_Server::start() {
                           "webClientUpdate",                  /* name of task. */
                           6000 + (DEBUG_LOG_BUFFER_SIZE * 2), /* Stack size of task Used to be 3000*/
                           NULL,                               /* parameter of the task */
-                          2,                                  /* priority of the task */
+                          10,                                 /* priority of the task */
                           &webClientTask,                     /* Task handle to keep track of created task */
                           0);                                 /* pin task to core */
 

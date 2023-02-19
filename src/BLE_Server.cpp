@@ -587,7 +587,7 @@ void calculateInstPwrFromHR() {
   oldHR               = newHR;  // Copying HR from Last loop
   newHR               = rtConfig.hr.getValue();
 
-  delta = (newHR - oldHR) / (BLE_CLIENT_DELAY / 1000);
+  delta = (newHR - oldHR) / (BLE_CLIENT_DELAY / 1000) +1 ;
 
   // userConfig.setSimulatedWatts((s1Pwr*s2HR)-(s2Pwr*S1HR))/(S2HR-s1HR)+(userConfig.getSimulatedHr(*((s1Pwr-s2Pwr)/(s1HR-s2HR)));
   int avgP = ((userPWC.session1Pwr * userPWC.session2HR) - (userPWC.session2Pwr * userPWC.session1HR)) / (userPWC.session2HR - userPWC.session1HR) +

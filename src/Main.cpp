@@ -176,7 +176,7 @@ void setup() {
 
   xTaskCreatePinnedToCore(SS2K::maintenanceLoop,     /* Task function. */
                           "maintenanceLoopFunction", /* name of task. */
-                          4500,                      /* Stack size of task */
+                          6500,                      /* Stack size of task */
                           NULL,                      /* parameter of the task */
                           20,                        /* priority of the task */
                           &maintenanceLoopTask,      /* Task handle to keep track of created task */
@@ -201,7 +201,7 @@ void SS2K::maintenanceLoop(void *pvParameters) {
       ss2k.txSerial();
     }
 
-    if ((millis() - intervalTimer) > 500) {  // add check here for when to restart WiFi
+    if ((millis() - intervalTimer) > 2003) {  // add check here for when to restart WiFi
                                              // maybe if in STA mode and 8.8.8.8 no ping return?
       // ss2k.restartWifi();
       logHandler.writeLogs();
@@ -209,7 +209,7 @@ void SS2K::maintenanceLoop(void *pvParameters) {
       intervalTimer = millis();
     }
 
-    if ((millis() - intervalTimer2) > 6000) {
+    if ((millis() - intervalTimer2) > 6007) {
       if (NimBLEDevice::getScan()->isScanning()) {  // workaround to prevent occasional runaway scans
         if (isScanning == true) {
           SS2K_LOGW(MAIN_LOG_TAG, "Forcing Scan to stop.");
