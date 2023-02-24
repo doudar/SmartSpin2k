@@ -48,7 +48,7 @@ static void onNotify(BLERemoteCharacteristic *pBLERemoteCharacteristic, uint8_t 
 // BLE Client loop task
 void bleClientTask(void *pvParameters) {
   for (;;) {
-      vTaskDelay(BLE_CLIENT_DELAY / portTICK_PERIOD_MS);  // Delay a second between loops.
+    vTaskDelay(BLE_CLIENT_DELAY / portTICK_PERIOD_MS);  // Delay a second between loops.
     if (spinBLEClient.doScan && (spinBLEClient.scanRetries > 0) && !NimBLEDevice::getScan()->isScanning()) {
       spinBLEClient.scanRetries--;
       SS2K_LOG(BLE_CLIENT_LOG_TAG, "Initiating Scan from Client Task:");
@@ -267,10 +267,11 @@ bool SpinBLEClient::connectToServer() {
  **                       Remove as you see fit for your needs                        */
 
 void MyClientCallback::onConnect(NimBLEClient *pClient) {
-  // Currently Not Used
+    // additional characteristic subscriptions.
+    spinBLEClient.handleBattInfo(pClient, true);
 }
 
-void MyClientCallback::onDisconnect(NimBLEClient *pclient) {
+void MyClientCallback::onDisconnect(NimBLEClient *pClient) {
   SS2K_LOG(BLE_CLIENT_LOG_TAG, "Disconnect Called");
 
   if (spinBLEClient.intentionalDisconnect) {
@@ -278,8 +279,10 @@ void MyClientCallback::onDisconnect(NimBLEClient *pclient) {
     spinBLEClient.intentionalDisconnect = false;
     return;
   }
-  if (!pclient->isConnected()) {
-    NimBLEAddress addr = pclient->getPeerAddress();
+  
+  //cleanup spinBLE.myDevices
+  if (!pClient->isConnected()) {
+    NimBLEAddress addr = pClient->getPeerAddress();
     // auto addr = BLEDevice::getDisconnectedClient()->getPeerAddress();
     SS2K_LOG(BLE_CLIENT_LOG_TAG, "This disconnected client Address %s", addr.toString().c_str());
     for (size_t i = 0; i < NUM_BLE_DEVICES; i++) {
@@ -288,13 +291,16 @@ void MyClientCallback::onDisconnect(NimBLEClient *pclient) {
         SS2K_LOG(BLE_CLIENT_LOG_TAG, "Detected %s Disconnect", spinBLEClient.myBLEDevices[i].serviceUUID.toString().c_str());
         spinBLEClient.myBLEDevices[i].doConnect = true;
         if ((spinBLEClient.myBLEDevices[i].charUUID == CYCLINGPOWERMEASUREMENT_UUID) || (spinBLEClient.myBLEDevices[i].charUUID == FITNESSMACHINEINDOORBIKEDATA_UUID) ||
-            (spinBLEClient.myBLEDevices[i].charUUID == FLYWHEEL_UART_RX_UUID) || (spinBLEClient.myBLEDevices[i].charUUID == ECHELON_SERVICE_UUID)) {
+            (spinBLEClient.myBLEDevices[i].charUUID == FLYWHEEL_UART_RX_UUID) || (spinBLEClient.myBLEDevices[i].charUUID == ECHELON_SERVICE_UUID) ||
+            (spinBLEClient.myBLEDevices[i].charUUID == CYCLINGPOWERSERVICE_UUID)) {
           SS2K_LOG(BLE_CLIENT_LOG_TAG, "Deregistered PM on Disconnect");
+          rtConfig.pm_batt.setValue(0);
           spinBLEClient.connectedPM = false;
           break;
         }
         if ((spinBLEClient.myBLEDevices[i].charUUID == HEARTCHARACTERISTIC_UUID)) {
           SS2K_LOG(BLE_CLIENT_LOG_TAG, "Deregistered HR on Disconnect");
+          rtConfig.hr_batt.setValue(0);
           spinBLEClient.connectedHR = false;
           break;
         }
@@ -507,7 +513,8 @@ void SpinBLEClient::postConnect() {
         myBLEDevices[i].postConnected = true;
         NimBLEClient *pClient         = NimBLEDevice::getClientByPeerAddress(myBLEDevices[i].peerAddress);
         if ((this->myBLEDevices[i].charUUID == CYCLINGPOWERMEASUREMENT_UUID) || (this->myBLEDevices[i].charUUID == FITNESSMACHINEINDOORBIKEDATA_UUID) ||
-            (this->myBLEDevices[i].charUUID == FLYWHEEL_UART_RX_UUID) || (this->myBLEDevices[i].charUUID == ECHELON_DATA_UUID)) {
+            (this->myBLEDevices[i].charUUID == FLYWHEEL_UART_RX_UUID) || (this->myBLEDevices[i].charUUID == ECHELON_DATA_UUID) ||
+            (this->myBLEDevices[i].charUUID == CYCLINGPOWERSERVICE_UUID)) {
           this->connectedPM = true;
           SS2K_LOG(BLE_CLIENT_LOG_TAG, "Registered PM on Connect");
 
@@ -612,4 +619,31 @@ void SpinBLEAdvertisedDevice::print() {
   logBufP += sprintf(logBufP, " doConnect: (%s)", doConnect ? "true" : "false");
   strcat(logBufP, "|");
   SS2K_LOG(BLE_CLIENT_LOG_TAG, "%s", String(logBuf));
+}
+
+// Poll BLE devices for battCharacteristic if available and read value.
+void SpinBLEClient::handleBattInfo(NimBLEClient *pClient, bool updateNow=false) {
+  static unsigned long last_battery_update = 0;
+  if ((millis() - last_battery_update >= BATTERY_UPDATE_INTERVAL_MILLIS) || (last_battery_update == 0) || updateNow) {
+    last_battery_update = millis();
+    if (pClient->getService(HEARTSERVICE_UUID)) {  // get battery level at first connect
+      BLERemoteCharacteristic *battCharacteristic = pClient->getService(BATTERYSERVICE_UUID)->getCharacteristic(BATTERYCHARACTERISTIC_UUID);
+      if (battCharacteristic != nullptr) {
+        std::string value = battCharacteristic->readValue();
+        rtConfig.hr_batt.setValue((uint8_t)value[0]);
+        SS2K_LOG(BLE_CLIENT_LOG_TAG, "HRM battery updated %d", (int)value[0]);
+      } else {
+        rtConfig.hr_batt.setValue(0);
+      }
+    } else if (pClient->getService(CYCLINGPOWERMEASUREMENT_UUID) || pClient->getService(CYCLINGPOWERSERVICE_UUID)) {  // get batterylevel at first connect
+      BLERemoteCharacteristic *battCharacteristic = pClient->getService(BATTERYSERVICE_UUID)->getCharacteristic(BATTERYCHARACTERISTIC_UUID);
+      if (battCharacteristic != nullptr) {
+        std::string value = battCharacteristic->readValue();
+        rtConfig.pm_batt.setValue((uint8_t)value[0]);
+        SS2K_LOG(BLE_CLIENT_LOG_TAG, "PM battery updated %d", (int)value[0]);
+      } else {
+        rtConfig.pm_batt.setValue(0);
+      }
+    }
+  }
 }

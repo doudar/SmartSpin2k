@@ -8,7 +8,7 @@
 #include "Main.h"
 #include "SS2KLog.h"
 #include "BLE_Common.h"
-
+#include <Constants.h>
 #include <math.h>
 #include <sensors/SensorData.h>
 #include <sensors/SensorDataFactory.h>
@@ -54,8 +54,10 @@ void BLECommunications(void *pvParameters) {
                     pData[i] = incomingNotifyData.data[i];
                   }
                   collectAndSet(pRemoteBLECharacteristic->getUUID(), myAdvertisedDevice.serviceUUID, pRemoteBLECharacteristic->getRemoteService()->getClient()->getPeerAddress(), pData, length);
-
                 }
+
+                spinBLEClient.handleBattInfo(pClient, false);
+                
               } else if (!pClient->isConnected()) {  // This shouldn't ever be
                                                      // called...
                 if (pClient->disconnect() == 0) {    // 0 is a successful disconnect
