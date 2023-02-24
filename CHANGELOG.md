@@ -12,6 +12,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Simplified Platform Packages to work better with newest version of PlatformIO.
 - Fixed broken images in wiki
 ### Hardware
+- Updated PCB switch placement
+- Updated PCB Inductor
+- Updated PCB Motor Connector
+- Updated PCB Back Side Silkscreen Layer
 - Added fixed length arms. 
 - Added R3 assembly instructions.
 - Added back a modified version of the single button shifter.
