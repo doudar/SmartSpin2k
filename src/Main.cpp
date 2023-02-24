@@ -408,6 +408,7 @@ void SS2K::resetIfShiftersHeld() {
       digitalWrite(LED_PIN, LOW);
     }
     for (int i = 0; i < 20; i++) {
+      LittleFS.format();
       userConfig.setDefaults();
       vTaskDelay(200 / portTICK_PERIOD_MS);
       userConfig.saveToLittleFS();
