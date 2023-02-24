@@ -1,0 +1,9 @@
+### Module positions - created on Tue Jan 17 20:43:15 2023 ###
+### Printed by Pcbnew version (6.0.7)
+## Unit = mm, Angle = deg.
+## Side : bottom
+# Ref     Val            Package                                      PosX       PosY       Rot  Side
+J1        B4B-XH-AMLFSN  JST_XH_B4B-XH-AM_1x04_P2.50mm_Vertical   -51.7980    16.8230   90.0000  bottom
+J2        B4B-XH-AMLFSN  JST_XH_B4B-XH-AM_1x04_P2.50mm_Vertical   -28.8100    31.7650  180.0000  bottom
+J3        B8B-XH-A_LFSN  JST_XH_B8B-XH-AM_1x08_P2.50mm_Vertical   -51.7810    30.3520   90.0000  bottom
+## End
