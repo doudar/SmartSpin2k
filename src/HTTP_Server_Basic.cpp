@@ -645,10 +645,10 @@ void HTTP_Server::FirmwareUpdate() {
       updateAnyway = true;
       SS2K_LOG(HTTP_SERVER_LOG_TAG, "  -index.html not found. Forcing update");
     }
-    Version availiableVer(payload.c_str());
+    Version availableVer(payload.c_str());
     Version currentVer(FIRMWARE_VERSION);
 
-    if ((availiableVer > currentVer) || (updateAnyway)) {
+    if (((availableVer > currentVer) && (userConfig.getAutoUpdate()))  || (updateAnyway)) {
       SS2K_LOG(HTTP_SERVER_LOG_TAG, "New firmware detected!");
       SS2K_LOG(HTTP_SERVER_LOG_TAG, "Upgrading from %s to %s", FIRMWARE_VERSION, payload.c_str());
 
@@ -706,7 +706,7 @@ void HTTP_Server::FirmwareUpdate() {
 
       //////// Update Firmware /////////
       SS2K_LOG(HTTP_SERVER_LOG_TAG, "Updating Firmware...Please Wait");
-      if ((availiableVer > currentVer) && (userConfig.getAutoUpdate())) {
+      if ((availableVer > currentVer) && (userConfig.getAutoUpdate())) {
         t_httpUpdate_return ret = httpUpdate.update(client, userConfig.getFirmwareUpdateURL() + String(FW_BINFILE));
         switch (ret) {
           case HTTP_UPDATE_FAILED:
