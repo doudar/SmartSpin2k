@@ -66,7 +66,9 @@ class RuntimeParameters {
 
  public:
   Measurement watts;
+  Measurement pm_batt;
   Measurement hr;
+  Measurement hr_batt;
   Measurement cad;
   Measurement resistance;
 

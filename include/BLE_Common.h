@@ -200,6 +200,7 @@ class SpinBLEClient {
   void connectBLE_HID(NimBLEClient *pClient);
   void keepAliveBLE_HID(NimBLEClient *pClient);
   void checkBLEReconnect();
+  void handleBattInfo(NimBLEClient *pClient, bool updateNow);
 };
 
 class MyAdvertisedDeviceCallback : public NimBLEAdvertisedDeviceCallbacks {

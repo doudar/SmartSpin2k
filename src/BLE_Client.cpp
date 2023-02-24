@@ -309,7 +309,8 @@ bool SpinBLEClient::connectToServer() {
  **                       Remove as you see fit for your needs                        */
 
 void MyClientCallback::onConnect(NimBLEClient *pClient) {
-  // Currently Not Used
+    // additional characteristic subscriptions.
+    spinBLEClient.handleBattInfo(pClient, true);
 }
 
 void MyClientCallback::onDisconnect(NimBLEClient *pClient) {
@@ -332,13 +333,16 @@ void MyClientCallback::onDisconnect(NimBLEClient *pClient) {
         SS2K_LOG(BLE_CLIENT_LOG_TAG, "Detected %s Disconnect", spinBLEClient.myBLEDevices[i].serviceUUID.toString().c_str());
         spinBLEClient.myBLEDevices[i].doConnect = true;
         if ((spinBLEClient.myBLEDevices[i].charUUID == CYCLINGPOWERMEASUREMENT_UUID) || (spinBLEClient.myBLEDevices[i].charUUID == FITNESSMACHINEINDOORBIKEDATA_UUID) ||
-            (spinBLEClient.myBLEDevices[i].charUUID == FLYWHEEL_UART_RX_UUID) || (spinBLEClient.myBLEDevices[i].charUUID == ECHELON_SERVICE_UUID)) {
+            (spinBLEClient.myBLEDevices[i].charUUID == FLYWHEEL_UART_RX_UUID) || (spinBLEClient.myBLEDevices[i].charUUID == ECHELON_SERVICE_UUID) ||
+            (spinBLEClient.myBLEDevices[i].charUUID == CYCLINGPOWERSERVICE_UUID)) {
           SS2K_LOG(BLE_CLIENT_LOG_TAG, "Deregistered PM on Disconnect");
+          rtConfig.pm_batt.setValue(0);
           spinBLEClient.connectedPM = false;
           break;
         }
         if ((spinBLEClient.myBLEDevices[i].charUUID == HEARTCHARACTERISTIC_UUID)) {
           SS2K_LOG(BLE_CLIENT_LOG_TAG, "Deregistered HR on Disconnect");
+          rtConfig.hr_batt.setValue(0);
           spinBLEClient.connectedHRM = false;
           break;
         }
@@ -771,5 +775,31 @@ void SpinBLEAdvertisedDevice::reset() {
   if (dataBufferQueue != nullptr) {
     // Serial.println("Resetting queue");
     xQueueReset(dataBufferQueue);
+  }
+}
+// Poll BLE devices for battCharacteristic if available and read value.
+void SpinBLEClient::handleBattInfo(NimBLEClient *pClient, bool updateNow=false) {
+  static unsigned long last_battery_update = 0;
+  if ((millis() - last_battery_update >= BATTERY_UPDATE_INTERVAL_MILLIS) || (last_battery_update == 0) || updateNow) {
+    last_battery_update = millis();
+    if (pClient->getService(HEARTSERVICE_UUID)) {  // get battery level at first connect
+      BLERemoteCharacteristic *battCharacteristic = pClient->getService(BATTERYSERVICE_UUID)->getCharacteristic(BATTERYCHARACTERISTIC_UUID);
+      if (battCharacteristic != nullptr) {
+        std::string value = battCharacteristic->readValue();
+        rtConfig.hr_batt.setValue((uint8_t)value[0]);
+        SS2K_LOG(BLE_CLIENT_LOG_TAG, "HRM battery updated %d", (int)value[0]);
+      } else {
+        rtConfig.hr_batt.setValue(0);
+      }
+    } else if (pClient->getService(CYCLINGPOWERMEASUREMENT_UUID) || pClient->getService(CYCLINGPOWERSERVICE_UUID)) {  // get batterylevel at first connect
+      BLERemoteCharacteristic *battCharacteristic = pClient->getService(BATTERYSERVICE_UUID)->getCharacteristic(BATTERYCHARACTERISTIC_UUID);
+      if (battCharacteristic != nullptr) {
+        std::string value = battCharacteristic->readValue();
+        rtConfig.pm_batt.setValue((uint8_t)value[0]);
+        SS2K_LOG(BLE_CLIENT_LOG_TAG, "PM battery updated %d", (int)value[0]);
+      } else {
+        rtConfig.pm_batt.setValue(0);
+      }
+    }
   }
 }

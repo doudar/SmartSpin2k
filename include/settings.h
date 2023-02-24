@@ -275,6 +275,12 @@
 // If ble devices are both setup, how often to attempt a reconnect.
 #define BLE_RECONNECT_INTERVAL 1
 
+// Interval for polling ble battery updates
+#define BATTERY_UPDATE_INTERVAL_MILLIS 300000 
+
+// Initial and web scan duration.
+#define DEFAULT_SCAN_DURATION 10
+
 // BLE automatic reconnect duration. Set this low to avoid interruption.
 #define BLE_RECONNECT_SCAN_DURATION 1
 

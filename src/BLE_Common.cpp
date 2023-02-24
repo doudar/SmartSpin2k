@@ -63,6 +63,9 @@ void BLECommunications(void *pvParameters) {
                   collectAndSet(pRemoteBLECharacteristic->getUUID(), myAdvertisedDevice.serviceUUID, pRemoteBLECharacteristic->getRemoteService()->getClient()->getPeerAddress(),
                                 pData, length);
                 }
+
+                spinBLEClient.handleBattInfo(pClient, false);
+                
               } else if (!pClient->isConnected()) {  // This shouldn't ever be
                                                      // called...
                 if (pClient->disconnect() == 0) {    // 0 is a successful disconnect

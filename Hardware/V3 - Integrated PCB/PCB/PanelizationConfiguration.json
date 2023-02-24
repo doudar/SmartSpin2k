@@ -1,0 +1,26 @@
+{
+    "layout": {
+        "hspace": "2mm",
+        "vspace": "5mm",
+        "rows": "3",
+        "cols": "3"
+    },
+    "cuts": {
+        "type": "vcuts"
+    },
+    "framing": {
+        "type": "tightframe"
+    },
+    "tooling": {
+        "type": "3hole",
+        "hoffset": "10mm",
+        "voffset": "3.35mm",
+        "size": "1.152mm"
+    },
+    "fiducials": {
+        "type": "4fid",
+        "hoffset": "5mm",
+        "voffset": "3.35mm",
+        "opening": "2mm"
+    }
+}
