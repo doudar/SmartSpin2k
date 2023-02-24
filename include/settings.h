@@ -203,9 +203,6 @@
 // Max tries that BLE client will perform on reconnect
 #define MAX_RECONNECT_TRIES 3
 
-// Time in seconds for a scan
-#define DEFAULT_SCAN_DURATION 1
-
 // loop speed for the SmartSpin2k BLE communications
 #define BLE_NOTIFY_DELAY 503
 
@@ -279,7 +276,7 @@
 #define BATTERY_UPDATE_INTERVAL_MILLIS 300000 
 
 // Initial and web scan duration.
-#define DEFAULT_SCAN_DURATION 10
+#define DEFAULT_SCAN_DURATION 1
 
 // BLE automatic reconnect duration. Set this low to avoid interruption.
 #define BLE_RECONNECT_SCAN_DURATION 1

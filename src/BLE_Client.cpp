@@ -219,6 +219,7 @@ bool SpinBLEClient::connectToServer() {
     pClient->setConnectTimeout(2);  // 5
 
     if (!pClient->connect(myDevice->getAddress())) {
+      SS2K_LOG(BLE_CLIENT_LOG_TAG, " - Failed to connect client");
       /** Created a client but failed to connect, don't need to keep it as it has no data */
       spinBLEClient.myBLEDevices[device_number].reset();
       pClient->deleteServices();
@@ -315,8 +316,8 @@ void MyClientCallback::onConnect(NimBLEClient *pClient) {
 
 void MyClientCallback::onDisconnect(NimBLEClient *pClient) {
   NimBLEDevice::getScan()->stop();
-  NimBLEDevice::getScan()->clearResults();
-  NimBLEDevice::getScan()->clearDuplicateCache();
+  //NimBLEDevice::getScan()->clearResults();
+  //NimBLEDevice::getScan()->clearDuplicateCache();
   SS2K_LOG(BLE_CLIENT_LOG_TAG, "Disconnect Called");
   if (spinBLEClient.intentionalDisconnect) {
     SS2K_LOG(BLE_CLIENT_LOG_TAG, "Intentional Disconnect");
@@ -344,6 +345,11 @@ void MyClientCallback::onDisconnect(NimBLEClient *pClient) {
           SS2K_LOG(BLE_CLIENT_LOG_TAG, "Deregistered HR on Disconnect");
           rtConfig.hr_batt.setValue(0);
           spinBLEClient.connectedHRM = false;
+          break;
+        }
+        if ((spinBLEClient.myBLEDevices[i].charUUID == HID_REPORT_DATA_UUID)) {
+          SS2K_LOG(BLE_CLIENT_LOG_TAG, "Deregistered Remote on Disconnect");
+          spinBLEClient.connectedRemote = false;
           break;
         }
       }
@@ -725,7 +731,7 @@ void SpinBLEClient::checkBLEReconnect() {
   if (scan) {
     if (!NimBLEDevice::getScan()->isScanning()) {
       spinBLEClient.scanProcess(BLE_RECONNECT_SCAN_DURATION);
-      //Serial.println("scan");
+      Serial.println("scan");
     }
   }
 }
@@ -782,7 +788,7 @@ void SpinBLEClient::handleBattInfo(NimBLEClient *pClient, bool updateNow=false) 
   static unsigned long last_battery_update = 0;
   if ((millis() - last_battery_update >= BATTERY_UPDATE_INTERVAL_MILLIS) || (last_battery_update == 0) || updateNow) {
     last_battery_update = millis();
-    if (pClient->getService(HEARTSERVICE_UUID)) {  // get battery level at first connect
+    if (pClient->getService(HEARTSERVICE_UUID) && pClient->getService(BATTERYSERVICE_UUID)) {  // get battery level at first connect
       BLERemoteCharacteristic *battCharacteristic = pClient->getService(BATTERYSERVICE_UUID)->getCharacteristic(BATTERYCHARACTERISTIC_UUID);
       if (battCharacteristic != nullptr) {
         std::string value = battCharacteristic->readValue();
@@ -791,7 +797,7 @@ void SpinBLEClient::handleBattInfo(NimBLEClient *pClient, bool updateNow=false) 
       } else {
         rtConfig.hr_batt.setValue(0);
       }
-    } else if (pClient->getService(CYCLINGPOWERMEASUREMENT_UUID) || pClient->getService(CYCLINGPOWERSERVICE_UUID)) {  // get batterylevel at first connect
+    } else if ((pClient->getService(CYCLINGPOWERMEASUREMENT_UUID) || pClient->getService(CYCLINGPOWERSERVICE_UUID)) && pClient->getService(BATTERYSERVICE_UUID)) {  // get batterylevel at first connect
       BLERemoteCharacteristic *battCharacteristic = pClient->getService(BATTERYSERVICE_UUID)->getCharacteristic(BATTERYCHARACTERISTIC_UUID);
       if (battCharacteristic != nullptr) {
         std::string value = battCharacteristic->readValue();
