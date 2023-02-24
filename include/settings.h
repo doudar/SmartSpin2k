@@ -228,7 +228,7 @@
 
 // Name of default remote. any connects to anything, none connects to
 // nothing.
-#define CONNECTED_REMOTE "any"
+#define CONNECTED_REMOTE "none"
 
 // number of main loops the shifters need to be held before a BLE scan is
 // initiated.
