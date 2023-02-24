@@ -13,9 +13,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Fixed broken images in wiki
 ### Hardware
 - Revised an old shifter cover for more options.
+- Updated arm folder to procedurally generated arms ov various lengths.
+- Updated C7 bike mount to use hook style arms. 
+- Updated PCB switch placement
+- Updated PCB Inductor
+- Updated PCB Motor Connector
+- Updated PCB Back Side Silkscreen Layer
 - Added fixed length arms. 
 - Added R3 assembly instructions.
-- Added back a modified version of the single button shifter. 
+- Added back a modified version of the single button shifter.
+- Changed Logo font and position.
+- Increased material around the top screw hole. 
+- Made shifter plugs slightly smaller.
+- Increased diameter of shifter strain relief.
 
 ## [23.1.22]
 ### Added
