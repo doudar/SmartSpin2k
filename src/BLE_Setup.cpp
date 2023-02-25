@@ -22,16 +22,16 @@ void setupBLE() {  // Common BLE setup for both client and server
                           "BLECommunicationTask", /* name of task. */
                           6000,                   /* Stack size of task*/
                           NULL,                   /* parameter of the task */
-                          1,                      /* priority of the task*/
+                          3,                      /* priority of the task*/
                           &BLECommunicationTask,  /* Task handle to keep track of created task */
                           1);                     /* pin task to core */
 
   SS2K_LOG(BLE_SETUP_LOG_TAG, "BLE Notify Task Started");
-  vTaskDelay(100 / portTICK_PERIOD_MS);
+  /*vTaskDelay(100 / portTICK_PERIOD_MS);
   if (strcmp(userConfig.getConnectedPowerMeter(), "none") != 0 || strcmp(userConfig.getConnectedHeartMonitor(), "none") != 0) {
     spinBLEClient.serverScan(true);
     SS2K_LOG(BLE_SETUP_LOG_TAG, "Scanning");
-  }
-  SS2K_LOG(BLE_SETUP_LOG_TAG, "%s %s", userConfig.getConnectedPowerMeter(), userConfig.getConnectedHeartMonitor());
+  }*/
+  SS2K_LOG(BLE_SETUP_LOG_TAG, "%s %s %s", userConfig.getConnectedPowerMeter(), userConfig.getConnectedHeartMonitor(), userConfig.getConnectedRemote());
   SS2K_LOG(BLE_SETUP_LOG_TAG, "End BLE Setup");
 }
