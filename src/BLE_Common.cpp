@@ -44,8 +44,8 @@ void BLECommunications(void *pvParameters) {
 
                 // Handle BLE HID Remotes
                 if (spinBLEClient.myBLEDevices[x].serviceUUID == HID_SERVICE_UUID) {
-                  // spinBLEClient.keepAliveBLE_HID(pClient); //keep alive doesn't seem to help :(
-                  break;  // There is not data that needs to be dequeued for the remote, so got to the next device.
+                  spinBLEClient.keepAliveBLE_HID(pClient); //keep alive doesn't seem to help :(
+                  continue;  // There is not data that needs to be dequeued for the remote, so got to the next device.
                 }
 
                 // Dequeue sensor data we stored during notifications
