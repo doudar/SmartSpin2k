@@ -121,10 +121,12 @@ class userParameters {
   bool stepperDir;
   bool shifterDir;
   bool udpLogEnabled = false;
+  bool logComm       = false;
   String ssid;
   String password;
   String connectedPowerMeter   = "any";
   String connectedHeartMonitor = "any";
+  String connectedRemote    = "any";
   String foundDevices          = " ";
 
  public:
@@ -164,6 +166,9 @@ class userParameters {
   void setConnectedHeartMonitor(String cHr) { connectedHeartMonitor = cHr; }
   const char* getConnectedHeartMonitor() { return connectedHeartMonitor.c_str(); }
 
+  void setConnectedRemote(String cRemote) { connectedRemote = cRemote; }
+  const char* getConnectedRemote() { return connectedRemote.c_str();}
+
   void setStepperPower(int sp) { stepperPower = sp; }
   int getStepperPower() { return stepperPower; }
 
@@ -181,6 +186,9 @@ class userParameters {
 
   void setUdpLogEnabled(bool enabled) { udpLogEnabled = enabled; }
   bool getUdpLogEnabled() { return udpLogEnabled; }
+
+  void setLogComm(bool lgcm) { logComm = lgcm; }
+  bool getLogComm() { return logComm; }
 
   void setFoundDevices(String fdv) { foundDevices = fdv; }
   const char* getFoundDevices() { return foundDevices.c_str(); }

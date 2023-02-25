@@ -60,6 +60,7 @@
 // Setup
 void setupBLE();
 extern TaskHandle_t BLECommunicationTask;
+extern TaskHandle_t BLEClientTask;
 // ***********************Common**********************************
 void BLECommunications(void *pvParameters);
 
@@ -68,6 +69,7 @@ class MyServerCallbacks : public NimBLEServerCallbacks {
  public:
   void onConnect(BLEServer *, ble_gap_conn_desc *desc);
   void onDisconnect(BLEServer *);
+  bool onConnParamsUpdateRequest(NimBLEClient *pClient, const ble_gap_upd_params *params);
 };
 
 class MyCallbacks : public NimBLECharacteristicCallbacks {
@@ -76,7 +78,6 @@ class MyCallbacks : public NimBLECharacteristicCallbacks {
   void onSubscribe(NimBLECharacteristic *pCharacteristic, ble_gap_conn_desc *desc, uint16_t subValue);
 };
 
-// static void onNotify(NimBLECharacteristic *pCharacteristic, uint8_t *pData);
 class ss2kCustomCharacteristicCallbacks : public BLECharacteristicCallbacks {
   void onWrite(BLECharacteristic *);
 };
@@ -102,8 +103,6 @@ extern SpinBLEServer spinBLEServer;
 
 void startBLEServer();
 bool spinDown();
-// void computeERG(int = 0);
-void computeCSC();
 void logCharacteristic(char *buffer, const size_t bufferCapacity, const byte *data, const size_t dataLength, const NimBLEUUID serviceUUID, const NimBLEUUID charUUID,
                        const char *format, ...);
 void updateIndoorBikeDataChar();
@@ -153,40 +152,15 @@ class SpinBLEAdvertisedDevice {
   int connectedClientID = BLE_HS_CONN_HANDLE_NONE;
   BLEUUID serviceUUID   = (uint16_t)0x0000;
   BLEUUID charUUID      = (uint16_t)0x0000;
-  bool userSelectedHR   = false;
-  bool userSelectedPM   = false;
-  bool userSelectedCSC  = false;
-  bool userSelectedCT   = false;
+  bool isHRM            = false;
+  bool isPM             = false;
+  bool isCSC            = false;
+  bool isCT             = false;
+  bool isRemote         = false;
   bool doConnect        = false;
   bool postConnected    = false;
-
-  void set(BLEAdvertisedDevice *device, int id = BLE_HS_CONN_HANDLE_NONE, BLEUUID inserviceUUID = (uint16_t)0x0000, BLEUUID incharUUID = (uint16_t)0x0000) {
-    advertisedDevice  = device;
-    peerAddress       = device->getAddress();
-    connectedClientID = id;
-    serviceUUID       = BLEUUID(inserviceUUID);
-    charUUID          = BLEUUID(incharUUID);
-    dataBufferQueue   = xQueueCreate(6, sizeof(NotifyData));
-  }
-
-  void reset() {
-    advertisedDevice = nullptr;
-    // NimBLEAddress peerAddress;
-    connectedClientID = BLE_HS_CONN_HANDLE_NONE;
-    serviceUUID       = (uint16_t)0x0000;
-    charUUID          = (uint16_t)0x0000;
-    userSelectedHR    = false;  // Heart Rate Monitor
-    userSelectedPM    = false;  // Power Meter
-    userSelectedCSC   = false;  // Cycling Speed/Cadence
-    userSelectedCT    = false;  // Controllable Trainer
-    doConnect         = false;  // Initiate connection flag
-    postConnected     = false;  // Has Cost Connect Been Run?
-    if (dataBufferQueue != nullptr) {
-      //Serial.println("Resetting queue");
-      xQueueReset(dataBufferQueue);
-    }
-  }
-
+  void set(BLEAdvertisedDevice *device, int id = BLE_HS_CONN_HANDLE_NONE, BLEUUID inServiceUUID = (uint16_t)0x0000, BLEUUID inCharUUID = (uint16_t)0x0000);
+  void reset();
   void print();
   bool enqueueData(uint8_t data[25], size_t length);
   NotifyData dequeueData();
@@ -196,14 +170,16 @@ class SpinBLEClient {
  public:  // Not all of these need to be public. This should be cleaned up
           // later.
   boolean connectedPM        = false;
-  boolean connectedHR        = false;
+  boolean connectedHRM       = false;
   boolean connectedCD        = false;
+  boolean connectedCT        = false;
+  boolean connectedRemote    = false;
   boolean doScan             = false;
+  bool dontBlockScan         = true;
   bool intentionalDisconnect = false;
   int noReadingIn            = 0;
   int cscCumulativeCrankRev  = 0;
   int cscLastCrankEvtTime    = 0;
-  int scanRetries            = MAX_SCAN_RETRIES;
   int reconnectTries         = MAX_RECONNECT_TRIES;
 
   BLERemoteCharacteristic *pRemoteCharacteristic = nullptr;
@@ -212,20 +188,21 @@ class SpinBLEClient {
   SpinBLEAdvertisedDevice myBLEDevices[NUM_BLE_DEVICES];
 
   void start();
-  void serverScan(bool connectRequest);
+  // void serverScan(bool connectRequest);
   bool connectToServer();
   void scanProcess(int duration = DEFAULT_SCAN_DURATION);
-  void disconnect();
   // Check for duplicate services of BLEClient and remove the previously
   // connected one.
   void removeDuplicates(NimBLEClient *pClient);
-  // Reset devices in myBLEDevices[]. Bool All (true) or only connected ones
-  // (false)
-  void resetDevices();
+  void resetDevices(NimBLEClient *pclient);
   void postConnect();
   void FTMSControlPointWrite(const uint8_t *pData, int length);
+  void connectBLE_HID(NimBLEClient *pClient);
+  void keepAliveBLE_HID(NimBLEClient *pClient);
+  void checkBLEReconnect();
   void handleBattInfo(NimBLEClient *pClient, bool updateNow);
 };
+
 class MyAdvertisedDeviceCallback : public NimBLEAdvertisedDeviceCallbacks {
  public:
   void onResult(NimBLEAdvertisedDevice *);

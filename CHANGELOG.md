@@ -6,8 +6,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 ### Added
-- Added battery monitoring of BLE devices by @Flo100.
+- Added battery monitoring of BLE devices by @Flo100. Implemented BLE HID shifting.
 ### Changed
+-Disregard Peloton serial power and cadence if user has a BLE power Meter selected. 
 - Filesystem no longer updates when auto-update is unchecked. 
 - Holding shifter buttons on boot now erases LittleFS as well as resetting settings.
 - Fixed bug where "none" hr still scanned. Credit to @xpectnil for discovering. 
@@ -122,7 +123,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Added
 - Added comment when files are written to LittleFS.
 - Added comment when firmware starts to update.
-- Added setting for minWatts
+- Added setting for minWatts.
+- Can now update LittleFS via update page.
+- Removed dependency on jQuery. (Saves 30k in filesystem)
 
 ### Changed
 - Driver Over Temp logging fixed.
@@ -130,7 +133,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Disabled setting of min/maxWatts if minWatts/maxWatts is 0.
 - Added a check to workaround a bug where a powertable pair member was zero.
 - Fixed a bug where a powertable pair could be returned that was larger than the powertable size.
-- changes to default settings 
+- Changes to default settings. 
+- Fixed scanning memory leak.
+- Scans continuously unless all devices are connected or set "none"
 
 ### Hardware
 

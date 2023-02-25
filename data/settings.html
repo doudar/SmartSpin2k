@@ -254,6 +254,16 @@
                     class="slider"></span></label>
               </td>
             </tr>
+            <tr>
+              <td>
+                <p class="tooltip">Enable BLE RX Logging<span class="tooltiptext">Enable logging BLE RX messages.
+                    Uses lots of bandwidth.</span></p>
+              </td>
+              <td>
+                <label class="switch"><input type="checkbox" name="logComm" id="logComm"><span
+                    class="slider"></span></label>
+              </td>
+            </tr>
           </tbody>
         </table>
         <input type="submit" value="Save Settings" />
@@ -324,6 +334,7 @@
         document.getElementById("stepperDir").checked = obj.stepperDir;
         document.getElementById("shifterDir").checked = obj.shifterDir;
         document.getElementById("udpLogEnabled").checked = !!obj.udpLogEnabled;
+        document.getElementById("logComm").checked = !!obj.logComm;
         updateSlider(document.getElementById("shiftStep").value, document.getElementById("shiftStepValue"));
         updateSlider(document.getElementById("inclineMultiplier").value, document.getElementById("inclineMultiplierValue"));
         updateSlider(document.getElementById("ERGSensitivity").value, document.getElementById("ERGSensitivityValue"));
