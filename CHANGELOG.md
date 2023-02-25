@@ -8,12 +8,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Added
 - Added battery monitoring of BLE devices by @Flo100. Implemented BLE HID shifting.
 ### Changed
--Disregard Peloton serial power and cadence if user has a BLE power Meter selected. 
+- Disregard Peloton serial power and cadence if user has a BLE power Meter selected. 
 - Filesystem no longer updates when auto-update is unchecked. 
 - Holding shifter buttons on boot now erases LittleFS as well as resetting settings.
 - Fixed bug where "none" hr still scanned. Credit to @xpectnil for discovering. 
 - Simplified Platform Packages to work better with newest version of PlatformIO.
-- Fixed broken images in wiki
+- Fixed broken images in wiki.
+- Valid files displayed on OTA page.
 ### Hardware
 - Revised an old shifter cover for more options.
 - Updated arm folder to procedurally generated arms ov various lengths.

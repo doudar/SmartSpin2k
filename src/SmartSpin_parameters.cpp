@@ -60,6 +60,7 @@ void userParameters::setDefaults() {
   connectedPowerMeter   = CONNECTED_POWER_METER;
   connectedHeartMonitor = CONNECTED_HEART_MONITOR;
   connectedRemote       = CONNECTED_REMOTE;
+  foundDevices          = " ";
   maxWatts              = DEFAULT_MAX_WATTS;
   minWatts              = DEFAULT_MIN_WATTS;
   stepperDir            = true;

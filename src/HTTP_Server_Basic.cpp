@@ -150,7 +150,8 @@ void HTTP_Server::start() {
         "15 seconds.</body><script> setTimeout(\"location.href = 'http://" +
         myIP.toString() + "/bluetoothscanner.html';\",15000);</script></html>";
     // spinBLEClient.resetDevices();
-    // spinBLEClient.serverScan(true);
+    spinBLEClient.dontBlockScan = true;
+    spinBLEClient.scanProcess(DEFAULT_SCAN_DURATION);
     server.send(200, "text/html", response);
   });
 
@@ -333,7 +334,7 @@ void HTTP_Server::start() {
           if (upload.status == UPLOAD_FILE_START) {
             SS2K_LOG(HTTP_SERVER_LOG_TAG, "Update: %s", upload.filename.c_str());
             if (!Update.begin(UPDATE_SIZE_UNKNOWN, U_SPIFFS)) {  // start with max
-                                                                // available size
+                                                                 // available size
               Update.printError(Serial);
             }
           } else if (upload.status == UPLOAD_FILE_WRITE) {
@@ -344,7 +345,7 @@ void HTTP_Server::start() {
           } else if (upload.status == UPLOAD_FILE_END) {
             if (Update.end(true)) {  // true to set the size to the
                                      // current progress
-              server.send(200, "text/plain", "Spiffs Uploaded Successfully. Rebooting...");
+              server.send(200, "text/plain", "Littlefs Uploaded Successfully. Rebooting...");
               userConfig.saveToLittleFS();
               userPWC.saveToLittleFS();
               vTaskDelay(100);
@@ -615,8 +616,6 @@ void HTTP_Server::settingsProcessor() {
         "Selections Saved!</h2></body><script> setTimeout(\"location.href "
         "= 'http://" +
         myIP.toString() + "/bluetoothscanner.html';\",1000);</script></html>";
-    // spinBLEClient.resetDevices();
-    // spinBLEClient.serverScan(true);
   } else if (wasSettingsUpdate) {  // Special Settings Page update response
     response +=
         "Network settings will be applied at next reboot. <br> Everything "
@@ -688,7 +687,7 @@ void HTTP_Server::FirmwareUpdate() {
     Version availableVer(payload.c_str());
     Version currentVer(FIRMWARE_VERSION);
 
-    if (((availableVer > currentVer) && (userConfig.getAutoUpdate()))  || (updateAnyway)) {
+    if (((availableVer > currentVer) && (userConfig.getAutoUpdate())) || (updateAnyway)) {
       SS2K_LOG(HTTP_SERVER_LOG_TAG, "New firmware detected!");
       SS2K_LOG(HTTP_SERVER_LOG_TAG, "Upgrading from %s to %s", FIRMWARE_VERSION, payload.c_str());
 
