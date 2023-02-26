@@ -124,9 +124,9 @@ class userParameters {
   bool logComm       = false;
   String ssid;
   String password;
-  String connectedPowerMeter   = "any";
-  String connectedHeartMonitor = "any";
-  String connectedRemote    = "any";
+  String connectedPowerMeter   = CONNECTED_POWER_METER;
+  String connectedHeartMonitor = CONNECTED_HEART_MONITOR;
+  String connectedRemote    = CONNECTED_REMOTE;
   String foundDevices          = " ";
 
  public:

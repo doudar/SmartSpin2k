@@ -179,7 +179,7 @@ bool SpinBLEClient::connectToServer() {
         SS2K_LOG(BLE_CLIENT_LOG_TAG, "%d left.", reconnectTries);
         if (reconnectTries < 1) {
           spinBLEClient.myBLEDevices[device_number].reset();
-           spinBLEClient.resetDevices(pClient);
+          spinBLEClient.resetDevices(pClient);
           pClient->deleteServices();
           pClient->disconnect();
           NimBLEDevice::getScan()->erase(pClient->getPeerAddress());
@@ -310,14 +310,14 @@ bool SpinBLEClient::connectToServer() {
  **                       Remove as you see fit for your needs                        */
 
 void MyClientCallback::onConnect(NimBLEClient *pClient) {
-    // additional characteristic subscriptions.
-    spinBLEClient.handleBattInfo(pClient, true);
+  // additional characteristic subscriptions.
+  spinBLEClient.handleBattInfo(pClient, true);
 }
 
 void MyClientCallback::onDisconnect(NimBLEClient *pClient) {
   NimBLEDevice::getScan()->stop();
-  //NimBLEDevice::getScan()->clearResults();
-  //NimBLEDevice::getScan()->clearDuplicateCache();
+  // NimBLEDevice::getScan()->clearResults();
+  // NimBLEDevice::getScan()->clearDuplicateCache();
   SS2K_LOG(BLE_CLIENT_LOG_TAG, "Disconnect Called");
   if (spinBLEClient.intentionalDisconnect) {
     SS2K_LOG(BLE_CLIENT_LOG_TAG, "Intentional Disconnect");
@@ -474,7 +474,9 @@ void SpinBLEClient::scanProcess(int duration) {
 
   String output;
   serializeJson(devices, output);
-  SS2K_LOGW(BLE_CLIENT_LOG_TAG, "Bluetooth Client Found Devices: %s", output.c_str());
+  if (duration > BLE_RECONNECT_SCAN_DURATION) {
+    SS2K_LOG(BLE_CLIENT_LOG_TAG, "Bluetooth Client Found Devices: %s", output.c_str());
+  }
 #ifdef USE_TELEGRAM
   SEND_TO_TELEGRAM("Bluetooth Client Found Devices: " + output);
 #endif
@@ -784,7 +786,7 @@ void SpinBLEAdvertisedDevice::reset() {
   }
 }
 // Poll BLE devices for battCharacteristic if available and read value.
-void SpinBLEClient::handleBattInfo(NimBLEClient *pClient, bool updateNow=false) {
+void SpinBLEClient::handleBattInfo(NimBLEClient *pClient, bool updateNow = false) {
   static unsigned long last_battery_update = 0;
   if ((millis() - last_battery_update >= BATTERY_UPDATE_INTERVAL_MILLIS) || (last_battery_update == 0) || updateNow) {
     last_battery_update = millis();
@@ -797,7 +799,8 @@ void SpinBLEClient::handleBattInfo(NimBLEClient *pClient, bool updateNow=false) 
       } else {
         rtConfig.hr_batt.setValue(0);
       }
-    } else if ((pClient->getService(CYCLINGPOWERMEASUREMENT_UUID) || pClient->getService(CYCLINGPOWERSERVICE_UUID)) && pClient->getService(BATTERYSERVICE_UUID)) {  // get batterylevel at first connect
+    } else if ((pClient->getService(CYCLINGPOWERMEASUREMENT_UUID) || pClient->getService(CYCLINGPOWERSERVICE_UUID)) &&
+               pClient->getService(BATTERYSERVICE_UUID)) {  // get batterylevel at first connect
       BLERemoteCharacteristic *battCharacteristic = pClient->getService(BATTERYSERVICE_UUID)->getCharacteristic(BATTERYCHARACTERISTIC_UUID);
       if (battCharacteristic != nullptr) {
         std::string value = battCharacteristic->readValue();

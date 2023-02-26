@@ -78,6 +78,7 @@ String OTAServerIndex = "<body style='font-family: Verdana,sans-serif; font-size
                         "<div style='width:100%;background-color:#e0e0e0;border-radius:8px;'>"
                         "<div id='prg' style='width:0%;background-color:#2196F3;padding:2px;border-radius:8px;color:white;text-align:center;'>0%</div>"
                         "</div>"
+                        "<div>Valid files are firmware.bin or littlefs.bin</div>"
                         "</div>"
                         "</body>"
                         "<script>"
