@@ -19,7 +19,7 @@ jobs:
             hardware:
               - 'Hardware/**'
       - name: Ensure changelog is updated
-        uses: dangoslen/changelog-enforcer@v3.3.0
+        uses: dangoslen/changelog-enforcer@v3.3.2
       - name: Setup python
         uses: actions/setup-python@v4
       - name: Check pre-commit hooks
