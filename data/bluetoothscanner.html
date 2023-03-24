@@ -39,6 +39,12 @@
             </tr>
             <tr>
               <td>
+                <p><label for="connectedRemote">Saved Remote:</label></p>
+              </td>
+              <td><label id="connectedRemote">loading</label></td>
+            </tr>
+            <tr>
+              <td>
                 <p><label for="BluetoothPMDevices">Select New Power Meter:</label></p>
               </td>
               <td><select id="blePMDropdown" name="blePMDropdown" value="loading">
@@ -49,6 +55,13 @@
                 <p><label for="BluetoothHRDevices">Select New Heart Monitor:</label></p>
               </td>
               <td><select id="bleHRDropdown" name="bleHRDropdown" value="loading">
+              </td>
+            </tr>
+            <tr>
+              <td>
+                <p><label for="BluetoothRemoteDevices">Select New Remote:</label></p>
+              </td>
+              <td><select id="bleRemoteDropdown" name="bleRemoteDropdown" value="loading">
               </td>
             </tr>
             <tr>
@@ -90,8 +103,10 @@
 <script>
   let PMDropdown = document.getElementById('blePMDropdown');
   let HRDropdown = document.getElementById('bleHRDropdown');
+  let remoteDropdown = document.getElementById('bleRemoteDropdown');
   PMDropdown.length = 0;
   HRDropdown.length = 0;
+  remoteDropdown.length = 0;
 
   //Update values on specified interval loading late because this tiny webserver hates frequent requests
   setInterval(function () {
@@ -152,12 +167,30 @@
           }
         }
 
+        let optionRemote;
+        for (var key in t_obj) {
+          if (t_obj[key].UUID == '0x1812') {
+            optionRemote = document.createElement('option');
+            if (t_obj[key].name) {
+              optionRemote.text = t_obj[key].name;
+            }
+            else if (t_obj[key].address) {
+              optionRemote.text = t_obj[key].address;
+            }
+            optionRemote.selected;
+            remoteDropdown.add(optionRemote);
+          }
+        }
+
         let connectedOptionPM = document.createElement('option');
         connectedOptionPM.text = data.connectedPowerMeter;
         let connectedOptionHR = document.createElement('option');
         connectedOptionHR.text = data.connectedHeartMonitor;
+        let connectedOptionRemote = document.createElement('option');
+        connectedOptionRemote.text = data.connectedRemote;
         PMDropdown.add(connectedOptionPM);
         HRDropdown.add(connectedOptionHR);
+        remoteDropdown.add(connectedOptionRemote);
         let anyOptionPM = document.createElement('option');
         anyOptionPM.text = 'any';
         let anyOptionHR = document.createElement('option');
@@ -168,10 +201,14 @@
         noneOptionPM.text = 'none';
         let noneOptionHR = document.createElement('option');
         noneOptionHR.text = 'none';
+        let noneOptionRemote = document.createElement('option');
+        noneOptionRemote.text = 'none';
         PMDropdown.add(noneOptionPM);
         HRDropdown.add(noneOptionHR);
+        remoteDropdown.add(noneOptionRemote);
         document.getElementById("connectedPowerMeter").innerHTML = data.connectedPowerMeter;
         document.getElementById("connectedHeartMonitor").innerHTML = data.connectedHeartMonitor;
+        document.getElementById("connectedRemote").innerHTML = data.connectedRemote;
         document.getElementById("powerCorrectionFactorValue").innerHTML = data.powerCorrectionFactor;
         document.getElementById("powerCorrectionFactor").value = data.powerCorrectionFactor;
         document.getElementById("loadingWatermark").opacity = 0;

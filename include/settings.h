@@ -203,22 +203,17 @@
 // Max tries that BLE client will perform on reconnect
 #define MAX_RECONNECT_TRIES 3
 
-// When quick reconnect fails ^^, we try to scan for the disconnected server.
-// Scans slow BLE & WiFi traffic so we don't want to do this forever.
-// Give up scanning for the lost connection after this many tries:
-#define MAX_SCAN_RETRIES 2
-
 // loop speed for the SmartSpin2k BLE communications
-#define BLE_NOTIFY_DELAY 500
+#define BLE_NOTIFY_DELAY 503
 
 // loop speed for the SmartSpin2k BLE Client reconnect
-#define BLE_CLIENT_DELAY 1000
+#define BLE_CLIENT_DELAY 101
 
 // Number of devices that can be connected to the Client (myBLEDevices size)
 #define NUM_BLE_DEVICES 4
 
 // loop speed for the Webserver
-#define WEBSERVER_DELAY 60
+#define WEBSERVER_DELAY 7
 
 // Name of default Power Meter. any connects to anything, none connects to
 // nothing.
@@ -227,6 +222,10 @@
 // Name of default heart monitor. any connects to anything, none connects to
 // nothing.
 #define CONNECTED_HEART_MONITOR "any"
+
+// Name of default remote. any connects to anything, none connects to
+// nothing.
+#define CONNECTED_REMOTE "none"
 
 // number of main loops the shifters need to be held before a BLE scan is
 // initiated.
@@ -239,7 +238,7 @@
 #define WIFI_CONNECT_TIMEOUT 10
 
 // Max size of userconfig
-#define USERCONFIG_JSON_SIZE 1024 + DEBUG_LOG_BUFFER_SIZE
+#define USERCONFIG_JSON_SIZE 1524 + DEBUG_LOG_BUFFER_SIZE
 
 #define RUNTIMECONFIG_JSON_SIZE 512 + DEBUG_LOG_BUFFER_SIZE
 
@@ -271,13 +270,16 @@
 #define TX_CHECK_INTERVAL 20
 
 // If ble devices are both setup, how often to attempt a reconnect.
-#define BLE_RECONNECT_INTERVAL 15
+#define BLE_RECONNECT_INTERVAL 1
+
+// Interval for polling ble battery updates
+#define BATTERY_UPDATE_INTERVAL_MILLIS 300000 
 
 // Initial and web scan duration.
 #define DEFAULT_SCAN_DURATION 10
 
 // BLE automatic reconnect duration. Set this low to avoid interruption.
-#define BLE_RECONNECT_SCAN_DURATION 3
+#define BLE_RECONNECT_SCAN_DURATION 1
 
 // Uncomment to enable sending Telegram debug messages back to the chat
 // specified in telegram_token.h
