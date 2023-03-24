@@ -59,11 +59,14 @@ void userParameters::setDefaults() {
   password              = DEFAULT_PASSWORD;
   connectedPowerMeter   = CONNECTED_POWER_METER;
   connectedHeartMonitor = CONNECTED_HEART_MONITOR;
+  connectedRemote       = CONNECTED_REMOTE;
+  foundDevices          = " ";
   maxWatts              = DEFAULT_MAX_WATTS;
   minWatts              = DEFAULT_MIN_WATTS;
   stepperDir            = true;
   shifterDir            = true;
   udpLogEnabled         = false;
+  logComm               = false;
 }
 
 //---------------------------------------------------------------------------------
@@ -89,12 +92,14 @@ String userParameters::returnJSON() {
   doc["password"]              = password;
   doc["connectedPowerMeter"]   = connectedPowerMeter;
   doc["connectedHeartMonitor"] = connectedHeartMonitor;
+  doc["connectedRemote"]       = connectedRemote;
   doc["foundDevices"]          = foundDevices;
   doc["maxWatts"]              = maxWatts;
   doc["minWatts"]              = minWatts;
   doc["shifterDir"]            = shifterDir;
   doc["stepperDir"]            = stepperDir;
   doc["udpLogEnabled"]         = udpLogEnabled;
+  doc["logComm"]               = logComm;
 
   String output;
   serializeJson(doc, output);
@@ -135,12 +140,14 @@ void userParameters::saveToLittleFS() {
   doc["password"]              = password;
   doc["connectedPowerMeter"]   = connectedPowerMeter;
   doc["connectedHeartMonitor"] = connectedHeartMonitor;
+  doc["connectedRemote"]       = connectedRemote;
   doc["foundDevices"]          = foundDevices;
   doc["maxWatts"]              = maxWatts;
   doc["minWatts"]              = minWatts;
   doc["shifterDir"]            = shifterDir;
   doc["stepperDir"]            = stepperDir;
   doc["udpLogEnabled"]         = udpLogEnabled;
+  doc["logComm"]               = logComm;
 
   // Serialize JSON to file
   if (serializeJson(doc, file) == 0) {
@@ -205,11 +212,17 @@ void userParameters::loadFromLittleFS() {
   if (!doc["udpLogEnabled"].isNull()) {
     setUdpLogEnabled(doc["udpLogEnabled"]);
   }
+  if (!doc["logComm"].isNull()) {
+    setLogComm(doc["logComm"]);
+  }
   if (doc["powerCorrectionFactor"]) {
     setPowerCorrectionFactor(doc["powerCorrectionFactor"]);
     if ((getPowerCorrectionFactor() < MIN_PCF) || (getPowerCorrectionFactor() > MAX_PCF)) {
       setPowerCorrectionFactor(1);
     }
+  }
+  if (doc["connectedRemote"]) {
+    setConnectedRemote(doc["connectedRemote"]);
   }
 
   SS2K_LOG(CONFIG_LOG_TAG, "Config File Loaded: %s", configFILENAME);

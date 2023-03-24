@@ -58,12 +58,25 @@ void SS2K::startTasks() {
 }
 
 void SS2K::stopTasks() {
+  spinBLEClient.reconnectTries        = 0;
+  spinBLEClient.intentionalDisconnect = true;
+  SS2K_LOG(BLE_CLIENT_LOG_TAG, "Shutting Down all BLE services");
+  if (NimBLEDevice::getInitialized()) {
+    NimBLEDevice::deinit();
+    ss2k.stopTasks();
+  }
   SS2K_LOG(MAIN_LOG_TAG, "Stop BLE + ERG Tasks");
   if (BLECommunicationTask != NULL) {
     vTaskDelete(BLECommunicationTask);
+    BLECommunicationTask = NULL;
   }
   if (ErgTask != NULL) {
     vTaskDelete(ErgTask);
+    ErgTask = NULL;
+  }
+  if (BLEClientTask != NULL) {
+    vTaskDelete(BLEClientTask);
+    BLEClientTask = NULL;
   }
 }
 
@@ -163,7 +176,7 @@ void setup() {
 
   xTaskCreatePinnedToCore(SS2K::maintenanceLoop,     /* Task function. */
                           "maintenanceLoopFunction", /* name of task. */
-                          4500,                      /* Stack size of task */
+                          6500,                      /* Stack size of task */
                           NULL,                      /* parameter of the task */
                           20,                        /* priority of the task */
                           &maintenanceLoopTask,      /* Task handle to keep track of created task */
@@ -181,14 +194,14 @@ void SS2K::maintenanceLoop(void *pvParameters) {
   static bool isScanning              = false;
 
   while (true) {
-    vTaskDelay(75 / portTICK_RATE_MS);
+    vTaskDelay(73 / portTICK_RATE_MS);
     ss2k.FTMSModeShiftModifier();
 
     if (currentBoard.auxSerialTxPin) {
       ss2k.txSerial();
     }
 
-    if ((millis() - intervalTimer) > 500) {  // add check here for when to restart WiFi
+    if ((millis() - intervalTimer) > 2003) {  // add check here for when to restart WiFi
                                              // maybe if in STA mode and 8.8.8.8 no ping return?
       // ss2k.restartWifi();
       logHandler.writeLogs();
@@ -196,10 +209,10 @@ void SS2K::maintenanceLoop(void *pvParameters) {
       intervalTimer = millis();
     }
 
-    if ((millis() - intervalTimer2) > 6000) {
+    if ((millis() - intervalTimer2) > 6007) {
       if (NimBLEDevice::getScan()->isScanning()) {  // workaround to prevent occasional runaway scans
         if (isScanning == true) {
-          SS2K_LOG(MAIN_LOG_TAG, "Forcing Scan to stop.");
+          SS2K_LOGW(MAIN_LOG_TAG, "Forcing Scan to stop.");
           NimBLEDevice::getScan()->stop();
           isScanning = false;
         } else {
@@ -209,9 +222,8 @@ void SS2K::maintenanceLoop(void *pvParameters) {
       intervalTimer2 = millis();
     }
     if (loopCounter > 10) {
-      ss2k.scanIfShiftersHeld();
       ss2k.checkDriverTemperature();
-      ss2k.checkBLEReconnect();
+      // ss2k.checkBLEReconnect();
       // SS2K_LOG(MAIN_LOG_TAG, "target %f  current %f", rtConfig.getTargetIncline(), rtConfig.getCurrentIncline());
 
 #ifdef DEBUG_STACK
@@ -408,35 +420,13 @@ void SS2K::resetIfShiftersHeld() {
       digitalWrite(LED_PIN, LOW);
     }
     for (int i = 0; i < 20; i++) {
+      LittleFS.format();
       userConfig.setDefaults();
       vTaskDelay(200 / portTICK_PERIOD_MS);
       userConfig.saveToLittleFS();
       vTaskDelay(200 / portTICK_PERIOD_MS);
     }
     ESP.restart();
-  }
-}
-
-void SS2K::scanIfShiftersHeld() {
-  if ((digitalRead(currentBoard.shiftUpPin) == LOW) && (digitalRead(currentBoard.shiftDownPin) == LOW)) {  // are both shifters held?
-    SS2K_LOG(MAIN_LOG_TAG, "Shifters Held %d", shiftersHoldForScan);
-    if (shiftersHoldForScan < 1) {  // have they been held for enough loops?
-      SS2K_LOG(MAIN_LOG_TAG, "Shifters Held < 1 %d", shiftersHoldForScan);
-      if ((millis() - scanDelayStart) >= scanDelayTime) {  // Has this already been done within 10 seconds?
-        scanDelayStart += scanDelayTime;
-        spinBLEClient.resetDevices();
-        spinBLEClient.serverScan(true);
-        shiftersHoldForScan = SHIFTERS_HOLD_FOR_SCAN;
-        digitalWrite(LED_PIN, LOW);
-        SS2K_LOG(MAIN_LOG_TAG, "Scan From Buttons");
-      } else {
-        SS2K_LOG(MAIN_LOG_TAG, "Shifters Held but timer not up %d", (millis() - scanDelayStart) >= scanDelayTime);
-        shiftersHoldForScan = SHIFTERS_HOLD_FOR_SCAN;
-        return;
-      }
-    } else {
-      shiftersHoldForScan--;
-    }
   }
 }
 
@@ -537,10 +527,10 @@ void SS2K::txSerial() {  // Serial.printf(" Before TX ");
   }
 }
 
-void SS2K::pelotonConnected(){
-txCheck = TX_CHECK_INTERVAL;
-rtConfig.setMinResistance(MIN_PELOTON_RESISTANCE);
-rtConfig.setMaxResistance(MAX_PELOTON_RESISTANCE);
+void SS2K::pelotonConnected() {
+  txCheck = TX_CHECK_INTERVAL;
+  rtConfig.setMinResistance(MIN_PELOTON_RESISTANCE);
+  rtConfig.setMaxResistance(MAX_PELOTON_RESISTANCE);
 }
 
 void SS2K::rxSerial(void) {
@@ -557,38 +547,5 @@ void SS2K::rxSerial(void) {
         collectAndSet(PELOTON_DATA_UUID, PELOTON_DATA_UUID, PELOTON_ADDRESS, newBuf, newLen);
       }
     }
-  }
-}
-
-void SS2K::checkBLEReconnect() {
-  static int bleCheck = 0;
-  if ((String(userConfig.getConnectedPowerMeter()) == "none") && ((String(userConfig.getConnectedPowerMeter()) == "none"))) {  // Exit immediately if "none" and "none"
-    bleCheck = 0;
-    return;
-  }
-  if ((spinBLEClient.connectedHR) && (spinBLEClient.connectedPM)) {  // Exit if both are connected
-    bleCheck = 0;
-    return;
-  }
-  if (((String(userConfig.getConnectedPowerMeter()) == "none") && (spinBLEClient.connectedHR))) {  // Exit if "none" PM and HR is connected
-    bleCheck = 0;
-    return;
-  }
-  if (((String(userConfig.getConnectedPowerMeter()) == "none") && (spinBLEClient.connectedPM))) {  // Exit if "none" HR and PM is connected
-    bleCheck = 0;
-    return;
-  }
-  if (bleCheck >= BLE_RECONNECT_INTERVAL) {
-    bleCheck = 0;
-    if (!NimBLEDevice::getScan()->isScanning()) {
-      SS2K_LOG(MAIN_LOG_TAG, "Scanning from Check BLE Reconnect %d", bleCheck);
-      spinBLEClient.resetDevices();
-      spinBLEClient.scanProcess(BLE_RECONNECT_SCAN_DURATION);
-    }
-  }
-  if (NimBLEDevice::getScan()->isScanning()) {
-    bleCheck = 0;
-  } else {
-    bleCheck++;
   }
 }
