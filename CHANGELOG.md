@@ -17,6 +17,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Fixed broken images in wiki.
 - Valid files displayed on OTA page.
 ### Hardware
+- tweaks to echelon bike mount
 - Revised an old shifter cover for more options.
 - Updated arm folder to procedurally generated arms ov various lengths.
 - Updated C7 bike mount to use hook style arms. 
