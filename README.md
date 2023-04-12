@@ -1,20 +1,46 @@
 ### Rev 3 Now Availiable!!!
-<img src="/Pictures/Version3.jpg" alt="Hardware 3.0"/> 
+<img src="/Pictures/Version3.jpg" alt="Hardware 3.0" height="124"> 
 
-### Updates
-After many months of work, we're proud to finally introduce SmartSpin2k hardware revision 3.0! This new hardware revision incorporates a brand new SMT PCB for much easier and more reliable building. It is able to be ordered directly from an automated manufacturer (like JLCPCB or PCBWAY) or from [EmadMan](https://www.etsy.com/shop/eMadmanMakes) with all of the components already soldered in place. We have also designed a pre-fabricated cable management solution as well making this newest revision easier than ever to build. It's truly "Print", "Plug" & "Play! 
+# SmartSpin2k Revision 3.0 Announcement
 
-In Addition to being easier to build, we've incorporated a Peloton serial interface into rev 3 so you can plug your Peloton bike directly into the SS2K and recieve cadence and power data directly from the bike. If you have your bike in developer mode, you can even unplug the Peloton head unit from the bike and Zwift on the main screen without being in a Peloton workout. 
+We are excited to announce the release of SmartSpin2k revision 3.0! This new revision features a number of improvements, including:
 
-Further, we've incorporated a more powerful and capable stepper driver into the board. It completely removes any of the past issues with motor torque (on friction bikes) and will also allow us to detect hardware endstops in future firmware upgrades.
+* A new SMT PCB for easier and more reliable building.
+* The ability to order the board pre-assembled from [EmadMan.](https://www.etsy.com/shop/eMadmanMakes)
+* A pre-fabricated cable management solution.
 
-### Introduction
-SmartSpin2k adds automatic resistance control to any spin bike! It physically connects to your spin bike resistance control knob and then wirelessly to any apps like Zwift or Trainer Road via BLE. SS2k also has shifter buttons that allow the user to simulate shifting gears on the stationary bike and includes advanced trainer features like ERG mode! 
+SmartSpin2k is a DIY project that allows you to turn any spin bike into a smart trainer. With SmartSpin2k, you can connect your spin bike to Zwift, TrainerRoad, or other popular training apps. This allows you to control your bike's resistance automatically, track your performance, and compete with other riders online.
 
-One of the main primary design goals of SS2k is to keep the parts count low making it easy for makers to build for themselves. 
+SmartSpin2k is easy to build and requires only a few simple tools. The [entire build process](https://github.com/doudar/SmartSpin2k/blob/develop/SS2kR3BuildingInstructions.pdf) can be completed in under an hour.
 
-### Pre-Built Kits!
-If you'd like to get involved in SS2K but don't want to build your own, a limited number of kits are available on sale by our community members.  [CLICK HERE](https://github.com/doudar/SmartSpin2k/wiki/Prebuilt-Kits) for more information.
+If you are looking for a way to turn your spin bike into a smart trainer, SmartSpin2k is the perfect solution. With its new features and improvements, SmartSpin2k rev 3 is the best version yet.
+
+## Getting Started
+
+To get started with SmartSpin2k, you will need the following:
+
+* A spin bike with a resistance control knob.
+* A 3D printer.
+* A soldering iron and basic soldering skills.
+
+Once you have these materials, you can follow the [these instructions](https://github.com/doudar/SmartSpin2k/blob/develop/SS2kR3BuildingInstructions.pdf) to build your own SmartSpin2k. If you'd prefer to buy a pre-assembled kit, eMadman has them for sale in his [Etsy Shop.](https://www.etsy.com/shop/eMadmanMakes) 
+
+## Features
+
+SmartSpin2k offers a number of features, including:
+
+* Automatic incline resistance control: SmartSpin2k can automatically control your bike's resistance based on the resistance settings in your training app. This allows you to focus on your workout and not worry about adjusting the resistance yourself.
+* SmartSpin2k ERG function is a great way to improve your cycling performance. It allows you to train at a consistent power output, which is essential for improving your speed and endurance. ERG stands for "electronic resistance control." It works by automatically adjusting the resistance on your bike based on the power output you set in your training app.
+* Online competition: SmartSpin2k can connect to Zwift, TrainerRoad, and many other cycling apps allowing you to compete with other riders online. This is a great way to stay motivated and push yourself to new heights.
+* Do you have a spin bike that doesn't output realistic or accurate power numbers? If so, you're not alone. Many spin bikes have inaccurate power meters that can make it difficult to track your progress and train effectively. With SmartSpin2k you can calibrate the power output of your spin bike. 
+
+## Cost
+
+The cost of building a SmartSpin2k varies depending on the cost of your 3D printer and the cost of the components. However, the total cost should be under $150.
+
+## Conclusion
+
+SmartSpin2k is a great way to turn any spin bike into a smart trainer. With its new features and improvements, SmartSpin2k Rev 3 is the best version yet. If you are looking for a way to improve your indoor cycling experience, SmartSpin2k is the perfect solution.
 
 ### Documentation
 Everything you need to know is in the [SS2K Wiki](https://github.com/doudar/SmartSpin2k/wiki)
