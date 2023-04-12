@@ -1,5 +1,4 @@
-### Rev 3 Now Availiable!!!
-<img src="/Pictures/Version3.jpg" alt="Hardware 3.0" height="124"> 
+<img src="/Pictures/Version3.jpg" alt="Hardware 3.0" height="124"> <img src="https://raw.githubusercontent.com/doudar/SmartSpin2k/develop/Pictures/ss2k_wiki_banner.png" alt="ss2k banner" height="124">
 
 # SmartSpin2k Revision 3.0 Announcement
 
