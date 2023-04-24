@@ -745,22 +745,22 @@ void HTTP_Server::FirmwareUpdate() {
 
       //////// Update Firmware /////////
       SS2K_LOG(HTTP_SERVER_LOG_TAG, "Updating Firmware...Please Wait");
-      if ((availableVer > currentVer) && (userConfig.getAutoUpdate())) {
-        t_httpUpdate_return ret = httpUpdate.update(client, userConfig.getFirmwareUpdateURL() + String(FW_BINFILE));
-        switch (ret) {
-          case HTTP_UPDATE_FAILED:
-            SS2K_LOG(HTTP_SERVER_LOG_TAG, "HTTP_UPDATE_FAILED Error %d : %s", httpUpdate.getLastError(), httpUpdate.getLastErrorString().c_str());
-            break;
+      if (((availableVer > currentVer) || updateAnyway) && (userConfig.getAutoUpdate())) {
+          t_httpUpdate_return ret = httpUpdate.update(client, userConfig.getFirmwareUpdateURL() + String(FW_BINFILE));
+          switch (ret) {
+            case HTTP_UPDATE_FAILED:
+              SS2K_LOG(HTTP_SERVER_LOG_TAG, "HTTP_UPDATE_FAILED Error %d : %s", httpUpdate.getLastError(), httpUpdate.getLastErrorString().c_str());
+              break;
 
-          case HTTP_UPDATE_NO_UPDATES:
-            SS2K_LOG(HTTP_SERVER_LOG_TAG, "HTTP_UPDATE_NO_UPDATES");
-            break;
+            case HTTP_UPDATE_NO_UPDATES:
+              SS2K_LOG(HTTP_SERVER_LOG_TAG, "HTTP_UPDATE_NO_UPDATES");
+              break;
 
-          case HTTP_UPDATE_OK:
-            SS2K_LOG(HTTP_SERVER_LOG_TAG, "HTTP_UPDATE_OK");
-            break;
+            case HTTP_UPDATE_OK:
+              SS2K_LOG(HTTP_SERVER_LOG_TAG, "HTTP_UPDATE_OK");
+              break;
+          }
         }
-      }
     } else {  // don't update
       SS2K_LOG(HTTP_SERVER_LOG_TAG, "  - Current Version: %s", FIRMWARE_VERSION);
     }
