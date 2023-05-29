@@ -23,7 +23,7 @@
 #define LOG_HANDLER_TAG "Log_Handler"
 
 #ifndef DEBUG_LOG_BUFFER_SIZE
-#define DEBUG_LOG_BUFFER_SIZE 2000
+#define DEBUG_LOG_BUFFER_SIZE 600
 #endif
 
 #ifndef DEBUG_FILE_CHARS_PER_LINE

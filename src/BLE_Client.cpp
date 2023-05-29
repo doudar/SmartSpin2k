@@ -733,7 +733,7 @@ void SpinBLEClient::checkBLEReconnect() {
   if (scan) {
     if (!NimBLEDevice::getScan()->isScanning()) {
       spinBLEClient.scanProcess(BLE_RECONNECT_SCAN_DURATION);
-      Serial.println("scan");
+      //Serial.println("scan");
     }
   }
 }

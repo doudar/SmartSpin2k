@@ -6,6 +6,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 ### Added
+- new photos for wiki
 - Added battery monitoring of BLE devices by @Flo100. Implemented BLE HID shifting.
 ### Changed
 - Disregard Peloton serial power and cadence if user has a BLE power Meter selected. 
@@ -15,6 +16,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Simplified Platform Packages to work better with newest version of PlatformIO.
 - Fixed broken images in wiki.
 - Valid files displayed on OTA page.
+- Increased heap for more reliable OTA updates. 
 ### Hardware
 - tweaks to echelon bike mount
 - Revised an old shifter cover for more options.
