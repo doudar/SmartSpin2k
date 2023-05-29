@@ -124,6 +124,12 @@ void setup() {
   userPWC.printFile();
   userPWC.saveToLittleFS();
 
+  // Check for firmware update. It's important that this stays before BLE &
+  // HTTP setup because otherwise they use too much traffic and the device
+  // fails to update which really sucks when it corrupts your settings.
+  startWifi();
+  httpServer.FirmwareUpdate();
+
   pinMode(currentBoard.shiftUpPin, INPUT_PULLUP);    // Push-Button with input Pullup
   pinMode(currentBoard.shiftDownPin, INPUT_PULLUP);  // Push-Button with input Pullup
   pinMode(LED_PIN, OUTPUT);
@@ -152,18 +158,11 @@ void setup() {
 
   digitalWrite(LED_PIN, HIGH);
 
-  startWifi();
-
   // Configure and Initialize Logger
   logHandler.addAppender(&webSocketAppender);
   logHandler.addAppender(&udpAppender);
   logHandler.initialize();
 
-  // Check for firmware update. It's important that this stays before BLE &
-  // HTTP setup because otherwise they use too much traffic and the device
-  // fails to update which really sucks when it corrupts your settings.
-
-  httpServer.FirmwareUpdate();
   ss2k.startTasks();
   httpServer.start();
 
@@ -202,7 +201,7 @@ void SS2K::maintenanceLoop(void *pvParameters) {
     }
 
     if ((millis() - intervalTimer) > 2003) {  // add check here for when to restart WiFi
-                                             // maybe if in STA mode and 8.8.8.8 no ping return?
+                                              // maybe if in STA mode and 8.8.8.8 no ping return?
       // ss2k.restartWifi();
       logHandler.writeLogs();
       webSocketAppender.Loop();
