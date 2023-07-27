@@ -15,6 +15,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Added
 - new photos for wiki
 - Added battery monitoring of BLE devices by @Flo100. Implemented BLE HID shifting.
+- Added table for arm lengths. 
 ### Changed
 - Disregard Peloton serial power and cadence if user has a BLE power Meter selected. 
 - Filesystem no longer updates when auto-update is unchecked. 

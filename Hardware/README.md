@@ -1,5 +1,5 @@
 # SmartSpin2K Hardware
-V3 is the brand spanking new version where we've gone to a more rigid mount and designed a completly custom PCB with SMT components which can be manufactured using automated techniques. THe newest PCB sports a uart->serial driver to allow direct communication with Peloton bikes. 
+V3 is the brand spanking new version where we've gone to a more rigid mount and designed a completly custom PCB with SMT components which can be manufactured using automated techniques. The newest PCB sports a uart->serial driver to allow direct communication with Peloton bikes. 
 
 V2 prints easier, is smaller and uses less hardware. It has a much better gear ratio than V1 and supports a carrier board PCB onto which the devkits mount for easy wiring/soldering.  A rigid mount referred to as Direct Mount is available for stable mounting.
 
