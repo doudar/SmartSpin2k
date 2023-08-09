@@ -3,11 +3,19 @@ All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/)
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
-
 ## [Unreleased]
+### Added
+
+### Changed
+
+### Hardware
+- Wire diameter reduced from 7.2mm to 6.0mm on the window passthrough to accommodate the latest batch of cables. 
+
+## [23.6.28]
 ### Added
 - new photos for wiki
 - Added battery monitoring of BLE devices by @Flo100. Implemented BLE HID shifting.
+- Added table for arm lengths. 
 ### Changed
 - Disregard Peloton serial power and cadence if user has a BLE power Meter selected. 
 - Filesystem no longer updates when auto-update is unchecked. 
