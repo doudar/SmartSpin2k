@@ -10,6 +10,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Hardware
 - Wire diameter reduced from 7.2mm to 6.0mm on the window passthrough to accommodate the latest batch of cables. 
+- Changed reference to M4 bolt to M5 Bolt in the construction instructions pdf.
+- Increased right side case mounting hole to 5.5mm so the bolt slides in easier.
 
 ## [23.6.28]
 ### Added
