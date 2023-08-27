@@ -28,6 +28,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Valid files displayed on OTA page.
 - Increased heap for more reliable OTA updates. 
 ### Hardware
+- Tweaks to IC4 bike mount
 - directory cleanup
 - tweaks to echelon bike mount
 - Revised an old shifter cover for more options.

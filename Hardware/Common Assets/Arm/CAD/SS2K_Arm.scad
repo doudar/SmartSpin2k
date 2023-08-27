@@ -1,3 +1,4 @@
+
 /*All in one Arm*/
 
 //Length of arm
@@ -12,12 +13,15 @@ armWidth=9;
 armHeight = 12;
 
 //bolt diameter
-boltDiameter = 5;
+boltDiameter = 5.05;
 
 //hook diameter
 hookDiameter = 5.2;
 ///////////////////////////
 
+//Required to add roundness to parts
+$fa = 1;
+$fs = 0.5;
 
 difference(){
 union(){ 
