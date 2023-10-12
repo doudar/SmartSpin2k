@@ -5,7 +5,7 @@
 We are excited to announce the release of SmartSpin2k revision 3.0! This new revision features a number of improvements, including:
 
 * A new SMT PCB for easier and more reliable building.
-* The ability to order the board pre-assembled from [EmadMan.](https://www.etsy.com/shop/eMadmanMakes)
+* The ability to order the board pre-assembled from [SmartSpin2k.com](https://www.smartspin2k.com/purchase-kits)
 * A pre-fabricated cable management solution.
 
 SmartSpin2k is a DIY project that allows you to turn any spin bike into a smart trainer. With SmartSpin2k, you can connect your spin bike to Zwift, TrainerRoad, or other popular training apps. This allows you to control your bike's resistance automatically, track your performance, and compete with other riders online.
@@ -22,7 +22,7 @@ To get started with SmartSpin2k, you will need the following:
 * A 3D printer.
 * A soldering iron and basic soldering skills.
 
-Once you have these materials, you can follow the [these instructions](https://github.com/doudar/SmartSpin2k/blob/develop/SS2kR3BuildingInstructions.pdf) to build your own SmartSpin2k. If you'd prefer to buy a pre-assembled kit, eMadman has them for sale in his [Etsy Shop.](https://www.etsy.com/shop/eMadmanMakes) 
+Once you have these materials, you can follow the [these instructions](https://github.com/doudar/SmartSpin2k/blob/develop/SS2kR3BuildingInstructions.pdf) to build your own SmartSpin2k. If you'd prefer to buy a pre-assembled kit, we have them for sale at [SmartSpin2k.com](https://www.smartspin2k.com/purchase-kits) 
 
 ## Features
 
