@@ -7,7 +7,6 @@
 
 #include "Main.h"
 #include "Version_Converter.h"
-#include "Builtin_Pages.h"
 #include "HTTP_Server_Basic.h"
 #include "cert.h"
 #include "SS2KLog.h"
@@ -20,6 +19,7 @@
 #include <Update.h>
 #include <DNSServer.h>
 #include <ArduinoJson.h>
+#include <WiFiManager.h>
 
 File fsUploadFile;
 
@@ -42,59 +42,18 @@ UniversalTelegramBot bot(TELEGRAM_TOKEN, client);
 String telegramMessage = "";
 #endif  // USE_TELEGRAM
 
+void wmConfig(WiFiManager *wm) { wm->setTitle("Welcome to SmartSpin2k"); }
+
 // ********************************WIFI Setup*************************
 void startWifi() {
-  int i = 0;
+  WiFiManager wm;
+  wmConfig(&wm);
+  wm.setConfigPortalBlocking(false);
+  wm.autoConnect(userConfig.getSsid(), userConfig.getPassword());
+  userConfig.setSsid(wm.getWiFiSSID());
+  userConfig.setPassword(wm.getWiFiPass());
+  wm.setHostname(userConfig.getDeviceName());
 
-  // Trying Station mode first:
-  SS2K_LOG(HTTP_SERVER_LOG_TAG, "Connecting to: %s", userConfig.getSsid());
-  if (String(WiFi.SSID()) != userConfig.getSsid()) {
-    WiFi.mode(WIFI_STA);
-    WiFi.begin(userConfig.getSsid(), userConfig.getPassword());
-    WiFi.setTxPower(WIFI_POWER_19_5dBm);
-    WiFi.setAutoReconnect(true);
-  }
-
-  while (WiFi.status() != WL_CONNECTED) {
-    vTaskDelay(1000 / portTICK_RATE_MS);
-    SS2K_LOG(HTTP_SERVER_LOG_TAG, "Waiting for connection to be established...");
-    i++;
-    if (i > WIFI_CONNECT_TIMEOUT || (String(userConfig.getSsid()) == DEVICE_NAME)) {
-      i = 0;
-      SS2K_LOG(HTTP_SERVER_LOG_TAG, "Couldn't Connect. Switching to AP mode");
-      WiFi.disconnect();
-      WiFi.mode(WIFI_AP);
-      break;
-    }
-  }
-  if (WiFi.status() == WL_CONNECTED) {
-    myIP                          = WiFi.localIP();
-    httpServer.internetConnection = true;
-  }
-
-  // Couldn't connect to existing network, Create SoftAP
-  if (WiFi.status() != WL_CONNECTED) {
-    String t_pass = DEFAULT_PASSWORD;
-    if (String(userConfig.getSsid()) == DEVICE_NAME) {
-      // If default SSID is still in use, let the user
-      // select a new password.
-      // Else Fall Back to the default password (probably "password")
-      String t_pass = String(userConfig.getPassword());
-    }
-    WiFi.softAP(userConfig.getDeviceName(), t_pass.c_str());
-    vTaskDelay(50);
-    myIP = WiFi.softAPIP();
-    /* Setup the DNS server redirecting all the domains to the apIP */
-    dnsServer.setErrorReplyCode(DNSReplyCode::NoError);
-    dnsServer.start(DNS_PORT, "*", myIP);
-  }
-
-  if (!MDNS.begin(userConfig.getDeviceName())) {
-    SS2K_LOG(HTTP_SERVER_LOG_TAG, "Error setting up MDNS responder!");
-  }
-
-  MDNS.addService("http", "_tcp", 80);
-  MDNS.addServiceTxt("http", "_tcp", "lf", "0");
   SS2K_LOG(HTTP_SERVER_LOG_TAG, "Connected to %s IP address: %s", userConfig.getSsid(), myIP.toString().c_str());
 #ifdef USE_TELEGRAM
   SEND_TO_TELEGRAM("Connected to " + String(userConfig.getSsid()) + " IP address: " + myIP.toString());
@@ -160,6 +119,8 @@ void HTTP_Server::start() {
     LittleFS.format();
     userConfig.setDefaults();
     userConfig.saveToLittleFS();
+    WiFiManager wm;
+    wm.resetSettings();
     String response =
         "<!DOCTYPE html><html><body><h1>Defaults have been "
         "loaded.</h1><p><br><br> Please reconnect to the device on WiFi "
@@ -291,13 +252,13 @@ void HTTP_Server::start() {
 
   server.on("/login", HTTP_GET, []() {
     server.sendHeader("Connection", "close");
-    server.send(200, "text/html", OTALoginIndex);
+    server.send(404, "text/html", "File Removed");
   });
 
   server.on("/OTAIndex", HTTP_GET, []() {
     ss2k.stopTasks();
     server.sendHeader("Connection", "close");
-    server.send(200, "text/html", OTAServerIndex);
+    server.send(404, "text/html", "File Removed");
   });
 
   /*handling uploading firmware file */
@@ -401,10 +362,38 @@ void HTTP_Server::start() {
   SS2K_LOG(HTTP_SERVER_LOG_TAG, "HTTP server started");
 }
 
+bool HTTP_Server::indexCheck(bool forceWiFiManager) {
+  if (!LittleFS.exists("/index.html")) {
+    httpServer.indexExists = false;
+  }else if(forceWiFiManager){
+    httpServer.indexExists = false;
+  } 
+  else {
+    httpServer.indexExists = true;
+  } 
+  return httpServer.indexExists;
+}
+
+void handlePreOtaUpdateCallback() { ss2k.stopTasks(); }
+void handleSaveConfigCallback() {ESP.restart();}
+
 void HTTP_Server::webClientUpdate(void *pvParameters) {
   static unsigned long mDnsTimer = millis();  // NOLINT: There is no overload in String for uint64_t
+
   for (;;) {
-    server.handleClient();
+    if (!httpServer.indexExists) {
+      httpServer.stop();
+      WiFiManager wm;
+      wmConfig(&wm);
+      wm.setPreOtaUpdateCallback(handlePreOtaUpdateCallback);
+      wm.startConfigPortal(userConfig.getSsid(), userConfig.getPassword());
+      wm.setSaveConfigCallback(handleSaveConfigCallback);
+      userConfig.setSsid(wm.getWiFiSSID());
+      userConfig.setPassword(wm.getWiFiPass());
+      httpServer.start();
+    } else {
+      server.handleClient();
+    }
     vTaskDelay(WEBSERVER_DELAY / portTICK_RATE_MS);
     if (WiFi.getMode() == WIFI_AP) {
       dnsServer.processNextRequest();
@@ -422,14 +411,14 @@ void HTTP_Server::webClientUpdate(void *pvParameters) {
 
 void HTTP_Server::handleIndexFile() {
   String filename = "/index.html";
-  if (LittleFS.exists(filename)) {
+  if (httpServer.indexCheck()) {
     File file = LittleFS.open(filename, FILE_READ);
     server.streamFile(file, "text/html");
     file.close();
     SS2K_LOG(HTTP_SERVER_LOG_TAG, "Served %s", filename.c_str());
   } else {
     SS2K_LOG(HTTP_SERVER_LOG_TAG, "%s not found. Sending builtin Index.html", filename.c_str());
-    server.send(200, "text/html", noIndexHTML);
+    server.send(404, "text/html", "not installed");
   }
 }
 
@@ -445,7 +434,7 @@ void HTTP_Server::handleLittleFSFile() {
     server.streamFile(file, "text/" + fileType);
     file.close();
     SS2K_LOG(HTTP_SERVER_LOG_TAG, "Served %s", filename.c_str());
-  } else if (!LittleFS.exists("/index.html")) {
+  } else if (!httpServer.indexCheck()) {
     SS2K_LOG(HTTP_SERVER_LOG_TAG, "%s not found and no filesystem. Sending builtin index.html", filename.c_str());
     handleIndexFile();
   } else {
@@ -680,7 +669,7 @@ void HTTP_Server::FirmwareUpdate() {
   http.end();
   if (httpCode == HTTP_CODE_OK) {  // if version received
     bool updateAnyway = false;
-    if (!LittleFS.exists("/index.html")) {
+    if (!httpServer.indexCheck()) {
       updateAnyway = true;
       SS2K_LOG(HTTP_SERVER_LOG_TAG, "  -index.html not found. Forcing update");
     }
@@ -746,21 +735,21 @@ void HTTP_Server::FirmwareUpdate() {
       //////// Update Firmware /////////
       SS2K_LOG(HTTP_SERVER_LOG_TAG, "Updating Firmware...Please Wait");
       if (((availableVer > currentVer) || updateAnyway) && (userConfig.getAutoUpdate())) {
-          t_httpUpdate_return ret = httpUpdate.update(client, userConfig.getFirmwareUpdateURL() + String(FW_BINFILE));
-          switch (ret) {
-            case HTTP_UPDATE_FAILED:
-              SS2K_LOG(HTTP_SERVER_LOG_TAG, "HTTP_UPDATE_FAILED Error %d : %s", httpUpdate.getLastError(), httpUpdate.getLastErrorString().c_str());
-              break;
+        t_httpUpdate_return ret = httpUpdate.update(client, userConfig.getFirmwareUpdateURL() + String(FW_BINFILE));
+        switch (ret) {
+          case HTTP_UPDATE_FAILED:
+            SS2K_LOG(HTTP_SERVER_LOG_TAG, "HTTP_UPDATE_FAILED Error %d : %s", httpUpdate.getLastError(), httpUpdate.getLastErrorString().c_str());
+            break;
 
-            case HTTP_UPDATE_NO_UPDATES:
-              SS2K_LOG(HTTP_SERVER_LOG_TAG, "HTTP_UPDATE_NO_UPDATES");
-              break;
+          case HTTP_UPDATE_NO_UPDATES:
+            SS2K_LOG(HTTP_SERVER_LOG_TAG, "HTTP_UPDATE_NO_UPDATES");
+            break;
 
-            case HTTP_UPDATE_OK:
-              SS2K_LOG(HTTP_SERVER_LOG_TAG, "HTTP_UPDATE_OK");
-              break;
-          }
+          case HTTP_UPDATE_OK:
+            SS2K_LOG(HTTP_SERVER_LOG_TAG, "HTTP_UPDATE_OK");
+            break;
         }
+      }
     } else {  // don't update
       SS2K_LOG(HTTP_SERVER_LOG_TAG, "  - Current Version: %s", FIRMWARE_VERSION);
     }

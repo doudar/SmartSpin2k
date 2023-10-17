@@ -14,7 +14,8 @@
 class HTTP_Server {
  private:
  public:
-  bool internetConnection;
+  bool internetConnection = false;
+  bool indexExists = false;
 
   void start();
   void stop();
@@ -23,7 +24,8 @@ class HTTP_Server {
   static void settingsProcessor();
   static void handleHrSlider();
   static void FirmwareUpdate();
-  
+  bool indexCheck(bool forceWiFiManager = true);
+
   static void webClientUpdate(void *pvParameters);
 
   HTTP_Server() { internetConnection = false; }
@@ -41,6 +43,5 @@ void telegramUpdate(void *pvParameters);
 // wifi Function
 void startWifi();
 void stopWifi();
-
 
 extern HTTP_Server httpServer;
