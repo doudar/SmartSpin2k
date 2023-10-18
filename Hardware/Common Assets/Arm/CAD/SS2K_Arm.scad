@@ -13,7 +13,7 @@ armWidth=9;
 armHeight = 12;
 
 //bolt diameter
-boltDiameter = 5.05;
+boltDiameter = 5.25;
 
 //hook diameter
 hookDiameter = 5.2;

@@ -1,0 +1,1 @@
+The arms are all procedurally generated from an openscad file. You can make the modifications needed to that file with openscad. To generate a folder of arms, right click on OpenSCAD_Bulk_Exporter.ps1 and run with powershell. It will take some minutes to generate all of the files. 
