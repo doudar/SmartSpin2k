@@ -11,7 +11,10 @@ HMC|HMC|Any|60mm
 Joroto|X2|Any|20
 LeMond|RevMaster|Any|75
 Peloton|Bike|Any|75 (90 for slammed bars)
+PooBoo|?|Any|60-80
 Schwinn|IC4|Any|65
 Vortec|Vortec|Any|20
+York|SB300|Any|20-40
+
 
 
