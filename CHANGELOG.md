@@ -16,6 +16,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Increased right side case mounting hole to 5.5mm so the bolt slides in easier.
 - Added Pooboo and York SB300 Bikes.
 - Increased size of the arm hardware holes by .25mm.
+- Added Spinning L7 bike.
 
 ## [23.6.28]
 ### Added
