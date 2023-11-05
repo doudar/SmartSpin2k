@@ -9,6 +9,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Changed
 - Updated communications overview picture.
 - Updated kit purchasing links. 
+- MIN_ERG_CADENCE created and changed from 20 to 30.
 
 ### Hardware
 - Wire diameter reduced from 7.2mm to 6.0mm on the window passthrough to accommodate the latest batch of cables. 
