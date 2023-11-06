@@ -34,6 +34,11 @@ HTTP_Server httpServer;
 WiFiClientSecure client;
 WebServer server(80);
 
+// WiFi Scanner
+int _numNetworks    = 0;
+int _minimumQuality = -1;
+bool haveScan       = false;
+
 #ifdef USE_TELEGRAM
 #include <UniversalTelegramBot.h>
 TaskHandle_t telegramTask;
@@ -148,9 +153,7 @@ void HTTP_Server::start() {
     String response =
         "<!DOCTYPE html><html><body>Scanning for BLE Devices. Please wait "
         "15 seconds.</body><script> setTimeout(\"location.href = 'http://" +
-        myIP.toString() + "/bluetoothscanner.html';\",15000);</script></html>";
-    // spinBLEClient.resetDevices();
-    spinBLEClient.dontBlockScan = true;
+        myIP.toString() + "/bluetoothscanner.html';\",100);</script></html>";
     spinBLEClient.scanProcess(DEFAULT_SCAN_DURATION);
     server.send(200, "text/html", response);
   });
@@ -291,7 +294,17 @@ void HTTP_Server::start() {
 
   server.on("/login", HTTP_GET, []() {
     server.sendHeader("Connection", "close");
-    server.send(200, "text/html", OTALoginIndex);
+    String page = FPSTR(OTALOGININDEX);
+    page += FPSTR(HTTP_STYLE);
+    server.send(200, "text/html", page);
+  });
+
+  server.on("/wifi", []() {
+    if (!server.arg("refresh").isEmpty()) {
+      WiFi_scanNetworks();
+    }
+    server.sendHeader("Connection", "close");
+    server.send(200, "text/html", httpServer.processWiFiHTML());
   });
 
   server.on("/OTAIndex", HTTP_GET, []() {
@@ -384,7 +397,7 @@ void HTTP_Server::start() {
                           "webClientUpdate",                  /* name of task. */
                           6000 + (DEBUG_LOG_BUFFER_SIZE * 2), /* Stack size of task Used to be 3000*/
                           NULL,                               /* parameter of the task */
-                          10,                                 /* priority of the task */
+                          4,                                  /* priority of the task */
                           &webClientTask,                     /* Task handle to keep track of created task */
                           0);                                 /* pin task to core */
 
@@ -403,14 +416,30 @@ void HTTP_Server::start() {
 
 void HTTP_Server::webClientUpdate(void *pvParameters) {
   static unsigned long mDnsTimer = millis();  // NOLINT: There is no overload in String for uint64_t
+  bool recheck                   = false;
   for (;;) {
     server.handleClient();
-    vTaskDelay(WEBSERVER_DELAY / portTICK_RATE_MS);
-    if (WiFi.getMode() == WIFI_AP) {
+    // vTaskDelay(WEBSERVER_DELAY / portTICK_RATE_MS);
+    if (WiFi.getMode() != WIFI_MODE_STA) {
+      if (WiFi.softAPgetStationNum()) {  // Client Connected to AP
+        httpServer.isServing = true;
+      }
       dnsServer.processNextRequest();
+      if (!haveScan) {
+        WiFi_scanNetworks();
+        haveScan = true;
+      }
     }
     // Keep MDNS alive
     if ((millis() - mDnsTimer) > 30000) {
+      if (httpServer.isServing) {
+        if (recheck) {
+          httpServer.isServing = false;  // reset BLE communications slowdown.
+          recheck              = false;
+        } else {
+          recheck = true;  // check again in 30 seconds.
+        }
+      }
       MDNS.addServiceTxt("http", "_tcp", "lf", String(mDnsTimer));
       mDnsTimer = millis();
 #ifdef DEBUG_STACK
@@ -421,29 +450,265 @@ void HTTP_Server::webClientUpdate(void *pvParameters) {
 }
 
 void HTTP_Server::handleIndexFile() {
-  String filename = "/index.html";
+  httpServer.isServing = true;
+  String filename      = "/index.html";
+  server.sendHeader("Connection", "close");
   if (LittleFS.exists(filename)) {
-    File file = LittleFS.open(filename, FILE_READ);
-    server.streamFile(file, "text/html");
+    File file   = LittleFS.open(filename, FILE_READ);
+    String page = "";
+    page += FPSTR(HTTP_HEAD_START);
+    page.replace(FPSTR(T_v), DEVICE_NAME);
+    page += FPSTR(HTTP_STYLE);
+    while (file.available()) {
+      page += char(file.read());
+    }
+    server.send(200, "text/html", page);
+    // server.streamFile(file, "text/html");
     file.close();
     SS2K_LOG(HTTP_SERVER_LOG_TAG, "Served %s", filename.c_str());
   } else {
     SS2K_LOG(HTTP_SERVER_LOG_TAG, "%s not found. Sending builtin Index.html", filename.c_str());
-    server.send(200, "text/html", noIndexHTML);
+    server.send(200, "text/html", httpServer.processWiFiHTML());
   }
 }
 
+String HTTP_Server::processWiFiHTML() {
+  String page = getHTTPHead();  // @token titlewifi
+  if (!haveScan) {
+    WiFi_scanNetworks();  // wifiscan, force if arg refresh
+  }
+
+  page.replace(FPSTR(T_1), reinterpret_cast<const char *>(WIFI_PAGE_TITLE));
+  page += getScanItemOut();
+
+  String pitem = "";
+
+  pitem = FPSTR(HTTP_FORM_START);
+  pitem.replace(FPSTR(T_v), F("send_settings"));  // set form action
+  page += pitem;
+
+  pitem = FPSTR(HTTP_FORM_WIFI);
+  pitem.replace(FPSTR(T_v), reinterpret_cast<const char *>(userConfig.getSsid()));
+
+  pitem.replace(FPSTR(T_p), reinterpret_cast<const char *>(DEFAULT_PASSWORD));
+
+  page += pitem;
+
+  page += FPSTR(HTTP_BR);
+  page += FPSTR(HTTP_FORM_WIFI_END);
+  page += FPSTR(HTTP_FORM_END);
+  page += FPSTR(HTTP_SCAN_LINK);
+  if (!LittleFS.exists("/index.html")) {
+    page += FPSTR(NOINDEXHTML);
+  }
+  page += FPSTR(HTTP_REBOOT_LINK);
+
+  page += FPSTR(HTTP_END);
+
+  return page;
+}
+
+bool WiFi_scanNetworks() {
+  // if 0 networks, rescan @note this was a kludge, now disabling to test real cause ( maybe wifi not init etc)
+  // enable only if preload failed?
+  if (_numNetworks == 0) {
+    SS2K_LOG(HTTP_SERVER_LOG_TAG, "NO APs found forcing new scan");
+  }
+
+  int8_t res;
+
+  SS2K_LOG(HTTP_SERVER_LOG_TAG, "WiFi Scan SYNC started");
+  res = WiFi.scanNetworks();
+
+  if (res == WIFI_SCAN_FAILED) {
+    SS2K_LOG(HTTP_SERVER_LOG_TAG, "WiFi Scan failed");
+  } else if (res == WIFI_SCAN_RUNNING) {
+    while (WiFi.scanComplete() == WIFI_SCAN_RUNNING) {
+      Serial.print(".");
+      delay(100);
+    }
+    _numNetworks = WiFi.scanComplete();
+  } else if (res >= 0) {
+    _numNetworks = res;
+    haveScan     = true;
+  }
+
+  if (res > 0) {
+    // Serial.printf("Networks found: %d", _numNetworks);
+    return true;
+  } else {
+    return false;
+  }
+}
+
+String getHTTPHead() {
+  String page;
+  page += FPSTR(HTTP_HEAD_START);
+  page.replace(FPSTR(T_v), DEVICE_NAME);
+  page += FPSTR(HTTP_SCRIPT);
+  page += FPSTR(HTTP_STYLE);
+  page += FPSTR(HTTP_TITLE);
+  page += FPSTR(HTTP_HEAD_END);
+  return page;
+}
+
+String getScanItemOut() {
+  String page;
+
+  if (!_numNetworks) WiFi_scanNetworks();  // scan in case this gets called before any scans
+
+  int n = _numNetworks;
+  if (n == 0) {
+#ifdef WM_DEBUG_LEVEL
+    DEBUG_WM(F("No networks found"));
+#endif
+    page += FPSTR(S_nonetworks);  // @token nonetworks
+    page += F("<br/><br/>");
+  } else {
+#ifdef WM_DEBUG_LEVEL
+    DEBUG_WM(n, F("networks found"));
+#endif
+    // sort networks
+    int indices[n];
+    for (int i = 0; i < n; i++) {
+      indices[i] = i;
+    }
+
+    // RSSI SORT
+    for (int i = 0; i < n; i++) {
+      for (int j = i + 1; j < n; j++) {
+        if (WiFi.RSSI(indices[j]) > WiFi.RSSI(indices[i])) {
+          std::swap(indices[i], indices[j]);
+        }
+      }
+    }
+
+    /* test std:sort
+      std::sort(indices, indices + n, [](const int & a, const int & b) -> bool
+      {
+      return WiFi.RSSI(a) > WiFi.RSSI(b);
+      });
+     */
+
+    // remove duplicates ( must be RSSI sorted )
+    String cssid;
+    for (int i = 0; i < n; i++) {
+      if (indices[i] == -1) continue;
+      cssid = WiFi.SSID(indices[i]);
+      for (int j = i + 1; j < n; j++) {
+        if (cssid == WiFi.SSID(indices[j])) {
+#ifdef WM_DEBUG_LEVEL
+          DEBUG_WM(WM_DEBUG_VERBOSE, F("DUP AP:"), WiFi.SSID(indices[j]));
+#endif
+          indices[j] = -1;  // set dup aps to index -1
+        }
+      }
+    }
+
+    // token precheck, to speed up replacements on large ap lists
+    String HTTP_ITEM_STR = FPSTR(HTTP_ITEM);
+
+    // toggle icons with percentage
+    HTTP_ITEM_STR.replace("{qp}", FPSTR(HTTP_ITEM_QP));
+    HTTP_ITEM_STR.replace("{qi}", FPSTR(HTTP_ITEM_QI));
+
+    // set token precheck flags
+    bool tok_r = HTTP_ITEM_STR.indexOf(FPSTR(T_r)) > 0;
+    bool tok_R = HTTP_ITEM_STR.indexOf(FPSTR(T_R)) > 0;
+    bool tok_e = HTTP_ITEM_STR.indexOf(FPSTR(T_e)) > 0;
+    bool tok_q = HTTP_ITEM_STR.indexOf(FPSTR(T_q)) > 0;
+    bool tok_i = HTTP_ITEM_STR.indexOf(FPSTR(T_i)) > 0;
+
+    // display networks in page
+    for (int i = 0; i < n; i++) {
+      if (indices[i] == -1) continue;  // skip dups
+
+#ifdef WM_DEBUG_LEVEL
+      DEBUG_WM(WM_DEBUG_VERBOSE, F("AP: "), (String)WiFi.RSSI(indices[i]) + " " + (String)WiFi.SSID(indices[i]));
+#endif
+
+      int rssiperc     = getRSSIasQuality(WiFi.RSSI(indices[i]));
+      uint8_t enc_type = WiFi.encryptionType(indices[i]);
+
+      if (_minimumQuality == -1 || _minimumQuality < rssiperc) {
+        String item = HTTP_ITEM_STR;
+        if (WiFi.SSID(indices[i]) == "") {
+          // Serial.println(WiFi.BSSIDstr(indices[i]));
+          continue;  // No idea why I am seeing these, lets just skip them for now
+        }
+        item.replace(FPSTR(T_V), htmlEntities(WiFi.SSID(indices[i])));        // ssid no encoding
+        item.replace(FPSTR(T_v), htmlEntities(WiFi.SSID(indices[i]), true));  // ssid no encoding
+        if (tok_e) item.replace(FPSTR(T_e), AUTH_MODE_NAMES[enc_type]);
+        if (tok_r) item.replace(FPSTR(T_r), (String)rssiperc);                                  // rssi percentage 0-100
+        if (tok_R) item.replace(FPSTR(T_R), (String)WiFi.RSSI(indices[i]));                     // rssi db
+        if (tok_q) item.replace(FPSTR(T_q), (String) int(round(map(rssiperc, 0, 100, 1, 4))));  // quality icon 1-4
+        if (tok_i) {
+          if (enc_type != WIFI_AUTH_OPEN) {
+            item.replace(FPSTR(T_i), F("l"));
+          } else {
+            item.replace(FPSTR(T_i), "");
+          }
+        }
+        // Serial.println(WiFi.SSID(indices[i]));
+        page += item;
+        delay(0);
+      } else {
+#ifdef WM_DEBUG_LEVEL
+        DEBUG_WM(WM_DEBUG_VERBOSE, F("Skipping , does not meet _minimumQuality"));
+#endif
+      }
+    }
+    page += FPSTR(HTTP_BR);
+  }
+
+  return page;
+}
+
+int getRSSIasQuality(int RSSI) {
+  int quality = 0;
+  if (RSSI <= -100) {
+    quality = 0;
+  } else if (RSSI >= -50) {
+    quality = 100;
+  } else {
+    quality = 2 * (RSSI + 100);
+  }
+  Serial.println(quality);
+  return quality;
+}
+
+String htmlEntities(String str, bool whitespace) {
+  str.replace("&", "&amp;");
+  str.replace("<", "&lt;");
+  str.replace(">", "&gt;");
+  str.replace("'", "&#39;");
+  if (whitespace) str.replace(" ", "&#160;");
+  return str;
+}
+
 void HTTP_Server::handleLittleFSFile() {
-  String filename = server.uri();
-  int dotPosition = filename.lastIndexOf(".");
-  String fileType = filename.substring((dotPosition + 1), filename.length());
+  server.sendHeader("Connection", "close");
+  httpServer.isServing = true;
+  String filename      = server.uri();
+  int dotPosition      = filename.lastIndexOf(".");
+  String fileType      = filename.substring((dotPosition + 1), filename.length());
   if (LittleFS.exists(filename)) {
     File file = LittleFS.open(filename, FILE_READ);
-    if (fileType == "gz") {
-      fileType = "html";  // no need to change content type as it's done automatically by .streamfile below VV
+
+    if (fileType == "ico") {  // send favicon.ico
+      server.streamFile(file, "image/png");
+    } else {
+      String page = "";
+      page += FPSTR(HTTP_HEAD_START);
+      page.replace(FPSTR(T_v), DEVICE_NAME);
+      page += FPSTR(HTTP_STYLE);
+      while (file.available()) {
+        page += char(file.read());
+      }
+      server.send(200, "text/html", page);
     }
-    server.streamFile(file, "text/" + fileType);
     file.close();
+
     SS2K_LOG(HTTP_SERVER_LOG_TAG, "Served %s", filename.c_str());
   } else if (!LittleFS.exists("/index.html")) {
     SS2K_LOG(HTTP_SERVER_LOG_TAG, "%s not found and no filesystem. Sending builtin index.html", filename.c_str());
@@ -463,11 +728,17 @@ void HTTP_Server::settingsProcessor() {
   if (!server.arg("ssid").isEmpty()) {
     tString = server.arg("ssid");
     tString.trim();
+    if (tString != userConfig.getSsid()) {
+      reboot = true;
+    }
     userConfig.setSsid(tString);
   }
   if (!server.arg("password").isEmpty()) {
     tString = server.arg("password");
     tString.trim();
+    if (tString != userConfig.getPassword()) {
+      reboot = true;
+    }
     userConfig.setPassword(tString);
   }
   if (!server.arg("deviceName").isEmpty()) {
@@ -746,21 +1017,21 @@ void HTTP_Server::FirmwareUpdate() {
       //////// Update Firmware /////////
       SS2K_LOG(HTTP_SERVER_LOG_TAG, "Updating Firmware...Please Wait");
       if (((availableVer > currentVer) || updateAnyway) && (userConfig.getAutoUpdate())) {
-          t_httpUpdate_return ret = httpUpdate.update(client, userConfig.getFirmwareUpdateURL() + String(FW_BINFILE));
-          switch (ret) {
-            case HTTP_UPDATE_FAILED:
-              SS2K_LOG(HTTP_SERVER_LOG_TAG, "HTTP_UPDATE_FAILED Error %d : %s", httpUpdate.getLastError(), httpUpdate.getLastErrorString().c_str());
-              break;
+        t_httpUpdate_return ret = httpUpdate.update(client, userConfig.getFirmwareUpdateURL() + String(FW_BINFILE));
+        switch (ret) {
+          case HTTP_UPDATE_FAILED:
+            SS2K_LOG(HTTP_SERVER_LOG_TAG, "HTTP_UPDATE_FAILED Error %d : %s", httpUpdate.getLastError(), httpUpdate.getLastErrorString().c_str());
+            break;
 
-            case HTTP_UPDATE_NO_UPDATES:
-              SS2K_LOG(HTTP_SERVER_LOG_TAG, "HTTP_UPDATE_NO_UPDATES");
-              break;
+          case HTTP_UPDATE_NO_UPDATES:
+            SS2K_LOG(HTTP_SERVER_LOG_TAG, "HTTP_UPDATE_NO_UPDATES");
+            break;
 
-            case HTTP_UPDATE_OK:
-              SS2K_LOG(HTTP_SERVER_LOG_TAG, "HTTP_UPDATE_OK");
-              break;
-          }
+          case HTTP_UPDATE_OK:
+            SS2K_LOG(HTTP_SERVER_LOG_TAG, "HTTP_UPDATE_OK");
+            break;
         }
+      }
     } else {  // don't update
       SS2K_LOG(HTTP_SERVER_LOG_TAG, "  - Current Version: %s", FIRMWARE_VERSION);
     }

@@ -58,16 +58,30 @@ static void onNotify(BLERemoteCharacteristic *pBLERemoteCharacteristic, uint8_t 
   }
 }
 
-// BLE Client loop task
+// BLE Client loop task. Manages connections to BLE servers.
 void bleClientTask(void *pvParameters) {
+  static unsigned long scanCacheTimer = millis();
   for (;;) {
-    vTaskDelay(BLE_CLIENT_DELAY / portTICK_PERIOD_MS);  // Delay a second between loops.
+    if (httpServer.isServing) {  // Scan slower if HTTP Server is working.
+      vTaskDelay((BLE_NOTIFY_DELAY * 3) / portTICK_PERIOD_MS);
+    }
+    vTaskDelay(BLE_CLIENT_DELAY / portTICK_PERIOD_MS);
+
+    NimBLEScan *scan = NimBLEDevice::getScan();
+    if (scan) {
+      while (scan->isScanning()) {  // wait for current scan to finish
+        vTaskDelay(BLE_CLIENT_DELAY / portTICK_PERIOD_MS);
+        Serial.print(".");
+      }
+    }
+
+    if ((millis() - scanCacheTimer) > 1200000) {  // Clear the scan cache every 120 seconds
+      scanCacheTimer = millis();
+      SS2K_LOG(BLE_CLIENT_LOG_TAG, "Clearing BLE Scan Cache.");
+      scan->clearDuplicateCache();
+      scan->clearResults();
+    }
     spinBLEClient.checkBLEReconnect();
-    // if (spinBLEClient.doScan && (spinBLEClient.scanRetries > 0) && !NimBLEDevice::getScan()->isScanning()) {
-    //   spinBLEClient.scanRetries--;
-    //   SS2K_LOG(BLE_CLIENT_LOG_TAG, "Initiating Scan from Client Task:");
-    //   spinBLEClient.scanProcess();
-    //  }
 #ifdef DEBUG_STACK
     Serial.printf("BLEClient: %d \n", uxTaskGetStackHighWaterMark(BLEClientTask));
 #endif  // DEBUG_STACK
@@ -75,7 +89,6 @@ void bleClientTask(void *pvParameters) {
       if (spinBLEClient.myBLEDevices[x].doConnect == true) {
         if (spinBLEClient.connectToServer()) {
           SS2K_LOG(BLE_CLIENT_LOG_TAG, "We are now connected to the BLE Server.");
-          // vTaskDelay(5000 / portTICK_PERIOD_MS);
         } else {
         }
       }
@@ -182,7 +195,9 @@ bool SpinBLEClient::connectToServer() {
           spinBLEClient.resetDevices(pClient);
           pClient->deleteServices();
           pClient->disconnect();
-          NimBLEDevice::getScan()->erase(pClient->getPeerAddress());
+          if (NimBLEDevice::getScan()) {
+            NimBLEDevice::getScan()->erase(pClient->getPeerAddress());
+          }
           NimBLEDevice::deleteClient(pClient);
         }
         return false;
@@ -447,7 +462,7 @@ void SpinBLEClient::scanProcess(int duration) {
   pBLEScan->setDuplicateFilter(true);
   pBLEScan->setActiveScan(true);
   BLEScanResults foundDevices = pBLEScan->start(duration, true);
-  this->dontBlockScan         = false;
+  // this->dontBlockScan         = false;
   // Load the scan into a Json String
   int count = foundDevices.getCount();
 
@@ -733,7 +748,7 @@ void SpinBLEClient::checkBLEReconnect() {
   if (scan) {
     if (!NimBLEDevice::getScan()->isScanning()) {
       spinBLEClient.scanProcess(BLE_RECONNECT_SCAN_DURATION);
-      //Serial.println("scan");
+      // Serial.println("scan");
     }
   }
 }

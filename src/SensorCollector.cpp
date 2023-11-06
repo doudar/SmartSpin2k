@@ -28,7 +28,7 @@ void collectAndSet(NimBLEUUID charUUID, NimBLEUUID serviceUUID, NimBLEAddress ad
   if (sensorData->hasHeartRate() && !rtConfig.hr.getSimulate()) {
     int heartRate = sensorData->getHeartRate();
     rtConfig.hr.setValue(heartRate);
-    spinBLEClient.connectedHRM|= true;
+    spinBLEClient.connectedHRM |= true;
     logBufLength += snprintf(logBuf + logBufLength, kLogBufMaxLength - logBufLength, " HR(%d)", heartRate % 1000);
   }
   if (sensorData->hasCadence() && !rtConfig.cad.getSimulate()) {
@@ -66,11 +66,8 @@ void collectAndSet(NimBLEUUID charUUID, NimBLEUUID serviceUUID, NimBLEAddress ad
     }
   }
   strncat(logBuf + logBufLength, " ]", kLogBufMaxLength - logBufLength);
-  if (userConfig.getLogComm()) {
-    SS2K_LOG(BLE_COMMON_LOG_TAG, "%s", logBuf);
-  } else {
-    SS2K_LOG(BLE_COMMON_LOG_TAG, "rx %s", sensorData->getId().c_str());
-  }
+
+  SS2K_LOG(BLE_COMMON_LOG_TAG, "%s", logBuf);
 #ifdef USE_TELEGRAM
   SEND_TO_TELEGRAM(String(logBuf));
 #endif

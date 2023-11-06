@@ -204,7 +204,7 @@
 #define MAX_RECONNECT_TRIES 3
 
 // loop speed for the SmartSpin2k BLE communications
-#define BLE_NOTIFY_DELAY 503
+#define BLE_NOTIFY_DELAY 503 
 
 // loop speed for the SmartSpin2k BLE Client reconnect
 #define BLE_CLIENT_DELAY 101
@@ -258,7 +258,7 @@
 #define NORMAL_CAD 90
 
 // Temperature of the ESP32 at which to start reducing the power output of the stepper motor driver.
-#define THROTTLE_TEMP 85
+#define THROTTLE_TEMP 100
 
 // Size of the Aux Serial Buffer for Peloton
 #define AUX_BUF_SIZE 10

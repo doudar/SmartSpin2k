@@ -13,9 +13,11 @@
 
 class HTTP_Server {
  private:
- public:
-  bool internetConnection;
+  String processWiFiHTML();
 
+ public:
+  bool internetConnection = false;
+  bool isServing = false;
   void start();
   void stop();
   static void handleLittleFSFile();
@@ -23,9 +25,7 @@ class HTTP_Server {
   static void settingsProcessor();
   static void handleHrSlider();
   static void FirmwareUpdate();
-  
   static void webClientUpdate(void *pvParameters);
-
   HTTP_Server() { internetConnection = false; }
 };
 
@@ -38,9 +38,13 @@ void telegramUpdate(void *pvParameters);
 #define SEND_TO_TELEGRAM(message) (void)message
 #endif
 
-// wifi Function
 void startWifi();
 void stopWifi();
-
+String getScanItemOut();
+String encryptionTypeStr(uint8_t authmode);
+bool WiFi_scanNetworks();
+String getHTTPHead();
+int getRSSIasQuality(int RSSI);
+String htmlEntities(String str, bool whitespace = false);
 
 extern HTTP_Server httpServer;

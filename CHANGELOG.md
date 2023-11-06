@@ -5,10 +5,18 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/)
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 ## [Unreleased]
 ### Added
+- Added a custom integrated implementation of WifiManager.
 
 ### Changed
 - Updated communications overview picture.
 - Updated kit purchasing links. 
+- Updated builtin.h html color scheme. 
+- When pages are served, BLE server will slow it's roll.
+- Removed several BLE scan hard stops in favor of a single loop which waits for the scan to gracefully end.
+- Fixed bug where WiFi.getMode() wasn't returning the correct mode and caused slow/no wifi connections in AP mode.
+- Repurposed LogComData. Will now not transmit any logging info to WiFi when it's turned off.
+- Reworked web pages to start to implement more built in functions.
+- Removed style.css (Internal to the program now).
 
 ### Hardware
 - Wire diameter reduced from 7.2mm to 6.0mm on the window passthrough to accommodate the latest batch of cables. 

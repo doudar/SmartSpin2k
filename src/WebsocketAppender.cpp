@@ -31,6 +31,9 @@ void WebSocketAppender::Loop() {
 void WebSocketAppender::Log(const char* message) {
   // Serial.println("Log websocket.");
   // Serial.printf("%d clients connected.\n", GetClientsCount());
+  if(!userConfig.getLogComm()){
+    return;
+  }
 
   for (uint8_t index = 0; index < maxClients; index++) {
     WebsocketsClient* client = _clients[index];
