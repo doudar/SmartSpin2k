@@ -406,7 +406,7 @@ void HTTP_Server::webClientUpdate(void *pvParameters) {
   for (;;) {
     server.handleClient();
     vTaskDelay(WEBSERVER_DELAY / portTICK_RATE_MS);
-    if (WiFi.getMode() == WIFI_AP) {
+    if (WiFi.getMode() != WIFI_MODE_STA) {
       dnsServer.processNextRequest();
     }
     // Keep MDNS alive
