@@ -1,0 +1,256 @@
+<style>
+html {
+    font-family: sans-serif;
+    display: inline-block;
+    margin: 5px auto;
+    text-align: center;
+    background-color: #03245c;
+    line-height: 1em;
+}
+label {
+    font-size: medium;
+}
+div {
+    font-size: medium;
+}
+a{
+    color: #000000;text-decoration:underline
+}
+a:visited {
+    color: #000000;
+}
+h1{
+    color: #03245c;
+    padding: 0.5rem;
+    line-height: 1em;
+}
+h2{
+    color: #000000;
+    font-size: 1.5rem;
+    font-weight: bold;
+}
+p{
+    font-size: 1rem;
+}
+.button {
+    display: inline-block;
+    background-color: #2a9df4;
+    border: #404040;
+    border-radius: 4px;
+    color: #d0efff;
+    padding: 10px 40px;
+    text-decoration: none;
+    font-size: 20px;
+    margin: 0px;
+cursor: pointer;
+}
+.button2 {background-color: #f44336;
+    padding: 10px 35px;
+}
+.switch {
+    position: relative;
+    display: inline-block;
+    width: 80px;height: 40px;
+}
+.switch input {
+    display: none;
+}
+.slider {
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    transition: 0.4s;
+    background-color: #03254c;
+    border-radius: 34px;}
+.slider:before {
+    position: absolute;
+    content: "";
+    height: 37px;
+    width: 37px;
+    left: 2px;
+    bottom: 2px;
+    background-color: #d0efff;
+    -webkit-transition: 0.4s;
+    transition: 0.4s;
+border-radius: 68px;
+}
+input:checked + .slider {
+    transition: 0.4s;
+    background-color: #2a9df4;
+}
+input:checked + .slider:before 
+{-webkit-transform: translateX(38px);
+    -ms-transform: translateX(38px);
+    transform: translateX(38px);
+}
+.slider2 {
+  -webkit-appearance: none;
+  margin: 5px;
+  width: 270px;
+  height: 20px;
+  background: #d0efff;
+  outline: none;
+  -webkit-transition: 0.2s;
+  transition: opacity 0.2s;
+}
+.slider2::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 30px;
+  height: 30px;
+  background: #03254c;
+  cursor: pointer;
+}
+.slider2::-moz-range-thumb {
+  width: 30px;
+  height: 30px;
+  background: #1167b1;
+  cursor: pointer;
+}
+
+table.center {
+  margin-left: auto;
+  margin-right: auto;
+}
+
+.tooltip {
+  position: relative;
+  display: inline-block;
+  border-bottom: 1px dotted #03254c;
+}
+
+.tooltip .tooltiptext {
+  visibility: hidden;
+  width: 120px;
+  background-color: #03254c;
+  color: #d0efff;
+  text-align: center;
+  border-radius: 6px;
+  padding: 5px 0;
+  position: absolute;
+  z-index: 1;
+}
+.tooltip:hover .tooltiptext {
+  visibility: visible;
+}
+
+.watermark {
+  display: inline;
+  position: fixed;
+  top: 0px;
+  left: 0px;
+  transform: translate(calc(50vw - 200px), calc(50vh - 170px)) rotate(45deg);
+  transition: 0.4s ease-in-out;
+  opacity: 0.7;
+  z-index: 99;
+  color: grey;
+  font-size: 7rem;
+}
+
+.watermark:hidden {
+  transition: visibility 0s 2s, opacity 2s linear;
+}
+
+.shiftButton {
+  -webkit-appearance: none;
+  -webkit-text-stroke: 2px rgba(104, 104, 104, 0.412);
+  appearance: auto;
+  width: 16%;
+  height: 6rem;
+  background: #03254c;
+  color: white;
+  cursor: pointer;
+  font-weight: bold;
+  font-size: calc(1vw + 1vh);
+}
+
+.shiftBox {
+  background: #2a9df4;
+  color: white;
+  font-weight: bold;
+  font-size: calc(1vw + 1vh);
+  width: 4%;
+  text-align: center;
+}
+
+body {
+  display: block;
+  margin: 0 auto;
+  background-color: #1167b1;
+  opacity: 1;
+  transition: 0.5s ease-in-out;
+  height: 100%;
+  width: 100%;
+}
+
+fieldset {
+  border: 10px solid;
+  border-color: #1e3252;
+  box-sizing: border-box;
+  grid-area: 1 / 1;
+  padding: 5px;
+  margin: 0 auto;
+  z-index: -1;
+}
+
+.confirmation-dialog {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  position: fixed;
+  top: 0;
+  left: 0;
+  height: 100%;
+  width: 100%;
+  background-color: rgba(201, 201, 201, 0.7);
+  z-index: 100;
+}
+
+.confirmation-dialog > .confirmation-panel {
+  background-color: #03245c;
+  color: white;
+  padding: 20px;
+  border-radius: 10px;
+}
+
+.confirmation-panel > .confirmation-buttongroup {
+  padding-top: 10px;
+}
+
+.confirmation-buttongroup > input[type="button"] {
+  width: 75px;
+  height: 40px;
+  font-size: 1em;
+  border-radius: 10px;
+}
+/ quality icon
+.q{height:16px;margin:0;padding:0 
+5px;text-align:right;min-width:38px;float:right}.q.q-0:after{background-position-x:0}.q.q-1:after{background-position-x:-16px}.q.q-2:after{background-position-x:-32px}.q.q-3:
+after{background-position-x:-48px}.q.q-4:after{background-position-x:-64px}.q.l:before{background-position-x:-80px;padding-right:5px}.ql 
+.q{float:left}.q:after,.q:before{content:'';width:16px;height:16px;display:inline-block;background-repeat:no-repeat;background-position: 16px 0;
+background-image:url('data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAGAAAAAQCAMAAADeZIrLAAAAJFBMVEX///
+8AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAADHJj5lAAAAC3RSTlMAIjN3iJmqu8zd7vF8pzcAAABsSURBVHja7Y1BCsAwCASNSVo3/v+/
+BUEiXnIoXkoX5jAQMxTHzK9cVSnvDxwD8bFx8PhZ9q8FmghXBhqA1faxk92PsxvRc2CCCFdhQCbRkLoAQ3q/wWUBqG35ZxtVzW4Ed6LngPyBU2CobdIDQ5oPWI5nCUwAAAAASUVORK5CYII=');}
+/ icons @2x media query (32px rescaled
+@media (-webkit-min-device-pixel-ratio: 2),(min-resolution: 192dpi){.q:before,.q:after {
+background-image:url('data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAALwAAAAgCAMAAACfM+KhAAAALVBMVEX///
+8AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAADAOrOgAAAADnRSTlMAESIzRGZ3iJmqu8zd7gKjCLQAAACmSURBVHgB7dDBCoMwEEXRmKlVY3L//3NLhyzqIqSUggy8uxnhCR5Mo8xLt+14aZ7wwgsvvPA/
+ofv9+44334UXXngvb6XsFhO/VoC2RsSv9J7x8BnYLW+AjT56ud/uePMdb7IP8Bsc/
+e7h8Cfk912ghsNXWPpDC4hvN+D1560A1QPORyh84VKLjjdvfPFm++i9EWq0348XXnjhhT+4dIbCW+WjZim9AKk4UZMnnCEuAAAAAElFTkSuQmCC');
+background-size: 95px 16px;}}
+/ msg callout
+.msg{padding:20px;margin:20px 0;border:1px solid #eee;border-left-width:5px;border-left-color:#777}.msg 
+h4{margin-top:0;margin-bottom:5px}.msg.P{border-left-color:#1fa3ec}.msg.P h4{color:#1fa3ec}.msg.D{border-left-color:#dc3630}.msg.D h4{color:#dc3630}.msg.S{border-left-color: 
+#5cb85c}.msg.S h4{color: #5cb85c}
+/ list
+dt{font-weight:bold}dd{margin:0;padding:0 0 0.5em 0;min-height:12px}
+td{vertical-align: top;}
+.h{display:none}
+button{transition: 0s opacity;transition-delay: 3s;transition-duration: 0s;cursor: pointer}
+button.D{background-color:#dc3630}
+button:active{opacity:50% !important;cursor:wait;transition-delay: 0s}
+/ link
+a{color:#000;font-weight:700;text-decoration:none}a:hover{color:#1fa3ec;text-decoration:underline}
+</style>
