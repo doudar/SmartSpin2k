@@ -18,7 +18,7 @@ const char HTTP_STYLE[] =
     "label {font-size: medium;}"
     "div {font-size: medium;}"
     "a{color: #000000;text-decoration:underline}"
-    "a:visited {color: #000000;}"
+    "a:visited {color: #000000;text-decoration:underline}"
     "h1{color: #03245c;padding: 0.5rem;line-height: 1em;}"
     "h2{color: #000000;font-size: 1.5rem;font-weight: bold;}"
     "p{font-size: 1rem;}"
@@ -199,7 +199,7 @@ const char HTTP_STYLE[] =
     "button.D{background-color:#dc3630}"
     "button:active{opacity:50% !important;cursor:wait;transition-delay: 0s}"
     // links
-    "a{color:#000;font-weight:700;text-decoration:none}a:hover{color:#1fa3ec;text-decoration:underline}"
+    "a{color:#000;font-weight:700;text-decoration:underline}a:hover{color:#1fa3ec;text-decoration:underline}"
     "</style>";
 
 /* Login page */
@@ -307,16 +307,16 @@ const char* const HTTP_PORTAL_MENU[] = {
 
 // const char HTTP_PORTAL_OPTIONS[]    = strcat(HTTP_PORTAL_MENU[0] , HTTP_PORTAL_MENU[3] , HTTP_PORTAL_MENU[7]);
 const char HTTP_PORTAL_OPTIONS[] = "";
-const char HTTP_ITEM_QI[]        = "<div role='img' aria-label='{r}%' title='{r}%' class='q q-{q} {i} {h}'></div>";  // rssi icons
-const char HTTP_ITEM_QP[]        = "<div class='q {h}'>{r}%</div>";                                                  // rssi percentage {h} = hidden showperc pref
-const char HTTP_ITEM[]           = "<div><a href='#p' onclick='c(this)' data-ssid='{V}'>{v}</a>{qi}{qp}</div>";      // {q} = HTTP_ITEM_QI, {r} = HTTP_ITEM_QP
+const char HTTP_ITEM_QI[]        = "<div role='img' aria-label='{r}%' title='{r}%' class='q q-{q} {i} {h}'></div></td></tr></table>";  // rssi icons
+// const char HTTP_ITEM_QP[]        = "<div class='q {h}'>{r}%</div>";                                                  // rssi percentage {h} = hidden showperc pref
+const char HTTP_ITEM[]           = "<table align=center><tr><td><div><a href='#p' onclick='c(this)' data-ssid='{V}'>{v}</a>{qi}</div>";      // {q} = HTTP_ITEM_QI, {r} = HTTP_ITEM_QP
 // const char HTTP_ITEM[]             = "<div><a href='#p' onclick='c(this)'>{v}</a> {R} {r}% {q} {e}</div>"; // test all tokens
 
 const char HTTP_FORM_START[] = "<form method='POST' action='{v}'>";
 const char HTTP_FORM_WIFI[] =
-    "<label for='ssid'>SSID</label><input id='ssid' name='ssid' maxlength='32' autocorrect='off' autocapitalize='none' placeholder='{v}'><br/><label "
-    "for='password'>Password</label><input id='password' "
-    "name='password' maxlength='64' type='password' placeholder='password'><input type='checkbox' onclick='f()'> Show Password";
+    "<table align=center><tr><td align=right><label for='ssid'>SSID</label></td><td><input id='ssid' name='ssid' maxlength='32' autocorrect='off' autocapitalize='none' placeholder='{v}'></td><tr><td align=right><label "
+    "for='password'>Password</label></td><td><input id='password' "
+    "name='password' maxlength='64' type='password' placeholder='password'></td></tr></table><br/><input type='checkbox' onclick='f()'> Show Password";
 const char HTTP_FORM_WIFI_END[]    = "";
 const char HTTP_FORM_STATIC_HEAD[] = "<hr><br/>";
 const char HTTP_FORM_END[]         = "<br/><br/><button type='submit'>Save</button></form>";

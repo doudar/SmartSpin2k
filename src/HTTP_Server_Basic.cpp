@@ -605,11 +605,12 @@ String getScanItemOut() {
       }
     }
 
+    
     // token precheck, to speed up replacements on large ap lists
     String HTTP_ITEM_STR = FPSTR(HTTP_ITEM);
 
     // toggle icons with percentage
-    HTTP_ITEM_STR.replace("{qp}", FPSTR(HTTP_ITEM_QP));
+    // HTTP_ITEM_STR.replace("{qp}", FPSTR(HTTP_ITEM_QP));
     HTTP_ITEM_STR.replace("{qi}", FPSTR(HTTP_ITEM_QI));
 
     // set token precheck flags

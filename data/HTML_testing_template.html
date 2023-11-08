@@ -399,7 +399,7 @@
             a {
                 color: #000;
                 font-weight: 700;
-                text-decoration: none
+                text-decoration: underline
             }
 
             a:hover {
@@ -423,29 +423,46 @@
                 <strong>WiFi Setup</strong>
             </h1>
             <div class='wrap'>
-                <div>
-                    <a href='#p' onclick='c(this)' data-ssid='NetwalkerLair'>NetwalkerLair</a>
-                    <div role='img' aria-label='86%' title='86%' class='q q-3 l {h}'></div>
-                    <div class='q {h}'>86%</div>
-                </div>
-                <div>
+                <table align="center">
+                <tr>
+                    <td><div>
+                        <a href='#p' onclick='c(this)' data-ssid='NetwalkerLair'>NetwalkerLair</a>
+                        <div role='img' aria-label='86%' title='86%' class='q q-3 l {h}'></div>
+                        <div class='q {h}'>86%</div>
+                    </div></td>
+                </tr>
+                <tr><td><div>
                     <a href='#p' onclick='c(this)' data-ssid='danger55-plus'>danger55-plus</a>
                     <div role='img' aria-label='34%' title='34%' class='q q-2 l {h}'></div>
                     <div class='q {h}'>34%</div>
-                </div>
-                <div>
+                </div></td>
+                </tr>
+                <tr><td><div>
                     <a href='#p' onclick='c(this)' data-ssid='Emily'>Emily</a>
                     <div role='img' aria-label='18%' title='18%' class='q q-1 l {h}'></div>
                     <div class='q {h}'>18%</div>
-                </div>
+                </div></td>
+                </tr>
+                </table>
                 <br/>
                 <form method='POST' action='send_settings'>
-                    <label for='ssid'>SSID</label>
-                    <input id='ssid' name='ssid' maxlength='32' autocorrect='off' autocapitalize='none' placeholder='NetwalkerLair'>
-                    <br/>
-                    <label for='password'>Password</label>
-                    <input id='password' name='password' maxlength='64' type='password' placeholder='password'>
-                    <input type='checkbox' onclick='f()'>
+                <table align="center">
+                    <tr>
+                        <td align="right">
+                            <label for='ssid'>SSID</label>
+                        </td>
+                        <td><input id='ssid' name='ssid' maxlength='32' autocorrect='off' autocapitalize='none' placeholder='NetwalkerLair'></td>
+                    </tr>
+                    <tr>
+                        <td align="right">
+                            <label for='password'>Password</label>
+                        </td>
+                        <td>
+                            <input id='password' name='password' maxlength='64' type='password' placeholder='password'>
+                        </td>
+                    </tr>
+                </table>
+                    <br/><input type='checkbox' onclick='f()'>
                     Show Password<br/>
                     <br/>
                     <br/>
