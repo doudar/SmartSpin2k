@@ -544,9 +544,17 @@ void SpinBLEClient::FTMSControlPointWrite(const uint8_t *pData, int length) {
   }
   if (pClient) {
     NimBLERemoteCharacteristic *writeCharacteristic = pClient->getService(FITNESSMACHINESERVICE_UUID)->getCharacteristic(FITNESSMACHINECONTROLPOINT_UUID);
-    if (writeCharacteristic) {
+    String shiftedData(*pData);
+    if (writeCharacteristic && ((uint8_t)shiftedData[0] == FitnessMachineControlPointProcedure::SetTargetInclination)) {  // use virtual Shifting
+      int incline    = rtConfig.getTargetIncline() + (rtConfig.getShifterPosition() * userConfig.getShiftStep());
+      incline        = incline / 10;
+      shiftedData[1] = (uint8_t)(incline & 0xff);
+      shiftedData[2] = (uint8_t)(incline >> 8);
+      writeCharacteristic->writeValue(shiftedData, shiftedData.length());
+      SS2K_LOG(BLE_CLIENT_LOG_TAG, "Sent Shifted Data");
+    } else {
       writeCharacteristic->writeValue(pData, length);
-      SS2K_LOG(BLE_CLIENT_LOG_TAG, "Sent FTMS");
+      SS2K_LOG(BLE_CLIENT_LOG_TAG, "Sent passthrough FTMS");
     }
   }
 }
@@ -733,7 +741,7 @@ void SpinBLEClient::checkBLEReconnect() {
   if (scan) {
     if (!NimBLEDevice::getScan()->isScanning()) {
       spinBLEClient.scanProcess(BLE_RECONNECT_SCAN_DURATION);
-      //Serial.println("scan");
+      // Serial.println("scan");
     }
   }
 }
