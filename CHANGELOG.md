@@ -21,6 +21,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Added Spinning L7 bike.
 - Added Yosuda bike. 
 - Added Peloton low profile (for slammed bars) bike mount by @chaloney
+- Added Pro-Form 505 SPX bike. 
 
 ## [23.6.28]
 ### Added
