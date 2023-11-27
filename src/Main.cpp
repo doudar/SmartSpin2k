@@ -244,7 +244,7 @@ void SS2K::FTMSModeShiftModifier() {
   if (shiftDelta) {  // Shift detected
     switch (rtConfig.getFTMSMode()) {
       case FitnessMachineControlPointProcedure::SetTargetPower:  // ERG Mode
-
+      {
         rtConfig.setShifterPosition(ss2k.lastShifterPosition);  // reset shifter position because we're remapping it to ERG target
         if ((rtConfig.watts.getTarget() + (shiftDelta * ERG_PER_SHIFT) < userConfig.getMinWatts()) ||
             (rtConfig.watts.getTarget() + (shiftDelta * ERG_PER_SHIFT) > userConfig.getMaxWatts())) {
@@ -253,10 +253,14 @@ void SS2K::FTMSModeShiftModifier() {
         }
         rtConfig.watts.setTarget(rtConfig.watts.getTarget() + (ERG_PER_SHIFT * shiftDelta));
         SS2K_LOG(MAIN_LOG_TAG, "ERG Shift. New Target: %dw", rtConfig.watts.getTarget());
-        break;
+        // Format output for FTMS passthrough
+        int adjustedTarget         = rtConfig.watts.getTarget() / userConfig.getPowerCorrectionFactor();
+        const uint8_t translated[] = {FitnessMachineControlPointProcedure::SetTargetPower, (uint8_t)(adjustedTarget % 256), (uint8_t)(adjustedTarget / 256)};
+        spinBLEClient.FTMSControlPointWrite(translated, 3);
+      }
 
       case FitnessMachineControlPointProcedure::SetTargetResistanceLevel:  // Resistance Mode
-
+      {
         rtConfig.setShifterPosition(ss2k.lastShifterPosition);  // reset shifter position because we're remapping it to resistance target
         if (rtConfig.getMaxResistance() != DEFAULT_RESISTANCE_RANGE) {
           if (rtConfig.resistance.getTarget() + shiftDelta < rtConfig.getMinResistance()) {
@@ -271,9 +275,10 @@ void SS2K::FTMSModeShiftModifier() {
           rtConfig.resistance.setTarget(rtConfig.resistance.getTarget() + shiftDelta);
           SS2K_LOG(MAIN_LOG_TAG, "Resistance Shift. New Target: %d", rtConfig.resistance.getTarget());
         }
+      }
 
       default:  // Sim Mode
-
+      {
         SS2K_LOG(MAIN_LOG_TAG, "Shift %+d pos %d tgt %d min %d max %d r_min %d r_max %d", shiftDelta, rtConfig.getShifterPosition(), ss2k.targetPosition, rtConfig.getMinStep(),
                  rtConfig.getMaxStep(), rtConfig.getMinResistance(), rtConfig.getMaxResistance());
 
@@ -292,6 +297,9 @@ void SS2K::FTMSModeShiftModifier() {
           SS2K_LOG(MAIN_LOG_TAG, "Shift Blocked by resistance limit.");
           rtConfig.setShifterPosition(ss2k.lastShifterPosition);
         }
+        const uint8_t ibsp[] = {FitnessMachineControlPointProcedure::SetIndoorBikeSimulationParameters, 0x00, 0x00, 0x00, 0x00, 0x28, 0x33};
+        spinBLEClient.FTMSControlPointWrite(ibsp, 7);
+      }
     }
     ss2k.lastShifterPosition = rtConfig.getShifterPosition();
     spinBLEServer.notifyShift();
