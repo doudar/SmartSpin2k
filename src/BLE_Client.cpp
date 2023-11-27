@@ -544,17 +544,27 @@ void SpinBLEClient::FTMSControlPointWrite(const uint8_t *pData, int length) {
   }
   if (pClient) {
     NimBLERemoteCharacteristic *writeCharacteristic = pClient->getService(FITNESSMACHINESERVICE_UUID)->getCharacteristic(FITNESSMACHINECONTROLPOINT_UUID);
-    String shiftedData(*pData);
-    if (writeCharacteristic && ((uint8_t)shiftedData[0] == FitnessMachineControlPointProcedure::SetTargetInclination)) {  // use virtual Shifting
-      int incline    = rtConfig.getTargetIncline() + (rtConfig.getShifterPosition() * userConfig.getShiftStep());
-      incline        = incline / 10;
-      shiftedData[1] = (uint8_t)(incline & 0xff);
-      shiftedData[2] = (uint8_t)(incline >> 8);
-      writeCharacteristic->writeValue(shiftedData, shiftedData.length());
-      SS2K_LOG(BLE_CLIENT_LOG_TAG, "Sent Shifted Data");
-    } else {
-      writeCharacteristic->writeValue(pData, length);
-      SS2K_LOG(BLE_CLIENT_LOG_TAG, "Sent passthrough FTMS");
+    NotifyData shiftedData;
+    shiftedData.length = length;
+    for (size_t i = 0; i < length; i++) {
+      shiftedData.data[i] = pData[i];
+    }
+    if (writeCharacteristic) {
+      const int kLogBufCapacity = shiftedData.length + 40;
+      char logBuf[kLogBufCapacity];
+      // if ((uint8_t)shiftedData[0] == FitnessMachineControlPointProcedure::SetIndoorBikeSimulationParameters) {  // use virtual Shifting
+      int incline    = rtConfig.getTargetIncline() + (rtConfig.getShifterPosition() * userConfig.getShiftStep())/10;
+      SS2K_LOG(BLE_CLIENT_LOG_TAG, "%d", incline);
+      shiftedData.data[3] = (uint8_t)(incline & 0xff);
+      shiftedData.data[4] = (uint8_t)(incline >> 8);
+      writeCharacteristic->writeValue(shiftedData.data, shiftedData.length);
+      int logBufLength = ss2k_log_hex_to_buffer(shiftedData.data, shiftedData.length, logBuf, 0, kLogBufCapacity);
+      logBufLength += snprintf(logBuf + logBufLength, kLogBufCapacity - logBufLength, "-> Shifted Data: %d", rtConfig.getShifterPosition());
+      SS2K_LOG(BLE_CLIENT_LOG_TAG, "%s", logBuf);
+      //} else {
+      //  writeCharacteristic->writeValue(pData, length);
+      //  SS2K_LOG(BLE_CLIENT_LOG_TAG, "Sent passthrough FTMS");
+      //}
     }
   }
 }
