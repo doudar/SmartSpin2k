@@ -255,8 +255,9 @@ void SS2K::FTMSModeShiftModifier() {
         SS2K_LOG(MAIN_LOG_TAG, "ERG Shift. New Target: %dw", rtConfig.watts.getTarget());
         // Format output for FTMS passthrough
         int adjustedTarget         = rtConfig.watts.getTarget() / userConfig.getPowerCorrectionFactor();
-        const uint8_t translated[] = {FitnessMachineControlPointProcedure::SetTargetPower, (uint8_t)(adjustedTarget % 256), (uint8_t)(adjustedTarget / 256)};
+        const uint8_t translated[] = {FitnessMachineControlPointProcedure::SetTargetPower, (uint8_t)(adjustedTarget & 0xff), (uint8_t)(adjustedTarget >> 8)};
         spinBLEClient.FTMSControlPointWrite(translated, 3);
+        break;
       }
 
       case FitnessMachineControlPointProcedure::SetTargetResistanceLevel:  // Resistance Mode
@@ -275,6 +276,7 @@ void SS2K::FTMSModeShiftModifier() {
           rtConfig.resistance.setTarget(rtConfig.resistance.getTarget() + shiftDelta);
           SS2K_LOG(MAIN_LOG_TAG, "Resistance Shift. New Target: %d", rtConfig.resistance.getTarget());
         }
+        break;
       }
 
       default:  // Sim Mode
