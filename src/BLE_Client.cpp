@@ -532,8 +532,13 @@ void SpinBLEClient::resetDevices(NimBLEClient *pClient) {
   }
 }
 
-void SpinBLEClient::FTMSControlPointWrite(const uint8_t *pData, int length) {
+// Control a connected FTMS trainer. If no args are passed, treat it like an external stepper motor.
+void SpinBLEClient::FTMSControlPointWrite(const uint8_t* pData, int length) {
   NimBLEClient *pClient = nullptr;
+  uint8_t modData[7];
+  for (int i = 0; i < length; i++) {
+    modData[i] = pData[i];
+  }
   for (int i = 0; i < NUM_BLE_DEVICES; i++) {
     if (myBLEDevices[i].postConnected && (myBLEDevices[i].serviceUUID == FITNESSMACHINESERVICE_UUID)) {
       if (NimBLEDevice::getClientByPeerAddress(myBLEDevices[i].peerAddress)->getService(FITNESSMACHINESERVICE_UUID)) {
@@ -544,25 +549,20 @@ void SpinBLEClient::FTMSControlPointWrite(const uint8_t *pData, int length) {
   }
   if (pClient) {
     NimBLERemoteCharacteristic *writeCharacteristic = pClient->getService(FITNESSMACHINESERVICE_UUID)->getCharacteristic(FITNESSMACHINECONTROLPOINT_UUID);
-    NotifyData shiftedData;
-    shiftedData.length = length;
-    int logBufLength   = 0;
-    for (size_t i = 0; i < length; i++) {
-      shiftedData.data[i] = pData[i];
-    }
+    int logBufLength                                = 0;
     if (writeCharacteristic) {
-      const int kLogBufCapacity = shiftedData.length + 40;
+      const int kLogBufCapacity = length + 40;
       char logBuf[kLogBufCapacity];
-      if (shiftedData.data[0] == FitnessMachineControlPointProcedure::SetIndoorBikeSimulationParameters) {  // use virtual Shifting
-        int incline = rtConfig.getTargetIncline() + (rtConfig.getShifterPosition() * userConfig.getShiftStep()) / 10;
-        shiftedData.data[3] = (uint8_t)(incline & 0xff);
-        shiftedData.data[4] = (uint8_t)(incline >> 8);
-        writeCharacteristic->writeValue(shiftedData.data, shiftedData.length);
-        logBufLength = ss2k_log_hex_to_buffer(shiftedData.data, shiftedData.length, logBuf, 0, kLogBufCapacity);
+      if (modData[0] == FitnessMachineControlPointProcedure::SetIndoorBikeSimulationParameters) {  // use virtual Shifting
+        int incline = ss2k.targetPosition / userConfig.getInclineMultiplier();
+        modData[3]  = (uint8_t)(incline & 0xff);
+        modData[4]  = (uint8_t)(incline >> 8);
+        writeCharacteristic->writeValue(modData, length);
+        logBufLength = ss2k_log_hex_to_buffer(modData, length, logBuf, 0, kLogBufCapacity);
         logBufLength += snprintf(logBuf + logBufLength, kLogBufCapacity - logBufLength, "-> Shifted Sim Data: %d", rtConfig.getShifterPosition());
       } else {
-        writeCharacteristic->writeValue(shiftedData.data, shiftedData.length);
-        logBufLength = ss2k_log_hex_to_buffer(shiftedData.data, shiftedData.length, logBuf, 0, kLogBufCapacity);
+        writeCharacteristic->writeValue(modData, length);
+        logBufLength = ss2k_log_hex_to_buffer(modData, length, logBuf, 0, kLogBufCapacity);
         logBufLength += snprintf(logBuf + logBufLength, kLogBufCapacity - logBufLength, "-> Shifted ERG Data: %d", rtConfig.getShifterPosition());
       }
       SS2K_LOG(BLE_CLIENT_LOG_TAG, "%s", logBuf);

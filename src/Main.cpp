@@ -254,9 +254,11 @@ void SS2K::FTMSModeShiftModifier() {
         rtConfig.watts.setTarget(rtConfig.watts.getTarget() + (ERG_PER_SHIFT * shiftDelta));
         SS2K_LOG(MAIN_LOG_TAG, "ERG Shift. New Target: %dw", rtConfig.watts.getTarget());
         // Format output for FTMS passthrough
+        #ifndef INTERNAL_ERG_4EXT_FTMS
         int adjustedTarget         = rtConfig.watts.getTarget() / userConfig.getPowerCorrectionFactor();
         const uint8_t translated[] = {FitnessMachineControlPointProcedure::SetTargetPower, (uint8_t)(adjustedTarget & 0xff), (uint8_t)(adjustedTarget >> 8)};
         spinBLEClient.FTMSControlPointWrite(translated, 3);
+        #endif
         break;
       }
 
@@ -299,8 +301,8 @@ void SS2K::FTMSModeShiftModifier() {
           SS2K_LOG(MAIN_LOG_TAG, "Shift Blocked by resistance limit.");
           rtConfig.setShifterPosition(ss2k.lastShifterPosition);
         }
-        const uint8_t ibsp[] = {FitnessMachineControlPointProcedure::SetIndoorBikeSimulationParameters, 0x00, 0x00, 0x00, 0x00, 0x28, 0x33};
-        spinBLEClient.FTMSControlPointWrite(ibsp, 7);
+        uint8_t _controlData[] = {FitnessMachineControlPointProcedure::SetIndoorBikeSimulationParameters, 0x00, 0x00, 0x00, 0x00, 0x28, 0x33};
+        spinBLEClient.FTMSControlPointWrite(_controlData, 7);
       }
     }
     ss2k.lastShifterPosition = rtConfig.getShifterPosition();

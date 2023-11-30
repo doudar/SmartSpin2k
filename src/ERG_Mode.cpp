@@ -65,6 +65,11 @@ void ergTaskLoop(void* pvParameters) {
       loopCounter = 0;
       powerTable.setStepperMinMax();
     }
+
+    // Check for saved power table if we have < 3 positions calculated. If so, load saved power table.
+
+    // Save Power table if we currently have more positions calculated than the saved version.
+
     loopCounter++;
 
 #ifdef DEBUG_STACK

@@ -57,7 +57,7 @@
 // Stepper peak current in ma. This is hardware restricted to a maximum of 2000ma on the TMC2225. RMS current is less.
 #define DEFAULT_STEPPER_POWER 900
 
-// Default Shift Step. THe amount to move the stepper motor for a shift press.
+// Default Shift Step. The amount to move the stepper motor for a shift press.
 #define DEFAULT_SHIFT_STEP 1000
 
 // Stepper Acceleration in steps/s^2
@@ -78,6 +78,9 @@
 
 // Amount to change watt target per shift in ERG mode.
 #define ERG_PER_SHIFT 10
+
+// Use internal ERG control on external FTMS Trainer.
+#define INTERNAL_ERG_4EXT_FTMS
 
 //Minimum cadence where ERG mode stops.
 #define MIN_ERG_CADENCE 30
