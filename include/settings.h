@@ -116,7 +116,7 @@
 #define STEPPER_PELOTON_SPEED 2500
 
 // Default +- Stepper Travel Limit
-// This is used until the PowerTable has enough data to compute travel limits
+// This is used until the TorqueTable has enough data to compute travel limits
 #define DEFAULT_STEPPER_TRAVEL 200000000
 
 // Default debounce delay for shifters. Increase if you have false shifts. Decrease if shifting takes too long.
@@ -248,19 +248,19 @@
 
 #define RUNTIMECONFIG_JSON_SIZE 512 + DEBUG_LOG_BUFFER_SIZE
 
-/* Number of entries in the ERG Power Lookup Table
+/* Number of entries in the ERG Torque Lookup Table
  This is currently maintained as to keep memory usage lower and reduce the print output of the table.
- It can be depreciated in the future should we decide to remove logging of the power table. Then it should be calculated in ERG_Mode.cpp
- by dividing userConfig.getMaxWatts() by POWERTABLE_INCREMENT.  */
-#define POWERTABLE_SIZE 20
+ It can be depreciated in the future should we decide to remove logging of the torque table. Then it should be calculated in ERG_Mode.cpp
+ by dividing userConfig.getMaxWatts() by TORQUETABLE_INCREMENT.  */
+#define TORQUETABLE_SIZE 20
 
-// Size of increments (in watts) for the ERG Lookup Table. Needs to be one decimal place for proper calculations i.e. 50.0
-#define POWERTABLE_INCREMENT 50.0
+// Size of increments (in Nm) for the ERG Lookup Table. Needs to be one decimal place for proper calculations
+#define TORQUETABLE_INCREMENT 5.31
 
-// Number of similar power samples to take before writing to the Power Table
-#define POWER_SAMPLES 5
+// Number of similar torque samples to take before writing to the Torque Table
+#define TORQUE_SAMPLES 5
 
-// Normal cadence value (used in power table and other areas)
+// Normal cadence value (used in torque table and other areas)
 #define NORMAL_CAD 90
 
 // Temperature of the ESP32 at which to start reducing the power output of the stepper motor driver.
@@ -298,8 +298,8 @@
 // Calculation. Never sets userConfig.setSimulatedPower();
 // #define DEBUG_HR_TO_PWR
 
-// Uncomment to enable HR->PWR enhanced powertable debugging.
-// #define DEBUG_POWERTABLE
+// Uncomment to enable HR->PWR enhanced torquetable debugging.
+// #define DEBUG_TORQUETABLE
 
 #ifdef USE_TELEGRAM
 // Max number of telegram messages to send per session
