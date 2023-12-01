@@ -12,69 +12,70 @@
 
 #define ERG_MODE_LOG_TAG     "ERG_Mode"
 #define ERG_MODE_LOG_CSV_TAG "ERG_Mode_CSV"
-#define POWERTABLE_LOG_TAG   "PowTab"
+#define TORQUETABLE_LOG_TAG  "PowTab"
 #define ERG_MODE_DELAY       700
 #define RETURN_ERROR         -99
+#define TORQUE_CONSTANT      9.5488
+#define CAD_MULTIPLIER       2.7
 
 extern TaskHandle_t ErgTask;
 void setupERG();
 void ergTaskLoop(void* pvParameters);
 
-class PowerEntry {
+int _torqueToWatts(float torque, float cad);
+float _wattsToTorque(int watts, float cad);
+
+class TorqueEntry {
  public:
-  int watts;
+  float torque;
   int32_t targetPosition;
-  int cad;
   int readings;
 
-  PowerEntry() {
-    this->watts          = 0;
+  TorqueEntry() {
+    this->torque         = 0;
     this->targetPosition = 0;
-    this->cad            = 0;
     this->readings       = 0;
   }
 };
 
-class PowerBuffer {
+class TorqueBuffer {
  public:
-  PowerEntry powerEntry[POWER_SAMPLES];
+  TorqueEntry torqueEntry[TORQUE_SAMPLES];
   void set(int);
   void reset();
 };
 
-class PowerTable {
+class TorqueTable {
  public:
-  PowerEntry powerEntry[POWERTABLE_SIZE];
+  TorqueEntry torqueEntry[TORQUETABLE_SIZE];
 
-  // Pick up new power value and put them into the power table
-  void processPowerValue(PowerBuffer& powerBuffer, int cadence, Measurement watts);
+  // Pick up new torque value and put them into the torque table
+  void processTorqueValue(TorqueBuffer& torqueBuffer, int cadence, Measurement torque);
 
-  // Sets stepper min/max value from power table
+  // Sets stepper min/max value from torque table
   void setStepperMinMax();
 
-  // Catalogs a new entry into the power table.
-  void newEntry(PowerBuffer& powerBuffer);
+  // Catalogs a new entry into the torque table.
+  void newEntry(TorqueBuffer& torqueBuffer);
 
   // returns incline for wattTarget. Null if not found.
   int32_t lookup(int watts, int cad);
 
-  // load power table from littlefs
+  // load torque table from littlefs
   bool load();
 
-  // save powertable from littlefs
+  // save torquetable from littlefs
   bool save();
 
-  // Display power table in log
+  // Display torque table in log
   void toLog();
 
  private:
-  // Adjust Watts For Cadence
-  int _adjustWattsForCadence(int watts, float cad);
 };
 
 class ErgMode {
  public:
-  ErgMode(PowerTable* powerTable) { this->powerTable = powerTable; }
+  ErgMode(TorqueTable* torqueTable) { this->torqueTable = torqueTable; }
   void computeErg();
   void computeResistance();
   void _writeLogHeader();
@@ -89,7 +90,7 @@ class ErgMode {
   int cadence          = 0;
 
   Measurement watts;
-  PowerTable* powerTable;
+  TorqueTable* torqueTable;
 
   // check if user is spinning, reset incline if user stops spinning
   bool _userIsSpinning(int cadence, float incline);
