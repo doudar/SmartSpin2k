@@ -12,7 +12,7 @@
 
 #define ERG_MODE_LOG_TAG     "ERG_Mode"
 #define ERG_MODE_LOG_CSV_TAG "ERG_Mode_CSV"
-#define TORQUETABLE_LOG_TAG  "PowTab"
+#define TORQUETABLE_LOG_TAG  "TTable"
 #define ERG_MODE_DELAY       700
 #define RETURN_ERROR         -99
 #define TORQUE_CONSTANT      9.5488

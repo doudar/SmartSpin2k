@@ -466,7 +466,7 @@ void ErgMode::_setPointChangeState(int newCadence, Measurement& newWatts) {
     i++;
   }
 
-  vTaskDelay(BLE_NOTIFY_DELAY / portTICK_PERIOD_MS);  // Wait for torque meter to register new torque
+  vTaskDelay((ERG_MODE_DELAY*3) / portTICK_PERIOD_MS);  // Wait for power meter to register new watts
 }
 
 void ErgMode::_inSetpointState(int newCadence, Measurement& newWatts) {

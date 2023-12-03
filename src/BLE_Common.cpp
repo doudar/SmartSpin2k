@@ -116,10 +116,8 @@ void BLECommunications(void *pvParameters) {
       spinBLEClient.postConnect();
 
 #ifdef INTERNAL_ERG_4EXT_FTMS
-      if (rtConfig.getFTMSMode() == FitnessMachineControlPointProcedure::SetTargetPower) {
         uint8_t test[] = {FitnessMachineControlPointProcedure::SetIndoorBikeSimulationParameters, 0x00, 0x00, 0x00, 0x00, 0x28, 0x33};
         spinBLEClient.FTMSControlPointWrite(test, 7);
-      }
 #endif
 
       if (BLEDevice::getAdvertising()) {
