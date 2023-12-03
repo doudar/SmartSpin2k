@@ -17,6 +17,7 @@ Spinning|L7|Any|20-40 (mount needs to go above SS2k)
 Vortec|Vortec|Any|20
 York|SB300|Any|20-40
 Yosuda|Pro|any|20-40 (mount needs to go above SS2k)
+Yesoul|S3|any| 140 (145-150 may be better)
 
 
 
