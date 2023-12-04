@@ -40,6 +40,9 @@
 // name of local file to save Physical Working Capacity in LittleFS
 #define userPWCFILENAME "/userPWC.txt"
 
+// name of the local file to save the torque table. 
+#define TORQUE_TABLE_FILENAME "/TorqueTable.txt"
+
 // Default Incline Multiplier.
 // Incline multiplier is the multiple required to convert incline received from the remote client (percent grade*100)
 // into actual stepper steps that move the stepper motor. It takes 2,181.76 steps to rotate the knob 1 full revolution. with hardware version 1.
@@ -259,6 +262,12 @@
 
 // Number of similar torque samples to take before writing to the Torque Table
 #define TORQUE_SAMPLES 5
+
+// The Array position of the most reliable Torque Table stepper position according to testing data.
+#define MOST_DEPENDABLE_TORQUE_ENTRY 2
+
+// How often in ms to save the torque table if no new data is added and user is pedaling.
+#define TORQUE_TABLE_SAVE_INTERVAL 120000
 
 // Normal cadence value (used in torque table and other areas)
 #define NORMAL_CAD 90

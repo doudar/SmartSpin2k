@@ -8,6 +8,8 @@
 #include "ERG_Mode.h"
 #include "SS2KLog.h"
 #include "Main.h"
+#include <LittleFS.h>
+#include <ArduinoJSON.h>
 
 TaskHandle_t ErgTask;
 TorqueTable torqueTable;
@@ -109,6 +111,7 @@ void TorqueTable::processTorqueValue(TorqueBuffer& torqueBuffer, int cadence, Me
       if (torqueBuffer.torqueEntry[TORQUE_SAMPLES - 1].readings == 1) {  // If buffer is full, create a new table entry and clear the buffer.
         this->newEntry(torqueBuffer);
         this->toLog();
+        this->_manageSaveState();
         torqueBuffer.reset();
       }
     } else {  // Reading was outside the range - clear the buffer and start over.
@@ -192,7 +195,12 @@ void TorqueTable::newEntry(TorqueBuffer& torqueBuffer) {
     for (int j = i - 1; j > 0; j--) {
       if ((this->torqueEntry[j].targetPosition != 0) && (this->torqueEntry[j].targetPosition >= targetPosition)) {
         SS2K_LOG(TORQUETABLE_LOG_TAG, "Target Slot (%dw)(%d)(%d) was less than previous (%d)(%d)", (int)torque, i, targetPosition, j, this->torqueEntry[j].targetPosition);
-        this->torqueEntry[j].readings = 1;  // Make previous slot easier to round/faster to change.
+        this->torqueEntry[j].readings--;
+        if (this->torqueEntry[j].readings <= 1) {  // Wipe The slot
+          this->torqueEntry[j].targetPosition = 0;
+          this->torqueEntry[j].torque         = 0;
+          this->torqueEntry[j].readings       = 0;
+        }
         return;
       }
     }
@@ -202,7 +210,12 @@ void TorqueTable::newEntry(TorqueBuffer& torqueBuffer) {
     for (int j = i + 1; j < TORQUETABLE_SIZE; j++) {
       if ((this->torqueEntry[j].targetPosition != 0) && (targetPosition >= this->torqueEntry[j].targetPosition)) {
         SS2K_LOG(TORQUETABLE_LOG_TAG, "Target Slot (%dw)(%d)(%d) was greater than next (%d)(%d)", (int)torque, i, targetPosition, j, this->torqueEntry[j].targetPosition);
-        this->torqueEntry[j].readings = 1;  // Make next slot easier to round/faster to change.
+        this->torqueEntry[j].readings--;
+        if (this->torqueEntry[j].readings <= 1) {  // Wipe The slot
+          this->torqueEntry[j].targetPosition = 0;
+          this->torqueEntry[j].torque         = 0;
+          this->torqueEntry[j].readings       = 0;
+        }
         return;
       }
     }
@@ -326,23 +339,133 @@ int32_t TorqueTable::lookup(int watts, int cad) {
   return rTargetPosition;
 }
 
-bool TorqueTable::load() {
-  // load torque table from littleFs
-  return false;  // return unsuccessful
+// checks Torque Table for applicability of loading and if so, replaces the one in memory with the one from the filesystem.
+bool TorqueTable::_manageSaveState() {
+  // Open file for writing
+  bool ret = false;
+  // SS2K_LOG(CONFIG_LOG_TAG, "Reading File: %s", TORQUE_TABLE_FILENAME);
+  File file = LittleFS.open(TORQUE_TABLE_FILENAME, FILE_READ);
+  if (!file) {
+    return false;
+  }
+
+  // SS2K_LOG(CONFIG_LOG_TAG, file.readString().c_str());
+
+  // Allocate a temporary JsonDocument
+  // Don't forget to change the capacity to match your requirements.
+  // Use arduinojson.org/assistant to compute the capacity.
+  StaticJsonDocument<1000> doc;
+
+  // Deserialize the JSON document
+  DeserializationError error = deserializeJson(doc, file);
+  if (error) {
+    SS2K_LOG(CONFIG_LOG_TAG, "Failed to deserialize.");
+    doc = nullptr;
+    file.close();
+    this->_save();
+    return false;
+  }
+
+  // Is the filesystem version better quality?
+  int currentSize = 0;
+  int size        = 0;
+  for (int i = 0; i < TORQUETABLE_SIZE; i++) {
+    if (this->torqueEntry[i].torque > 0) {  // 0 values are default unfilled values.
+      currentSize++;
+    }
+  }
+  int loadSize = doc["size"];
+  if (loadSize > currentSize && !_hasBeenLoadedThisSession) {
+    // check if position 3 (the most accurate in my testing) is filled on both tables and then calculate the offset
+    for (int j = MOST_DEPENDABLE_TORQUE_ENTRY * 3; j >= MOST_DEPENDABLE_TORQUE_ENTRY; j--) {
+      String t = "t";
+      t += std::to_string(j).c_str();
+      String p = "p";
+      p += std::to_string(j).c_str();
+      if ((this->torqueEntry[j].torque > 0) && (this->torqueEntry[j].readings >= (TORQUE_SAMPLES - 2)) && ((int32_t)doc[t] > 0)) {
+        int32_t offset = (int32_t)doc[p] - this->torqueEntry[j].targetPosition;
+        // Actually load the data
+        for (int i = 0; i < TORQUETABLE_SIZE; i++) {
+          t = "t";
+          t += std::to_string(i).c_str();
+          int valid = doc[t];
+          if (valid > 0) {
+            p = "p";
+            p += std::to_string(i).c_str();
+            this->torqueEntry[i].torque         = doc[t];
+            this->torqueEntry[i].targetPosition = (int32_t)(doc[p]) - offset;
+          }
+        }
+        ret = true;
+        SS2K_LOG(TORQUETABLE_LOG_TAG, "Torque Table Loaded!");
+        _hasBeenLoadedThisSession = true;
+        break;
+      }
+    }
+  } else if (currentSize > loadSize || _hasBeenLoadedThisSession == true) {
+    file.close();
+    doc = nullptr;
+    this->_save();
+    return true;
+
+  } else {  // Size hasn't changed, but data was updated. Do this only occasionally to prevent wearing out flash.
+    if ((millis() - lastSaveTime) > TORQUE_TABLE_SAVE_INTERVAL) {
+      file.close();
+      doc = nullptr;
+      this->_save();
+      return true;
+    }
+  }
+  file.close();
+  return ret;
 }
 
-bool TorqueTable::save() {
-  // save torque table from littleFs
-  return false;  // return unsuccessful
+bool TorqueTable::_save() {
+  // Delete existing file, otherwise the configuration is appended to the file
+  LittleFS.remove(TORQUE_TABLE_FILENAME);
+
+  // Open file for writing
+  SS2K_LOG(CONFIG_LOG_TAG, "Writing File: %s", TORQUE_TABLE_FILENAME);
+  File file = LittleFS.open(TORQUE_TABLE_FILENAME, FILE_WRITE);
+  if (!file) {
+    SS2K_LOG(CONFIG_LOG_TAG, "Failed to create file");
+    return false;
+  }
+  // Allocate a temporary JsonDocument
+  // Don't forget to change the capacity to match your requirements.
+  // Use arduinojson.org/assistant to compute the capacity.
+  StaticJsonDocument<1000> doc;
+  int size = 0;
+  for (int i = 0; i < TORQUETABLE_SIZE; i++) {
+    String t = "t";
+    t += std::to_string(i).c_str();
+    String p = "p";
+    p += std::to_string(i).c_str();
+    doc[t] = this->torqueEntry[i].torque;
+    doc[p] = this->torqueEntry[i].targetPosition;
+    if (this->torqueEntry[i].torque > 0) {
+      size++;
+    }
+  }
+  doc["size"] = size;
+
+  // Serialize JSON to file
+  if (serializeJson(doc, file) == 0) {
+    SS2K_LOG(CONFIG_LOG_TAG, "Failed to write to file");
+  }
+  // Close the file
+  file.close();
+  lastSaveTime = millis();
+  return true;  // return successful
 }
 
 float _wattsToTorque(int watts, float cad) {
-  float torque = (TORQUE_CONSTANT * watts) / cad + ((NORMAL_CAD-cad)/CAD_MULTIPLIER);
+  float torque = (TORQUE_CONSTANT * watts) / cad + ((NORMAL_CAD - cad) / CAD_MULTIPLIER);
   return torque;
 }
 
 int _torqueToWatts(float torque, float cad) {
-  int watts = ((CAD_MULTIPLIER*cad*torque)+((cad*cad)-cad*NORMAL_CAD))/(TORQUE_CONSTANT*CAD_MULTIPLIER);
+  int watts = ((CAD_MULTIPLIER * cad * torque) + ((cad * cad) - cad * NORMAL_CAD)) / (TORQUE_CONSTANT * CAD_MULTIPLIER);
   return watts;
 }
 
@@ -466,7 +589,7 @@ void ErgMode::_setPointChangeState(int newCadence, Measurement& newWatts) {
     i++;
   }
 
-  vTaskDelay((ERG_MODE_DELAY*3) / portTICK_PERIOD_MS);  // Wait for power meter to register new watts
+  vTaskDelay((ERG_MODE_DELAY * 3) / portTICK_PERIOD_MS);  // Wait for power meter to register new watts
 }
 
 void ErgMode::_inSetpointState(int newCadence, Measurement& newWatts) {

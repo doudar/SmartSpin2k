@@ -61,16 +61,18 @@ class TorqueTable {
   // returns incline for wattTarget. Null if not found.
   int32_t lookup(int watts, int cad);
 
-  // load torque table from littlefs
-  bool load();
+  // automatically load or save the Torque Table
+  bool _manageSaveState();
 
   // save torquetable from littlefs
-  bool save();
+  bool _save();
 
   // Display torque table in log
   void toLog();
 
  private:
+  unsigned long lastSaveTime = millis();
+  bool _hasBeenLoadedThisSession = false;
 };
 
 class ErgMode {
