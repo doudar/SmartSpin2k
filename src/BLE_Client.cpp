@@ -539,10 +539,7 @@ void SpinBLEClient::resetDevices(NimBLEClient *pClient) {
   }
 }
 
-<<<<<<< Updated upstream
-=======
 // Control a connected FTMS trainer. If no args are passed, treat it like an external stepper motor.
->>>>>>> Stashed changes
 void SpinBLEClient::FTMSControlPointWrite(const uint8_t *pData, int length) {
   NimBLEClient *pClient = nullptr;
   for (int i = 0; i < NUM_BLE_DEVICES; i++) {
