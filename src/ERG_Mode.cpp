@@ -209,7 +209,7 @@ void TorqueTable::newEntry(TorqueBuffer& torqueBuffer) {
   if (i < TORQUETABLE_SIZE) {
     for (int j = i + 1; j < TORQUETABLE_SIZE; j++) {
       if ((this->torqueEntry[j].targetPosition != 0) && (targetPosition >= this->torqueEntry[j].targetPosition)) {
-        SS2K_LOG(TORQUETABLE_LOG_TAG, "Target Slot (%dw)(%d)(%d) was greater than next (%d)(%d)", (int)torque, i, targetPosition, j, this->torqueEntry[j].targetPosition);
+        SS2K_LOG(TORQUETABLE_LOG_TAG, "Target Slot (%dn.M)(%d)(%d) was greater than next (%d)(%d)", (int)torque, i, targetPosition, j, this->torqueEntry[j].targetPosition);
         this->torqueEntry[j].readings--;
         if (this->torqueEntry[j].readings <= 1) {  // Wipe The slot
           this->torqueEntry[j].targetPosition = 0;
