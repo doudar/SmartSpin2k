@@ -79,6 +79,9 @@
 // Amount to change watt target per shift in ERG mode.
 #define ERG_PER_SHIFT 10
 
+//Minimum cadence where ERG mode stops.
+#define MIN_ERG_CADENCE 30
+
 // Default Min Watts to stop stepper.
 // This is used to set the lower travel limit for the motor.
 #define DEFAULT_MIN_WATTS 50

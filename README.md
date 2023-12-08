@@ -1,5 +1,5 @@
 <img src="/Pictures/Version3.jpg" alt="Hardware 3.0" height="124"> <img src="https://raw.githubusercontent.com/doudar/SmartSpin2k/develop/Pictures/ss2k_wiki_banner.png" alt="ss2k banner" height="124">
-
+### You can now visit us at [Facebook](https://www.facebook.com/groups/716297469953492/)
 # SmartSpin2k Revision 3.0 Announcement
 
 We are excited to announce the release of SmartSpin2k revision 3.0! This new revision features a number of improvements, including:

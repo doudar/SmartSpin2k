@@ -482,7 +482,14 @@ void SpinBLEClient::scanProcess(int duration) {
       }
 
       if (d.haveServiceUUID()) {
-        devices[device]["UUID"] = d.getServiceUUID().toString();
+        // Workaround for IC4 advertising this service first instead of FTMS.
+        // Potentially others may need to be added in the future.
+        // The symptom was the bike name not showing up in the HTML.
+        if (d.getServiceUUID() == DEVICEINFORMATIONSERVICE_UUID) {
+          devices[device]["UUID"] = FITNESSMACHINESERVICE_UUID.toString();
+        } else {
+          devices[device]["UUID"] = d.getServiceUUID().toString();
+        }
       }
     }
   }
@@ -547,6 +554,7 @@ void SpinBLEClient::resetDevices(NimBLEClient *pClient) {
   }
 }
 
+// Control a connected FTMS trainer. If no args are passed, treat it like an external stepper motor.
 void SpinBLEClient::FTMSControlPointWrite(const uint8_t *pData, int length) {
   NimBLEClient *pClient = nullptr;
   for (int i = 0; i < NUM_BLE_DEVICES; i++) {

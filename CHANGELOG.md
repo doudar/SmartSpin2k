@@ -17,6 +17,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Repurposed LogComData. Will now not transmit any logging info to WiFi when it's turned off.
 - Reworked web pages to start to implement more built in functions.
 - Removed style.css (Internal to the program now).
+- MIN_ERG_CADENCE created and changed from 20 to 30.
+- Fixed DNS server in AP mode.
+- Fixed an issue with IC4 and variants not displaying device name in Bluetooth scanner. Fixes #500
 
 ### Hardware
 - Wire diameter reduced from 7.2mm to 6.0mm on the window passthrough to accommodate the latest batch of cables. 
@@ -26,6 +29,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Increased size of the arm hardware holes by .25mm.
 - Added Spinning L7 bike.
 - Added Yosuda bike. 
+- Added Peloton low profile (for slammed bars) bike mount by @chaloney
+- Updated CAD for the case to work flawlessly with small tweaks to motor height. 
+- Removed some free play in the IC4 insert.  
 
 ## [23.6.28]
 ### Added
