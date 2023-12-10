@@ -387,7 +387,7 @@ bool TorqueTable::_manageSaveState() {
   int loadSize    = doc["size"];
 
   if (loadSize < currentSize) {
-    SS2K_LOG(TORQUETABLE_LOG_TAG, "ave");
+    SS2K_LOG(TORQUETABLE_LOG_TAG, "Saving new");
     file.close();
     doc = nullptr;
     this->_save();
@@ -424,6 +424,7 @@ bool TorqueTable::_manageSaveState() {
             p += std::to_string(i).c_str();
             this->torqueEntry[i].torque         = doc[t];
             this->torqueEntry[i].targetPosition = (int32_t)(doc[p]) - offset;
+            SS2K_LOG(TORQUETABLE_LOG_TAG, "Loaded Table");
           }
         }
         _hasBeenLoadedThisSession = true;
