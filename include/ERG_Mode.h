@@ -43,6 +43,7 @@ class TorqueBuffer {
   TorqueEntry torqueEntry[TORQUE_SAMPLES];
   void set(int);
   void reset();
+  int getReadings();
 };
 
 class TorqueTable {
@@ -66,6 +67,9 @@ class TorqueTable {
 
   // save torquetable from littlefs
   bool _save();
+
+  //return number of entries in the table. 
+  int getEntries();
 
   // Display torque table in log
   void toLog();

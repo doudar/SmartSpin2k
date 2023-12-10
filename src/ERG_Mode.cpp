@@ -94,6 +94,17 @@ void TorqueBuffer::reset() {
   }
 }
 
+// return the number of entries with readings.
+int TorqueBuffer::getReadings() {
+  int ret = 0;
+  for (int i = 0; i < TORQUE_SAMPLES; i++) {
+    if (this->torqueEntry[i].readings != 0) {
+      ret++;
+    }
+    return ret;
+  }
+}
+
 void TorqueTable::processTorqueValue(TorqueBuffer& torqueBuffer, int cadence, Measurement watts) {
   float torque = _wattsToTorque(watts.getValue(), cadence);
   if ((cadence >= (NORMAL_CAD - 20)) && (cadence <= (NORMAL_CAD + 20)) && (watts.getValue() > 10) && (torque < (TORQUETABLE_SIZE * TORQUETABLE_INCREMENT))) {
@@ -166,20 +177,20 @@ void TorqueTable::newEntry(TorqueBuffer& torqueBuffer) {
 
   for (int i = 0; i < TORQUE_SAMPLES; i++) {
     if (torqueBuffer.torqueEntry[i].readings == 0) {
-      // break if torqueEntry is not set. This should never happen.
+      // Stop when buffer is empty
       break;
     }
 
     if (i == 0) {  // first loop -> assign values
       torque         = torqueBuffer.torqueEntry[i].torque;
       targetPosition = torqueBuffer.torqueEntry[i].targetPosition;
-      continue;
+      continue;  // skip averaging below
     }
 #ifdef DEBUG_TORQUETABLE
     SS2K_LOGW(TORQUETABLE_LOG_TAG, "Buf[%d](%dw)(%dpos)(%dcad)", i, torqueBuffer.torqueEntry[i].torque, torqueBuffer.torqueEntry[i].targetPosition,
               torqueBuffer.torqueEntry[i].cad);
 #endif
-    // calculate average
+    // average each entry individually.
     torque         = (torque + torqueBuffer.torqueEntry[i].torque) / 2;
     targetPosition = (targetPosition + torqueBuffer.torqueEntry[i].targetPosition) / 2;
   }
@@ -194,7 +205,7 @@ void TorqueTable::newEntry(TorqueBuffer& torqueBuffer) {
   if (i > 0) {
     for (int j = i - 1; j > 0; j--) {
       if ((this->torqueEntry[j].targetPosition != 0) && (this->torqueEntry[j].targetPosition >= targetPosition)) {
-        SS2K_LOG(TORQUETABLE_LOG_TAG, "Target Slot (%dw)(%d)(%d) was less than previous (%d)(%d)", (int)torque, i, targetPosition, j, this->torqueEntry[j].targetPosition);
+        SS2K_LOG(TORQUETABLE_LOG_TAG, "Target Slot (%dn.M)(%d)(%d) was less than previous (%d)(%d)", (int)torque, i, targetPosition, j, this->torqueEntry[j].targetPosition);
         this->torqueEntry[j].readings--;
         if (this->torqueEntry[j].readings <= 1) {  // Wipe The slot
           this->torqueEntry[j].targetPosition = 0;
@@ -229,8 +240,8 @@ void TorqueTable::newEntry(TorqueBuffer& torqueBuffer) {
     this->torqueEntry[i].torque         = (torque + (this->torqueEntry[i].torque * this->torqueEntry[i].readings)) / (this->torqueEntry[i].readings + 1.0);
     this->torqueEntry[i].targetPosition = (targetPosition + (this->torqueEntry[i].targetPosition * this->torqueEntry[i].readings)) / (this->torqueEntry[i].readings + 1.0);
     this->torqueEntry[i].readings++;
-    if (this->torqueEntry[i].readings > 10) {
-      this->torqueEntry[i].readings = 10;  // keep from diluting recent readings too far.
+    if (this->torqueEntry[i].readings > TORQUE_SAMPLES * 2) {
+      this->torqueEntry[i].readings = TORQUE_SAMPLES * 2;  // keep from diluting recent readings too far.
     }
   }
 }
@@ -245,8 +256,12 @@ int32_t TorqueTable::lookup(int watts, int cad) {
 
   float torque = _wattsToTorque(watts, cad);
 
-  int i         = round(torque / TORQUETABLE_INCREMENT);  // find the closest entry
-  float scale   = torque / TORQUETABLE_INCREMENT - i;     // Should we look at the next higher or next lower index for comparison?
+  int i = round(torque / TORQUETABLE_INCREMENT);  // find the closest entry
+  //Cap i to max table size. 
+  if (i > TORQUETABLE_SIZE) {
+    i = TORQUETABLE_SIZE - 1;
+  }
+  float scale   = torque / TORQUETABLE_INCREMENT - i;  // Should we look at the next higher or next lower index for comparison?
   int indexPair = -1;  // The next closest index with data for interpolation                                                                           // The next closest index
                        // with data for interpolation
   entry above;
@@ -305,7 +320,7 @@ int32_t TorqueTable::lookup(int watts, int cad) {
       }
     }
   }
-
+  SS2K_LOG(ERG_MODE_LOG_TAG, "TorqueTable pairs [%d][%d]", i, indexPair);
   if (indexPair != -1) {
     if (i > indexPair) {
       below.torque         = this->torqueEntry[indexPair].torque;
@@ -326,7 +341,6 @@ int32_t TorqueTable::lookup(int watts, int cad) {
     SS2K_LOG(ERG_MODE_LOG_TAG, "No pair in torque table");
     return (RETURN_ERROR);
   }
-  SS2K_LOG(ERG_MODE_LOG_TAG, "TorqueTable pairs [%d][%d]", i, indexPair);
 
   if (!below.torque || !above.torque) {  // We should never get here. This is a failsafe vv
     SS2K_LOG(ERG_MODE_LOG_TAG, "One of the pair was zero. Calculation rejected.");
@@ -342,10 +356,12 @@ int32_t TorqueTable::lookup(int watts, int cad) {
 // checks Torque Table for applicability of loading and if so, replaces the one in memory with the one from the filesystem.
 bool TorqueTable::_manageSaveState() {
   // Open file for writing
-  bool ret = false;
   // SS2K_LOG(CONFIG_LOG_TAG, "Reading File: %s", TORQUE_TABLE_FILENAME);
   File file = LittleFS.open(TORQUE_TABLE_FILENAME, FILE_READ);
   if (!file) {
+    SS2K_LOG(TORQUETABLE_LOG_TAG, "Failed to Load Torque Table.");
+    file.close();
+    this->_save();
     return false;
   }
 
@@ -359,7 +375,7 @@ bool TorqueTable::_manageSaveState() {
   // Deserialize the JSON document
   DeserializationError error = deserializeJson(doc, file);
   if (error) {
-    SS2K_LOG(CONFIG_LOG_TAG, "Failed to deserialize.");
+    SS2K_LOG(TORQUETABLE_LOG_TAG, "Failed to deserialize.");
     doc = nullptr;
     file.close();
     this->_save();
@@ -367,22 +383,36 @@ bool TorqueTable::_manageSaveState() {
   }
 
   // Is the filesystem version better quality?
-  int currentSize = 0;
-  int size        = 0;
-  for (int i = 0; i < TORQUETABLE_SIZE; i++) {
-    if (this->torqueEntry[i].torque > 0) {  // 0 values are default unfilled values.
-      currentSize++;
+  int currentSize = this->getEntries();
+  int loadSize    = doc["size"];
+
+  if (loadSize < currentSize) {
+    SS2K_LOG(TORQUETABLE_LOG_TAG, "ave");
+    file.close();
+    doc = nullptr;
+    this->_save();
+    _hasBeenLoadedThisSession = true;  // updating because the current data is better
+    return true;
+
+  } else if (_hasBeenLoadedThisSession == true) {  // Data was updated. Do this only occasionally to prevent wearing out flash.
+    if ((millis() - lastSaveTime) > TORQUE_TABLE_SAVE_INTERVAL) {
+      SS2K_LOG(TORQUETABLE_LOG_TAG, "Autosave");
+      file.close();
+      doc = nullptr;
+      this->_save();
+      return true;
     }
   }
-  int loadSize = doc["size"];
-  if (loadSize > currentSize && !_hasBeenLoadedThisSession) {
+
+  if ((loadSize > 0) && (!_hasBeenLoadedThisSession)) {
     // check if position 3 (the most accurate in my testing) is filled on both tables and then calculate the offset
     for (int j = MOST_DEPENDABLE_TORQUE_ENTRY * 3; j >= MOST_DEPENDABLE_TORQUE_ENTRY; j--) {
       String t = "t";
       t += std::to_string(j).c_str();
       String p = "p";
       p += std::to_string(j).c_str();
-      if ((this->torqueEntry[j].torque > 0) && (this->torqueEntry[j].readings >= (TORQUE_SAMPLES - 2)) && ((int32_t)doc[t] > 0)) {
+
+      if ((this->torqueEntry[j].torque > 0) && (this->torqueEntry[j].readings >= 3) && ((int32_t)doc[t] > 0)) {
         int32_t offset = (int32_t)doc[p] - this->torqueEntry[j].targetPosition;
         // Actually load the data
         for (int i = 0; i < TORQUETABLE_SIZE; i++) {
@@ -396,28 +426,13 @@ bool TorqueTable::_manageSaveState() {
             this->torqueEntry[i].targetPosition = (int32_t)(doc[p]) - offset;
           }
         }
-        ret = true;
-        SS2K_LOG(TORQUETABLE_LOG_TAG, "Torque Table Loaded!");
         _hasBeenLoadedThisSession = true;
         break;
       }
     }
-  } else if (currentSize > loadSize || _hasBeenLoadedThisSession == true) {
-    file.close();
-    doc = nullptr;
-    this->_save();
-    return true;
-
-  } else {  // Size hasn't changed, but data was updated. Do this only occasionally to prevent wearing out flash.
-    if ((millis() - lastSaveTime) > TORQUE_TABLE_SAVE_INTERVAL) {
-      file.close();
-      doc = nullptr;
-      this->_save();
-      return true;
-    }
   }
   file.close();
-  return ret;
+  return true;
 }
 
 bool TorqueTable::_save() {
@@ -425,10 +440,10 @@ bool TorqueTable::_save() {
   LittleFS.remove(TORQUE_TABLE_FILENAME);
 
   // Open file for writing
-  SS2K_LOG(CONFIG_LOG_TAG, "Writing File: %s", TORQUE_TABLE_FILENAME);
+  SS2K_LOG(TORQUETABLE_LOG_TAG, "Writing File: %s", TORQUE_TABLE_FILENAME);
   File file = LittleFS.open(TORQUE_TABLE_FILENAME, FILE_WRITE);
   if (!file) {
-    SS2K_LOG(CONFIG_LOG_TAG, "Failed to create file");
+    SS2K_LOG(TORQUETABLE_LOG_TAG, "Failed to create file");
     return false;
   }
   // Allocate a temporary JsonDocument
@@ -451,7 +466,7 @@ bool TorqueTable::_save() {
 
   // Serialize JSON to file
   if (serializeJson(doc, file) == 0) {
-    SS2K_LOG(CONFIG_LOG_TAG, "Failed to write to file");
+    SS2K_LOG(TORQUETABLE_LOG_TAG, "Failed to write to file");
   }
   // Close the file
   file.close();
@@ -467,6 +482,16 @@ float _wattsToTorque(int watts, float cad) {
 int _torqueToWatts(float torque, float cad) {
   int watts = ((CAD_MULTIPLIER * cad * torque) + ((cad * cad) - cad * NORMAL_CAD)) / (TORQUE_CONSTANT * CAD_MULTIPLIER);
   return watts;
+}
+
+int TorqueTable::getEntries() {
+  int ret = 0;
+  for (int i = 0; i < TORQUETABLE_SIZE; i++) {
+    if (this->torqueEntry[i].readings > 0) {
+      ret++;
+    }
+  }
+  return ret;
 }
 
 // Display torque table in log
@@ -511,29 +536,12 @@ void ErgMode::computeResistance() {
 
   int newSetPoint = rtConfig.resistance.getTarget();
   int actualDelta = rtConfig.resistance.getTarget() - rtConfig.resistance.getValue();
-  // SS2K_LOG(ERG_MODE_LOG_TAG, "StepChange %d TargetDelta %d ActualDelta %d OldSetPoint %d NewSetPoint %d", stepChangePerResistance, targetDelta, actualDelta, oldSetPoint,
-  // newSetPoint);
-
-  // if (rtConfig.getCurrentIncline() == rtConfig.getTargetIncline()) {
-  //  if (actualDelta > 0) {
-  //    rtConfig.setTargetIncline(rtConfig.getTargetIncline() + (100 * actualDelta));
-  // SS2K_LOG(ERG_MODE_LOG_TAG, "adjusting target up");
-  //  SS2K_LOG(ERG_MODE_LOG_TAG, "First run shift up");
-  //}
-  //   if (actualDelta < 0) {
   rtConfig.setTargetIncline(rtConfig.getTargetIncline() + (100 * actualDelta));
-  // SS2K_LOG(ERG_MODE_LOG_TAG, "adjusting target down");
-  // SS2K_LOG(ERG_MODE_LOG_TAG, "First run shift down");
-  // }
-  //}
   if (actualDelta = 0) {
     rtConfig.setTargetIncline(rtConfig.getCurrentIncline());
-    // SS2K_LOG(ERG_MODE_LOG_TAG, "Set point Reached - stopping");
   }
   oldResistance = rtConfig.resistance;
 }
-//}
-
 // as a note, Trainer Road sends 50w target whenever the app is connected.
 void ErgMode::computeErg() {
   Measurement newWatts = rtConfig.watts;
