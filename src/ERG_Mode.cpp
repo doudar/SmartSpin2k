@@ -21,7 +21,7 @@ void setupERG() {
   SS2K_LOG(ERG_MODE_LOG_TAG, "Starting ERG Mode task...");
   xTaskCreatePinnedToCore(ergTaskLoop,    /* Task function. */
                           "FTMSModeTask", /* name of task. */
-                          5500,           /* Stack size of task*/
+                          ERG_STACK,           /* Stack size of task*/
                           NULL,           /* parameter of the task */
                           1,              /* priority of the task*/
                           &ErgTask,       /* Task handle to keep track of created task */
@@ -463,6 +463,7 @@ bool TorqueTable::_save() {
       size++;
     }
   }
+
   doc["size"] = size;
 
   // Serialize JSON to file

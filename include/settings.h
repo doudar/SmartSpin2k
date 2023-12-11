@@ -267,7 +267,7 @@
 #define MOST_DEPENDABLE_TORQUE_ENTRY 2
 
 // How often in ms to save the torque table if no new data is added and user is pedaling.
-#define TORQUE_TABLE_SAVE_INTERVAL 120000
+#define TORQUE_TABLE_SAVE_INTERVAL 240000
 
 // Normal cadence value (used in torque table and other areas)
 #define NORMAL_CAD 90
@@ -296,12 +296,20 @@
 // BLE automatic reconnect duration. Set this low to avoid interruption.
 #define BLE_RECONNECT_SCAN_DURATION 1
 
+//Task Stack Sizes
+#define MAIN_STACK 4500
+#define ERG_STACK 4500
+#define HTTP_STACK 6000
+#define BLE_COMM_STACK 6000
+#define BLE_CLIENT_STACK 5000
+#define STEPPER_STACK 1700
+
 // Uncomment to enable sending Telegram debug messages back to the chat
 // specified in telegram_token.h
 // #define USE_TELEGRAM
 
 // Uncomment to enable stack size debugging info
-// #define DEBUG_STACK
+#define DEBUG_STACK
 
 // Uncomment to enable HR->PWR debugging info. Always displays HR->PWR
 // Calculation. Never sets userConfig.setSimulatedPower();

@@ -150,7 +150,7 @@ void setup() {
 
   xTaskCreatePinnedToCore(SS2K::moveStepper,     /* Task function. */
                           "moveStepperFunction", /* name of task. */
-                          1700,                  /* Stack size of task */
+                          STEPPER_STACK,                  /* Stack size of task */
                           NULL,                  /* parameter of the task */
                           18,                    /* priority of the task */
                           &moveStepperTask,      /* Task handle to keep track of created task */
@@ -175,7 +175,7 @@ void setup() {
 
   xTaskCreatePinnedToCore(SS2K::maintenanceLoop,     /* Task function. */
                           "maintenanceLoopFunction", /* name of task. */
-                          6500,                      /* Stack size of task */
+                          MAIN_STACK,                      /* Stack size of task */
                           NULL,                      /* parameter of the task */
                           20,                        /* priority of the task */
                           &maintenanceLoopTask,      /* Task handle to keep track of created task */
@@ -227,7 +227,7 @@ void SS2K::maintenanceLoop(void *pvParameters) {
 
 #ifdef DEBUG_STACK
       Serial.printf("Step Task: %d \n", uxTaskGetStackHighWaterMark(moveStepperTask));
-      Serial.printf("Shft Task: %d \n", uxTaskGetStackHighWaterMark(maintenanceLoopTask));
+      Serial.printf("Main Task: %d \n", uxTaskGetStackHighWaterMark(maintenanceLoopTask));
       Serial.printf("Free Heap: %d \n", ESP.getFreeHeap());
       Serial.printf("Best Blok: %d \n", heap_caps_get_largest_free_block(MALLOC_CAP_8BIT));
 #endif  // DEBUG_STACK
