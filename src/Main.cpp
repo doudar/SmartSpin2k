@@ -150,7 +150,7 @@ void setup() {
 
   xTaskCreatePinnedToCore(SS2K::moveStepper,     /* Task function. */
                           "moveStepperFunction", /* name of task. */
-                          STEPPER_STACK,                  /* Stack size of task */
+                          STEPPER_STACK,         /* Stack size of task */
                           NULL,                  /* parameter of the task */
                           18,                    /* priority of the task */
                           &moveStepperTask,      /* Task handle to keep track of created task */
@@ -175,7 +175,7 @@ void setup() {
 
   xTaskCreatePinnedToCore(SS2K::maintenanceLoop,     /* Task function. */
                           "maintenanceLoopFunction", /* name of task. */
-                          MAIN_STACK,                      /* Stack size of task */
+                          MAIN_STACK,                /* Stack size of task */
                           NULL,                      /* parameter of the task */
                           20,                        /* priority of the task */
                           &maintenanceLoopTask,      /* Task handle to keep track of created task */
@@ -253,12 +253,12 @@ void SS2K::FTMSModeShiftModifier() {
         }
         rtConfig.watts.setTarget(rtConfig.watts.getTarget() + (ERG_PER_SHIFT * shiftDelta));
         SS2K_LOG(MAIN_LOG_TAG, "ERG Shift. New Target: %dw", rtConfig.watts.getTarget());
-        // Format output for FTMS passthrough
-        #ifndef INTERNAL_ERG_4EXT_FTMS
+// Format output for FTMS passthrough
+#ifndef INTERNAL_ERG_4EXT_FTMS
         int adjustedTarget         = rtConfig.watts.getTarget() / userConfig.getPowerCorrectionFactor();
         const uint8_t translated[] = {FitnessMachineControlPointProcedure::SetTargetPower, (uint8_t)(adjustedTarget & 0xff), (uint8_t)(adjustedTarget >> 8)};
         spinBLEClient.FTMSControlPointWrite(translated, 3);
-        #endif
+#endif
         break;
       }
 
@@ -540,8 +540,13 @@ void SS2K::txSerial() {  // Serial.printf(" Before TX ");
 
 void SS2K::pelotonConnected() {
   txCheck = TX_CHECK_INTERVAL;
-  rtConfig.setMinResistance(MIN_PELOTON_RESISTANCE);
-  rtConfig.setMaxResistance(MAX_PELOTON_RESISTANCE);
+  if (rtConfig.resistance.getValue() > 0) {
+    rtConfig.setMinResistance(MIN_PELOTON_RESISTANCE);
+    rtConfig.setMaxResistance(MAX_PELOTON_RESISTANCE);
+  } else {
+    rtConfig.setMinResistance(-DEFAULT_RESISTANCE_RANGE);
+    rtConfig.setMaxResistance(DEFAULT_RESISTANCE_RANGE);
+  }
 }
 
 void SS2K::rxSerial(void) {

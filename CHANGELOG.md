@@ -13,6 +13,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Fixed DNS server in AP mode.
 - Fixed an issue with IC4 and variants not displaying device name in Bluetooth scanner. Fixes #500
 - Switched from using Power Table to a Torque Table for better compensation in cad variations. 
+- added test for invalid Peloton data to keep stepper from running away without resistance information. 
 
 ### Hardware
 - Wire diameter reduced from 7.2mm to 6.0mm on the window passthrough to accommodate the latest batch of cables. 
