@@ -9,8 +9,7 @@
 #include "SS2KLog.h"
 #include "Main.h"
 #include <LittleFS.h>
-#include <ArduinoJSON.h>
-
+#include <ArduinoJson.h>
 TaskHandle_t ErgTask;
 TorqueTable torqueTable;
 
