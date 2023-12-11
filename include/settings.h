@@ -298,7 +298,7 @@
 
 //Task Stack Sizes
 #define MAIN_STACK 4500
-#define ERG_STACK 4500
+#define ERG_STACK 6500
 #define HTTP_STACK 6000
 #define BLE_COMM_STACK 6000
 #define BLE_CLIENT_STACK 5000
@@ -309,7 +309,7 @@
 // #define USE_TELEGRAM
 
 // Uncomment to enable stack size debugging info
-#define DEBUG_STACK
+// #define DEBUG_STACK
 
 // Uncomment to enable HR->PWR debugging info. Always displays HR->PWR
 // Calculation. Never sets userConfig.setSimulatedPower();
