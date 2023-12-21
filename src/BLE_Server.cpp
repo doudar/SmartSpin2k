@@ -492,8 +492,7 @@ void processFTMSWrite() {
       } break;
 
       case FitnessMachineControlPointProcedure::SetIndoorBikeSimulationParameters: {  // sim mode
-        spinBLEClient.FTMSControlPointWrite(pData, length);
-        returnValue[2] = FitnessMachineControlPointResultCode::Success;  // 0x01;
+        returnValue[2] = FitnessMachineControlPointResultCode::Success;               // 0x01;
         pCharacteristic->setValue(returnValue, 3);
 
         signed char buf[2];
@@ -516,6 +515,7 @@ void processFTMSWrite() {
 
         ftmsTrainingStatus[1] = FitnessMachineTrainingStatus::Other;  // 0x00;
         fitnessMachineTrainingStatus->setValue(ftmsTrainingStatus, 2);
+        spinBLEClient.FTMSControlPointWrite(pData, length);
       } break;
 
       case FitnessMachineControlPointProcedure::SpinDownControl: {
@@ -587,7 +587,7 @@ void calculateInstPwrFromHR() {
   oldHR               = newHR;  // Copying HR from Last loop
   newHR               = rtConfig.hr.getValue();
 
-  delta = (newHR - oldHR) / (BLE_CLIENT_DELAY / 1000) +1 ;
+  delta = (newHR - oldHR) / (BLE_CLIENT_DELAY / 1000) + 1;
 
   // userConfig.setSimulatedWatts((s1Pwr*s2HR)-(s2Pwr*S1HR))/(S2HR-s1HR)+(userConfig.getSimulatedHr(*((s1Pwr-s2Pwr)/(s1HR-s2HR)));
   int avgP = ((userPWC.session1Pwr * userPWC.session2HR) - (userPWC.session2Pwr * userPWC.session1HR)) / (userPWC.session2HR - userPWC.session1HR) +

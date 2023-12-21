@@ -65,6 +65,7 @@
 #define PELOTON_FOOTER       0xF6
 #define PELOTON_CAD_ID       0x41
 #define PELOTON_RES_ID       0x49
+#define PELOTON_RES_ID2      0x4a
 #define PELOTON_POW_ID       0x44
 #define PELOTON_REQ_POS      1
 #define PELOTON_CHECKSUM_POS 2

@@ -17,7 +17,7 @@ bool PelotonData::hasPower() { return this->hasData; }
 
 bool PelotonData::hasSpeed() { return false; }
 
-bool PelotonData::hasResistance() {return true;}
+bool PelotonData::hasResistance() { return receivedResistance; }
 
 int PelotonData::getHeartRate() { return INT_MIN; }
 
@@ -27,7 +27,11 @@ int PelotonData::getPower() { return this->power; }
 
 float PelotonData::getSpeed() { return nanf(""); }
 
-int PelotonData::getResistance() {return this->resistance;}
+int PelotonData::getResistance() { return this->resistance; }
+
+// example Peloton data f1 41 03 31 35 30 cb CD(51.00) PW(34) RS(36)
+//                         1: 2:  3:      4:
+// 1:data type 2:length 3:data 4:checksum
 
 void PelotonData::decode(uint8_t *data, size_t length) {
   float value                  = 0.0;
@@ -58,6 +62,11 @@ void PelotonData::decode(uint8_t *data, size_t length) {
 
     case PELOTON_RES_ID:
       resistance = value;
+      receivedResistance = true;
+      break;
+
+    case PELOTON_RES_ID2:
+      //resistance = -99; //send an error because the table lookup hasn't been implemented yet. 
       break;
 
     default:

@@ -150,7 +150,7 @@ void setup() {
 
   xTaskCreatePinnedToCore(SS2K::moveStepper,     /* Task function. */
                           "moveStepperFunction", /* name of task. */
-                          1700,                  /* Stack size of task */
+                          STEPPER_STACK,         /* Stack size of task */
                           NULL,                  /* parameter of the task */
                           18,                    /* priority of the task */
                           &moveStepperTask,      /* Task handle to keep track of created task */
@@ -175,7 +175,7 @@ void setup() {
 
   xTaskCreatePinnedToCore(SS2K::maintenanceLoop,     /* Task function. */
                           "maintenanceLoopFunction", /* name of task. */
-                          6500,                      /* Stack size of task */
+                          MAIN_STACK,                /* Stack size of task */
                           NULL,                      /* parameter of the task */
                           20,                        /* priority of the task */
                           &maintenanceLoopTask,      /* Task handle to keep track of created task */
@@ -227,7 +227,7 @@ void SS2K::maintenanceLoop(void *pvParameters) {
 
 #ifdef DEBUG_STACK
       Serial.printf("Step Task: %d \n", uxTaskGetStackHighWaterMark(moveStepperTask));
-      Serial.printf("Shft Task: %d \n", uxTaskGetStackHighWaterMark(maintenanceLoopTask));
+      Serial.printf("Main Task: %d \n", uxTaskGetStackHighWaterMark(maintenanceLoopTask));
       Serial.printf("Free Heap: %d \n", ESP.getFreeHeap());
       Serial.printf("Best Blok: %d \n", heap_caps_get_largest_free_block(MALLOC_CAP_8BIT));
 #endif  // DEBUG_STACK
@@ -244,7 +244,7 @@ void SS2K::FTMSModeShiftModifier() {
   if (shiftDelta) {  // Shift detected
     switch (rtConfig.getFTMSMode()) {
       case FitnessMachineControlPointProcedure::SetTargetPower:  // ERG Mode
-
+      {
         rtConfig.setShifterPosition(ss2k.lastShifterPosition);  // reset shifter position because we're remapping it to ERG target
         if ((rtConfig.watts.getTarget() + (shiftDelta * ERG_PER_SHIFT) < userConfig.getMinWatts()) ||
             (rtConfig.watts.getTarget() + (shiftDelta * ERG_PER_SHIFT) > userConfig.getMaxWatts())) {
@@ -253,10 +253,17 @@ void SS2K::FTMSModeShiftModifier() {
         }
         rtConfig.watts.setTarget(rtConfig.watts.getTarget() + (ERG_PER_SHIFT * shiftDelta));
         SS2K_LOG(MAIN_LOG_TAG, "ERG Shift. New Target: %dw", rtConfig.watts.getTarget());
+// Format output for FTMS passthrough
+#ifndef INTERNAL_ERG_4EXT_FTMS
+        int adjustedTarget         = rtConfig.watts.getTarget() / userConfig.getPowerCorrectionFactor();
+        const uint8_t translated[] = {FitnessMachineControlPointProcedure::SetTargetPower, (uint8_t)(adjustedTarget & 0xff), (uint8_t)(adjustedTarget >> 8)};
+        spinBLEClient.FTMSControlPointWrite(translated, 3);
+#endif
         break;
+      }
 
       case FitnessMachineControlPointProcedure::SetTargetResistanceLevel:  // Resistance Mode
-
+      {
         rtConfig.setShifterPosition(ss2k.lastShifterPosition);  // reset shifter position because we're remapping it to resistance target
         if (rtConfig.getMaxResistance() != DEFAULT_RESISTANCE_RANGE) {
           if (rtConfig.resistance.getTarget() + shiftDelta < rtConfig.getMinResistance()) {
@@ -271,9 +278,11 @@ void SS2K::FTMSModeShiftModifier() {
           rtConfig.resistance.setTarget(rtConfig.resistance.getTarget() + shiftDelta);
           SS2K_LOG(MAIN_LOG_TAG, "Resistance Shift. New Target: %d", rtConfig.resistance.getTarget());
         }
+        break;
+      }
 
       default:  // Sim Mode
-
+      {
         SS2K_LOG(MAIN_LOG_TAG, "Shift %+d pos %d tgt %d min %d max %d r_min %d r_max %d", shiftDelta, rtConfig.getShifterPosition(), ss2k.targetPosition, rtConfig.getMinStep(),
                  rtConfig.getMaxStep(), rtConfig.getMinResistance(), rtConfig.getMaxResistance());
 
@@ -292,6 +301,9 @@ void SS2K::FTMSModeShiftModifier() {
           SS2K_LOG(MAIN_LOG_TAG, "Shift Blocked by resistance limit.");
           rtConfig.setShifterPosition(ss2k.lastShifterPosition);
         }
+        uint8_t _controlData[] = {FitnessMachineControlPointProcedure::SetIndoorBikeSimulationParameters, 0x00, 0x00, 0x00, 0x00, 0x28, 0x33};
+        spinBLEClient.FTMSControlPointWrite(_controlData, 7);
+      }
     }
     ss2k.lastShifterPosition = rtConfig.getShifterPosition();
     spinBLEServer.notifyShift();
@@ -528,8 +540,13 @@ void SS2K::txSerial() {  // Serial.printf(" Before TX ");
 
 void SS2K::pelotonConnected() {
   txCheck = TX_CHECK_INTERVAL;
-  rtConfig.setMinResistance(MIN_PELOTON_RESISTANCE);
-  rtConfig.setMaxResistance(MAX_PELOTON_RESISTANCE);
+  if (rtConfig.resistance.getValue() > 0) {
+    rtConfig.setMinResistance(MIN_PELOTON_RESISTANCE);
+    rtConfig.setMaxResistance(MAX_PELOTON_RESISTANCE);
+  } else {
+    rtConfig.setMinResistance(-DEFAULT_RESISTANCE_RANGE);
+    rtConfig.setMaxResistance(DEFAULT_RESISTANCE_RANGE);
+  }
 }
 
 void SS2K::rxSerial(void) {
