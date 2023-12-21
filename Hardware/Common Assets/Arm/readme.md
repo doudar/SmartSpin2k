@@ -6,6 +6,7 @@ Manufacturer|Model|Year|Arm Length (range)
 BH Fitness||Any|50
 Body Bike|Body Bike|Any|50 (Steep angle)
 Bowflex|C6|Any|65
+Bowflex|C7|Any|45
 Echelon|Connect Sport|Any| 105
 HMC|HMC|Any|60mm
 Joroto|X2|Any|20
