@@ -30,4 +30,5 @@ class PelotonData : public SensorData {
   float cadence = nanf("");
   int power     = INT_MIN;
   int resistance = INT_MIN;
+  bool receivedResistance = false;
 };

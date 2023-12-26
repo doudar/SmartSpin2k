@@ -20,7 +20,7 @@ void setupBLE() {  // Common BLE setup for both client and server
 
   xTaskCreatePinnedToCore(BLECommunications,      /* Task function. */
                           "BLECommunicationTask", /* name of task. */
-                          6000,                   /* Stack size of task*/
+                          BLE_COMM_STACK,                   /* Stack size of task*/
                           NULL,                   /* parameter of the task */
                           3,                      /* priority of the task*/
                           &BLECommunicationTask,  /* Task handle to keep track of created task */

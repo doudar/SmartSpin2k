@@ -115,6 +115,11 @@ void BLECommunications(void *pvParameters) {
       processFTMSWrite();
       spinBLEClient.postConnect();
 
+#ifdef INTERNAL_ERG_4EXT_FTMS
+        uint8_t test[] = {FitnessMachineControlPointProcedure::SetIndoorBikeSimulationParameters, 0x00, 0x00, 0x00, 0x00, 0x28, 0x33};
+        spinBLEClient.FTMSControlPointWrite(test, 7);
+#endif
+
       if (BLEDevice::getAdvertising()) {
         if (!(BLEDevice::getAdvertising()->isAdvertising()) && (BLEDevice::getServer()->getConnectedCount() < CONFIG_BT_NIMBLE_MAX_CONNECTIONS - NUM_BLE_DEVICES)) {
           SS2K_LOG(BLE_COMMON_LOG_TAG, "Starting Advertising From Communication Loop");
