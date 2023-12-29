@@ -26,7 +26,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Added Peloton low profile (for slammed bars) bike mount by @chaloney
 - Updated CAD for the case to work flawlessly with small tweaks to motor height. 
 - Removed some free play in the IC4 insert.  
-- Added Bowflex Velocore bike. 
+- Added Bowflex Velocore bike.
+- Added another Y cable picture for Peloton. 
 
 ## [23.6.28]
 ### Added
