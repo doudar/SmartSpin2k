@@ -192,6 +192,13 @@ void SS2K::maintenanceLoop(void *pvParameters) {
   static unsigned long intervalTimer2 = millis();
   static bool isScanning              = false;
 
+  // required to set a flag instead of directly calling the function for saving from BLE_Custom Characteristic.
+  if (userConfig.saveFlag) {
+    userConfig.saveFlag = false;
+    userConfig.saveToLittleFS();
+    userPWC.saveToLittleFS();
+  }
+
   while (true) {
     vTaskDelay(73 / portTICK_RATE_MS);
     ss2k.FTMSModeShiftModifier();

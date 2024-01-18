@@ -29,13 +29,13 @@ static MyAdvertisedDeviceCallback myAdvertisedDeviceCallbacks;
 
 void SpinBLEClient::start() {
   // Create the task for the BLE Client loop
-  xTaskCreatePinnedToCore(bleClientTask,   /* Task function. */
-                          "BLEClientTask", /* name of task. */
-                          BLE_CLIENT_STACK,            /* Stack size of task */
-                          NULL,            /* parameter of the task */
-                          1,               /* priority of the task  */
-                          &BLEClientTask,  /* Task handle to keep track of created task */
-                          1);              /* pin task to core */
+  xTaskCreatePinnedToCore(bleClientTask,    /* Task function. */
+                          "BLEClientTask",  /* name of task. */
+                          BLE_CLIENT_STACK, /* Stack size of task */
+                          NULL,             /* parameter of the task */
+                          1,                /* priority of the task  */
+                          &BLEClientTask,   /* Task handle to keep track of created task */
+                          1);               /* pin task to core */
 }
 
 static void onNotify(BLERemoteCharacteristic *pBLERemoteCharacteristic, uint8_t *pData, size_t length, bool isNotify) {
@@ -60,9 +60,13 @@ static void onNotify(BLERemoteCharacteristic *pBLERemoteCharacteristic, uint8_t 
 
 // BLE Client loop task
 void bleClientTask(void *pvParameters) {
+  long int scanDelay = millis();
   for (;;) {
     vTaskDelay(BLE_CLIENT_DELAY / portTICK_PERIOD_MS);  // Delay a second between loops.
+    if((millis()-scanDelay)*2 > (BLE_RECONNECT_SCAN_DURATION*1000)){
     spinBLEClient.checkBLEReconnect();
+    scanDelay = millis();
+    }
     // if (spinBLEClient.doScan && (spinBLEClient.scanRetries > 0) && !NimBLEDevice::getScan()->isScanning()) {
     //   spinBLEClient.scanRetries--;
     //   SS2K_LOG(BLE_CLIENT_LOG_TAG, "Initiating Scan from Client Task:");
@@ -181,7 +185,6 @@ bool SpinBLEClient::connectToServer() {
           spinBLEClient.myBLEDevices[device_number].reset();
           spinBLEClient.resetDevices(pClient);
           pClient->deleteServices();
-          pClient->disconnect();
           NimBLEDevice::getScan()->erase(pClient->getPeerAddress());
           NimBLEDevice::deleteClient(pClient);
         }
@@ -223,7 +226,6 @@ bool SpinBLEClient::connectToServer() {
       /** Created a client but failed to connect, don't need to keep it as it has no data */
       spinBLEClient.myBLEDevices[device_number].reset();
       pClient->deleteServices();
-      pClient->disconnect();
       NimBLEDevice::getScan()->erase(pClient->getPeerAddress());
       NimBLEDevice::deleteClient(pClient);
       return false;
@@ -271,7 +273,6 @@ bool SpinBLEClient::connectToServer() {
           /** Disconnect if subscribe failed */
           spinBLEClient.myBLEDevices[device_number].reset();
           pClient->deleteServices();
-          pClient->disconnect();
           NimBLEDevice::getScan()->erase(pClient->getPeerAddress());
           NimBLEDevice::deleteClient(pClient);
           return false;
@@ -283,7 +284,6 @@ bool SpinBLEClient::connectToServer() {
           /** Disconnect if subscribe failed */
           spinBLEClient.myBLEDevices[device_number].reset();
           pClient->deleteServices();
-          pClient->disconnect();
           NimBLEDevice::getScan()->erase(pClient->getPeerAddress());
           NimBLEDevice::deleteClient(pClient);
           return false;
@@ -445,7 +445,7 @@ void SpinBLEClient::scanProcess(int duration) {
   pBLEScan->setInterval(49);  // 97
   pBLEScan->setWindow(33);    // 67
   pBLEScan->setDuplicateFilter(true);
-  pBLEScan->setActiveScan(true);
+  pBLEScan->setActiveScan(false); //might cause memory leak if true - undetermined
   BLEScanResults foundDevices = pBLEScan->start(duration, true);
   this->dontBlockScan         = false;
   // Load the scan into a Json String
@@ -519,7 +519,7 @@ void SpinBLEClient::removeDuplicates(NimBLEClient *pClient) {
         if (BLEDevice::getClientByPeerAddress(oldBLEd.peerAddress)) {
           if (BLEDevice::getClientByPeerAddress(oldBLEd.peerAddress)->isConnected()) {
             SS2K_LOG(BLE_CLIENT_LOG_TAG, "%s Matched another service.  Disconnecting: %s", tBLEd.peerAddress.toString().c_str(), oldBLEd.peerAddress.toString().c_str());
-            BLEDevice::getClientByPeerAddress(oldBLEd.peerAddress)->disconnect();
+            NimBLEDevice::deleteClient(BLEDevice::getClientByPeerAddress(oldBLEd.peerAddress));
             oldBLEd.reset();
             spinBLEClient.intentionalDisconnect = true;
             return;
@@ -541,38 +541,40 @@ void SpinBLEClient::resetDevices(NimBLEClient *pClient) {
 
 // Control a connected FTMS trainer. If no args are passed, treat it like an external stepper motor.
 void SpinBLEClient::FTMSControlPointWrite(const uint8_t *pData, int length) {
-  NimBLEClient *pClient = nullptr;
-  uint8_t modData[7];
-  for (int i = 0; i < length; i++) {
-    modData[i] = pData[i];
-  }
-  for (int i = 0; i < NUM_BLE_DEVICES; i++) {
-    if (myBLEDevices[i].postConnected && (myBLEDevices[i].serviceUUID == FITNESSMACHINESERVICE_UUID)) {
-      if (NimBLEDevice::getClientByPeerAddress(myBLEDevices[i].peerAddress)->getService(FITNESSMACHINESERVICE_UUID)) {
-        pClient = NimBLEDevice::getClientByPeerAddress(myBLEDevices[i].peerAddress);
-        break;
+  if (FTMS_PASSTHROUGH) {
+    NimBLEClient *pClient = nullptr;
+    uint8_t modData[7];
+    for (int i = 0; i < length; i++) {
+      modData[i] = pData[i];
+    }
+    for (int i = 0; i < NUM_BLE_DEVICES; i++) {
+      if (myBLEDevices[i].postConnected && (myBLEDevices[i].serviceUUID == FITNESSMACHINESERVICE_UUID)) {
+        if (NimBLEDevice::getClientByPeerAddress(myBLEDevices[i].peerAddress)->getService(FITNESSMACHINESERVICE_UUID)) {
+          pClient = NimBLEDevice::getClientByPeerAddress(myBLEDevices[i].peerAddress);
+          break;
+        }
       }
     }
-  }
-  if (pClient) {
-    NimBLERemoteCharacteristic *writeCharacteristic = pClient->getService(FITNESSMACHINESERVICE_UUID)->getCharacteristic(FITNESSMACHINECONTROLPOINT_UUID);
-    int logBufLength                                = 0;
-    if (writeCharacteristic) {
-      const int kLogBufCapacity = length + 40;
-      char logBuf[kLogBufCapacity];
-      if (modData[0] == FitnessMachineControlPointProcedure::SetIndoorBikeSimulationParameters) {  // use virtual Shifting
-        int incline = ss2k.targetPosition / userConfig.getInclineMultiplier();
-        modData[3]  = (uint8_t)(incline & 0xff);
-        modData[4]  = (uint8_t)(incline >> 8);
-        writeCharacteristic->writeValue(modData, length);
-        logBufLength = ss2k_log_hex_to_buffer(modData, length, logBuf, 0, kLogBufCapacity);
-        logBufLength += snprintf(logBuf + logBufLength, kLogBufCapacity - logBufLength, "-> Shifted Sim Data: %d", rtConfig.getShifterPosition());
-      } else {
-        writeCharacteristic->writeValue(modData, length);
-        logBufLength = ss2k_log_hex_to_buffer(modData, length, logBuf, 0, kLogBufCapacity);
-        logBufLength += snprintf(logBuf + logBufLength, kLogBufCapacity - logBufLength, "-> Shifted ERG Data: %d", rtConfig.getShifterPosition());
+    if (pClient) {
+      NimBLERemoteCharacteristic *writeCharacteristic = pClient->getService(FITNESSMACHINESERVICE_UUID)->getCharacteristic(FITNESSMACHINECONTROLPOINT_UUID);
+      int logBufLength                                = 0;
+      if (writeCharacteristic) {
+        const int kLogBufCapacity = length + 40;
+        char logBuf[kLogBufCapacity];
+        if (modData[0] == FitnessMachineControlPointProcedure::SetIndoorBikeSimulationParameters) {  // use virtual Shifting
+          int incline = ss2k.targetPosition / userConfig.getInclineMultiplier();
+          modData[3]  = (uint8_t)(incline & 0xff);
+          modData[4]  = (uint8_t)(incline >> 8);
+          writeCharacteristic->writeValue(modData, length);
+          logBufLength = ss2k_log_hex_to_buffer(modData, length, logBuf, 0, kLogBufCapacity);
+          logBufLength += snprintf(logBuf + logBufLength, kLogBufCapacity - logBufLength, "-> Shifted Sim Data: %d", rtConfig.getShifterPosition());
+        } else {
+          writeCharacteristic->writeValue(modData, length);
+          logBufLength = ss2k_log_hex_to_buffer(modData, length, logBuf, 0, kLogBufCapacity);
+          logBufLength += snprintf(logBuf + logBufLength, kLogBufCapacity - logBufLength, "-> Shifted ERG Data: %d", rtConfig.getShifterPosition());
+        }
+        SS2K_LOG(BLE_CLIENT_LOG_TAG, "%s", logBuf);
       }
-      SS2K_LOG(BLE_CLIENT_LOG_TAG, "%s", logBuf);
     }
   }
 }
@@ -712,7 +714,7 @@ void SpinBLEClient::connectBLE_HID(NimBLEClient *pClient) {
           if (!it->subscribe(true, onNotify)) {
             /** Disconnect if subscribe failed */
             Serial.println("subscribe notification failed");
-            pClient->disconnect();
+            NimBLEDevice::deleteClient(pClient);
             return;  // false;
           } else {
             Serial.println("subscribed");

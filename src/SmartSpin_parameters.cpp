@@ -16,7 +16,7 @@ String RuntimeParameters::returnJSON() {
   // Allocate a temporary JsonDocument
   // Don't forget to change the capacity to match your requirements.
   // Use arduinojson.org/assistant to compute the capacity.
-  StaticJsonDocument<RUNTIMECONFIG_JSON_SIZE> doc;
+  DynamicJsonDocument doc(USERCONFIG_JSON_SIZE);
   // Set the values in the document
 
   doc["watts"]            = this->watts.getValue();
@@ -75,7 +75,7 @@ String userParameters::returnJSON() {
   // Allocate a temporary JsonDocument
   // Don't forget to change the capacity to match your requirements.
   // Use arduinojson.org/assistant to compute the capacity.
-  StaticJsonDocument<USERCONFIG_JSON_SIZE> doc;
+  DynamicJsonDocument doc(USERCONFIG_JSON_SIZE);
   // Set the values in the document
 
   doc["firmwareUpdateURL"]     = firmwareUpdateURL;
@@ -122,7 +122,7 @@ void userParameters::saveToLittleFS() {
   // Allocate a temporary JsonDocument
   // Don't forget to change the capacity to match your requirements.
   // Use arduinojson.org/assistant to compute the capacity.
-  StaticJsonDocument<USERCONFIG_JSON_SIZE> doc;
+  DynamicJsonDocument doc(USERCONFIG_JSON_SIZE);
 
   // Set the values in the document
   // commented items are not needed in save file
@@ -172,7 +172,7 @@ void userParameters::loadFromLittleFS() {
   // Allocate a temporary JsonDocument
   // Don't forget to change the capacity to match your requirements.
   // Use arduinojson.org/v6/assistant to compute the capacity.
-  StaticJsonDocument<USERCONFIG_JSON_SIZE> doc;
+  DynamicJsonDocument doc(USERCONFIG_JSON_SIZE);
 
   // Deserialize the JSON document
   DeserializationError error = deserializeJson(doc, file);

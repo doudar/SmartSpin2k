@@ -130,6 +130,8 @@ class userParameters {
   String foundDevices          = " ";
 
  public:
+
+  bool saveFlag = false;
   void setFirmwareUpdateURL(String fURL) { firmwareUpdateURL = fURL; }
   const char* getFirmwareUpdateURL() { return firmwareUpdateURL.c_str(); }
 

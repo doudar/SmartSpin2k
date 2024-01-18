@@ -380,13 +380,13 @@ void HTTP_Server::start() {
   /********************************************End Server
    * Handlers*******************************/
 
-  xTaskCreatePinnedToCore(HTTP_Server::webClientUpdate,       /* Task function. */
-                          "webClientUpdate",                  /* name of task. */
+  xTaskCreatePinnedToCore(HTTP_Server::webClientUpdate,             /* Task function. */
+                          "webClientUpdate",                        /* name of task. */
                           HTTP_STACK + (DEBUG_LOG_BUFFER_SIZE * 2), /* Stack size of task Used to be 3000*/
-                          NULL,                               /* parameter of the task */
-                          10,                                 /* priority of the task */
-                          &webClientTask,                     /* Task handle to keep track of created task */
-                          0);                                 /* pin task to core */
+                          NULL,                                     /* parameter of the task */
+                          10,                                       /* priority of the task */
+                          &webClientTask,                           /* Task handle to keep track of created task */
+                          0);                                       /* pin task to core */
 
 #ifdef USE_TELEGRAM
   xTaskCreatePinnedToCore(telegramUpdate,   /* Task function. */
@@ -630,10 +630,7 @@ void HTTP_Server::settingsProcessor() {
         myIP.toString() + "/index.html';\",1000);</script></html>";
   }
   SS2K_LOG(HTTP_SERVER_LOG_TAG, "Config Updated From Web");
-  userConfig.saveToLittleFS();
-  userConfig.printFile();
-  userPWC.saveToLittleFS();
-  userPWC.printFile();
+  userConfig.saveFlag = true;
   if (reboot) {
     response +=
         "Please wait while your settings are saved and SmartSpin2k reboots.</h2></body><script> "
@@ -746,21 +743,21 @@ void HTTP_Server::FirmwareUpdate() {
       //////// Update Firmware /////////
       SS2K_LOG(HTTP_SERVER_LOG_TAG, "Updating Firmware...Please Wait");
       if (((availableVer > currentVer) || updateAnyway) && (userConfig.getAutoUpdate())) {
-          t_httpUpdate_return ret = httpUpdate.update(client, userConfig.getFirmwareUpdateURL() + String(FW_BINFILE));
-          switch (ret) {
-            case HTTP_UPDATE_FAILED:
-              SS2K_LOG(HTTP_SERVER_LOG_TAG, "HTTP_UPDATE_FAILED Error %d : %s", httpUpdate.getLastError(), httpUpdate.getLastErrorString().c_str());
-              break;
+        t_httpUpdate_return ret = httpUpdate.update(client, userConfig.getFirmwareUpdateURL() + String(FW_BINFILE));
+        switch (ret) {
+          case HTTP_UPDATE_FAILED:
+            SS2K_LOG(HTTP_SERVER_LOG_TAG, "HTTP_UPDATE_FAILED Error %d : %s", httpUpdate.getLastError(), httpUpdate.getLastErrorString().c_str());
+            break;
 
-            case HTTP_UPDATE_NO_UPDATES:
-              SS2K_LOG(HTTP_SERVER_LOG_TAG, "HTTP_UPDATE_NO_UPDATES");
-              break;
+          case HTTP_UPDATE_NO_UPDATES:
+            SS2K_LOG(HTTP_SERVER_LOG_TAG, "HTTP_UPDATE_NO_UPDATES");
+            break;
 
-            case HTTP_UPDATE_OK:
-              SS2K_LOG(HTTP_SERVER_LOG_TAG, "HTTP_UPDATE_OK");
-              break;
-          }
+          case HTTP_UPDATE_OK:
+            SS2K_LOG(HTTP_SERVER_LOG_TAG, "HTTP_UPDATE_OK");
+            break;
         }
+      }
     } else {  // don't update
       SS2K_LOG(HTTP_SERVER_LOG_TAG, "  - Current Version: %s", FIRMWARE_VERSION);
     }

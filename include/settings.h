@@ -82,8 +82,11 @@
 // Amount to change watt target per shift in ERG mode.
 #define ERG_PER_SHIFT 10
 
+//Pass all of the FTMS commands sent to SS2k down to a connected FTMS device. 
+#define FTMS_PASSTHROUGH false
+
 // Use internal ERG control on external FTMS Trainer.
-#define INTERNAL_ERG_4EXT_FTMS
+//#define INTERNAL_ERG_4EXT_FTMS
 
 //Minimum cadence where ERG mode stops.
 #define MIN_ERG_CADENCE 30
@@ -291,10 +294,10 @@
 #define BATTERY_UPDATE_INTERVAL_MILLIS 300000 
 
 // Initial and web scan duration.
-#define DEFAULT_SCAN_DURATION 10
+#define DEFAULT_SCAN_DURATION 5
 
 // BLE automatic reconnect duration. Set this low to avoid interruption.
-#define BLE_RECONNECT_SCAN_DURATION 1
+#define BLE_RECONNECT_SCAN_DURATION 15
 
 //Task Stack Sizes
 #define MAIN_STACK 4500

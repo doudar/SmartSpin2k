@@ -660,7 +660,8 @@ void ss2kCustomCharacteristicCallbacks::onWrite(BLECharacteristic *pCharacterist
 
   size_t returnLength = rxValue.length();
   uint8_t returnValue[returnLength];
-  returnValue[0] = error;
+  std::string returnString = "";
+  returnValue[0]           = error;
   for (size_t i = 1; i < returnLength; i++) {
     returnValue[i] = rxValue[i];
   }
@@ -668,7 +669,14 @@ void ss2kCustomCharacteristicCallbacks::onWrite(BLECharacteristic *pCharacterist
   switch (rxValue[1]) {
     case BLE_firmwareUpdateURL:  // 0x01
       logBufLength += snprintf(logBuf + logBufLength, kLogBufCapacity - logBufLength, "<-Firmware Update URL");
-      returnValue[0] = error;
+      returnValue[0] = success;
+      if (rxValue[0] == read) {
+        returnString = userConfig.getFirmwareUpdateURL();
+      } else if (rxValue[0] == write) {
+        String str = (char*)pData;
+        str.remove(0,2);
+        userConfig.setFirmwareUpdateURL(str);
+      }
       break;
 
     case BLE_incline: {  // 0x02
@@ -745,7 +753,14 @@ void ss2kCustomCharacteristicCallbacks::onWrite(BLECharacteristic *pCharacterist
 
     case BLE_deviceName:  // 0x07
       logBufLength   = snprintf(logBuf + logBufLength, kLogBufCapacity - logBufLength, "<-deviceName");
-      returnValue[0] = error;
+      returnValue[0] = success;
+      if (rxValue[0] == read) {
+        returnString = userConfig.getDeviceName();
+      } else if (rxValue[0] == write) {
+        String str = (char*)pData;
+        str.remove(0,2);
+        userConfig.setDeviceName(str);
+      }
       break;
 
     case BLE_shiftStep:  // 0x08
@@ -889,28 +904,62 @@ void ss2kCustomCharacteristicCallbacks::onWrite(BLECharacteristic *pCharacterist
 
     case BLE_ssid:  // 0x12
       logBufLength += snprintf(logBuf + logBufLength, kLogBufCapacity - logBufLength, "<-ssid");
-
-      returnValue[0] = error;
+      returnValue[0] = success;
+      if (rxValue[0] == read) {
+        returnString = userConfig.getSsid();
+      } else if (rxValue[0] == write) {
+        String str = (char*)pData;
+        str.remove(0,2);
+        userConfig.setSsid(str);
+      }
       break;
 
     case BLE_password:  // 0x13
       logBufLength += snprintf(logBuf + logBufLength, kLogBufCapacity - logBufLength, "<-password");
-      returnValue[0] = error;
+      returnValue[0] = success;
+      if (rxValue[0] == read) {
+        returnString = userConfig.getPassword();
+      } else if (rxValue[0] == write) {
+        String str = (char*)pData;
+        str.remove(0,2);
+        userConfig.setPassword(str);
+      }
       break;
 
     case BLE_foundDevices:  // 0x14
       logBufLength += snprintf(logBuf + logBufLength, kLogBufCapacity - logBufLength, "<-foundDevices");
-      returnValue[0] = error;
+      returnValue[0] = success;
+      if (rxValue[0] == read) {
+        returnString = userConfig.getFoundDevices();
+      } else if (rxValue[0] == write) {
+        String str = (char*)pData;
+        str.remove(0,2);
+        userConfig.setFoundDevices(str);
+      }
       break;
 
     case BLE_connectedPowerMeter:  // 0x15
       logBufLength += snprintf(logBuf + logBufLength, kLogBufCapacity - logBufLength, "<-connectedPowerMete");
-      returnValue[0] = error;
+      returnValue[0] = success;
+      if (rxValue[0] == read) {
+        returnString = userConfig.getConnectedPowerMeter();
+      } else if (rxValue[0] == write) {
+        String str = (char*)pData;
+        str.remove(0,2);
+        userConfig.setConnectedPowerMeter(str);
+      }
       break;
 
     case BLE_connectedHeartMonitor:  // 0x16
       logBufLength += snprintf(logBuf + logBufLength, kLogBufCapacity - logBufLength, "<-connectedHeartMonitor");
-      returnValue[0] = error;
+      returnValue[0] = success;
+      if (rxValue[0] == read) {
+        returnString = userConfig.getConnectedHeartMonitor();
+      } else if (rxValue[0] == write) {
+        String str = (char*)pData;
+        str.remove(0,2);
+        userConfig.setConnectedHeartMonitor(str);
+      }
       break;
 
     case BLE_shifterPosition:  // 0x17
@@ -931,7 +980,9 @@ void ss2kCustomCharacteristicCallbacks::onWrite(BLECharacteristic *pCharacterist
 
     case BLE_saveToLittleFS:  // 0x18
       logBufLength += snprintf(logBuf + logBufLength, kLogBufCapacity - logBufLength, "<-saveToLittleFS");
-      userConfig.saveToLittleFS();
+      if (rxValue[0] == write) {
+        userConfig.saveFlag = true;
+      }
       returnValue[0] = success;
       break;
 
@@ -978,7 +1029,18 @@ void ss2kCustomCharacteristicCallbacks::onWrite(BLECharacteristic *pCharacterist
       break;
   }
   SS2K_LOG(CUSTOM_CHAR_LOG_TAG, "%s", logBuf);
-  pCharacteristic->setValue(returnValue, returnLength);
+  if (returnString == "") {
+    pCharacteristic->setValue(returnValue, returnLength);
+  } else {  // Need to send a string instead
+    uint8_t returnChar[returnString.length() + 2];
+    returnChar[0] = 0x80;
+    returnChar[1] = rxValue[1];
+    for (int i = 0; i < returnString.length(); i++) {
+      returnChar[i + 2] = returnString[i];
+    }
+    pCharacteristic->setValue(returnChar, returnString.length() + 2);
+  }
+
   pCharacteristic->indicate();
 }
 
