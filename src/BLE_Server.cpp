@@ -683,13 +683,13 @@ void ss2kCustomCharacteristicCallbacks::onWrite(BLECharacteristic *pCharacterist
       logBufLength += snprintf(logBuf + logBufLength, kLogBufCapacity - logBufLength, "<-incline");
       returnValue[0] = success;
       if (rxValue[0] == read) {
-        int inc        = rtConfig.getTargetIncline() * 100;
+        int inc        = rtConfig.getTargetIncline() * 10;
         returnValue[2] = (uint8_t)(inc & 0xff);
         returnValue[3] = (uint8_t)(inc >> 8);
         returnLength += 2;
       }
       if (rxValue[0] == write) {
-        rtConfig.setTargetIncline(bytes_to_u16(rxValue[3], rxValue[2]) / 100);
+        rtConfig.setTargetIncline(bytes_to_u16(rxValue[3], rxValue[2]) / 10);
         logBufLength += snprintf(logBuf + logBufLength, kLogBufCapacity - logBufLength, "(%f)", rtConfig.getTargetIncline());
       }
     } break;
@@ -809,14 +809,14 @@ void ss2kCustomCharacteristicCallbacks::onWrite(BLECharacteristic *pCharacterist
     case BLE_inclineMultiplier: {  // 0x0B
       logBufLength += snprintf(logBuf + logBufLength, kLogBufCapacity - logBufLength, "<-inclineMultiplier");
       returnValue[0] = success;
-      int inc        = userConfig.getInclineMultiplier();
+      int inc        = userConfig.getInclineMultiplier() * 10;
       if (rxValue[0] == read) {
         returnValue[2] = (uint8_t)(inc & 0xff);
         returnValue[3] = (uint8_t)(inc >> 8);
         returnLength += 2;
       }
       if (rxValue[0] == write) {
-        userConfig.setInclineMultiplier(bytes_to_u16(rxValue[3], rxValue[2]));
+        userConfig.setInclineMultiplier(bytes_to_u16(rxValue[3], rxValue[2])/10);
         logBufLength += snprintf(logBuf + logBufLength, kLogBufCapacity - logBufLength, "(%f)", userConfig.getInclineMultiplier());
       }
     } break;
@@ -879,11 +879,12 @@ void ss2kCustomCharacteristicCallbacks::onWrite(BLECharacteristic *pCharacterist
       logBufLength += snprintf(logBuf + logBufLength, kLogBufCapacity - logBufLength, "<-FTMSMode");
       returnValue[0] = success;
       if (rxValue[0] == read) {
-        returnValue[2] = (uint8_t)(rtConfig.getFTMSMode());
+        returnValue[2] = (uint8_t)(rtConfig.getFTMSMode() & 0xff);
+        returnValue[3] = (uint8_t)(rtConfig.getFTMSMode() >> 8);
         returnLength += 1;
       }
       if (rxValue[0] == write) {
-        rtConfig.setFTMSMode(rxValue[2]);
+        rtConfig.setFTMSMode(bytes_to_u16(rxValue[3], rxValue[2]));
         logBufLength += snprintf(logBuf + logBufLength, kLogBufCapacity - logBufLength, "(%hhu)", rtConfig.getFTMSMode());
       }
       break;
