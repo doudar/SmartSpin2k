@@ -983,8 +983,9 @@ void ss2kCustomCharacteristicCallbacks::onWrite(BLECharacteristic *pCharacterist
       logBufLength += snprintf(logBuf + logBufLength, kLogBufCapacity - logBufLength, "<-saveToLittleFS");
       if (rxValue[0] == write) {
         userConfig.saveFlag = true;
+        returnValue[0] = success;
       }
-      returnValue[0] = success;
+      
       break;
 
     case BLE_targetPosition:  // 0x19
