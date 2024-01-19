@@ -881,7 +881,7 @@ void ss2kCustomCharacteristicCallbacks::onWrite(BLECharacteristic *pCharacterist
       if (rxValue[0] == read) {
         returnValue[2] = (uint8_t)(rtConfig.getFTMSMode() & 0xff);
         returnValue[3] = (uint8_t)(rtConfig.getFTMSMode() >> 8);
-        returnLength += 1;
+        returnLength += 2;
       }
       if (rxValue[0] == write) {
         rtConfig.setFTMSMode(bytes_to_u16(rxValue[3], rxValue[2]));
