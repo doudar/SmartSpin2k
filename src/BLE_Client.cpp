@@ -445,7 +445,7 @@ void SpinBLEClient::scanProcess(int duration) {
   pBLEScan->setInterval(49);  // 97
   pBLEScan->setWindow(33);    // 67
   pBLEScan->setDuplicateFilter(true);
-  pBLEScan->setActiveScan(false); //might cause memory leak if true - undetermined
+  pBLEScan->setActiveScan(true); //might cause memory leak if true - undetermined. We don't get device names without it.
   BLEScanResults foundDevices = pBLEScan->start(duration, true);
   this->dontBlockScan         = false;
   // Load the scan into a Json String
