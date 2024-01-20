@@ -549,7 +549,7 @@ void ErgMode::computeErg() {
   int newCadence       = rtConfig.cad.getValue();
 
   // check for new torque value or new set point, if watts < 10 treat as faulty
-  if ((this->watts.getTimestamp() == newWatts.getTimestamp() || this->setPoint == newWatts.getTarget()) || newWatts.getValue() < 10) {
+  if ((this->watts.getTimestamp() == newWatts.getTimestamp() && this->setPoint == newWatts.getTarget()) || newWatts.getValue() < 10) {
     SS2K_LOGW(ERG_MODE_LOG_TAG, "Watts previously processed.");
     return;
   }
@@ -567,7 +567,7 @@ void ErgMode::computeErg() {
   }
 
   // SetPoint changed
-  if (this->setPoint != newWatts.getTarget()) {
+  if (abs(this->setPoint - newWatts.getTarget() > 20)) {
     _setPointChangeState(newCadence, newWatts);
     return;
   }
