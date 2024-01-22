@@ -1037,6 +1037,7 @@ void ss2kCustomCharacteristicCallbacks::onWrite(BLECharacteristic *pCharacterist
         reboot         = true;
         returnValue[0] = success;
       }
+      break;
 
     case BLE_resetToDefaults:  // 0x1D
       logBufLength += snprintf(logBuf + logBufLength, kLogBufCapacity - logBufLength, "<-reset to defaults");
@@ -1061,8 +1062,10 @@ void ss2kCustomCharacteristicCallbacks::onWrite(BLECharacteristic *pCharacterist
   }
 
   pCharacteristic->indicate();
-  vTaskDelay(10);
-  ESP.restart();
+  if (reboot) {
+    vTaskDelay(10);
+    ESP.restart();
+  }
 }
 
 void SpinBLEServer::notifyShift() {
