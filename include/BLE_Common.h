@@ -50,6 +50,8 @@
 #define BLE_targetPosition        0x19
 #define BLE_externalControl       0x1A
 #define BLE_syncMode              0x1B
+#define BLE_reboot                0x1C
+#define BLE_resetToDefaults       0x1D
 
 // macros to convert different types of bytes into int The naming here sucks and
 // should be fixed.
@@ -169,7 +171,6 @@ class SpinBLEAdvertisedDevice {
 
 class SpinBLEClient {
  private:
-
  public:  // Not all of these need to be public. This should be cleaned up
           // later.
   boolean connectedPM        = false;
@@ -199,7 +200,7 @@ class SpinBLEClient {
   void removeDuplicates(NimBLEClient *pClient);
   void resetDevices(NimBLEClient *pClient);
   void postConnect();
-  void FTMSControlPointWrite(const uint8_t*  pData, int length);
+  void FTMSControlPointWrite(const uint8_t *pData, int length);
   void connectBLE_HID(NimBLEClient *pClient);
   void keepAliveBLE_HID(NimBLEClient *pClient);
   void checkBLEReconnect();
