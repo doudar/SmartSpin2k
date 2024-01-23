@@ -51,6 +51,7 @@ void userParameters::setDefaults() {
   shiftStep             = DEFAULT_SHIFT_STEP;
   stealthChop           = STEALTHCHOP;
   stepperPower          = DEFAULT_STEPPER_POWER;
+  stepperSpeed            = DEFAULT_STEPPER_SPEED;
   inclineMultiplier     = 3.0;
   powerCorrectionFactor = 1.0;
   ERGSensitivity        = ERG_SENSITIVITY;
@@ -83,6 +84,7 @@ String userParameters::returnJSON() {
   doc["deviceName"]            = deviceName;
   doc["shiftStep"]             = shiftStep;
   doc["stepperPower"]          = stepperPower;
+  doc["stepperSpeed"]          = stepperSpeed;
   doc["stealthChop"]           = stealthChop;
   doc["inclineMultiplier"]     = inclineMultiplier;
   doc["powerCorrectionFactor"] = powerCorrectionFactor;
@@ -131,6 +133,7 @@ void userParameters::saveToLittleFS() {
   doc["deviceName"]            = deviceName;
   doc["shiftStep"]             = shiftStep;
   doc["stepperPower"]          = stepperPower;
+  doc["stepperSpeed"]          = stepperSpeed;
   doc["stealthChop"]           = stealthChop;
   doc["inclineMultiplier"]     = inclineMultiplier;
   doc["powerCorrectionFactor"] = powerCorrectionFactor;
@@ -199,6 +202,9 @@ void userParameters::loadFromLittleFS() {
   }
   if (doc["maxWatts"]) {
     setMaxWatts(doc["maxWatts"]);
+  }
+  if (doc["stepperSpeed"]){
+    setStepperSpeed(doc["stepperSpeed"]);
   }
   if (doc["minWatts"]) {
     setMinWatts(doc["minWatts"]);

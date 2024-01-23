@@ -43,21 +43,21 @@ void ergTaskLoop(void* pvParameters) {
     vTaskDelay(ERG_MODE_DELAY / portTICK_PERIOD_MS);
 
     hasConnectedPowerMeter = spinBLEClient.connectedPM;
-    simulationRunning      = rtConfig.watts.getTarget();
+    simulationRunning      = rtConfig->watts.getTarget();
     if (!simulationRunning) {
-      simulationRunning = rtConfig.watts.getSimulate();
+      simulationRunning = rtConfig->watts.getSimulate();
     }
 
     // add values to torque table
-    torqueTable.processTorqueValue(torqueBuffer, rtConfig.cad.getValue(), rtConfig.watts);
+    torqueTable.processTorqueValue(torqueBuffer, rtConfig->cad.getValue(), rtConfig->watts);
 
     // compute ERG
-    if ((rtConfig.getFTMSMode() == FitnessMachineControlPointProcedure::SetTargetPower) && (hasConnectedPowerMeter || simulationRunning)) {
+    if ((rtConfig->getFTMSMode() == FitnessMachineControlPointProcedure::SetTargetPower) && (hasConnectedPowerMeter || simulationRunning)) {
       ergMode.computeErg();
     }
 
     // resistance mode
-    if ((rtConfig.getFTMSMode() == FitnessMachineControlPointProcedure::SetTargetResistanceLevel) && (rtConfig.getMaxResistance() != DEFAULT_RESISTANCE_RANGE)) {
+    if ((rtConfig->getFTMSMode() == FitnessMachineControlPointProcedure::SetTargetResistanceLevel) && (rtConfig->getMaxResistance() != DEFAULT_RESISTANCE_RANGE)) {
       ergMode.computeResistance();
     }
 
@@ -81,8 +81,8 @@ void ergTaskLoop(void* pvParameters) {
 
 void TorqueBuffer::set(int i) {
   this->torqueEntry[i].readings       = 1;
-  this->torqueEntry[i].torque         = _wattsToTorque(rtConfig.watts.getValue(), rtConfig.cad.getValue());
-  this->torqueEntry[i].targetPosition = rtConfig.getCurrentIncline();
+  this->torqueEntry[i].torque         = _wattsToTorque(rtConfig->watts.getValue(), rtConfig->cad.getValue());
+  this->torqueEntry[i].targetPosition = rtConfig->getCurrentIncline();
 }
 
 void TorqueBuffer::reset() {
@@ -135,35 +135,35 @@ void TorqueTable::setStepperMinMax() {
   int _return = RETURN_ERROR;
 
   // if the FTMS device reports resistance feedback, skip estimating min_max
-  if (rtConfig.resistance.getValue() > 0) {
-    rtConfig.setMinStep(-DEFAULT_STEPPER_TRAVEL);
-    rtConfig.setMaxStep(DEFAULT_STEPPER_TRAVEL);
+  if (rtConfig->resistance.getValue() > 0) {
+    rtConfig->setMinStep(-DEFAULT_STEPPER_TRAVEL);
+    rtConfig->setMaxStep(DEFAULT_STEPPER_TRAVEL);
     SS2K_LOG(ERG_MODE_LOG_TAG, "Using Resistance Travel Limits");
     return;
   }
 
-  int minBreakWatts = userConfig.getMinWatts();
+  int minBreakWatts = userConfig->getMinWatts();
   if (minBreakWatts > 0) {
     _return = this->lookup(minBreakWatts, NORMAL_CAD);
     if (_return != RETURN_ERROR) {
       // never set less than one shift below current incline.
-      if ((_return >= rtConfig.getCurrentIncline()) && (rtConfig.watts.getValue() > userConfig.getMinWatts())) {
-        _return = rtConfig.getCurrentIncline() - userConfig.getShiftStep();
+      if ((_return >= rtConfig->getCurrentIncline()) && (rtConfig->watts.getValue() > userConfig->getMinWatts())) {
+        _return = rtConfig->getCurrentIncline() - userConfig->getShiftStep();
       }
-      rtConfig.setMinStep(_return);
+      rtConfig->setMinStep(_return);
       SS2K_LOG(ERG_MODE_LOG_TAG, "Min Position Set: %d", _return);
     }
   }
 
-  int maxBreakWatts = userConfig.getMaxWatts();
+  int maxBreakWatts = userConfig->getMaxWatts();
   if (maxBreakWatts > 0) {
     _return = this->lookup(maxBreakWatts, NORMAL_CAD);
     if (_return != RETURN_ERROR) {
       // never set less than one shift above current incline.
-      if ((_return <= rtConfig.getCurrentIncline()) && (rtConfig.watts.getValue() < userConfig.getMaxWatts())) {
-        _return = rtConfig.getCurrentIncline() + userConfig.getShiftStep();
+      if ((_return <= rtConfig->getCurrentIncline()) && (rtConfig->watts.getValue() < userConfig->getMaxWatts())) {
+        _return = rtConfig->getCurrentIncline() + userConfig->getShiftStep();
       }
-      rtConfig.setMaxStep(_return);
+      rtConfig->setMaxStep(_return);
       SS2K_LOG(ERG_MODE_LOG_TAG, "Max Position Set: %d", _return);
     }
   }
@@ -527,26 +527,26 @@ void TorqueTable::toLog() {
 
 // compute position for resistance control mode
 void ErgMode::computeResistance() {
-  static int stepChangePerResistance = userConfig.getShiftStep();
+  static int stepChangePerResistance = userConfig->getShiftStep();
   static Measurement oldResistance;
 
-  if (rtConfig.resistance.getTimestamp() == oldResistance.getTimestamp()) {
+  if (rtConfig->resistance.getTimestamp() == oldResistance.getTimestamp()) {
     SS2K_LOG(ERG_MODE_LOG_TAG, "Resistance previously processed.");
     return;
   }
 
-  int newSetPoint = rtConfig.resistance.getTarget();
-  int actualDelta = rtConfig.resistance.getTarget() - rtConfig.resistance.getValue();
-  rtConfig.setTargetIncline(rtConfig.getTargetIncline() + (100 * actualDelta));
+  int newSetPoint = rtConfig->resistance.getTarget();
+  int actualDelta = rtConfig->resistance.getTarget() - rtConfig->resistance.getValue();
+  rtConfig->setTargetIncline(rtConfig->getTargetIncline() + (100 * actualDelta));
   if (actualDelta = 0) {
-    rtConfig.setTargetIncline(rtConfig.getCurrentIncline());
+    rtConfig->setTargetIncline(rtConfig->getCurrentIncline());
   }
-  oldResistance = rtConfig.resistance;
+  oldResistance = rtConfig->resistance;
 }
 // as a note, Trainer Road sends 50w target whenever the app is connected.
 void ErgMode::computeErg() {
-  Measurement newWatts = rtConfig.watts;
-  int newCadence       = rtConfig.cad.getValue();
+  Measurement newWatts = rtConfig->watts;
+  int newCadence       = rtConfig->cad.getValue();
 
   // check for new torque value or new set point, if watts < 10 treat as faulty
   if ((this->watts.getTimestamp() == newWatts.getTimestamp() && this->setPoint == newWatts.getTarget()) || newWatts.getValue() < 10) {
@@ -555,12 +555,12 @@ void ErgMode::computeErg() {
   }
 
   // set minimum set point to minimum bike watts if app sends set point lower than minimum bike watts.
-  if (newWatts.getTarget() < userConfig.getMinWatts()) {
+  if (newWatts.getTarget() < userConfig->getMinWatts()) {
     SS2K_LOG(ERG_MODE_LOG_TAG, "ERG Target Below Minumum Value.");
-    newWatts.setTarget(userConfig.getMinWatts());
+    newWatts.setTarget(userConfig->getMinWatts());
   }
 
-  bool isUserSpinning = this->_userIsSpinning(newCadence, rtConfig.getCurrentIncline());
+  bool isUserSpinning = this->_userIsSpinning(newCadence, rtConfig->getCurrentIncline());
   if (!isUserSpinning) {
     SS2K_LOG(ERG_MODE_LOG_TAG, "ERG Mode but no User Spin");
     return;
@@ -581,15 +581,15 @@ void ErgMode::_setPointChangeState(int newCadence, Measurement& newWatts) {
   if (tableResult == RETURN_ERROR) {
     int wattChange  = newWatts.getTarget() - newWatts.getValue();
     float deviation = ((float)wattChange * 100.0) / ((float)newWatts.getTarget());
-    float factor    = abs(deviation) > 10 ? userConfig.getERGSensitivity() : userConfig.getERGSensitivity() / 2;
-    tableResult     = rtConfig.getCurrentIncline() + (wattChange * factor);
+    float factor    = abs(deviation) > 10 ? userConfig->getERGSensitivity() : userConfig->getERGSensitivity() / 2;
+    tableResult     = rtConfig->getCurrentIncline() + (wattChange * factor);
   }
 
   SS2K_LOG(ERG_MODE_LOG_TAG, "SetPoint changed:%dw TorqueTable Result: %d", newWatts.getTarget(), tableResult);
   _updateValues(newCadence, newWatts, tableResult);
 
   int i = 0;
-  while (rtConfig.getTargetIncline() != rtConfig.getCurrentIncline()) {  // wait while the knob moves to target position.
+  while (rtConfig->getTargetIncline() != rtConfig->getCurrentIncline()) {  // wait while the knob moves to target position.
     vTaskDelay(100 / portTICK_PERIOD_MS);
     if (i > 50) {  // failsafe for infinite loop
       SS2K_LOG(ERG_MODE_LOG_TAG, "Stepper didn't reach target position");
@@ -607,15 +607,15 @@ void ErgMode::_inSetpointState(int newCadence, Measurement& newWatts) {
   int wattChange  = newWatts.getTarget() - watts;  // setpoint_form_trainer - current_torque => Amount to increase or decrease incline
   float deviation = ((float)wattChange * 100.0) / ((float)newWatts.getTarget());
 
-  float factor     = abs(deviation) > 10 ? userConfig.getERGSensitivity() : userConfig.getERGSensitivity() / 2;
-  float newIncline = rtConfig.getCurrentIncline() + (wattChange * factor);
+  float factor     = abs(deviation) > 10 ? userConfig->getERGSensitivity() : userConfig->getERGSensitivity() / 2;
+  float newIncline = rtConfig->getCurrentIncline() + (wattChange * factor);
 
   _updateValues(newCadence, newWatts, newIncline);
 }
 
 void ErgMode::_updateValues(int newCadence, Measurement& newWatts, float newIncline) {
-  rtConfig.setTargetIncline(newIncline);
-  _writeLog(rtConfig.getCurrentIncline(), newIncline, this->setPoint, newWatts.getTarget(), this->watts.getValue(), newWatts.getValue(), this->cadence, newCadence);
+  rtConfig->setTargetIncline(newIncline);
+  _writeLog(rtConfig->getCurrentIncline(), newIncline, this->setPoint, newWatts.getTarget(), this->watts.getValue(), newWatts.getValue(), this->cadence, newCadence);
 
   this->watts    = newWatts;
   this->setPoint = newWatts.getTarget();
@@ -625,8 +625,8 @@ void ErgMode::_updateValues(int newCadence, Measurement& newWatts, float newIncl
 bool ErgMode::_userIsSpinning(int cadence, float incline) {
   if (cadence <= MIN_ERG_CADENCE) {
     if (!this->engineStopped) {                              // Test so motor stop command only happens once.
-      ss2k.motorStop();                                      // release tension
-      rtConfig.setTargetIncline(incline - WATTS_PER_SHIFT);  // release incline
+      ss2k->motorStop();                                      // release tension
+      rtConfig->setTargetIncline(incline - WATTS_PER_SHIFT);  // release incline
       this->engineStopped = true;
     }
     return false;  // Cadence too low, nothing to do here

@@ -38,7 +38,7 @@
 #define configFILENAME "/config.txt"
 
 // name of local file to save Physical Working Capacity in LittleFS
-#define userPWCFILENAME "/userPWC.txt"
+#define userPWCFILENAME "/userPWC->txt"
 
 // name of the local file to save the torque table. 
 #define TORQUE_TABLE_FILENAME "/TorqueTable.txt"
@@ -67,7 +67,7 @@
 #define STEPPER_ACCELERATION 3000
 
 // Stepper Max Speed in steps/s
-#define STEPPER_SPEED 1500
+#define DEFAULT_STEPPER_SPEED 1500
 
 // Default ERG Sensitivity. Predicated on # of Shifts (further defined by shift steps) per 30 watts of resistance change.
 // I.E. If the difference between ERG target and Current watts were 30, and the Shift step is defined as 600 steps,
@@ -117,9 +117,6 @@
 
 // Resistance range when no bike with resistance is connected.
 #define DEFAULT_RESISTANCE_RANGE 2000
-
-// Stepper Max Speed in ERG Mode steps/s
-#define STEPPER_PELOTON_SPEED 2500
 
 // Default +- Stepper Travel Limit
 // This is used until the TorqueTable has enough data to compute travel limits
@@ -257,7 +254,7 @@
 /* Number of entries in the ERG Torque Lookup Table
  This is currently maintained as to keep memory usage lower and reduce the print output of the table.
  It can be depreciated in the future should we decide to remove logging of the torque table. Then it should be calculated in ERG_Mode.cpp
- by dividing userConfig.getMaxWatts() by TORQUETABLE_INCREMENT.  */
+ by dividing userConfig->getMaxWatts() by TORQUETABLE_INCREMENT.  */
 #define TORQUETABLE_SIZE 20
 
 // Size of increments (in Nm) for the ERG Lookup Table. Needs to be one decimal place for proper calculations
@@ -300,22 +297,22 @@
 #define BLE_RECONNECT_SCAN_DURATION 15
 
 //Task Stack Sizes
-#define MAIN_STACK 4500
-#define ERG_STACK 6500
-#define HTTP_STACK 6000
-#define BLE_COMM_STACK 6000
+#define MAIN_STACK 3500
+#define ERG_STACK 3500
+#define HTTP_STACK 5000
+#define BLE_COMM_STACK 5000
 #define BLE_CLIENT_STACK 5000
-#define STEPPER_STACK 1700
+#define STEPPER_STACK 2000
+
+// Uncomment to enable stack size debugging info
+// #define DEBUG_STACK
 
 // Uncomment to enable sending Telegram debug messages back to the chat
 // specified in telegram_token.h
 // #define USE_TELEGRAM
 
-// Uncomment to enable stack size debugging info
-// #define DEBUG_STACK
-
 // Uncomment to enable HR->PWR debugging info. Always displays HR->PWR
-// Calculation. Never sets userConfig.setSimulatedPower();
+// Calculation. Never sets userConfig->setSimulatedPower();
 // #define DEBUG_HR_TO_PWR
 
 // Uncomment to enable HR->PWR enhanced torquetable debugging.

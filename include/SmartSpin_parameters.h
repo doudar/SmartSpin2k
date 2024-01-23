@@ -118,20 +118,20 @@ class userParameters {
   int stepperPower;
   int maxWatts;
   int minWatts;
+  int stepperSpeed;
   bool stepperDir;
   bool shifterDir;
   bool udpLogEnabled = false;
   bool logComm       = false;
+  bool saveFlag      = false;
   String ssid;
   String password;
   String connectedPowerMeter   = CONNECTED_POWER_METER;
   String connectedHeartMonitor = CONNECTED_HEART_MONITOR;
-  String connectedRemote    = CONNECTED_REMOTE;
+  String connectedRemote       = CONNECTED_REMOTE;
   String foundDevices          = " ";
 
  public:
-
-  bool saveFlag = false;
   void setFirmwareUpdateURL(String fURL) { firmwareUpdateURL = fURL; }
   const char* getFirmwareUpdateURL() { return firmwareUpdateURL.c_str(); }
 
@@ -169,10 +169,13 @@ class userParameters {
   const char* getConnectedHeartMonitor() { return connectedHeartMonitor.c_str(); }
 
   void setConnectedRemote(String cRemote) { connectedRemote = cRemote; }
-  const char* getConnectedRemote() { return connectedRemote.c_str();}
+  const char* getConnectedRemote() { return connectedRemote.c_str(); }
 
   void setStepperPower(int sp) { stepperPower = sp; }
   int getStepperPower() { return stepperPower; }
+
+  void setStepperSpeed(int sp) { stepperSpeed = sp; }
+  int getStepperSpeed() { return stepperSpeed; }
 
   void setMaxWatts(int maxW) { maxWatts = maxW; }
   int getMaxWatts() { return maxWatts; }
@@ -191,6 +194,9 @@ class userParameters {
 
   void setLogComm(bool lgcm) { logComm = lgcm; }
   bool getLogComm() { return logComm; }
+
+  void setSaveFlag(bool sf) { saveFlag = sf; }
+  bool getSaveFlag() { return saveFlag; }
 
   void setFoundDevices(String fdv) { foundDevices = fdv; }
   const char* getFoundDevices() { return foundDevices.c_str(); }

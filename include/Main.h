@@ -48,6 +48,7 @@ class SS2K {
   void setupTMCStepperDriver();
   void updateStepperPower();
   void updateStealthChop();
+  void updateStepperSpeed();
   void checkDriverTemperature();
   void motorStop(bool releaseTension = false);
   void FTMSModeShiftModifier();
@@ -86,14 +87,9 @@ class AuxSerialBuffer {
 
 // Users Physical Working Capacity Calculation Parameters (heart rate to Power
 // calculation)
-extern physicalWorkingCapacity userPWC;
-extern SS2K ss2k;
+extern physicalWorkingCapacity *userPWC;
+extern SS2K *ss2k;
 
 // Main program variable that stores most everything
-extern userParameters userConfig;
-extern RuntimeParameters rtConfig;
-
-// Peloton Specific Parameters
-// const uint8_t peloton_rq_watts[]{0xF5, 0x44, 0x39, 0xF6};
-// const uint8_t peloton_rq_cad[]{0xF5, 0x41, 0x36, 0xF6};
-// const uint8_t peloton_rq_res[]{0xF5, 0x49, 0x3F, 0xF6};
+extern userParameters *userConfig;
+extern RuntimeParameters *rtConfig;

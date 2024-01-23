@@ -43,10 +43,10 @@ static void onNotify(BLERemoteCharacteristic *pBLERemoteCharacteristic, uint8_t 
   if (pBLERemoteCharacteristic->getRemoteService()->getUUID() == HID_SERVICE_UUID) {
     Serial.print(pData[0], HEX);
     if (pData[0] == 0x04) {
-      rtConfig.setShifterPosition(rtConfig.getShifterPosition() + 1);
+      rtConfig->setShifterPosition(rtConfig->getShifterPosition() + 1);
     }
     if (pData[0] == 0x08) {
-      rtConfig.setShifterPosition(rtConfig.getShifterPosition() - 1);
+      rtConfig->setShifterPosition(rtConfig->getShifterPosition() - 1);
     }
   }
 
@@ -337,13 +337,13 @@ void MyClientCallback::onDisconnect(NimBLEClient *pClient) {
             (spinBLEClient.myBLEDevices[i].charUUID == FLYWHEEL_UART_RX_UUID) || (spinBLEClient.myBLEDevices[i].charUUID == ECHELON_SERVICE_UUID) ||
             (spinBLEClient.myBLEDevices[i].charUUID == CYCLINGPOWERSERVICE_UUID)) {
           SS2K_LOG(BLE_CLIENT_LOG_TAG, "Deregistered PM on Disconnect");
-          rtConfig.pm_batt.setValue(0);
+          rtConfig->pm_batt.setValue(0);
           spinBLEClient.connectedPM = false;
           break;
         }
         if ((spinBLEClient.myBLEDevices[i].charUUID == HEARTCHARACTERISTIC_UUID)) {
           SS2K_LOG(BLE_CLIENT_LOG_TAG, "Deregistered HR on Disconnect");
-          rtConfig.hr_batt.setValue(0);
+          rtConfig->hr_batt.setValue(0);
           spinBLEClient.connectedHRM = false;
           break;
         }
@@ -391,33 +391,33 @@ void MyAdvertisedDeviceCallback::onResult(BLEAdvertisedDevice *advertisedDevice)
        advertisedDevice->isAdvertisingService(ECHELON_DEVICE_UUID) || advertisedDevice->isAdvertisingService(HID_SERVICE_UUID))) {
     SS2K_LOG(BLE_CLIENT_LOG_TAG, "Matching Device Name: %s", aDevName.c_str());
     if (advertisedDevice->getServiceUUID() == HID_SERVICE_UUID) {
-      if (String(userConfig.getConnectedRemote()) == "any") {
+      if (String(userConfig->getConnectedRemote()) == "any") {
         SS2K_LOG(BLE_CLIENT_LOG_TAG, "Remote String Matched Any");
         // continue
-      } else if (aDevName != String(userConfig.getConnectedRemote()) || (String(userConfig.getConnectedRemote()) == "none")) {
-        SS2K_LOG(BLE_CLIENT_LOG_TAG, "Skipping non-selected Remote |%s|%s", aDevName.c_str(), userConfig.getConnectedRemote());
+      } else if (aDevName != String(userConfig->getConnectedRemote()) || (String(userConfig->getConnectedRemote()) == "none")) {
+        SS2K_LOG(BLE_CLIENT_LOG_TAG, "Skipping non-selected Remote |%s|%s", aDevName.c_str(), userConfig->getConnectedRemote());
         return;
-      } else if (aDevName == String(userConfig.getConnectedRemote())) {
+      } else if (aDevName == String(userConfig->getConnectedRemote())) {
         SS2K_LOG(BLE_CLIENT_LOG_TAG, "Remote String Matched %s", aDevName.c_str());
       }
     } else if (advertisedDevice->getServiceUUID() == HEARTSERVICE_UUID) {
-      if (String(userConfig.getConnectedHeartMonitor()) == "any") {
+      if (String(userConfig->getConnectedHeartMonitor()) == "any") {
         SS2K_LOG(BLE_CLIENT_LOG_TAG, "HR String Matched Any");
         // continue
-      } else if (aDevName != String(userConfig.getConnectedHeartMonitor()) || (String(userConfig.getConnectedHeartMonitor()) == "none")) {
-        SS2K_LOG(BLE_CLIENT_LOG_TAG, "Skipping non-selected HRM |%s|%s", aDevName.c_str(), userConfig.getConnectedHeartMonitor());
+      } else if (aDevName != String(userConfig->getConnectedHeartMonitor()) || (String(userConfig->getConnectedHeartMonitor()) == "none")) {
+        SS2K_LOG(BLE_CLIENT_LOG_TAG, "Skipping non-selected HRM |%s|%s", aDevName.c_str(), userConfig->getConnectedHeartMonitor());
         return;
-      } else if (aDevName == String(userConfig.getConnectedHeartMonitor())) {
+      } else if (aDevName == String(userConfig->getConnectedHeartMonitor())) {
         SS2K_LOG(BLE_CLIENT_LOG_TAG, "HR String Matched %s", aDevName.c_str());
       }
     } else {
-      if (String(userConfig.getConnectedPowerMeter()) == "any") {
+      if (String(userConfig->getConnectedPowerMeter()) == "any") {
         SS2K_LOG(BLE_CLIENT_LOG_TAG, "PM String Matched Any");
         // continue
-      } else if (aDevName != String(userConfig.getConnectedPowerMeter()) || (String(userConfig.getConnectedPowerMeter()) == "none")) {
-        SS2K_LOG(BLE_CLIENT_LOG_TAG, "Skipping non-selected PM |%s|%s", aDevName.c_str(), userConfig.getConnectedPowerMeter());
+      } else if (aDevName != String(userConfig->getConnectedPowerMeter()) || (String(userConfig->getConnectedPowerMeter()) == "none")) {
+        SS2K_LOG(BLE_CLIENT_LOG_TAG, "Skipping non-selected PM |%s|%s", aDevName.c_str(), userConfig->getConnectedPowerMeter());
         return;
-      } else if (aDevName == String(userConfig.getConnectedPowerMeter())) {
+      } else if (aDevName == String(userConfig->getConnectedPowerMeter())) {
         SS2K_LOG(BLE_CLIENT_LOG_TAG, "PM String Matched %s", aDevName.c_str());
       }
     }
@@ -487,7 +487,7 @@ void SpinBLEClient::scanProcess(int duration) {
 #ifdef USE_TELEGRAM
   SEND_TO_TELEGRAM("Bluetooth Client Found Devices: " + output);
 #endif
-  userConfig.setFoundDevices(output);
+  userConfig->setFoundDevices(output);
   pBLEScan = nullptr;  // free up memory
 }
 
@@ -562,16 +562,16 @@ void SpinBLEClient::FTMSControlPointWrite(const uint8_t *pData, int length) {
         const int kLogBufCapacity = length + 40;
         char logBuf[kLogBufCapacity];
         if (modData[0] == FitnessMachineControlPointProcedure::SetIndoorBikeSimulationParameters) {  // use virtual Shifting
-          int incline = ss2k.targetPosition / userConfig.getInclineMultiplier();
+          int incline = ss2k->targetPosition / userConfig->getInclineMultiplier();
           modData[3]  = (uint8_t)(incline & 0xff);
           modData[4]  = (uint8_t)(incline >> 8);
           writeCharacteristic->writeValue(modData, length);
           logBufLength = ss2k_log_hex_to_buffer(modData, length, logBuf, 0, kLogBufCapacity);
-          logBufLength += snprintf(logBuf + logBufLength, kLogBufCapacity - logBufLength, "-> Shifted Sim Data: %d", rtConfig.getShifterPosition());
+          logBufLength += snprintf(logBuf + logBufLength, kLogBufCapacity - logBufLength, "-> Shifted Sim Data: %d", rtConfig->getShifterPosition());
         } else {
           writeCharacteristic->writeValue(modData, length);
           logBufLength = ss2k_log_hex_to_buffer(modData, length, logBuf, 0, kLogBufCapacity);
-          logBufLength += snprintf(logBuf + logBufLength, kLogBufCapacity - logBufLength, "-> Shifted ERG Data: %d", rtConfig.getShifterPosition());
+          logBufLength += snprintf(logBuf + logBufLength, kLogBufCapacity - logBufLength, "-> Shifted ERG Data: %d", rtConfig->getShifterPosition());
         }
         SS2K_LOG(BLE_CLIENT_LOG_TAG, "%s", logBuf);
       }
@@ -596,8 +596,8 @@ void SpinBLEClient::postConnect() {
           byte message[] = {0xF0, 0xB0, 0x01, 0x01, 0xA2};
           writeCharacteristic->writeValue(message, 5);
           SS2K_LOG(BLE_CLIENT_LOG_TAG, "Activated Echelon callbacks.");
-          rtConfig.setMinResistance(MIN_ECHELON_RESISTANCE);
-          rtConfig.setMaxResistance(MAX_ECHELON_RESISTANCE);
+          rtConfig->setMinResistance(MIN_ECHELON_RESISTANCE);
+          rtConfig->setMaxResistance(MAX_ECHELON_RESISTANCE);
         }
 
         if (this->myBLEDevices[i].charUUID == FITNESSMACHINEINDOORBIKEDATA_UUID) {
@@ -749,13 +749,13 @@ void SpinBLEClient::keepAliveBLE_HID(NimBLEClient *pClient) {
 
 void SpinBLEClient::checkBLEReconnect() {
   bool scan = false;
-  if ((String(userConfig.getConnectedHeartMonitor()) != "none") && !(spinBLEClient.connectedHRM)) {
+  if ((String(userConfig->getConnectedHeartMonitor()) != "none") && !(spinBLEClient.connectedHRM)) {
     scan = true;
   }
-  if ((String(userConfig.getConnectedPowerMeter()) != "none") && !(spinBLEClient.connectedPM)) {
+  if ((String(userConfig->getConnectedPowerMeter()) != "none") && !(spinBLEClient.connectedPM)) {
     scan = true;
   }
-  if ((String(userConfig.getConnectedRemote()) != "none") && !(spinBLEClient.connectedRemote)) {
+  if ((String(userConfig->getConnectedRemote()) != "none") && !(spinBLEClient.connectedRemote)) {
     scan = true;
   }
   if (scan) {
@@ -822,20 +822,20 @@ void SpinBLEClient::handleBattInfo(NimBLEClient *pClient, bool updateNow = false
       BLERemoteCharacteristic *battCharacteristic = pClient->getService(BATTERYSERVICE_UUID)->getCharacteristic(BATTERYCHARACTERISTIC_UUID);
       if (battCharacteristic != nullptr) {
         std::string value = battCharacteristic->readValue();
-        rtConfig.hr_batt.setValue((uint8_t)value[0]);
+        rtConfig->hr_batt.setValue((uint8_t)value[0]);
         SS2K_LOG(BLE_CLIENT_LOG_TAG, "HRM battery updated %d", (int)value[0]);
       } else {
-        rtConfig.hr_batt.setValue(0);
+        rtConfig->hr_batt.setValue(0);
       }
     } else if ((pClient->getService(CYCLINGPOWERMEASUREMENT_UUID) || pClient->getService(CYCLINGPOWERSERVICE_UUID)) &&
                pClient->getService(BATTERYSERVICE_UUID)) {  // get batterylevel at first connect
       BLERemoteCharacteristic *battCharacteristic = pClient->getService(BATTERYSERVICE_UUID)->getCharacteristic(BATTERYCHARACTERISTIC_UUID);
       if (battCharacteristic != nullptr) {
         std::string value = battCharacteristic->readValue();
-        rtConfig.pm_batt.setValue((uint8_t)value[0]);
+        rtConfig->pm_batt.setValue((uint8_t)value[0]);
         SS2K_LOG(BLE_CLIENT_LOG_TAG, "PM battery updated %d", (int)value[0]);
       } else {
-        rtConfig.pm_batt.setValue(0);
+        rtConfig->pm_batt.setValue(0);
       }
     }
   }

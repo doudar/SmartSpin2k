@@ -82,8 +82,8 @@ void BLECommunications(void *pvParameters) {
     }
 
     // ***********************************SERVER**************************************
-    if ((spinBLEClient.connectedHRM || rtConfig.hr.getSimulate()) && !spinBLEClient.connectedPM && !rtConfig.watts.getSimulate() && (rtConfig.hr.getValue() > 0) &&
-        userPWC.hr2Pwr) {
+    if ((spinBLEClient.connectedHRM || rtConfig->hr.getSimulate()) && !spinBLEClient.connectedPM && !rtConfig->watts.getSimulate() && (rtConfig->hr.getValue() > 0) &&
+        userPWC->hr2Pwr) {
       calculateInstPwrFromHR();
       hr2p = true;
     } else {
@@ -93,12 +93,12 @@ void BLECommunications(void *pvParameters) {
     calculateInstPwrFromHR();
 #endif  // DEBUG_HR_TO_PWR
 
-    if (!spinBLEClient.connectedPM && !hr2p && !rtConfig.watts.getSimulate() && !rtConfig.cad.getSimulate()) {
-      rtConfig.cad.setValue(0);
-      rtConfig.watts.setValue(0);
+    if (!spinBLEClient.connectedPM && !hr2p && !rtConfig->watts.getSimulate() && !rtConfig->cad.getSimulate()) {
+      rtConfig->cad.setValue(0);
+      rtConfig->watts.setValue(0);
     }
-    if (!spinBLEClient.connectedHRM && !rtConfig.hr.getSimulate()) {
-      rtConfig.hr.setValue(0);
+    if (!spinBLEClient.connectedHRM && !rtConfig->hr.getSimulate()) {
+      rtConfig->hr.setValue(0);
     }
 
     if (connectedClientCount() > 0) {

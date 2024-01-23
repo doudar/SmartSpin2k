@@ -13,7 +13,7 @@
 
 void setupBLE() {  // Common BLE setup for both client and server
   SS2K_LOG(BLE_SETUP_LOG_TAG, "Starting Arduino BLE Client application...");
-  BLEDevice::init(userConfig.getDeviceName());
+  BLEDevice::init(userConfig->getDeviceName());
   FTMSWrite = "";
   spinBLEClient.start();
   startBLEServer();
@@ -28,10 +28,10 @@ void setupBLE() {  // Common BLE setup for both client and server
 
   SS2K_LOG(BLE_SETUP_LOG_TAG, "BLE Notify Task Started");
   /*vTaskDelay(100 / portTICK_PERIOD_MS);
-  if (strcmp(userConfig.getConnectedPowerMeter(), "none") != 0 || strcmp(userConfig.getConnectedHeartMonitor(), "none") != 0) {
+  if (strcmp(userConfig->getConnectedPowerMeter(), "none") != 0 || strcmp(userConfig->getConnectedHeartMonitor(), "none") != 0) {
     spinBLEClient.serverScan(true);
     SS2K_LOG(BLE_SETUP_LOG_TAG, "Scanning");
   }*/
-  SS2K_LOG(BLE_SETUP_LOG_TAG, "%s %s %s", userConfig.getConnectedPowerMeter(), userConfig.getConnectedHeartMonitor(), userConfig.getConnectedRemote());
+  SS2K_LOG(BLE_SETUP_LOG_TAG, "%s %s %s", userConfig->getConnectedPowerMeter(), userConfig->getConnectedHeartMonitor(), userConfig->getConnectedRemote());
   SS2K_LOG(BLE_SETUP_LOG_TAG, "End BLE Setup");
 }
