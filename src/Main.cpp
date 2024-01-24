@@ -35,10 +35,10 @@ Boards boards;
 Board currentBoard;
 
 ///////////// Initialize the Config /////////////
-SS2K *ss2k;
-userParameters *userConfig;
-RuntimeParameters *rtConfig;
-physicalWorkingCapacity *userPWC;
+SS2K *ss2k = new SS2K;
+userParameters *userConfig = new userParameters;
+RuntimeParameters *rtConfig = new RuntimeParameters;
+physicalWorkingCapacity *userPWC = new physicalWorkingCapacity;
 
 ///////////// Log Appender /////////////
 UdpAppender udpAppender;
