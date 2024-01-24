@@ -386,7 +386,7 @@ void ss2kCustomCharacteristicCallbacks::onWrite(BLECharacteristic *pCharacterist
       logBufLength += snprintf(logBuf + logBufLength, kLogBufCapacity - logBufLength, "<-saveToLittleFS");
       if (rxValue[0] == write) {
         userConfig->setSaveFlag(true);
-        returnValue[0]      = success;
+        returnValue[0] = success;
       }
 
       break;
@@ -465,7 +465,23 @@ void ss2kCustomCharacteristicCallbacks::onWrite(BLECharacteristic *pCharacterist
         return;
       }
       break;
+
+    case BLE_ERGSensitivity: {  // 0x1F
+      logBufLength += snprintf(logBuf + logBufLength, kLogBufCapacity - logBufLength, "<-ERGSensitivity");
+      returnValue[0] = success;
+      int pcf        = userConfig->getERGSensitivity() * 10;
+      if (rxValue[0] == read) {
+        returnValue[2] = (uint8_t)(pcf & 0xff);
+        returnValue[3] = (uint8_t)(pcf >> 8);
+        returnLength += 2;
+      }
+      if (rxValue[0] == write) {
+        userConfig->setERGSensitivity(bytes_to_u16(rxValue[3], rxValue[2]) / 10);
+        logBufLength += snprintf(logBuf + logBufLength, kLogBufCapacity - logBufLength, "(%f)", userConfig->getERGSensitivity());
+      }
+    } break;
   }
+
   SS2K_LOG(CUSTOM_CHAR_LOG_TAG, "%s", logBuf);
   if (returnString == "") {
     pCharacteristic->setValue(returnValue, returnLength);

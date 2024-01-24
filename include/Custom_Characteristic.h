@@ -38,3 +38,4 @@
 #define BLE_reboot                0x1C
 #define BLE_resetToDefaults       0x1D
 #define BLE_stepperSpeed          0x1E
+#define BLE_ERGSensitivity        0x1F
