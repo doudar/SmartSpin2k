@@ -6,6 +6,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 ### Added
 - Added pass through shifting in both ERG and SIM mode. 
+- Refined and added BLE custom characteristics for upcoming configuration app. 
+- 
 ### Changed
 - Updated communications overview picture.
 - Updated kit purchasing links. 
