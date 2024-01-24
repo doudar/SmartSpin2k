@@ -35,10 +35,10 @@ Boards boards;
 Board currentBoard;
 
 ///////////// Initialize the Config /////////////
-SS2K *ss2k                       = new SS2K;
-userParameters *userConfig       = new userParameters;
-RuntimeParameters *rtConfig      = new RuntimeParameters;
-physicalWorkingCapacity *userPWC = new physicalWorkingCapacity;
+SS2K *ss2k                       = SS2K;
+userParameters *userConfig       = userParameters;
+RuntimeParameters *rtConfig      = RuntimeParameters;
+physicalWorkingCapacity *userPWC = physicalWorkingCapacity;
 
 ///////////// Log Appender /////////////
 UdpAppender udpAppender;
@@ -206,7 +206,7 @@ void SS2K::maintenanceLoop(void *pvParameters) {
       userConfig->saveToLittleFS();
       userPWC->saveToLittleFS();
     }
-    
+
     if ((millis() - intervalTimer) > 2003) {  // add check here for when to restart WiFi
                                               // maybe if in STA mode and 8.8.8.8 no ping return?
       // ss2k->restartWifi();

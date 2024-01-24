@@ -297,12 +297,12 @@
 #define BLE_RECONNECT_SCAN_DURATION 15
 
 //Task Stack Sizes
-#define MAIN_STACK 3500
-#define ERG_STACK 3500
-#define HTTP_STACK 5000
-#define BLE_COMM_STACK 5000
+#define MAIN_STACK 4500
+#define ERG_STACK 6500
+#define HTTP_STACK 6000
+#define BLE_COMM_STACK 6000
 #define BLE_CLIENT_STACK 5000
-#define STEPPER_STACK 2000
+#define STEPPER_STACK 1700
 
 // Uncomment to enable stack size debugging info
 // #define DEBUG_STACK
