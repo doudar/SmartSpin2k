@@ -45,7 +45,6 @@ void ss2kCustomCharacteristicCallbacks::onWrite(BLECharacteristic *pCharacterist
   uint8_t write       = 0x02;  // Value to request write operation
   uint8_t error       = 0xff;  // value server error/unable
   uint8_t success     = 0x80;  // value for success
-  bool reboot         = false;
 
   uint8_t *pData = reinterpret_cast<uint8_t *>(&rxValue[0]);
   int length     = rxValue.length();
@@ -385,7 +384,7 @@ void ss2kCustomCharacteristicCallbacks::onWrite(BLECharacteristic *pCharacterist
     case BLE_saveToLittleFS:  // 0x18
       logBufLength += snprintf(logBuf + logBufLength, kLogBufCapacity - logBufLength, "<-saveToLittleFS");
       if (rxValue[0] == write) {
-        userConfig->setSaveFlag(true);
+        ss2k->saveFlag = true;
         returnValue[0] = success;
       }
 
@@ -436,7 +435,7 @@ void ss2kCustomCharacteristicCallbacks::onWrite(BLECharacteristic *pCharacterist
     case BLE_reboot:  // 0x1C
       logBufLength += snprintf(logBuf + logBufLength, kLogBufCapacity - logBufLength, "<-reboot");
       if (rxValue[0] == write) {
-        reboot         = true;
+        ss2k->rebootFlag = true;
         returnValue[0] = success;
       }
       break;
@@ -496,8 +495,4 @@ void ss2kCustomCharacteristicCallbacks::onWrite(BLECharacteristic *pCharacterist
   }
 
   pCharacteristic->indicate();
-  if (reboot) {
-    vTaskDelay(10);
-    ESP.restart();
-  }
 }

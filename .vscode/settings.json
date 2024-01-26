@@ -82,5 +82,6 @@
         "userconfig",
         "VERSIONFILE",
         "WEBSERVER"
-    ]
+    ],
+    "cmake.configureOnOpen": true
 }

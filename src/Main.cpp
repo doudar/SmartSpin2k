@@ -200,9 +200,14 @@ void SS2K::maintenanceLoop(void *pvParameters) {
       ss2k->txSerial();
     }
 
+    if(ss2k->rebootFlag){
+      vTaskDelay(100/portTICK_RATE_MS);
+      ESP.restart();
+    }
+
     // required to set a flag instead of directly calling the function for saving from BLE_Custom Characteristic.
-    if (userConfig->getSaveFlag()) {
-      userConfig->setSaveFlag(false);
+    if (ss2k->saveFlag) {
+      ss2k->saveFlag = false;
       userConfig->saveToLittleFS();
       userPWC->saveToLittleFS();
     }

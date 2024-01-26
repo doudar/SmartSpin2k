@@ -35,10 +35,12 @@ class SS2K {
   bool externalControl;
   bool syncMode;
   int txCheck;
+  bool rebootFlag = false;
+  bool saveFlag   = false;
 
   bool IRAM_ATTR deBounce();
-  static void IRAM_ATTR moveStepper(void* pvParameters);
-  static void IRAM_ATTR maintenanceLoop(void* pvParameters);
+  static void IRAM_ATTR moveStepper(void *pvParameters);
+  static void IRAM_ATTR maintenanceLoop(void *pvParameters);
   static void IRAM_ATTR shiftUp();
   static void IRAM_ATTR shiftDown();
   void resetIfShiftersHeld();
