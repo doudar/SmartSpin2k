@@ -63,6 +63,7 @@ void ss2kCustomCharacteristicCallbacks::onWrite(BLECharacteristic *pCharacterist
   }
 
   switch (rxValue[1]) {
+    
     case BLE_firmwareUpdateURL:  // 0x01
       logBufLength += snprintf(logBuf + logBufLength, kLogBufCapacity - logBufLength, "<-Firmware Update URL");
       returnValue[0] = success;
