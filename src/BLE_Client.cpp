@@ -159,11 +159,8 @@ bool SpinBLEClient::connectToServer() {
     // spinBLEClient.serverScan(true);
     return false;
   }
-  String t_name = "";
-  if (myDevice->haveName()) {
-    String t_name = myDevice->getName().c_str();
-  }
-  SS2K_LOG(BLE_CLIENT_LOG_TAG, "Forming a connection to: %s %s", t_name.c_str(), myDevice->getAddress().toString().c_str());
+
+  SS2K_LOG(BLE_CLIENT_LOG_TAG, "Forming a connection to: %s %s", myDevice->haveName() ? myDevice->getName() : "", myDevice->getAddress().toString().c_str());
 
   NimBLEClient *pClient = nullptr;
 
@@ -377,7 +374,7 @@ void MyClientCallback::onAuthenticationComplete(ble_gap_conn_desc desc) { SS2K_L
  */
 
 void MyAdvertisedDeviceCallback::onResult(BLEAdvertisedDevice *advertisedDevice) {
-  char aDevName[40]; //40 should be enough for anybody!
+  char aDevName[40];  // 40 should be enough for anybody!
   (advertisedDevice->haveName()) ? strcpy(aDevName, advertisedDevice->getName().c_str()) : strcpy(aDevName, advertisedDevice->getAddress().toString().c_str());
 
   if ((advertisedDevice->haveServiceUUID()) &&
@@ -455,10 +452,11 @@ void SpinBLEClient::scanProcess(int duration) {
     if (d.isAdvertisingService(CYCLINGPOWERSERVICE_UUID) || d.isAdvertisingService(HEARTSERVICE_UUID) || d.isAdvertisingService(FLYWHEEL_UART_SERVICE_UUID) ||
         d.isAdvertisingService(FITNESSMACHINESERVICE_UUID) || d.isAdvertisingService(ECHELON_DEVICE_UUID) || d.isAdvertisingService(HID_SERVICE_UUID)) {
       device                     = "device " + String(i);
-      devices[device]["address"] = d.getAddress().toString();
 
       if (d.haveName()) {
         devices[device]["name"] = d.getName();
+      }else {
+        devices[device]["address"] = d.getAddress().toString();
       }
 
       if (d.haveServiceUUID()) {
