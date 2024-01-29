@@ -39,3 +39,4 @@
 #define BLE_resetToDefaults       0x1D
 #define BLE_stepperSpeed          0x1E
 #define BLE_ERGSensitivity        0x1F
+#define BLE_shiftDir              0x20

@@ -415,7 +415,7 @@ void ss2kCustomCharacteristicCallbacks::onWrite(BLECharacteristic *pCharacterist
       }
       if (rxValue[0] == write) {
         ss2k->externalControl = static_cast<bool>(rxValue[2]);
-        logBufLength += snprintf(logBuf + logBufLength, kLogBufCapacity - logBufLength, "(%B)", ss2k->externalControl);
+        logBufLength += snprintf(logBuf + logBufLength, kLogBufCapacity - logBufLength, "(%s)", ss2k->externalControl? "On" : "Off");
       }
       break;
 
@@ -436,7 +436,7 @@ void ss2kCustomCharacteristicCallbacks::onWrite(BLECharacteristic *pCharacterist
       logBufLength += snprintf(logBuf + logBufLength, kLogBufCapacity - logBufLength, "<-reboot");
       if (rxValue[0] == write) {
         ss2k->rebootFlag = true;
-        returnValue[0] = success;
+        returnValue[0]   = success;
       }
       break;
 
@@ -479,6 +479,19 @@ void ss2kCustomCharacteristicCallbacks::onWrite(BLECharacteristic *pCharacterist
         logBufLength += snprintf(logBuf + logBufLength, kLogBufCapacity - logBufLength, "(%f)", userConfig->getERGSensitivity());
       }
     } break;
+
+    case BLE_shiftDir:  // 0x20
+      logBufLength += snprintf(logBuf + logBufLength, kLogBufCapacity - logBufLength, "<-ShiftDir");
+      returnValue[0] = success;
+      if (rxValue[0] == read) {
+        returnValue[2] = (uint8_t)(userConfig->getShifterDir());
+        returnLength += 1;
+      }
+      if (rxValue[0] == write) {
+        userConfig->setShifterDir(static_cast<bool>(rxValue[2]));
+        logBufLength += snprintf(logBuf + logBufLength, kLogBufCapacity - logBufLength, "(%s)", userConfig->getShifterDir() ? "Normal" : "Reverse");
+      }
+      break;
   }
 
   SS2K_LOG(CUSTOM_CHAR_LOG_TAG, "%s", logBuf);
