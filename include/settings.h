@@ -38,7 +38,7 @@
 #define configFILENAME "/config.txt"
 
 // name of local file to save Physical Working Capacity in LittleFS
-#define userPWCFILENAME "/userPWC->txt"
+#define userPWCFILENAME "/userPWC.txt"
 
 // name of the local file to save the torque table. 
 #define TORQUE_TABLE_FILENAME "/TorqueTable.txt"

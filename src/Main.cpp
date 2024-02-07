@@ -35,9 +35,9 @@ Boards boards;
 Board currentBoard;
 
 ///////////// Initialize the Config /////////////
-SS2K *ss2k = new SS2K;
-userParameters *userConfig = new userParameters;
-RuntimeParameters *rtConfig = new RuntimeParameters;
+SS2K *ss2k                       = new SS2K;
+userParameters *userConfig       = new userParameters;
+RuntimeParameters *rtConfig      = new RuntimeParameters;
 physicalWorkingCapacity *userPWC = new physicalWorkingCapacity;
 
 ///////////// Log Appender /////////////
@@ -190,6 +190,7 @@ void SS2K::maintenanceLoop(void *pvParameters) {
   static int loopCounter              = 0;
   static unsigned long intervalTimer  = millis();
   static unsigned long intervalTimer2 = millis();
+  static unsigned long rebootTimer    = millis();
   static bool isScanning              = false;
 
   while (true) {
@@ -200,8 +201,8 @@ void SS2K::maintenanceLoop(void *pvParameters) {
       ss2k->txSerial();
     }
 
-    if(ss2k->rebootFlag){
-      vTaskDelay(100/portTICK_RATE_MS);
+    if (ss2k->rebootFlag) {
+      vTaskDelay(100 / portTICK_RATE_MS);
       ESP.restart();
     }
 
@@ -232,6 +233,19 @@ void SS2K::maintenanceLoop(void *pvParameters) {
       }
       intervalTimer2 = millis();
     }
+
+    // reboot every half hour if not in use.
+    if ((millis() - rebootTimer) > 1800000) {
+      if (NimBLEDevice::getServer()) {
+        if (!(NimBLEDevice::getServer()->getConnectedCount())) {
+          SS2K_LOGW(MAIN_LOG_TAG, "Rebooting due to inactivity");
+          ss2k->rebootFlag = true;
+        }else{
+          rebootTimer = millis();
+        }
+      }
+    }
+
     if (loopCounter > 10) {
       ss2k->checkDriverTemperature();
 
