@@ -630,7 +630,7 @@ void HTTP_Server::settingsProcessor() {
         myIP.toString() + "/index.html';\",1000);</script></html>";
   }
   SS2K_LOG(HTTP_SERVER_LOG_TAG, "Config Updated From Web");
-  userConfig->setSaveFlag(true);
+  ss2k->saveFlag = true;
   if (reboot) {
     response +=
         "Please wait while your settings are saved and SmartSpin2k reboots.</h2></body><script> "

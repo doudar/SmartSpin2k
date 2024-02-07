@@ -45,7 +45,6 @@ void ss2kCustomCharacteristicCallbacks::onWrite(BLECharacteristic *pCharacterist
   uint8_t write       = 0x02;  // Value to request write operation
   uint8_t error       = 0xff;  // value server error/unable
   uint8_t success     = 0x80;  // value for success
-  bool reboot         = false;
 
   uint8_t *pData = reinterpret_cast<uint8_t *>(&rxValue[0]);
   int length     = rxValue.length();
@@ -386,7 +385,7 @@ void ss2kCustomCharacteristicCallbacks::onWrite(BLECharacteristic *pCharacterist
     case BLE_saveToLittleFS:  // 0x18
       logBufLength += snprintf(logBuf + logBufLength, kLogBufCapacity - logBufLength, "<-saveToLittleFS");
       if (rxValue[0] == write) {
-        userConfig->setSaveFlag(true);
+        ss2k->saveFlag = true;
         returnValue[0] = success;
       }
 
@@ -417,7 +416,7 @@ void ss2kCustomCharacteristicCallbacks::onWrite(BLECharacteristic *pCharacterist
       }
       if (rxValue[0] == write) {
         ss2k->externalControl = static_cast<bool>(rxValue[2]);
-        logBufLength += snprintf(logBuf + logBufLength, kLogBufCapacity - logBufLength, "(%B)", ss2k->externalControl);
+        logBufLength += snprintf(logBuf + logBufLength, kLogBufCapacity - logBufLength, "(%s)", ss2k->externalControl? "On" : "Off");
       }
       break;
 
@@ -437,8 +436,8 @@ void ss2kCustomCharacteristicCallbacks::onWrite(BLECharacteristic *pCharacterist
     case BLE_reboot:  // 0x1C
       logBufLength += snprintf(logBuf + logBufLength, kLogBufCapacity - logBufLength, "<-reboot");
       if (rxValue[0] == write) {
-        reboot         = true;
-        returnValue[0] = success;
+        ss2k->rebootFlag = true;
+        returnValue[0]   = success;
       }
       break;
 
@@ -481,6 +480,19 @@ void ss2kCustomCharacteristicCallbacks::onWrite(BLECharacteristic *pCharacterist
         logBufLength += snprintf(logBuf + logBufLength, kLogBufCapacity - logBufLength, "(%f)", userConfig->getERGSensitivity());
       }
     } break;
+
+    case BLE_shiftDir:  // 0x20
+      logBufLength += snprintf(logBuf + logBufLength, kLogBufCapacity - logBufLength, "<-ShiftDir");
+      returnValue[0] = success;
+      if (rxValue[0] == read) {
+        returnValue[2] = (uint8_t)(userConfig->getShifterDir());
+        returnLength += 1;
+      }
+      if (rxValue[0] == write) {
+        userConfig->setShifterDir(static_cast<bool>(rxValue[2]));
+        logBufLength += snprintf(logBuf + logBufLength, kLogBufCapacity - logBufLength, "(%s)", userConfig->getShifterDir() ? "Normal" : "Reverse");
+      }
+      break;
   }
 
   SS2K_LOG(CUSTOM_CHAR_LOG_TAG, "%s", logBuf);
@@ -497,8 +509,4 @@ void ss2kCustomCharacteristicCallbacks::onWrite(BLECharacteristic *pCharacterist
   }
 
   pCharacteristic->indicate();
-  if (reboot) {
-    vTaskDelay(10);
-    ESP.restart();
-  }
 }

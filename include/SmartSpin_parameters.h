@@ -123,7 +123,7 @@ class userParameters {
   bool shifterDir;
   bool udpLogEnabled = false;
   bool logComm       = false;
-  bool saveFlag      = false;
+ 
   String ssid;
   String password;
   String connectedPowerMeter   = CONNECTED_POWER_METER;
@@ -194,9 +194,6 @@ class userParameters {
 
   void setLogComm(bool lgcm) { logComm = lgcm; }
   bool getLogComm() { return logComm; }
-
-  void setSaveFlag(bool sf) { saveFlag = sf; }
-  bool getSaveFlag() { return saveFlag; }
 
   void setFoundDevices(String fdv) { foundDevices = fdv; }
   const char* getFoundDevices() { return foundDevices.c_str(); }
