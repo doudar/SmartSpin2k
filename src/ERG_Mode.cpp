@@ -567,7 +567,7 @@ void ErgMode::computeErg() {
   }
 
   // SetPoint changed
-  if (this->setPoint != newWatts.getTarget()) {
+  if (abs(this->setPoint - newWatts.getTarget() > 20)) {
     _setPointChangeState(newCadence, newWatts);
     return;
   }
