@@ -410,7 +410,7 @@ void processFTMSWrite() {
       } break;
 
       case FitnessMachineControlPointProcedure::SetTargetInclination: {
-        rtConfig.setFTMSMode((uint8_t)rxValue[0]);
+        rtConfig->setFTMSMode((uint8_t)rxValue[0]);
         returnValue[2] = FitnessMachineControlPointResultCode::Success;  // 0x01;
         pCharacteristic->setValue(returnValue, 3);
 
@@ -427,7 +427,7 @@ void processFTMSWrite() {
       } break;
 
       case FitnessMachineControlPointProcedure::SetTargetResistanceLevel: {
-        rtConfig.setFTMSMode((uint8_t)rxValue[0]);
+        rtConfig->setFTMSMode((uint8_t)rxValue[0]);
         returnValue[2]        = FitnessMachineControlPointResultCode::Success;  // 0x01;
         ftmsTrainingStatus[1] = FitnessMachineTrainingStatus::Other;            // 0x00;
         fitnessMachineTrainingStatus->setValue(ftmsTrainingStatus, 2);
@@ -452,7 +452,7 @@ void processFTMSWrite() {
 
       case FitnessMachineControlPointProcedure::SetTargetPower: {
         rtConfig->setFTMSMode((uint8_t)rxValue[0]);
-        if (spinBLEClient.connectedPM || rtConfig.watts.getSimulate()) {
+        if (spinBLEClient.connectedPM || rtConfig->watts.getSimulate()) {
           returnValue[2] = FitnessMachineControlPointResultCode::Success;  // 0x01;
 
           rtConfig->watts.setTarget(bytes_to_u16(rxValue[2], rxValue[1]));
@@ -497,7 +497,7 @@ void processFTMSWrite() {
       } break;
 
       case FitnessMachineControlPointProcedure::SetIndoorBikeSimulationParameters: {  // sim mode
-        rtConfig.setFTMSMode((uint8_t)rxValue[0]);
+        rtConfig->setFTMSMode((uint8_t)rxValue[0]);
         returnValue[2] = FitnessMachineControlPointResultCode::Success;               // 0x01;
         pCharacteristic->setValue(returnValue, 3);
 
@@ -525,7 +525,7 @@ void processFTMSWrite() {
       } break;
 
       case FitnessMachineControlPointProcedure::SpinDownControl: {
-        rtConfig.setFTMSMode((uint8_t)rxValue[0]);
+        rtConfig->setFTMSMode((uint8_t)rxValue[0]);
         uint8_t controlPoint[6] = {FitnessMachineControlPointProcedure::ResponseCode, 0x01, 0x24, 0x03, 0x96, 0x0e};  // send low and high speed targets
         pCharacteristic->setValue(controlPoint, 6);
         logBufLength += snprintf(logBuf + logBufLength, kLogBufCapacity - logBufLength, "-> Spin Down Requested");
@@ -537,7 +537,7 @@ void processFTMSWrite() {
       } break;
 
       case FitnessMachineControlPointProcedure::SetTargetedCadence: {
-        rtConfig.setFTMSMode((uint8_t)rxValue[0]);
+        rtConfig->setFTMSMode((uint8_t)rxValue[0]);
         returnValue[2] = FitnessMachineControlPointResultCode::Success;  // 0x01;
         pCharacteristic->setValue(returnValue, 3);
 
