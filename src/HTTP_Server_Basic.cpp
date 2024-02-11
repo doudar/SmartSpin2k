@@ -529,11 +529,6 @@ void HTTP_Server::settingsProcessor() {
   } else if (wasSettingsUpdate) {
     userConfig->setUdpLogEnabled(false);
   }
-  if (!server.arg("logComm").isEmpty()) {
-    userConfig->setLogComm(true);
-  } else if (wasSettingsUpdate) {
-    userConfig->setLogComm(false);
-  }
   if (!server.arg("stealthChop").isEmpty()) {
     userConfig->setStealthChop(true);
     ss2k->updateStealthChop();

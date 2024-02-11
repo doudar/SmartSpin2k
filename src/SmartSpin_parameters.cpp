@@ -67,7 +67,6 @@ void userParameters::setDefaults() {
   stepperDir            = true;
   shifterDir            = true;
   udpLogEnabled         = false;
-  logComm               = false;
 }
 
 //---------------------------------------------------------------------------------
@@ -101,7 +100,6 @@ String userParameters::returnJSON() {
   doc["shifterDir"]            = shifterDir;
   doc["stepperDir"]            = stepperDir;
   doc["udpLogEnabled"]         = udpLogEnabled;
-  doc["logComm"]               = logComm;
 
   String output;
   serializeJson(doc, output);
@@ -150,7 +148,6 @@ void userParameters::saveToLittleFS() {
   doc["shifterDir"]            = shifterDir;
   doc["stepperDir"]            = stepperDir;
   doc["udpLogEnabled"]         = udpLogEnabled;
-  doc["logComm"]               = logComm;
 
   // Serialize JSON to file
   if (serializeJson(doc, file) == 0) {
@@ -217,9 +214,6 @@ void userParameters::loadFromLittleFS() {
   }
   if (!doc["udpLogEnabled"].isNull()) {
     setUdpLogEnabled(doc["udpLogEnabled"]);
-  }
-  if (!doc["logComm"].isNull()) {
-    setLogComm(doc["logComm"]);
   }
   if (doc["powerCorrectionFactor"]) {
     setPowerCorrectionFactor(doc["powerCorrectionFactor"]);
