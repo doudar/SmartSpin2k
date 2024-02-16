@@ -86,14 +86,14 @@ class otaCallback : public BLECharacteristicCallbacks {
       if (esp_ota_write(otaHandler, (uint8_t *)rxData.c_str(), rxData.length()) != ESP_OK) {
         SS2K_LOG(BLE_SERVER_LOG_TAG, "Error: write to flash failed");
         downloadFlag = false;
-        pTxCharacteristic->setValue(&txValue, 0);
+        pTxCharacteristic->setValue(&txValue, 4);
         return;
       } else {
         bufferCount = 1;
         // SS2K_LOG(BLE_SERVER_LOG_TAG, "--Data received---");
         // Notify the iOS app so next batch can be sent
-        pTxCharacteristic->setValue(&txValue, 1);
-        //pTxCharacteristic->notify();
+        pTxCharacteristic->setValue(&txValue, 2);
+        pTxCharacteristic->notify();
       }
 
       //-------------------------------------------------------------------
@@ -111,10 +111,12 @@ class otaCallback : public BLECharacteristicCallbacks {
         if (esp_ota_end(otaHandler) != ESP_OK) {
           SS2K_LOG(BLE_SERVER_LOG_TAG, "OTA end failed ");
           downloadFlag = false;
-           pTxCharacteristic->setValue(&txValue, 0);
+           pTxCharacteristic->setValue(&txValue, 5);
+           pTxCharacteristic->notify();
           return;
         }
-
+        pTxCharacteristic->setValue(&txValue, 3);
+        pTxCharacteristic->notify();
         //-----------------------------------------------------------------
         // Clear download flag and restart the ESP32 if the firmware
         // update was successful
@@ -131,7 +133,8 @@ class otaCallback : public BLECharacteristicCallbacks {
           // Something went wrong, the upload was not successful
           //------------------------------------------------------------
           SS2K_LOG(BLE_SERVER_LOG_TAG, "Upload Error");
-           pTxCharacteristic->setValue(&txValue, 0);
+           pTxCharacteristic->setValue(&txValue, 5);
+           pTxCharacteristic->notify();
           downloadFlag = false;
           esp_ota_end(otaHandler);
           return;
