@@ -534,7 +534,7 @@ void SpinBLEClient::resetDevices(NimBLEClient *pClient) {
 
 // Control a connected FTMS trainer. If no args are passed, treat it like an external stepper motor.
 void SpinBLEClient::FTMSControlPointWrite(const uint8_t *pData, int length) {
-  if (userConfig.getFTMSControlPointWrite()) {
+  if (userConfig->getFTMSControlPointWrite()) {
     NimBLEClient *pClient = nullptr;
     uint8_t modData[7];
     for (int i = 0; i < length; i++) {
@@ -555,16 +555,16 @@ void SpinBLEClient::FTMSControlPointWrite(const uint8_t *pData, int length) {
         const int kLogBufCapacity = length + 40;
         char logBuf[kLogBufCapacity];
         if (modData[0] == FitnessMachineControlPointProcedure::SetIndoorBikeSimulationParameters) {  // use virtual Shifting
-          int incline = ss2k.targetPosition / userConfig.getInclineMultiplier();
+          int incline = ss2k->targetPosition / userConfig->getInclineMultiplier();
           modData[3]  = (uint8_t)(incline & 0xff);
           modData[4]  = (uint8_t)(incline >> 8);
           writeCharacteristic->writeValue(modData, length);
           logBufLength = ss2k_log_hex_to_buffer(modData, length, logBuf, 0, kLogBufCapacity);
-          logBufLength += snprintf(logBuf + logBufLength, kLogBufCapacity - logBufLength, "-> Shifted Sim Data: %d", rtConfig.getShifterPosition());
+          logBufLength += snprintf(logBuf + logBufLength, kLogBufCapacity - logBufLength, "-> Shifted Sim Data: %d", rtConfig->getShifterPosition());
         } else {
           writeCharacteristic->writeValue(modData, length);
           logBufLength = ss2k_log_hex_to_buffer(modData, length, logBuf, 0, kLogBufCapacity);
-          logBufLength += snprintf(logBuf + logBufLength, kLogBufCapacity - logBufLength, "-> Shifted ERG Data: %d", rtConfig.getShifterPosition());
+          logBufLength += snprintf(logBuf + logBufLength, kLogBufCapacity - logBufLength, "-> Shifted ERG Data: %d", rtConfig->getShifterPosition());
         }
         SS2K_LOG(BLE_CLIENT_LOG_TAG, "%s", logBuf);
       }
@@ -600,7 +600,7 @@ void SpinBLEClient::postConnect() {
             return;
           }
           // Start Training
-          if (userConfig.getFTMSControlPointWrite()) {
+          if (userConfig->getFTMSControlPointWrite()) {
             writeCharacteristic->writeValue(FitnessMachineControlPointProcedure::RequestControl, 1);
             vTaskDelay(BLE_NOTIFY_DELAY / portTICK_PERIOD_MS);
             writeCharacteristic->writeValue(FitnessMachineControlPointProcedure::StartOrResume, 1);
