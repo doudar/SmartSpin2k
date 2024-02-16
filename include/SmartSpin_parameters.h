@@ -122,6 +122,7 @@ class userParameters {
   bool shifterDir;
   bool udpLogEnabled = false;
   bool logComm       = false;
+  bool FTMSControlPointWrite = false;
   String ssid;
   String password;
   String connectedPowerMeter   = CONNECTED_POWER_METER;
@@ -141,6 +142,9 @@ class userParameters {
 
   void setStealthChop(bool sc) { stealthChop = sc; }
   bool getStealthChop() { return stealthChop; }
+
+  void setFTMSControlPointWrite(bool cpw) { FTMSControlPointWrite = cpw; }
+  bool getFTMSControlPointWrite() { return FTMSControlPointWrite; }
 
   void setInclineMultiplier(float im) { inclineMultiplier = im; }
   float getInclineMultiplier() { return inclineMultiplier; }
