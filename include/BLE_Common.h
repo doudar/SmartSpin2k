@@ -64,7 +64,7 @@ class SpinBLEServer {
     bool CyclingPowerMeasurement : 1;
     bool IndoorBikeData : 1;
   } clientSubscribed;
-
+  NimBLEServer *pServer = nullptr;
   void setClientSubscribed(NimBLEUUID pUUID, bool subscribe);
   void notifyShift();
 
@@ -84,6 +84,9 @@ void updateHeartRateMeasurementChar();
 int connectedClientCount();
 void controlPointIndicate();
 void processFTMSWrite();
+
+//BLE FIRMWARE UPDATER
+void BLEFirmwareSetup();
 
 // *****************************Client*****************************
 

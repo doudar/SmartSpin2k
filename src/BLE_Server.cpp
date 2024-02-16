@@ -17,8 +17,6 @@
 // BLE Server Settings
 SpinBLEServer spinBLEServer;
 
-NimBLEServer *pServer = nullptr;
-
 static MyCallbacks chrCallbacks;
 
 BLEService *pHeartService;
@@ -101,20 +99,20 @@ void logCharacteristic(char *buffer, const size_t bufferCapacity, const byte *da
 void startBLEServer() {
   // Server Setup
   SS2K_LOG(BLE_SERVER_LOG_TAG, "Starting BLE Server");
-  pServer = BLEDevice::createServer();
+  spinBLEServer.pServer = BLEDevice::createServer();
 
   // HEART RATE MONITOR SERVICE SETUP
-  pHeartService                      = pServer->createService(HEARTSERVICE_UUID);
+  pHeartService                      = spinBLEServer.pServer->createService(HEARTSERVICE_UUID);
   heartRateMeasurementCharacteristic = pHeartService->createCharacteristic(HEARTCHARACTERISTIC_UUID, NIMBLE_PROPERTY::READ | NIMBLE_PROPERTY::NOTIFY);
 
   // Power Meter MONITOR SERVICE SETUP
-  pPowerMonitor                         = pServer->createService(CYCLINGPOWERSERVICE_UUID);
+  pPowerMonitor                         = spinBLEServer.pServer->createService(CYCLINGPOWERSERVICE_UUID);
   cyclingPowerMeasurementCharacteristic = pPowerMonitor->createCharacteristic(CYCLINGPOWERMEASUREMENT_UUID, NIMBLE_PROPERTY::NOTIFY);
   cyclingPowerFeatureCharacteristic     = pPowerMonitor->createCharacteristic(CYCLINGPOWERFEATURE_UUID, NIMBLE_PROPERTY::READ);
   sensorLocationCharacteristic          = pPowerMonitor->createCharacteristic(SENSORLOCATION_UUID, NIMBLE_PROPERTY::READ);
 
   // Fitness Machine service setup
-  pFitnessMachineService             = pServer->createService(FITNESSMACHINESERVICE_UUID);
+  pFitnessMachineService             = spinBLEServer.pServer->createService(FITNESSMACHINESERVICE_UUID);
   fitnessMachineFeature              = pFitnessMachineService->createCharacteristic(FITNESSMACHINEFEATURE_UUID, NIMBLE_PROPERTY::READ);
   fitnessMachineControlPoint         = pFitnessMachineService->createCharacteristic(FITNESSMACHINECONTROLPOINT_UUID, NIMBLE_PROPERTY::WRITE | NIMBLE_PROPERTY::INDICATE);
   fitnessMachineStatusCharacteristic = pFitnessMachineService->createCharacteristic(FITNESSMACHINESTATUS_UUID, NIMBLE_PROPERTY::NOTIFY);
@@ -124,11 +122,11 @@ void startBLEServer() {
   fitnessMachineInclinationRange     = pFitnessMachineService->createCharacteristic(FITNESSMACHINEINCLINATIONRANGE_UUID, NIMBLE_PROPERTY::READ);
   fitnessMachineTrainingStatus       = pFitnessMachineService->createCharacteristic(FITNESSMACHINETRAININGSTATUS_UUID, NIMBLE_PROPERTY::NOTIFY);
 
-  pSmartSpin2kService = pServer->createService(SMARTSPIN2K_SERVICE_UUID);
+  pSmartSpin2kService = spinBLEServer.pServer->createService(SMARTSPIN2K_SERVICE_UUID);
   smartSpin2kCharacteristic =
       pSmartSpin2kService->createCharacteristic(SMARTSPIN2K_CHARACTERISTIC_UUID, NIMBLE_PROPERTY::WRITE | NIMBLE_PROPERTY::INDICATE | NIMBLE_PROPERTY::NOTIFY);
 
-  pServer->setCallbacks(new MyServerCallbacks());
+ spinBLEServer.pServer->setCallbacks(new MyServerCallbacks());
 
   // Creating Characteristics
   heartRateMeasurementCharacteristic->setValue(heartRateMeasurement, 2);
@@ -167,6 +165,8 @@ void startBLEServer() {
   pAdvertising->setMaxInterval(250);
   pAdvertising->setMinInterval(160);
   pAdvertising->setScanResponse(true);
+
+  BLEFirmwareSetup();
   BLEDevice::startAdvertising();
 
   SS2K_LOG(BLE_SERVER_LOG_TAG, "Bluetooth Characteristic defined!");
