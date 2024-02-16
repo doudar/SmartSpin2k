@@ -31,7 +31,7 @@ void BLECommunications(void *pvParameters) {
                   spinBLEClient.myBLEDevices[x].peerAddress.toString().c_str(), spinBLEClient.myBLEDevices[x].connectedClientID,
                   spinBLEClient.myBLEDevices[x].serviceUUID.toString().c_str(), spinBLEClient.myBLEDevices[x].charUUID.toString().c_str(),
                   spinBLEClient.myBLEDevices[x].isHRM ? "true" : "false", spinBLEClient.myBLEDevices[x].isPM ? "true" : "false",
-                  spinBLEClient.myBLEDevices[x].isCSC? "true" : "false", spinBLEClient.myBLEDevices[x].isCT ? "true" : "false",
+                  spinBLEClient.myBLEDevices[x].isCSC ? "true" : "false", spinBLEClient.myBLEDevices[x].isCT ? "true" : "false",
                   spinBLEClient.myBLEDevices[x].doConnect ? "true" : "false");
         if (spinBLEClient.myBLEDevices[x].advertisedDevice) {  // is device registered?
           SpinBLEAdvertisedDevice myAdvertisedDevice = spinBLEClient.myBLEDevices[x];
@@ -44,8 +44,8 @@ void BLECommunications(void *pvParameters) {
 
                 // Handle BLE HID Remotes
                 if (spinBLEClient.myBLEDevices[x].serviceUUID == HID_SERVICE_UUID) {
-                  spinBLEClient.keepAliveBLE_HID(pClient); //keep alive doesn't seem to help :(
-                  continue;  // There is not data that needs to be dequeued for the remote, so got to the next device.
+                  spinBLEClient.keepAliveBLE_HID(pClient);  // keep alive doesn't seem to help :(
+                  continue;                                 // There is not data that needs to be dequeued for the remote, so got to the next device.
                 }
 
                 // Dequeue sensor data we stored during notifications
@@ -65,7 +65,7 @@ void BLECommunications(void *pvParameters) {
                 }
 
                 spinBLEClient.handleBattInfo(pClient, false);
-                
+
               } else if (!pClient->isConnected()) {  // This shouldn't ever be
                                                      // called...
                 if (pClient->disconnect() == 0) {    // 0 is a successful disconnect
@@ -82,7 +82,8 @@ void BLECommunications(void *pvParameters) {
     }
 
     // ***********************************SERVER**************************************
-    if ((spinBLEClient.connectedHRM|| rtConfig.hr.getSimulate()) && !spinBLEClient.connectedPM && !rtConfig.watts.getSimulate() && (rtConfig.hr.getValue() > 0) && userPWC.hr2Pwr) {
+    if ((spinBLEClient.connectedHRM || rtConfig.hr.getSimulate()) && !spinBLEClient.connectedPM && !rtConfig.watts.getSimulate() && (rtConfig.hr.getValue() > 0) &&
+        userPWC.hr2Pwr) {
       calculateInstPwrFromHR();
       hr2p = true;
     } else {
@@ -96,7 +97,7 @@ void BLECommunications(void *pvParameters) {
       rtConfig.cad.setValue(0);
       rtConfig.watts.setValue(0);
     }
-    if (!spinBLEClient.connectedHRM&& !rtConfig.hr.getSimulate()) {
+    if (!spinBLEClient.connectedHRM && !rtConfig.hr.getSimulate()) {
       rtConfig.hr.setValue(0);
     }
 
@@ -113,6 +114,11 @@ void BLECommunications(void *pvParameters) {
 
       processFTMSWrite();
       spinBLEClient.postConnect();
+
+#ifdef INTERNAL_ERG_4EXT_FTMS
+      uint8_t test[] = {FitnessMachineControlPointProcedure::SetIndoorBikeSimulationParameters, 0x00, 0x00, 0x00, 0x00, 0x28, 0x33};
+      spinBLEClient.FTMSControlPointWrite(test, 7);
+#endif
 
       if (BLEDevice::getAdvertising()) {
         if (!(BLEDevice::getAdvertising()->isAdvertising()) && (BLEDevice::getServer()->getConnectedCount() < CONFIG_BT_NIMBLE_MAX_CONNECTIONS - NUM_BLE_DEVICES)) {

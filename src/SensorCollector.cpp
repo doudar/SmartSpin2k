@@ -28,7 +28,7 @@ void collectAndSet(NimBLEUUID charUUID, NimBLEUUID serviceUUID, NimBLEAddress ad
   if (sensorData->hasHeartRate() && !rtConfig.hr.getSimulate()) {
     int heartRate = sensorData->getHeartRate();
     rtConfig.hr.setValue(heartRate);
-    spinBLEClient.connectedHRM|= true;
+    spinBLEClient.connectedHRM |= true;
     logBufLength += snprintf(logBuf + logBufLength, kLogBufMaxLength - logBufLength, " HR(%d)", heartRate % 1000);
   }
   if (sensorData->hasCadence() && !rtConfig.cad.getSimulate()) {

@@ -382,7 +382,7 @@ void HTTP_Server::start() {
 
   xTaskCreatePinnedToCore(HTTP_Server::webClientUpdate,       /* Task function. */
                           "webClientUpdate",                  /* name of task. */
-                          6000 + (DEBUG_LOG_BUFFER_SIZE * 2), /* Stack size of task Used to be 3000*/
+                          HTTP_STACK + (DEBUG_LOG_BUFFER_SIZE * 2), /* Stack size of task Used to be 3000*/
                           NULL,                               /* parameter of the task */
                           10,                                 /* priority of the task */
                           &webClientTask,                     /* Task handle to keep track of created task */

@@ -84,6 +84,7 @@ extern LogHandler logHandler;
 void ss2k_remove_newlines(std::string *str);
 
 int ss2k_log_hex_to_buffer(const byte *data, const size_t data_length, char *buffer, const int buffer_offset, const size_t buffer_length);
+int ss2k_log_hex_to_buffer(const char *data, const size_t data_length, char *buffer, const int buffer_offset, const size_t buffer_length);
 
 void ss2k_log_write(esp_log_level_t level, const char *module, const char *format, ...);
 
