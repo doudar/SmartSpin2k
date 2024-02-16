@@ -90,7 +90,7 @@ class otaCallback : public BLECharacteristicCallbacks {
         return;
       } else {
         bufferCount = 1;
-        SS2K_LOG(BLE_SERVER_LOG_TAG, "--Data received---");
+        // SS2K_LOG(BLE_SERVER_LOG_TAG, "--Data received---");
         // Notify the iOS app so next batch can be sent
         pTxCharacteristic->setValue(&txValue, 1);
         //pTxCharacteristic->notify();
