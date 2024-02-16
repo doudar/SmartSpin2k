@@ -7,6 +7,7 @@ BH Fitness||Any|50
 Body Bike|Body Bike|Any|50 (Steep angle)
 Bowflex|C6|Any|85
 Bowflex|IC Bike SE|Any|100
+Bowflex|Velocore|150
 Echelon|Connect Sport|Any| 105
 HMC|HMC|Any|60mm
 Joroto|X2|Any|20

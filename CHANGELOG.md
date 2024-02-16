@@ -5,13 +5,16 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/)
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 ## [Unreleased]
 ### Added
-
+- Added pass through shifting in both ERG and SIM mode. 
 ### Changed
 - Updated communications overview picture.
 - Updated kit purchasing links. 
 - MIN_ERG_CADENCE created and changed from 20 to 30.
 - Fixed DNS server in AP mode.
 - Fixed an issue with IC4 and variants not displaying device name in Bluetooth scanner. Fixes #500
+- Switched from using Power Table to a Torque Table for better compensation in cad variations. 
+- added test for invalid Peloton data to keep stepper from running away without resistance information.
+- Fixed a bug with Trainer Day and rapid ERG sending. 
 
 ### Hardware
 - Wire diameter reduced from 7.2mm to 6.0mm on the window passthrough to accommodate the latest batch of cables. 
@@ -25,6 +28,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Updated CAD for the case to work flawlessly with small tweaks to motor height. 
 - Removed some free play in the IC4 insert. 
 - Added IC Bike SE 
+- Removed some free play in the IC4 insert.  
+- Added Bowflex Velocore bike.
+- Added another Y cable picture for Peloton. 
+
 
 ## [23.6.28]
 ### Added

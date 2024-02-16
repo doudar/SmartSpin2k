@@ -40,6 +40,9 @@
 // name of local file to save Physical Working Capacity in LittleFS
 #define userPWCFILENAME "/userPWC.txt"
 
+// name of the local file to save the torque table. 
+#define TORQUE_TABLE_FILENAME "/TorqueTable.txt"
+
 // Default Incline Multiplier.
 // Incline multiplier is the multiple required to convert incline received from the remote client (percent grade*100)
 // into actual stepper steps that move the stepper motor. It takes 2,181.76 steps to rotate the knob 1 full revolution. with hardware version 1.
@@ -57,7 +60,7 @@
 // Stepper peak current in ma. This is hardware restricted to a maximum of 2000ma on the TMC2225. RMS current is less.
 #define DEFAULT_STEPPER_POWER 900
 
-// Default Shift Step. THe amount to move the stepper motor for a shift press.
+// Default Shift Step. The amount to move the stepper motor for a shift press.
 #define DEFAULT_SHIFT_STEP 1000
 
 // Stepper Acceleration in steps/s^2
@@ -78,6 +81,9 @@
 
 // Amount to change watt target per shift in ERG mode.
 #define ERG_PER_SHIFT 10
+
+// Use internal ERG control on external FTMS Trainer.
+#define INTERNAL_ERG_4EXT_FTMS
 
 //Minimum cadence where ERG mode stops.
 #define MIN_ERG_CADENCE 30
@@ -113,7 +119,7 @@
 #define STEPPER_PELOTON_SPEED 2500
 
 // Default +- Stepper Travel Limit
-// This is used until the PowerTable has enough data to compute travel limits
+// This is used until the TorqueTable has enough data to compute travel limits
 #define DEFAULT_STEPPER_TRAVEL 200000000
 
 // Default debounce delay for shifters. Increase if you have false shifts. Decrease if shifting takes too long.
@@ -245,19 +251,25 @@
 
 #define RUNTIMECONFIG_JSON_SIZE 512 + DEBUG_LOG_BUFFER_SIZE
 
-/* Number of entries in the ERG Power Lookup Table
+/* Number of entries in the ERG Torque Lookup Table
  This is currently maintained as to keep memory usage lower and reduce the print output of the table.
- It can be depreciated in the future should we decide to remove logging of the power table. Then it should be calculated in ERG_Mode.cpp
- by dividing userConfig.getMaxWatts() by POWERTABLE_INCREMENT.  */
-#define POWERTABLE_SIZE 20
+ It can be depreciated in the future should we decide to remove logging of the torque table. Then it should be calculated in ERG_Mode.cpp
+ by dividing userConfig.getMaxWatts() by TORQUETABLE_INCREMENT.  */
+#define TORQUETABLE_SIZE 20
 
-// Size of increments (in watts) for the ERG Lookup Table. Needs to be one decimal place for proper calculations i.e. 50.0
-#define POWERTABLE_INCREMENT 50.0
+// Size of increments (in Nm) for the ERG Lookup Table. Needs to be one decimal place for proper calculations
+#define TORQUETABLE_INCREMENT 5.31
 
-// Number of similar power samples to take before writing to the Power Table
-#define POWER_SAMPLES 5
+// Number of similar torque samples to take before writing to the Torque Table
+#define TORQUE_SAMPLES 5
 
-// Normal cadence value (used in power table and other areas)
+// The Array position of the most reliable Torque Table stepper position according to testing data.
+#define MOST_DEPENDABLE_TORQUE_ENTRY 2
+
+// How often in ms to save the torque table if no new data is added and user is pedaling.
+#define TORQUE_TABLE_SAVE_INTERVAL 240000
+
+// Normal cadence value (used in torque table and other areas)
 #define NORMAL_CAD 90
 
 // Temperature of the ESP32 at which to start reducing the power output of the stepper motor driver.
@@ -284,6 +296,14 @@
 // BLE automatic reconnect duration. Set this low to avoid interruption.
 #define BLE_RECONNECT_SCAN_DURATION 1
 
+//Task Stack Sizes
+#define MAIN_STACK 4500
+#define ERG_STACK 6500
+#define HTTP_STACK 6000
+#define BLE_COMM_STACK 6000
+#define BLE_CLIENT_STACK 5000
+#define STEPPER_STACK 1700
+
 // Uncomment to enable sending Telegram debug messages back to the chat
 // specified in telegram_token.h
 // #define USE_TELEGRAM
@@ -295,8 +315,8 @@
 // Calculation. Never sets userConfig.setSimulatedPower();
 // #define DEBUG_HR_TO_PWR
 
-// Uncomment to enable HR->PWR enhanced powertable debugging.
-// #define DEBUG_POWERTABLE
+// Uncomment to enable HR->PWR enhanced torquetable debugging.
+// #define DEBUG_TORQUETABLE
 
 #ifdef USE_TELEGRAM
 // Max number of telegram messages to send per session

@@ -31,7 +31,7 @@ jobs:
         with:
           tag: ${{ steps.date.outputs.date }}
           message: "Automatic release ${{ steps.date.outputs.date }}"
-      - uses: dorny/paths-filter@v2
+      - uses: dorny/paths-filter@v3
         id: changes
         with:
           filters: |
@@ -44,7 +44,7 @@ jobs:
       - name: Install PlatformIO
         run: python -m pip install platformio
       - name: Check pre-commit hooks
-        uses: pre-commit/action@v3.0.0
+        uses: pre-commit/action@v3.0.1
       - name: Build firmware
         run: platformio run
       - name: Build filesystem
@@ -53,12 +53,12 @@ jobs:
         run: |
           7z a SmartSpin2kFirmware-${{ steps.date.outputs.date }}.bin.zip ./.pio/build/release/*.bin
       - name: Archive
-        uses: actions/upload-artifact@v3
+        uses: actions/upload-artifact@v4
         with:
           name: all-artifacts
           path: SmartSpin2kFirmware-${{ steps.date.outputs.date }}.bin.zip
       - name: Download Artifacts
-        uses: actions/download-artifact@v3
+        uses: actions/download-artifact@v4
         with:
           name: all-artifacts
       - name: Get tag info
