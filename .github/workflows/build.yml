@@ -13,7 +13,7 @@ jobs:
         with:
           fetch-depth: 0
       - name: Ensure changelog is updated
-        uses: dangoslen/changelog-enforcer@v3.5.1
+        uses: dangoslen/changelog-enforcer@v3.6.0
       - name: Set up python
         uses: actions/setup-python@v5
         with:
@@ -79,7 +79,7 @@ jobs:
             SmartSpin2kFirmware-${{ steps.date.outputs.date }}.bin.zip
               update-changelog:
       - name: Update changelog
-        uses: thomaseizinger/keep-a-changelog-new-release@v1
+        uses: thomaseizinger/keep-a-changelog-new-release@v2
         with:
           version: ${{ steps.date.outputs.date }}
 

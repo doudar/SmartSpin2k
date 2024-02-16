@@ -5,6 +5,8 @@ Manufacturer|Model|Year|Arm Length (range)
 ----------: |:---:|:---:|:------:
 BH Fitness||Any|50
 Body Bike|Body Bike|Any|50 (Steep angle)
+Bowflex|C6|Any|65
+Bowflex|C7|Any|45
 Bowflex|C6|Any|85
 Bowflex|IC Bike SE|Any|100
 Bowflex|Velocore|150
@@ -19,6 +21,7 @@ Spinning|L7|Any|20-40 (mount needs to go above SS2k)
 Vortec|Vortec|Any|20
 York|SB300|Any|20-40
 Yosuda|Pro|any|20-40 (mount needs to go above SS2k)
+Yesoul|S3|any| 140 (145-150 may be better)
 
 
 
