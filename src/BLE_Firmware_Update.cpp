@@ -73,6 +73,17 @@ class otaCallback : public BLECharacteristicCallbacks {
       // so make sure there's no timeout on the client side (iOS) that triggers before that.
       //------------------------------------------------------------------------------------------
       esp_task_wdt_init(10, false);
+      
+      SS2K_LOG(MAIN_LOG_TAG, "Stop BLE Tasks");
+      if (BLECommunicationTask != NULL) {
+        vTaskDelete(BLECommunicationTask);
+        BLECommunicationTask = NULL;
+      }
+      if (BLEClientTask != NULL) {
+        vTaskDelete(BLEClientTask);
+        BLEClientTask = NULL;
+      }
+
       vTaskDelay(5);
 
       if (esp_ota_begin(update_partition, OTA_SIZE_UNKNOWN, &otaHandler) != ESP_OK) {
@@ -87,13 +98,14 @@ class otaCallback : public BLECharacteristicCallbacks {
         SS2K_LOG(BLE_SERVER_LOG_TAG, "Error: write to flash failed");
         downloadFlag = false;
         pTxCharacteristic->setValue(&txValue, 4);
+        pTxCharacteristic->notify();
         return;
       } else {
         bufferCount = 1;
         // SS2K_LOG(BLE_SERVER_LOG_TAG, "--Data received---");
         // Notify the iOS app so next batch can be sent
         pTxCharacteristic->setValue(&txValue, 2);
-        pTxCharacteristic->notify();
+        // pTxCharacteristic->notify();
       }
 
       //-------------------------------------------------------------------
@@ -111,8 +123,8 @@ class otaCallback : public BLECharacteristicCallbacks {
         if (esp_ota_end(otaHandler) != ESP_OK) {
           SS2K_LOG(BLE_SERVER_LOG_TAG, "OTA end failed ");
           downloadFlag = false;
-           pTxCharacteristic->setValue(&txValue, 5);
-           pTxCharacteristic->notify();
+          pTxCharacteristic->setValue(&txValue, 5);
+          pTxCharacteristic->notify();
           return;
         }
         pTxCharacteristic->setValue(&txValue, 3);
@@ -133,8 +145,8 @@ class otaCallback : public BLECharacteristicCallbacks {
           // Something went wrong, the upload was not successful
           //------------------------------------------------------------
           SS2K_LOG(BLE_SERVER_LOG_TAG, "Upload Error");
-           pTxCharacteristic->setValue(&txValue, 5);
-           pTxCharacteristic->notify();
+          pTxCharacteristic->setValue(&txValue, 5);
+          pTxCharacteristic->notify();
           downloadFlag = false;
           esp_ota_end(otaHandler);
           return;
@@ -151,7 +163,7 @@ void BLEFirmwareSetup() {
   NimBLEService *pService = spinBLEServer.pServer->createService(FIRMWARE_SERVICE_UUID);
 
   // 4. Create BLE Characteristics inside the service(s)
-  pTxCharacteristic = pService->createCharacteristic(FIRMWARE_CHARACTERISTIC_TX_UUID, NIMBLE_PROPERTY::READ | NIMBLE_PROPERTY::WRITE);
+  pTxCharacteristic = pService->createCharacteristic(FIRMWARE_CHARACTERISTIC_TX_UUID, NIMBLE_PROPERTY::READ | NIMBLE_PROPERTY::WRITE | NIMBLE_PROPERTY::NOTIFY);
 
   pOtaCharacteristic = pService->createCharacteristic(FIRMWARE_CHARACTERISTIC_OTA_UUID, NIMBLE_PROPERTY::WRITE);
   pOtaCharacteristic->setCallbacks(new otaCallback());
