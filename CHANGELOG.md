@@ -6,6 +6,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 ### Added
 - Added pass through shifting in both ERG and SIM mode. 
+- Added pio script to upload without building.
 ### Changed
 - Updated communications overview picture.
 - Updated kit purchasing links. 
