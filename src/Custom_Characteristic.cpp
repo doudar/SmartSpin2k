@@ -62,7 +62,6 @@ void ss2kCustomCharacteristicCallbacks::onWrite(BLECharacteristic *pCharacterist
   }
 
   switch (rxValue[1]) {
-    
     case BLE_firmwareUpdateURL:  // 0x01
       logBufLength += snprintf(logBuf + logBufLength, kLogBufCapacity - logBufLength, "<-Firmware Update URL");
       returnValue[0] = success;
@@ -207,14 +206,14 @@ void ss2kCustomCharacteristicCallbacks::onWrite(BLECharacteristic *pCharacterist
     case BLE_inclineMultiplier: {  // 0x0B
       logBufLength += snprintf(logBuf + logBufLength, kLogBufCapacity - logBufLength, "<-inclineMultiplier");
       returnValue[0] = success;
-      int inc        = userConfig->getInclineMultiplier() * 10;
+      int inc        = userConfig->getInclineMultiplier();
       if (rxValue[0] == read) {
         returnValue[2] = (uint8_t)(inc & 0xff);
         returnValue[3] = (uint8_t)(inc >> 8);
         returnLength += 2;
       }
       if (rxValue[0] == write) {
-        userConfig->setInclineMultiplier(bytes_to_u16(rxValue[3], rxValue[2]) / 10);
+        userConfig->setInclineMultiplier(bytes_to_u16(rxValue[3], rxValue[2]));
         logBufLength += snprintf(logBuf + logBufLength, kLogBufCapacity - logBufLength, "(%f)", userConfig->getInclineMultiplier());
       }
     } break;
@@ -222,14 +221,14 @@ void ss2kCustomCharacteristicCallbacks::onWrite(BLECharacteristic *pCharacterist
     case BLE_powerCorrectionFactor: {  // 0x0C
       logBufLength += snprintf(logBuf + logBufLength, kLogBufCapacity - logBufLength, "<-powerCorrectionFactor");
       returnValue[0] = success;
-      int pcf        = userConfig->getPowerCorrectionFactor() * 10;
+      int pcf        = userConfig->getPowerCorrectionFactor();
       if (rxValue[0] == read) {
         returnValue[2] = (uint8_t)(pcf & 0xff);
         returnValue[3] = (uint8_t)(pcf >> 8);
         returnLength += 2;
       }
       if (rxValue[0] == write) {
-        userConfig->setPowerCorrectionFactor(bytes_to_u16(rxValue[3], rxValue[2]) / 10);
+        userConfig->setPowerCorrectionFactor(bytes_to_u16(rxValue[3], rxValue[2]));
         logBufLength += snprintf(logBuf + logBufLength, kLogBufCapacity - logBufLength, "(%f)", userConfig->getPowerCorrectionFactor());
       }
     } break;
@@ -416,7 +415,7 @@ void ss2kCustomCharacteristicCallbacks::onWrite(BLECharacteristic *pCharacterist
       }
       if (rxValue[0] == write) {
         ss2k->externalControl = static_cast<bool>(rxValue[2]);
-        logBufLength += snprintf(logBuf + logBufLength, kLogBufCapacity - logBufLength, "(%s)", ss2k->externalControl? "On" : "Off");
+        logBufLength += snprintf(logBuf + logBufLength, kLogBufCapacity - logBufLength, "(%s)", ss2k->externalControl ? "On" : "Off");
       }
       break;
 
@@ -462,7 +461,6 @@ void ss2kCustomCharacteristicCallbacks::onWrite(BLECharacteristic *pCharacterist
         logBufLength += snprintf(logBuf + logBufLength, kLogBufCapacity - logBufLength, "(%d)", userConfig->getStepperSpeed());
         ss2k->updateStepperSpeed();
         SS2K_LOG(CUSTOM_CHAR_LOG_TAG, "%s", logBuf);
-        return;
       }
       break;
 
@@ -491,6 +489,55 @@ void ss2kCustomCharacteristicCallbacks::onWrite(BLECharacteristic *pCharacterist
       if (rxValue[0] == write) {
         userConfig->setShifterDir(static_cast<bool>(rxValue[2]));
         logBufLength += snprintf(logBuf + logBufLength, kLogBufCapacity - logBufLength, "(%s)", userConfig->getShifterDir() ? "Normal" : "Reverse");
+      }
+      break;
+      ///////////////
+    case BLE_minBrakeWatts:  // 0x21
+      logBufLength += snprintf(logBuf + logBufLength, kLogBufCapacity - logBufLength, "<-MinWatts");
+      returnValue[0] = success;
+      if (rxValue[0] == read) {
+        returnValue[2] = (uint8_t)(userConfig->getMinWatts() & 0xff);
+        returnValue[3] = (uint8_t)(userConfig->getMinWatts() >> 8);
+        returnLength += 2;
+      }
+      if (rxValue[0] == write) {
+        userConfig->setMinWatts(bytes_to_u16(rxValue[3], rxValue[2]));
+        logBufLength += snprintf(logBuf + logBufLength, kLogBufCapacity - logBufLength, "(%d)", userConfig->getMinWatts());
+        SS2K_LOG(CUSTOM_CHAR_LOG_TAG, "%s", logBuf);
+      }
+      break;
+    case BLE_maxBrakeWatts:  // 0x22
+      logBufLength += snprintf(logBuf + logBufLength, kLogBufCapacity - logBufLength, "<-MaxWatts");
+      returnValue[0] = success;
+      if (rxValue[0] == read) {
+        returnValue[2] = (uint8_t)(userConfig->getMaxWatts() & 0xff);
+        returnValue[3] = (uint8_t)(userConfig->getMaxWatts() >> 8);
+        returnLength += 2;
+      }
+      if (rxValue[0] == write) {
+        userConfig->setMaxWatts(bytes_to_u16(rxValue[3], rxValue[2]));
+        logBufLength += snprintf(logBuf + logBufLength, kLogBufCapacity - logBufLength, "(%d)", userConfig->getMaxWatts());
+        SS2K_LOG(CUSTOM_CHAR_LOG_TAG, "%s", logBuf);
+      }
+      break;
+    case BLE_restartBLE:  // 0x23
+      logBufLength += snprintf(logBuf + logBufLength, kLogBufCapacity - logBufLength, "<-restart BLE");
+      if (rxValue[0] == write) {
+        for (auto i : spinBLEClient.myBLEDevices) {
+          if (NimBLEDevice::getClientByPeerAddress(i.peerAddress)->isConnected()) {
+            NimBLEDevice::deleteClient(BLEDevice::getClientByPeerAddress(i.peerAddress));
+            i.reset();
+            spinBLEClient.intentionalDisconnect ++;
+          }
+        }
+        returnValue[0] = success;
+      }
+      break;
+    case BLE_scanBLE:  // 0x24
+      logBufLength += snprintf(logBuf + logBufLength, kLogBufCapacity - logBufLength, "<-scan BLE");
+      if (rxValue[0] == write) {
+        spinBLEClient.doScan = true;
+        returnValue[0]       = success;
       }
       break;
   }

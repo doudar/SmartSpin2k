@@ -40,3 +40,7 @@
 #define BLE_stepperSpeed          0x1E
 #define BLE_ERGSensitivity        0x1F
 #define BLE_shiftDir              0x20
+#define BLE_minBrakeWatts         0x21
+#define BLE_maxBrakeWatts         0x22
+#define BLE_restartBLE            0x23
+#define BLE_scanBLE               0x24

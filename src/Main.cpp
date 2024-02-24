@@ -49,6 +49,7 @@ WebSocketAppender webSocketAppender;
 
 void SS2K::startTasks() {
   SS2K_LOG(MAIN_LOG_TAG, "Start BLE + ERG Tasks");
+  spinBLEClient.intentionalDisconnect = 0;
   if (BLECommunicationTask == NULL) {
     setupBLE();
   }
@@ -58,9 +59,9 @@ void SS2K::startTasks() {
 }
 
 void SS2K::stopTasks() {
-  spinBLEClient.reconnectTries        = 0;
-  spinBLEClient.intentionalDisconnect = true;
   SS2K_LOG(BLE_CLIENT_LOG_TAG, "Shutting Down all BLE services");
+  spinBLEClient.reconnectTries        = 0;
+  spinBLEClient.intentionalDisconnect = NUM_BLE_DEVICES;
   if (NimBLEDevice::getInitialized()) {
     NimBLEDevice::deinit();
     ss2k->stopTasks();
@@ -240,7 +241,7 @@ void SS2K::maintenanceLoop(void *pvParameters) {
         if (!(NimBLEDevice::getServer()->getConnectedCount())) {
           SS2K_LOGW(MAIN_LOG_TAG, "Rebooting due to inactivity");
           ss2k->rebootFlag = true;
-        }else{
+        } else {
           rebootTimer = millis();
         }
       }

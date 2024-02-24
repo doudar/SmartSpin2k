@@ -315,12 +315,6 @@ void MyClientCallback::onDisconnect(NimBLEClient *pClient) {
   NimBLEDevice::getScan()->stop();
   // NimBLEDevice::getScan()->clearResults();
   // NimBLEDevice::getScan()->clearDuplicateCache();
-  SS2K_LOG(BLE_CLIENT_LOG_TAG, "Disconnect Called");
-  if (spinBLEClient.intentionalDisconnect) {
-    SS2K_LOG(BLE_CLIENT_LOG_TAG, "Intentional Disconnect");
-    spinBLEClient.intentionalDisconnect = false;
-    return;
-  }
   if (!pClient->isConnected()) {
     NimBLEAddress addr = pClient->getPeerAddress();
     // auto addr = BLEDevice::getDisconnectedClient()->getPeerAddress();

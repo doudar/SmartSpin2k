@@ -85,7 +85,7 @@ int connectedClientCount();
 void controlPointIndicate();
 void processFTMSWrite();
 
-//BLE FIRMWARE UPDATER
+// BLE FIRMWARE UPDATER
 void BLEFirmwareSetup();
 
 // *****************************Client*****************************
@@ -145,18 +145,18 @@ class SpinBLEClient {
  private:
  public:  // Not all of these need to be public. This should be cleaned up
           // later.
-  boolean connectedPM        = false;
-  boolean connectedHRM       = false;
-  boolean connectedCD        = false;
-  boolean connectedCT        = false;
-  boolean connectedRemote    = false;
-  boolean doScan             = false;
-  bool dontBlockScan         = true;
-  bool intentionalDisconnect = false;
-  int noReadingIn            = 0;
-  int cscCumulativeCrankRev  = 0;
-  int cscLastCrankEvtTime    = 0;
-  int reconnectTries         = MAX_RECONNECT_TRIES;
+  boolean connectedPM       = false;
+  boolean connectedHRM      = false;
+  boolean connectedCD       = false;
+  boolean connectedCT       = false;
+  boolean connectedRemote   = false;
+  boolean doScan            = false;
+  bool dontBlockScan        = true;
+  int intentionalDisconnect = 0;
+  int noReadingIn           = 0;
+  int cscCumulativeCrankRev = 0;
+  int cscLastCrankEvtTime   = 0;
+  int reconnectTries        = MAX_RECONNECT_TRIES;
 
   BLERemoteCharacteristic *pRemoteCharacteristic = nullptr;
 
