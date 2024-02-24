@@ -9,3 +9,4 @@ include/telegram_token.h
 Errors
 SmartSpin_logfile.txt
 *.err
+.DS_Store
