@@ -2,7 +2,7 @@ name: Update OTA Repository
 
 on:
   workflow_run:
-    workflows: ["Update_OTA_Repo"] # Replace with your actual build workflow name
+    workflows: [build] # Replace with your actual build workflow name
     branches: [develop]
     types:
       - completed
