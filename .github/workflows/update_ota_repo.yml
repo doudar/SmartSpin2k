@@ -42,6 +42,7 @@ jobs:
         if: steps.get-release.outputs.url
         run: |
           curl -L "${{ steps.get-release.outputs.url }}" -o firmware.zip
+          mkdir firmware/
           unzip firmware.zip -d firmware
           ls -R firmware # List files for diagnostics
 
@@ -50,9 +51,9 @@ jobs:
           VERSION_TAG="${{ steps.get-release.outputs.tag_name }}"
           PROCESSED_VERSION="${VERSION_TAG%-*}"
           echo $PROCESSED_VERSION > version.txt
-          
+          ls
           # Copy the .bin files directly as they are now confirmed to be in the 'firmware' directory
-          cp *.bin ./
+          cp ./firmware/*.bin ./
           
           # Ensure we're listing files here for a final check, remove in the final workflow
           ls -la
