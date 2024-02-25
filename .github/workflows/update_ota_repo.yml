@@ -2,7 +2,7 @@ name: Update OTA Repository
 
 on:
   workflow_run:
-    workflows: [build]
+    workflows: ["build"]
     branches: [develop]
     types:
       - completed
@@ -23,22 +23,27 @@ jobs:
         uses: actions/github-script@v5
         with:
           script: |
-            const response = await github.rest.repos.getLatestRelease({
+            const repo = {
               owner: 'doudar',
               repo: 'SmartSpin2k',
-            });
-            if (response.data.assets.length > 0) {
-              const assets = response.data.assets.filter(asset => asset.name.includes('.bin.zip'));
-              if (assets.length > 0) {
-                return {
-                  tag_name: response.data.tag_name,
-                  url: assets[0].browser_download_url,
-                };
-              }
+            };
+            
+            const response = await github.rest.repos.getLatestRelease(repo);
+            const assets = response.data.assets.filter(asset => asset.name.includes('.bin.zip'));
+            
+            if (assets.length === 0) {
+              core.setFailed('No .bin.zip assets found in the latest release.');
+              return; // This stops the script execution if no assets are found
             }
-            throw new Error('No suitable assets found');
+            
+            const url = assets[0].browser_download_url;
+            const tag_name = response.data.tag_name;
+            
+            core.setOutput('url', url);
+            core.setOutput('tag_name', tag_name);
 
       - name: Download Artifacts
+        if: steps.get-release.outputs.url
         run: |
           curl -L "${{ steps.get-release.outputs.url }}" -o firmware.zip
           unzip firmware.zip -d firmware
@@ -49,7 +54,7 @@ jobs:
           PROCESSED_VERSION="${VERSION_TAG%-*}"
           echo $PROCESSED_VERSION > OTAUpdates/version.txt
           cp firmware/*.bin OTAUpdates/
-          # Assuming the archive directly contains firmware.bin and littlefs.bin
+          # This assumes the archive directly contains firmware.bin and littlefs.bin
 
       - name: Commit and Push Updates to OTAUpdates Repository
         uses: EndBug/add-and-commit@v7
