@@ -50,8 +50,12 @@ jobs:
           VERSION_TAG="${{ steps.get-release.outputs.tag_name }}"
           PROCESSED_VERSION="${VERSION_TAG%-*}"
           echo $PROCESSED_VERSION > version.txt
-          # Adjust the pattern or paths below based on the actual file paths
+          
+          # Copy the .bin files directly as they are now confirmed to be in the 'firmware' directory
           cp firmware/*.bin ./
+          
+          # Ensure we're listing files here for a final check, remove in the final workflow
+          ls -la
         working-directory: ./OTAUpdates
 
       - name: Commit and Push Updates to OTAUpdates Repository
