@@ -15,7 +15,7 @@ jobs:
         uses: actions/checkout@v2
         with:
           repository: 'doudar/OTAUpdates'
-          token: ${{ secrets.OTA_TOKEN }}
+          token: ${{ secrets.OTA_TOKEN }} # Use your secret token here
           path: 'OTAUpdates'
 
       - name: Get Latest Release from SmartSpin2k
@@ -27,18 +27,14 @@ jobs:
               owner: 'doudar',
               repo: 'SmartSpin2k',
             };
-            
             const response = await github.rest.repos.getLatestRelease(repo);
             const assets = response.data.assets.filter(asset => asset.name.includes('.bin.zip'));
-            
             if (assets.length === 0) {
               core.setFailed('No .bin.zip assets found in the latest release.');
               return; // This stops the script execution if no assets are found
             }
-            
             const url = assets[0].browser_download_url;
             const tag_name = response.data.tag_name;
-            
             core.setOutput('url', url);
             core.setOutput('tag_name', tag_name);
 
@@ -46,13 +42,15 @@ jobs:
         if: steps.get-release.outputs.url
         run: |
           curl -L "${{ steps.get-release.outputs.url }}" -o firmware.zip
-          unzip firmware.zip -d firmware 
+          unzip firmware.zip -d firmware
+          ls -R firmware # List files for diagnostics
 
       - name: Process Version and Files
         run: |
           VERSION_TAG="${{ steps.get-release.outputs.tag_name }}"
           PROCESSED_VERSION="${VERSION_TAG%-*}"
           echo $PROCESSED_VERSION > version.txt
+          # Adjust the pattern or paths below based on the actual file paths
           cp firmware/*.bin ./
         working-directory: ./OTAUpdates
 
