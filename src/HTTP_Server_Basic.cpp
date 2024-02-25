@@ -16,6 +16,7 @@
 #include <HTTPUpdate.h>
 #include <LittleFS.h>
 #include <ESPmDNS.h>
+#include <WiFi.h>
 #include <WiFiClientSecure.h>
 #include <Update.h>
 #include <DNSServer.h>
@@ -122,7 +123,7 @@ void stopWifi() {
 
 void HTTP_Server::start() {
   server.enableCORS(true);
-  server.onNotFound([]() { SS2K_LOG(HTTP_SERVER_LOG_TAG, "Link Not Found: %s", server.uri().c_str()); });
+  server.onNotFound(handleIndexFile);
 
   /***************************Begin Handlers*******************/
   server.on("/", handleIndexFile);

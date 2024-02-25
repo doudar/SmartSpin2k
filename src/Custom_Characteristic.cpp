@@ -215,7 +215,7 @@ void ss2kCustomCharacteristicCallbacks::onWrite(BLECharacteristic *pCharacterist
 
     case BLE_inclineMultiplier: {  // 0x0B
       logBufLength += snprintf(logBuf + logBufLength, kLogBufCapacity - logBufLength, "<-inclineMultiplier");
-      int inc        = userConfig->getInclineMultiplier();
+      int inc        = userConfig->getInclineMultiplier()*10;
       if (rxValue[0] == read) {
          returnValue[0] = success;
         returnValue[2] = (uint8_t)(inc & 0xff);
@@ -224,14 +224,14 @@ void ss2kCustomCharacteristicCallbacks::onWrite(BLECharacteristic *pCharacterist
       }
       if (rxValue[0] == write) {
          returnValue[0] = success;
-        userConfig->setInclineMultiplier(bytes_to_u16(rxValue[3], rxValue[2]));
+        userConfig->setInclineMultiplier((bytes_to_u16(rxValue[3], rxValue[2]))/10.0);
         logBufLength += snprintf(logBuf + logBufLength, kLogBufCapacity - logBufLength, "(%f)", userConfig->getInclineMultiplier());
       }
     } break;
 
     case BLE_powerCorrectionFactor: {  // 0x0C
       logBufLength += snprintf(logBuf + logBufLength, kLogBufCapacity - logBufLength, "<-powerCorrectionFactor");
-      int pcf        = userConfig->getPowerCorrectionFactor();
+      int pcf        = userConfig->getPowerCorrectionFactor() * 10 ;
       if (rxValue[0] == read) {
          returnValue[0] = success;
         returnValue[2] = (uint8_t)(pcf & 0xff);
@@ -240,7 +240,7 @@ void ss2kCustomCharacteristicCallbacks::onWrite(BLECharacteristic *pCharacterist
       }
       if (rxValue[0] == write) {
          returnValue[0] = success;
-        userConfig->setPowerCorrectionFactor(bytes_to_u16(rxValue[3], rxValue[2]));
+        userConfig->setPowerCorrectionFactor((bytes_to_u16(rxValue[3], rxValue[2]))/10.0);
         logBufLength += snprintf(logBuf + logBufLength, kLogBufCapacity - logBufLength, "(%f)", userConfig->getPowerCorrectionFactor());
       }
     } break;
@@ -501,7 +501,7 @@ void ss2kCustomCharacteristicCallbacks::onWrite(BLECharacteristic *pCharacterist
       }
       if (rxValue[0] == write) {
          returnValue[0] = success;
-        userConfig->setERGSensitivity(bytes_to_u16(rxValue[3], rxValue[2]) / 10);
+        userConfig->setERGSensitivity((bytes_to_u16(rxValue[3], rxValue[2])) / 10);
         logBufLength += snprintf(logBuf + logBufLength, kLogBufCapacity - logBufLength, "(%f)", userConfig->getERGSensitivity());
       }
     } break;
