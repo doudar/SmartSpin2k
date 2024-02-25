@@ -2,7 +2,7 @@ name: Update OTA Repository
 
 on:
   workflow_run:
-    workflows: [build] # Replace with your actual build workflow name
+    workflows: [build]
     branches: [develop]
     types:
       - completed
@@ -15,7 +15,7 @@ jobs:
         uses: actions/checkout@v2
         with:
           repository: 'doudar/OTAUpdates'
-          token: ${{ secrets.ACCESS_TOKEN }} # Ensure this token has the appropriate permissions
+          token: ${{ secrets.OTA_TOKEN }}
           path: 'OTAUpdates'
 
       - name: Get Latest Release from SmartSpin2k
@@ -48,8 +48,8 @@ jobs:
           VERSION_TAG="${{ steps.get-release.outputs.tag_name }}"
           PROCESSED_VERSION="${VERSION_TAG%-*}"
           echo $PROCESSED_VERSION > OTAUpdates/version.txt
-          cp firmware/SmartSpin2kFirmware-${PROCESSED_VERSION}.bin OTAUpdates/firmware.bin
-          cp firmware/littlefs.bin OTAUpdates/littlefs.bin
+          cp firmware/*.bin OTAUpdates/
+          # Assuming the archive directly contains firmware.bin and littlefs.bin
 
       - name: Commit and Push Updates to OTAUpdates Repository
         uses: EndBug/add-and-commit@v7
@@ -62,4 +62,4 @@ jobs:
           pull_strategy: 'NO-PULL'
           push: true
         env:
-          GITHUB_TOKEN: ${{ secrets.ACCESS_TOKEN }}
+          GITHUB_TOKEN: ${{ secrets.OTA_TOKEN }}
