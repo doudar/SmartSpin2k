@@ -1,0 +1,65 @@
+name: Update OTA Repository
+
+on:
+  workflow_run:
+    workflows: ["Update_OTA_Repo"] # Replace with your actual build workflow name
+    branches: [develop]
+    types:
+      - completed
+
+jobs:
+  update-ota:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout OTA Updates Repository
+        uses: actions/checkout@v2
+        with:
+          repository: 'doudar/OTAUpdates'
+          token: ${{ secrets.ACCESS_TOKEN }} # Ensure this token has the appropriate permissions
+          path: 'OTAUpdates'
+
+      - name: Get Latest Release from SmartSpin2k
+        id: get-release
+        uses: actions/github-script@v5
+        with:
+          script: |
+            const response = await github.rest.repos.getLatestRelease({
+              owner: 'doudar',
+              repo: 'SmartSpin2k',
+            });
+            if (response.data.assets.length > 0) {
+              const assets = response.data.assets.filter(asset => asset.name.includes('.bin.zip'));
+              if (assets.length > 0) {
+                return {
+                  tag_name: response.data.tag_name,
+                  url: assets[0].browser_download_url,
+                };
+              }
+            }
+            throw new Error('No suitable assets found');
+
+      - name: Download Artifacts
+        run: |
+          curl -L "${{ steps.get-release.outputs.url }}" -o firmware.zip
+          unzip firmware.zip -d firmware
+
+      - name: Process Version and Files
+        run: |
+          VERSION_TAG="${{ steps.get-release.outputs.tag_name }}"
+          PROCESSED_VERSION="${VERSION_TAG%-*}"
+          echo $PROCESSED_VERSION > OTAUpdates/version.txt
+          cp firmware/SmartSpin2kFirmware-${PROCESSED_VERSION}.bin OTAUpdates/firmware.bin
+          cp firmware/littlefs.bin OTAUpdates/littlefs.bin
+
+      - name: Commit and Push Updates to OTAUpdates Repository
+        uses: EndBug/add-and-commit@v7
+        with:
+          repository: 'doudar/OTAUpdates'
+          default_author: github_actions
+          message: 'Update firmware and LittleFS with version ${{ steps.get-release.outputs.tag_name }}'
+          add: 'OTAUpdates/*'
+          cwd: 'OTAUpdates'
+          pull_strategy: 'NO-PULL'
+          push: true
+        env:
+          GITHUB_TOKEN: ${{ secrets.ACCESS_TOKEN }}
