@@ -46,24 +46,23 @@ jobs:
         if: steps.get-release.outputs.url
         run: |
           curl -L "${{ steps.get-release.outputs.url }}" -o firmware.zip
-          unzip firmware.zip -d firmware
+          unzip firmware.zip -d firmware 
 
       - name: Process Version and Files
         run: |
           VERSION_TAG="${{ steps.get-release.outputs.tag_name }}"
           PROCESSED_VERSION="${VERSION_TAG%-*}"
-          echo $PROCESSED_VERSION > OTAUpdates/version.txt
-          cp firmware/*.bin OTAUpdates/
-          # This assumes the archive directly contains firmware.bin and littlefs.bin
+          echo $PROCESSED_VERSION > version.txt
+          cp firmware/*.bin ./
+        working-directory: ./OTAUpdates
 
       - name: Commit and Push Updates to OTAUpdates Repository
         uses: EndBug/add-and-commit@v7
         with:
-          repository: 'doudar/OTAUpdates'
           default_author: github_actions
           message: 'Update firmware and LittleFS with version ${{ steps.get-release.outputs.tag_name }}'
-          add: 'OTAUpdates/*'
-          cwd: 'OTAUpdates'
+          add: './*'
+          cwd: './OTAUpdates'
           pull_strategy: 'NO-PULL'
           push: true
         env:
