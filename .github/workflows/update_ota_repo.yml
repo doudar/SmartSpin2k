@@ -20,7 +20,7 @@ jobs:
 
       - name: Get Latest Release from SmartSpin2k
         id: get-release
-        uses: actions/github-script@v5
+        uses: actions/github-script@v7
         with:
           script: |
             const repo = {
