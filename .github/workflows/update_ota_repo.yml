@@ -12,7 +12,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout OTA Updates Repository
-        uses: actions/checkout@v2
+        uses: actions/checkout@v4
         with:
           repository: 'doudar/OTAUpdates'
           token: ${{ secrets.OTA_TOKEN }} # Use your secret token here
