@@ -60,7 +60,7 @@ jobs:
         working-directory: ./OTAUpdates
 
       - name: Commit and Push Updates to OTAUpdates Repository
-        uses: EndBug/add-and-commit@v7
+        uses: EndBug/add-and-commit@v9
         with:
           default_author: github_actions
           message: 'Update firmware and LittleFS with version ${{ steps.get-release.outputs.tag_name }}'
