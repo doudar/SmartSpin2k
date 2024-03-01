@@ -116,6 +116,8 @@ bool SpinBLEClient::connectToServer() {
         // spinBLEClient.serverScan(true);
         return false;
       }
+    } else {  // We don't want client connected.
+      return false;
     }
   }
   if (myDevice == nullptr) {
@@ -323,7 +325,11 @@ void MyClientCallback::onDisconnect(NimBLEClient *pClient) {
       if (addr == spinBLEClient.myBLEDevices[i].peerAddress) {
         // spinBLEClient.myBLEDevices[i].connectedClientID = BLE_HS_CONN_HANDLE_NONE;
         SS2K_LOG(BLE_CLIENT_LOG_TAG, "Detected %s Disconnect", spinBLEClient.myBLEDevices[i].serviceUUID.toString().c_str());
-        spinBLEClient.myBLEDevices[i].doConnect = true;
+        if (!spinBLEClient.intentionalDisconnect) {
+          spinBLEClient.myBLEDevices[i].doConnect = true;
+        } else {
+          spinBLEClient.intentionalDisconnect--;
+        }
         if ((spinBLEClient.myBLEDevices[i].charUUID == CYCLINGPOWERMEASUREMENT_UUID) || (spinBLEClient.myBLEDevices[i].charUUID == FITNESSMACHINEINDOORBIKEDATA_UUID) ||
             (spinBLEClient.myBLEDevices[i].charUUID == FLYWHEEL_UART_RX_UUID) || (spinBLEClient.myBLEDevices[i].charUUID == ECHELON_SERVICE_UUID) ||
             (spinBLEClient.myBLEDevices[i].charUUID == CYCLINGPOWERSERVICE_UUID)) {
@@ -432,7 +438,7 @@ void SpinBLEClient::scanProcess(int duration) {
   pBLEScan->setWindow(33);    // 67
   pBLEScan->setDuplicateFilter(true);
   pBLEScan->setActiveScan(true);  // might cause memory leak if true - undetermined. We don't get device names without it.
-  BLEScanResults foundDevices = pBLEScan->start(duration, true);
+  BLEScanResults foundDevices = pBLEScan->start(duration, false);
   this->dontBlockScan         = false;
   // Load the scan into a Json String
   int count = foundDevices.getCount();
@@ -445,11 +451,11 @@ void SpinBLEClient::scanProcess(int duration) {
     BLEAdvertisedDevice d = foundDevices.getDevice(i);
     if (d.isAdvertisingService(CYCLINGPOWERSERVICE_UUID) || d.isAdvertisingService(HEARTSERVICE_UUID) || d.isAdvertisingService(FLYWHEEL_UART_SERVICE_UUID) ||
         d.isAdvertisingService(FITNESSMACHINESERVICE_UUID) || d.isAdvertisingService(ECHELON_DEVICE_UUID) || d.isAdvertisingService(HID_SERVICE_UUID)) {
-      device                     = "device " + String(i);
+      device = "device " + String(i);
 
       if (d.haveName()) {
         devices[device]["name"] = d.getName();
-      }else {
+      } else {
         devices[device]["address"] = d.getAddress().toString();
       }
 
@@ -508,7 +514,7 @@ void SpinBLEClient::removeDuplicates(NimBLEClient *pClient) {
             SS2K_LOG(BLE_CLIENT_LOG_TAG, "%s Matched another service.  Disconnecting: %s", tBLEd.peerAddress.toString().c_str(), oldBLEd.peerAddress.toString().c_str());
             NimBLEDevice::deleteClient(BLEDevice::getClientByPeerAddress(oldBLEd.peerAddress));
             oldBLEd.reset();
-            spinBLEClient.intentionalDisconnect = true;
+            spinBLEClient.intentionalDisconnect = 1;
             return;
           }
         }
@@ -757,7 +763,7 @@ void SpinBLEClient::checkBLEReconnect() {
 
 void SpinBLEAdvertisedDevice::set(BLEAdvertisedDevice *device, int id, BLEUUID inServiceUUID, BLEUUID inCharUUID) {
   advertisedDevice  = device;
-  peerAddress       = device->getAddress();
+  peerAddress      = device->getAddress();
   connectedClientID = id;
   serviceUUID       = BLEUUID(inServiceUUID);
   charUUID          = BLEUUID(inCharUUID);
