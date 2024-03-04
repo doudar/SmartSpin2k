@@ -77,10 +77,11 @@ void bleClientTask(void *pvParameters) {
 #endif  // DEBUG_STACK
     for (int x = 0; x < NUM_BLE_DEVICES; x++) {
       if (spinBLEClient.myBLEDevices[x].doConnect == true) {
+        SS2K_LOG(BLE_CLIENT_LOG_TAG, "Connecting device on slot %d ...", x);
         if (spinBLEClient.connectToServer()) {
           SS2K_LOG(BLE_CLIENT_LOG_TAG, "We are now connected to the BLE Server.");
-          // vTaskDelay(5000 / portTICK_PERIOD_MS);
         } else {
+          SS2K_LOG(BLE_CLIENT_LOG_TAG, "slot %d connection failed", x);
         }
       }
     }
@@ -99,9 +100,11 @@ bool SpinBLEClient::connectToServer() {
   for (int i = 0; i < NUM_BLE_DEVICES; i++) {
     if (spinBLEClient.myBLEDevices[i].doConnect == true) {   // Client wants to be connected
       if (spinBLEClient.myBLEDevices[i].advertisedDevice) {  // Client is assigned
+        // If this device is advertising HR service AND not advertising FTMS service AND there is no connected PM AND the next slot is set to connect, connect that one first and
+        // connect the HRM last.
         if (spinBLEClient.myBLEDevices[i].advertisedDevice->isAdvertisingService(HEARTSERVICE_UUID) &&
             (!spinBLEClient.myBLEDevices[i].advertisedDevice->isAdvertisingService(FITNESSMACHINESERVICE_UUID)) && (!connectedPM) &&
-            (spinBLEClient.myBLEDevices[i + 1].doConnect == true)) {  // Connect HRM last because it causes problems when connecting PM if it connects first.
+            (spinBLEClient.myBLEDevices[i + 1].doConnect == true)) {
           myDevice      = spinBLEClient.myBLEDevices[i + 1].advertisedDevice;
           device_number = i + 1;
           SS2K_LOG(BLE_CLIENT_LOG_TAG, "Connecting HRM last.");
@@ -111,13 +114,12 @@ bool SpinBLEClient::connectToServer() {
         }
         break;
       } else {
-        SS2K_LOG(BLE_CLIENT_LOG_TAG, "doConnect and client out of alignment. Resetting device slot");
+        SS2K_LOG(BLE_CLIENT_LOG_TAG, "doConnect and client out of alignment. Resetting device slot.");
         spinBLEClient.myBLEDevices[i].reset();
-        // spinBLEClient.serverScan(true);
         return false;
       }
-    } else {  // We don't want client connected.
-      return false;
+    } else {
+      SS2K_LOG(BLE_CLIENT_LOG_TAG, "doConnect on slot %d not set", i);
     }
   }
   if (myDevice == nullptr) {
@@ -162,7 +164,7 @@ bool SpinBLEClient::connectToServer() {
     return false;
   }
 
-  SS2K_LOG(BLE_CLIENT_LOG_TAG, "Forming a connection to: %s %s", myDevice->haveName() ? myDevice->getName() : "", myDevice->getAddress().toString().c_str());
+  SS2K_LOG(BLE_CLIENT_LOG_TAG, "Forming a connection to: %s", myDevice->haveName() ? myDevice->getName().c_str() : myDevice->getAddress().toString().c_str());
 
   NimBLEClient *pClient = nullptr;
 
@@ -238,7 +240,7 @@ bool SpinBLEClient::connectToServer() {
     }
   }
 
-  SS2K_LOG(BLE_CLIENT_LOG_TAG, "Connected to: %s RSSI %d", pClient->getPeerAddress().toString().c_str(), pClient->getRssi());
+  SS2K_LOG(BLE_CLIENT_LOG_TAG, "Connected to: %s RSSI %d", myDevice->haveName() ? myDevice->getName().c_str() : pClient->getPeerAddress().toString().c_str(), pClient->getRssi());
 
   if (serviceUUID == HID_SERVICE_UUID) {
     connectBLE_HID(pClient);
@@ -325,6 +327,7 @@ void MyClientCallback::onDisconnect(NimBLEClient *pClient) {
       if (addr == spinBLEClient.myBLEDevices[i].peerAddress) {
         // spinBLEClient.myBLEDevices[i].connectedClientID = BLE_HS_CONN_HANDLE_NONE;
         SS2K_LOG(BLE_CLIENT_LOG_TAG, "Detected %s Disconnect", spinBLEClient.myBLEDevices[i].serviceUUID.toString().c_str());
+        //did another task disconnect this device?
         if (!spinBLEClient.intentionalDisconnect) {
           spinBLEClient.myBLEDevices[i].doConnect = true;
         } else {
@@ -375,48 +378,52 @@ void MyClientCallback::onAuthenticationComplete(ble_gap_conn_desc desc) { SS2K_L
 
 void MyAdvertisedDeviceCallback::onResult(BLEAdvertisedDevice *advertisedDevice) {
   char aDevName[40];  // 40 should be enough for anybody!
+  NimBLEUUID _service;
   (advertisedDevice->haveName()) ? strcpy(aDevName, advertisedDevice->getName().c_str()) : strcpy(aDevName, advertisedDevice->getAddress().toString().c_str());
 
   if ((advertisedDevice->haveServiceUUID()) &&
       (advertisedDevice->isAdvertisingService(CYCLINGPOWERSERVICE_UUID) || (advertisedDevice->isAdvertisingService(FLYWHEEL_UART_SERVICE_UUID) && aDevName == FLYWHEEL_BLE_NAME) ||
        advertisedDevice->isAdvertisingService(FITNESSMACHINESERVICE_UUID) || advertisedDevice->isAdvertisingService(HEARTSERVICE_UUID) ||
        advertisedDevice->isAdvertisingService(ECHELON_DEVICE_UUID) || advertisedDevice->isAdvertisingService(HID_SERVICE_UUID))) {
-    SS2K_LOG(BLE_CLIENT_LOG_TAG, "Matching Device Name: %s", aDevName);
+    SS2K_LOG(BLE_CLIENT_LOG_TAG, "Trying to match found device name: %s", aDevName);
     if (advertisedDevice->getServiceUUID() == HID_SERVICE_UUID) {
+      _service = HID_SERVICE_UUID;
       if (strcmp(userConfig->getConnectedRemote(), "any") == 0) {
         SS2K_LOG(BLE_CLIENT_LOG_TAG, "Remote String Matched Any");
         // continue
       } else if ((strcmp(aDevName, userConfig->getConnectedRemote()) == 0) || (strcmp(userConfig->getConnectedRemote(), "none") == 0)) {
-        SS2K_LOG(BLE_CLIENT_LOG_TAG, "Skipping non-selected Remote |%s|%s", aDevName, userConfig->getConnectedRemote());
-        return;
+        SS2K_LOG(BLE_CLIENT_LOG_TAG, "This remote name %s didn't match the saved %s", aDevName, userConfig->getConnectedRemote());
+        return;  // Ignore this device;
       } else if (strcmp(aDevName, userConfig->getConnectedRemote()) == 0) {
         SS2K_LOG(BLE_CLIENT_LOG_TAG, "Remote String Matched %s", aDevName);
       }
     } else if (advertisedDevice->getServiceUUID() == HEARTSERVICE_UUID) {
+      _service = HEARTSERVICE_UUID;
       if (strcmp(userConfig->getConnectedHeartMonitor(), "any") == 0) {
         SS2K_LOG(BLE_CLIENT_LOG_TAG, "HR String Matched Any");
         // continue
       } else if ((strcmp(aDevName, userConfig->getConnectedHeartMonitor()) != 0) || (strcmp(userConfig->getConnectedHeartMonitor(), "none") == 0)) {
-        SS2K_LOG(BLE_CLIENT_LOG_TAG, "Skipping non-selected HRM |%s|%s", aDevName, userConfig->getConnectedHeartMonitor());
-        return;
+        SS2K_LOG(BLE_CLIENT_LOG_TAG, "This HRM %s didn't match the saved %s", aDevName, userConfig->getConnectedHeartMonitor());
+        return;  // Ignore this device;
       } else if (strcmp(aDevName, userConfig->getConnectedHeartMonitor()) == 0) {
         SS2K_LOG(BLE_CLIENT_LOG_TAG, "HR String Matched %s", aDevName);
       }
     } else {
+      _service = advertisedDevice->getServiceUUID();
       if (strcmp(userConfig->getConnectedPowerMeter(), "any") == 0) {
         SS2K_LOG(BLE_CLIENT_LOG_TAG, "PM String Matched Any");
         // continue
       } else if ((strcmp(aDevName, userConfig->getConnectedPowerMeter()) != 0) || (strcmp(userConfig->getConnectedPowerMeter(), "none") == 0)) {
-        SS2K_LOG(BLE_CLIENT_LOG_TAG, "Skipping non-selected PM |%s|%s", aDevName, userConfig->getConnectedPowerMeter());
-        return;
+        SS2K_LOG(BLE_CLIENT_LOG_TAG, "This PM %s didn't match the saved %s", aDevName, userConfig->getConnectedPowerMeter());
+        return;  // Ignore this device;
       } else if (strcmp(aDevName, userConfig->getConnectedPowerMeter()) == 0) {
         SS2K_LOG(BLE_CLIENT_LOG_TAG, "PM String Matched %s", aDevName);
       }
     }
-    for (size_t i = 0; i < NUM_BLE_DEVICES; i++) {
+    for (size_t i = 0; i < NUM_BLE_DEVICES; i++) {  // add more debugging here. doconnect not getting set correctly on string match
       if ((spinBLEClient.myBLEDevices[i].advertisedDevice == nullptr) ||
           (advertisedDevice->getAddress() == spinBLEClient.myBLEDevices[i].peerAddress)) {  // found empty device slot
-        spinBLEClient.myBLEDevices[i].set(advertisedDevice);
+        spinBLEClient.myBLEDevices[i].set(advertisedDevice, BLE_HS_CONN_HANDLE_NONE, _service);
         spinBLEClient.myBLEDevices[i].doConnect = true;
         SS2K_LOG(BLE_CLIENT_LOG_TAG, "doConnect set on device: %d", i);
 
@@ -425,7 +432,6 @@ void MyAdvertisedDeviceCallback::onResult(BLEAdvertisedDevice *advertisedDevice)
       SS2K_LOG(BLE_CLIENT_LOG_TAG, "Checking Slot %d", i);
     }
     return;
-    //}
   }
 }
 void SpinBLEClient::scanProcess(int duration) {
@@ -514,7 +520,7 @@ void SpinBLEClient::removeDuplicates(NimBLEClient *pClient) {
             SS2K_LOG(BLE_CLIENT_LOG_TAG, "%s Matched another service.  Disconnecting: %s", tBLEd.peerAddress.toString().c_str(), oldBLEd.peerAddress.toString().c_str());
             NimBLEDevice::deleteClient(BLEDevice::getClientByPeerAddress(oldBLEd.peerAddress));
             oldBLEd.reset();
-            spinBLEClient.intentionalDisconnect = 1;
+            spinBLEClient.intentionalDisconnect++;
             return;
           }
         }
@@ -763,7 +769,7 @@ void SpinBLEClient::checkBLEReconnect() {
 
 void SpinBLEAdvertisedDevice::set(BLEAdvertisedDevice *device, int id, BLEUUID inServiceUUID, BLEUUID inCharUUID) {
   advertisedDevice  = device;
-  peerAddress      = device->getAddress();
+  peerAddress       = device->getAddress();
   connectedClientID = id;
   serviceUUID       = BLEUUID(inServiceUUID);
   charUUID          = BLEUUID(inCharUUID);
