@@ -74,8 +74,8 @@ class otaCallback : public BLECharacteristicCallbacks {
       //------------------------------------------------------------------------------------------
       esp_task_wdt_init(10, false);
       
-      SS2K_LOG(MAIN_LOG_TAG, "Stop BLE Tasks");
       if (BLECommunicationTask != NULL) {
+        SS2K_LOG(MAIN_LOG_TAG, "Stop BLE Tasks");
         vTaskDelete(BLECommunicationTask);
         BLECommunicationTask = NULL;
       }
@@ -84,7 +84,7 @@ class otaCallback : public BLECharacteristicCallbacks {
         BLEClientTask = NULL;
       }
 
-      vTaskDelay(5);
+      // vTaskDelay(5);
 
       if (esp_ota_begin(update_partition, OTA_SIZE_UNKNOWN, &otaHandler) != ESP_OK) {
         downloadFlag = false;
@@ -102,7 +102,7 @@ class otaCallback : public BLECharacteristicCallbacks {
         return;
       } else {
         bufferCount = 1;
-        // SS2K_LOG(BLE_SERVER_LOG_TAG, "--Data received---");
+        SS2K_LOG(BLE_SERVER_LOG_TAG, "%d bytes", rxData.length());
         // Notify the iOS app so next batch can be sent
         pTxCharacteristic->setValue(&txValue, 2);
         // pTxCharacteristic->notify();
@@ -113,7 +113,7 @@ class otaCallback : public BLECharacteristicCallbacks {
       // smaller than the maximum MTU size). For improvement: let iOS app send byte
       // length instead of hardcoding "510"
       //-------------------------------------------------------------------
-      if (rxData.length() < 510)  // TODO Asumes at least 511 data bytes (@BLE 4.2).
+      if (rxData.length() < 500)  // TODO Asumes at least 511 data bytes (@BLE 4.2).
       {
         SS2K_LOG(BLE_SERVER_LOG_TAG, "4. Final byte arrived");
         //-----------------------------------------------------------------

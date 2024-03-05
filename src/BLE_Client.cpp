@@ -220,7 +220,7 @@ bool SpinBLEClient::connectToServer() {
      */
     pClient->setConnectionParams(6, 6, 0, 200);
     /** Set how long we are willing to wait for the connection to complete (seconds), default is 30. */
-    pClient->setConnectTimeout(2);  // 5
+    pClient->setConnectTimeout(5);  // 5
 
     if (!pClient->connect(myDevice->getAddress())) {
       SS2K_LOG(BLE_CLIENT_LOG_TAG, " - Failed to connect client");
@@ -327,7 +327,7 @@ void MyClientCallback::onDisconnect(NimBLEClient *pClient) {
       if (addr == spinBLEClient.myBLEDevices[i].peerAddress) {
         // spinBLEClient.myBLEDevices[i].connectedClientID = BLE_HS_CONN_HANDLE_NONE;
         SS2K_LOG(BLE_CLIENT_LOG_TAG, "Detected %s Disconnect", spinBLEClient.myBLEDevices[i].serviceUUID.toString().c_str());
-        //did another task disconnect this device?
+        // did another task disconnect this device?
         if (!spinBLEClient.intentionalDisconnect) {
           spinBLEClient.myBLEDevices[i].doConnect = true;
         } else {
@@ -797,21 +797,25 @@ void SpinBLEAdvertisedDevice::set(BLEAdvertisedDevice *device, int id, BLEUUID i
 }
 
 void SpinBLEAdvertisedDevice::reset() {
+  if (this->isHRM) spinBLEClient.connectedHRM = false;
+  if (this->isPM) spinBLEClient.connectedPM = false;
+  if (this->isCSC) spinBLEClient.connectedCD = false;
+
   advertisedDevice = nullptr;
   // NimBLEAddress peerAddress;
-  connectedClientID = BLE_HS_CONN_HANDLE_NONE;
-  serviceUUID       = (uint16_t)0x0000;
-  charUUID          = (uint16_t)0x0000;
-  isHRM             = false;  // Heart Rate Monitor
-  isPM              = false;  // Power Meter
-  isCSC             = false;  // Cycling Speed/Cadence
-  isCT              = false;  // Controllable Trainer
-  isRemote          = false;  // BLE Remote
-  doConnect         = false;  // Initiate connection flag
-  postConnected     = false;  // Has Cost Connect Been Run?
-  if (dataBufferQueue != nullptr) {
+  this->connectedClientID = BLE_HS_CONN_HANDLE_NONE;
+  this->serviceUUID       = (uint16_t)0x0000;
+  this->charUUID          = (uint16_t)0x0000;
+  this->isHRM             = false;  // Heart Rate Monitor
+  this->isPM              = false;  // Power Meter
+  this->isCSC             = false;  // Cycling Speed/Cadence
+  this->isCT              = false;  // Controllable Trainer
+  this->isRemote          = false;  // BLE Remote
+  this->doConnect         = false;  // Initiate connection flag
+  this->postConnected     = false;  // Has Cost Connect Been Run?
+  if (this->dataBufferQueue != nullptr) {
     // Serial.println("Resetting queue");
-    xQueueReset(dataBufferQueue);
+    xQueueReset(this->dataBufferQueue);
   }
 }
 // Poll BLE devices for battCharacteristic if available and read value.
