@@ -451,7 +451,7 @@ void SpinBLEClient::scanProcess(int duration) {
   StaticJsonDocument<1000> devices;
 
   // Check if 'devices' JSON document already exists and has content; if so, deserialize it.
-  const char* foundDevicesJson = userConfig->getFoundDevices();
+  const char *foundDevicesJson = userConfig->getFoundDevices();
   if (foundDevicesJson[0] != '\0') {
     deserializeJson(devices, userConfig->getFoundDevices());
   }
@@ -482,8 +482,12 @@ void SpinBLEClient::scanProcess(int duration) {
       } else {
         devices[device]["address"] = d.getAddress().toString();
       }
-
-      if (d.haveServiceUUID()) {
+      // Workaround for IC4 not advertising FTMS as the first service.
+      // Potentially others may need to be added in the future.
+      // The symptom was the bike name not showing up in the HTML.
+      if (d.haveServiceUUID() && d.isAdvertisingService(FITNESSMACHINESERVICE_UUID)) {
+        devices[device]["UUID"] = FITNESSMACHINESERVICE_UUID.toString();
+      } else {
         devices[device]["UUID"] = d.getServiceUUID().toString();
       }
     }
