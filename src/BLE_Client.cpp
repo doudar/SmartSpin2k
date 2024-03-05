@@ -316,7 +316,7 @@ void MyClientCallback::onConnect(NimBLEClient *pClient) {
 }
 
 void MyClientCallback::onDisconnect(NimBLEClient *pClient) {
-  NimBLEDevice::getScan()->stop();
+ //  NimBLEDevice::getScan()->stop();
   // NimBLEDevice::getScan()->clearResults();
   // NimBLEDevice::getScan()->clearDuplicateCache();
   if (!pClient->isConnected()) {
@@ -338,20 +338,15 @@ void MyClientCallback::onDisconnect(NimBLEClient *pClient) {
             (spinBLEClient.myBLEDevices[i].charUUID == CYCLINGPOWERSERVICE_UUID)) {
           SS2K_LOG(BLE_CLIENT_LOG_TAG, "Deregistered PM on Disconnect");
           rtConfig->pm_batt.setValue(0);
-          spinBLEClient.connectedPM = false;
-          break;
         }
         if ((spinBLEClient.myBLEDevices[i].charUUID == HEARTCHARACTERISTIC_UUID)) {
           SS2K_LOG(BLE_CLIENT_LOG_TAG, "Deregistered HR on Disconnect");
           rtConfig->hr_batt.setValue(0);
-          spinBLEClient.connectedHRM = false;
-          break;
         }
         if ((spinBLEClient.myBLEDevices[i].charUUID == HID_REPORT_DATA_UUID)) {
           SS2K_LOG(BLE_CLIENT_LOG_TAG, "Deregistered Remote on Disconnect");
-          spinBLEClient.connectedRemote = false;
-          break;
         }
+        spinBLEClient.myBLEDevices[i].reset();
       }
     }
     return;
@@ -439,6 +434,8 @@ void SpinBLEClient::scanProcess(int duration) {
   SS2K_LOGW(BLE_CLIENT_LOG_TAG, "Scanning for BLE servers and putting them into a list...");
 
   BLEScan *pBLEScan = BLEDevice::getScan();
+  pBLEScan->clearDuplicateCache();
+  pBLEScan->clearResults();
   pBLEScan->setAdvertisedDeviceCallbacks(&myAdvertisedDeviceCallbacks);
   pBLEScan->setInterval(49);  // 97
   pBLEScan->setWindow(33);    // 67
@@ -480,9 +477,7 @@ void SpinBLEClient::scanProcess(int duration) {
 
   String output;
   serializeJson(devices, output);
-  if (duration > BLE_RECONNECT_SCAN_DURATION) {
     SS2K_LOG(BLE_CLIENT_LOG_TAG, "Bluetooth Client Found Devices: %s", output.c_str());
-  }
 #ifdef USE_TELEGRAM
   SEND_TO_TELEGRAM("Bluetooth Client Found Devices: " + output);
 #endif

@@ -21,9 +21,9 @@ TaskHandle_t BLECommunicationTask;
 
 void BLECommunications(void *pvParameters) {
   for (;;) {
-    if (!spinBLEClient.dontBlockScan) {
-      NimBLEDevice::getScan()->stop();  // stop routine scans
-    }
+   // if (!spinBLEClient.dontBlockScan) {
+   //   NimBLEDevice::getScan()->stop();  // stop routine scans
+   // }
     // **********************************Client***************************************
     for (size_t x = 0; x < NUM_BLE_DEVICES; x++) {  // loop through discovered devices
       if (spinBLEClient.myBLEDevices[x].connectedClientID != BLE_HS_CONN_HANDLE_NONE) {
@@ -68,12 +68,12 @@ void BLECommunications(void *pvParameters) {
 
               } else if (!pClient->isConnected()) {  // This shouldn't ever be
                                                      // called...
-                if (pClient->disconnect() == 0) {    // 0 is a successful disconnect
-                  BLEDevice::deleteClient(pClient);
-                  vTaskDelay(100 / portTICK_PERIOD_MS);
-                  SS2K_LOG(BLE_COMMON_LOG_TAG, "Workaround connect");
-                  myAdvertisedDevice.doConnect = true;
-                }
+                                                     // if (pClient->disconnect() == 0) {    // 0 is a successful disconnect
+                // BLEDevice::deleteClient(pClient);
+                // vTaskDelay(100 / portTICK_PERIOD_MS);
+                SS2K_LOG(BLE_COMMON_LOG_TAG, "Workaround connect");
+                myAdvertisedDevice.doConnect = true;
+                //}
               }
             }
           }

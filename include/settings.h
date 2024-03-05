@@ -294,7 +294,7 @@
 #define DEFAULT_SCAN_DURATION 5
 
 // BLE automatic reconnect duration. Set this low to avoid interruption.
-#define BLE_RECONNECT_SCAN_DURATION 15
+#define BLE_RECONNECT_SCAN_DURATION 5
 
 //Task Stack Sizes
 #define MAIN_STACK 4500
