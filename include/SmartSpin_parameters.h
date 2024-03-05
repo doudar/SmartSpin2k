@@ -129,7 +129,7 @@ class userParameters {
   String connectedPowerMeter   = CONNECTED_POWER_METER;
   String connectedHeartMonitor = CONNECTED_HEART_MONITOR;
   String connectedRemote       = CONNECTED_REMOTE;
-  String foundDevices          = " ";
+  String foundDevices          = "";
 
  public:
   void setFirmwareUpdateURL(String fURL) { firmwareUpdateURL = fURL; }

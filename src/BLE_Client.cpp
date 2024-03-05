@@ -316,7 +316,7 @@ void MyClientCallback::onConnect(NimBLEClient *pClient) {
 }
 
 void MyClientCallback::onDisconnect(NimBLEClient *pClient) {
- //  NimBLEDevice::getScan()->stop();
+  //  NimBLEDevice::getScan()->stop();
   // NimBLEDevice::getScan()->clearResults();
   // NimBLEDevice::getScan()->clearDuplicateCache();
   if (!pClient->isConnected()) {
@@ -429,8 +429,10 @@ void MyAdvertisedDeviceCallback::onResult(BLEAdvertisedDevice *advertisedDevice)
     return;
   }
 }
+
 void SpinBLEClient::scanProcess(int duration) {
   this->doScan = false;  // Confirming we did the scan
+
   SS2K_LOGW(BLE_CLIENT_LOG_TAG, "Scanning for BLE servers and putting them into a list...");
 
   BLEScan *pBLEScan = BLEDevice::getScan();
@@ -443,18 +445,37 @@ void SpinBLEClient::scanProcess(int duration) {
   pBLEScan->setActiveScan(true);  // might cause memory leak if true - undetermined. We don't get device names without it.
   BLEScanResults foundDevices = pBLEScan->start(duration, false);
   this->dontBlockScan         = false;
-  // Load the scan into a Json String
+
   int count = foundDevices.getCount();
 
   StaticJsonDocument<1000> devices;
 
-  String device = "";
+  // Check if 'devices' JSON document already exists and has content; if so, deserialize it.
+  const char* foundDevicesJson = userConfig->getFoundDevices();
+  if (foundDevicesJson[0] != '\0') {
+    deserializeJson(devices, userConfig->getFoundDevices());
+  }
 
   for (int i = 0; i < count; i++) {
     BLEAdvertisedDevice d = foundDevices.getDevice(i);
-    if (d.isAdvertisingService(CYCLINGPOWERSERVICE_UUID) || d.isAdvertisingService(HEARTSERVICE_UUID) || d.isAdvertisingService(FLYWHEEL_UART_SERVICE_UUID) ||
-        d.isAdvertisingService(FITNESSMACHINESERVICE_UUID) || d.isAdvertisingService(ECHELON_DEVICE_UUID) || d.isAdvertisingService(HID_SERVICE_UUID)) {
-      device = "device " + String(i);
+
+    // Check for duplicates by name or address before adding
+    bool isDuplicate = false;
+    for (JsonPair kv : devices.as<JsonObject>()) {
+      JsonObject obj = kv.value().as<JsonObject>();
+      if (obj.containsKey("name") && String(obj["name"].as<const char *>()) == d.getName().c_str()) {
+        isDuplicate = true;
+        break;
+      }
+      if (obj.containsKey("address") && String(obj["address"].as<const char *>()) == d.getAddress().toString().c_str()) {
+        isDuplicate = true;
+        break;
+      }
+    }
+
+    if (!isDuplicate && (d.isAdvertisingService(CYCLINGPOWERSERVICE_UUID) || d.isAdvertisingService(HEARTSERVICE_UUID) || d.isAdvertisingService(FLYWHEEL_UART_SERVICE_UUID) ||
+                         d.isAdvertisingService(FITNESSMACHINESERVICE_UUID) || d.isAdvertisingService(ECHELON_DEVICE_UUID) || d.isAdvertisingService(HID_SERVICE_UUID))) {
+      String device = "device " + String(devices.size());  // Use the current size to index the new device
 
       if (d.haveName()) {
         devices[device]["name"] = d.getName();
@@ -463,25 +484,19 @@ void SpinBLEClient::scanProcess(int duration) {
       }
 
       if (d.haveServiceUUID()) {
-        // Workaround for IC4 advertising this service first instead of FTMS.
-        // Potentially others may need to be added in the future.
-        // The symptom was the bike name not showing up in the HTML.
-        if (d.getServiceUUID() == DEVICEINFORMATIONSERVICE_UUID) {
-          devices[device]["UUID"] = FITNESSMACHINESERVICE_UUID.toString();
-        } else {
-          devices[device]["UUID"] = d.getServiceUUID().toString();
-        }
+        devices[device]["UUID"] = d.getServiceUUID().toString();
       }
     }
   }
 
   String output;
   serializeJson(devices, output);
-    SS2K_LOG(BLE_CLIENT_LOG_TAG, "Bluetooth Client Found Devices: %s", output.c_str());
+  SS2K_LOG(BLE_CLIENT_LOG_TAG, "Bluetooth Client Found Devices: %s", output.c_str());
 #ifdef USE_TELEGRAM
   SEND_TO_TELEGRAM("Bluetooth Client Found Devices: " + output);
 #endif
-  userConfig->setFoundDevices(output);
+  userConfig->setFoundDevices(output);  // Save the updated JSON document
+
   pBLEScan = nullptr;  // free up memory
 }
 
