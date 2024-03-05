@@ -21,8 +21,6 @@
 #include <Update.h>
 #include <DNSServer.h>
 #include <ArduinoJson.h>
-// just so we cen set wifi powersave to never
-#include <esp_wifi.h>
 
 File fsUploadFile;
 
@@ -55,7 +53,6 @@ void startWifi() {
     WiFi.mode(WIFI_STA);
     WiFi.begin(userConfig->getSsid(), userConfig->getPassword());
     WiFi.setTxPower(WIFI_POWER_19_5dBm);
-    esp_wifi_set_ps(WIFI_PS_NONE);
     WiFi.setAutoReconnect(true);
   }
 
