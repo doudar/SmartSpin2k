@@ -62,6 +62,10 @@ static void onNotify(BLERemoteCharacteristic *pBLERemoteCharacteristic, uint8_t 
 void bleClientTask(void *pvParameters) {
   long int scanDelay = millis();
   for (;;) {
+      //be quiet while updating BLE
+  while (ss2k->isUpdating) {
+    vTaskDelay(100);
+  }
     vTaskDelay(BLE_CLIENT_DELAY / portTICK_PERIOD_MS);  // Delay a second between loops.
     if ((millis() - scanDelay) * 2 > (BLE_RECONNECT_SCAN_DURATION * 1000)) {
       spinBLEClient.checkBLEReconnect();

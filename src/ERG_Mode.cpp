@@ -20,7 +20,7 @@ void setupERG() {
   SS2K_LOG(ERG_MODE_LOG_TAG, "Starting ERG Mode task...");
   xTaskCreatePinnedToCore(ergTaskLoop,    /* Task function. */
                           "FTMSModeTask", /* name of task. */
-                          ERG_STACK,           /* Stack size of task*/
+                          ERG_STACK,      /* Stack size of task*/
                           NULL,           /* parameter of the task */
                           1,              /* priority of the task*/
                           &ErgTask,       /* Task handle to keep track of created task */
@@ -40,6 +40,10 @@ void ergTaskLoop(void* pvParameters) {
   int loopCounter             = 0;
 
   while (true) {
+    // be quiet while updating via BLE
+    while (ss2k->isUpdating) {
+      vTaskDelay(100);
+    }
     vTaskDelay(ERG_MODE_DELAY / portTICK_PERIOD_MS);
 
     hasConnectedPowerMeter = spinBLEClient.connectedPM;
@@ -256,7 +260,7 @@ int32_t TorqueTable::lookup(int watts, int cad) {
   float torque = _wattsToTorque(watts, cad);
 
   int i = round(torque / TORQUETABLE_INCREMENT);  // find the closest entry
-  //Cap i to max table size. 
+  // Cap i to max table size.
   if (i > TORQUETABLE_SIZE) {
     i = TORQUETABLE_SIZE - 1;
   }
@@ -624,7 +628,7 @@ void ErgMode::_updateValues(int newCadence, Measurement& newWatts, float newIncl
 
 bool ErgMode::_userIsSpinning(int cadence, float incline) {
   if (cadence <= MIN_ERG_CADENCE) {
-    if (!this->engineStopped) {                              // Test so motor stop command only happens once.
+    if (!this->engineStopped) {                               // Test so motor stop command only happens once.
       ss2k->motorStop();                                      // release tension
       rtConfig->setTargetIncline(incline - WATTS_PER_SHIFT);  // release incline
       this->engineStopped = true;

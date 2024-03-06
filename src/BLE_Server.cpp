@@ -126,7 +126,7 @@ void startBLEServer() {
   smartSpin2kCharacteristic =
       pSmartSpin2kService->createCharacteristic(SMARTSPIN2K_CHARACTERISTIC_UUID, NIMBLE_PROPERTY::WRITE | NIMBLE_PROPERTY::INDICATE | NIMBLE_PROPERTY::NOTIFY);
 
- spinBLEServer.pServer->setCallbacks(new MyServerCallbacks());
+  spinBLEServer.pServer->setCallbacks(new MyServerCallbacks());
 
   // Creating Characteristics
   heartRateMeasurementCharacteristic->setValue(heartRateMeasurement, 2);
@@ -326,8 +326,7 @@ void MyServerCallbacks::onDisconnect(BLEServer *pServer) {
 }
 
 bool MyServerCallbacks::onConnParamsUpdateRequest(NimBLEClient *pClient, const ble_gap_upd_params *params) {
-  // Failing to accept parameters may result in the remote device
-  // disconnecting.
+  SS2K_LOG(BLE_SERVER_LOG_TAG, "Updated Server Connection Parameters for %s", pClient->getPeerAddress().toString().c_str());
   return true;
 };
 
@@ -387,7 +386,6 @@ void processFTMSWrite() {
     uint8_t returnValue[3] = {FitnessMachineControlPointProcedure::ResponseCode, (uint8_t)rxValue[0], FitnessMachineControlPointResultCode::OpCodeNotSupported};
 
     ftmsStatus = {FitnessMachineStatus::ReservedForFutureUse};
-    
 
     switch ((uint8_t)rxValue[0]) {
       case FitnessMachineControlPointProcedure::RequestControl:
@@ -498,7 +496,7 @@ void processFTMSWrite() {
 
       case FitnessMachineControlPointProcedure::SetIndoorBikeSimulationParameters: {  // sim mode
         rtConfig->setFTMSMode((uint8_t)rxValue[0]);
-        returnValue[2] = FitnessMachineControlPointResultCode::Success;               // 0x01;
+        returnValue[2] = FitnessMachineControlPointResultCode::Success;  // 0x01;
         pCharacteristic->setValue(returnValue, 3);
 
         signed char buf[2];

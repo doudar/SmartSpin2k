@@ -37,6 +37,7 @@ class SS2K {
   int txCheck;
   bool rebootFlag = false;
   bool saveFlag   = false;
+  bool isUpdating = false;
 
   bool IRAM_ATTR deBounce();
   static void IRAM_ATTR moveStepper(void *pvParameters);

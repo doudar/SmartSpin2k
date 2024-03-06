@@ -240,6 +240,7 @@ void SS2K::maintenanceLoop(void *pvParameters) {
       if (NimBLEDevice::getServer()) {
         if (!(NimBLEDevice::getServer()->getConnectedCount())) {
           SS2K_LOGW(MAIN_LOG_TAG, "Rebooting due to inactivity");
+          
           ss2k->rebootFlag = true;
         } else {
           rebootTimer = millis();

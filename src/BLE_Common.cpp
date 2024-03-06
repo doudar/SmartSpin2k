@@ -21,9 +21,13 @@ TaskHandle_t BLECommunicationTask;
 
 void BLECommunications(void *pvParameters) {
   for (;;) {
-   // if (!spinBLEClient.dontBlockScan) {
-   //   NimBLEDevice::getScan()->stop();  // stop routine scans
-   // }
+  //be quiet while updating
+  while (ss2k->isUpdating) {
+    vTaskDelay(100);
+  }
+    // if (!spinBLEClient.dontBlockScan) {
+    //   NimBLEDevice::getScan()->stop();  // stop routine scans
+    // }
     // **********************************Client***************************************
     for (size_t x = 0; x < NUM_BLE_DEVICES; x++) {  // loop through discovered devices
       if (spinBLEClient.myBLEDevices[x].connectedClientID != BLE_HS_CONN_HANDLE_NONE) {
