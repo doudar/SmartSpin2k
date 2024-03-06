@@ -405,10 +405,6 @@ void HTTP_Server::start() {
 void HTTP_Server::webClientUpdate(void *pvParameters) {
   static unsigned long mDnsTimer = millis();  // NOLINT: There is no overload in String for uint64_t
   for (;;) {
-    // be quiet while updating via BLE
-    while (ss2k->isUpdating) {
-      vTaskDelay(100);
-    }
     server.handleClient();
     vTaskDelay(WEBSERVER_DELAY / portTICK_RATE_MS);
     if (WiFi.getMode() != WIFI_MODE_STA) {
