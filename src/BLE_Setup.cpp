@@ -14,7 +14,7 @@
 void setupBLE() {  // Common BLE setup for both client and server
   SS2K_LOG(BLE_SETUP_LOG_TAG, "Starting Arduino BLE Client application...");
   BLEDevice::init(userConfig->getDeviceName());
-  BLEDevice::setMTU(515);
+  BLEDevice::setMTU(BLE_ATT_MTU_MAX);
   FTMSWrite = "";
   spinBLEClient.start();
   startBLEServer();
