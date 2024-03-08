@@ -21,40 +21,32 @@ TaskHandle_t BLECommunicationTask;
 
 void BLECommunications(void *pvParameters) {
   for (;;) {
-  //be quiet while updating
-  while (ss2k->isUpdating) {
-    vTaskDelay(100);
-  }
     // if (!spinBLEClient.dontBlockScan) {
     //   NimBLEDevice::getScan()->stop();  // stop routine scans
     // }
     // **********************************Client***************************************
-    for (size_t x = 0; x < NUM_BLE_DEVICES; x++) {  // loop through discovered devices
-      if (spinBLEClient.myBLEDevices[x].connectedClientID != BLE_HS_CONN_HANDLE_NONE) {
+    for (auto _BLEd : spinBLEClient.myBLEDevices) {  // loop through discovered devices
+      if (_BLEd.connectedClientID != BLE_HS_CONN_HANDLE_NONE) {
         SS2K_LOGD(BLE_COMMON_LOG_TAG, "Address: (%s) Client ID: (%d) SerUUID: (%s) CharUUID: (%s) HRM: (%s) PM: (%s) CSC: (%s) CT: (%s) doConnect: (%s)",
-                  spinBLEClient.myBLEDevices[x].peerAddress.toString().c_str(), spinBLEClient.myBLEDevices[x].connectedClientID,
-                  spinBLEClient.myBLEDevices[x].serviceUUID.toString().c_str(), spinBLEClient.myBLEDevices[x].charUUID.toString().c_str(),
-                  spinBLEClient.myBLEDevices[x].isHRM ? "true" : "false", spinBLEClient.myBLEDevices[x].isPM ? "true" : "false",
-                  spinBLEClient.myBLEDevices[x].isCSC ? "true" : "false", spinBLEClient.myBLEDevices[x].isCT ? "true" : "false",
-                  spinBLEClient.myBLEDevices[x].doConnect ? "true" : "false");
-        if (spinBLEClient.myBLEDevices[x].advertisedDevice) {  // is device registered?
-          SpinBLEAdvertisedDevice myAdvertisedDevice = spinBLEClient.myBLEDevices[x];
-          if ((myAdvertisedDevice.connectedClientID != BLE_HS_CONN_HANDLE_NONE) && (myAdvertisedDevice.doConnect == false)) {  // client must not be in connection process
-            if (BLEDevice::getClientByPeerAddress(myAdvertisedDevice.peerAddress)) {                                           // nullptr check
-              BLEClient *pClient = NimBLEDevice::getClientByPeerAddress(myAdvertisedDevice.peerAddress);
+                  _BLEd.peerAddress.toString().c_str(), _BLEd.connectedClientID, _BLEd.serviceUUID.toString().c_str(), _BLEd.charUUID.toString().c_str(),
+                  _BLEd.isHRM ? "true" : "false", _BLEd.isPM ? "true" : "false", _BLEd.isCSC ? "true" : "false", _BLEd.isCT ? "true" : "false", _BLEd.doConnect ? "true" : "false");
+        if (_BLEd.advertisedDevice) {                                                                // is device registered?
+          if ((_BLEd.connectedClientID != BLE_HS_CONN_HANDLE_NONE) && (_BLEd.doConnect == false)) {  // client must not be in connection process
+            if (BLEDevice::getClientByPeerAddress(_BLEd.peerAddress)) {                              // nullptr check
+              BLEClient *pClient = NimBLEDevice::getClientByPeerAddress(_BLEd.peerAddress);
               // Client connected with a valid UUID registered
-              if ((myAdvertisedDevice.serviceUUID != BLEUUID((uint16_t)0x0000)) && (pClient->isConnected())) {
-                BLERemoteCharacteristic *pRemoteBLECharacteristic = pClient->getService(myAdvertisedDevice.serviceUUID)->getCharacteristic(myAdvertisedDevice.charUUID);
+              if ((_BLEd.serviceUUID != BLEUUID((uint16_t)0x0000)) && (pClient->isConnected())) {
+                BLERemoteCharacteristic *pRemoteBLECharacteristic = pClient->getService(_BLEd.serviceUUID)->getCharacteristic(_BLEd.charUUID);
 
                 // Handle BLE HID Remotes
-                if (spinBLEClient.myBLEDevices[x].serviceUUID == HID_SERVICE_UUID) {
+                if (_BLEd.serviceUUID == HID_SERVICE_UUID) {
                   spinBLEClient.keepAliveBLE_HID(pClient);  // keep alive doesn't seem to help :(
                   continue;                                 // There is not data that needs to be dequeued for the remote, so got to the next device.
                 }
 
                 // Dequeue sensor data we stored during notifications
                 while (pdTRUE) {
-                  NotifyData incomingNotifyData = myAdvertisedDevice.dequeueData();
+                  NotifyData incomingNotifyData = _BLEd.dequeueData();
                   if (incomingNotifyData.length == 0) {
                     break;
                   }
@@ -64,8 +56,7 @@ void BLECommunications(void *pvParameters) {
                   for (size_t i = 0; i < length; i++) {
                     pData[i] = incomingNotifyData.data[i];
                   }
-                  collectAndSet(pRemoteBLECharacteristic->getUUID(), myAdvertisedDevice.serviceUUID, pRemoteBLECharacteristic->getRemoteService()->getClient()->getPeerAddress(),
-                                pData, length);
+                  collectAndSet(pRemoteBLECharacteristic->getUUID(), _BLEd.serviceUUID, pRemoteBLECharacteristic->getRemoteService()->getClient()->getPeerAddress(), pData, length);
                 }
 
                 spinBLEClient.handleBattInfo(pClient, false);
@@ -76,7 +67,7 @@ void BLECommunications(void *pvParameters) {
                 // BLEDevice::deleteClient(pClient);
                 // vTaskDelay(100 / portTICK_PERIOD_MS);
                 SS2K_LOG(BLE_COMMON_LOG_TAG, "Workaround connect");
-                myAdvertisedDevice.doConnect = true;
+                _BLEd.doConnect = true;
                 //}
               }
             }
@@ -105,17 +96,15 @@ void BLECommunications(void *pvParameters) {
       rtConfig->hr.setValue(0);
     }
 
-    if (connectedClientCount() > 0) {
+    if (connectedClientCount() > 0 && !ss2k->isUpdating) {
       // update the BLE information on the server
       updateIndoorBikeDataChar();
       updateCyclingPowerMeasurementChar();
       updateHeartRateMeasurementChar();
       // controlPointIndicate();
-
       if (spinDown()) {
         // Possibly do something in the future. Right now we just fake the spindown.
       }
-
       processFTMSWrite();
       spinBLEClient.postConnect();
 

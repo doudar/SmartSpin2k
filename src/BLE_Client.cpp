@@ -62,25 +62,36 @@ static void onNotify(BLERemoteCharacteristic *pBLERemoteCharacteristic, uint8_t 
 void bleClientTask(void *pvParameters) {
   long int scanDelay = millis();
   for (;;) {
-      //be quiet while updating BLE
-  while (ss2k->isUpdating) {
-    vTaskDelay(100);
-  }
-    vTaskDelay(BLE_CLIENT_DELAY / portTICK_PERIOD_MS);  // Delay a second between loops.
-    if ((millis() - scanDelay) * 2 > (BLE_RECONNECT_SCAN_DURATION * 1000)) {
+    vTaskDelay(BLE_CLIENT_DELAY / portTICK_PERIOD_MS);  // Delay between loops.
+
+    // disconnect all connected servers if we're updating via BLE
+    if (ss2k->isUpdating) {
+      for (auto _BLEd: spinBLEClient.myBLEDevices) {  // loop through discovered devices
+        if (_BLEd.connectedClientID != BLE_HS_CONN_HANDLE_NONE) {
+          if (_BLEd.advertisedDevice) {                                                                // is device registered?
+            if ((_BLEd.connectedClientID != BLE_HS_CONN_HANDLE_NONE) && (_BLEd.doConnect == false)) {  // client must not be in connection process
+              if (BLEDevice::getClientByPeerAddress(_BLEd.peerAddress)) {                              // nullptr check
+                NimBLEClient *pClient  = NimBLEDevice::getClientByPeerAddress(_BLEd.peerAddress);
+                pClient->disconnect();
+              }
+            }
+          }
+        }
+      }
+    }
+
+    // Scan for BLE devices that we should connect to this client
+    if ((millis() - scanDelay) > ((BLE_RECONNECT_SCAN_DURATION * 1000) * 2)) {
       spinBLEClient.checkBLEReconnect();
       scanDelay = millis();
     }
-    // if (spinBLEClient.doScan && (spinBLEClient.scanRetries > 0) && !NimBLEDevice::getScan()->isScanning()) {
-    //   spinBLEClient.scanRetries--;
-    //   SS2K_LOG(BLE_CLIENT_LOG_TAG, "Initiating Scan from Client Task:");
-    //   spinBLEClient.scanProcess();
-    //  }
+
+// Connect BLE Servers to this client
 #ifdef DEBUG_STACK
     Serial.printf("BLEClient: %d \n", uxTaskGetStackHighWaterMark(BLEClientTask));
 #endif  // DEBUG_STACK
     for (int x = 0; x < NUM_BLE_DEVICES; x++) {
-      if (spinBLEClient.myBLEDevices[x].doConnect == true) {
+      if (spinBLEClient.myBLEDevices[x].doConnect == true && !ss2k->isUpdating) {
         SS2K_LOG(BLE_CLIENT_LOG_TAG, "Connecting device on slot %d ...", x);
         if (spinBLEClient.connectToServer()) {
           SS2K_LOG(BLE_CLIENT_LOG_TAG, "We are now connected to the BLE Server.");
@@ -778,9 +789,8 @@ void SpinBLEClient::checkBLEReconnect() {
     scan = true;
   }
   if (scan) {
-    if (!NimBLEDevice::getScan()->isScanning()) {
+    if (!NimBLEDevice::getScan()->isScanning() && !ss2k->isUpdating) {
       spinBLEClient.scanProcess(BLE_RECONNECT_SCAN_DURATION);
-      // Serial.println("scan");
     }
   }
 }
