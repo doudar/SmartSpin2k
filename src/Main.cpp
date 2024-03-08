@@ -426,45 +426,65 @@ void IRAM_ATTR SS2K::shiftDown() {  // Handle the shift down interrupt
 }
 
 void SS2K::resetIfShiftersHeld() {
+// Interrupt Handlers and Miscellaneous Functions
+// This section defines functions that handle external interrupts and perform various auxiliary tasks within the SmartSpin2k device.
+
+// Debounce logic for shift button presses
+bool IRAM_ATTR SS2K::deBounce() {
+  // Logic to ensure button press is legitimate and not due to noise
+  if ((millis() - lastDebounceTime) > debounceDelay) {
+    lastDebounceTime = millis();  // Update debounce time
+    return true;  // Valid button press
+  }
+  return false;  // Invalid press, likely noise
+}
+
+// Shift up interrupt handler
+void IRAM_ATTR SS2K::shiftUp() {
+  if (ss2k->deBounce()) {
+    // Check if the shift up button was legitimately pressed
+    if (!digitalRead(currentBoard.shiftUpPin)) {
+      // Adjust shifter position accordingly
+      rtConfig->setShifterPosition(rtConfig->getShifterPosition() - 1 + userConfig->getShifterDir() * 2);
+    } else {
+      // Reset debounce time if triggered by electromagnetic interference
+      ss2k->lastDebounceTime = 0;
+    }
+  }
+}
+
+// Shift down interrupt handler
+void IRAM_ATTR SS2K::shiftDown() {
+  if (ss2k->deBounce()) {
+    // Check if the shift down button was legitimately pressed
+    if (!digitalRead(currentBoard.shiftDownPin)) {
+      // Adjust shifter position accordingly
+      rtConfig->setShifterPosition(rtConfig->getShifterPosition() + 1 - userConfig->getShifterDir() * 2);
+    } else {
+      // Reset debounce time if triggered by electromagnetic interference
+      ss2k->lastDebounceTime = 0;
+    }
+  }
+}
+
+// Resets device to default settings if both shifters are held down simultaneously
+void SS2K::resetIfShiftersHeld() {
   if ((digitalRead(currentBoard.shiftUpPin) == LOW) && (digitalRead(currentBoard.shiftDownPin) == LOW)) {
-    SS2K_LOG(MAIN_LOG_TAG, "Resetting to defaults via shifter buttons.");
-    for (int x = 0; x < 10; x++) {  // blink fast to acknowledge
+    // Indicate reset process through LED blinking
+    for (int x = 0; x < 10; x++) {
       digitalWrite(LED_PIN, HIGH);
       vTaskDelay(200 / portTICK_PERIOD_MS);
       digitalWrite(LED_PIN, LOW);
     }
+    // Perform filesystem format and reset user configuration to defaults
     for (int i = 0; i < 20; i++) {
       LittleFS.format();
       userConfig->setDefaults();
-      vTaskDelay(200 / portTICK_PERIOD_MS);
-      userConfig->saveToLittleFS();
-      vTaskDelay(200 / portTICK_PERIOD_MS);
+      userConfig->saveToLittleFS();  // Save default configuration
     }
-    ESP.restart();
+    ESP.restart();  // Reboot device
   }
 }
-
-void SS2K::setupTMCStepperDriver() {
-  driver.begin();
-  driver.pdn_disable(true);
-  driver.mstep_reg_select(true);
-
-  ss2k->updateStepperPower();
-  driver.microsteps(4);  // Set microsteps to 1/8th
-  driver.irun(currentBoard.pwrScaler);
-  driver.ihold((uint8_t)(currentBoard.pwrScaler * .5));  // hold current % 0-DRIVER_MAX_PWR_SCALER
-  driver.iholddelay(10);                                 // Controls the number of clock cycles for motor
-                                                         // power down after standstill is detected
-  driver.TPOWERDOWN(128);
-
-  driver.toff(5);
-  bool t_bool = userConfig->getStealthChop();
-  driver.en_spreadCycle(!t_bool);
-  driver.pwm_autoscale(t_bool);
-  driver.pwm_autograd(t_bool);
-}
-
-// Applies current power to driver
 void SS2K::updateStepperPower() {
   uint16_t rmsPwr = (userConfig->getStepperPower());
   driver.rms_current(rmsPwr);
