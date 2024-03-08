@@ -81,15 +81,18 @@ void SS2K::stopTasks() {
     ErgTask = NULL;
   }
   if (BLEClientTask != NULL) {
-    vTaskDelete(BLEClientTask);
-    BLEClientTask = NULL;
-  }
-}
+// BEGIN SETUP
+// This section contains the initial setup code executed once at startup.
+// It initializes serial ports, configures board-specific settings, and prepares the system for operation.
+
+#ifndef UNIT_TEST  // Exclude this section from unit tests
 
 void setup() {
-  // Serial port for debugging purposes
+  // Initialize debugging serial port
   Serial.begin(512000);
   SS2K_LOG(MAIN_LOG_TAG, "Compiled %s%s", __DATE__, __TIME__);
+
+  // Determine the current board based on voltage measurement
   pinMode(REV_PIN, INPUT);
   int actualVoltage = analogRead(REV_PIN);
   if (actualVoltage - boards.rev1.versionVoltage >= boards.rev2.versionVoltage - actualVoltage) {
@@ -99,93 +102,73 @@ void setup() {
   }
   SS2K_LOG(MAIN_LOG_TAG, "Current Board Revision is: %s", currentBoard.name);
 
-  // initialize Stepper serial port
-
+  // Initialize stepper and auxiliary serial ports
   stepperSerial.begin(57600, SERIAL_8N2, currentBoard.stepperSerialRxPin, currentBoard.stepperSerialTxPin);
-  // initialize aux serial port (Peloton)
   if (currentBoard.auxSerialTxPin) {
-    auxSerial.begin(19200, SERIAL_8N1, currentBoard.auxSerialRxPin, currentBoard.auxSerialTxPin, false);  //////////////////////////////////change to false after testing!!!
+    auxSerial.begin(19200, SERIAL_8N1, currentBoard.auxSerialRxPin, currentBoard.auxSerialTxPin, false);
     if (!auxSerial) {
       SS2K_LOG(MAIN_LOG_TAG, "Invalid Serial Pin Configuration");
     }
-    auxSerial.onReceive(SS2K::rxSerial, false);  // setup callback
+    auxSerial.onReceive(SS2K::rxSerial, false);  // Setup callback for receiving data
   }
-  // Initialize LittleFS
+
+  // Filesystem initialization and configuration loading
   SS2K_LOG(MAIN_LOG_TAG, "Mounting Filesystem");
   if (!LittleFS.begin(false)) {
+    // Handle filesystem mount failure
     FSUpgrader upgrade;
     SS2K_LOG(MAIN_LOG_TAG, "An Error has occurred while mounting LittleFS.");
-    // BEGIN FS UPGRADE SPECIFIC//
-    upgrade.upgradeFS();
-    // END FS UPGRADE SPECIFIC//
+    upgrade.upgradeFS();  // Attempt filesystem upgrade if necessary
   }
-
-  // Load Config
+  // Load and print user configuration
   userConfig->loadFromLittleFS();
-  userConfig->printFile();  // Print userConfig->contents to serial
+  userConfig->printFile();
   userConfig->saveToLittleFS();
 
-  // load PWC for HR to Pwr Calculation
+  // Load and manage PWC data
   userPWC->loadFromLittleFS();
   userPWC->printFile();
   userPWC->saveToLittleFS();
 
-  // Check for firmware update. It's important that this stays before BLE &
-  // HTTP setup because otherwise they use too much traffic and the device
-  // fails to update which really sucks when it corrupts your settings.
+  // Firmware update check and initialization of web server
   startWifi();
   httpServer.FirmwareUpdate();
 
-  pinMode(currentBoard.shiftUpPin, INPUT_PULLUP);    // Push-Button with input Pullup
-  pinMode(currentBoard.shiftDownPin, INPUT_PULLUP);  // Push-Button with input Pullup
+  // Configure board-specific inputs and outputs
+  pinMode(currentBoard.shiftUpPin, INPUT_PULLUP);
+  pinMode(currentBoard.shiftDownPin, INPUT_PULLUP);
   pinMode(LED_PIN, OUTPUT);
   pinMode(currentBoard.enablePin, OUTPUT);
-  pinMode(currentBoard.dirPin, OUTPUT);   // Stepper Direction Pin
-  pinMode(currentBoard.stepPin, OUTPUT);  // Stepper Step Pin
-  digitalWrite(currentBoard.enablePin,
-               HIGH);  // Should be called a disable Pin - High Disables FETs
-  digitalWrite(currentBoard.dirPin, LOW);
-  digitalWrite(currentBoard.stepPin, LOW);
-  digitalWrite(LED_PIN, LOW);
+  pinMode(currentBoard.dirPin, OUTPUT);
+  pinMode(currentBoard.stepPin, OUTPUT);
+  digitalWrite(currentBoard.enablePin, HIGH);  // Disables FETs, effectively disabling the motor
+  digitalWrite(currentBoard.dirPin, LOW);  // Set motor direction
+  digitalWrite(currentBoard.stepPin, LOW);  // Initialize stepper motor step pin
+  digitalWrite(LED_PIN, LOW);  // Initialize system LED
 
-  ss2k->setupTMCStepperDriver();
+  // Stepper driver setup and task creation for stepper and maintenance operations
+  ss2k->setupTMCStepperDriver();  // Initialize TMC stepper driver
+  ss2k->startTasks();  // Start background tasks for BLE and ERG mode
+  httpServer.start();  // Start web server for remote management
 
-  SS2K_LOG(MAIN_LOG_TAG, "Setting up cpu Tasks");
-  disableCore0WDT();  // Disable the watchdog timer on core 0 (so long stepper
-                      // moves don't cause problems)
+  ss2k->resetIfShiftersHeld();  // Check and handle shifter button reset
+  attachInterrupt(digitalPinToInterrupt(currentBoard.shiftUpPin), ss2k->shiftUp, CHANGE);  // Setup interrupt for shift up
+  attachInterrupt(digitalPinToInterrupt(currentBoard.shiftDownPin), ss2k->shiftDown, CHANGE);  // Setup interrupt for shift down
+  digitalWrite(LED_PIN, HIGH);  // Indicate system readiness
 
-  xTaskCreatePinnedToCore(SS2K::moveStepper,     /* Task function. */
-                          "moveStepperFunction", /* name of task. */
-                          STEPPER_STACK,         /* Stack size of task */
-                          NULL,                  /* parameter of the task */
-                          18,                    /* priority of the task */
-                          &moveStepperTask,      /* Task handle to keep track of created task */
-                          0);                    /* pin task to core */
+  // Finalize setup by creating tasks for stepper movement and maintenance
+  xTaskCreatePinnedToCore(SS2K::moveStepper, "moveStepperFunction", STEPPER_STACK, NULL, 18, &moveStepperTask, 0);  // Task for controlling stepper motor movement
+  xTaskCreatePinnedToCore(SS2K::maintenanceLoop, "maintenanceLoopFunction", MAIN_STACK, NULL, 20, &maintenanceLoopTask, 1);  // Task for performing maintenance operations
+}
 
-  digitalWrite(LED_PIN, HIGH);
+#else
+// Additional code or configurations for unit testing
+#endif
 
-  // Configure and Initialize Logger
-  logHandler.addAppender(&webSocketAppender);
-  logHandler.addAppender(&udpAppender);
-  logHandler.initialize();
-
-  ss2k->startTasks();
-  httpServer.start();
-
-  ss2k->resetIfShiftersHeld();
-  SS2K_LOG(MAIN_LOG_TAG, "Creating Shifter Interrupts");
-  // Setup Interrupts so shifters work anytime
-  attachInterrupt(digitalPinToInterrupt(currentBoard.shiftUpPin), ss2k->shiftUp, CHANGE);
-  attachInterrupt(digitalPinToInterrupt(currentBoard.shiftDownPin), ss2k->shiftDown, CHANGE);
-  digitalWrite(LED_PIN, HIGH);
-
-  xTaskCreatePinnedToCore(SS2K::maintenanceLoop,     /* Task function. */
-                          "maintenanceLoopFunction", /* name of task. */
-                          MAIN_STACK,                /* Stack size of task */
-                          NULL,                      /* parameter of the task */
-                          20,                        /* priority of the task */
-                          &maintenanceLoopTask,      /* Task handle to keep track of created task */
-                          1);                        /* pin task to core */
+void loop() {
+  // Main program loop, typically empty in ESP32 projects where tasks are used instead.
+  vTaskDelete(NULL);  // Delete this task to free up memory, as it's not used.
+}
 }
 
 void loop() {  // Delete this task so we can make one that's more memory efficient.
