@@ -25,11 +25,12 @@ void BLECommunications(void *pvParameters) {
     //   NimBLEDevice::getScan()->stop();  // stop routine scans
     // }
     // **********************************Client***************************************
-    for (auto _BLEd : spinBLEClient.myBLEDevices) {  // loop through discovered devices
+    for (auto &_BLEd : spinBLEClient.myBLEDevices) {  // loop through discovered devices
       if (_BLEd.connectedClientID != BLE_HS_CONN_HANDLE_NONE) {
-        SS2K_LOGD(BLE_COMMON_LOG_TAG, "Address: (%s) Client ID: (%d) SerUUID: (%s) CharUUID: (%s) HRM: (%s) PM: (%s) CSC: (%s) CT: (%s) doConnect: (%s)",
-                  _BLEd.peerAddress.toString().c_str(), _BLEd.connectedClientID, _BLEd.serviceUUID.toString().c_str(), _BLEd.charUUID.toString().c_str(),
-                  _BLEd.isHRM ? "true" : "false", _BLEd.isPM ? "true" : "false", _BLEd.isCSC ? "true" : "false", _BLEd.isCT ? "true" : "false", _BLEd.doConnect ? "true" : "false");
+        SS2K_LOGW(BLE_COMMON_LOG_TAG, "Address: (%s) Client ID: (%d) SerUUID: (%s) CharUUID: (%s) HRM: (%s) PM: (%s) CSC: (%s) CT: (%s) doConnect: (%s) postConnect: (%s)",
+                 _BLEd.peerAddress.toString().c_str(), _BLEd.connectedClientID, _BLEd.serviceUUID.toString().c_str(), _BLEd.charUUID.toString().c_str(),
+                 _BLEd.isHRM ? "true" : "false", _BLEd.isPM ? "true" : "false", _BLEd.isCSC ? "true" : "false", _BLEd.isCT ? "true" : "false", _BLEd.doConnect ? "true" : "false",
+                 _BLEd.getPostConnected() ? "true" : "false");
         if (_BLEd.advertisedDevice) {                                                                // is device registered?
           if ((_BLEd.connectedClientID != BLE_HS_CONN_HANDLE_NONE) && (_BLEd.doConnect == false)) {  // client must not be in connection process
             if (BLEDevice::getClientByPeerAddress(_BLEd.peerAddress)) {                              // nullptr check
@@ -88,6 +89,7 @@ void BLECommunications(void *pvParameters) {
     calculateInstPwrFromHR();
 #endif  // DEBUG_HR_TO_PWR
 
+    // Set outputs to zero if we're not simulating or have connected devices.
     if (!spinBLEClient.connectedPM && !hr2p && !rtConfig->watts.getSimulate() && !rtConfig->cad.getSimulate()) {
       rtConfig->cad.setValue(0);
       rtConfig->watts.setValue(0);
@@ -95,6 +97,8 @@ void BLECommunications(void *pvParameters) {
     if (!spinBLEClient.connectedHRM && !rtConfig->hr.getSimulate()) {
       rtConfig->hr.setValue(0);
     }
+
+    spinBLEClient.postConnect();
 
     if (connectedClientCount() > 0 && !ss2k->isUpdating) {
       // update the BLE information on the server
@@ -106,7 +110,6 @@ void BLECommunications(void *pvParameters) {
         // Possibly do something in the future. Right now we just fake the spindown.
       }
       processFTMSWrite();
-      spinBLEClient.postConnect();
 
 #ifdef INTERNAL_ERG_4EXT_FTMS
       uint8_t test[] = {FitnessMachineControlPointProcedure::SetIndoorBikeSimulationParameters, 0x00, 0x00, 0x00, 0x00, 0x28, 0x33};

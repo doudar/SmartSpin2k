@@ -110,6 +110,8 @@ class SpinBLEAdvertisedDevice {
  private:
   QueueHandle_t dataBufferQueue = nullptr;
 
+  bool isPostConnected = false;
+
  public:  // eventually these should be made private
   // // TODO: Do we dispose of this object?  Is so, we need to de-allocate the queue.
   // //       This distructor was called too early and the queue was deleted out from
@@ -133,7 +135,8 @@ class SpinBLEAdvertisedDevice {
   bool isCT             = false;
   bool isRemote         = false;
   bool doConnect        = false;
-  bool postConnected    = false;
+  void setPostConnected(bool pc) { isPostConnected = pc; }
+  bool getPostConnected() { return isPostConnected; }
   void set(BLEAdvertisedDevice *device, int id = BLE_HS_CONN_HANDLE_NONE, BLEUUID inServiceUUID = (uint16_t)0x0000, BLEUUID inCharUUID = (uint16_t)0x0000);
   void reset();
   void print();
