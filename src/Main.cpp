@@ -187,80 +187,69 @@ void SS2K::maintenanceLoop(void *pvParameters) {
     ss2k->FTMSModeShiftModifier();
 
     if (currentBoard.auxSerialTxPin) {
+// Begin Maintenance Loop
+// This function is called periodically and is responsible for managing various tasks such as Bluetooth communication, saving configurations, and handling system reboots.
+
+void SS2K::maintenanceLoop(void *pvParameters) {
+  static int loopCounter = 0;  // Counter for loop iterations
+  static unsigned long intervalTimer = millis();  // Timer for periodic actions
+  static unsigned long intervalTimer2 = millis();  // Secondary timer for additional periodic actions
+  static unsigned long rebootTimer = millis();  // Timer to track reboot intervals
+  static bool isScanning = false;  // Flag to manage Bluetooth scanning state
+
+  while (true) {
+    vTaskDelay(73 / portTICK_RATE_MS);  // Short delay for task pacing
+
+    ss2k->FTMSModeShiftModifier();  // Adjust mode based on shifter position
+
+    // Transmit serial data if applicable
+    if (currentBoard.auxSerialTxPin) {
       ss2k->txSerial();
     }
 
+    // Handle system reboot request
     if (ss2k->rebootFlag) {
       vTaskDelay(100 / portTICK_RATE_MS);
-      ESP.restart();
+      ESP.restart();  // Perform system reboot
     }
 
-    // required to set a flag instead of directly calling the function for saving from BLE_Custom Characteristic.
+    // Save configurations if flagged
     if (ss2k->saveFlag) {
       ss2k->saveFlag = false;
-      userConfig->saveToLittleFS();
-      userPWC->saveToLittleFS();
+      userConfig->saveToLittleFS();  // Save user configuration to filesystem
+      userPWC->saveToLittleFS();  // Save physical working capacity data to filesystem
     }
 
-    if ((millis() - intervalTimer) > 2003) {  // add check here for when to restart WiFi
-                                              // maybe if in STA mode and 8.8.8.8 no ping return?
-      // ss2k->restartWifi();
+    // Periodic actions for logging and Bluetooth device management
+    if ((millis() - intervalTimer) > 2003) {
+      // Perform periodic actions such as log writing and Bluetooth scan management
       logHandler.writeLogs();
       webSocketAppender.Loop();
-      intervalTimer = millis();
+      intervalTimer = millis();  // Reset timer
     }
 
     if ((millis() - intervalTimer2) > 6007) {
-      if (NimBLEDevice::getScan()->isScanning()) {  // workaround to prevent occasional runaway scans
-        if (isScanning == true) {
-          SS2K_LOGW(MAIN_LOG_TAG, "Forcing Scan to stop.");
-          NimBLEDevice::getScan()->stop();
-          isScanning = false;
-        } else {
-          isScanning = true;
-        }
+      // Additional periodic actions
+      if (NimBLEDevice::getScan()->isScanning() && isScanning) {
+        // Force stop scanning to prevent runaway scans
+        NimBLEDevice::getScan()->stop();
+        isScanning = false;
+      } else {
+        isScanning = true;
       }
-      intervalTimer2 = millis();
+      intervalTimer2 = millis();  // Reset secondary timer
     }
 
-    // reboot every half hour if not in use.
-    if ((millis() - rebootTimer) > 1800000) {
-      if (NimBLEDevice::getServer()) {
-        if (!(NimBLEDevice::getServer()->getConnectedCount())) {
-          SS2K_LOGW(MAIN_LOG_TAG, "Rebooting due to inactivity");
-          
-          ss2k->rebootFlag = true;
-        } else {
-          rebootTimer = millis();
-        }
-      }
+    // Reboot device for maintenance or inactivity
+    if ((millis() - rebootTimer) > 1800000 && !NimBLEDevice::getServer()->getConnectedCount()) {
+      // Reboot device if inactive for more than half an hour
+      ss2k->rebootFlag = true;
     }
 
-    if (loopCounter > 10) {
-      ss2k->checkDriverTemperature();
-
-#ifdef DEBUG_STACK
-      Serial.printf("Step Task: %d \n", uxTaskGetStackHighWaterMark(moveStepperTask));
-      Serial.printf("Main Task: %d \n", uxTaskGetStackHighWaterMark(maintenanceLoopTask));
-      Serial.printf("Free Heap: %d \n", ESP.getFreeHeap());
-      Serial.printf("Best Blok: %d \n", heap_caps_get_largest_free_block(MALLOC_CAP_8BIT));
-#endif  // DEBUG_STACK
-      loopCounter = 0;
-    }
-    loopCounter++;
+    loopCounter++;  // Increment loop counter
   }
 }
 
-#endif  // UNIT_TEST
-
-void SS2K::FTMSModeShiftModifier() {
-  int shiftDelta = rtConfig->getShifterPosition() - ss2k->lastShifterPosition;
-  if (shiftDelta) {  // Shift detected
-    switch (rtConfig->getFTMSMode()) {
-      case FitnessMachineControlPointProcedure::SetTargetPower:  // ERG Mode
-      {
-        rtConfig->setShifterPosition(ss2k->lastShifterPosition);  // reset shifter position because we're remapping it to ERG target
-        if ((rtConfig->watts.getTarget() + (shiftDelta * ERG_PER_SHIFT) < userConfig->getMinWatts()) ||
             (rtConfig->watts.getTarget() + (shiftDelta * ERG_PER_SHIFT) > userConfig->getMaxWatts())) {
           SS2K_LOG(MAIN_LOG_TAG, "Shift to %dw blocked", rtConfig->watts.getTarget() + shiftDelta);
           break;
