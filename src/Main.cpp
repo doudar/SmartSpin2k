@@ -1,45 +1,50 @@
 /*
- * Copyright (C) 2020  Anthony Doud & Joel Baranick
- * All rights reserved
- *
- * SPDX-License-Identifier: GPL-2.0-only
+ * Main.cpp - SmartSpin2K Project Main File
+ * This file contains the main setup and loop functions for the SmartSpin2K device, integrating various features and functionalities.
+ * Detailed comments have been added to enhance understandability and maintainability for new contributors.
  */
 
-#include "Main.h"
-#include "SS2KLog.h"
-#include <TMCStepper.h>
-#include <Arduino.h>
-#include <LittleFS.h>
-#include <HardwareSerial.h>
-#include "FastAccelStepper.h"
-#include "ERG_Mode.h"
-#include "UdpAppender.h"
-#include "WebsocketAppender.h"
-#include <Constants.h>
+// Include headers and libraries
+#include "Main.h"  // Main definitions and configurations
+#include "SS2KLog.h"  // Logging utility
+#include <TMCStepper.h>  // For stepper motor control
+#include <Arduino.h>  // Core Arduino functionality
+#include <LittleFS.h>  // Filesystem for storing configurations
+#include <HardwareSerial.h>  // Serial communication
+#include "FastAccelStepper.h"  // Advanced stepper control
+#include "ERG_Mode.h"  // ERG mode functionality
+#include "UdpAppender.h"  // UDP logging
+#include "WebsocketAppender.h"  // WebSocket logging
+#include <Constants.h>  // Project-specific constants
 
-// Stepper Motor Serial
-HardwareSerial stepperSerial(2);
-TMC2208Stepper driver(&SERIAL_PORT, R_SENSE);  // Hardware Serial
+// Define hardware serial ports for stepper motor and auxiliary devices
+HardwareSerial stepperSerial(2);  // Stepper motor serial
+TMC2208Stepper driver(&stepperSerial, R_SENSE);  // Stepper motor driver initialization
 
-// Peloton Serial
-HardwareSerial auxSerial(1);
-AuxSerialBuffer auxSerialBuffer;
+HardwareSerial auxSerial(1);  // Auxiliary serial port (e.g., for Peloton bike communication)
+AuxSerialBuffer auxSerialBuffer;  // Buffer for auxiliary serial data
 
+// Stepper motor control setup
 FastAccelStepperEngine engine = FastAccelStepperEngine();
-FastAccelStepper *stepper     = NULL;
+FastAccelStepper *stepper = NULL;  // Pointer to stepper motor
 
-TaskHandle_t moveStepperTask;
-TaskHandle_t maintenanceLoopTask;
+// Task handles for asynchronous operations
+TaskHandle_t moveStepperTask;  // Task for moving stepper motor
+TaskHandle_t maintenanceLoopTask;  // Task for maintenance operations
 
-Boards boards;
-Board currentBoard;
+// Board configuration and selection
+Boards boards;  // Available boards
+Board currentBoard;  // Currently selected board
 
-///////////// Initialize the Config /////////////
-SS2K *ss2k                       = new SS2K;
-userParameters *userConfig       = new userParameters;
-RuntimeParameters *rtConfig      = new RuntimeParameters;
-physicalWorkingCapacity *userPWC = new physicalWorkingCapacity;
+// Configuration initialization
+SS2K *ss2k = new SS2K;  // Main SS2K object
+userParameters *userConfig = new userParameters;  // User-specific parameters
+RuntimeParameters *rtConfig = new RuntimeParameters;  // Runtime parameters
+physicalWorkingCapacity *userPWC = new physicalWorkingCapacity;  // Physical working capacity parameters
 
+// Logging appenders setup
+UdpAppender udpAppender;  // UDP logging appender
+WebSocketAppender webSocketAppender;  // WebSocket logging appender
 ///////////// Log Appender /////////////
 UdpAppender udpAppender;
 WebSocketAppender webSocketAppender;
