@@ -44,6 +44,7 @@ void ergTaskLoop(void* pvParameters) {
     while (ss2k->isUpdating) {
       vTaskDelay(100);
     }
+    
     vTaskDelay(ERG_MODE_DELAY / portTICK_PERIOD_MS);
 
     hasConnectedPowerMeter = spinBLEClient.connectedPM;

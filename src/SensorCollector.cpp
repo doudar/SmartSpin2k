@@ -28,7 +28,7 @@ void collectAndSet(NimBLEUUID charUUID, NimBLEUUID serviceUUID, NimBLEAddress ad
   if (sensorData->hasHeartRate() && !rtConfig->hr.getSimulate()) {
     int heartRate = sensorData->getHeartRate();
     rtConfig->hr.setValue(heartRate);
-    spinBLEClient.connectedHRM |= true;
+    spinBLEClient.connectedHRM = true;
     logBufLength += snprintf(logBuf + logBufLength, kLogBufMaxLength - logBufLength, " HR(%d)", heartRate % 1000);
   }
   if (sensorData->hasCadence() && !rtConfig->cad.getSimulate()) {
@@ -37,7 +37,7 @@ void collectAndSet(NimBLEUUID charUUID, NimBLEUUID serviceUUID, NimBLEAddress ad
     } else {
       float cadence = sensorData->getCadence();
       rtConfig->cad.setValue(cadence);
-      spinBLEClient.connectedCD |= true;
+      spinBLEClient.connectedCD = true;
       logBufLength += snprintf(logBuf + logBufLength, kLogBufMaxLength - logBufLength, " CD(%.2f)", fmodf(cadence, 1000.0));
     }
   }
@@ -47,7 +47,7 @@ void collectAndSet(NimBLEUUID charUUID, NimBLEUUID serviceUUID, NimBLEAddress ad
     } else {
       int power = sensorData->getPower() * userConfig->getPowerCorrectionFactor();
       rtConfig->watts.setValue(power);
-      spinBLEClient.connectedPM |= true;
+      spinBLEClient.connectedPM = true;
       logBufLength += snprintf(logBuf + logBufLength, kLogBufMaxLength - logBufLength, " PW(%d)", power % 10000);
     }
   }
