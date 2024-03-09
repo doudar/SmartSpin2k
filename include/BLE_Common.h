@@ -146,6 +146,8 @@ class SpinBLEAdvertisedDevice {
 
 class SpinBLEClient {
  private:
+
+
  public:  // Not all of these need to be public. This should be cleaned up
           // later.
   boolean connectedPM       = false;
@@ -169,7 +171,6 @@ class SpinBLEClient {
   void start();
   // void serverScan(bool connectRequest);
   bool connectToServer();
-  void scanProcess(int duration = DEFAULT_SCAN_DURATION);
   // Check for duplicate services of BLEClient and remove the previously
   // connected one.
   void removeDuplicates(NimBLEClient *pClient);
@@ -178,8 +179,10 @@ class SpinBLEClient {
   void FTMSControlPointWrite(const uint8_t *pData, int length);
   void connectBLE_HID(NimBLEClient *pClient);
   void keepAliveBLE_HID(NimBLEClient *pClient);
-  void checkBLEReconnect();
   void handleBattInfo(NimBLEClient *pClient, bool updateNow);
+    // Instead of using this directly, set the .doScan flag to start a scan.
+  void scanProcess(int duration = DEFAULT_SCAN_DURATION);
+  void checkBLEReconnect();
 };
 
 class MyAdvertisedDeviceCallback : public NimBLEAdvertisedDeviceCallbacks {

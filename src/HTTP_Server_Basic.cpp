@@ -152,7 +152,7 @@ void HTTP_Server::start() {
         myIP.toString() + "/bluetoothscanner.html';\",15000);</script></html>";
     // spinBLEClient.resetDevices();
     spinBLEClient.dontBlockScan = true;
-    spinBLEClient.scanProcess(DEFAULT_SCAN_DURATION);
+    spinBLEClient.doScan = true;
     server.send(200, "text/html", response);
   });
 

@@ -86,6 +86,10 @@ void bleClientTask(void *pvParameters) {
       scanDelay = millis();
     }
 
+    if (spinBLEClient.doScan) {
+      spinBLEClient.scanProcess();
+    }
+
 // Connect BLE Servers to this client
 #ifdef DEBUG_STACK
     Serial.printf("BLEClient: %d \n", uxTaskGetStackHighWaterMark(BLEClientTask));
@@ -382,68 +386,84 @@ void MyClientCallback::onAuthenticationComplete(ble_gap_conn_desc desc) { SS2K_L
  */
 
 void MyAdvertisedDeviceCallback::onResult(BLEAdvertisedDevice *advertisedDevice) {
+  // Define granular constants for maximal reuse during logging
+  const char *const MATCHED               = "Matched ";
+  const char *const DIDNT_MATCH_THE_SAVED = " didn't match the saved %s";
+  const char *const STRING_MATCHED_ANY    = " String Matched Any";
+  const char *const THIS                  = "This ";
+  const char *const NAME                  = "Name ";
+  const char *const ADDRESS               = "Address ";
+  const char *const REMOTE                = "Remote";
+  const char *const HRM                   = "HRM";
+  const char *const PM                    = "PM";
   char aDevName[40];  // 40 should be enough for anybody!
-  NimBLEUUID _service;
+  const char *aDevAddr = advertisedDevice->getAddress().toString().c_str();
   (advertisedDevice->haveName()) ? strcpy(aDevName, advertisedDevice->getName().c_str()) : strcpy(aDevName, advertisedDevice->getAddress().toString().c_str());
 
-  if ((advertisedDevice->haveServiceUUID()) &&
-      (advertisedDevice->isAdvertisingService(CYCLINGPOWERSERVICE_UUID) || (advertisedDevice->isAdvertisingService(FLYWHEEL_UART_SERVICE_UUID) && aDevName == FLYWHEEL_BLE_NAME) ||
-       advertisedDevice->isAdvertisingService(FITNESSMACHINESERVICE_UUID) || advertisedDevice->isAdvertisingService(HEARTSERVICE_UUID) ||
-       advertisedDevice->isAdvertisingService(ECHELON_DEVICE_UUID) || advertisedDevice->isAdvertisingService(HID_SERVICE_UUID))) {
+  if ((advertisedDevice->haveServiceUUID()) && (advertisedDevice->isAdvertisingService(CYCLINGPOWERSERVICE_UUID) ||
+                                                (advertisedDevice->isAdvertisingService(FLYWHEEL_UART_SERVICE_UUID) && strcmp(aDevName, FLYWHEEL_BLE_NAME) == 0) ||
+                                                advertisedDevice->isAdvertisingService(FITNESSMACHINESERVICE_UUID) || advertisedDevice->isAdvertisingService(HEARTSERVICE_UUID) ||
+                                                advertisedDevice->isAdvertisingService(ECHELON_DEVICE_UUID) || advertisedDevice->isAdvertisingService(HID_SERVICE_UUID))) {
     SS2K_LOG(BLE_CLIENT_LOG_TAG, "Trying to match found device name: %s", aDevName);
+
     if (advertisedDevice->getServiceUUID() == HID_SERVICE_UUID) {
-      _service = HID_SERVICE_UUID;
       if (strcmp(userConfig->getConnectedRemote(), "any") == 0) {
-        SS2K_LOG(BLE_CLIENT_LOG_TAG, "Remote String Matched Any");
-        // continue
-      } else if ((strcmp(aDevName, userConfig->getConnectedRemote()) == 0) || (strcmp(userConfig->getConnectedRemote(), "none") == 0)) {
-        SS2K_LOG(BLE_CLIENT_LOG_TAG, "This remote name %s didn't match the saved %s", aDevName, userConfig->getConnectedRemote());
-        return;  // Ignore this device;
-      } else if (strcmp(aDevName, userConfig->getConnectedRemote()) == 0) {
-        SS2K_LOG(BLE_CLIENT_LOG_TAG, "Remote String Matched %s", aDevName);
+        SS2K_LOG(BLE_CLIENT_LOG_TAG, "%s%s", REMOTE, STRING_MATCHED_ANY);
+      } else {
+        bool nameMatched = strcmp(aDevName, userConfig->getConnectedRemote()) == 0;
+        bool addrMatched = strcmp(aDevAddr, userConfig->getConnectedRemote()) == 0;
+        if (!nameMatched && !addrMatched || strcmp(userConfig->getConnectedRemote(), "none") == 0) {
+          SS2K_LOG(BLE_CLIENT_LOG_TAG, "%s %s%s", THIS, REMOTE, DIDNT_MATCH_THE_SAVED, userConfig->getConnectedRemote());
+          return;  // Ignore this device;
+        } else {
+          SS2K_LOG(BLE_CLIENT_LOG_TAG, "%s%s%s", REMOTE, nameMatched ? NAME : ADDRESS, MATCHED, nameMatched ? aDevName : aDevAddr);
+        }
       }
     } else if (advertisedDevice->getServiceUUID() == HEARTSERVICE_UUID) {
-      _service = HEARTSERVICE_UUID;
       if (strcmp(userConfig->getConnectedHeartMonitor(), "any") == 0) {
-        SS2K_LOG(BLE_CLIENT_LOG_TAG, "HR String Matched Any");
-        // continue
-      } else if ((strcmp(aDevName, userConfig->getConnectedHeartMonitor()) != 0) || (strcmp(userConfig->getConnectedHeartMonitor(), "none") == 0)) {
-        SS2K_LOG(BLE_CLIENT_LOG_TAG, "This HRM %s didn't match the saved %s", aDevName, userConfig->getConnectedHeartMonitor());
-        return;  // Ignore this device;
-      } else if (strcmp(aDevName, userConfig->getConnectedHeartMonitor()) == 0) {
-        SS2K_LOG(BLE_CLIENT_LOG_TAG, "HR String Matched %s", aDevName);
+        SS2K_LOG(BLE_CLIENT_LOG_TAG, "%s%s", HRM, STRING_MATCHED_ANY);
+      } else {
+        bool nameMatched = strcmp(aDevName, userConfig->getConnectedHeartMonitor()) == 0;
+        bool addrMatched = strcmp(aDevAddr, userConfig->getConnectedHeartMonitor()) == 0;
+        if (!nameMatched && !addrMatched || strcmp(userConfig->getConnectedHeartMonitor(), "none") == 0) {
+          SS2K_LOG(BLE_CLIENT_LOG_TAG, "%s %s%s", THIS, HRM, DIDNT_MATCH_THE_SAVED, userConfig->getConnectedHeartMonitor());
+          return;  // Ignore this device;
+        } else {
+          SS2K_LOG(BLE_CLIENT_LOG_TAG, "%s %s%s", HRM, nameMatched ? NAME : ADDRESS, MATCHED, nameMatched ? aDevName : aDevAddr);
+        }
       }
     } else {
-      _service = advertisedDevice->getServiceUUID();
+      // Power Meter
       if (strcmp(userConfig->getConnectedPowerMeter(), "any") == 0) {
-        SS2K_LOG(BLE_CLIENT_LOG_TAG, "PM String Matched Any");
-        // continue
-      } else if ((strcmp(aDevName, userConfig->getConnectedPowerMeter()) != 0) || (strcmp(userConfig->getConnectedPowerMeter(), "none") == 0)) {
-        SS2K_LOG(BLE_CLIENT_LOG_TAG, "This PM %s didn't match the saved %s", aDevName, userConfig->getConnectedPowerMeter());
-        return;  // Ignore this device;
-      } else if (strcmp(aDevName, userConfig->getConnectedPowerMeter()) == 0) {
-        SS2K_LOG(BLE_CLIENT_LOG_TAG, "PM String Matched %s", aDevName);
+        SS2K_LOG(BLE_CLIENT_LOG_TAG, "%s%s", PM, STRING_MATCHED_ANY);
+      } else {
+        bool nameMatched = strcmp(aDevName, userConfig->getConnectedPowerMeter()) == 0;
+        bool addrMatched = strcmp(aDevAddr, userConfig->getConnectedPowerMeter()) == 0;
+        if (!nameMatched && !addrMatched || strcmp(userConfig->getConnectedPowerMeter(), "none") == 0) {
+          SS2K_LOG(BLE_CLIENT_LOG_TAG, "%s %s%s", THIS, PM, DIDNT_MATCH_THE_SAVED, userConfig->getConnectedPowerMeter());
+          return;  // Ignore this device;
+        } else {
+          SS2K_LOG(BLE_CLIENT_LOG_TAG, "%s %s%s", PM, nameMatched ? NAME : ADDRESS, MATCHED, nameMatched ? aDevName : aDevAddr);
+        }
       }
     }
-    for (size_t i = 0; i < NUM_BLE_DEVICES; i++) {  // add more debugging here. doconnect not getting set correctly on string match
-      if ((spinBLEClient.myBLEDevices[i].advertisedDevice == nullptr) ||
-          (advertisedDevice->getAddress() == spinBLEClient.myBLEDevices[i].peerAddress)) {  // found empty device slot
-        spinBLEClient.myBLEDevices[i].set(advertisedDevice, BLE_HS_CONN_HANDLE_NONE, _service);
+
+    for (size_t i = 0; i < NUM_BLE_DEVICES; i++) {
+      if ((spinBLEClient.myBLEDevices[i].advertisedDevice == nullptr) || (advertisedDevice->getAddress() == spinBLEClient.myBLEDevices[i].peerAddress)) {
+        spinBLEClient.myBLEDevices[i].set(advertisedDevice, BLE_HS_CONN_HANDLE_NONE, advertisedDevice->getServiceUUID());
         spinBLEClient.myBLEDevices[i].doConnect = true;
         SS2K_LOG(BLE_CLIENT_LOG_TAG, "doConnect set on device: %d", i);
-
         return;
       }
       SS2K_LOG(BLE_CLIENT_LOG_TAG, "Checking Slot %d", i);
     }
-    return;
   }
 }
 
 void SpinBLEClient::scanProcess(int duration) {
   this->doScan = false;  // Confirming we did the scan
 
-  SS2K_LOGW(BLE_CLIENT_LOG_TAG, "Scanning for BLE servers and putting them into a list...");
+  SS2K_LOG(BLE_CLIENT_LOG_TAG, "Scanning for BLE servers and putting them into a list...");
 
   BLEScan *pBLEScan = BLEDevice::getScan();
   pBLEScan->clearDuplicateCache();
@@ -778,20 +798,14 @@ void SpinBLEClient::keepAliveBLE_HID(NimBLEClient *pClient) {
 }
 
 void SpinBLEClient::checkBLEReconnect() {
-  bool scan = false;
   if ((String(userConfig->getConnectedHeartMonitor()) != "none") && !(spinBLEClient.connectedHRM)) {
-    scan = true;
+    this->doScan = true;
   }
   if ((String(userConfig->getConnectedPowerMeter()) != "none") && !(spinBLEClient.connectedPM)) {
-    scan = true;
+    this->doScan = true;
   }
   if ((String(userConfig->getConnectedRemote()) != "none") && !(spinBLEClient.connectedRemote)) {
-    scan = true;
-  }
-  if (scan) {
-    if (!NimBLEDevice::getScan()->isScanning() && !ss2k->isUpdating) {
-      spinBLEClient.scanProcess(BLE_RECONNECT_SCAN_DURATION);
-    }
+    this->doScan = true;
   }
 }
 
