@@ -207,6 +207,19 @@ void SS2K::maintenanceLoop(void *pvParameters) {
       ESP.restart();
     }
 
+       // reboot every half hour if not in use.
+    if ((millis() - rebootTimer) > 1800000) {
+      if (NimBLEDevice::getServer()) {
+        if (!(NimBLEDevice::getServer()->getConnectedCount())) {
+          SS2K_LOGW(MAIN_LOG_TAG, "Rebooting due to inactivity");
+          
+          ss2k->rebootFlag = true;
+        } else {
+          rebootTimer = millis();
+        }
+      }
+    }
+
     // required to set a flag instead of directly calling the function for saving from BLE_Custom Characteristic.
     if (ss2k->saveFlag) {
       ss2k->saveFlag = false;
@@ -235,18 +248,7 @@ void SS2K::maintenanceLoop(void *pvParameters) {
       intervalTimer2 = millis();
     }
 
-    // reboot every half hour if not in use.
-    if ((millis() - rebootTimer) > 1800000) {
-      if (NimBLEDevice::getServer()) {
-        if (!(NimBLEDevice::getServer()->getConnectedCount())) {
-          SS2K_LOGW(MAIN_LOG_TAG, "Rebooting due to inactivity");
-          
-          ss2k->rebootFlag = true;
-        } else {
-          rebootTimer = millis();
-        }
-      }
-    }
+ 
 
     if (loopCounter > 10) {
       ss2k->checkDriverTemperature();
