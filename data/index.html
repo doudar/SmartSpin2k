@@ -1,36 +1,24 @@
-<!DOCTYPE html>
-<html>
-
-<head>
-  <style type="text/css">
-html {
-  background-color: #03245c;
-} 
-    </style>
-
-  <title>SmartSpin2K Web Server</title>
-  <meta name="viewport" content="width=device-width, initial-scale=1">
-</head>
-<fieldset><legend><a href="http://github.com/doudar/SmartSpin2k">http://github.com/doudar/SmartSpin2k</a></legend>
 <body>
-  <h1 style="text-align: center;"><strong>SmartSpin2k</strong></h1>
-  <h2>
-    <p style="text-align: center;"><strong><a href="shift.html">Web Shifter</a></strong></p>
-    <p style="text-align: center;"><strong><a href="hrtowatts.html">Heartrate to Watts Setup</a></strong></p>
-    <p style="text-align: center;"><strong><a href="settings.html">Settings</a></strong></p>
-    <p style="text-align: center;"><strong><a href="bluetoothscanner.html">Bluetooth Scanner</a></strong></p>
-    <p style="text-align: center;"><strong><a href="develop.html">Developer Tools</a></strong></p>
-    <p><a href=https://github.com/doudar/SmartSpin2k/wiki>SS2K Help</a></p>
-  </h2>
-</fieldset>
+  <fieldset>
+    <legend><a href="http://github.com/doudar/SmartSpin2k">http://github.com/doudar/SmartSpin2k</a></legend>
+    <h1 style="text-align: center;"><strong>SmartSpin2k</strong></h1>
+    <h2>
+      <p style="text-align: center;"><strong><a href="shift.html">Web Shifter</a></strong></p>
+      <p style="text-align: center;"><strong><a href="hrtowatts.html">Heartrate to Watts Setup</a></strong></p>
+      <p style="text-align: center;"><strong><a href="/wifi">WiFi Setup</a></strong></p>
+      <p style="text-align: center;"><strong><a href="bluetoothscanner.html">Bluetooth Setup</a></strong></p>
+      <p style="text-align: center;"><strong><a href="settings.html">Advanced Settings</a></strong></p>
+      <p style="text-align: center;"><strong><a href="develop.html">Developer Tools</a></strong></p>
+      <p><a href=https://github.com/doudar/SmartSpin2k/wiki>SS2K Help</a></p>
+    </h2>
+  </fieldset>
 
-<p style="text-align: center; color: blanchedalmond;"><label id="firmwareVersion">loading</label></p>
+  <p style="text-align: center; color: blanchedalmond;"><label id="firmwareVersion">loading</label></p>
 </body>
 
 <script>
-  //Update values on specified interval loading late because this tiny webserver hates frequent requests
-  setInterval(function () {
-    if (document.getElementById("firmwareVersion").innerHTML == "loading"){
+  var intTimer = setInterval(function () {
+    if (document.getElementById("firmwareVersion").innerHTML == "loading") {
       requestConfigValues();
     }
 
@@ -44,23 +32,14 @@ html {
         document.getElementById("firmwareVersion").innerHTML = obj.firmwareVersion;
       }
     };
+    let color = window.getComputedStyle(document.body, null).getPropertyValue('background-color');
+    if (color == "rgba(0, 0, 0, 0)") {
+      alert("New firmware is available and your webserver files aren't compatible with this firmware. Please update your firmware manually. \n\nhttps://github.com/doudar/SmartSpin2k/wiki/Loading-Software");
+      clearInterval(intTimer);
+    }
     xhttp.open("GET", "/configJSON", true);
     xhttp.send();
   }
-
-  //define function to load css
-  var loadCss = function () {
-    var cssLink = document.createElement('link');
-    cssLink.rel = 'stylesheet';
-    cssLink.href = 'style.css';
-    var head = document.getElementsByTagName('head')[0];
-    head.parentNode.insertBefore(cssLink, head);
-  };
-
-  //Delay loading css to not swamp webserver
-  window.addEventListener('load', function () {
-    setTimeout(loadCss, 100);
-  }, false);
 
 </script>
 

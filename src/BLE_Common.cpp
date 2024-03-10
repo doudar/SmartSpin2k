@@ -21,9 +21,9 @@ TaskHandle_t BLECommunicationTask;
 
 void BLECommunications(void *pvParameters) {
   for (;;) {
-    if (!spinBLEClient.dontBlockScan) {
-      NimBLEDevice::getScan()->stop();  // stop routine scans
-    }
+    // if (!spinBLEClient.dontBlockScan) {
+    //   NimBLEDevice::getScan()->stop();  // stop routine scans
+    //}
     // **********************************Client***************************************
     for (size_t x = 0; x < NUM_BLE_DEVICES; x++) {  // loop through discovered devices
       if (spinBLEClient.myBLEDevices[x].connectedClientID != BLE_HS_CONN_HANDLE_NONE) {
@@ -137,6 +137,9 @@ void BLECommunications(void *pvParameters) {
       }
     } else {
       digitalWrite(LED_PIN, HIGH);
+    }
+    if (httpServer.isServing) {  // slow the BLE communications for faster web tasks.
+      vTaskDelay((BLE_NOTIFY_DELAY) / portTICK_PERIOD_MS);
     }
     vTaskDelay((BLE_NOTIFY_DELAY) / portTICK_PERIOD_MS);
 #ifdef DEBUG_STACK

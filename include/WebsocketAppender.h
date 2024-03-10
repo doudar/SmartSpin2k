@@ -9,6 +9,7 @@
 
 #include <ArduinoWebsockets.h>
 #include "LogAppender.h"
+#include "main.h"
 
 using namespace websockets;
 

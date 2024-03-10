@@ -190,7 +190,7 @@ void SS2K::maintenanceLoop(void *pvParameters) {
   static int loopCounter              = 0;
   static unsigned long intervalTimer  = millis();
   static unsigned long intervalTimer2 = millis();
-  static bool isScanning              = false;
+  // static bool isScanning              = false;
 
   while (true) {
     vTaskDelay(73 / portTICK_RATE_MS);
@@ -208,18 +208,18 @@ void SS2K::maintenanceLoop(void *pvParameters) {
       intervalTimer = millis();
     }
 
-    if ((millis() - intervalTimer2) > 6007) {
-      if (NimBLEDevice::getScan()->isScanning()) {  // workaround to prevent occasional runaway scans
-        if (isScanning == true) {
-          SS2K_LOGW(MAIN_LOG_TAG, "Forcing Scan to stop.");
-          NimBLEDevice::getScan()->stop();
-          isScanning = false;
-        } else {
-          isScanning = true;
+    /*  if ((millis() - intervalTimer2) > 6007) {
+        if (NimBLEDevice::getScan()->isScanning()) {  // workaround to prevent occasional runaway scans
+          if (isScanning == true) {
+            SS2K_LOGW(MAIN_LOG_TAG, "Forcing Scan to stop.");
+            NimBLEDevice::getScan()->stop();
+            isScanning = false;
+          } else {
+            isScanning = true;
+          }
         }
-      }
-      intervalTimer2 = millis();
-    }
+    intervalTimer2 = millis();
+  }*/
     if (loopCounter > 10) {
       ss2k.checkDriverTemperature();
       // ss2k.checkBLEReconnect();

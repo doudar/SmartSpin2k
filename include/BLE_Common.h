@@ -178,7 +178,7 @@ class SpinBLEClient {
   boolean connectedCT        = false;
   boolean connectedRemote    = false;
   boolean doScan             = false;
-  bool dontBlockScan         = true;
+  // bool dontBlockScan         = true;
   bool intentionalDisconnect = false;
   int noReadingIn            = 0;
   int cscCumulativeCrankRev  = 0;
