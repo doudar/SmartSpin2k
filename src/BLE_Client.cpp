@@ -183,7 +183,7 @@ bool SpinBLEClient::connectToServer() {
     return false;
   }
 
-  SS2K_LOG(BLE_CLIENT_LOG_TAG, "Forming a connection to: %s", myDevice->haveName() ? myDevice->getName().c_str() : myDevice->getAddress().toString().c_str());
+  SS2K_LOG(BLE_CLIENT_LOG_TAG, "Forming a connection to: %s", this->adevName2UniqueName(myDevice).c_str());
 
   NimBLEClient *pClient = nullptr;
 
@@ -259,7 +259,7 @@ bool SpinBLEClient::connectToServer() {
     }
   }
 
-  SS2K_LOG(BLE_CLIENT_LOG_TAG, "Connected to: %s - %s RSSI %d", myDevice->getName().c_str(), pClient->getPeerAddress().toString().c_str(), pClient->getRssi());
+  SS2K_LOG(BLE_CLIENT_LOG_TAG, "Connected to: %s - %s RSSI %d", this->adevName2UniqueName(myDevice).c_str(), pClient->getPeerAddress().toString().c_str(), pClient->getRssi());
 
   if (serviceUUID == HID_SERVICE_UUID) {
     connectBLE_HID(pClient);
@@ -283,10 +283,6 @@ bool SpinBLEClient::connectToServer() {
     pChr = pSvc->getCharacteristic(charUUID);
 
     if (pChr) { /** make sure it's not null */
-      if (pChr->canRead()) {
-        std::string value = pChr->readValue();
-        SS2K_LOG(BLE_CLIENT_LOG_TAG, "The characteristic value was: %s", value.c_str());
-      }
 
       if (pChr->canNotify()) {
         // if(!pChr->registerForNotify(notifyCB)) {
@@ -388,7 +384,7 @@ void MyClientCallback::onAuthenticationComplete(ble_gap_conn_desc desc) { SS2K_L
 void MyAdvertisedDeviceCallback::onResult(BLEAdvertisedDevice *advertisedDevice) {
   // Define granular constants for maximal reuse during logging
   const char *const MATCHED               = "Matched ";
-  const char *const DIDNT_MATCH_THE_SAVED = " didn't match the saved %s";
+  const char *const DIDNT_MATCH_THE_SAVED = " didn't match the saved: ";
   const char *const STRING_MATCHED_ANY    = " String Matched Any";
   const char *const THIS                  = "This ";
   const char *const NAME                  = "Name ";
@@ -396,40 +392,40 @@ void MyAdvertisedDeviceCallback::onResult(BLEAdvertisedDevice *advertisedDevice)
   const char *const REMOTE                = "Remote";
   const char *const HRM                   = "HRM";
   const char *const PM                    = "PM";
-  char aDevName[40];  // 40 should be enough for anybody!
-  const char *aDevAddr = advertisedDevice->getAddress().toString().c_str();
-  (advertisedDevice->haveName()) ? strcpy(aDevName, advertisedDevice->getName().c_str()) : strcpy(aDevName, advertisedDevice->getAddress().toString().c_str());
+  String aDevName                         = spinBLEClient.adevName2UniqueName(advertisedDevice);
+  const char *aDevAddr                    = advertisedDevice->getAddress().toString().c_str();
 
   if ((advertisedDevice->haveServiceUUID()) && (advertisedDevice->isAdvertisingService(CYCLINGPOWERSERVICE_UUID) ||
-                                                (advertisedDevice->isAdvertisingService(FLYWHEEL_UART_SERVICE_UUID) && strcmp(aDevName, FLYWHEEL_BLE_NAME) == 0) ||
+                                                (advertisedDevice->isAdvertisingService(FLYWHEEL_UART_SERVICE_UUID) && aDevName == String(FLYWHEEL_BLE_NAME)) ||
                                                 advertisedDevice->isAdvertisingService(FITNESSMACHINESERVICE_UUID) || advertisedDevice->isAdvertisingService(HEARTSERVICE_UUID) ||
                                                 advertisedDevice->isAdvertisingService(ECHELON_DEVICE_UUID) || advertisedDevice->isAdvertisingService(HID_SERVICE_UUID))) {
-    SS2K_LOG(BLE_CLIENT_LOG_TAG, "Trying to match found device name: %s", aDevName);
+    SS2K_LOG(BLE_CLIENT_LOG_TAG, "Trying to match found device name: %s", aDevName.c_str());
 
+    //Handling for BLE connected remotes
     if (advertisedDevice->getServiceUUID() == HID_SERVICE_UUID) {
       if (strcmp(userConfig->getConnectedRemote(), "any") == 0) {
         SS2K_LOG(BLE_CLIENT_LOG_TAG, "%s%s", REMOTE, STRING_MATCHED_ANY);
       } else {
-        bool nameMatched = strcmp(aDevName, userConfig->getConnectedRemote()) == 0;
+        bool nameMatched = (aDevName = userConfig->getConnectedRemote()) ? true : false;
         bool addrMatched = strcmp(aDevAddr, userConfig->getConnectedRemote()) == 0;
         if (!nameMatched && !addrMatched || strcmp(userConfig->getConnectedRemote(), "none") == 0) {
-          SS2K_LOG(BLE_CLIENT_LOG_TAG, "%s %s%s", THIS, REMOTE, DIDNT_MATCH_THE_SAVED, userConfig->getConnectedRemote());
+          SS2K_LOG(BLE_CLIENT_LOG_TAG, "%s%s%s%s", THIS, REMOTE, DIDNT_MATCH_THE_SAVED, userConfig->getConnectedRemote());
           return;  // Ignore this device;
         } else {
-          SS2K_LOG(BLE_CLIENT_LOG_TAG, "%s%s%s", REMOTE, nameMatched ? NAME : ADDRESS, MATCHED, nameMatched ? aDevName : aDevAddr);
+          SS2K_LOG(BLE_CLIENT_LOG_TAG, "%s %s%s", REMOTE, NAME, MATCHED, aDevName);
         }
       }
     } else if (advertisedDevice->getServiceUUID() == HEARTSERVICE_UUID) {
       if (strcmp(userConfig->getConnectedHeartMonitor(), "any") == 0) {
         SS2K_LOG(BLE_CLIENT_LOG_TAG, "%s%s", HRM, STRING_MATCHED_ANY);
       } else {
-        bool nameMatched = strcmp(aDevName, userConfig->getConnectedHeartMonitor()) == 0;
+        bool nameMatched = (aDevName == userConfig->getConnectedHeartMonitor()) ? true : false;
         bool addrMatched = strcmp(aDevAddr, userConfig->getConnectedHeartMonitor()) == 0;
         if (!nameMatched && !addrMatched || strcmp(userConfig->getConnectedHeartMonitor(), "none") == 0) {
-          SS2K_LOG(BLE_CLIENT_LOG_TAG, "%s %s%s", THIS, HRM, DIDNT_MATCH_THE_SAVED, userConfig->getConnectedHeartMonitor());
+          SS2K_LOG(BLE_CLIENT_LOG_TAG, "%s%s%s%s", THIS, HRM, DIDNT_MATCH_THE_SAVED, userConfig->getConnectedHeartMonitor());
           return;  // Ignore this device;
         } else {
-          SS2K_LOG(BLE_CLIENT_LOG_TAG, "%s %s%s", HRM, nameMatched ? NAME : ADDRESS, MATCHED, nameMatched ? aDevName : aDevAddr);
+          SS2K_LOG(BLE_CLIENT_LOG_TAG, "%s %s%s", HRM, NAME, MATCHED, aDevName);
         }
       }
     } else {
@@ -437,13 +433,12 @@ void MyAdvertisedDeviceCallback::onResult(BLEAdvertisedDevice *advertisedDevice)
       if (strcmp(userConfig->getConnectedPowerMeter(), "any") == 0) {
         SS2K_LOG(BLE_CLIENT_LOG_TAG, "%s%s", PM, STRING_MATCHED_ANY);
       } else {
-        bool nameMatched = strcmp(aDevName, userConfig->getConnectedPowerMeter()) == 0;
-        bool addrMatched = strcmp(aDevAddr, userConfig->getConnectedPowerMeter()) == 0;
-        if (!nameMatched && !addrMatched || strcmp(userConfig->getConnectedPowerMeter(), "none") == 0) {
-          SS2K_LOG(BLE_CLIENT_LOG_TAG, "%s %s%s", THIS, PM, DIDNT_MATCH_THE_SAVED, userConfig->getConnectedPowerMeter());
+        bool nameMatched = (aDevName == userConfig->getConnectedPowerMeter()) ? true : false;
+        if (!nameMatched || strcmp(userConfig->getConnectedPowerMeter(), "none") == 0) {
+          SS2K_LOG(BLE_CLIENT_LOG_TAG, "%s%s%s%s", THIS, PM, DIDNT_MATCH_THE_SAVED, userConfig->getConnectedPowerMeter());
           return;  // Ignore this device;
         } else {
-          SS2K_LOG(BLE_CLIENT_LOG_TAG, "%s %s%s", PM, nameMatched ? NAME : ADDRESS, MATCHED, nameMatched ? aDevName : aDevAddr);
+          SS2K_LOG(BLE_CLIENT_LOG_TAG, "%s %s%s", PM, NAME, MATCHED, aDevName);
         }
       }
     }
@@ -493,11 +488,7 @@ void SpinBLEClient::scanProcess(int duration) {
     bool isDuplicate = false;
     for (JsonPair kv : devices.as<JsonObject>()) {
       JsonObject obj = kv.value().as<JsonObject>();
-      if (obj.containsKey("name") && String(obj["name"].as<const char *>()) == d.getName().c_str()) {
-        isDuplicate = true;
-        break;
-      }
-      if (obj.containsKey("address") && String(obj["address"].as<const char *>()) == d.getAddress().toString().c_str()) {
+      if (obj.containsKey("name") && obj["name"] == this->adevName2UniqueName(&d)) {
         isDuplicate = true;
         break;
       }
@@ -508,9 +499,7 @@ void SpinBLEClient::scanProcess(int duration) {
       String device = "device " + String(devices.size());  // Use the current size to index the new device
 
       if (d.haveName()) {
-        devices[device]["name"] = d.getName();
-      } else {
-        devices[device]["address"] = d.getAddress().toString();
+        devices[device]["name"] = this->adevName2UniqueName(&d);
       }
       // Workaround for IC4 not advertising FTMS as the first service.
       // Potentially others may need to be added in the future.
@@ -834,6 +823,18 @@ void SpinBLEClient::handleBattInfo(NimBLEClient *pClient, bool updateNow = false
         rtConfig->pm_batt.setValue(0);
       }
     }
+  }
+}
+// Returns a device name with the las two of the peer address attached. This lets us distinguish between multiple devices with the same device name.
+String SpinBLEClient::adevName2UniqueName(NimBLEAdvertisedDevice *inDev) {
+  if (inDev->haveName()) {
+    String _outDevName = String(inDev->getName().c_str());
+    // add the last two of the string
+    _outDevName += +" " + String(inDev->getAddress().toString().c_str()).substring(inDev->getAddress().toString().length() - 2);
+    return _outDevName;
+  } else {
+    String _outDevName = inDev->getAddress().toString().c_str();
+    return _outDevName;
   }
 }
 

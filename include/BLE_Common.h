@@ -146,8 +146,6 @@ class SpinBLEAdvertisedDevice {
 
 class SpinBLEClient {
  private:
-
-
  public:  // Not all of these need to be public. This should be cleaned up
           // later.
   boolean connectedPM       = false;
@@ -180,9 +178,11 @@ class SpinBLEClient {
   void connectBLE_HID(NimBLEClient *pClient);
   void keepAliveBLE_HID(NimBLEClient *pClient);
   void handleBattInfo(NimBLEClient *pClient, bool updateNow);
-    // Instead of using this directly, set the .doScan flag to start a scan.
+  // Instead of using this directly, set the .doScan flag to start a scan.
   void scanProcess(int duration = DEFAULT_SCAN_DURATION);
   void checkBLEReconnect();
+
+  String adevName2UniqueName(NimBLEAdvertisedDevice *inDev);
 };
 
 class MyAdvertisedDeviceCallback : public NimBLEAdvertisedDeviceCallbacks {
