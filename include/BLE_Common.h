@@ -54,6 +54,16 @@ class ss2kCustomCharacteristicCallbacks : public BLECharacteristicCallbacks {
   void onWrite(BLECharacteristic *);
 };
 
+class ss2kCustomCharacteristic {
+ public:
+ //Used internally for notify and onWrite Callback.
+  static void process(std::string rxValue);
+  //Custom Characteristic value that needs to be notified
+  static void notify(const uint8_t _item);
+  // Notify any changed value in userConfig
+  static void parseNemit();
+};
+
 extern std::string FTMSWrite;
 
 // TODO add the rest of the server to this class
@@ -181,6 +191,8 @@ class SpinBLEClient {
   // Instead of using this directly, set the .doScan flag to start a scan.
   void scanProcess(int duration = DEFAULT_SCAN_DURATION);
   void checkBLEReconnect();
+  // Disconnects all devices. They will then be reconnected if scanned and preferred again.
+  void reconnectAllDevices();
 
   String adevName2UniqueName(NimBLEAdvertisedDevice *inDev);
 };

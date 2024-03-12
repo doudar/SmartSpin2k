@@ -21,6 +21,7 @@
 #include <Update.h>
 #include <DNSServer.h>
 #include <ArduinoJson.h>
+#include <Custom_Characteristic.h>
 
 File fsUploadFile;
 
@@ -152,7 +153,7 @@ void HTTP_Server::start() {
         myIP.toString() + "/bluetoothscanner.html';\",15000);</script></html>";
     // spinBLEClient.resetDevices();
     spinBLEClient.dontBlockScan = true;
-    spinBLEClient.doScan = true;
+    spinBLEClient.doScan        = true;
     server.send(200, "text/html", response);
   });
 
@@ -270,6 +271,7 @@ void HTTP_Server::start() {
       SS2K_LOG(HTTP_SERVER_LOG_TAG, "Invalid HTML Shift");
       server.send(200, "text/plain", "OK");
     }
+    // BLE Shift notifications are handles by the shift processing in main.cpp
   });
 
   server.on("/configJSON", []() {
@@ -555,7 +557,7 @@ void HTTP_Server::settingsProcessor() {
       tString = server.arg("blePMDropdown");
       if (tString != userConfig->getConnectedPowerMeter()) {
         userConfig->setConnectedPowerMeter(tString);
-        reboot = true;
+        spinBLEClient.reconnectAllDevices();
       }
     } else {
       userConfig->setConnectedPowerMeter("any");
@@ -567,7 +569,7 @@ void HTTP_Server::settingsProcessor() {
       bool reset = false;
       tString    = server.arg("bleHRDropdown");
       if (tString != userConfig->getConnectedHeartMonitor()) {
-        reboot = true;
+        spinBLEClient.reconnectAllDevices();
       }
       userConfig->setConnectedHeartMonitor(server.arg("bleHRDropdown"));
     } else {
@@ -580,7 +582,7 @@ void HTTP_Server::settingsProcessor() {
       bool reset = false;
       tString    = server.arg("bleRemoteDropdown");
       if (tString != userConfig->getConnectedRemote()) {
-        reboot = true;
+        spinBLEClient.reconnectAllDevices();
       }
       userConfig->setConnectedRemote(server.arg("bleRemoteDropdown"));
     } else {

@@ -618,13 +618,3 @@ void calculateInstPwrFromHR() {
 
   SS2K_LOG(BLE_SERVER_LOG_TAG, "Power From HR: %d", avgP);
 }
-
-void SpinBLEServer::notifyShift() {
-  uint8_t returnValue[4];
-  returnValue[0] = 0x80;
-  returnValue[1] = BLE_shifterPosition;
-  returnValue[2] = (uint8_t)(rtConfig->getShifterPosition() & 0xff);
-  returnValue[3] = (uint8_t)(rtConfig->getShifterPosition() >> 8);
-  smartSpin2kCharacteristic->setValue(returnValue, 4);
-  smartSpin2kCharacteristic->notify(true);
-}

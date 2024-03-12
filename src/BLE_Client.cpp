@@ -401,7 +401,7 @@ void MyAdvertisedDeviceCallback::onResult(BLEAdvertisedDevice *advertisedDevice)
                                                 advertisedDevice->isAdvertisingService(ECHELON_DEVICE_UUID) || advertisedDevice->isAdvertisingService(HID_SERVICE_UUID))) {
     SS2K_LOG(BLE_CLIENT_LOG_TAG, "Trying to match found device name: %s", aDevName.c_str());
 
-    //Handling for BLE connected remotes
+    // Handling for BLE connected remotes
     if (advertisedDevice->getServiceUUID() == HID_SERVICE_UUID) {
       if (strcmp(userConfig->getConnectedRemote(), "any") == 0) {
         SS2K_LOG(BLE_CLIENT_LOG_TAG, "%s%s", REMOTE, STRING_MATCHED_ANY);
@@ -494,13 +494,13 @@ void SpinBLEClient::scanProcess(int duration) {
       }
     }
 
+    // is this device advertising something we're interested in?
     if (!isDuplicate && (d.isAdvertisingService(CYCLINGPOWERSERVICE_UUID) || d.isAdvertisingService(HEARTSERVICE_UUID) || d.isAdvertisingService(FLYWHEEL_UART_SERVICE_UUID) ||
                          d.isAdvertisingService(FITNESSMACHINESERVICE_UUID) || d.isAdvertisingService(ECHELON_DEVICE_UUID) || d.isAdvertisingService(HID_SERVICE_UUID))) {
       String device = "device " + String(devices.size());  // Use the current size to index the new device
 
-      if (d.haveName()) {
-        devices[device]["name"] = this->adevName2UniqueName(&d);
-      }
+      devices[device]["name"] = this->adevName2UniqueName(&d);
+
       // Workaround for IC4 not advertising FTMS as the first service.
       // Potentially others may need to be added in the future.
       // The symptom was the bike name not showing up in the HTML.
@@ -795,6 +795,18 @@ void SpinBLEClient::checkBLEReconnect() {
   }
   if ((String(userConfig->getConnectedRemote()) != "none") && !(spinBLEClient.connectedRemote)) {
     this->doScan = true;
+  }
+}
+
+void SpinBLEClient::reconnectAllDevices() {
+  for (auto i : spinBLEClient.myBLEDevices) {
+    if (NimBLEDevice::getClientByPeerAddress(i.peerAddress)) {
+      if (NimBLEDevice::getClientByPeerAddress(i.peerAddress)->isConnected()) {
+        NimBLEDevice::getClientByPeerAddress(i.peerAddress)->disconnect();
+        i.reset();
+        spinBLEClient.intentionalDisconnect++;
+      }
+    }
   }
 }
 
