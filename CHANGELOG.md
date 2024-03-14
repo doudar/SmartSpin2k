@@ -17,6 +17,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Switched from using Power Table to a Torque Table for better compensation in cad variations. 
 - added test for invalid Peloton data to keep stepper from running away without resistance information.
 - Fixed a bug with Trainer Day and rapid ERG sending. 
+- Many updates and bug fixes which enable the Config App to communicate with SmartSpin2k. 
 
 ### Hardware
 - added Yesoul S3

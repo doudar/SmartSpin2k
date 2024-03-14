@@ -104,7 +104,7 @@ class otaCallback : public BLECharacteristicCallbacks {
       if (esp_ota_write(otaHandler, (uint8_t *)rxData.c_str(), rxData.length()) != ESP_OK) {
         Serial.printf("Error: write to flash failed");
         downloadFlag = false;
-        pTxCharacteristic->setValue(&txValue, 4);
+        pTxCharacteristic->setValue(&txValue, 0x04);
         pTxCharacteristic->notify();
         return;
       } else {
@@ -112,7 +112,7 @@ class otaCallback : public BLECharacteristicCallbacks {
         // Serial.printf("%d bytes", rxData.length());
         //  Notify the iOS app so next batch can be sent
         Serial.printf(".");
-        pTxCharacteristic->setValue(&txValue, 2);
+        pTxCharacteristic->setValue(&txValue, 0x02);
         // pTxCharacteristic->notify();
       }
 
@@ -131,11 +131,11 @@ class otaCallback : public BLECharacteristicCallbacks {
         if (esp_ota_end(otaHandler) != ESP_OK) {
           Serial.printf("OTA end failed ");
           downloadFlag = false;
-          pTxCharacteristic->setValue(&txValue, 4);
+          pTxCharacteristic->setValue(&txValue, 0x04);
           pTxCharacteristic->notify();
           return;
         }
-        pTxCharacteristic->setValue(&txValue, 5);
+        pTxCharacteristic->setValue(&txValue, 0x05);
         pTxCharacteristic->notify();
         //-----------------------------------------------------------------
         // Clear download flag and restart the ESP32 if the firmware

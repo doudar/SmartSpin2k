@@ -197,7 +197,7 @@ void SS2K::maintenanceLoop(void *pvParameters) {
 
   while (true) {
     vTaskDelay(73 / portTICK_RATE_MS);
-    //send BLE notification for any userConfig values that changed. 
+    // send BLE notification for any userConfig values that changed.
     ss2kCustomCharacteristic::parseNemit();
     ss2k->FTMSModeShiftModifier();
 
@@ -206,16 +206,22 @@ void SS2K::maintenanceLoop(void *pvParameters) {
     }
 
     if (ss2k->rebootFlag) {
-      vTaskDelay(100 / portTICK_RATE_MS);
-      ESP.restart();
+      static bool _loopOnce = false;
+      // Let the main task loop complete once before rebooting
+      if (_loopOnce) {
+        // Important to keep this delay high in order to allow coms to finish.
+        vTaskDelay(1000 / portTICK_RATE_MS);
+        ESP.restart();
+      }
+      _loopOnce = true;
     }
 
-       // reboot every half hour if not in use.
+    // reboot every half hour if not in use.
     if ((millis() - rebootTimer) > 1800000) {
       if (NimBLEDevice::getServer()) {
         if (!(NimBLEDevice::getServer()->getConnectedCount())) {
           SS2K_LOGW(MAIN_LOG_TAG, "Rebooting due to inactivity");
-           logHandler.writeLogs();
+          logHandler.writeLogs();
           ss2k->rebootFlag = true;
         } else {
           rebootTimer = millis();
@@ -251,8 +257,6 @@ void SS2K::maintenanceLoop(void *pvParameters) {
       }
       intervalTimer2 = millis();
     }
-
- 
 
     if (loopCounter > 10) {
       ss2k->checkDriverTemperature();
