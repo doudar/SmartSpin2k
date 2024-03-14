@@ -76,14 +76,13 @@ void startWifi() {
 
   // Couldn't connect to existing network, Create SoftAP
   if (WiFi.status() != WL_CONNECTED) {
-    String t_pass = DEFAULT_PASSWORD;
-    if (String(userConfig->getSsid()) == DEVICE_NAME) {
+    if (strcmp(userConfig->getSsid(), DEVICE_NAME) == 0) {
       // If default SSID is still in use, let the user
       // select a new password.
       // Else Fall Back to the default password (probably "password")
-      String t_pass = String(userConfig->getPassword());
-    }
-    WiFi.softAP(userConfig->getDeviceName(), t_pass.c_str());
+      WiFi.softAP(userConfig->getDeviceName(), userConfig->getPassword());
+    }else{
+    WiFi.softAP(userConfig->getDeviceName(), DEFAULT_PASSWORD);}
     vTaskDelay(50);
     myIP = WiFi.softAPIP();
     /* Setup the DNS server redirecting all the domains to the apIP */
