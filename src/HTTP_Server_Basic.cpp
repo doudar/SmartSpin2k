@@ -16,10 +16,12 @@
 #include <HTTPUpdate.h>
 #include <LittleFS.h>
 #include <ESPmDNS.h>
+#include <WiFi.h>
 #include <WiFiClientSecure.h>
 #include <Update.h>
 #include <DNSServer.h>
 #include <ArduinoJson.h>
+#include <Custom_Characteristic.h>
 
 File fsUploadFile;
 
@@ -47,10 +49,10 @@ void startWifi() {
   int i = 0;
 
   // Trying Station mode first:
-  SS2K_LOG(HTTP_SERVER_LOG_TAG, "Connecting to: %s", userConfig.getSsid());
-  if (String(WiFi.SSID()) != userConfig.getSsid()) {
+  SS2K_LOG(HTTP_SERVER_LOG_TAG, "Connecting to: %s", userConfig->getSsid());
+  if (String(WiFi.SSID()) != userConfig->getSsid()) {
     WiFi.mode(WIFI_STA);
-    WiFi.begin(userConfig.getSsid(), userConfig.getPassword());
+    WiFi.begin(userConfig->getSsid(), userConfig->getPassword());
     WiFi.setTxPower(WIFI_POWER_19_5dBm);
     WiFi.setAutoReconnect(true);
   }
@@ -59,7 +61,7 @@ void startWifi() {
     vTaskDelay(1000 / portTICK_RATE_MS);
     SS2K_LOG(HTTP_SERVER_LOG_TAG, "Waiting for connection to be established...");
     i++;
-    if (i > WIFI_CONNECT_TIMEOUT || (String(userConfig.getSsid()) == DEVICE_NAME)) {
+    if (i > WIFI_CONNECT_TIMEOUT || (String(userConfig->getSsid()) == DEVICE_NAME)) {
       i = 0;
       SS2K_LOG(HTTP_SERVER_LOG_TAG, "Couldn't Connect. Switching to AP mode");
       WiFi.disconnect();
@@ -75,13 +77,13 @@ void startWifi() {
   // Couldn't connect to existing network, Create SoftAP
   if (WiFi.status() != WL_CONNECTED) {
     String t_pass = DEFAULT_PASSWORD;
-    if (String(userConfig.getSsid()) == DEVICE_NAME) {
+    if (String(userConfig->getSsid()) == DEVICE_NAME) {
       // If default SSID is still in use, let the user
       // select a new password.
       // Else Fall Back to the default password (probably "password")
-      String t_pass = String(userConfig.getPassword());
+      String t_pass = String(userConfig->getPassword());
     }
-    WiFi.softAP(userConfig.getDeviceName(), t_pass.c_str());
+    WiFi.softAP(userConfig->getDeviceName(), t_pass.c_str());
     vTaskDelay(50);
     myIP = WiFi.softAPIP();
     /* Setup the DNS server redirecting all the domains to the apIP */
@@ -89,17 +91,17 @@ void startWifi() {
     dnsServer.start(DNS_PORT, "*", myIP);
   }
 
-  if (!MDNS.begin(userConfig.getDeviceName())) {
+  if (!MDNS.begin(userConfig->getDeviceName())) {
     SS2K_LOG(HTTP_SERVER_LOG_TAG, "Error setting up MDNS responder!");
   }
 
   MDNS.addService("http", "_tcp", 80);
   MDNS.addServiceTxt("http", "_tcp", "lf", "0");
-  SS2K_LOG(HTTP_SERVER_LOG_TAG, "Connected to %s IP address: %s", userConfig.getSsid(), myIP.toString().c_str());
+  SS2K_LOG(HTTP_SERVER_LOG_TAG, "Connected to %s IP address: %s", userConfig->getSsid(), myIP.toString().c_str());
 #ifdef USE_TELEGRAM
-  SEND_TO_TELEGRAM("Connected to " + String(userConfig.getSsid()) + " IP address: " + myIP.toString());
+  SEND_TO_TELEGRAM("Connected to " + String(userConfig->getSsid()) + " IP address: " + myIP.toString());
 #endif
-  SS2K_LOG(HTTP_SERVER_LOG_TAG, "Open http://%s.local/", userConfig.getDeviceName());
+  SS2K_LOG(HTTP_SERVER_LOG_TAG, "Open http://%s.local/", userConfig->getDeviceName());
   WiFi.setTxPower(WIFI_POWER_19_5dBm);
 
   if (WiFi.getMode() == WIFI_STA) {
@@ -116,13 +118,13 @@ void startWifi() {
 }
 
 void stopWifi() {
-  SS2K_LOG(HTTP_SERVER_LOG_TAG, "Closing connection to: %s", userConfig.getSsid());
+  SS2K_LOG(HTTP_SERVER_LOG_TAG, "Closing connection to: %s", userConfig->getSsid());
   WiFi.disconnect();
 }
 
 void HTTP_Server::start() {
   server.enableCORS(true);
-  server.onNotFound([]() { SS2K_LOG(HTTP_SERVER_LOG_TAG, "Link Not Found: %s", server.uri().c_str()); });
+  server.onNotFound(handleIndexFile);
 
   /***************************Begin Handlers*******************/
   server.on("/", handleIndexFile);
@@ -151,15 +153,15 @@ void HTTP_Server::start() {
         myIP.toString() + "/bluetoothscanner.html';\",15000);</script></html>";
     // spinBLEClient.resetDevices();
     spinBLEClient.dontBlockScan = true;
-    spinBLEClient.scanProcess(DEFAULT_SCAN_DURATION);
+    spinBLEClient.doScan        = true;
     server.send(200, "text/html", response);
   });
 
   server.on("/load_defaults.html", []() {
     SS2K_LOG(HTTP_SERVER_LOG_TAG, "Setting Defaults from Web Request");
     LittleFS.format();
-    userConfig.setDefaults();
-    userConfig.saveToLittleFS();
+    userConfig->setDefaults();
+    userConfig->saveToLittleFS();
     String response =
         "<!DOCTYPE html><html><body><h1>Defaults have been "
         "loaded.</h1><p><br><br> Please reconnect to the device on WiFi "
@@ -180,16 +182,16 @@ void HTTP_Server::start() {
   server.on("/hrslider", []() {
     String value = server.arg("value");
     if (value == "enable") {
-      rtConfig.hr.setSimulate(true);
+      rtConfig->hr.setSimulate(true);
       server.send(200, "text/plain", "OK");
       SS2K_LOG(HTTP_SERVER_LOG_TAG, "HR Simulator turned on");
     } else if (value == "disable") {
-      rtConfig.hr.setSimulate(false);
+      rtConfig->hr.setSimulate(false);
       server.send(200, "text/plain", "OK");
       SS2K_LOG(HTTP_SERVER_LOG_TAG, "HR Simulator turned off");
     } else {
-      rtConfig.hr.setValue(value.toInt());
-      SS2K_LOG(HTTP_SERVER_LOG_TAG, "HR is now: %d", rtConfig.hr.getValue());
+      rtConfig->hr.setValue(value.toInt());
+      SS2K_LOG(HTTP_SERVER_LOG_TAG, "HR is now: %d", rtConfig->hr.getValue());
       server.send(200, "text/plain", "OK");
     }
   });
@@ -197,16 +199,16 @@ void HTTP_Server::start() {
   server.on("/wattsslider", []() {
     String value = server.arg("value");
     if (value == "enable") {
-      rtConfig.watts.setSimulate(true);
+      rtConfig->watts.setSimulate(true);
       server.send(200, "text/plain", "OK");
       SS2K_LOG(HTTP_SERVER_LOG_TAG, "Watt Simulator turned on");
     } else if (value == "disable") {
-      rtConfig.watts.setSimulate(false);
+      rtConfig->watts.setSimulate(false);
       server.send(200, "text/plain", "OK");
       SS2K_LOG(HTTP_SERVER_LOG_TAG, "Watt Simulator turned off");
     } else {
-      rtConfig.watts.setValue(value.toInt());
-      SS2K_LOG(HTTP_SERVER_LOG_TAG, "Watts are now: %d", rtConfig.watts.getValue());
+      rtConfig->watts.setValue(value.toInt());
+      SS2K_LOG(HTTP_SERVER_LOG_TAG, "Watts are now: %d", rtConfig->watts.getValue());
       server.send(200, "text/plain", "OK");
     }
   });
@@ -214,16 +216,16 @@ void HTTP_Server::start() {
   server.on("/cadslider", []() {
     String value = server.arg("value");
     if (value == "enable") {
-      rtConfig.cad.setSimulate(true);
+      rtConfig->cad.setSimulate(true);
       server.send(200, "text/plain", "OK");
       SS2K_LOG(HTTP_SERVER_LOG_TAG, "CAD Simulator turned on");
     } else if (value == "disable") {
-      rtConfig.cad.setSimulate(false);
+      rtConfig->cad.setSimulate(false);
       server.send(200, "text/plain", "OK");
       SS2K_LOG(HTTP_SERVER_LOG_TAG, "CAD Simulator turned off");
     } else {
-      rtConfig.cad.setValue(value.toInt());
-      SS2K_LOG(HTTP_SERVER_LOG_TAG, "CAD is now: %d", rtConfig.cad.getValue());
+      rtConfig->cad.setValue(value.toInt());
+      SS2K_LOG(HTTP_SERVER_LOG_TAG, "CAD is now: %d", rtConfig->cad.getValue());
       server.send(200, "text/plain", "OK");
     }
   });
@@ -231,11 +233,11 @@ void HTTP_Server::start() {
   server.on("/ergmode", []() {
     String value = server.arg("value");
     if (value == "enable") {
-      rtConfig.setFTMSMode(FitnessMachineControlPointProcedure::SetTargetPower);
+      rtConfig->setFTMSMode(FitnessMachineControlPointProcedure::SetTargetPower);
       server.send(200, "text/plain", "OK");
       SS2K_LOG(HTTP_SERVER_LOG_TAG, "ERG Mode turned on");
     } else {
-      rtConfig.setFTMSMode(FitnessMachineControlPointProcedure::RequestControl);
+      rtConfig->setFTMSMode(FitnessMachineControlPointProcedure::RequestControl);
       server.send(200, "text/plain", "OK");
       SS2K_LOG(HTTP_SERVER_LOG_TAG, "ERG Mode turned off");
     }
@@ -244,16 +246,16 @@ void HTTP_Server::start() {
   server.on("/targetwattsslider", []() {
     String value = server.arg("value");
     if (value == "enable") {
-      rtConfig.setSimTargetWatts(true);
+      rtConfig->setSimTargetWatts(true);
       server.send(200, "text/plain", "OK");
       SS2K_LOG(HTTP_SERVER_LOG_TAG, "Target Watts Simulator turned on");
     } else if (value == "disable") {
-      rtConfig.setSimTargetWatts(false);
+      rtConfig->setSimTargetWatts(false);
       server.send(200, "text/plain", "OK");
       SS2K_LOG(HTTP_SERVER_LOG_TAG, "Target Watts Simulator turned off");
     } else {
-      rtConfig.watts.setTarget(value.toInt());
-      SS2K_LOG(HTTP_SERVER_LOG_TAG, "Target Watts are now: %d", rtConfig.watts.getTarget());
+      rtConfig->watts.setTarget(value.toInt());
+      SS2K_LOG(HTTP_SERVER_LOG_TAG, "Target Watts are now: %d", rtConfig->watts.getTarget());
       server.send(200, "text/plain", "OK");
     }
   });
@@ -261,31 +263,32 @@ void HTTP_Server::start() {
   server.on("/shift", []() {
     int value = server.arg("value").toInt();
     if ((value > -10) && (value < 10)) {
-      rtConfig.setShifterPosition(rtConfig.getShifterPosition() + value);
+      rtConfig->setShifterPosition(rtConfig->getShifterPosition() + value);
       server.send(200, "text/plain", "OK");
       SS2K_LOG(HTTP_SERVER_LOG_TAG, "Shift From HTML");
     } else {
-      rtConfig.setShifterPosition(value);
+      rtConfig->setShifterPosition(value);
       SS2K_LOG(HTTP_SERVER_LOG_TAG, "Invalid HTML Shift");
       server.send(200, "text/plain", "OK");
     }
+    // BLE Shift notifications are handles by the shift processing in main.cpp
   });
 
   server.on("/configJSON", []() {
     String tString;
-    tString = userConfig.returnJSON();
+    tString = userConfig->returnJSON();
     server.send(200, "text/plain", tString);
   });
 
   server.on("/runtimeConfigJSON", []() {
     String tString;
-    tString = rtConfig.returnJSON();
+    tString = rtConfig->returnJSON();
     server.send(200, "text/plain", tString);
   });
 
   server.on("/PWCJSON", []() {
     String tString;
-    tString = userPWC.returnJSON();
+    tString = userPWC->returnJSON();
     server.send(200, "text/plain", tString);
   });
 
@@ -295,7 +298,7 @@ void HTTP_Server::start() {
   });
 
   server.on("/OTAIndex", HTTP_GET, []() {
-    ss2k.stopTasks();
+    ss2k->stopTasks();
     server.sendHeader("Connection", "close");
     server.send(200, "text/html", OTAServerIndex);
   });
@@ -346,8 +349,8 @@ void HTTP_Server::start() {
             if (Update.end(true)) {  // true to set the size to the
                                      // current progress
               server.send(200, "text/plain", "Littlefs Uploaded Successfully. Rebooting...");
-              userConfig.saveToLittleFS();
-              userPWC.saveToLittleFS();
+              userConfig->saveToLittleFS();
+              userPWC->saveToLittleFS();
               vTaskDelay(100);
               ESP.restart();
             } else {
@@ -380,13 +383,13 @@ void HTTP_Server::start() {
   /********************************************End Server
    * Handlers*******************************/
 
-  xTaskCreatePinnedToCore(HTTP_Server::webClientUpdate,       /* Task function. */
-                          "webClientUpdate",                  /* name of task. */
+  xTaskCreatePinnedToCore(HTTP_Server::webClientUpdate,             /* Task function. */
+                          "webClientUpdate",                        /* name of task. */
                           HTTP_STACK + (DEBUG_LOG_BUFFER_SIZE * 2), /* Stack size of task Used to be 3000*/
-                          NULL,                               /* parameter of the task */
-                          10,                                 /* priority of the task */
-                          &webClientTask,                     /* Task handle to keep track of created task */
-                          0);                                 /* pin task to core */
+                          NULL,                                     /* parameter of the task */
+                          10,                                       /* priority of the task */
+                          &webClientTask,                           /* Task handle to keep track of created task */
+                          0);                                       /* pin task to core */
 
 #ifdef USE_TELEGRAM
   xTaskCreatePinnedToCore(telegramUpdate,   /* Task function. */
@@ -463,106 +466,101 @@ void HTTP_Server::settingsProcessor() {
   if (!server.arg("ssid").isEmpty()) {
     tString = server.arg("ssid");
     tString.trim();
-    userConfig.setSsid(tString);
+    userConfig->setSsid(tString);
   }
   if (!server.arg("password").isEmpty()) {
     tString = server.arg("password");
     tString.trim();
-    userConfig.setPassword(tString);
+    userConfig->setPassword(tString);
   }
   if (!server.arg("deviceName").isEmpty()) {
     tString = server.arg("deviceName");
     tString.trim();
-    userConfig.setDeviceName(tString);
+    userConfig->setDeviceName(tString);
   }
   if (!server.arg("shiftStep").isEmpty()) {
     uint64_t shiftStep = server.arg("shiftStep").toInt();
     if (shiftStep >= 50 && shiftStep <= 6000) {
-      userConfig.setShiftStep(shiftStep);
+      userConfig->setShiftStep(shiftStep);
     }
     wasSettingsUpdate = true;
   }
   if (!server.arg("stepperPower").isEmpty()) {
     uint64_t stepperPower = server.arg("stepperPower").toInt();
     if (stepperPower >= 500 && stepperPower <= 2000) {
-      userConfig.setStepperPower(stepperPower);
-      ss2k.updateStepperPower();
+      userConfig->setStepperPower(stepperPower);
+      ss2k->updateStepperPower();
     }
   }
   if (!server.arg("maxWatts").isEmpty()) {
     uint64_t maxWatts = server.arg("maxWatts").toInt();
     if (maxWatts >= 0 && maxWatts <= 2000) {
-      userConfig.setMaxWatts(maxWatts);
+      userConfig->setMaxWatts(maxWatts);
     }
   }
   if (!server.arg("minWatts").isEmpty()) {
     uint64_t minWatts = server.arg("minWatts").toInt();
     if (minWatts >= 0 && minWatts <= 200) {
-      userConfig.setMinWatts(minWatts);
+      userConfig->setMinWatts(minWatts);
     }
   }
   if (!server.arg("ERGSensitivity").isEmpty()) {
     float ERGSensitivity = server.arg("ERGSensitivity").toFloat();
     if (ERGSensitivity >= .5 && ERGSensitivity <= 20) {
-      userConfig.setERGSensitivity(ERGSensitivity);
+      userConfig->setERGSensitivity(ERGSensitivity);
     }
   }
   // checkboxes don't report off, so need to check using another parameter
   // that's always present on that page
   if (!server.arg("autoUpdate").isEmpty()) {
-    userConfig.setAutoUpdate(true);
+    userConfig->setAutoUpdate(true);
   } else if (wasSettingsUpdate) {
-    userConfig.setAutoUpdate(false);
+    userConfig->setAutoUpdate(false);
   }
   if (!server.arg("stepperDir").isEmpty()) {
-    userConfig.setStepperDir(true);
+    userConfig->setStepperDir(true);
   } else if (wasSettingsUpdate) {
-    userConfig.setStepperDir(false);
+    userConfig->setStepperDir(false);
   }
   if (!server.arg("shifterDir").isEmpty()) {
-    userConfig.setShifterDir(true);
+    userConfig->setShifterDir(true);
   } else if (wasSettingsUpdate) {
-    userConfig.setShifterDir(false);
+    userConfig->setShifterDir(false);
   }
   if (!server.arg("udpLogEnabled").isEmpty()) {
-    userConfig.setUdpLogEnabled(true);
+    userConfig->setUdpLogEnabled(true);
   } else if (wasSettingsUpdate) {
-    userConfig.setUdpLogEnabled(false);
-  }
-  if (!server.arg("logComm").isEmpty()) {
-    userConfig.setLogComm(true);
-  } else if (wasSettingsUpdate) {
-    userConfig.setLogComm(false);
+    userConfig->setUdpLogEnabled(false);
   }
   if (!server.arg("stealthChop").isEmpty()) {
-    userConfig.setStealthChop(true);
-    ss2k.updateStealthChop();
+    userConfig->setStealthChop(true);
+    ss2k->updateStealthChop();
   } else if (wasSettingsUpdate) {
-    userConfig.setStealthChop(false);
-    ss2k.updateStealthChop();
+    userConfig->setStealthChop(false);
+    ss2k->updateStealthChop();
   }
   if (!server.arg("inclineMultiplier").isEmpty()) {
     float inclineMultiplier = server.arg("inclineMultiplier").toFloat();
     if (inclineMultiplier >= 1 && inclineMultiplier <= 10) {
-      userConfig.setInclineMultiplier(inclineMultiplier);
+      userConfig->setInclineMultiplier(inclineMultiplier);
     }
   }
   if (!server.arg("powerCorrectionFactor").isEmpty()) {
     float powerCorrectionFactor = server.arg("powerCorrectionFactor").toFloat();
     if (powerCorrectionFactor >= MIN_PCF && powerCorrectionFactor <= MAX_PCF) {
-      userConfig.setPowerCorrectionFactor(powerCorrectionFactor);
+      userConfig->setPowerCorrectionFactor(powerCorrectionFactor);
     }
   }
   if (!server.arg("blePMDropdown").isEmpty()) {
     wasBTUpdate = true;
     if (server.arg("blePMDropdown")) {
       tString = server.arg("blePMDropdown");
-      if (tString != userConfig.getConnectedPowerMeter()) {
-        userConfig.setConnectedPowerMeter(tString);
-        reboot = true;
+      if (tString != userConfig->getConnectedPowerMeter()) {
+        userConfig->setConnectedPowerMeter(tString);
+        spinBLEClient.reconnectAllDevices();
       }
     } else {
-      userConfig.setConnectedPowerMeter("any");
+      userConfig->setConnectedPowerMeter("any");
     }
   }
   if (!server.arg("bleHRDropdown").isEmpty()) {
@@ -570,12 +568,12 @@ void HTTP_Server::settingsProcessor() {
     if (server.arg("bleHRDropdown")) {
       bool reset = false;
       tString    = server.arg("bleHRDropdown");
-      if (tString != userConfig.getConnectedHeartMonitor()) {
-        reboot = true;
+      if (tString != userConfig->getConnectedHeartMonitor()) {
+        spinBLEClient.reconnectAllDevices();
       }
-      userConfig.setConnectedHeartMonitor(server.arg("bleHRDropdown"));
+      userConfig->setConnectedHeartMonitor(server.arg("bleHRDropdown"));
     } else {
-      userConfig.setConnectedHeartMonitor("any");
+      userConfig->setConnectedHeartMonitor("any");
     }
   }
   if (!server.arg("bleRemoteDropdown").isEmpty()) {
@@ -583,30 +581,30 @@ void HTTP_Server::settingsProcessor() {
     if (server.arg("bleRemoteDropdown")) {
       bool reset = false;
       tString    = server.arg("bleRemoteDropdown");
-      if (tString != userConfig.getConnectedRemote()) {
-        reboot = true;
+      if (tString != userConfig->getConnectedRemote()) {
+        spinBLEClient.reconnectAllDevices();
       }
-      userConfig.setConnectedRemote(server.arg("bleRemoteDropdown"));
+      userConfig->setConnectedRemote(server.arg("bleRemoteDropdown"));
     } else {
-      userConfig.setConnectedRemote("any");
+      userConfig->setConnectedRemote("any");
     }
   }
   if (!server.arg("session1HR").isEmpty()) {  // Needs checking for unrealistic numbers.
-    userPWC.session1HR = server.arg("session1HR").toInt();
+    userPWC->session1HR = server.arg("session1HR").toInt();
   }
   if (!server.arg("session1Pwr").isEmpty()) {
-    userPWC.session1Pwr = server.arg("session1Pwr").toInt();
+    userPWC->session1Pwr = server.arg("session1Pwr").toInt();
   }
   if (!server.arg("session2HR").isEmpty()) {
-    userPWC.session2HR = server.arg("session2HR").toInt();
+    userPWC->session2HR = server.arg("session2HR").toInt();
   }
   if (!server.arg("session2Pwr").isEmpty()) {
-    userPWC.session2Pwr = server.arg("session2Pwr").toInt();
+    userPWC->session2Pwr = server.arg("session2Pwr").toInt();
 
     if (!server.arg("hr2Pwr").isEmpty()) {
-      userPWC.hr2Pwr = true;
+      userPWC->hr2Pwr = true;
     } else {
-      userPWC.hr2Pwr = false;
+      userPWC->hr2Pwr = false;
     }
   }
   String response = "<!DOCTYPE html><html><body><h2>";
@@ -630,10 +628,7 @@ void HTTP_Server::settingsProcessor() {
         myIP.toString() + "/index.html';\",1000);</script></html>";
   }
   SS2K_LOG(HTTP_SERVER_LOG_TAG, "Config Updated From Web");
-  userConfig.saveToLittleFS();
-  userConfig.printFile();
-  userPWC.saveToLittleFS();
-  userPWC.printFile();
+  ss2k->saveFlag = true;
   if (reboot) {
     response +=
         "Please wait while your settings are saved and SmartSpin2k reboots.</h2></body><script> "
@@ -661,7 +656,7 @@ void HTTP_Server::FirmwareUpdate() {
 
   client.setCACert(rootCACertificate);
   SS2K_LOG(HTTP_SERVER_LOG_TAG, "Checking for newer firmware:");
-  http.begin(userConfig.getFirmwareUpdateURL() + String(FW_VERSIONFILE),
+  http.begin(userConfig->getFirmwareUpdateURL() + String(FW_VERSIONFILE),
              rootCACertificate);  // check version URL
   delay(100);
   int httpCode = http.GET();  // get data from version file
@@ -687,7 +682,7 @@ void HTTP_Server::FirmwareUpdate() {
     Version availableVer(payload.c_str());
     Version currentVer(FIRMWARE_VERSION);
 
-    if (((availableVer > currentVer) && (userConfig.getAutoUpdate())) || (updateAnyway)) {
+    if (((availableVer > currentVer) && (userConfig->getAutoUpdate())) || (updateAnyway)) {
       SS2K_LOG(HTTP_SERVER_LOG_TAG, "New firmware detected!");
       SS2K_LOG(HTTP_SERVER_LOG_TAG, "Upgrading from %s to %s", FIRMWARE_VERSION, payload.c_str());
 
@@ -745,22 +740,22 @@ void HTTP_Server::FirmwareUpdate() {
 
       //////// Update Firmware /////////
       SS2K_LOG(HTTP_SERVER_LOG_TAG, "Updating Firmware...Please Wait");
-      if (((availableVer > currentVer) || updateAnyway) && (userConfig.getAutoUpdate())) {
-          t_httpUpdate_return ret = httpUpdate.update(client, userConfig.getFirmwareUpdateURL() + String(FW_BINFILE));
-          switch (ret) {
-            case HTTP_UPDATE_FAILED:
-              SS2K_LOG(HTTP_SERVER_LOG_TAG, "HTTP_UPDATE_FAILED Error %d : %s", httpUpdate.getLastError(), httpUpdate.getLastErrorString().c_str());
-              break;
+      if (((availableVer > currentVer) || updateAnyway) && (userConfig->getAutoUpdate())) {
+        t_httpUpdate_return ret = httpUpdate.update(client, userConfig->getFirmwareUpdateURL() + String(FW_BINFILE));
+        switch (ret) {
+          case HTTP_UPDATE_FAILED:
+            SS2K_LOG(HTTP_SERVER_LOG_TAG, "HTTP_UPDATE_FAILED Error %d : %s", httpUpdate.getLastError(), httpUpdate.getLastErrorString().c_str());
+            break;
 
-            case HTTP_UPDATE_NO_UPDATES:
-              SS2K_LOG(HTTP_SERVER_LOG_TAG, "HTTP_UPDATE_NO_UPDATES");
-              break;
+          case HTTP_UPDATE_NO_UPDATES:
+            SS2K_LOG(HTTP_SERVER_LOG_TAG, "HTTP_UPDATE_NO_UPDATES");
+            break;
 
-            case HTTP_UPDATE_OK:
-              SS2K_LOG(HTTP_SERVER_LOG_TAG, "HTTP_UPDATE_OK");
-              break;
-          }
+          case HTTP_UPDATE_OK:
+            SS2K_LOG(HTTP_SERVER_LOG_TAG, "HTTP_UPDATE_OK");
+            break;
         }
+      }
     } else {  // don't update
       SS2K_LOG(HTTP_SERVER_LOG_TAG, "  - Current Version: %s", FIRMWARE_VERSION);
     }
@@ -776,7 +771,7 @@ void sendTelegram(String textToSend) {
 
   if (millis() - startTime > timeout) {  // Let one message send every two minutes
     numberOfMessages = MAX_TELEGRAM_MESSAGES - 1;
-    telegramMessage += " " + String(userConfig.getSsid()) + " ";
+    telegramMessage += " " + String(userConfig->getSsid()) + " ";
     startTime = millis();
   }
 

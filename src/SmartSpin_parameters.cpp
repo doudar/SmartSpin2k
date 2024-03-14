@@ -16,7 +16,7 @@ String RuntimeParameters::returnJSON() {
   // Allocate a temporary JsonDocument
   // Don't forget to change the capacity to match your requirements.
   // Use arduinojson.org/assistant to compute the capacity.
-  StaticJsonDocument<RUNTIMECONFIG_JSON_SIZE> doc;
+  DynamicJsonDocument doc(USERCONFIG_JSON_SIZE);
   // Set the values in the document
 
   doc["watts"]            = this->watts.getValue();
@@ -51,6 +51,7 @@ void userParameters::setDefaults() {
   shiftStep             = DEFAULT_SHIFT_STEP;
   stealthChop           = STEALTHCHOP;
   stepperPower          = DEFAULT_STEPPER_POWER;
+  stepperSpeed            = DEFAULT_STEPPER_SPEED;
   inclineMultiplier     = 3.0;
   powerCorrectionFactor = 1.0;
   ERGSensitivity        = ERG_SENSITIVITY;
@@ -66,7 +67,6 @@ void userParameters::setDefaults() {
   stepperDir            = true;
   shifterDir            = true;
   udpLogEnabled         = false;
-  logComm               = false;
 }
 
 //---------------------------------------------------------------------------------
@@ -75,7 +75,7 @@ String userParameters::returnJSON() {
   // Allocate a temporary JsonDocument
   // Don't forget to change the capacity to match your requirements.
   // Use arduinojson.org/assistant to compute the capacity.
-  StaticJsonDocument<USERCONFIG_JSON_SIZE> doc;
+  DynamicJsonDocument doc(USERCONFIG_JSON_SIZE);
   // Set the values in the document
 
   doc["firmwareUpdateURL"]     = firmwareUpdateURL;
@@ -83,6 +83,7 @@ String userParameters::returnJSON() {
   doc["deviceName"]            = deviceName;
   doc["shiftStep"]             = shiftStep;
   doc["stepperPower"]          = stepperPower;
+  doc["stepperSpeed"]          = stepperSpeed;
   doc["stealthChop"]           = stealthChop;
   doc["inclineMultiplier"]     = inclineMultiplier;
   doc["powerCorrectionFactor"] = powerCorrectionFactor;
@@ -99,7 +100,6 @@ String userParameters::returnJSON() {
   doc["shifterDir"]            = shifterDir;
   doc["stepperDir"]            = stepperDir;
   doc["udpLogEnabled"]         = udpLogEnabled;
-  doc["logComm"]               = logComm;
 
   String output;
   serializeJson(doc, output);
@@ -122,7 +122,7 @@ void userParameters::saveToLittleFS() {
   // Allocate a temporary JsonDocument
   // Don't forget to change the capacity to match your requirements.
   // Use arduinojson.org/assistant to compute the capacity.
-  StaticJsonDocument<USERCONFIG_JSON_SIZE> doc;
+  DynamicJsonDocument doc(USERCONFIG_JSON_SIZE);
 
   // Set the values in the document
   // commented items are not needed in save file
@@ -131,6 +131,7 @@ void userParameters::saveToLittleFS() {
   doc["deviceName"]            = deviceName;
   doc["shiftStep"]             = shiftStep;
   doc["stepperPower"]          = stepperPower;
+  doc["stepperSpeed"]          = stepperSpeed;
   doc["stealthChop"]           = stealthChop;
   doc["inclineMultiplier"]     = inclineMultiplier;
   doc["powerCorrectionFactor"] = powerCorrectionFactor;
@@ -147,7 +148,6 @@ void userParameters::saveToLittleFS() {
   doc["shifterDir"]            = shifterDir;
   doc["stepperDir"]            = stepperDir;
   doc["udpLogEnabled"]         = udpLogEnabled;
-  doc["logComm"]               = logComm;
 
   // Serialize JSON to file
   if (serializeJson(doc, file) == 0) {
@@ -172,7 +172,7 @@ void userParameters::loadFromLittleFS() {
   // Allocate a temporary JsonDocument
   // Don't forget to change the capacity to match your requirements.
   // Use arduinojson.org/v6/assistant to compute the capacity.
-  StaticJsonDocument<USERCONFIG_JSON_SIZE> doc;
+  DynamicJsonDocument doc(USERCONFIG_JSON_SIZE);
 
   // Deserialize the JSON document
   DeserializationError error = deserializeJson(doc, file);
@@ -200,6 +200,9 @@ void userParameters::loadFromLittleFS() {
   if (doc["maxWatts"]) {
     setMaxWatts(doc["maxWatts"]);
   }
+  if (doc["stepperSpeed"]){
+    setStepperSpeed(doc["stepperSpeed"]);
+  }
   if (doc["minWatts"]) {
     setMinWatts(doc["minWatts"]);
   }
@@ -211,9 +214,6 @@ void userParameters::loadFromLittleFS() {
   }
   if (!doc["udpLogEnabled"].isNull()) {
     setUdpLogEnabled(doc["udpLogEnabled"]);
-  }
-  if (!doc["logComm"].isNull()) {
-    setLogComm(doc["logComm"]);
   }
   if (doc["powerCorrectionFactor"]) {
     setPowerCorrectionFactor(doc["powerCorrectionFactor"]);

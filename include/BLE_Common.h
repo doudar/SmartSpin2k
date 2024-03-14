@@ -22,35 +22,6 @@
 #define FMTS_SERVER_LOG_TAG "FTMS_SERVER"
 #define CUSTOM_CHAR_LOG_TAG "Custom_C"
 
-// custom characteristic codes
-#define BLE_firmwareUpdateURL     0x01
-#define BLE_incline               0x02
-#define BLE_simulatedWatts        0x03
-#define BLE_simulatedHr           0x04
-#define BLE_simulatedCad          0x05
-#define BLE_simulatedSpeed        0x06
-#define BLE_deviceName            0x07
-#define BLE_shiftStep             0x08
-#define BLE_stepperPower          0x09
-#define BLE_stealthChop           0x0A
-#define BLE_inclineMultiplier     0x0B
-#define BLE_powerCorrectionFactor 0x0C
-#define BLE_simulateHr            0x0D
-#define BLE_simulateWatts         0x0E
-#define BLE_simulateCad           0x0F
-#define BLE_FTMSMode              0x10
-#define BLE_autoUpdate            0x11
-#define BLE_ssid                  0x12
-#define BLE_password              0x13
-#define BLE_foundDevices          0x14
-#define BLE_connectedPowerMeter   0x15
-#define BLE_connectedHeartMonitor 0x16
-#define BLE_shifterPosition       0x17
-#define BLE_saveToLittleFS        0x18
-#define BLE_targetPosition        0x19
-#define BLE_externalControl       0x1A
-#define BLE_syncMode              0x1B
-
 // macros to convert different types of bytes into int The naming here sucks and
 // should be fixed.
 #define bytes_to_s16(MSB, LSB) (((signed int)((signed char)MSB))) << 8 | (((signed char)LSB))
@@ -83,6 +54,16 @@ class ss2kCustomCharacteristicCallbacks : public BLECharacteristicCallbacks {
   void onWrite(BLECharacteristic *);
 };
 
+class ss2kCustomCharacteristic {
+ public:
+ //Used internally for notify and onWrite Callback.
+  static void process(std::string rxValue);
+  //Custom Characteristic value that needs to be notified
+  static void notify(const uint8_t _item);
+  // Notify any changed value in userConfig
+  static void parseNemit();
+};
+
 extern std::string FTMSWrite;
 
 // TODO add the rest of the server to this class
@@ -93,7 +74,7 @@ class SpinBLEServer {
     bool CyclingPowerMeasurement : 1;
     bool IndoorBikeData : 1;
   } clientSubscribed;
-
+  NimBLEServer *pServer = nullptr;
   void setClientSubscribed(NimBLEUUID pUUID, bool subscribe);
   void notifyShift();
 
@@ -113,6 +94,9 @@ void updateHeartRateMeasurementChar();
 int connectedClientCount();
 void controlPointIndicate();
 void processFTMSWrite();
+
+// BLE FIRMWARE UPDATER
+void BLEFirmwareSetup();
 
 // *****************************Client*****************************
 
@@ -135,6 +119,8 @@ typedef struct NotifyData {
 class SpinBLEAdvertisedDevice {
  private:
   QueueHandle_t dataBufferQueue = nullptr;
+
+  bool isPostConnected = false;
 
  public:  // eventually these should be made private
   // // TODO: Do we dispose of this object?  Is so, we need to de-allocate the queue.
@@ -159,7 +145,8 @@ class SpinBLEAdvertisedDevice {
   bool isCT             = false;
   bool isRemote         = false;
   bool doConnect        = false;
-  bool postConnected    = false;
+  void setPostConnected(bool pc) { isPostConnected = pc; }
+  bool getPostConnected() { return isPostConnected; }
   void set(BLEAdvertisedDevice *device, int id = BLE_HS_CONN_HANDLE_NONE, BLEUUID inServiceUUID = (uint16_t)0x0000, BLEUUID inCharUUID = (uint16_t)0x0000);
   void reset();
   void print();
@@ -169,21 +156,20 @@ class SpinBLEAdvertisedDevice {
 
 class SpinBLEClient {
  private:
-
  public:  // Not all of these need to be public. This should be cleaned up
           // later.
-  boolean connectedPM        = false;
-  boolean connectedHRM       = false;
-  boolean connectedCD        = false;
-  boolean connectedCT        = false;
-  boolean connectedRemote    = false;
-  boolean doScan             = false;
-  bool dontBlockScan         = true;
-  bool intentionalDisconnect = false;
-  int noReadingIn            = 0;
-  int cscCumulativeCrankRev  = 0;
-  int cscLastCrankEvtTime    = 0;
-  int reconnectTries         = MAX_RECONNECT_TRIES;
+  boolean connectedPM       = false;
+  boolean connectedHRM      = false;
+  boolean connectedCD       = false;
+  boolean connectedCT       = false;
+  boolean connectedRemote   = false;
+  boolean doScan            = false;
+  bool dontBlockScan        = true;
+  int intentionalDisconnect = 0;
+  int noReadingIn           = 0;
+  int cscCumulativeCrankRev = 0;
+  int cscLastCrankEvtTime   = 0;
+  int reconnectTries        = MAX_RECONNECT_TRIES;
 
   BLERemoteCharacteristic *pRemoteCharacteristic = nullptr;
 
@@ -193,17 +179,22 @@ class SpinBLEClient {
   void start();
   // void serverScan(bool connectRequest);
   bool connectToServer();
-  void scanProcess(int duration = DEFAULT_SCAN_DURATION);
   // Check for duplicate services of BLEClient and remove the previously
   // connected one.
   void removeDuplicates(NimBLEClient *pClient);
   void resetDevices(NimBLEClient *pClient);
   void postConnect();
-  void FTMSControlPointWrite(const uint8_t*  pData, int length);
+  void FTMSControlPointWrite(const uint8_t *pData, int length);
   void connectBLE_HID(NimBLEClient *pClient);
   void keepAliveBLE_HID(NimBLEClient *pClient);
-  void checkBLEReconnect();
   void handleBattInfo(NimBLEClient *pClient, bool updateNow);
+  // Instead of using this directly, set the .doScan flag to start a scan.
+  void scanProcess(int duration = DEFAULT_SCAN_DURATION);
+  void checkBLEReconnect();
+  // Disconnects all devices. They will then be reconnected if scanned and preferred again.
+  void reconnectAllDevices();
+
+  String adevName2UniqueName(NimBLEAdvertisedDevice *inDev);
 };
 
 class MyAdvertisedDeviceCallback : public NimBLEAdvertisedDeviceCallbacks {
