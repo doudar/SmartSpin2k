@@ -18,6 +18,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - added test for invalid Peloton data to keep stepper from running away without resistance information.
 - Fixed a bug with Trainer Day and rapid ERG sending. 
 - Many updates and bug fixes which enable the Config App to communicate with SmartSpin2k. 
+- Scanned devices no longer saved to filesystem. The new scanning method would keep snowballing them otherwise. 
 - increased MTU for android
 
 ### Hardware

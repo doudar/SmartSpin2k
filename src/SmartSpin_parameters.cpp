@@ -142,7 +142,7 @@ void userParameters::saveToLittleFS() {
   doc["connectedPowerMeter"]   = connectedPowerMeter;
   doc["connectedHeartMonitor"] = connectedHeartMonitor;
   doc["connectedRemote"]       = connectedRemote;
-  doc["foundDevices"]          = foundDevices;
+  //doc["foundDevices"]          = foundDevices;
   doc["maxWatts"]              = maxWatts;
   doc["minWatts"]              = minWatts;
   doc["shifterDir"]            = shifterDir;
@@ -193,8 +193,10 @@ void userParameters::loadFromLittleFS() {
   setPassword(doc["password"]);
   setConnectedPowerMeter(doc["connectedPowerMeter"]);
   setConnectedHeartMonitor(doc["connectedHeartMonitor"]);
-  setFoundDevices(doc["foundDevices"]);
-  if (doc["ERGSensitivity"]) {  // If statements to upgrade old versions of config.txt that didn't include these
+  //setFoundDevices(doc["foundDevices"]);
+  
+  // If statements to upgrade old versions of config.txt that didn't include these
+  if (doc["ERGSensitivity"]) {  
     setERGSensitivity(doc["ERGSensitivity"]);
   }
   if (doc["maxWatts"]) {
