@@ -20,6 +20,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Many updates and bug fixes which enable the Config App to communicate with SmartSpin2k. 
 - Scanned devices no longer saved to filesystem. The new scanning method would keep snowballing them otherwise. 
 - increased MTU for android
+- Updated WiFi connection setup.
 
 ### Hardware
 - added Yesoul S3

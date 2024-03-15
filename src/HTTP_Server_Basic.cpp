@@ -50,10 +50,9 @@ void startWifi() {
 
   // Trying Station mode first:
   SS2K_LOG(HTTP_SERVER_LOG_TAG, "Connecting to: %s", userConfig->getSsid());
-  if (String(WiFi.SSID()) != userConfig->getSsid()) {
+  if (WiFi.SSID() != String(userConfig->getSsid())) {
     WiFi.mode(WIFI_STA);
     WiFi.begin(userConfig->getSsid(), userConfig->getPassword());
-    WiFi.setTxPower(WIFI_POWER_19_5dBm);
     WiFi.setAutoReconnect(true);
   }
 
@@ -64,8 +63,9 @@ void startWifi() {
     if (i > WIFI_CONNECT_TIMEOUT || (String(userConfig->getSsid()) == DEVICE_NAME)) {
       i = 0;
       SS2K_LOG(HTTP_SERVER_LOG_TAG, "Couldn't Connect. Switching to AP mode");
-      WiFi.disconnect();
-      WiFi.mode(WIFI_AP);
+      // Resets NVS settings. Important for firmware upgrades.
+      WiFi.disconnect(false, true);
+      vTaskDelay(50);  // Micro controller requires some time to disconnect
       break;
     }
   }
@@ -76,13 +76,18 @@ void startWifi() {
 
   // Couldn't connect to existing network, Create SoftAP
   if (WiFi.status() != WL_CONNECTED) {
+    WiFi.mode(WIFI_AP);
+    WiFi.setAutoReconnect(false);
+    WiFi.enableAP(true);
+    vTaskDelay(50);  // Micro controller requires some time to reset the mode
     if (strcmp(userConfig->getSsid(), DEVICE_NAME) == 0) {
       // If default SSID is still in use, let the user
       // select a new password.
       // Else Fall Back to the default password (probably "password")
-      WiFi.softAP(userConfig->getDeviceName(), userConfig->getPassword());
-    }else{
-    WiFi.softAP(userConfig->getDeviceName(), DEFAULT_PASSWORD);}
+      WiFi.softAP(userConfig->getDeviceName(), String(userConfig->getPassword()));
+    } else {
+      WiFi.softAP(userConfig->getDeviceName(), DEFAULT_PASSWORD);
+    }
     vTaskDelay(50);
     myIP = WiFi.softAPIP();
     /* Setup the DNS server redirecting all the domains to the apIP */
