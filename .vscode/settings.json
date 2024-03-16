@@ -60,7 +60,6 @@
         "iostream": "cpp",
         "*.dontuse": "cpp"
     },
-    "C_Cpp.errorSquiggles": "Disabled",
     "cSpell.words": [
         "Appender",
         "Baranick",

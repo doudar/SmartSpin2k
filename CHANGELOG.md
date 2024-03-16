@@ -21,6 +21,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Scanned devices no longer saved to filesystem. The new scanning method would keep snowballing them otherwise. 
 - increased MTU for android
 - Updated WiFi connection setup.
+- Firmware no longer updates if only the html files need to be loaded. 
 
 ### Hardware
 - added Yesoul S3

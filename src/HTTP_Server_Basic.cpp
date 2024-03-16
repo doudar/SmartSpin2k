@@ -22,6 +22,7 @@
 #include <DNSServer.h>
 #include <ArduinoJson.h>
 #include <Custom_Characteristic.h>
+#include <WiFiProv.h>
 
 File fsUploadFile;
 
@@ -44,6 +45,13 @@ UniversalTelegramBot bot(TELEGRAM_TOKEN, client);
 String telegramMessage = "";
 #endif  // USE_TELEGRAM
 
+void _staSetup() {
+  WiFi.setHostname(userConfig->getDeviceName());
+  WiFi.mode(WIFI_STA);
+  WiFi.begin(userConfig->getSsid(), userConfig->getPassword());
+  WiFi.setAutoReconnect(true);
+}
+
 // ********************************WIFI Setup*************************
 void startWifi() {
   int i = 0;
@@ -51,9 +59,7 @@ void startWifi() {
   // Trying Station mode first:
   SS2K_LOG(HTTP_SERVER_LOG_TAG, "Connecting to: %s", userConfig->getSsid());
   if (WiFi.SSID() != String(userConfig->getSsid())) {
-    WiFi.mode(WIFI_STA);
-    WiFi.begin(userConfig->getSsid(), userConfig->getPassword());
-    WiFi.setAutoReconnect(true);
+    _staSetup();
   }
 
   while (WiFi.status() != WL_CONNECTED) {
@@ -63,9 +69,6 @@ void startWifi() {
     if (i > WIFI_CONNECT_TIMEOUT || (String(userConfig->getSsid()) == DEVICE_NAME)) {
       i = 0;
       SS2K_LOG(HTTP_SERVER_LOG_TAG, "Couldn't Connect. Switching to AP mode");
-      // Resets NVS settings. Important for firmware upgrades.
-      WiFi.disconnect(false, true);
-      vTaskDelay(50);  // Micro controller requires some time to disconnect
       break;
     }
   }
@@ -76,7 +79,17 @@ void startWifi() {
 
   // Couldn't connect to existing network, Create SoftAP
   if (WiFi.status() != WL_CONNECTED) {
+    // This below is to compensate for a bug in platform = espressif32 @ 6.5.0 . Hopefully it's fixed soon.
+    // The Symptoms are that we cannot connect in AP mode unless .eraseAp is called. Then Station needs to get initialized and dumped again before it will connect. Dumbest thing
+    // ever.
+    WiFi.eraseAP();
+    _staSetup();
+    WiFi.disconnect(true, true);
+    WiFi.mode(WIFI_MODE_NULL);
+    vTaskDelay(1000 / portTICK_RATE_MS);
+    // *********************** End of platform = espressif32 @ 6.5.0 Bug Workaround *************************
     WiFi.mode(WIFI_AP);
+    WiFi.softAPsetHostname(userConfig->getDeviceName());
     WiFi.setAutoReconnect(false);
     WiFi.enableAP(true);
     vTaskDelay(50);  // Micro controller requires some time to reset the mode
@@ -84,7 +97,7 @@ void startWifi() {
       // If default SSID is still in use, let the user
       // select a new password.
       // Else Fall Back to the default password (probably "password")
-      WiFi.softAP(userConfig->getDeviceName(), String(userConfig->getPassword()));
+      WiFi.softAP(userConfig->getDeviceName(), userConfig->getPassword());
     } else {
       WiFi.softAP(userConfig->getDeviceName(), DEFAULT_PASSWORD);
     }
@@ -657,7 +670,6 @@ void HTTP_Server::stop() {
 void HTTP_Server::FirmwareUpdate() {
   HTTPClient http;
   // WiFiClientSecure client;
-
   client.setCACert(rootCACertificate);
   SS2K_LOG(HTTP_SERVER_LOG_TAG, "Checking for newer firmware:");
   http.begin(userConfig->getFirmwareUpdateURL() + String(FW_VERSIONFILE),
@@ -680,16 +692,13 @@ void HTTP_Server::FirmwareUpdate() {
   if (httpCode == HTTP_CODE_OK) {  // if version received
     bool updateAnyway = false;
     if (!LittleFS.exists("/index.html")) {
-      updateAnyway = true;
-      SS2K_LOG(HTTP_SERVER_LOG_TAG, "  -index.html not found. Forcing update");
+      // updateAnyway = true;
+      SS2K_LOG(HTTP_SERVER_LOG_TAG, "  -index.html not found.");
     }
     Version availableVer(payload.c_str());
     Version currentVer(FIRMWARE_VERSION);
 
-    if (((availableVer > currentVer) && (userConfig->getAutoUpdate())) || (updateAnyway)) {
-      SS2K_LOG(HTTP_SERVER_LOG_TAG, "New firmware detected!");
-      SS2K_LOG(HTTP_SERVER_LOG_TAG, "Upgrading from %s to %s", FIRMWARE_VERSION, payload.c_str());
-
+    if (((availableVer > currentVer) && (userConfig->getAutoUpdate())) || (!LittleFS.exists("/index.html"))) {
       //////////////// Update LittleFS//////////////
       SS2K_LOG(HTTP_SERVER_LOG_TAG, "Updating FileSystem");
       http.begin(DATA_UPDATEURL + String(DATA_FILELIST),
@@ -743,8 +752,9 @@ void HTTP_Server::FirmwareUpdate() {
       }
 
       //////// Update Firmware /////////
-      SS2K_LOG(HTTP_SERVER_LOG_TAG, "Updating Firmware...Please Wait");
       if (((availableVer > currentVer) || updateAnyway) && (userConfig->getAutoUpdate())) {
+        SS2K_LOG(HTTP_SERVER_LOG_TAG, "New firmware detected!");
+        SS2K_LOG(HTTP_SERVER_LOG_TAG, "Upgrading from %s to %s", FIRMWARE_VERSION, payload.c_str());
         t_httpUpdate_return ret = httpUpdate.update(client, userConfig->getFirmwareUpdateURL() + String(FW_BINFILE));
         switch (ret) {
           case HTTP_UPDATE_FAILED:
