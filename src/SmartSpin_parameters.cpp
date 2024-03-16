@@ -52,7 +52,7 @@ void userParameters::setDefaults() {
   stealthChop           = STEALTHCHOP;
   stepperPower          = DEFAULT_STEPPER_POWER;
   stepperSpeed            = DEFAULT_STEPPER_SPEED;
-  inclineMultiplier     = 3.0;
+  inclineMultiplier     = INCLINE_MULTIPLIER;
   powerCorrectionFactor = 1.0;
   ERGSensitivity        = ERG_SENSITIVITY;
   autoUpdate            = AUTO_FIRMWARE_UPDATE;
