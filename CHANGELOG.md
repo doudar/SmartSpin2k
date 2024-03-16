@@ -23,6 +23,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Updated WiFi connection setup.
 - Firmware no longer updates if only the html files need to be loaded. 
 - BLE scans blocked during firmware upgrade.
+- Increased the default incline multiplier to 5.
 
 ### Hardware
 - added Yesoul S3.
