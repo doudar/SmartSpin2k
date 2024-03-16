@@ -61,7 +61,7 @@
 #define DEFAULT_STEPPER_POWER 900
 
 // Default Shift Step. The amount to move the stepper motor for a shift press.
-#define DEFAULT_SHIFT_STEP 1000
+#define DEFAULT_SHIFT_STEP 1200
 
 // Stepper Acceleration in steps/s^2
 #define STEPPER_ACCELERATION 3000
