@@ -86,7 +86,7 @@ void bleClientTask(void *pvParameters) {
       scanDelay = millis();
     }
 
-    if (spinBLEClient.doScan) {
+    if (spinBLEClient.doScan && (!ss2k->isUpdating)) {
       spinBLEClient.scanProcess();
     }
 
@@ -522,15 +522,6 @@ void SpinBLEClient::scanProcess(int duration) {
 
   pBLEScan = nullptr;  // free up memory
 }
-
-/*// This is the main server scan request process to use.
-void SpinBLEClient::serverScan(bool connectRequest) {
-  this->dontBlockScan = true;
-  if (connectRequest) {
-    this->scanRetries = MAX_SCAN_RETRIES;
-  }
-  this->doScan = true;
-}*/
 
 // remove the last connected BLE Power Meter
 void SpinBLEClient::removeDuplicates(NimBLEClient *pClient) {

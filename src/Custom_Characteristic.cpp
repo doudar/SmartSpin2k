@@ -45,7 +45,7 @@ void ss2kCustomCharacteristicCallbacks::onWrite(BLECharacteristic *pCharacterist
   ss2kCustomCharacteristic::process(rxValue);
 }
 
-void ss2kCustomCharacteristic::notify(const uint8_t _item) {
+void ss2kCustomCharacteristic::notify(char _item) {
   std::string returnValue = {cc_read, _item};
   process(returnValue);
 }
@@ -475,7 +475,7 @@ void ss2kCustomCharacteristic::process(std::string rxValue) {
     case BLE_resetToDefaults:  // 0x1D
       logBufLength += snprintf(logBuf + logBufLength, kLogBufCapacity - logBufLength, "<-reset to defaults");
       if (rxValue[0] == cc_write) {
-        userConfig->setDefaults();
+        ss2k->resetDefaultsFlag = true;
         returnValue[0] = cc_success;
       }
 
@@ -707,7 +707,7 @@ void ss2kCustomCharacteristic::parseNemit() {
     ss2kCustomCharacteristic::notify(BLE_maxBrakeWatts);
     return;
   }
-    if (userConfig->getShifterDir() != _oldParams.getShifterDir()) {
+  if (userConfig->getShifterDir() != _oldParams.getShifterDir()) {
     _oldParams.setShifterDir(userConfig->getShifterDir());
     ss2kCustomCharacteristic::notify(BLE_shiftDir);
     return;

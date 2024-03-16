@@ -176,16 +176,13 @@ void HTTP_Server::start() {
 
   server.on("/load_defaults.html", []() {
     SS2K_LOG(HTTP_SERVER_LOG_TAG, "Setting Defaults from Web Request");
-    LittleFS.format();
-    userConfig->setDefaults();
-    userConfig->saveToLittleFS();
+   ss2k->resetDefaultsFlag = true;
     String response =
         "<!DOCTYPE html><html><body><h1>Defaults have been "
         "loaded.</h1><p><br><br> Please reconnect to the device on WiFi "
         "network: " +
         myIP.toString() + "</p></body></html>";
     server.send(200, "text/html", response);
-    ESP.restart();
   });
 
   server.on("/reboot.html", []() {
