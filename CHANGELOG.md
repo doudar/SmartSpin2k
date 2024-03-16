@@ -13,18 +13,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Updated kit purchasing links. 
 - MIN_ERG_CADENCE created and changed from 20 to 30.
 - Fixed DNS server in AP mode.
-- Fixed an issue with IC4 and variants not displaying device name in Bluetooth scanner. Fixes #500
+- Fixed an issue with IC4 and variants not displaying device name in Bluetooth scanner. Fixes #500.
 - Switched from using Power Table to a Torque Table for better compensation in cad variations. 
 - added test for invalid Peloton data to keep stepper from running away without resistance information.
 - Fixed a bug with Trainer Day and rapid ERG sending. 
 - Many updates and bug fixes which enable the Config App to communicate with SmartSpin2k. 
 - Scanned devices no longer saved to filesystem. The new scanning method would keep snowballing them otherwise. 
-- increased MTU for android
+- increased MTU for android.
 - Updated WiFi connection setup.
 - Firmware no longer updates if only the html files need to be loaded. 
+- BLE scans blocked during firmware upgrade.
 
 ### Hardware
-- added Yesoul S3
+- added Yesoul S3.
 - Wire diameter reduced from 7.2mm to 6.0mm on the window passthrough to accommodate the latest batch of cables. 
 - Changed reference to M4 bolt to M5 Bolt in the construction instructions pdf.
 - Increased right side case mounting hole to 5.5mm so the bolt slides in easier.

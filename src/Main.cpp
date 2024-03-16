@@ -216,6 +216,14 @@ void SS2K::maintenanceLoop(void *pvParameters) {
       _loopOnce = true;
     }
 
+    if (ss2k->resetDefaultsFlag) {
+      LittleFS.format();
+      userConfig->setDefaults();
+      userConfig->saveToLittleFS();
+      ss2k->resetDefaultsFlag = false;
+      ss2k->rebootFlag = true;
+    }
+
     // reboot every half hour if not in use.
     if ((millis() - rebootTimer) > 1800000) {
       if (NimBLEDevice::getServer()) {

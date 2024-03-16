@@ -59,7 +59,7 @@ class ss2kCustomCharacteristic {
  //Used internally for notify and onWrite Callback.
   static void process(std::string rxValue);
   //Custom Characteristic value that needs to be notified
-  static void notify(const uint8_t _item);
+  static void notify(char _item);
   // Notify any changed value in userConfig
   static void parseNemit();
 };
