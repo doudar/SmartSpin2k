@@ -100,7 +100,7 @@ void setup() {
   stepperSerial.begin(57600, SERIAL_8N2, currentBoard.stepperSerialRxPin, currentBoard.stepperSerialTxPin);
   // initialize aux serial port (Peloton)
   if (currentBoard.auxSerialTxPin) {
-    auxSerial.begin(19200, SERIAL_8N1, currentBoard.auxSerialRxPin, currentBoard.auxSerialTxPin, false);  //////////////////////////////////change to false after testing!!!
+    auxSerial.begin(19200, SERIAL_8N1, currentBoard.auxSerialRxPin, currentBoard.auxSerialTxPin, false);
     if (!auxSerial) {
       SS2K_LOG(MAIN_LOG_TAG, "Invalid Serial Pin Configuration");
     }
