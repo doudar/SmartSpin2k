@@ -323,6 +323,9 @@ void MyServerCallbacks::onConnect(BLEServer *pServer, ble_gap_conn_desc *desc) {
 void MyServerCallbacks::onDisconnect(BLEServer *pServer) {
   SS2K_LOG(BLE_SERVER_LOG_TAG, "Bluetooth Remote Client Disconnected. Remaining Clients: %d", pServer->getConnectedCount());
   BLEDevice::startAdvertising();
+  //client disconnected while trying to write fw - reboot to clear the faulty upload. 
+  if (ss2k->isUpdating) {SS2K_LOG(BLE_SERVER_LOG_TAG, "Rebooting because of update interruption.", pServer->getConnectedCount());
+  ss2k->rebootFlag = true;}
 }
 
 bool MyServerCallbacks::onConnParamsUpdateRequest(NimBLEClient *pClient, const ble_gap_upd_params *params) {
