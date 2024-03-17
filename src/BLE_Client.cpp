@@ -780,12 +780,15 @@ void SpinBLEClient::keepAliveBLE_HID(NimBLEClient *pClient) {
 void SpinBLEClient::checkBLEReconnect() {
   if ((String(userConfig->getConnectedHeartMonitor()) != "none") && !(spinBLEClient.connectedHRM)) {
     this->doScan = true;
+    SS2K_LOG(BLE_CLIENT_LOG_TAG,"No HRM Connected");
   }
   if ((String(userConfig->getConnectedPowerMeter()) != "none") && !(spinBLEClient.connectedPM)) {
     this->doScan = true;
+    SS2K_LOG(BLE_CLIENT_LOG_TAG,"No PM Connected");
   }
   if ((String(userConfig->getConnectedRemote()) != "none") && !(spinBLEClient.connectedRemote)) {
     this->doScan = true;
+    SS2K_LOG(BLE_CLIENT_LOG_TAG,"No Rem Connected");
   }
 }
 

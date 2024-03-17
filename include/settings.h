@@ -48,7 +48,7 @@
 // into actual stepper steps that move the stepper motor. It takes 2,181.76 steps to rotate the knob 1 full revolution. with hardware version 1.
 // Incline_Multiplier may be able to be removed in the future by dividing ShiftSteps by ~200 to get this value but we're not quite ready
 // to make that commitment yet.
-#define INCLINE_MULTIPLIER 6.0
+#define INCLINE_MULTIPLIER 5.0
 
 // Minumum value for power correction factor user setting
 #define MIN_PCF .5
@@ -61,7 +61,7 @@
 #define DEFAULT_STEPPER_POWER 900
 
 // Default Shift Step. The amount to move the stepper motor for a shift press.
-#define DEFAULT_SHIFT_STEP 1000
+#define DEFAULT_SHIFT_STEP 1200
 
 // Stepper Acceleration in steps/s^2
 #define STEPPER_ACCELERATION 3000
@@ -97,7 +97,7 @@
 
 // Default Max Watts that the brake on the spin bike can absorb from the user.
 // This is used to set the upper travel limit for the motor.
-#define DEFAULT_MAX_WATTS 800
+#define DEFAULT_MAX_WATTS 1400
 
 // Minimum resistance on a Peloton Bike.
 // This is used to set the lower travel limit for the motor.
