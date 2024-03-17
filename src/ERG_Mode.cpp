@@ -105,8 +105,8 @@ int TorqueBuffer::getReadings() {
     if (this->torqueEntry[i].readings != 0) {
       ret++;
     }
-    return ret;
   }
+  return ret;
 }
 
 void TorqueTable::processTorqueValue(TorqueBuffer& torqueBuffer, int cadence, Measurement watts) {
