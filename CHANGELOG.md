@@ -24,6 +24,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Firmware no longer updates if only the html files need to be loaded. 
 - BLE scans blocked during firmware upgrade.
 - Increased the default incline multiplier to 5.
+- Added more robust activity monitoring and reboot every 30 minutes if there is no activity.
 
 ### Hardware
 - added Yesoul S3.

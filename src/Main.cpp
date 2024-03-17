@@ -197,14 +197,19 @@ void SS2K::maintenanceLoop(void *pvParameters) {
 
   while (true) {
     vTaskDelay(73 / portTICK_RATE_MS);
+
     // send BLE notification for any userConfig values that changed.
     ss2kCustomCharacteristic::parseNemit();
+
+    // If we're in ERG mode, modify shift commands to inc/dec the target watts instead.
     ss2k->FTMSModeShiftModifier();
 
+    // if this hardware version has serial pins, check and process their data.
     if (currentBoard.auxSerialTxPin) {
       ss2k->txSerial();
     }
 
+    // Handle flag set for rebooting
     if (ss2k->rebootFlag) {
       static bool _loopOnce = false;
       // Let the main task loop complete once before rebooting
@@ -216,25 +221,13 @@ void SS2K::maintenanceLoop(void *pvParameters) {
       _loopOnce = true;
     }
 
+    // Handle a flag set to reset SmartSpin2k to defaults
     if (ss2k->resetDefaultsFlag) {
       LittleFS.format();
       userConfig->setDefaults();
       userConfig->saveToLittleFS();
       ss2k->resetDefaultsFlag = false;
-      ss2k->rebootFlag = true;
-    }
-
-    // reboot every half hour if not in use.
-    if ((millis() - rebootTimer) > 1800000) {
-      if (NimBLEDevice::getServer()) {
-        if (!(NimBLEDevice::getServer()->getConnectedCount())) {
-          SS2K_LOGW(MAIN_LOG_TAG, "Rebooting due to inactivity");
-          logHandler.writeLogs();
-          ss2k->rebootFlag = true;
-        } else {
-          rebootTimer = millis();
-        }
-      }
+      ss2k->rebootFlag        = true;
     }
 
     // required to set a flag instead of directly calling the function for saving from BLE_Custom Characteristic.
@@ -244,6 +237,7 @@ void SS2K::maintenanceLoop(void *pvParameters) {
       userPWC->saveToLittleFS();
     }
 
+    // Things to do every two seconds
     if ((millis() - intervalTimer) > 2003) {  // add check here for when to restart WiFi
                                               // maybe if in STA mode and 8.8.8.8 no ping return?
       // ss2k->restartWifi();
@@ -252,8 +246,35 @@ void SS2K::maintenanceLoop(void *pvParameters) {
       intervalTimer = millis();
     }
 
+    // Things to do every 6 seconds
     if ((millis() - intervalTimer2) > 6007) {
-      if (NimBLEDevice::getScan()->isScanning()) {  // workaround to prevent occasional runaway scans
+      // reboot every half hour if not in use.
+      static int _oldHR               = 0;
+      static int _oldWatts            = 0;
+      static double _oldTargetIncline = 0;
+      static int _oldClientCount      = 0;
+      if (_oldHR == rtConfig->hr.getValue() && _oldWatts == rtConfig->watts.getValue() && _oldTargetIncline == rtConfig->getTargetIncline() &&
+          _oldClientCount == NimBLEDevice::getServer()->getConnectedCount()) {
+        // Inactivity detected
+        if (((millis() - rebootTimer) > 1800000)) {
+          // Timer expired
+          SS2K_LOGW(MAIN_LOG_TAG, "Rebooting due to inactivity.");
+          ss2k->rebootFlag = true;
+          logHandler.writeLogs();
+          webSocketAppender.Loop();
+        }
+
+      } else {
+        // We have activity, update monitored values
+        _oldHR            = rtConfig->hr.getValue();
+        _oldWatts         = rtConfig->watts.getValue();
+        _oldTargetIncline = rtConfig->getTargetIncline();
+        _oldClientCount   = NimBLEDevice::getServer()->getConnectedCount();
+        rebootTimer       = millis();
+      }
+
+      // Prevent occasional runaway scans
+      if (NimBLEDevice::getScan()->isScanning()) {
         if (isScanning == true) {
           SS2K_LOGW(MAIN_LOG_TAG, "Forcing Scan to stop.");
           spinBLEClient.doScan = false;
@@ -266,7 +287,8 @@ void SS2K::maintenanceLoop(void *pvParameters) {
       intervalTimer2 = millis();
     }
 
-    if (loopCounter > 10) {
+    // Things to do every 20 loops
+    if (loopCounter > 20) {
       ss2k->checkDriverTemperature();
 
 #ifdef DEBUG_STACK
