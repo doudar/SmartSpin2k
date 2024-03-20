@@ -556,7 +556,7 @@ void SpinBLEClient::removeDuplicates(NimBLEClient *pClient) {
 void SpinBLEClient::resetDevices(NimBLEClient *pClient) {
   for (auto &_BLEd : spinBLEClient.myBLEDevices) {
     if (pClient->getPeerAddress() == _BLEd.peerAddress) {
-      SS2K_LOGW(BLE_CLIENT_LOG_TAG, "Reset Client Slot: %d", i);
+       SS2K_LOGW(BLE_CLIENT_LOG_TAG, "Reset Client: %s", _BLEd.peerAddress.toString().c_str());
       _BLEd.reset();
     }
   }
