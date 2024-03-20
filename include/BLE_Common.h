@@ -52,6 +52,7 @@ class MyCallbacks : public NimBLECharacteristicCallbacks {
 
 class ss2kCustomCharacteristicCallbacks : public BLECharacteristicCallbacks {
   void onWrite(BLECharacteristic *);
+  void onSubscribe(NimBLECharacteristic* pCharacteristic, ble_gap_conn_desc* desc, uint16_t subValue);
 };
 
 class ss2kCustomCharacteristic {

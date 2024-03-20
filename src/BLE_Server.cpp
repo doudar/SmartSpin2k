@@ -288,7 +288,7 @@ void updateCyclingPowerMeasurementChar() {
       150;  // Data(18), Sep(data/2), Arrow(3), CharId(37), Sep(3), CharId(37), Sep(3),Name(8), Prefix(2), CD(10), SEP(1), PW(8), Suffix(2), Nul(1), rounded up
   char logBuf[kLogBufCapacity];
   const size_t cyclingPowerMeasurementLength = sizeof(cyclingPowerMeasurement) / sizeof(cyclingPowerMeasurement[0]);
-  logCharacteristic(logBuf, kLogBufCapacity, cyclingPowerMeasurement, cyclingPowerMeasurementLength, FITNESSMACHINESERVICE_UUID, fitnessMachineIndoorBikeData->getUUID(),
+  logCharacteristic(logBuf, kLogBufCapacity, cyclingPowerMeasurement, cyclingPowerMeasurementLength, CYCLINGPOWERSERVICE_UUID, cyclingPowerMeasurementCharacteristic->getUUID(),
                     "CPS(CPM)[ CD(%.2f) PW(%d) ]", cadence > 0 ? fmodf(cadence, 1000.0) : 0, power % 10000);
 }
 

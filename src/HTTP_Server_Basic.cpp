@@ -82,7 +82,7 @@ void startWifi() {
     // This below is to compensate for a bug in platform = espressif32 @ 6.5.0 . Hopefully it's fixed soon.
     // The Symptoms are that we cannot connect in AP mode unless .eraseAp is called. Then Station needs to get initialized and dumped again before it will connect. Dumbest thing
     // ever.
-    WiFi.eraseAP();
+    //WiFi.eraseAP();
     _staSetup();
     WiFi.disconnect(true, true);
     WiFi.mode(WIFI_MODE_NULL);

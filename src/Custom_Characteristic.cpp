@@ -45,6 +45,10 @@ void ss2kCustomCharacteristicCallbacks::onWrite(BLECharacteristic *pCharacterist
   ss2kCustomCharacteristic::process(rxValue);
 }
 
+void ss2kCustomCharacteristicCallbacks::onSubscribe(NimBLECharacteristic* pCharacteristic, ble_gap_conn_desc* desc, uint16_t subValue){
+    NimBLEDevice::setMTU(515);
+}
+
 void ss2kCustomCharacteristic::notify(char _item) {
   std::string returnValue = {cc_read, _item};
   process(returnValue);

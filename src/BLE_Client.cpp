@@ -283,21 +283,29 @@ bool SpinBLEClient::connectToServer() {
     pChr = pSvc->getCharacteristic(charUUID);
 
     if (pChr) { /** make sure it's not null */
-
+      if (pChr->canRead()) {
+        NimBLEAttValue value       = pChr->readValue();
+        const int kLogBufMaxLength = 250;
+        char logBuf[kLogBufMaxLength];
+        int logBufLength = ss2k_log_hex_to_buffer(value.data(), value.length(), logBuf, 0, kLogBufMaxLength);
+        logBufLength += snprintf(logBuf + logBufLength, kLogBufMaxLength - logBufLength, " <-initial Value");
+        SS2K_LOG(BLE_COMMON_LOG_TAG, "%s", logBuf);
+      }
       if (pChr->canNotify()) {
-        // if(!pChr->registerForNotify(notifyCB)) {
         if (!pChr->subscribe(true, onNotify)) {
           /** Disconnect if subscribe failed */
+          SS2K_LOG(BLE_CLIENT_LOG_TAG, "Notifications Failed for %s", pClient->getPeerAddress().toString().c_str());
           spinBLEClient.myBLEDevices[device_number].reset();
           pClient->deleteServices();
           NimBLEDevice::getScan()->erase(pClient->getPeerAddress());
           NimBLEDevice::deleteClient(pClient);
           return false;
         }
+        SS2K_LOG(BLE_CLIENT_LOG_TAG, "Notifications Subscribed for %s", pClient->getPeerAddress().toString().c_str());
       } else if (pChr->canIndicate()) {
         /** Send false as first argument to subscribe to indications instead of notifications */
-        // if(!pChr->registerForNotify(notifyCB, false)) {
         if (!pChr->subscribe(false, onNotify)) {
+          SS2K_LOG(BLE_CLIENT_LOG_TAG, "Indications Failed for %s", pClient->getPeerAddress().toString().c_str());
           /** Disconnect if subscribe failed */
           spinBLEClient.myBLEDevices[device_number].reset();
           pClient->deleteServices();
@@ -305,6 +313,7 @@ bool SpinBLEClient::connectToServer() {
           NimBLEDevice::deleteClient(pClient);
           return false;
         }
+        SS2K_LOG(BLE_CLIENT_LOG_TAG, "Indications Subscribed for %s", pClient->getPeerAddress().toString().c_str());
       }
       this->reconnectTries = MAX_RECONNECT_TRIES;
       SS2K_LOG(BLE_CLIENT_LOG_TAG, "Successful %s subscription.", pChr->getUUID().toString().c_str());
@@ -556,7 +565,7 @@ void SpinBLEClient::removeDuplicates(NimBLEClient *pClient) {
 void SpinBLEClient::resetDevices(NimBLEClient *pClient) {
   for (auto &_BLEd : spinBLEClient.myBLEDevices) {
     if (pClient->getPeerAddress() == _BLEd.peerAddress) {
-      SS2K_LOGW(BLE_CLIENT_LOG_TAG, "Reset Client Slot: %d", i);
+      SS2K_LOGW(BLE_CLIENT_LOG_TAG, "Reset Client: %s", _BLEd.peerAddress.toString().c_str());
       _BLEd.reset();
     }
   }
@@ -632,13 +641,13 @@ void SpinBLEClient::postConnect() {
             return;
           }
 
-          // Start Training
+          // If we would like to control an external FTMS trainer. With most spin bikes we would want this off, but it's useful if you want to use the SmartSpin2k as an appliance.
           if (userConfig->getFTMSControlPointWrite()) {
             writeCharacteristic->writeValue(FitnessMachineControlPointProcedure::RequestControl, 1);
             vTaskDelay(BLE_NOTIFY_DELAY / portTICK_PERIOD_MS);
-            writeCharacteristic->writeValue(FitnessMachineControlPointProcedure::StartOrResume, 1);
             SS2K_LOG(BLE_CLIENT_LOG_TAG, "Activated FTMS Training.");
           }
+          writeCharacteristic->writeValue(FitnessMachineControlPointProcedure::StartOrResume, 1);
           SS2K_LOG(BLE_CLIENT_LOG_TAG, "Updating Connection Params for: %s", _BLEd.peerAddress.toString().c_str());
           BLEDevice::getServer()->updateConnParams(pClient->getConnId(), 120, 120, 2, 1000);
           spinBLEClient.handleBattInfo(pClient, true);
@@ -780,15 +789,15 @@ void SpinBLEClient::keepAliveBLE_HID(NimBLEClient *pClient) {
 void SpinBLEClient::checkBLEReconnect() {
   if ((String(userConfig->getConnectedHeartMonitor()) != "none") && !(spinBLEClient.connectedHRM)) {
     this->doScan = true;
-    SS2K_LOG(BLE_CLIENT_LOG_TAG,"No HRM Connected");
+    SS2K_LOG(BLE_CLIENT_LOG_TAG, "No HRM Connected");
   }
   if ((String(userConfig->getConnectedPowerMeter()) != "none") && !(spinBLEClient.connectedPM)) {
     this->doScan = true;
-    SS2K_LOG(BLE_CLIENT_LOG_TAG,"No PM Connected");
+    SS2K_LOG(BLE_CLIENT_LOG_TAG, "No PM Connected");
   }
   if ((String(userConfig->getConnectedRemote()) != "none") && !(spinBLEClient.connectedRemote)) {
     this->doScan = true;
-    SS2K_LOG(BLE_CLIENT_LOG_TAG,"No Rem Connected");
+    SS2K_LOG(BLE_CLIENT_LOG_TAG, "No Rem Connected");
   }
 }
 
