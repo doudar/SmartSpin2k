@@ -10,7 +10,7 @@ Fusion 360 exports and generic STEP files are both provided
 - [See Shifter Assembly video linked in Wiki](https://github.com/doudar/SmartSpin2k/wiki/Building-How-To)
 
 ## Setup
-- In case you need to flip the orientation of the shifter, you can easily do so in the SmartSpin2K User Interface.  Navigate to [http://SmartSpin2K.local/](http://SmartSpin2K.local).  Here, you can toggle the Shifter Direction button until the device shifts in the right direction and save your settings.  You can verify your settings in the [Web Shifter](http://smartspin2k.local/shift.html)
+- In case you need to flip the orientation of the shifter, you can easily do so in the SmartSpin2k User Interface.  Navigate to [http://SmartSpin2k.local/](http://SmartSpin2k.local).  Here, you can toggle the Shifter Direction button until the device shifts in the right direction and save your settings.  You can verify your settings in the [Web Shifter](http://smartspin2k.local/shift.html)
 
 ## BOM
 - Momentary microswitches

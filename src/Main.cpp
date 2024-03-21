@@ -17,6 +17,7 @@
 #include "WebsocketAppender.h"
 #include "Custom_Characteristic.h"
 #include <Constants.h>
+#include "settings.h"
 
 // Stepper Motor Serial
 HardwareSerial stepperSerial(2);
