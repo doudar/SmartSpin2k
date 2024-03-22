@@ -65,8 +65,7 @@ std::string FTMSWrite = "";
 
 byte heartRateMeasurement[2] = {0x00, 0x00};
 byte cpsLocation[1]          = {0b0101};    // sensor location 5 == left crank
-byte cpFeature[1]            = {0b001000};  // crank information present // 3rd & 2nd
-                                            // byte is reported power
+byte cpFeature[1]            = {0b001100};  // crank information & wheel revolution data present
 
 // Fitness Machine
 uint8_t ftmsIndoorBikeData[11] = {0};
@@ -338,9 +337,12 @@ void updateCyclingPowerMeasurementChar() {
   // Example setting of flags and values
   cpm.flags                            = {0};  // Clear all flags initially
   cpm.flags.crankRevolutionDataPresent = 1;    // Crank Revolution Data Present
+  cpm.flags.wheelRevolutionDataPresent = 1;
   cpm.instantaneousPower               = rtConfig->watts.getValue();
   cpm.cumulativeCrankRevolutions       = spinBLEClient.cscCumulativeCrankRev;
   cpm.lastCrankEventTime               = spinBLEClient.cscLastCrankEvtTime;
+  cpm.cumulativeWheelRevolutions       = spinBLEClient.cscCumulativeWheelRev;
+  cpm.lastWheelEventTime               = spinBLEClient.cscLastWheelEvtTime;
 
   auto byteArray = cpm.toByteArray();
 
