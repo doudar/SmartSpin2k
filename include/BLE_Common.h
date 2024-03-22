@@ -52,14 +52,14 @@ class MyCallbacks : public NimBLECharacteristicCallbacks {
 
 class ss2kCustomCharacteristicCallbacks : public BLECharacteristicCallbacks {
   void onWrite(BLECharacteristic *);
-  void onSubscribe(NimBLECharacteristic* pCharacteristic, ble_gap_conn_desc* desc, uint16_t subValue);
+  void onSubscribe(NimBLECharacteristic *pCharacteristic, ble_gap_conn_desc *desc, uint16_t subValue);
 };
 
 class ss2kCustomCharacteristic {
  public:
- //Used internally for notify and onWrite Callback.
+  // Used internally for notify and onWrite Callback.
   static void process(std::string rxValue);
-  //Custom Characteristic value that needs to be notified
+  // Custom Characteristic value that needs to be notified
   static void notify(char _item);
   // Notify any changed value in userConfig
   static void parseNemit();
@@ -74,6 +74,7 @@ class SpinBLEServer {
     bool Heartrate : 1;
     bool CyclingPowerMeasurement : 1;
     bool IndoorBikeData : 1;
+    bool CyclingSpeedCadence : 1;
   } clientSubscribed;
   NimBLEServer *pServer = nullptr;
   void setClientSubscribed(NimBLEUUID pUUID, bool subscribe);
@@ -88,8 +89,10 @@ void startBLEServer();
 bool spinDown();
 void logCharacteristic(char *buffer, const size_t bufferCapacity, const byte *data, const size_t dataLength, const NimBLEUUID serviceUUID, const NimBLEUUID charUUID,
                        const char *format, ...);
+void updateWheelAndCrankRev();
 void updateIndoorBikeDataChar();
 void updateCyclingPowerMeasurementChar();
+void updateCyclingSpeedCadenceChar();
 void calculateInstPwrFromHR();
 void updateHeartRateMeasurementChar();
 int connectedClientCount();
@@ -159,18 +162,21 @@ class SpinBLEClient {
  private:
  public:  // Not all of these need to be public. This should be cleaned up
           // later.
-  boolean connectedPM       = false;
-  boolean connectedHRM      = false;
-  boolean connectedCD       = false;
-  boolean connectedCT       = false;
-  boolean connectedRemote   = false;
-  boolean doScan            = false;
-  bool dontBlockScan        = true;
-  int intentionalDisconnect = 0;
-  int noReadingIn           = 0;
-  int cscCumulativeCrankRev = 0;
-  int cscLastCrankEvtTime   = 0;
-  int reconnectTries        = MAX_RECONNECT_TRIES;
+  boolean connectedPM            = false;
+  boolean connectedHRM           = false;
+  boolean connectedCD            = false;
+  boolean connectedCT            = false;
+  boolean connectedSpeed         = false;
+  boolean connectedRemote        = false;
+  boolean doScan                 = false;
+  bool dontBlockScan             = true;
+  int intentionalDisconnect      = 0;
+  int noReadingIn                = 0;
+  long int cscCumulativeCrankRev = 0;
+  double cscLastCrankEvtTime     = 0.0;
+  long int cscCumulativeWheelRev = 0;
+  double cscLastWheelEvtTime     = 0.0;
+  int reconnectTries             = MAX_RECONNECT_TRIES;
 
   BLERemoteCharacteristic *pRemoteCharacteristic = nullptr;
 

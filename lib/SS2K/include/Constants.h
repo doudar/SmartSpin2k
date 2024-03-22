@@ -31,6 +31,7 @@
 // Cycling Power Service
 #define CSCSERVICE_UUID              NimBLEUUID((uint16_t)0x1816)
 #define CSCMEASUREMENT_UUID          NimBLEUUID((uint16_t)0x2A5B)
+#define CSCFEATURE_UUID              NimBLEUUID((uint16_t)0x2A5C)
 #define CYCLINGPOWERSERVICE_UUID     NimBLEUUID((uint16_t)0x1818)
 #define CYCLINGPOWERMEASUREMENT_UUID NimBLEUUID((uint16_t)0x2A63)
 #define CYCLINGPOWERFEATURE_UUID     NimBLEUUID((uint16_t)0x2A65)

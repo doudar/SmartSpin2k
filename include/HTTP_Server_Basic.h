@@ -18,6 +18,7 @@ class HTTP_Server {
 
   void start();
   void stop();
+  static void handleBTScanner();
   static void handleLittleFSFile();
   static void handleIndexFile();
   static void settingsProcessor();

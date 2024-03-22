@@ -888,6 +888,7 @@ void SpinBLEAdvertisedDevice::reset() {
   if (this->isHRM) spinBLEClient.connectedHRM = false;
   if (this->isPM) spinBLEClient.connectedPM = false;
   if (this->isCSC) spinBLEClient.connectedCD = false;
+  spinBLEClient.connectedSpeed = false;
 
   advertisedDevice = nullptr;
   // NimBLEAddress peerAddress;

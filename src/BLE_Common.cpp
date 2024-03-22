@@ -101,10 +101,13 @@ void BLECommunications(void *pvParameters) {
     spinBLEClient.postConnect();
 
     if (connectedClientCount() > 0 && !ss2k->isUpdating) {
+      // Setup the information
+      updateWheelAndCrankRev();
       // update the BLE information on the server
       updateIndoorBikeDataChar();
       updateCyclingPowerMeasurementChar();
       updateHeartRateMeasurementChar();
+      updateCyclingSpeedCadenceChar();
       // controlPointIndicate();
       if (spinDown()) {
         // Possibly do something in the future. Right now we just fake the spindown.

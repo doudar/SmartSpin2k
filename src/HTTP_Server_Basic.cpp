@@ -157,7 +157,7 @@ void HTTP_Server::start() {
   server.on("/shift.html", handleLittleFSFile);
   server.on("/settings.html", handleLittleFSFile);
   server.on("/status.html", handleLittleFSFile);
-  server.on("/bluetoothscanner.html", handleLittleFSFile);
+  server.on("/bluetoothscanner.html", handleBTScanner);
   server.on("/streamfit.html", handleLittleFSFile);
   server.on("/hrtowatts.html", handleLittleFSFile);
   server.on("/favicon.ico", handleLittleFSFile);
@@ -437,6 +437,11 @@ void HTTP_Server::webClientUpdate(void *pvParameters) {
 #endif  // DEBUG_STACK
     }
   }
+}
+
+void HTTP_Server::handleBTScanner(){
+  spinBLEClient.doScan = true;
+  handleLittleFSFile();
 }
 
 void HTTP_Server::handleIndexFile() {
