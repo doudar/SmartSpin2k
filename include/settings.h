@@ -7,16 +7,14 @@
 
 #pragma once
 
-#include "SS2KLog.h"
-
 // Update firmware on boot?
 #define AUTO_FIRMWARE_UPDATE true
 
 // Default Bluetooth WiFi and MDNS Name
-#define DEVICE_NAME "SmartSpin2K"
+const char * const DEVICE_NAME  = "SmartSpin2k";
 
 // Default WiFi Password
-#define DEFAULT_PASSWORD "password"
+const char * const DEFAULT_PASSWORD = "password";
 
 // default URL To get Updates From.
 // If changed you'll also need to get a root certificate from the new server
@@ -245,6 +243,10 @@
 
 // how long to try STA mode before falling back to AP mode
 #define WIFI_CONNECT_TIMEOUT 10
+
+#ifndef DEBUG_LOG_BUFFER_SIZE
+#define DEBUG_LOG_BUFFER_SIZE 600
+#endif
 
 // Max size of userconfig
 #define USERCONFIG_JSON_SIZE 1524 + DEBUG_LOG_BUFFER_SIZE

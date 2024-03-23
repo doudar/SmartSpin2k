@@ -52,26 +52,42 @@ void _staSetup() {
   WiFi.setAutoReconnect(true);
 }
 
+void _APSetup() {
+  // WiFi.eraseAP(); //Needed if we switch back to espressif32 @6.5.0
+  WiFi.mode(WIFI_AP);
+  WiFi.setHostname("reset"); // Fixes a bug when switching Arduino Core Versions
+  WiFi.softAPsetHostname("reset");
+  WiFi.setHostname(userConfig->getDeviceName());
+  WiFi.softAPsetHostname(userConfig->getDeviceName());
+  WiFi.enableAP(true);
+  vTaskDelay(500);  // Micro controller requires some time to reset the mode
+}
+
 // ********************************WIFI Setup*************************
 void startWifi() {
   int i = 0;
 
   // Trying Station mode first:
-  SS2K_LOG(HTTP_SERVER_LOG_TAG, "Connecting to: %s", userConfig->getSsid());
-  if (WiFi.SSID() != String(userConfig->getSsid())) {
+  if (strcmp(userConfig->getSsid(), DEVICE_NAME) != 0) {
+    SS2K_LOG(HTTP_SERVER_LOG_TAG, "Connecting to: %s", userConfig->getSsid());
     _staSetup();
-  }
-
-  while (WiFi.status() != WL_CONNECTED) {
-    vTaskDelay(1000 / portTICK_RATE_MS);
-    SS2K_LOG(HTTP_SERVER_LOG_TAG, "Waiting for connection to be established...");
-    i++;
-    if (i > WIFI_CONNECT_TIMEOUT || (String(userConfig->getSsid()) == DEVICE_NAME)) {
-      i = 0;
-      SS2K_LOG(HTTP_SERVER_LOG_TAG, "Couldn't Connect. Switching to AP mode");
-      break;
+    while (WiFi.status() != WL_CONNECTED) {
+      vTaskDelay(1000 / portTICK_RATE_MS);
+      SS2K_LOG(HTTP_SERVER_LOG_TAG, "Waiting for connection to be established...");
+      i++;
+      if (i > WIFI_CONNECT_TIMEOUT) {
+        i = 0;
+        SS2K_LOG(HTTP_SERVER_LOG_TAG, "Couldn't Connect. Switching to AP mode");
+        WiFi.disconnect(true, true);
+        WiFi.setAutoReconnect(false);
+        WiFi.mode(WIFI_MODE_NULL);
+        vTaskDelay(1000 / portTICK_RATE_MS);
+        break;
+      }
     }
   }
+
+  // Did we connect in STA mode?
   if (WiFi.status() == WL_CONNECTED) {
     myIP                          = WiFi.localIP();
     httpServer.internetConnection = true;
@@ -79,24 +95,10 @@ void startWifi() {
 
   // Couldn't connect to existing network, Create SoftAP
   if (WiFi.status() != WL_CONNECTED) {
-    // This below is to compensate for a bug in platform = espressif32 @ 6.5.0 . Hopefully it's fixed soon.
-    // The Symptoms are that we cannot connect in AP mode unless .eraseAp is called. Then Station needs to get initialized and dumped again before it will connect. Dumbest thing
-    // ever.
-    WiFi.eraseAP();
-    _staSetup();
-    WiFi.disconnect(true, true);
-    WiFi.mode(WIFI_MODE_NULL);
-    vTaskDelay(1000 / portTICK_RATE_MS);
-    // *********************** End of platform = espressif32 @ 6.5.0 Bug Workaround *************************
-    WiFi.mode(WIFI_AP);
-    WiFi.softAPsetHostname(userConfig->getDeviceName());
-    WiFi.setAutoReconnect(false);
-    WiFi.enableAP(true);
-    vTaskDelay(50);  // Micro controller requires some time to reset the mode
+    _APSetup();
     if (strcmp(userConfig->getSsid(), DEVICE_NAME) == 0) {
-      // If default SSID is still in use, let the user
-      // select a new password.
-      // Else Fall Back to the default password (probably "password")
+      // If default SSID is still in use, let the user select a new password.
+      // Else fall back to the default password.
       WiFi.softAP(userConfig->getDeviceName(), userConfig->getPassword());
     } else {
       WiFi.softAP(userConfig->getDeviceName(), DEFAULT_PASSWORD);
@@ -155,7 +157,7 @@ void HTTP_Server::start() {
   server.on("/shift.html", handleLittleFSFile);
   server.on("/settings.html", handleLittleFSFile);
   server.on("/status.html", handleLittleFSFile);
-  server.on("/bluetoothscanner.html", handleLittleFSFile);
+  server.on("/bluetoothscanner.html", handleBTScanner);
   server.on("/streamfit.html", handleLittleFSFile);
   server.on("/hrtowatts.html", handleLittleFSFile);
   server.on("/favicon.ico", handleLittleFSFile);
@@ -176,7 +178,7 @@ void HTTP_Server::start() {
 
   server.on("/load_defaults.html", []() {
     SS2K_LOG(HTTP_SERVER_LOG_TAG, "Setting Defaults from Web Request");
-   ss2k->resetDefaultsFlag = true;
+    ss2k->resetDefaultsFlag = true;
     String response =
         "<!DOCTYPE html><html><body><h1>Defaults have been "
         "loaded.</h1><p><br><br> Please reconnect to the device on WiFi "
@@ -435,6 +437,11 @@ void HTTP_Server::webClientUpdate(void *pvParameters) {
 #endif  // DEBUG_STACK
     }
   }
+}
+
+void HTTP_Server::handleBTScanner(){
+  spinBLEClient.doScan = true;
+  handleLittleFSFile();
 }
 
 void HTTP_Server::handleIndexFile() {

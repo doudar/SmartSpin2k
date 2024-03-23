@@ -1,4 +1,4 @@
-These are the parts that adapt your knob to the SmartSpin2K. 
+These are the parts that adapt your knob to the SmartSpin2k. 
 
 You'll see two of most of these because as we make them we've designed two slightly different sizes to accommodate 
 

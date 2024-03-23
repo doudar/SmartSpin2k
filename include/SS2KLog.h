@@ -22,10 +22,6 @@
 #define SS2K_LOG_TAG    "SS2K"
 #define LOG_HANDLER_TAG "Log_Handler"
 
-#ifndef DEBUG_LOG_BUFFER_SIZE
-#define DEBUG_LOG_BUFFER_SIZE 600
-#endif
-
 #ifndef DEBUG_FILE_CHARS_PER_LINE
 #define DEBUG_FILE_CHARS_PER_LINE 64
 #endif

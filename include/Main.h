@@ -7,13 +7,13 @@
 
 #pragma once
 
-#include "settings.h"
 #include "HTTP_Server_Basic.h"
 #include "SmartSpin_parameters.h"
 #include "BLE_Common.h"
 #include "LittleFS_Upgrade.h"
 #include "boards.h"
 #include "SensorCollector.h"
+#include "SS2KLog.h"
 
 #define MAIN_LOG_TAG "Main"
 

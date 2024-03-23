@@ -7,6 +7,29 @@
 
 #pragma once
 
+struct FitnessMachineIndoorBikeDataFlags {
+  enum Types : uint16_t {
+    MoreDataBit                 = 1U << 0,
+    AverageSpeedPresent         = 1U << 1,
+    InstantaneousCadencePresent = 1U << 2,
+    AverageCadencePresent       = 1U << 3,
+    TotalDistancePresent        = 1U << 4,
+    ResistanceLevelPresent      = 1U << 5,
+    InstantaneousPowerPresent   = 1U << 6,
+    AveragePowerPresent         = 1U << 7,
+    ExpendedEnergyPresent       = 1U << 8,
+    HeartRatePresent            = 1U << 9,
+    MetabolicEquivalentPresent  = 1U << 10,
+    ElapsedTimePresent          = 1U << 11,
+    RemainingTimePresent        = 1U << 12
+
+  };
+};
+
+inline FitnessMachineIndoorBikeDataFlags::Types operator|(FitnessMachineIndoorBikeDataFlags::Types a, FitnessMachineIndoorBikeDataFlags::Types b) {
+  return static_cast<FitnessMachineIndoorBikeDataFlags::Types>(static_cast<int>(a) | static_cast<int>(b));
+}
+
 // https://www.bluetooth.com/specifications/specs/fitness-machine-service-1-0/
 // Table 4.13: Training Status Field Definition
 struct FitnessMachineTrainingStatus {
@@ -166,4 +189,120 @@ struct FitnessMachineFeature {
 struct FtmsStatus {
   uint8_t data[8];
   int length;
+};
+
+class CyclingPowerMeasurement {
+ public:
+  // Flags definition as per specification
+  struct Flags {
+    uint16_t pedalPowerBalancePresent : 1;
+    uint16_t pedalPowerBalanceReference : 1;
+    uint16_t accumulatedTorquePresent : 1;
+    uint16_t accumulatedTorqueSource : 1;
+    uint16_t wheelRevolutionDataPresent : 1;
+    uint16_t crankRevolutionDataPresent : 1;
+    uint16_t extremeForceMagnitudesPresent : 1;
+    uint16_t extremeTorqueMagnitudesPresent : 1;
+    uint16_t extremeAnglesPresent : 1;
+    uint16_t topDeadSpotAnglePresent : 1;
+    uint16_t bottomDeadSpotAnglePresent : 1;
+    uint16_t accumulatedEnergyPresent : 1;
+    uint16_t offsetCompensationIndicator : 1;
+    uint16_t reserved : 3;
+  } flags;
+
+  // Assuming these are the possible data fields based on flags
+  int16_t instantaneousPower;  // Mandatory
+  // Other fields as optional, based on the flags
+  uint8_t pedalPowerBalance;  // Example optional field
+  uint16_t accumulatedTorque;
+  uint32_t cumulativeWheelRevolutions;
+  uint16_t lastWheelEventTime;
+  uint16_t cumulativeCrankRevolutions;
+  uint16_t lastCrankEventTime;
+
+  std::vector<uint8_t> toByteArray() {
+    std::vector<uint8_t> data;
+    // Add flags to data vector
+    data.push_back(static_cast<uint8_t>(*(reinterpret_cast<uint16_t*>(&flags)) & 0xFF));
+    data.push_back(static_cast<uint8_t>((*(reinterpret_cast<uint16_t*>(&flags)) >> 8) & 0xFF));
+
+    // Add Instantaneous Power
+    data.push_back(static_cast<uint8_t>(instantaneousPower & 0xFF));
+    data.push_back(static_cast<uint8_t>((instantaneousPower >> 8) & 0xFF));
+
+    // Conditional fields based on flags
+    if (flags.crankRevolutionDataPresent) {
+      // Add crank revolution data if present
+      data.push_back(static_cast<uint8_t>(cumulativeCrankRevolutions & 0xFF));
+      data.push_back(static_cast<uint8_t>((cumulativeCrankRevolutions >> 8) & 0xFF));
+
+      data.push_back(static_cast<uint8_t>(lastCrankEventTime & 0xFF));
+      data.push_back(static_cast<uint8_t>((lastCrankEventTime >> 8) & 0xFF));
+    }
+    // Conditional fields based on flags
+    if (flags.wheelRevolutionDataPresent) {
+      // Add wheel revolution data if present
+      data.push_back(static_cast<uint8_t>(cumulativeWheelRevolutions & 0xFF));
+      data.push_back(static_cast<uint8_t>((cumulativeWheelRevolutions >> 8) & 0xFF));
+      data.push_back(static_cast<uint8_t>((cumulativeWheelRevolutions >> 16) & 0xFF));
+      data.push_back(static_cast<uint8_t>((cumulativeWheelRevolutions >> 24) & 0xFF));
+
+      data.push_back(static_cast<uint8_t>(lastWheelEventTime & 0xFF));
+      data.push_back(static_cast<uint8_t>((lastWheelEventTime >> 8) & 0xFF));
+    }
+
+    return data;
+  }
+};
+
+class CscMeasurement {
+ public:
+  // Flags definition as per specification
+  struct Flags {
+    uint8_t wheelRevolutionDataPresent : 1;
+    uint8_t crankRevolutionDataPresent : 1;
+    uint8_t reserved : 6;
+  } flags;
+
+  // Data fields
+  uint32_t cumulativeWheelRevolutions;
+  uint16_t lastWheelEventTime;  // Resolution of 1/1024 seconds
+  uint16_t cumulativeCrankRevolutions;
+  uint16_t lastCrankEventTime;  // Resolution of 1/1024 seconds
+
+  CscMeasurement() : cumulativeWheelRevolutions(0), lastWheelEventTime(0), cumulativeCrankRevolutions(0), lastCrankEventTime(0) {
+    // Clear all flags initially
+    *(reinterpret_cast<uint8_t*>(&flags)) = 0;
+  }
+
+  std::vector<uint8_t> toByteArray() {
+    std::vector<uint8_t> data;
+
+    // Add flags to data vector
+    data.push_back(*(reinterpret_cast<uint8_t*>(&flags)));
+
+    // Conditional fields based on flags
+    if (flags.wheelRevolutionDataPresent) {
+      // Add wheel revolution data if present
+      for (int i = 0; i < 4; ++i) {
+        data.push_back((cumulativeWheelRevolutions >> (i * 8)) & 0xFF);
+      }
+      for (int i = 0; i < 2; ++i) {
+        data.push_back((lastWheelEventTime >> (i * 8)) & 0xFF);
+      }
+    }
+
+    if (flags.crankRevolutionDataPresent) {
+      // Add crank revolution data if present
+      for (int i = 0; i < 2; ++i) {
+        data.push_back((cumulativeCrankRevolutions >> (i * 8)) & 0xFF);
+      }
+      for (int i = 0; i < 2; ++i) {
+        data.push_back((lastCrankEventTime >> (i * 8)) & 0xFF);
+      }
+    }
+
+    return data;
+  }
 };

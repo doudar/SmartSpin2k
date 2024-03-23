@@ -54,6 +54,7 @@ void collectAndSet(NimBLEUUID charUUID, NimBLEUUID serviceUUID, NimBLEAddress ad
   if (sensorData->hasSpeed()) {
     float speed = sensorData->getSpeed();
     rtConfig->setSimulatedSpeed(speed);
+    spinBLEClient.connectedSpeed = true;
     logBufLength += snprintf(logBuf + logBufLength, kLogBufMaxLength - logBufLength, " SD(%.2f)", fmodf(speed, 1000.0));
   }
   if (sensorData->hasResistance()) {

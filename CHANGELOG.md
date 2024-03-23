@@ -7,7 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Added
 - Added pass through shifting in both ERG and SIM mode. 
 - Refined and added BLE custom characteristics for upcoming configuration app. 
-- 
+- Added CSC Service to BLE server.
+
 ### Changed
 - Updated communications overview picture.
 - Updated kit purchasing links. 
@@ -25,6 +26,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - BLE scans blocked during firmware upgrade.
 - Increased the default incline multiplier to 5.
 - Added more robust activity monitoring and reboot every 30 minutes if there is no activity.
+- Updated all references of SmartSkin2K to SmartSpin2k for consistency.
+- Fixed bug where BT scanner "Loading" wouldn't disappear if "NONE" and "NONE" were selected. 
 
 ### Hardware
 - added Yesoul S3.
@@ -412,7 +415,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 *1.3.21
 * SS2K BLE Server now accepts more than one simultaneous connection (you can not connect SS2K to both Zwift and another app simultaneously)
 * Echelon bike is now supported
-* SmartSpin2K.local more accessible with different browsers (fixed certain MDNS dropouts)
+* SmartSpin2k.local more accessible with different browsers (fixed certain MDNS dropouts)
 * Flywheel bike support built in (still untested)
 * Backend (client) completely revamped to allow more device decoders, better stability, and faster network speeds.
 * Lots of FTMS server and client polishing

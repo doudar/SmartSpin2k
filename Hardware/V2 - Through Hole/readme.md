@@ -1,6 +1,6 @@
 <img src="/Pictures/Version2.0.jpg" alt="Hardware 2.0"/> 
 # [Description]
-This version of SmartSpin2K is designed with DIY in mind.  The PCB can be hand soldered using readily available components.  
+This version of SmartSpin2k is designed with DIY in mind.  The PCB can be hand soldered using readily available components.  
 
 The case for V2 is available in multiple versions that are suitable for various needs.  The direct mount design is the currently recommended case design.
 

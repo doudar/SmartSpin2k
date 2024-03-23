@@ -13,6 +13,8 @@
 #include <ArduinoFake.h>
 #endif
 
+#include "settings.h"
+
 #define CONFIG_LOG_TAG "Config"
 
 class Measurement {

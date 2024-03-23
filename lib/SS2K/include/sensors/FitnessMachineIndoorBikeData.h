@@ -39,11 +39,9 @@ class FitnessMachineIndoorBikeData : public SensorData {
     InstantaneousPower   = 6,
     AveragePower         = 7,
     TotalEnergy          = 8,
-    EnergyPerHour        = 9,
+    HeartRate            = 9,
     EnergyPerMinute      = 10,
-    HeartRate            = 11,
-    MetabolicEquivalent  = 12,
-    ElapsedTime          = 13,
+    ElapsedTime          = 11,
     RemainingTime        = 14
   };
 
