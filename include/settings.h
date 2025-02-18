@@ -303,7 +303,11 @@ const char* const DEFAULT_PASSWORD = "password";
 #define MINIMUM_RELIABLE_POSITIONS 3
 
 // Limit power table size to save memory
-#define TABLE_DIVISOR 100.0
+#define TABLE_DIVISOR 10.0
+
+#define VERTICAL_NEIGHBOR_DIVISOR 150
+
+#define HORIZONTAL_NEIGHBOR_DIVISON 300
 
 // Temperature of the ESP32 at which to start reducing the power output of the stepper motor driver.
 #define THROTTLE_TEMP 90
