@@ -201,14 +201,15 @@ bool SpinBLEClient::connectToServer() {
   NimBLEUUID serviceUUID;
   NimBLEUUID charUUID;
 
-  int successful = 0;
+  int successful                         = 0;
   const NimBLEAdvertisedDevice *myDevice = nullptr;
-  int device_number = -1;
+  int device_number                      = -1;
 
   for (int i = 0; i < NUM_BLE_DEVICES; i++) {
     if (spinBLEClient.myBLEDevices[i].doConnect == true) {   // Client wants to be connected
       if (spinBLEClient.myBLEDevices[i].advertisedDevice) {  // Client is assigned
-        myDevice      = spinBLEClient.myBLEDevices[i].advertisedDevice;
+        myDevice = spinBLEClient.myBLEDevices[i].advertisedDevice;
+        SS2K_LOG(BLE_CLIENT_LOG_TAG, "Connecting slot %d", i);
         device_number = i;
         break;
       } else {
@@ -448,7 +449,7 @@ void ScanCallbacks::onResult(const NimBLEAdvertisedDevice *advertisedDevice) {
           SS2K_LOG(BLE_CLIENT_LOG_TAG, "%s%s%s%s", THIS, REMOTE, DIDNT_MATCH_THE_SAVED, userConfig->getConnectedRemote());
           return;  // Ignore this device;
         } else {
-          SS2K_LOG(BLE_CLIENT_LOG_TAG, "%s %s%s", REMOTE, NAME, MATCHED, aDevName);
+          SS2K_LOG(BLE_CLIENT_LOG_TAG, "%s %s%s%s", REMOTE, NAME, MATCHED, aDevName.c_str());
         }
       }
     } else if (advertisedDevice->getServiceUUID() == HEARTSERVICE_UUID) {
@@ -461,7 +462,7 @@ void ScanCallbacks::onResult(const NimBLEAdvertisedDevice *advertisedDevice) {
           SS2K_LOG(BLE_CLIENT_LOG_TAG, "%s%s%s%s", THIS, HRM, DIDNT_MATCH_THE_SAVED, userConfig->getConnectedHeartMonitor());
           return;  // Ignore this device;
         } else {
-          SS2K_LOG(BLE_CLIENT_LOG_TAG, "%s %s%s", HRM, NAME, MATCHED, aDevName);
+          SS2K_LOG(BLE_CLIENT_LOG_TAG, "%s %s%s%s", HRM, NAME, MATCHED, aDevName.c_str());
         }
       }
     } else {
@@ -474,7 +475,7 @@ void ScanCallbacks::onResult(const NimBLEAdvertisedDevice *advertisedDevice) {
           SS2K_LOG(BLE_CLIENT_LOG_TAG, "%s%s%s%s", THIS, PM, DIDNT_MATCH_THE_SAVED, userConfig->getConnectedPowerMeter());
           return;  // Ignore this device;
         } else {
-          SS2K_LOG(BLE_CLIENT_LOG_TAG, "%s %s%s", PM, NAME, MATCHED, aDevName);
+          SS2K_LOG(BLE_CLIENT_LOG_TAG, "%s %s%s%s", PM, NAME, MATCHED, aDevName.c_str());
         }
       }
     }
@@ -545,7 +546,7 @@ void ScanCallbacks::onScanEnd(const NimBLEScanResults &results, int reason) {
 
   String output;
   serializeJson(devices, output);
-  //SS2K_LOG(BLE_CLIENT_LOG_TAG, "Found Devices: %s", output.c_str());
+  // SS2K_LOG(BLE_CLIENT_LOG_TAG, "Found Devices: %s", output.c_str());
 #ifdef USE_TELEGRAM
   SEND_TO_TELEGRAM("Bluetooth Client Found Devices: " + output);
 #endif
