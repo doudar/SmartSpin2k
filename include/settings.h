@@ -351,7 +351,7 @@ const char* const DEFAULT_PASSWORD = "password";
 // #define DEBUG_TORQUETABLE
 
 // Uncomment to enable BLE_TX_RX Logging
-// #define DEBUG_BLE_TX_RX
+#define DEBUG_BLE_TX_RX
 
 // UNcomment to enable Custom Characteristic Logging
 // #define CUSTOM_CHAR_DEBUG

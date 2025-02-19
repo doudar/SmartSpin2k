@@ -27,7 +27,6 @@ class BLE_Fitness_Machine_Service {
   BLECharacteristic *fitnessMachinePowerRange;
   BLECharacteristic *fitnessMachineInclinationRange;
   BLECharacteristic *fitnessMachineTrainingStatus;
-  uint8_t ftmsIndoorBikeData[11] = {0};
   void processFTMSWrite();
 };
 

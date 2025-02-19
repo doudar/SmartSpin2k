@@ -15,8 +15,9 @@ class BLE_Heart_Service {
   BLE_Heart_Service();
   void setupService(NimBLEServer *pServer, MyCharacteristicCallbacks *chrCallbacks);
   void update();
+  void deinit();
 
  private:
-BLEService *pHeartService;
-BLECharacteristic *heartRateMeasurementCharacteristic;
+  NimBLEService *pHeartService;
+  NimBLECharacteristic *heartRateMeasurementCharacteristic;
 };
