@@ -36,9 +36,9 @@ void collectAndSet(NimBLEUUID charUUID, NimBLEUUID serviceUUID, NimBLEAddress ad
       zeroCount = 0;
     }else{
       //require 10 readings in a row before setting the HR to 0
+      logBufLength += snprintf(logBuf + logBufLength, kLogBufMaxLength - logBufLength, " HR IGNORED");
       if (zeroCount > 10){
         rtConfig->hr.setValue(0);
-        logBufLength += snprintf(logBuf + logBufLength, kLogBufMaxLength - logBufLength, " HR IGNORED", 0);
         spinBLEClient.connectedHRM = false;
         zeroCount = 0;
       }
