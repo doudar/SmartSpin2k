@@ -420,7 +420,7 @@ void MyClientCallback::onAuthenticationComplete(NimBLEConnInfo &connInfo) {
  * - If the device does not match the user configuration, it ignores the device.
  */
 void ScanCallbacks::onResult(const NimBLEAdvertisedDevice *advertisedDevice) {
-  Serial.printf("Advertised Device found: %s\n", advertisedDevice->toString().c_str());
+  //Serial.printf("Advertised Device found: %s\n", advertisedDevice->toString().c_str());
   // Define granular constants for maximal reuse during logging
   const char *const MATCHED               = "Matched ";
   const char *const DIDNT_MATCH_THE_SAVED = " didn't match the saved: ";
