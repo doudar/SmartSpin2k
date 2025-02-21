@@ -24,6 +24,7 @@ void PowerBuffer::set(int i) {
 }
 
 void PowerBuffer::reset() {
+  SS2K_LOG(POWERTABLE_LOG_TAG, "Power Table Reset");
   for (int i = 0; i < POWER_SAMPLES; i++) {
     this->powerEntry[i].readings       = 0;
     this->powerEntry[i].cad            = 0;
@@ -667,6 +668,7 @@ int PowerTable::getNumEntries() {
 }
 
 void PowerTable::clean() {
+  SS2K_LOG(POWERTABLE_LOG_TAG, "Clean Power Table");
   int ret = 0;
   for (int i = 0; i < POWERTABLE_CAD_SIZE; i++) {
     for (int j = 0; j < POWERTABLE_WATT_SIZE; j++) {
@@ -764,15 +766,18 @@ void PowerTable::newEntry(PowerBuffer& powerBuffer) {
       if (testResults.leftNeighbor.i == k &&
           (testResults.leftNeighbor.targetPosition <= targetPosition + HORIZONTAL_NEIGHBOR_RANGE &&
            testResults.leftNeighbor.targetPosition >= targetPosition)) {  // check if the cadence is the same and positions are within a set range in this case its 30.
-        SS2K_LOG(POWERTABLE_LOG_TAG, "Cadence is the same and targetPosition is within range");
 
         int avgPosition = (targetPosition + testResults.leftNeighbor.targetPosition) / 2;  // calculate the average
-        SS2K_LOG(POWERTABLE_LOG_TAG, "Avg position: %d", avgPosition);
+        SS2K_LOG(POWERTABLE_LOG_TAG, "Left failed at: (%d) Target pos: (%f) Avg pos: (%d)", testResults.leftNeighbor.targetPosition, targetPosition, avgPosition);
+         
 
         if (this->testNeighbors(testResults.leftNeighbor.i, testResults.leftNeighbor.j, targetPosition).allNeighborsPassed) {  // check if the current position moved left is valid
           SS2K_LOG(POWERTABLE_LOG_TAG, "Current Position moved left was valid! Current position: %f", targetPosition);
           if(this->tableRow[testResults.leftNeighbor.i].tableEntry[testResults.leftNeighbor.j].readings < 10){
             this->enterData(testResults.leftNeighbor.i, testResults.leftNeighbor.j, targetPosition);  // enter the data
+          }else {
+            SS2K_LOG(POWERTABLE_LOG_TAG, "Neighbor reading = 0"); 
+            this->tableRow[testResults.leftNeighbor.i].tableEntry[testResults.leftNeighbor.j].readings = 0; 
           }
         } 
         // else {
@@ -786,6 +791,9 @@ void PowerTable::newEntry(PowerBuffer& powerBuffer) {
           SS2K_LOG(POWERTABLE_LOG_TAG, "Avg postion is valid with current cadence and watts! Avg position: %d", avgPosition);
           if(this->tableRow[k].tableEntry[i].readings < 10){
             this->enterData(k, i, avgPosition);
+          }else {
+            SS2K_LOG(POWERTABLE_LOG_TAG, "Neighbor reading = 0"); 
+            this->tableRow[k].tableEntry[i].readings = 0; 
           }
         } 
         // else { 
@@ -800,7 +808,10 @@ void PowerTable::newEntry(PowerBuffer& powerBuffer) {
                    testResults.leftNeighbor.targetPosition);
                    if(this->tableRow[testResults.rightNeighbor.i].tableEntry[testResults.rightNeighbor.j].readings < 10){
                     this->enterData(testResults.rightNeighbor.i, testResults.rightNeighbor.j, testResults.leftNeighbor.targetPosition);
-                   }
+                   }else {
+                    SS2K_LOG(POWERTABLE_LOG_TAG, "Neighbor reading = 0"); 
+                    this->tableRow[testResults.rightNeighbor.i].tableEntry[testResults.rightNeighbor.j].readings = 0; 
+                  }
 
         } 
         // else { 
@@ -814,10 +825,16 @@ void PowerTable::newEntry(PowerBuffer& powerBuffer) {
         (this->testNeighbors(k, i, avgPosition).allNeighborsPassed) ||
         (this->testNeighbors(testResults.rightNeighbor.i, testResults.rightNeighbor.j, testResults.leftNeighbor.targetPosition).allNeighborsPassed)))
         {
-          this->downVoteData(testResults.leftNeighbor.i, testResults.leftNeighbor.j, targetPosition, testResults.leftNeighbor.targetPosition); 
+          SS2K_LOG(POWERTABLE_LOG_TAG, "PT failed left (%d)(%d)(%d), readings (%d)", testResults.leftNeighbor.i, testResults.leftNeighbor.j,
+            testResults.leftNeighbor.targetPosition, this->tableRow[testResults.leftNeighbor.i].tableEntry[testResults.leftNeighbor.j].readings);
+          this->tableRow[testResults.leftNeighbor.i].tableEntry[testResults.leftNeighbor.j].readings--; 
+          //this->downVoteData(testResults.leftNeighbor.i, testResults.leftNeighbor.j, targetPosition, testResults.leftNeighbor.targetPosition); 
         }
       } else {
-        this->downVoteData(testResults.leftNeighbor.i, testResults.leftNeighbor.j, targetPosition, testResults.leftNeighbor.targetPosition); 
+        SS2K_LOG(POWERTABLE_LOG_TAG, "PT failed left (%d)(%d)(%d), readings (%d)", testResults.leftNeighbor.i, testResults.leftNeighbor.j,
+          testResults.leftNeighbor.targetPosition, this->tableRow[testResults.leftNeighbor.i].tableEntry[testResults.leftNeighbor.j].readings);
+        this->tableRow[testResults.leftNeighbor.i].tableEntry[testResults.leftNeighbor.j].readings--; 
+        //this->downVoteData(testResults.leftNeighbor.i, testResults.leftNeighbor.j, targetPosition, testResults.leftNeighbor.targetPosition); 
       }
     }
 
@@ -825,12 +842,16 @@ void PowerTable::newEntry(PowerBuffer& powerBuffer) {
       if (testResults.rightNeighbor.i == k && (testResults.rightNeighbor.targetPosition >= targetPosition - VERTICAL_NEIGHBOR_RANGE
          && testResults.rightNeighbor.targetPosition <= targetPosition)) {
         int avgPosition = (targetPosition + testResults.rightNeighbor.targetPosition) / 2;
-        SS2K_LOG(POWERTABLE_LOG_TAG, "Avg position: %d", avgPosition);
+        SS2K_LOG(POWERTABLE_LOG_TAG, "Right failed at: (%d) Target pos: (%f) Avg pos: (%d)", testResults.rightNeighbor.targetPosition, targetPosition, avgPosition);
+         
 
         if (this->testNeighbors(testResults.rightNeighbor.i, testResults.rightNeighbor.j, targetPosition).allNeighborsPassed) {
           SS2K_LOG(POWERTABLE_LOG_TAG, "Current Position moved right was valid! Current position: %f", targetPosition);
           if(this->tableRow[testResults.rightNeighbor.i].tableEntry[testResults.rightNeighbor.j].readings < 10){
             this->enterData(testResults.rightNeighbor.i, testResults.rightNeighbor.j, targetPosition);
+          }else {
+            SS2K_LOG(POWERTABLE_LOG_TAG, "Neighbor reading = 0"); 
+            this->tableRow[testResults.rightNeighbor.i].tableEntry[testResults.rightNeighbor.j].readings = 0; 
           }
         } 
         // else {
@@ -843,6 +864,9 @@ void PowerTable::newEntry(PowerBuffer& powerBuffer) {
           SS2K_LOG(POWERTABLE_LOG_TAG, "Avg postion is valid with current cadence and watts! Avg position: %d", avgPosition);
           if(this->tableRow[k].tableEntry[i].readings < 10){
             this->enterData(k, i, avgPosition);
+          }else {
+            SS2K_LOG(POWERTABLE_LOG_TAG, "Neighbor reading = 0"); 
+            this->tableRow[k].tableEntry[i].readings = 0; 
           }
         } 
         // else {
@@ -856,7 +880,10 @@ void PowerTable::newEntry(PowerBuffer& powerBuffer) {
                    testResults.rightNeighbor.targetPosition);
                    if(this->tableRow[testResults.leftNeighbor.i].tableEntry[testResults.leftNeighbor.j].readings < 10){
                     this->enterData(testResults.leftNeighbor.i, testResults.leftNeighbor.j, testResults.rightNeighbor.targetPosition);
-                   }
+                   } else {
+                    SS2K_LOG(POWERTABLE_LOG_TAG, "Neighbor reading = 0"); 
+                    this->tableRow[testResults.leftNeighbor.i].tableEntry[testResults.leftNeighbor.j].readings = 0; 
+                  }
         } 
         // else {
         //   if(this->tableRow[testResults.leftNeighbor.i].tableEntry[testResults.leftNeighbor.j].readings != 0){
@@ -869,10 +896,16 @@ void PowerTable::newEntry(PowerBuffer& powerBuffer) {
         (this->testNeighbors(k, i, avgPosition).allNeighborsPassed) || 
         (this->testNeighbors(testResults.leftNeighbor.i, testResults.leftNeighbor.j, testResults.rightNeighbor.targetPosition).allNeighborsPassed)))
         {
-          this->downVoteData(testResults.rightNeighbor.i, testResults.rightNeighbor.j, targetPosition, testResults.rightNeighbor.targetPosition); 
+          SS2K_LOG(POWERTABLE_LOG_TAG, "PT failed right (%d)(%d)(%d), readings (%d)", testResults.rightNeighbor.i, testResults.rightNeighbor.j,
+            testResults.rightNeighbor.targetPosition, this->tableRow[testResults.rightNeighbor.i].tableEntry[testResults.rightNeighbor.j].readings);
+          this->tableRow[testResults.rightNeighbor.i].tableEntry[testResults.rightNeighbor.j].readings--; 
+          //this->downVoteData(testResults.rightNeighbor.i, testResults.rightNeighbor.j, targetPosition, testResults.rightNeighbor.targetPosition); 
         }
       } else {
-        this->downVoteData(testResults.rightNeighbor.i, testResults.rightNeighbor.j, targetPosition, testResults.rightNeighbor.targetPosition); 
+        SS2K_LOG(POWERTABLE_LOG_TAG, "PT failed right (%d)(%d)(%d), readings (%d)", testResults.rightNeighbor.i, testResults.rightNeighbor.j,
+            testResults.rightNeighbor.targetPosition, this->tableRow[testResults.rightNeighbor.i].tableEntry[testResults.rightNeighbor.j].readings);
+        this->tableRow[testResults.rightNeighbor.i].tableEntry[testResults.rightNeighbor.j].readings--; 
+        //this->downVoteData(testResults.rightNeighbor.i, testResults.rightNeighbor.j, targetPosition, testResults.rightNeighbor.targetPosition); 
       }
     }
 
@@ -880,12 +913,16 @@ void PowerTable::newEntry(PowerBuffer& powerBuffer) {
       if (testResults.topNeighbor.j == i && (testResults.topNeighbor.targetPosition >= targetPosition - VERTICAL_NEIGHBOR_RANGE
          && testResults.topNeighbor.targetPosition <= targetPosition)) {
         int avgPosition = (targetPosition + testResults.topNeighbor.targetPosition) / 2;
-        SS2K_LOG(POWERTABLE_LOG_TAG, "Avg position: %d", avgPosition);
+        SS2K_LOG(POWERTABLE_LOG_TAG, "Top failed at: (%d) Target pos: (%f) Avg pos: (%d)", testResults.topNeighbor.targetPosition, targetPosition, avgPosition);
+         
 
         if (this->testNeighbors(testResults.topNeighbor.i, testResults.topNeighbor.j, targetPosition).allNeighborsPassed) {
           SS2K_LOG(POWERTABLE_LOG_TAG, "Current Position moved up was valid! Current position: %f", targetPosition);
           if(this->tableRow[testResults.topNeighbor.i].tableEntry[testResults.topNeighbor.j].readings < 10){
             this->enterData(testResults.topNeighbor.i, testResults.topNeighbor.j, targetPosition);
+          } else {
+            SS2K_LOG(POWERTABLE_LOG_TAG, "Neighbor reading = 0"); 
+            this->tableRow[testResults.topNeighbor.i].tableEntry[testResults.topNeighbor.j].readings = 0; 
           }
         } 
         // else {
@@ -898,6 +935,9 @@ void PowerTable::newEntry(PowerBuffer& powerBuffer) {
           SS2K_LOG(POWERTABLE_LOG_TAG, "Avg postion is valid with current cadence and watts! Avg position: %d", avgPosition);
           if(this->tableRow[k].tableEntry[i].readings < 10){
             this->enterData(k, i, avgPosition);
+          } else {
+            SS2K_LOG(POWERTABLE_LOG_TAG, "Neighbor reading = 0"); 
+            this->tableRow[k].tableEntry[i].readings = 0; 
           }
         }
         //  else {
@@ -911,7 +951,10 @@ void PowerTable::newEntry(PowerBuffer& powerBuffer) {
                    testResults.topNeighbor.targetPosition);
                    if(this->tableRow[testResults.bottomNeighbor.i].tableEntry[testResults.bottomNeighbor.j].readings < 10){
                     this->enterData(testResults.bottomNeighbor.i, testResults.bottomNeighbor.j, testResults.topNeighbor.targetPosition);
-                   }
+                   }else {
+                    SS2K_LOG(POWERTABLE_LOG_TAG, "Neighbor reading = 0"); 
+                    this->tableRow[testResults.bottomNeighbor.i].tableEntry[testResults.bottomNeighbor.j].readings = 0; 
+                  }
         }
         //  else {
         //   if(this->tableRow[testResults.bottomNeighbor.i].tableEntry[testResults.bottomNeighbor.j].readings != 0){
@@ -924,10 +967,16 @@ void PowerTable::newEntry(PowerBuffer& powerBuffer) {
         (this->testNeighbors(k, i, avgPosition).allNeighborsPassed) || 
         (this->testNeighbors(testResults.bottomNeighbor.i, testResults.bottomNeighbor.j, testResults.topNeighbor.targetPosition).allNeighborsPassed)))
         {
-          this->downVoteData(testResults.topNeighbor.i, testResults.topNeighbor.j, targetPosition, testResults.topNeighbor.targetPosition);
+          SS2K_LOG(POWERTABLE_LOG_TAG, "PT failed top (%d)(%d)(%d), readings (%d)", testResults.topNeighbor.i, testResults.topNeighbor.j,
+            testResults.topNeighbor.targetPosition, this->tableRow[testResults.topNeighbor.i].tableEntry[testResults.topNeighbor.j].readings);
+          this->tableRow[testResults.topNeighbor.i].tableEntry[testResults.topNeighbor.j].readings--; 
+          //this->downVoteData(testResults.topNeighbor.i, testResults.topNeighbor.j, targetPosition, testResults.topNeighbor.targetPosition);
         }
       } else {
-        this->downVoteData(testResults.topNeighbor.i, testResults.topNeighbor.j, targetPosition, testResults.topNeighbor.targetPosition); 
+        SS2K_LOG(POWERTABLE_LOG_TAG, "PT failed top (%d)(%d)(%d), readings (%d)", testResults.topNeighbor.i, testResults.topNeighbor.j,
+            testResults.topNeighbor.targetPosition, this->tableRow[testResults.topNeighbor.i].tableEntry[testResults.topNeighbor.j].readings);
+        this->tableRow[testResults.topNeighbor.i].tableEntry[testResults.topNeighbor.j].readings--; 
+        //this->downVoteData(testResults.topNeighbor.i, testResults.topNeighbor.j, targetPosition, testResults.topNeighbor.targetPosition); 
       }
     }
 
@@ -935,12 +984,16 @@ void PowerTable::newEntry(PowerBuffer& powerBuffer) {
       if (testResults.bottomNeighbor.j == i && (testResults.bottomNeighbor.targetPosition <= targetPosition + HORIZONTAL_NEIGHBOR_RANGE && 
         testResults.bottomNeighbor.targetPosition >= targetPosition)) {
         int avgPosition = (targetPosition + testResults.bottomNeighbor.targetPosition) / 2;
-        SS2K_LOG(POWERTABLE_LOG_TAG, "Avg position: %d", avgPosition);
+        SS2K_LOG(POWERTABLE_LOG_TAG, "Bottom failed at: (%d) Target pos: (%f) Avg pos: (%d)", testResults.bottomNeighbor.targetPosition, targetPosition, avgPosition);
+         
 
         if (this->testNeighbors(testResults.bottomNeighbor.i, testResults.bottomNeighbor.j, targetPosition).allNeighborsPassed) {
           SS2K_LOG(POWERTABLE_LOG_TAG, "Current Position moved up was valid! Current position: %f", targetPosition);
           if(this->tableRow[testResults.bottomNeighbor.i].tableEntry[testResults.bottomNeighbor.j].readings < 10){
             this->enterData(testResults.bottomNeighbor.i, testResults.bottomNeighbor.j, targetPosition);
+          } else {
+            SS2K_LOG(POWERTABLE_LOG_TAG, "Neighbor reading = 0"); 
+            this->tableRow[testResults.bottomNeighbor.i].tableEntry[testResults.bottomNeighbor.j].readings = 0; 
           }
         } 
         // else {
@@ -953,6 +1006,9 @@ void PowerTable::newEntry(PowerBuffer& powerBuffer) {
           SS2K_LOG(POWERTABLE_LOG_TAG, "Avg postion is valid with current cadence and watts! Avg position: %d", avgPosition);
           if(this->tableRow[k].tableEntry[i].readings < 10){
             this->enterData(k, i, avgPosition);
+          } else {
+            SS2K_LOG(POWERTABLE_LOG_TAG, "Neighbor reading = 0"); 
+            this->tableRow[k].tableEntry[i].readings = 0; 
           }
         } 
         // else {
@@ -966,7 +1022,10 @@ void PowerTable::newEntry(PowerBuffer& powerBuffer) {
                    testResults.topNeighbor.targetPosition);
                    if(this->tableRow[testResults.topNeighbor.i].tableEntry[testResults.topNeighbor.j].readings < 10){
                     this->enterData(testResults.topNeighbor.i, testResults.topNeighbor.j, testResults.bottomNeighbor.targetPosition);
-                   }
+                   } else {
+                    SS2K_LOG(POWERTABLE_LOG_TAG, "Neighbor reading = 0"); 
+                    this->tableRow[testResults.topNeighbor.i].tableEntry[testResults.topNeighbor.j].readings = 0; 
+                  }
         } 
         // else {
         //   if(this->tableRow[testResults.topNeighbor.i].tableEntry[testResults.topNeighbor.j].readings != 0){
@@ -979,10 +1038,16 @@ void PowerTable::newEntry(PowerBuffer& powerBuffer) {
         (this->testNeighbors(k, i, avgPosition).allNeighborsPassed) ||
         (this->testNeighbors(testResults.topNeighbor.i, testResults.topNeighbor.j, testResults.bottomNeighbor.targetPosition).allNeighborsPassed)))
         {
-          this->downVoteData(testResults.bottomNeighbor.i, testResults.bottomNeighbor.j, targetPosition, testResults.bottomNeighbor.targetPosition);
+          SS2K_LOG(POWERTABLE_LOG_TAG, "PT failed bottom (%d)(%d)(%d), readings (%d)", testResults.topNeighbor.i, testResults.topNeighbor.j,
+            testResults.topNeighbor.targetPosition, this->tableRow[testResults.topNeighbor.i].tableEntry[testResults.topNeighbor.j].readings);
+          this->tableRow[testResults.bottomNeighbor.i].tableEntry[testResults.bottomNeighbor.j].readings--; 
+          //this->downVoteData(testResults.bottomNeighbor.i, testResults.bottomNeighbor.j, targetPosition, testResults.bottomNeighbor.targetPosition);
         }
       } else {
-        this->downVoteData(testResults.bottomNeighbor.i, testResults.bottomNeighbor.j, targetPosition, testResults.bottomNeighbor.targetPosition);
+        SS2K_LOG(POWERTABLE_LOG_TAG, "PT failed bottom (%d)(%d)(%d), readings (%d)", testResults.bottomNeighbor.i, testResults.bottomNeighbor.j,
+          testResults.bottomNeighbor.targetPosition, this->tableRow[testResults.bottomNeighbor.i].tableEntry[testResults.bottomNeighbor.j].readings);
+        this->tableRow[testResults.bottomNeighbor.i].tableEntry[testResults.bottomNeighbor.j].readings--; 
+        //this->downVoteData(testResults.bottomNeighbor.i, testResults.bottomNeighbor.j, targetPosition, testResults.bottomNeighbor.targetPosition);
       }
     }
     return;
