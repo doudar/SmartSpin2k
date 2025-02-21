@@ -308,7 +308,7 @@ const char* const DEFAULT_PASSWORD = "password";
 //Max distance a failed neighbor can be horizontally from target position
 #define HORIZONTAL_NEIGHBOR_RANGE 20
 
-//Max distance a failed neighbr can be vertically from target position
+//Max distance a failed neighbor can be vertically from target position
 #define VERTICAL_NEIGHBOR_RANGE 10
 
 // Temperature of the ESP32 at which to start reducing the power output of the stepper motor driver.
