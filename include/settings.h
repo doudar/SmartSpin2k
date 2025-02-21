@@ -353,11 +353,11 @@ const char* const DEFAULT_PASSWORD = "password";
 // Calculation. Never sets userConfig->setSimulatedPower();
 // #define DEBUG_HR_TO_PWR
 
-// Uncomment to enable HR->PWR enhanced torquetable debugging.
-// #define DEBUG_TORQUETABLE
+// Uncomment to enable power table logging.
+#define DEBUG_POWERTABLE
 
 // Uncomment to enable BLE_TX_RX Logging
-#define DEBUG_BLE_TX_RX
+// #define DEBUG_BLE_TX_RX
 
 // UNcomment to enable Custom Characteristic Logging
 // #define CUSTOM_CHAR_DEBUG

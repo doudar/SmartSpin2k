@@ -1305,6 +1305,7 @@ bool PowerTable::reset() {
 }
 
 void PowerTable::toLog() {
+  #ifdef DEBUG_POWERTABLE
   int maxLen = 4;
   // Find the longest integer to dynamically size the table
   for (int i = 0; i < POWERTABLE_CAD_SIZE; i++) {
@@ -1342,6 +1343,7 @@ void PowerTable::toLog() {
     }
     SS2K_LOG(POWERTABLE_LOG_TAG, "%s", logString.c_str());
   }
+  #endif
 }
 
 int PowerTable::getNumReadings() {
