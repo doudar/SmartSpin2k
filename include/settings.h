@@ -305,8 +305,10 @@ const char* const DEFAULT_PASSWORD = "password";
 // Limit power table size to save memory
 #define TABLE_DIVISOR 100.0
 
+#define PT_READING_RANGE 15
+
 //Max distance a failed neighbor can be horizontally from target position
-#define HORIZONTAL_NEIGHBOR_RANGE 30
+#define HORIZONTAL_NEIGHBOR_RANGE 60
 
 //Max distance a failed neighbr can be vertically from target position
 #define VERTICAL_NEIGHBOR_RANGE 10
