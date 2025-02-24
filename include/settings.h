@@ -308,7 +308,7 @@ const char* const DEFAULT_PASSWORD = "password";
 #define PT_READING_RANGE 15
 
 //Max distance a failed neighbor can be horizontally from target position
-#define HORIZONTAL_NEIGHBOR_RANGE 60
+#define HORIZONTAL_NEIGHBOR_RANGE 30
 
 //Max distance a failed neighbr can be vertically from target position
 #define VERTICAL_NEIGHBOR_RANGE 10
