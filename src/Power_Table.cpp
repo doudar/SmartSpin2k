@@ -15,6 +15,7 @@
 #include <limits>
 #include <numeric>
 #include <unordered_map>
+#include <algorithm>
 
 void PowerBuffer::set(int i) {
   this->powerEntry[i].readings++;
@@ -360,56 +361,56 @@ double polynomialInterpolation(const std::vector<std::pair<double, double>>& dat
   return result;
 }
 
-void PowerTable::fillTable() {
-  for (int i = 0; i < POWERTABLE_CAD_SIZE; ++i) {
-      for (int j = 0; j < POWERTABLE_WATT_SIZE; ++j) {
-          if (this->tableRow[i].tableEntry[j].targetPosition == INT16_MIN) {
-              std::vector<std::pair<double, double>> data;
+// void PowerTable::fillTable() {
+//   for (int i = 0; i < POWERTABLE_CAD_SIZE; ++i) {
+//       for (int j = 0; j < POWERTABLE_WATT_SIZE; ++j) {
+//           if (this->tableRow[i].tableEntry[j].targetPosition == INT16_MIN) {
+//               std::vector<std::pair<double, double>> data;
 
-              // Gather data points for interpolation (horizontal)
-              for (int k = 0; k < POWERTABLE_WATT_SIZE; ++k) {
-                  if (this->tableRow[i].tableEntry[k].targetPosition != INT16_MIN) {
-                      data.push_back({static_cast<double>(k * 30), static_cast<double>(this->tableRow[i].tableEntry[k].targetPosition)}); // Power values are multiples of 30
-                  }
-              }
+//               // Gather data points for interpolation (horizontal)
+//               for (int k = 0; k < POWERTABLE_WATT_SIZE; ++k) {
+//                   if (this->tableRow[i].tableEntry[k].targetPosition != INT16_MIN) {
+//                       data.push_back({static_cast<double>(k * 30), static_cast<double>(this->tableRow[i].tableEntry[k].targetPosition)}); // Power values are multiples of 30
+//                   }
+//               }
 
-              if (!data.empty()) {
-                  double power = j * 30; // Power value for the current cell
-                  double interpValue = polynomialInterpolation(data, power);
+//               if (!data.empty()) {
+//                   double power = j * 30; // Power value for the current cell
+//                   double interpValue = polynomialInterpolation(data, power);
 
-                  if (!std::isnan(interpValue) && this->testNeighbors(i, j, static_cast<int>(round(interpValue))).allNeighborsPassed) {
-                      this->tableRow[i].tableEntry[j].targetPosition = static_cast<int>(round(interpValue));
-                  }
-              }
-          }
-      }
-  }
+//                   if (!std::isnan(interpValue) && this->testNeighbors(i, j, static_cast<int>(round(interpValue))).allNeighborsPassed) {
+//                       this->tableRow[i].tableEntry[j].targetPosition = static_cast<int>(round(interpValue));
+//                   }
+//               }
+//           }
+//       }
+//   }
 
-  // Vertical Interpolation (similar structure)
-  for (int j = 0; j < POWERTABLE_WATT_SIZE; ++j) {
-      for (int i = 0; i < POWERTABLE_CAD_SIZE; ++i) {
-          if (this->tableRow[i].tableEntry[j].targetPosition == INT16_MIN) {
-              std::vector<std::pair<double, double>> data;
+//   // Vertical Interpolation (similar structure)
+//   for (int j = 0; j < POWERTABLE_WATT_SIZE; ++j) {
+//       for (int i = 0; i < POWERTABLE_CAD_SIZE; ++i) {
+//           if (this->tableRow[i].tableEntry[j].targetPosition == INT16_MIN) {
+//               std::vector<std::pair<double, double>> data;
 
-              // Gather data points for interpolation (vertical)
-              for (int k = 0; k < POWERTABLE_CAD_SIZE; ++k) {
-                  if (this->tableRow[k].tableEntry[j].targetPosition != INT16_MIN) {
-                      data.push_back({static_cast<double>(k), static_cast<double>(this->tableRow[k].tableEntry[j].targetPosition)});
-                  }
-              }
+//               // Gather data points for interpolation (vertical)
+//               for (int k = 0; k < POWERTABLE_CAD_SIZE; ++k) {
+//                   if (this->tableRow[k].tableEntry[j].targetPosition != INT16_MIN) {
+//                       data.push_back({static_cast<double>(k), static_cast<double>(this->tableRow[k].tableEntry[j].targetPosition)});
+//                   }
+//               }
 
-              if (!data.empty()) {
-                  double cadence = i;
-                  double interpValue = polynomialInterpolation(data, cadence);
+//               if (!data.empty()) {
+//                   double cadence = i;
+//                   double interpValue = polynomialInterpolation(data, cadence);
 
-                  if (!std::isnan(interpValue) && this->testNeighbors(i, j, static_cast<int>(round(interpValue))).allNeighborsPassed) {
-                      this->tableRow[i].tableEntry[j].targetPosition = static_cast<int>(round(interpValue));
-                  }
-              }
-          }
-      }
-  }
-}
+//                   if (!std::isnan(interpValue) && this->testNeighbors(i, j, static_cast<int>(round(interpValue))).allNeighborsPassed) {
+//                       this->tableRow[i].tableEntry[j].targetPosition = static_cast<int>(round(interpValue));
+//                   }
+//               }
+//           }
+//       }
+//   }
+// }
 
 
 void PowerTable::extrapFillTable() {
@@ -462,6 +463,107 @@ void PowerTable::extrapFillTable() {
       }
   }
 }
+
+struct SplineCoefficients {
+  std::vector<double> a, b, c, d, x;
+};
+
+SplineCoefficients computeCubicSpline(const std::vector<double>& x, const std::vector<double>& y) {
+  int n = x.size() - 1;
+  std::vector<double> interval_widths(n), alpha(n), l(n + 1), mu(n), z(n + 1);
+  std::vector<double> a(y), b(n), c(n + 1), d(n);
+
+  for (int i = 0; i < n; ++i) {
+      interval_widths[i] = x[i + 1] - x[i];
+  }
+
+  for (int i = 1; i < n; ++i) {
+      alpha[i] = (3.0 / interval_widths[i]) * (y[i + 1] - y[i]) - (3.0 / interval_widths[i - 1]) * (y[i] - y[i - 1]);
+  }
+
+  l[0] = 1.0;
+  mu[0] = z[0] = 0.0;
+
+  for (int i = 1; i < n; ++i) {
+      l[i] = 2.0 * (x[i + 1] - x[i - 1]) - interval_widths[i - 1] * mu[i - 1];
+      mu[i] = interval_widths[i] / l[i];
+      z[i] = (alpha[i] - interval_widths[i - 1] * z[i - 1]) / l[i];
+  }
+
+  l[n] = 1.0;
+  z[n] = c[n] = 0.0;
+
+  for (int j = n - 1; j >= 0; --j) {
+      c[j] = z[j] - mu[j] * c[j + 1];
+      b[j] = (y[j + 1] - y[j]) / interval_widths[j] - interval_widths[j] * (c[j + 1] + 2.0 * c[j]) / 3.0;
+      d[j] = (c[j + 1] - c[j]) / (3.0 * interval_widths[j]);
+  }
+
+  return {a, b, c, d, x};
+}
+
+double interpolateCubicSpline(const SplineCoefficients& spline, double x_val) {
+  int n = spline.x.size() - 1;
+
+  // Binary search to find the correct interval
+  auto it = std::lower_bound(spline.x.begin(), spline.x.end(), x_val);
+  int i = std::distance(spline.x.begin(), it);
+  if (i > 0) {
+      i--;
+  } else if (i == n) {
+      i--; // Handle the case where x_val is equal to the last x
+  }
+
+
+  double dx = x_val - spline.x[i];
+  return spline.a[i] + spline.b[i] * dx + spline.c[i] * dx * dx + spline.d[i] * dx * dx * dx;
+}
+
+void PowerTable::fillTable() {
+
+  for (int i = 0; i < POWERTABLE_CAD_SIZE; ++i) {
+      std::vector<double> x_vals, y_vals;
+      for (int j = 0; j < POWERTABLE_WATT_SIZE; ++j) {
+          if (this->tableRow[i].tableEntry[j].targetPosition != INT16_MIN) {
+              x_vals.push_back(j);
+              y_vals.push_back(this->tableRow[i].tableEntry[j].targetPosition);
+          }
+      }
+      if (x_vals.size() > 1) {
+          SplineCoefficients spline = computeCubicSpline(x_vals, y_vals);
+          for (int j = 0; j < POWERTABLE_WATT_SIZE; ++j) {
+              if (this->tableRow[i].tableEntry[j].targetPosition == INT16_MIN) {
+                  double interpolated_value = interpolateCubicSpline(spline, j);
+                  if (this->testNeighbors(i, j, static_cast<int>(std::round(interpolated_value))).allNeighborsPassed) {
+                      this->tableRow[i].tableEntry[j].targetPosition = static_cast<int16_t>(std::round(interpolated_value));
+                  }
+              }
+          }
+      }
+  }
+
+  for (int j = 0; j < POWERTABLE_WATT_SIZE; ++j) {
+      std::vector<double> x_vals, y_vals;
+      for (int i = 0; i < POWERTABLE_CAD_SIZE; ++i) {
+          if (this->tableRow[i].tableEntry[j].targetPosition != INT16_MIN) {
+              x_vals.push_back(i);
+              y_vals.push_back(this->tableRow[i].tableEntry[j].targetPosition);
+          }
+      }
+      if (x_vals.size() > 1) {
+          SplineCoefficients spline = computeCubicSpline(x_vals, y_vals);
+          for (int i = 0; i < POWERTABLE_CAD_SIZE; ++i) {
+              if (this->tableRow[i].tableEntry[j].targetPosition == INT16_MIN) {
+                  double interpolated_value = interpolateCubicSpline(spline, i);
+                  if (this->testNeighbors(i, j, static_cast<int>(std::round(interpolated_value))).allNeighborsPassed) {
+                      this->tableRow[i].tableEntry[j].targetPosition = static_cast<int16_t>(std::round(interpolated_value));
+                  }
+              }
+          }
+      }
+  }
+}
+
 
 // void PowerTable::fillTable() {
 //   int tempValue = INT16_MIN;
@@ -886,7 +988,8 @@ void PowerTable::newEntry(PowerBuffer& powerBuffer) {
       SS2K_LOG(POWERTABLE_LOG_TAG, "k: (%d) leftNeighbor.i: (%d)", k, testResults.leftNeighbor.i);
       SS2K_LOG(POWERTABLE_LOG_TAG, "Left failed at: (%d) Target pos: (%f)", testResults.leftNeighbor.targetPosition, targetPosition);
          
-      if (testResults.leftNeighbor.targetPosition < targetPosition + HORIZONTAL_NEIGHBOR_RANGE && (int)targetPosition != testResults.leftNeighbor.targetPosition) {  // check if the cadence is the same and positions are within a set range in this case its 30.
+      if (testResults.leftNeighbor.targetPosition < targetPosition + HORIZONTAL_NEIGHBOR_RANGE){
+      // && (int)targetPosition != testResults.leftNeighbor.targetPosition) {  // check if the cadence is the same and positions are within a set range in this case its 30.
 
         avgPosition = (targetPosition + testResults.leftNeighbor.targetPosition) / 2;  // calculate the average
         SS2K_LOG(POWERTABLE_LOG_TAG, "Left failed at: (%d) Target pos: (%f) Avg pos: (%d)", testResults.leftNeighbor.targetPosition, targetPosition, avgPosition);
@@ -949,7 +1052,8 @@ void PowerTable::newEntry(PowerBuffer& powerBuffer) {
       SS2K_LOG(POWERTABLE_LOG_TAG, "k: (%d) rightNeighbor.i: (%d)", k, testResults.rightNeighbor.i);
       SS2K_LOG(POWERTABLE_LOG_TAG, "Right failed at: (%d) Target pos: (%f)", testResults.rightNeighbor.targetPosition, targetPosition);
       
-      if (testResults.rightNeighbor.targetPosition > targetPosition - VERTICAL_NEIGHBOR_RANGE && (int)targetPosition != testResults.rightNeighbor.targetPosition) {
+      if (testResults.rightNeighbor.targetPosition > targetPosition - VERTICAL_NEIGHBOR_RANGE){
+      // && (int)targetPosition != testResults.rightNeighbor.targetPosition) {
         avgPosition = (targetPosition + testResults.rightNeighbor.targetPosition) / 2;
         SS2K_LOG(POWERTABLE_LOG_TAG, "Right failed at: (%d) Target pos: (%f) Avg pos: (%d)", testResults.rightNeighbor.targetPosition, targetPosition, avgPosition);
          
@@ -1013,7 +1117,8 @@ void PowerTable::newEntry(PowerBuffer& powerBuffer) {
 
       SS2K_LOG(POWERTABLE_LOG_TAG, "i: (%d) topNeighbor.j: (%d)", i, testResults.topNeighbor.j);
       SS2K_LOG(POWERTABLE_LOG_TAG, "Top failed at: (%d) Target pos: (%f)", testResults.topNeighbor.targetPosition, targetPosition);
-      if (testResults.topNeighbor.targetPosition > targetPosition - VERTICAL_NEIGHBOR_RANGE && (int)targetPosition != testResults.topNeighbor.targetPosition) {
+      if (testResults.topNeighbor.targetPosition > targetPosition - VERTICAL_NEIGHBOR_RANGE){
+        // && (int)targetPosition != testResults.topNeighbor.targetPosition) {
         avgPosition = (targetPosition + testResults.topNeighbor.targetPosition) / 2;
         SS2K_LOG(POWERTABLE_LOG_TAG, "Top failed at: (%d) Target pos: (%f) Avg pos: (%d)", testResults.topNeighbor.targetPosition, targetPosition, avgPosition);
          
@@ -1077,7 +1182,8 @@ void PowerTable::newEntry(PowerBuffer& powerBuffer) {
 
       SS2K_LOG(POWERTABLE_LOG_TAG, "i: (%d) bottomNeighbor.j: (%d)", i, testResults.bottomNeighbor.j);
       SS2K_LOG(POWERTABLE_LOG_TAG, "Bottom failed at: (%d) Target pos: (%f)", testResults.bottomNeighbor.targetPosition, targetPosition);
-      if (testResults.bottomNeighbor.targetPosition < targetPosition + HORIZONTAL_NEIGHBOR_RANGE && (int)targetPosition != testResults.bottomNeighbor.targetPosition) {
+      if (testResults.bottomNeighbor.targetPosition < targetPosition + HORIZONTAL_NEIGHBOR_RANGE){
+        // && (int)targetPosition != testResults.bottomNeighbor.targetPosition) {
         avgPosition = (targetPosition + testResults.bottomNeighbor.targetPosition) / 2;
         SS2K_LOG(POWERTABLE_LOG_TAG, "Bottom failed at: (%d) Target pos: (%f) Avg pos: (%d)", testResults.bottomNeighbor.targetPosition, targetPosition, avgPosition);
          
@@ -1142,6 +1248,19 @@ void PowerTable::newEntry(PowerBuffer& powerBuffer) {
 
   this->enterData(k, i, (int)targetPosition);
 
+  if (this->getNumEntries() > 4) {
+    int entries    = 0;
+    int newEntries = 1;
+    // loop until we can't calculate any new data
+    while (entries < newEntries) {
+      entries = newEntries;
+      this->fillTable();
+      this->extrapFillTable();
+      //this->extrapolateDiagonal();
+      newEntries = getNumEntries();
+    }
+  }
+
   BLE_ss2kCustomCharacteristic::notify(0x27, k);
 }
 
@@ -1160,18 +1279,18 @@ void PowerTable::enterData(int i, int j, int pos) {
   }
   this->tableRow[i].tableEntry[j].readings++;
 
-  if (this->getNumEntries() > 4) {
-    int entries    = 0;
-    int newEntries = 1;
-    // loop until we can't calculate any new data
-    while (entries < newEntries) {
-      entries = newEntries;
-      this->fillTable();
-      this->extrapFillTable();
-      this->extrapolateDiagonal();
-      newEntries = getNumEntries();
-    }
-  }
+  // if (this->getNumEntries() > 4) {
+  //   int entries    = 0;
+  //   int newEntries = 1;
+  //   // loop until we can't calculate any new data
+  //   while (entries < newEntries) {
+  //     entries = newEntries;
+  //     this->fillTable();
+  //     this->extrapFillTable();
+  //     this->extrapolateDiagonal();
+  //     newEntries = getNumEntries();
+  //   }
+  // }
 }
 
 void PowerTable::downVoteData(int i, int j, float target, int neighbor){
