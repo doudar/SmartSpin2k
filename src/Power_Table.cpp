@@ -343,314 +343,434 @@ TestResults PowerTable::testNeighbors(int i, int j, int testValue) {
   return returnResult;
 }
 
-void PowerTable::fillTable() {
-  int tempValue = INT16_MIN;
+double polynomialInterpolation(const std::vector<std::pair<double, double>>& data, double x) {
+  int n = data.size();
+  if (n == 0) return std::numeric_limits<double>::quiet_NaN(); // Handle empty data
 
-  // Fill each empty cell by linear interpolation
-  for (int i = 0; i < POWERTABLE_CAD_SIZE; ++i) {
-    // Interpolate horizontally
-    for (int j = 0; j < POWERTABLE_WATT_SIZE; ++j) {
-      if (this->tableRow[i].tableEntry[j].targetPosition == INT16_MIN) {
-        // Find nearest left and right non-empty cells
-        int left = j - 1;
-        while (left >= 0 && this->tableRow[i].tableEntry[left].targetPosition == INT16_MIN) left--;
-        int right = j + 1;
-        while (right < POWERTABLE_WATT_SIZE && this->tableRow[i].tableEntry[right].targetPosition == INT16_MIN) right++;
-
-        if (left >= 0 && right < POWERTABLE_WATT_SIZE) {
-          // Linear interpolation
-          tempValue = this->tableRow[i].tableEntry[left].targetPosition +
-                      (this->tableRow[i].tableEntry[right].targetPosition - this->tableRow[i].tableEntry[left].targetPosition) * (j - left) / (right - left);
-          if (this->testNeighbors(i, j, tempValue).allNeighborsPassed) {
-            this->tableRow[i].tableEntry[j].targetPosition = tempValue;
+  double result = 0.0;
+  for (int i = 0; i < n; ++i) {
+      double term = data[i].second; // y_i
+      for (int j = 0; j < n; ++j) {
+          if (i != j) {
+              term *= (x - data[j].first) / (data[i].first - data[j].first); // Calculate Lagrange basis polynomial
           }
-        }
       }
-    }
+      result += term;
+  }
+  return result;
+}
+
+void PowerTable::fillTable() {
+  for (int i = 0; i < POWERTABLE_CAD_SIZE; ++i) {
+      for (int j = 0; j < POWERTABLE_WATT_SIZE; ++j) {
+          if (this->tableRow[i].tableEntry[j].targetPosition == INT16_MIN) {
+              std::vector<std::pair<double, double>> data;
+
+              // Gather data points for interpolation (horizontal)
+              for (int k = 0; k < POWERTABLE_WATT_SIZE; ++k) {
+                  if (this->tableRow[i].tableEntry[k].targetPosition != INT16_MIN) {
+                      data.push_back({static_cast<double>(k * 30), static_cast<double>(this->tableRow[i].tableEntry[k].targetPosition)}); // Power values are multiples of 30
+                  }
+              }
+
+              if (!data.empty()) {
+                  double power = j * 30; // Power value for the current cell
+                  double interpValue = polynomialInterpolation(data, power);
+
+                  if (!std::isnan(interpValue) && this->testNeighbors(i, j, static_cast<int>(round(interpValue))).allNeighborsPassed) {
+                      this->tableRow[i].tableEntry[j].targetPosition = static_cast<int>(round(interpValue));
+                  }
+              }
+          }
+      }
   }
 
+  // Vertical Interpolation (similar structure)
   for (int j = 0; j < POWERTABLE_WATT_SIZE; ++j) {
-    // Interpolate vertically
-    for (int i = 0; i < POWERTABLE_CAD_SIZE; ++i) {
-      if (this->tableRow[i].tableEntry[j].targetPosition == INT16_MIN) {
-        // Find nearest top and bottom non-empty cells
-        int top = i - 1;
-        while (top >= 0 && this->tableRow[top].tableEntry[j].targetPosition == INT16_MIN) top--;
-        int bottom = i + 1;
-        while (bottom < POWERTABLE_CAD_SIZE && this->tableRow[bottom].tableEntry[j].targetPosition == INT16_MIN) bottom++;
+      for (int i = 0; i < POWERTABLE_CAD_SIZE; ++i) {
+          if (this->tableRow[i].tableEntry[j].targetPosition == INT16_MIN) {
+              std::vector<std::pair<double, double>> data;
 
-        if (top >= 0 && bottom < POWERTABLE_CAD_SIZE) {
-          // Linear interpolation
-          tempValue = this->tableRow[top].tableEntry[j].targetPosition +
-                      (this->tableRow[bottom].tableEntry[j].targetPosition - this->tableRow[top].tableEntry[j].targetPosition) * (i - top) / (bottom - top);
-          if (this->testNeighbors(i, j, tempValue).allNeighborsPassed) {
-            this->tableRow[i].tableEntry[j].targetPosition = tempValue;
+              // Gather data points for interpolation (vertical)
+              for (int k = 0; k < POWERTABLE_CAD_SIZE; ++k) {
+                  if (this->tableRow[k].tableEntry[j].targetPosition != INT16_MIN) {
+                      data.push_back({static_cast<double>(k), static_cast<double>(this->tableRow[k].tableEntry[j].targetPosition)});
+                  }
+              }
+
+              if (!data.empty()) {
+                  double cadence = i;
+                  double interpValue = polynomialInterpolation(data, cadence);
+
+                  if (!std::isnan(interpValue) && this->testNeighbors(i, j, static_cast<int>(round(interpValue))).allNeighborsPassed) {
+                      this->tableRow[i].tableEntry[j].targetPosition = static_cast<int>(round(interpValue));
+                  }
+              }
           }
-        }
       }
-    }
   }
 }
+
 
 void PowerTable::extrapFillTable() {
-  // Find the center of the known data
-  int sumRow = 0, sumCol = 0, count = 0;
   for (int i = 0; i < POWERTABLE_CAD_SIZE; ++i) {
-    for (int j = 0; j < POWERTABLE_WATT_SIZE; ++j) {
-      if (this->tableRow[i].tableEntry[j].targetPosition != INT16_MIN) {
-        sumRow += i;
-        sumCol += j;
-        count++;
-      }
-    }
-  }
+      for (int j = 0; j < POWERTABLE_WATT_SIZE; ++j) {
+          if (this->tableRow[i].tableEntry[j].targetPosition == INT16_MIN) {
+              std::vector<std::pair<double, double>> data;
 
-  // prevent divide by zero
-  if (count == 0) {
-    return;
-  }
+              // Gather data points for extrapolation (horizontal)
+              for (int k = 0; k < POWERTABLE_WATT_SIZE; ++k) {
+                  if (this->tableRow[i].tableEntry[k].targetPosition != INT16_MIN) {
+                      data.push_back({static_cast<double>(k * 30), static_cast<double>(this->tableRow[i].tableEntry[k].targetPosition)});
+                  }
+              }
 
-  int centerRow = sumRow / count;
-  int centerCol = sumCol / count;
-  int tempValue = INT16_MIN;
+              if (!data.empty()) {
+                  double power = j * 30;
+                  double extrapValue = polynomialInterpolation(data, power);
 
-  // Function to extrapolate a single cell based on its neighbors
-  auto extrapolateCell = [&](int i, int j) {
-    // Find nearest left non-empty cell
-    int left = j - 1;
-    while (left >= 0 && this->tableRow[i].tableEntry[left].targetPosition == INT16_MIN) left--;
-
-    // Find nearest right non-empty cell
-    int right = j + 1;
-    while (right < POWERTABLE_WATT_SIZE && this->tableRow[i].tableEntry[right].targetPosition == INT16_MIN) right++;
-
-    if (left >= 0 && right < POWERTABLE_WATT_SIZE) {
-      // Linear extrapolation
-      if (this->tableRow[i].tableEntry[left].targetPosition != INT16_MIN && this->tableRow[i].tableEntry[right].targetPosition != INT16_MIN) {
-        if (j < left) {
-          // Extrapolate to the left
-          tempValue = this->tableRow[i].tableEntry[left].targetPosition -
-                      (this->tableRow[i].tableEntry[right].targetPosition - this->tableRow[i].tableEntry[left].targetPosition) / (right - left) * (left - j);
-          if (this->testNeighbors(i, j, tempValue).allNeighborsPassed) {
-            this->tableRow[i].tableEntry[j].targetPosition = tempValue;
+                  if (!std::isnan(extrapValue) && this->testNeighbors(i, j, static_cast<int>(round(extrapValue))).allNeighborsPassed) {
+                      this->tableRow[i].tableEntry[j].targetPosition = static_cast<int>(round(extrapValue));
+                  }
+              }
           }
-        } else if (j > right) {
-          // Extrapolate to the right
-          tempValue = this->tableRow[i].tableEntry[right].targetPosition +
-                      (this->tableRow[i].tableEntry[right].targetPosition - this->tableRow[i].tableEntry[left].targetPosition) / (right - left) * (j - right);
-          if (this->testNeighbors(i, j, tempValue).allNeighborsPassed) {
-            this->tableRow[i].tableEntry[j].targetPosition = tempValue;
-          }
-        }
       }
-    } else if (left - 1 >= 0) {
-      // Only left value available, extrapolate to the right
-      if (this->tableRow[i].tableEntry[left].targetPosition != INT16_MIN && this->tableRow[i].tableEntry[left - 1].targetPosition != INT16_MIN) {
-        tempValue = this->tableRow[i].tableEntry[left].targetPosition +
-                    (j - left) * (left > 0 ? this->tableRow[i].tableEntry[left].targetPosition - this->tableRow[i].tableEntry[left - 1].targetPosition : 1);
-        if (this->testNeighbors(i, j, tempValue).allNeighborsPassed) {
-          this->tableRow[i].tableEntry[j].targetPosition = tempValue;
-        }
-      }
-    } else if (right + 1 < POWERTABLE_WATT_SIZE) {
-      // Only right value available, extrapolate to the left
-      if (this->tableRow[i].tableEntry[right + 1].targetPosition != INT16_MIN && this->tableRow[i].tableEntry[right].targetPosition != INT16_MIN) {
-        tempValue =
-            this->tableRow[i].tableEntry[right].targetPosition -
-            (right - j) * (right < POWERTABLE_WATT_SIZE - 1 ? this->tableRow[i].tableEntry[right + 1].targetPosition - this->tableRow[i].tableEntry[right].targetPosition : 1);
-        if (this->testNeighbors(i, j, tempValue).allNeighborsPassed) {
-          this->tableRow[i].tableEntry[j].targetPosition = tempValue;
-        }
-      }
-    }
-  };
-
-  // Extrapolate horizontally and vertically starting from the center
-  for (int distance = 0; distance <= std::max(centerRow, centerCol); ++distance) {
-    for (int i = centerRow - distance; i <= centerRow + distance; ++i) {
-      for (int j = centerCol - distance; j <= centerCol + distance; ++j) {
-        if (i >= 0 && i < POWERTABLE_CAD_SIZE && j >= 0 && j < POWERTABLE_WATT_SIZE && this->tableRow[i].tableEntry[j].targetPosition == INT16_MIN) {
-          extrapolateCell(i, j);
-        }
-      }
-    }
-  }
-  // Extrapolate each empty cell
-  for (int i = 0; i < POWERTABLE_CAD_SIZE; ++i) {
-    // Extrapolate horizontally
-    for (int j = 0; j < POWERTABLE_WATT_SIZE; ++j) {
-      if (this->tableRow[i].tableEntry[j].targetPosition == INT16_MIN) {
-        // Find nearest left non-empty cell
-        int left = j - 1;
-        while (left >= 0 && this->tableRow[i].tableEntry[left].targetPosition == INT16_MIN) left--;
-
-        // Find nearest right non-empty cell
-        int right = j + 1;
-        while (right < POWERTABLE_WATT_SIZE && this->tableRow[i].tableEntry[right].targetPosition == INT16_MIN) right++;
-        if (this->tableRow[i].tableEntry[left].targetPosition != INT16_MIN && this->tableRow[i].tableEntry[right].targetPosition != INT16_MIN) {
-          if (left >= 0 && right < POWERTABLE_WATT_SIZE) {
-            // Linear extrapolation
-            if (j < left) {
-              // Extrapolate to the left
-              tempValue = this->tableRow[i].tableEntry[left].targetPosition -
-                          (this->tableRow[i].tableEntry[right].targetPosition - this->tableRow[i].tableEntry[left].targetPosition) / (right - left) * (left - j);
-              if (this->testNeighbors(i, j, tempValue).allNeighborsPassed) {
-                this->tableRow[i].tableEntry[j].targetPosition = tempValue;
-              }
-
-            } else if (j > right) {
-              // Extrapolate to the right
-              tempValue = this->tableRow[i].tableEntry[right].targetPosition +
-                          (this->tableRow[i].tableEntry[right].targetPosition - this->tableRow[i].tableEntry[left].targetPosition) / (right - left) * (j - right);
-              if (this->testNeighbors(i, j, tempValue).allNeighborsPassed) {
-                this->tableRow[i].tableEntry[j].targetPosition = tempValue;
-              }
-            }
-          } else if (left >= 1) {
-            // Only left value available, extrapolate to the right
-            if (this->tableRow[i].tableEntry[left].targetPosition != INT16_MIN && this->tableRow[i].tableEntry[left - 1].targetPosition != INT16_MIN) {
-              tempValue = this->tableRow[i].tableEntry[left].targetPosition +
-                          (j - left) * (left > 0 ? this->tableRow[i].tableEntry[left].targetPosition - this->tableRow[i].tableEntry[left - 1].targetPosition : 1);
-              if (this->testNeighbors(i, j, tempValue).allNeighborsPassed) {
-                this->tableRow[i].tableEntry[j].targetPosition = tempValue;
-              }
-            }
-          } else if (right + 1 < POWERTABLE_WATT_SIZE) {
-            // Only right value available, extrapolate to the left
-            if (this->tableRow[i].tableEntry[right].targetPosition != INT16_MIN && this->tableRow[i].tableEntry[right + 1].targetPosition != INT16_MIN) {
-              tempValue = this->tableRow[i].tableEntry[right].targetPosition -
-                          (right - j) *
-                              (right < POWERTABLE_WATT_SIZE - 1 ? this->tableRow[i].tableEntry[right + 1].targetPosition - this->tableRow[i].tableEntry[right].targetPosition : 1);
-              if (this->testNeighbors(i, j, tempValue).allNeighborsPassed) {
-                this->tableRow[i].tableEntry[j].targetPosition = tempValue;
-              }
-            }
-          }
-        }
-      }
-    }
   }
 
+  // Vertical Extrapolation (similar structure)
   for (int j = 0; j < POWERTABLE_WATT_SIZE; ++j) {
-    // Extrapolate vertically
-    for (int i = 0; i < POWERTABLE_CAD_SIZE; ++i) {
-      if (this->tableRow[i].tableEntry[j].targetPosition == INT16_MIN) {
-        // Find nearest top non-empty cell
-        int top = i - 1;
-        while (top >= 0 && this->tableRow[top].tableEntry[j].targetPosition == INT16_MIN) top--;
+      for (int i = 0; i < POWERTABLE_CAD_SIZE; ++i) {
+          if (this->tableRow[i].tableEntry[j].targetPosition == INT16_MIN) {
+              std::vector<std::pair<double, double>> data;
 
-        // Find nearest bottom non-empty cell
-        int bottom = i + 1;
-        while (bottom < POWERTABLE_CAD_SIZE && this->tableRow[bottom].tableEntry[j].targetPosition == INT16_MIN) bottom++;
+              // Gather data points for extrapolation (vertical)
+              for (int k = 0; k < POWERTABLE_CAD_SIZE; ++k) {
+                  if (this->tableRow[k].tableEntry[j].targetPosition != INT16_MIN) {
+                      data.push_back({static_cast<double>(k), static_cast<double>(this->tableRow[k].tableEntry[j].targetPosition)});
+                  }
+              }
 
-        if (top >= 0 && bottom < POWERTABLE_CAD_SIZE) {
-          // Linear extrapolation
-          if (i < top) {
-            // Extrapolate upwards
-            tempValue = this->tableRow[top].tableEntry[j].targetPosition -
-                        (this->tableRow[bottom].tableEntry[j].targetPosition - this->tableRow[top].tableEntry[j].targetPosition) / (bottom - top) * (top - i);
-            if (this->testNeighbors(i, j, tempValue).allNeighborsPassed) {
-              this->tableRow[i].tableEntry[j].targetPosition = tempValue;
-            }
-          } else if (i > bottom) {
-            // Extrapolate downwards
-            tempValue = this->tableRow[bottom].tableEntry[j].targetPosition +
-                        (this->tableRow[bottom].tableEntry[j].targetPosition - this->tableRow[top].tableEntry[j].targetPosition) / (bottom - top) * (i - bottom);
-            if (this->testNeighbors(i, j, tempValue).allNeighborsPassed) {
-              this->tableRow[i].tableEntry[j].targetPosition = tempValue;
-            }
+              if (!data.empty()) {
+                  double cadence = i;
+                  double extrapValue = polynomialInterpolation(data, cadence);
+
+                  if (!std::isnan(extrapValue) && this->testNeighbors(i, j, static_cast<int>(round(extrapValue))).allNeighborsPassed) {
+                      this->tableRow[i].tableEntry[j].targetPosition = static_cast<int>(round(extrapValue));
+                  }
+              }
           }
-        } else if (top >= 1) {
-          // Only top value available, extrapolate downwards
-          if (this->tableRow[top].tableEntry[j].targetPosition != INT16_MIN && this->tableRow[top - 1].tableEntry[j].targetPosition != INT16_MIN) {
-            tempValue = this->tableRow[top].tableEntry[j].targetPosition +
-                        (i - top) * (top > 0 ? this->tableRow[top].tableEntry[j].targetPosition - this->tableRow[top - 1].tableEntry[j].targetPosition : 1);
-            if (this->testNeighbors(i, j, tempValue).allNeighborsPassed) {
-              this->tableRow[i].tableEntry[j].targetPosition = tempValue;
-            } else {
-            }
-          }
-        } else if (bottom + 1 < POWERTABLE_CAD_SIZE) {
-          // Only bottom value available, extrapolate upwards
-          if (this->tableRow[bottom].tableEntry[j].targetPosition != INT16_MIN && this->tableRow[bottom + 1].tableEntry[j].targetPosition != INT16_MIN) {
-            tempValue = this->tableRow[bottom].tableEntry[j].targetPosition -
-                        (bottom - i) *
-                            (bottom < POWERTABLE_CAD_SIZE - 1 ? this->tableRow[bottom + 1].tableEntry[j].targetPosition - this->tableRow[bottom].tableEntry[j].targetPosition : 1);
-            if (this->testNeighbors(i, j, tempValue).allNeighborsPassed) {
-              this->tableRow[i].tableEntry[j].targetPosition = tempValue;
-            }
-          }
-        }
       }
-    }
   }
 }
 
-void PowerTable::extrapolateDiagonal() {
-  int tempValue = INT16_MIN;
+// void PowerTable::fillTable() {
+//   int tempValue = INT16_MIN;
 
-  for (int i = 0; i < POWERTABLE_CAD_SIZE; ++i) {
-    for (int j = 0; j < POWERTABLE_WATT_SIZE; ++j) {
-      if (this->tableRow[i].tableEntry[j].targetPosition == INT16_MIN) {
-        // Find nearest top-left non-empty cell
-        int topLeftRow = i - 1, topLeftCol = j - 1;
-        while (topLeftRow >= 0 && topLeftCol >= 0 && this->tableRow[topLeftRow].tableEntry[topLeftCol].targetPosition == INT16_MIN) {
-          topLeftRow--;
-          topLeftCol--;
-        }
+//   // Fill each empty cell by linear interpolation
+//   for (int i = 0; i < POWERTABLE_CAD_SIZE; ++i) {
+//     // Interpolate horizontally
+//     for (int j = 0; j < POWERTABLE_WATT_SIZE; ++j) {
+//       if (this->tableRow[i].tableEntry[j].targetPosition == INT16_MIN) {
+//         // Find nearest left and right non-empty cells
+//         int left = j - 1;
+//         while (left >= 0 && this->tableRow[i].tableEntry[left].targetPosition == INT16_MIN) left--;
+//         int right = j + 1;
+//         while (right < POWERTABLE_WATT_SIZE && this->tableRow[i].tableEntry[right].targetPosition == INT16_MIN) right++;
 
-        // Find nearest bottom-right non-empty cell
-        int bottomRightRow = i + 1, bottomRightCol = j + 1;
-        while (bottomRightRow < POWERTABLE_CAD_SIZE && bottomRightCol < POWERTABLE_WATT_SIZE &&
-               this->tableRow[bottomRightRow].tableEntry[bottomRightCol].targetPosition == INT16_MIN) {
-          bottomRightRow++;
-          bottomRightCol++;
-        }
+//         if (left >= 0 && right < POWERTABLE_WATT_SIZE) {
+//           // Linear interpolation
+//           tempValue = this->tableRow[i].tableEntry[left].targetPosition +
+//                       (this->tableRow[i].tableEntry[right].targetPosition - this->tableRow[i].tableEntry[left].targetPosition) * (j - left) / (right - left);
+//           if (this->testNeighbors(i, j, tempValue).allNeighborsPassed) {
+//             this->tableRow[i].tableEntry[j].targetPosition = tempValue;
+//           }
+//         }
+//       }
+//     }
+//   }
 
-        // Perform diagonal extrapolation (top-left to bottom-right)
-        if (topLeftRow >= 0 && topLeftCol >= 0 && bottomRightRow < POWERTABLE_CAD_SIZE && bottomRightCol < POWERTABLE_WATT_SIZE) {
-          tempValue =
-              this->tableRow[topLeftRow].tableEntry[topLeftCol].targetPosition +
-              ((this->tableRow[bottomRightRow].tableEntry[bottomRightCol].targetPosition - this->tableRow[topLeftRow].tableEntry[topLeftCol].targetPosition) * (j - topLeftCol)) /
-                  (bottomRightCol - topLeftCol);
+//   for (int j = 0; j < POWERTABLE_WATT_SIZE; ++j) {
+//     // Interpolate vertically
+//     for (int i = 0; i < POWERTABLE_CAD_SIZE; ++i) {
+//       if (this->tableRow[i].tableEntry[j].targetPosition == INT16_MIN) {
+//         // Find nearest top and bottom non-empty cells
+//         int top = i - 1;
+//         while (top >= 0 && this->tableRow[top].tableEntry[j].targetPosition == INT16_MIN) top--;
+//         int bottom = i + 1;
+//         while (bottom < POWERTABLE_CAD_SIZE && this->tableRow[bottom].tableEntry[j].targetPosition == INT16_MIN) bottom++;
 
-          if (testNeighbors(i, j, tempValue).allNeighborsPassed) {
-            this->tableRow[i].tableEntry[j].targetPosition = tempValue;
-          }
-        }
+//         if (top >= 0 && bottom < POWERTABLE_CAD_SIZE) {
+//           // Linear interpolation
+//           tempValue = this->tableRow[top].tableEntry[j].targetPosition +
+//                       (this->tableRow[bottom].tableEntry[j].targetPosition - this->tableRow[top].tableEntry[j].targetPosition) * (i - top) / (bottom - top);
+//           if (this->testNeighbors(i, j, tempValue).allNeighborsPassed) {
+//             this->tableRow[i].tableEntry[j].targetPosition = tempValue;
+//           }
+//         }
+//       }
+//     }
+//   }
+// }
 
-        // If diagonal top-left to bottom-right is not enough, try top-right to bottom-left
-        if (tempValue == INT16_MIN) {
-          // Find nearest top-right non-empty cell
-          int topRightRow = i - 1, topRightCol = j + 1;
-          while (topRightRow >= 0 && topRightCol < POWERTABLE_WATT_SIZE && this->tableRow[topRightRow].tableEntry[topRightCol].targetPosition == INT16_MIN) {
-            topRightRow--;
-            topRightCol++;
-          }
+// void PowerTable::extrapFillTable() {
+//   // Find the center of the known data
+//   int sumRow = 0, sumCol = 0, count = 0;
+//   for (int i = 0; i < POWERTABLE_CAD_SIZE; ++i) {
+//     for (int j = 0; j < POWERTABLE_WATT_SIZE; ++j) {
+//       if (this->tableRow[i].tableEntry[j].targetPosition != INT16_MIN) {
+//         sumRow += i;
+//         sumCol += j;
+//         count++;
+//       }
+//     }
+//   }
 
-          // Find nearest bottom-left non-empty cell
-          int bottomLeftRow = i + 1, bottomLeftCol = j - 1;
-          while (bottomLeftRow < POWERTABLE_CAD_SIZE && bottomLeftCol >= 0 && this->tableRow[bottomLeftRow].tableEntry[bottomLeftCol].targetPosition == INT16_MIN) {
-            bottomLeftRow++;
-            bottomLeftCol--;
-          }
+//   // prevent divide by zero
+//   if (count == 0) {
+//     return;
+//   }
 
-          // Perform diagonal extrapolation (top-right to bottom-left)
-          if (topRightRow >= 0 && topRightCol < POWERTABLE_WATT_SIZE && bottomLeftRow < POWERTABLE_CAD_SIZE && bottomLeftCol >= 0) {
-            tempValue = this->tableRow[topRightRow].tableEntry[topRightCol].targetPosition +
-                        ((this->tableRow[bottomLeftRow].tableEntry[bottomLeftCol].targetPosition - this->tableRow[topRightRow].tableEntry[topRightCol].targetPosition) *
-                         (j - bottomLeftCol)) /
-                            (topRightCol - bottomLeftCol);
+//   int centerRow = sumRow / count;
+//   int centerCol = sumCol / count;
+//   int tempValue = INT16_MIN;
 
-            if (testNeighbors(i, j, tempValue).allNeighborsPassed) {
-              this->tableRow[i].tableEntry[j].targetPosition = tempValue;
-            }
-          }
-        }
-      }
-    }
-  }
-}
+//   // Function to extrapolate a single cell based on its neighbors
+//   auto extrapolateCell = [&](int i, int j) {
+//     // Find nearest left non-empty cell
+//     int left = j - 1;
+//     while (left >= 0 && this->tableRow[i].tableEntry[left].targetPosition == INT16_MIN) left--;
+
+//     // Find nearest right non-empty cell
+//     int right = j + 1;
+//     while (right < POWERTABLE_WATT_SIZE && this->tableRow[i].tableEntry[right].targetPosition == INT16_MIN) right++;
+
+//     if (left >= 0 && right < POWERTABLE_WATT_SIZE) {
+//       // Linear extrapolation
+//       if (this->tableRow[i].tableEntry[left].targetPosition != INT16_MIN && this->tableRow[i].tableEntry[right].targetPosition != INT16_MIN) {
+//         if (j < left) {
+//           // Extrapolate to the left
+//           tempValue = this->tableRow[i].tableEntry[left].targetPosition -
+//                       (this->tableRow[i].tableEntry[right].targetPosition - this->tableRow[i].tableEntry[left].targetPosition) / (right - left) * (left - j);
+//           if (this->testNeighbors(i, j, tempValue).allNeighborsPassed) {
+//             this->tableRow[i].tableEntry[j].targetPosition = tempValue;
+//           }
+//         } else if (j > right) {
+//           // Extrapolate to the right
+//           tempValue = this->tableRow[i].tableEntry[right].targetPosition +
+//                       (this->tableRow[i].tableEntry[right].targetPosition - this->tableRow[i].tableEntry[left].targetPosition) / (right - left) * (j - right);
+//           if (this->testNeighbors(i, j, tempValue).allNeighborsPassed) {
+//             this->tableRow[i].tableEntry[j].targetPosition = tempValue;
+//           }
+//         }
+//       }
+//     } else if (left - 1 >= 0) {
+//       // Only left value available, extrapolate to the right
+//       if (this->tableRow[i].tableEntry[left].targetPosition != INT16_MIN && this->tableRow[i].tableEntry[left - 1].targetPosition != INT16_MIN) {
+//         tempValue = this->tableRow[i].tableEntry[left].targetPosition +
+//                     (j - left) * (left > 0 ? this->tableRow[i].tableEntry[left].targetPosition - this->tableRow[i].tableEntry[left - 1].targetPosition : 1);
+//         if (this->testNeighbors(i, j, tempValue).allNeighborsPassed) {
+//           this->tableRow[i].tableEntry[j].targetPosition = tempValue;
+//         }
+//       }
+//     } else if (right + 1 < POWERTABLE_WATT_SIZE) {
+//       // Only right value available, extrapolate to the left
+//       if (this->tableRow[i].tableEntry[right + 1].targetPosition != INT16_MIN && this->tableRow[i].tableEntry[right].targetPosition != INT16_MIN) {
+//         tempValue =
+//             this->tableRow[i].tableEntry[right].targetPosition -
+//             (right - j) * (right < POWERTABLE_WATT_SIZE - 1 ? this->tableRow[i].tableEntry[right + 1].targetPosition - this->tableRow[i].tableEntry[right].targetPosition : 1);
+//         if (this->testNeighbors(i, j, tempValue).allNeighborsPassed) {
+//           this->tableRow[i].tableEntry[j].targetPosition = tempValue;
+//         }
+//       }
+//     }
+//   };
+
+//   // Extrapolate horizontally and vertically starting from the center
+//   for (int distance = 0; distance <= std::max(centerRow, centerCol); ++distance) {
+//     for (int i = centerRow - distance; i <= centerRow + distance; ++i) {
+//       for (int j = centerCol - distance; j <= centerCol + distance; ++j) {
+//         if (i >= 0 && i < POWERTABLE_CAD_SIZE && j >= 0 && j < POWERTABLE_WATT_SIZE && this->tableRow[i].tableEntry[j].targetPosition == INT16_MIN) {
+//           extrapolateCell(i, j);
+//         }
+//       }
+//     }
+//   }
+//   // Extrapolate each empty cell
+//   for (int i = 0; i < POWERTABLE_CAD_SIZE; ++i) {
+//     // Extrapolate horizontally
+//     for (int j = 0; j < POWERTABLE_WATT_SIZE; ++j) {
+//       if (this->tableRow[i].tableEntry[j].targetPosition == INT16_MIN) {
+//         // Find nearest left non-empty cell
+//         int left = j - 1;
+//         while (left >= 0 && this->tableRow[i].tableEntry[left].targetPosition == INT16_MIN) left--;
+
+//         // Find nearest right non-empty cell
+//         int right = j + 1;
+//         while (right < POWERTABLE_WATT_SIZE && this->tableRow[i].tableEntry[right].targetPosition == INT16_MIN) right++;
+//         if (this->tableRow[i].tableEntry[left].targetPosition != INT16_MIN && this->tableRow[i].tableEntry[right].targetPosition != INT16_MIN) {
+//           if (left >= 0 && right < POWERTABLE_WATT_SIZE) {
+//             // Linear extrapolation
+//             if (j < left) {
+//               // Extrapolate to the left
+//               tempValue = this->tableRow[i].tableEntry[left].targetPosition -
+//                           (this->tableRow[i].tableEntry[right].targetPosition - this->tableRow[i].tableEntry[left].targetPosition) / (right - left) * (left - j);
+//               if (this->testNeighbors(i, j, tempValue).allNeighborsPassed) {
+//                 this->tableRow[i].tableEntry[j].targetPosition = tempValue;
+//               }
+
+//             } else if (j > right) {
+//               // Extrapolate to the right
+//               tempValue = this->tableRow[i].tableEntry[right].targetPosition +
+//                           (this->tableRow[i].tableEntry[right].targetPosition - this->tableRow[i].tableEntry[left].targetPosition) / (right - left) * (j - right);
+//               if (this->testNeighbors(i, j, tempValue).allNeighborsPassed) {
+//                 this->tableRow[i].tableEntry[j].targetPosition = tempValue;
+//               }
+//             }
+//           } else if (left >= 1) {
+//             // Only left value available, extrapolate to the right
+//             if (this->tableRow[i].tableEntry[left].targetPosition != INT16_MIN && this->tableRow[i].tableEntry[left - 1].targetPosition != INT16_MIN) {
+//               tempValue = this->tableRow[i].tableEntry[left].targetPosition +
+//                           (j - left) * (left > 0 ? this->tableRow[i].tableEntry[left].targetPosition - this->tableRow[i].tableEntry[left - 1].targetPosition : 1);
+//               if (this->testNeighbors(i, j, tempValue).allNeighborsPassed) {
+//                 this->tableRow[i].tableEntry[j].targetPosition = tempValue;
+//               }
+//             }
+//           } else if (right + 1 < POWERTABLE_WATT_SIZE) {
+//             // Only right value available, extrapolate to the left
+//             if (this->tableRow[i].tableEntry[right].targetPosition != INT16_MIN && this->tableRow[i].tableEntry[right + 1].targetPosition != INT16_MIN) {
+//               tempValue = this->tableRow[i].tableEntry[right].targetPosition -
+//                           (right - j) *
+//                               (right < POWERTABLE_WATT_SIZE - 1 ? this->tableRow[i].tableEntry[right + 1].targetPosition - this->tableRow[i].tableEntry[right].targetPosition : 1);
+//               if (this->testNeighbors(i, j, tempValue).allNeighborsPassed) {
+//                 this->tableRow[i].tableEntry[j].targetPosition = tempValue;
+//               }
+//             }
+//           }
+//         }
+//       }
+//     }
+//   }
+
+//   for (int j = 0; j < POWERTABLE_WATT_SIZE; ++j) {
+//     // Extrapolate vertically
+//     for (int i = 0; i < POWERTABLE_CAD_SIZE; ++i) {
+//       if (this->tableRow[i].tableEntry[j].targetPosition == INT16_MIN) {
+//         // Find nearest top non-empty cell
+//         int top = i - 1;
+//         while (top >= 0 && this->tableRow[top].tableEntry[j].targetPosition == INT16_MIN) top--;
+
+//         // Find nearest bottom non-empty cell
+//         int bottom = i + 1;
+//         while (bottom < POWERTABLE_CAD_SIZE && this->tableRow[bottom].tableEntry[j].targetPosition == INT16_MIN) bottom++;
+
+//         if (top >= 0 && bottom < POWERTABLE_CAD_SIZE) {
+//           // Linear extrapolation
+//           if (i < top) {
+//             // Extrapolate upwards
+//             tempValue = this->tableRow[top].tableEntry[j].targetPosition -
+//                         (this->tableRow[bottom].tableEntry[j].targetPosition - this->tableRow[top].tableEntry[j].targetPosition) / (bottom - top) * (top - i);
+//             if (this->testNeighbors(i, j, tempValue).allNeighborsPassed) {
+//               this->tableRow[i].tableEntry[j].targetPosition = tempValue;
+//             }
+//           } else if (i > bottom) {
+//             // Extrapolate downwards
+//             tempValue = this->tableRow[bottom].tableEntry[j].targetPosition +
+//                         (this->tableRow[bottom].tableEntry[j].targetPosition - this->tableRow[top].tableEntry[j].targetPosition) / (bottom - top) * (i - bottom);
+//             if (this->testNeighbors(i, j, tempValue).allNeighborsPassed) {
+//               this->tableRow[i].tableEntry[j].targetPosition = tempValue;
+//             }
+//           }
+//         } else if (top >= 1) {
+//           // Only top value available, extrapolate downwards
+//           if (this->tableRow[top].tableEntry[j].targetPosition != INT16_MIN && this->tableRow[top - 1].tableEntry[j].targetPosition != INT16_MIN) {
+//             tempValue = this->tableRow[top].tableEntry[j].targetPosition +
+//                         (i - top) * (top > 0 ? this->tableRow[top].tableEntry[j].targetPosition - this->tableRow[top - 1].tableEntry[j].targetPosition : 1);
+//             if (this->testNeighbors(i, j, tempValue).allNeighborsPassed) {
+//               this->tableRow[i].tableEntry[j].targetPosition = tempValue;
+//             } else {
+//             }
+//           }
+//         } else if (bottom + 1 < POWERTABLE_CAD_SIZE) {
+//           // Only bottom value available, extrapolate upwards
+//           if (this->tableRow[bottom].tableEntry[j].targetPosition != INT16_MIN && this->tableRow[bottom + 1].tableEntry[j].targetPosition != INT16_MIN) {
+//             tempValue = this->tableRow[bottom].tableEntry[j].targetPosition -
+//                         (bottom - i) *
+//                             (bottom < POWERTABLE_CAD_SIZE - 1 ? this->tableRow[bottom + 1].tableEntry[j].targetPosition - this->tableRow[bottom].tableEntry[j].targetPosition : 1);
+//             if (this->testNeighbors(i, j, tempValue).allNeighborsPassed) {
+//               this->tableRow[i].tableEntry[j].targetPosition = tempValue;
+//             }
+//           }
+//         }
+//       }
+//     }
+//   }
+// }
+
+// void PowerTable::extrapolateDiagonal() {
+//   int tempValue = INT16_MIN;
+
+//   for (int i = 0; i < POWERTABLE_CAD_SIZE; ++i) {
+//     for (int j = 0; j < POWERTABLE_WATT_SIZE; ++j) {
+//       if (this->tableRow[i].tableEntry[j].targetPosition == INT16_MIN) {
+//         // Find nearest top-left non-empty cell
+//         int topLeftRow = i - 1, topLeftCol = j - 1;
+//         while (topLeftRow >= 0 && topLeftCol >= 0 && this->tableRow[topLeftRow].tableEntry[topLeftCol].targetPosition == INT16_MIN) {
+//           topLeftRow--;
+//           topLeftCol--;
+//         }
+
+//         // Find nearest bottom-right non-empty cell
+//         int bottomRightRow = i + 1, bottomRightCol = j + 1;
+//         while (bottomRightRow < POWERTABLE_CAD_SIZE && bottomRightCol < POWERTABLE_WATT_SIZE &&
+//                this->tableRow[bottomRightRow].tableEntry[bottomRightCol].targetPosition == INT16_MIN) {
+//           bottomRightRow++;
+//           bottomRightCol++;
+//         }
+
+//         // Perform diagonal extrapolation (top-left to bottom-right)
+//         if (topLeftRow >= 0 && topLeftCol >= 0 && bottomRightRow < POWERTABLE_CAD_SIZE && bottomRightCol < POWERTABLE_WATT_SIZE) {
+//           tempValue =
+//               this->tableRow[topLeftRow].tableEntry[topLeftCol].targetPosition +
+//               ((this->tableRow[bottomRightRow].tableEntry[bottomRightCol].targetPosition - this->tableRow[topLeftRow].tableEntry[topLeftCol].targetPosition) * (j - topLeftCol)) /
+//                   (bottomRightCol - topLeftCol);
+
+//           if (testNeighbors(i, j, tempValue).allNeighborsPassed) {
+//             this->tableRow[i].tableEntry[j].targetPosition = tempValue;
+//           }
+//         }
+
+//         // If diagonal top-left to bottom-right is not enough, try top-right to bottom-left
+//         if (tempValue == INT16_MIN) {
+//           // Find nearest top-right non-empty cell
+//           int topRightRow = i - 1, topRightCol = j + 1;
+//           while (topRightRow >= 0 && topRightCol < POWERTABLE_WATT_SIZE && this->tableRow[topRightRow].tableEntry[topRightCol].targetPosition == INT16_MIN) {
+//             topRightRow--;
+//             topRightCol++;
+//           }
+
+//           // Find nearest bottom-left non-empty cell
+//           int bottomLeftRow = i + 1, bottomLeftCol = j - 1;
+//           while (bottomLeftRow < POWERTABLE_CAD_SIZE && bottomLeftCol >= 0 && this->tableRow[bottomLeftRow].tableEntry[bottomLeftCol].targetPosition == INT16_MIN) {
+//             bottomLeftRow++;
+//             bottomLeftCol--;
+//           }
+
+//           // Perform diagonal extrapolation (top-right to bottom-left)
+//           if (topRightRow >= 0 && topRightCol < POWERTABLE_WATT_SIZE && bottomLeftRow < POWERTABLE_CAD_SIZE && bottomLeftCol >= 0) {
+//             tempValue = this->tableRow[topRightRow].tableEntry[topRightCol].targetPosition +
+//                         ((this->tableRow[bottomLeftRow].tableEntry[bottomLeftCol].targetPosition - this->tableRow[topRightRow].tableEntry[topRightCol].targetPosition) *
+//                          (j - bottomLeftCol)) /
+//                             (topRightCol - bottomLeftCol);
+
+//             if (testNeighbors(i, j, tempValue).allNeighborsPassed) {
+//               this->tableRow[i].tableEntry[j].targetPosition = tempValue;
+//             }
+//           }
+//         }
+//       }
+//     }
+//   }
+// }
 
 int PowerTable::getNumEntries() {
   int ret = 0;
@@ -772,7 +892,7 @@ void PowerTable::newEntry(PowerBuffer& powerBuffer) {
         SS2K_LOG(POWERTABLE_LOG_TAG, "Left failed at: (%d) Target pos: (%f) Avg pos: (%d)", testResults.leftNeighbor.targetPosition, targetPosition, avgPosition);
          
 
-        if (this->testNeighbors(testResults.leftNeighbor.i, testResults.leftNeighbor.j, (int)targetPosition).allNeighborsPassed) {  // check if the current position moved left is valid
+        if (this->testNeighbors(testResults.leftNeighbor.i, testResults.leftNeighbor.j, targetPosition).allNeighborsPassed) {  // check if the current position moved left is valid
           SS2K_LOG(POWERTABLE_LOG_TAG, "Current Position moved left was valid! Current position: %f", targetPosition);
             this->enterData(testResults.leftNeighbor.i, testResults.leftNeighbor.j, targetPosition);  // enter the data
         } 
@@ -828,6 +948,7 @@ void PowerTable::newEntry(PowerBuffer& powerBuffer) {
 
       SS2K_LOG(POWERTABLE_LOG_TAG, "k: (%d) rightNeighbor.i: (%d)", k, testResults.rightNeighbor.i);
       SS2K_LOG(POWERTABLE_LOG_TAG, "Right failed at: (%d) Target pos: (%f)", testResults.rightNeighbor.targetPosition, targetPosition);
+      
       if (testResults.rightNeighbor.targetPosition > targetPosition - VERTICAL_NEIGHBOR_RANGE && (int)targetPosition != testResults.rightNeighbor.targetPosition) {
         avgPosition = (targetPosition + testResults.rightNeighbor.targetPosition) / 2;
         SS2K_LOG(POWERTABLE_LOG_TAG, "Right failed at: (%d) Target pos: (%f) Avg pos: (%d)", testResults.rightNeighbor.targetPosition, targetPosition, avgPosition);
