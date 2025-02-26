@@ -44,27 +44,23 @@ int PowerBuffer::getReadings() {
 }
 
 void PowerTable::processPowerValue(PowerBuffer& powerBuffer, int cadence,
-                                   Measurement watts) {  // this basically checks the constaraints and if everything is good it adds it into the powerbuffer. no need to change
-  static int calcStep;                                   // calcStep is the percentage range of the stepper motor
+                                   Measurement watts) {  
 
   if ((cadence >= (MINIMUM_TABLE_CAD - (POWERTABLE_CAD_INCREMENT / 2))) &&
       (cadence <= (MINIMUM_TABLE_CAD + (POWERTABLE_CAD_INCREMENT * POWERTABLE_CAD_SIZE) - (POWERTABLE_CAD_SIZE / 2))) && (watts.getValue() > 10) &&  // adding constraints
       (watts.getValue() < (POWERTABLE_WATT_SIZE * POWERTABLE_WATT_INCREMENT))) {
-    if (rtConfig->getMaxStep() == DEFAULT_STEPPER_TRAVEL && rtConfig->getMinStep() == -DEFAULT_STEPPER_TRAVEL) {
-      int totalStep = ((rtConfig->getMaxStep() - rtConfig->getMaxStep() / 2000000));  // stepper distance is 400,000,000 so dividing it by 2,000,000 gives us 200
-      calcStep      = totalStep * 0.05;                                               // 5% of that would give us around a 10 positive and negative range
-    } else if (rtConfig->getHomed()) {
-      int totalStep = (rtConfig->getMaxStep() / TABLE_DIVISOR);  // maxStep should be around 22000 / TABLE_DIVISOR gives us 200ish
-      calcStep      = totalStep * 0.05;                // 5% of that would give us around a 10 positive and negative range
-    }
 
     if (powerBuffer.powerEntry[0].readings == 0) {  // we need to make sure stepper position is not negative so it only takes positive resistance values
       // Take Initial reading
       powerBuffer.set(0);
       // Check if the current stepper posistion is within a 5% range of the previous stepper position and that the current position is not negative
     }
-    if (((ss2k->getCurrentPosition() / TABLE_DIVISOR) >= ((powerBuffer.powerEntry[0].targetPosition) - calcStep)) &&
-        ((ss2k->getCurrentPosition() / TABLE_DIVISOR) <= ((powerBuffer.powerEntry[0].targetPosition) + calcStep))) {
+
+    int currentPos = ss2k->getCurrentPosition() / TABLE_DIVISOR; 
+    int targetPos = powerBuffer.powerEntry[0].targetPosition; 
+    int range = PT_READING_RANGE + ERG_SENSITIVITY; 
+
+    if ( currentPos >= ( targetPos - range) && currentPos <= (targetPos + range)) {
       for (int i = 1; i < POWER_SAMPLES; i++) {
         if (powerBuffer.powerEntry[i].readings == 0) {
           SS2K_LOG(POWERTABLE_LOG_TAG, "Success!");

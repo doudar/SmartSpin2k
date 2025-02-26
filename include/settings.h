@@ -305,11 +305,14 @@ const char* const DEFAULT_PASSWORD = "password";
 // Limit power table size to save memory
 #define TABLE_DIVISOR 100.0
 
-//Max distance a failed neighbor can be horizontally from target position
-#define HORIZONTAL_NEIGHBOR_RANGE 20
+// Adds onto ERG_SENSITIVITY 
+#define PT_READING_RANGE 10.0
 
-//Max distance a failed neighbor can be vertically from target position
-#define VERTICAL_NEIGHBOR_RANGE 10
+//Max distance a failed neighbor can be horizontally from target position
+#define HORIZONTAL_NEIGHBOR_RANGE 0.6
+    
+//Max distance a failed neighbr can be vertically from target position
+#define VERTICAL_NEIGHBOR_RANGE 0.8
 
 // Temperature of the ESP32 at which to start reducing the power output of the stepper motor driver.
 #define THROTTLE_TEMP 90
