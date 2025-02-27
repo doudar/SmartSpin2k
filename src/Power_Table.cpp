@@ -8,8 +8,8 @@
 #include "Power_Table.h"
 #include "SS2KLog.h"
 #include "BLE_Custom_Characteristic.h"
+#include "spline.h"
 #include <LittleFS.h>
-#include <spline.h>
 #include <vector>
 #include <algorithm>
 #include <cmath>
@@ -444,170 +444,175 @@ TestResults PowerTable::testNeighbors(int i, int j, int testValue) {
 //   }
 // }
 
+// void PowerTable::fillTable() {
+//   tk::spline spline_interpolator; 
+
+//   // Perform horizontal cubic spline interpolation for each row
+//   for (int i = 0; i < POWERTABLE_CAD_SIZE; ++i) {
+//       std::vector<double> x_vals, y_vals;
+//       x_vals.reserve(POWERTABLE_WATT_SIZE);
+//       y_vals.reserve(POWERTABLE_WATT_SIZE);
+
+//       for (int j = 0; j < POWERTABLE_WATT_SIZE; ++j) {
+//           if (this->tableRow[i].tableEntry[j].targetPosition != INT16_MIN) {
+//               x_vals.push_back(j);
+//               y_vals.push_back(this->tableRow[i].tableEntry[j].targetPosition);
+//           }
+//       }
+
+//       if (x_vals.size() > 2) { // Only interpolate if we have 3 points. (Cubic)
+//           spline_interpolator.set_points(x_vals, y_vals);
+
+//           for (int j = 0; j < POWERTABLE_WATT_SIZE; ++j) {
+//               if (this->tableRow[i].tableEntry[j].targetPosition == INT16_MIN) {
+//                 int tempValue = static_cast<int>(std::round(spline_interpolator(j)));
+//                 if (this->testNeighbors(i, j, tempValue).allNeighborsPassed) {
+//                     this->tableRow[i].tableEntry[j].targetPosition = tempValue;
+//                 }
+//               }
+//           }
+//       }
+//   }
+
+//   // Perform vertical cubic spline interpolation for each column
+//   for (int j = 0; j < POWERTABLE_WATT_SIZE; ++j) {
+//       std::vector<double> x_vals, y_vals;
+//       x_vals.reserve(POWERTABLE_CAD_SIZE);
+//       y_vals.reserve(POWERTABLE_CAD_SIZE);
+
+//       for (int i = 0; i < POWERTABLE_CAD_SIZE; ++i) {
+//           if (this->tableRow[i].tableEntry[j].targetPosition != INT16_MIN) {
+//               x_vals.push_back(i);
+//               y_vals.push_back(this->tableRow[i].tableEntry[j].targetPosition);
+//           }
+//       }
+
+//       if (x_vals.size() > 2) { // Only interpolate if we have 3 points(cubic)
+//           spline_interpolator.set_points(x_vals, y_vals);
+
+//           for (int i = 0; i < POWERTABLE_CAD_SIZE; ++i) {
+//               if (this->tableRow[i].tableEntry[j].targetPosition == INT16_MIN) {
+//                 int tempValue = static_cast<int>(std::round(spline_interpolator(i)));
+//                 if (this->testNeighbors(i, j, tempValue).allNeighborsPassed) {
+//                     this->tableRow[i].tableEntry[j].targetPosition = tempValue;
+//                 }
+//               }
+//           }
+//       }
+//   }
+// }
+
 void PowerTable::fillTable() {
-  tk::spline spline_interpolator; // Declare spline object once
-
-  // Perform horizontal cubic spline interpolation for each row
+  // Horizontal Interpolation 
   for (int i = 0; i < POWERTABLE_CAD_SIZE; ++i) {
-      std::vector<double> x_vals, y_vals;
-      x_vals.reserve(POWERTABLE_WATT_SIZE);
-      y_vals.reserve(POWERTABLE_WATT_SIZE);
+      std::vector<double> x, y;
+      std::vector<int> emptyIndices;
 
+      // Collect existing data points and empty indices
       for (int j = 0; j < POWERTABLE_WATT_SIZE; ++j) {
           if (this->tableRow[i].tableEntry[j].targetPosition != INT16_MIN) {
-              x_vals.push_back(j);
-              y_vals.push_back(this->tableRow[i].tableEntry[j].targetPosition);
+              x.push_back(j);
+              y.push_back(this->tableRow[i].tableEntry[j].targetPosition);
+          } else {
+              emptyIndices.push_back(j);
           }
       }
 
-      if (x_vals.size() > 1) { // Only interpolate if we have enough points. might turn into 2
-          spline_interpolator.set_points(x_vals, y_vals);
+      if (x.size() > 2) { // Need 3 points
+          tk::spline s(x, y);
 
-          for (int j = 0; j < POWERTABLE_WATT_SIZE; ++j) {
-              if (this->tableRow[i].tableEntry[j].targetPosition == INT16_MIN) {
-                  double interpolated_value = spline_interpolator(j);
-                  if (this->testNeighbors(i, j, interpolated_value).allNeighborsPassed) {
-                      this->tableRow[i].tableEntry[j].targetPosition = static_cast<int>(interpolated_value);
-                  }
+          // Interpolate and fill empty cells
+          for (int j : emptyIndices) {
+              int tempValue = static_cast<int>(std::round(s(j))); // Round to make more accurete
+              if (this->testNeighbors(i, j, tempValue).allNeighborsPassed) {
+                  this->tableRow[i].tableEntry[j].targetPosition = tempValue;
               }
           }
       }
   }
 
-  // Perform vertical cubic spline interpolation for each column
+  // Vertical Interpolation
   for (int j = 0; j < POWERTABLE_WATT_SIZE; ++j) {
-      std::vector<double> x_vals, y_vals;
-      x_vals.reserve(POWERTABLE_CAD_SIZE);
-      y_vals.reserve(POWERTABLE_CAD_SIZE);
+      std::vector<double> x, y;
+      std::vector<int> emptyIndices;
 
+      // Collect existing data points and empty indices
       for (int i = 0; i < POWERTABLE_CAD_SIZE; ++i) {
           if (this->tableRow[i].tableEntry[j].targetPosition != INT16_MIN) {
-              x_vals.push_back(i);
-              y_vals.push_back(this->tableRow[i].tableEntry[j].targetPosition);
+              x.push_back(i);
+              y.push_back(this->tableRow[i].tableEntry[j].targetPosition);
+          } else {
+              emptyIndices.push_back(i);
           }
       }
 
-      if (x_vals.size() > 1) { // Only interpolate if we have enough points
-          spline_interpolator.set_points(x_vals, y_vals);
+      if (x.size() > 2) { // Need 3 points
+          tk::spline s(x, y);
 
-          for (int i = 0; i < POWERTABLE_CAD_SIZE; ++i) {
-              if (this->tableRow[i].tableEntry[j].targetPosition == INT16_MIN) {
-                  double interpolated_value = spline_interpolator(i);
-                  if (this->testNeighbors(i, j, interpolated_value).allNeighborsPassed) {
-                      this->tableRow[i].tableEntry[j].targetPosition = static_cast<int>(interpolated_value);
-                  }
+          // Interpolate and fill empty cells
+          for (int i : emptyIndices) {
+              int tempValue = static_cast<int>(std::round(s(i))); // Round to make more accurate
+              if (this->testNeighbors(i, j, tempValue).allNeighborsPassed) {
+                  this->tableRow[i].tableEntry[j].targetPosition = tempValue;
               }
           }
       }
   }
 }
 
-// void PowerTable::fillTable() {
-//   // Horizontal Interpolation using spline.h
-//   for (int i = 0; i < POWERTABLE_CAD_SIZE; ++i) {
-//       std::vector<double> x, y;
-//       std::vector<int> emptyIndices;
 
-//       // Collect existing data points and empty indices
+// void PowerTable::extrapFillTable() {
+//   // Extract known data points for each row
+//   for (int i = 0; i < POWERTABLE_CAD_SIZE; ++i) {
+//       std::vector<double> x_vals, y_vals;
 //       for (int j = 0; j < POWERTABLE_WATT_SIZE; ++j) {
 //           if (this->tableRow[i].tableEntry[j].targetPosition != INT16_MIN) {
-//               x.push_back(j);
-//               y.push_back(this->tableRow[i].tableEntry[j].targetPosition);
-//           } else {
-//               emptyIndices.push_back(j);
+//               x_vals.push_back(j);
+//               y_vals.push_back(this->tableRow[i].tableEntry[j].targetPosition);
 //           }
 //       }
-
-//       if (x.size() > 2) { // Need at least three points for cubic spline
-//           tk::spline s(x, y);
-
-//           // Interpolate and fill empty cells
-//           for (int j : emptyIndices) {
-//               int tempValue = static_cast<int>(std::round(s(j))); // Use rounding to avoid truncation errors
-//               if (this->testNeighbors(i, j, tempValue).allNeighborsPassed) {
-//                   this->tableRow[i].tableEntry[j].targetPosition = tempValue;
+      
+//       if (x_vals.size() > 2) {  // Need at least two points for spline
+//           tk::spline spline_interp;
+//           spline_interp.set_points(x_vals, y_vals, tk::spline::cspline); // Cubic spline interpolation
+          
+//           for (int j = 0; j < POWERTABLE_WATT_SIZE; ++j) {
+//               if (this->tableRow[i].tableEntry[j].targetPosition == INT16_MIN) {
+//                   double extrapolatedValue = spline_interp(j);
+//                   if (this->testNeighbors(i, j, extrapolatedValue).allNeighborsPassed) {
+//                       this->tableRow[i].tableEntry[j].targetPosition = extrapolatedValue;
+//                   }
 //               }
 //           }
 //       }
 //   }
-
-//   // Vertical Interpolation using spline.h
+  
+//   // Extract known data points for each column
 //   for (int j = 0; j < POWERTABLE_WATT_SIZE; ++j) {
-//       std::vector<double> x, y;
-//       std::vector<int> emptyIndices;
-
-//       // Collect existing data points and empty indices
+//       std::vector<double> x_vals, y_vals;
 //       for (int i = 0; i < POWERTABLE_CAD_SIZE; ++i) {
 //           if (this->tableRow[i].tableEntry[j].targetPosition != INT16_MIN) {
-//               x.push_back(i);
-//               y.push_back(this->tableRow[i].tableEntry[j].targetPosition);
-//           } else {
-//               emptyIndices.push_back(i);
+//               x_vals.push_back(i);
+//               y_vals.push_back(this->tableRow[i].tableEntry[j].targetPosition);
 //           }
 //       }
-
-//       if (x.size() > 2) { // Need at least three points for cubic spline
-//           tk::spline s(x, y);
-
-//           // Interpolate and fill empty cells
-//           for (int i : emptyIndices) {
-//               int tempValue = static_cast<int>(std::round(s(i))); // Use rounding to avoid truncation errors
-//               if (this->testNeighbors(i, j, tempValue).allNeighborsPassed) {
-//                   this->tableRow[i].tableEntry[j].targetPosition = tempValue;
+      
+//       if (x_vals.size() > 2) {
+//           tk::spline spline_interp;
+//           spline_interp.set_points(x_vals, y_vals, tk::spline::cspline);
+          
+//           for (int i = 0; i < POWERTABLE_CAD_SIZE; ++i) {
+//               if (this->tableRow[i].tableEntry[j].targetPosition == INT16_MIN) {
+//                   double extrapolatedValue = spline_interp(i);
+//                   if (this->testNeighbors(i, j, extrapolatedValue).allNeighborsPassed) {
+//                       this->tableRow[i].tableEntry[j].targetPosition = extrapolatedValue;
+//                   }
 //               }
 //           }
 //       }
 //   }
 // }
 
-// void PowerTable::fillTable() {
-//   int tempValue = INT16_MIN;
-
-//   // Fill each empty cell by linear interpolation
-//   for (int i = 0; i < POWERTABLE_CAD_SIZE; ++i) {
-//     // Interpolate horizontally
-//     for (int j = 0; j < POWERTABLE_WATT_SIZE; ++j) {
-//       if (this->tableRow[i].tableEntry[j].targetPosition == INT16_MIN) {
-//         // Find nearest left and right non-empty cells
-//         int left = j - 1;
-//         while (left >= 0 && this->tableRow[i].tableEntry[left].targetPosition == INT16_MIN) left--;
-//         int right = j + 1;
-//         while (right < POWERTABLE_WATT_SIZE && this->tableRow[i].tableEntry[right].targetPosition == INT16_MIN) right++;
-
-//         if (left >= 0 && right < POWERTABLE_WATT_SIZE) {
-//           // Linear interpolation
-//           tempValue = this->tableRow[i].tableEntry[left].targetPosition +
-//                       (this->tableRow[i].tableEntry[right].targetPosition - this->tableRow[i].tableEntry[left].targetPosition) * (j - left) / (right - left);
-//           if (this->testNeighbors(i, j, tempValue).allNeighborsPassed) {
-//             this->tableRow[i].tableEntry[j].targetPosition = tempValue;
-//           }
-//         }
-//       }
-//     }
-//   }
-
-//   for (int j = 0; j < POWERTABLE_WATT_SIZE; ++j) {
-//     // Interpolate vertically
-//     for (int i = 0; i < POWERTABLE_CAD_SIZE; ++i) {
-//       if (this->tableRow[i].tableEntry[j].targetPosition == INT16_MIN) {
-//         // Find nearest top and bottom non-empty cells
-//         int top = i - 1;
-//         while (top >= 0 && this->tableRow[top].tableEntry[j].targetPosition == INT16_MIN) top--;
-//         int bottom = i + 1;
-//         while (bottom < POWERTABLE_CAD_SIZE && this->tableRow[bottom].tableEntry[j].targetPosition == INT16_MIN) bottom++;
-
-//         if (top >= 0 && bottom < POWERTABLE_CAD_SIZE) {
-//           // Linear interpolation
-//           tempValue = this->tableRow[top].tableEntry[j].targetPosition +
-//                       (this->tableRow[bottom].tableEntry[j].targetPosition - this->tableRow[top].tableEntry[j].targetPosition) * (i - top) / (bottom - top);
-//           if (this->testNeighbors(i, j, tempValue).allNeighborsPassed) {
-//             this->tableRow[i].tableEntry[j].targetPosition = tempValue;
-//           }
-//         }
-//       }
-//     }
-//   }
-// }
 
 void PowerTable::extrapFillTable() {
   // Find the center of the known data
@@ -868,6 +873,42 @@ void PowerTable::extrapolateDiagonal() {
     }
   }
 }
+
+// void PowerTable::extrapolateDiagonal() {
+//   for (int diag = -POWERTABLE_CAD_SIZE + 1; diag < POWERTABLE_WATT_SIZE; ++diag) {
+//       std::vector<double> x, y;
+//       std::vector<int> indices;
+      
+//       // Collect known data points along the diagonal
+//       for (int i = 0; i < POWERTABLE_CAD_SIZE; ++i) {
+//           int j = i + diag;
+//           if (j >= 0 && j < POWERTABLE_WATT_SIZE && this->tableRow[i].tableEntry[j].targetPosition != INT16_MIN) {
+//               x.push_back(i);
+//               y.push_back(this->tableRow[i].tableEntry[j].targetPosition);
+//               indices.push_back(i);
+//           }
+//       }
+      
+//       // If we have enough points, perform cubic spline interpolation/extrapolation
+//       if (x.size() > 2) {
+//           tk::spline splineInterp;
+//           splineInterp.set_points(x, y, tk::spline::cspline);
+          
+//           // Extrapolate missing values
+//           for (int i = 0; i < POWERTABLE_CAD_SIZE; ++i) {
+//               int j = i + diag;
+//               if (j >= 0 && j < POWERTABLE_WATT_SIZE && this->tableRow[i].tableEntry[j].targetPosition == INT16_MIN) {
+//                   double tempValue = splineInterp(i);
+                  
+//                   if (testNeighbors(i, j, tempValue).allNeighborsPassed) {
+//                       this->tableRow[i].tableEntry[j].targetPosition = static_cast<int>(tempValue);
+//                   }
+//               }
+//           }
+//       }
+//   }
+// }
+
 
 // double polynomialExtrapolation(const std::vector<double>& x, const std::vector<double>& y, double x_new, int order = 1) {
 //   if (x.size() != y.size() || x.size() < order + 1 || order < 0) {
