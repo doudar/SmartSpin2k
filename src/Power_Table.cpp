@@ -7,6 +7,7 @@
 
 #include "Power_Table.h"
 #include "SS2KLog.h"
+#include "spline.h"
 #include "BLE_Custom_Characteristic.h"
 #include <LittleFS.h>
 #include <vector>
@@ -339,53 +340,112 @@ TestResults PowerTable::testNeighbors(int i, int j, int testValue) {
 }
 
 void PowerTable::fillTable() {
-  int tempValue = INT16_MIN;
-
-  // Fill each empty cell by linear interpolation
+  // Horizontal Interpolation 
   for (int i = 0; i < POWERTABLE_CAD_SIZE; ++i) {
-    // Interpolate horizontally
-    for (int j = 0; j < POWERTABLE_WATT_SIZE; ++j) {
-      if (this->tableRow[i].tableEntry[j].targetPosition == INT16_MIN) {
-        // Find nearest left and right non-empty cells
-        int left = j - 1;
-        while (left >= 0 && this->tableRow[i].tableEntry[left].targetPosition == INT16_MIN) left--;
-        int right = j + 1;
-        while (right < POWERTABLE_WATT_SIZE && this->tableRow[i].tableEntry[right].targetPosition == INT16_MIN) right++;
+      std::vector<double> x, y;
+      std::vector<int> emptyIndices;
 
-        if (left >= 0 && right < POWERTABLE_WATT_SIZE) {
-          // Linear interpolation
-          tempValue = this->tableRow[i].tableEntry[left].targetPosition +
-                      (this->tableRow[i].tableEntry[right].targetPosition - this->tableRow[i].tableEntry[left].targetPosition) * (j - left) / (right - left);
-          if (this->testNeighbors(i, j, tempValue).allNeighborsPassed) {
-            this->tableRow[i].tableEntry[j].targetPosition = tempValue;
+      // Collect existing data points and empty indices
+      for (int j = 0; j < POWERTABLE_WATT_SIZE; ++j) {
+          if (this->tableRow[i].tableEntry[j].targetPosition != INT16_MIN) {
+              x.push_back(j);
+              y.push_back(this->tableRow[i].tableEntry[j].targetPosition);
+          } else {
+              emptyIndices.push_back(j);
           }
-        }
       }
-    }
+
+      if (x.size() > 2) { // Need 3 points
+          tk::spline s(x, y);
+
+          // Interpolate and fill empty cells
+          for (int j : emptyIndices) {
+              int tempValue = static_cast<int>(std::round(s(j))); // Round to make more accurete
+              if (this->testNeighbors(i, j, tempValue).allNeighborsPassed) {
+                  this->tableRow[i].tableEntry[j].targetPosition = tempValue;
+              }
+          }
+      }
   }
 
+  // Vertical Interpolation
   for (int j = 0; j < POWERTABLE_WATT_SIZE; ++j) {
-    // Interpolate vertically
-    for (int i = 0; i < POWERTABLE_CAD_SIZE; ++i) {
-      if (this->tableRow[i].tableEntry[j].targetPosition == INT16_MIN) {
-        // Find nearest top and bottom non-empty cells
-        int top = i - 1;
-        while (top >= 0 && this->tableRow[top].tableEntry[j].targetPosition == INT16_MIN) top--;
-        int bottom = i + 1;
-        while (bottom < POWERTABLE_CAD_SIZE && this->tableRow[bottom].tableEntry[j].targetPosition == INT16_MIN) bottom++;
+      std::vector<double> x, y;
+      std::vector<int> emptyIndices;
 
-        if (top >= 0 && bottom < POWERTABLE_CAD_SIZE) {
-          // Linear interpolation
-          tempValue = this->tableRow[top].tableEntry[j].targetPosition +
-                      (this->tableRow[bottom].tableEntry[j].targetPosition - this->tableRow[top].tableEntry[j].targetPosition) * (i - top) / (bottom - top);
-          if (this->testNeighbors(i, j, tempValue).allNeighborsPassed) {
-            this->tableRow[i].tableEntry[j].targetPosition = tempValue;
+      // Collect existing data points and empty indices
+      for (int i = 0; i < POWERTABLE_CAD_SIZE; ++i) {
+          if (this->tableRow[i].tableEntry[j].targetPosition != INT16_MIN) {
+              x.push_back(i);
+              y.push_back(this->tableRow[i].tableEntry[j].targetPosition);
+          } else {
+              emptyIndices.push_back(i);
           }
-        }
       }
-    }
+
+      if (x.size() > 2) { // Need 3 points
+          tk::spline s(x, y);
+
+          // Interpolate and fill empty cells
+          for (int i : emptyIndices) {
+              int tempValue = static_cast<int>(std::round(s(i))); // Round to make more accurate
+              if (this->testNeighbors(i, j, tempValue).allNeighborsPassed) {
+                  this->tableRow[i].tableEntry[j].targetPosition = tempValue;
+              }
+          }
+      }
   }
 }
+
+// Old Fill Function 
+// void PowerTable::fillTable() {
+//   int tempValue = INT16_MIN;
+
+//   // Fill each empty cell by linear interpolation
+//   for (int i = 0; i < POWERTABLE_CAD_SIZE; ++i) {
+//     // Interpolate horizontally
+//     for (int j = 0; j < POWERTABLE_WATT_SIZE; ++j) {
+//       if (this->tableRow[i].tableEntry[j].targetPosition == INT16_MIN) {
+//         // Find nearest left and right non-empty cells
+//         int left = j - 1;
+//         while (left >= 0 && this->tableRow[i].tableEntry[left].targetPosition == INT16_MIN) left--;
+//         int right = j + 1;
+//         while (right < POWERTABLE_WATT_SIZE && this->tableRow[i].tableEntry[right].targetPosition == INT16_MIN) right++;
+
+//         if (left >= 0 && right < POWERTABLE_WATT_SIZE) {
+//           // Linear interpolation
+//           tempValue = this->tableRow[i].tableEntry[left].targetPosition +
+//                       (this->tableRow[i].tableEntry[right].targetPosition - this->tableRow[i].tableEntry[left].targetPosition) * (j - left) / (right - left);
+//           if (this->testNeighbors(i, j, tempValue).allNeighborsPassed) {
+//             this->tableRow[i].tableEntry[j].targetPosition = tempValue;
+//           }
+//         }
+//       }
+//     }
+//   }
+
+//   for (int j = 0; j < POWERTABLE_WATT_SIZE; ++j) {
+//     // Interpolate vertically
+//     for (int i = 0; i < POWERTABLE_CAD_SIZE; ++i) {
+//       if (this->tableRow[i].tableEntry[j].targetPosition == INT16_MIN) {
+//         // Find nearest top and bottom non-empty cells
+//         int top = i - 1;
+//         while (top >= 0 && this->tableRow[top].tableEntry[j].targetPosition == INT16_MIN) top--;
+//         int bottom = i + 1;
+//         while (bottom < POWERTABLE_CAD_SIZE && this->tableRow[bottom].tableEntry[j].targetPosition == INT16_MIN) bottom++;
+
+//         if (top >= 0 && bottom < POWERTABLE_CAD_SIZE) {
+//           // Linear interpolation
+//           tempValue = this->tableRow[top].tableEntry[j].targetPosition +
+//                       (this->tableRow[bottom].tableEntry[j].targetPosition - this->tableRow[top].tableEntry[j].targetPosition) * (i - top) / (bottom - top);
+//           if (this->testNeighbors(i, j, tempValue).allNeighborsPassed) {
+//             this->tableRow[i].tableEntry[j].targetPosition = tempValue;
+//           }
+//         }
+//       }
+//     }
+//   }
+// }
 
 void PowerTable::extrapFillTable() {
   // Find the center of the known data
