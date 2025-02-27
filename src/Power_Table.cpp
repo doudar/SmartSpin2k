@@ -670,22 +670,6 @@ void PowerTable::clean() {
   }
 }
 
-// function for weighted downvoting
-int weightedDownVote(int targetValue, int neighborValue) {
-  // calculate diff between target and neighbor
-  int delta = abs(targetValue - neighborValue);
-  int penalty;
-  float penaltyFactor = 0.2;
-
-  // currently consistently getting a 0 for neighbor value...
-  SS2K_LOG(POWERTABLE_LOG_TAG, "WEIGHTED DOWNVOTING: Target Value: (%d), NeighborValue: (%f)", targetValue, neighborValue);
-
-  penalty = round(delta * penaltyFactor);
-
-  SS2K_LOG(POWERTABLE_LOG_TAG, "WEIGHTED DOWNVOTING: Delta: (%d), Penalty: (%f)", delta, penalty);
-  return penalty;
-}
-
 void PowerTable::newEntry(PowerBuffer& powerBuffer) {
   // these are floats so that we make sure division works correctly.
   float watts          = 0;
@@ -774,14 +758,14 @@ void PowerTable::newEntry(PowerBuffer& powerBuffer) {
               (this->testNeighbors(testResults.rightNeighbor.i, testResults.rightNeighbor.j, testResults.leftNeighbor.targetPosition).allNeighborsPassed))) {
           SS2K_LOG(POWERTABLE_LOG_TAG, "All test failed left (%d)(%d)(%d), readings (%d)", testResults.leftNeighbor.i, testResults.leftNeighbor.j,
                    testResults.leftNeighbor.targetPosition, this->tableRow[testResults.leftNeighbor.i].tableEntry[testResults.leftNeighbor.j].readings);
-          this->tableRow[testResults.leftNeighbor.i].tableEntry[testResults.leftNeighbor.j].readings--;
-          // this->downVoteData(testResults.leftNeighbor.i, testResults.leftNeighbor.j, targetPosition, testResults.leftNeighbor.targetPosition);
+          //this->tableRow[testResults.leftNeighbor.i].tableEntry[testResults.leftNeighbor.j].readings--;
+          this->downVoteData(testResults.leftNeighbor.i, testResults.leftNeighbor.j, targetPosition, testResults.leftNeighbor.targetPosition);
         }
       } else {
         SS2K_LOG(POWERTABLE_LOG_TAG, "Was not in range failed left (%d)(%d)(%d), readings (%d)", testResults.leftNeighbor.i, testResults.leftNeighbor.j,
                  testResults.leftNeighbor.targetPosition, this->tableRow[testResults.leftNeighbor.i].tableEntry[testResults.leftNeighbor.j].readings);
-        this->tableRow[testResults.leftNeighbor.i].tableEntry[testResults.leftNeighbor.j].readings--;
-        // this->downVoteData(testResults.leftNeighbor.i, testResults.leftNeighbor.j, targetPosition, testResults.leftNeighbor.targetPosition);
+        //this->tableRow[testResults.leftNeighbor.i].tableEntry[testResults.leftNeighbor.j].readings--;
+        this->downVoteData(testResults.leftNeighbor.i, testResults.leftNeighbor.j, targetPosition, testResults.leftNeighbor.targetPosition);
       }
     }
 
@@ -817,14 +801,14 @@ void PowerTable::newEntry(PowerBuffer& powerBuffer) {
               (this->testNeighbors(testResults.leftNeighbor.i, testResults.leftNeighbor.j, testResults.rightNeighbor.targetPosition).allNeighborsPassed))) {
           SS2K_LOG(POWERTABLE_LOG_TAG, "All test failed right (%d)(%d)(%d), readings (%d)", testResults.rightNeighbor.i, testResults.rightNeighbor.j,
                    testResults.rightNeighbor.targetPosition, this->tableRow[testResults.rightNeighbor.i].tableEntry[testResults.rightNeighbor.j].readings);
-          this->tableRow[testResults.rightNeighbor.i].tableEntry[testResults.rightNeighbor.j].readings--;
-          // this->downVoteData(testResults.rightNeighbor.i, testResults.rightNeighbor.j, targetPosition, testResults.rightNeighbor.targetPosition);
+          //this->tableRow[testResults.rightNeighbor.i].tableEntry[testResults.rightNeighbor.j].readings--;
+          this->downVoteData(testResults.rightNeighbor.i, testResults.rightNeighbor.j, targetPosition, testResults.rightNeighbor.targetPosition);
         }
       } else {
         SS2K_LOG(POWERTABLE_LOG_TAG, "Was not in range failed right (%d)(%d)(%d), readings (%d)", testResults.rightNeighbor.i, testResults.rightNeighbor.j,
                  testResults.rightNeighbor.targetPosition, this->tableRow[testResults.rightNeighbor.i].tableEntry[testResults.rightNeighbor.j].readings);
-        this->tableRow[testResults.rightNeighbor.i].tableEntry[testResults.rightNeighbor.j].readings--;
-        // this->downVoteData(testResults.rightNeighbor.i, testResults.rightNeighbor.j, targetPosition, testResults.rightNeighbor.targetPosition);
+       // this->tableRow[testResults.rightNeighbor.i].tableEntry[testResults.rightNeighbor.j].readings--;
+        this->downVoteData(testResults.rightNeighbor.i, testResults.rightNeighbor.j, targetPosition, testResults.rightNeighbor.targetPosition);
       }
     }
 
@@ -860,14 +844,14 @@ void PowerTable::newEntry(PowerBuffer& powerBuffer) {
               (this->testNeighbors(testResults.bottomNeighbor.i, testResults.bottomNeighbor.j, testResults.topNeighbor.targetPosition).allNeighborsPassed))) {
           SS2K_LOG(POWERTABLE_LOG_TAG, "All test failed top (%d)(%d)(%d), readings (%d)", testResults.topNeighbor.i, testResults.topNeighbor.j,
                    testResults.topNeighbor.targetPosition, this->tableRow[testResults.topNeighbor.i].tableEntry[testResults.topNeighbor.j].readings);
-          this->tableRow[testResults.topNeighbor.i].tableEntry[testResults.topNeighbor.j].readings--;
-          // this->downVoteData(testResults.topNeighbor.i, testResults.topNeighbor.j, targetPosition, testResults.topNeighbor.targetPosition);
+          //this->tableRow[testResults.topNeighbor.i].tableEntry[testResults.topNeighbor.j].readings--;
+          this->downVoteData(testResults.topNeighbor.i, testResults.topNeighbor.j, targetPosition, testResults.topNeighbor.targetPosition);
         }
       } else {
         SS2K_LOG(POWERTABLE_LOG_TAG, "Was not in range failed top (%d)(%d)(%d), readings (%d)", testResults.topNeighbor.i, testResults.topNeighbor.j,
                  testResults.topNeighbor.targetPosition, this->tableRow[testResults.topNeighbor.i].tableEntry[testResults.topNeighbor.j].readings);
-        this->tableRow[testResults.topNeighbor.i].tableEntry[testResults.topNeighbor.j].readings--;
-        // this->downVoteData(testResults.topNeighbor.i, testResults.topNeighbor.j, targetPosition, testResults.topNeighbor.targetPosition);
+        //this->tableRow[testResults.topNeighbor.i].tableEntry[testResults.topNeighbor.j].readings--;
+        this->downVoteData(testResults.topNeighbor.i, testResults.topNeighbor.j, targetPosition, testResults.topNeighbor.targetPosition);
       }
     }
 
@@ -903,14 +887,14 @@ void PowerTable::newEntry(PowerBuffer& powerBuffer) {
               (this->testNeighbors(testResults.topNeighbor.i, testResults.topNeighbor.j, testResults.bottomNeighbor.targetPosition).allNeighborsPassed))) {
           SS2K_LOG(POWERTABLE_LOG_TAG, "All test failed bottom (%d)(%d)(%d), readings (%d)", testResults.topNeighbor.i, testResults.topNeighbor.j,
                    testResults.topNeighbor.targetPosition, this->tableRow[testResults.topNeighbor.i].tableEntry[testResults.topNeighbor.j].readings);
-          this->tableRow[testResults.bottomNeighbor.i].tableEntry[testResults.bottomNeighbor.j].readings--;
-          // this->downVoteData(testResults.bottomNeighbor.i, testResults.bottomNeighbor.j, targetPosition, testResults.bottomNeighbor.targetPosition);
+          // this->tableRow[testResults.bottomNeighbor.i].tableEntry[testResults.bottomNeighbor.j].readings--;
+          this->downVoteData(testResults.bottomNeighbor.i, testResults.bottomNeighbor.j, targetPosition, testResults.bottomNeighbor.targetPosition);
         }
       } else {
         SS2K_LOG(POWERTABLE_LOG_TAG, "Was not in range failed bottom (%d)(%d)(%d), readings (%d)", testResults.bottomNeighbor.i, testResults.bottomNeighbor.j,
                  testResults.bottomNeighbor.targetPosition, this->tableRow[testResults.bottomNeighbor.i].tableEntry[testResults.bottomNeighbor.j].readings);
-        this->tableRow[testResults.bottomNeighbor.i].tableEntry[testResults.bottomNeighbor.j].readings--;
-        // this->downVoteData(testResults.bottomNeighbor.i, testResults.bottomNeighbor.j, targetPosition, testResults.bottomNeighbor.targetPosition);
+        // this->tableRow[testResults.bottomNeighbor.i].tableEntry[testResults.bottomNeighbor.j].readings--;
+        this->downVoteData(testResults.bottomNeighbor.i, testResults.bottomNeighbor.j, targetPosition, testResults.bottomNeighbor.targetPosition);
       }
     }
     return;
@@ -961,6 +945,22 @@ void PowerTable::enterData(int i, int j, int pos) {
       newEntries = getNumEntries();
     }
   }
+}
+
+// function for weighted downvoting
+int weightedDownVote(int targetValue, int neighborValue) {
+  // calculate diff between target and neighbor
+  int delta = abs(targetValue - neighborValue);
+  int penalty;
+  float penaltyFactor = 0.2;
+
+  // currently consistently getting a 0 for neighbor value...
+  SS2K_LOG(POWERTABLE_LOG_TAG, "WEIGHTED DOWNVOTING: Target Value: (%d), NeighborValue: (%d)", targetValue, neighborValue);
+
+  penalty = (delta * penaltyFactor);
+
+  SS2K_LOG(POWERTABLE_LOG_TAG, "WEIGHTED DOWNVOTING: Delta: (%d), Penalty: (%d)", delta, penalty);
+  return penalty;
 }
 
 void PowerTable::downVoteData(int i, int j, float target, int neighbor) {
