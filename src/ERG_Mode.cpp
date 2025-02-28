@@ -181,7 +181,7 @@ void ErgMode::computeErg() {
 }
 
 void ErgMode::_setPointChangeState(int newCadence, Measurement& newWatts) {
-  int32_t tableResult = powerTable->lookup(newWatts.getTarget(), newCadence);
+  int32_t tableResult = powerTable->splineLookup(newWatts.getTarget(), newCadence);
 
   // Sanity check for targets
   if (tableResult != RETURN_ERROR) {

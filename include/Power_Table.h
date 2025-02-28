@@ -110,6 +110,9 @@ class PowerTable {
   // returns incline for wattTarget. Null if not found.
   int32_t lookup(int watts, int cad);
 
+  // returns 
+  int32_t splineLookup(int watts, int cad); 
+
   // returns watts for given cadence and target position. Returns RETURN_ERROR if not found.
   int32_t lookupWatts(int cad, int32_t targetPosition);
 

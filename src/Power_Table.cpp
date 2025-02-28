@@ -345,6 +345,79 @@ TestResults PowerTable::testNeighbors(int i, int j, int testValue) {
   return returnResult;
 }
 
+int32_t PowerTable::splineLookup(int watts, int cad) {
+  int cadIndex = round(((float)cad - (float)MINIMUM_TABLE_CAD) / (float)POWERTABLE_CAD_INCREMENT);
+  int wattIndex = round((float)watts / (float)POWERTABLE_WATT_INCREMENT);
+
+  std::vector<double> cadValues;
+  std::vector<double> targetPositionsCad;
+
+  for (int i = 0; i < POWERTABLE_CAD_SIZE; ++i) {
+      if (this->tableRow[i].tableEntry[wattIndex].targetPosition != INT16_MIN) {
+          cadValues.push_back(i * POWERTABLE_CAD_INCREMENT + MINIMUM_TABLE_CAD);
+          targetPositionsCad.push_back(this->tableRow[i].tableEntry[wattIndex].targetPosition);
+      }
+  }
+
+  if (cadValues.size() > 2) { // Need at least 3 points for cubic spline
+      tk::spline splineCad(cadValues, targetPositionsCad);
+      double interpolatedCad = splineCad(cad);
+      SS2K_LOG(POWERTABLE_LOG_TAG, "Spline Cadence Interpolated: %f", interpolatedCad);
+      if(interpolatedCad != interpolatedCad){ 
+          interpolatedCad = INT16_MIN;
+      }
+
+      std::vector<double> wattValues;
+      std::vector<double> targetPositionsWatt;
+
+      for (int j = 0; j < POWERTABLE_WATT_SIZE; ++j) {
+          if (this->tableRow[cadIndex].tableEntry[j].targetPosition != INT16_MIN) {
+              wattValues.push_back(j * POWERTABLE_WATT_INCREMENT);
+              targetPositionsWatt.push_back(this->tableRow[cadIndex].tableEntry[j].targetPosition);
+          }
+      }
+
+      if (wattValues.size() > 2) {
+          tk::spline splineWatt(wattValues, targetPositionsWatt);
+          double interpolatedWatt = splineWatt(watts);
+          SS2K_LOG(POWERTABLE_LOG_TAG, "Spline Wattage Interpolated: %f", interpolatedWatt);
+          if(interpolatedWatt != interpolatedWatt){ 
+              interpolatedWatt = INT16_MIN;
+          }
+
+          double sum = 0;
+          int count = 0;
+
+          if (interpolatedCad != INT16_MIN) {
+              sum += interpolatedCad;
+              count++;
+          }
+          if (interpolatedWatt != INT16_MIN) {
+              sum += interpolatedWatt;
+              count++;
+          }
+          if (this->tableRow[cadIndex].tableEntry[wattIndex].targetPosition != INT16_MIN) {
+              sum += this->tableRow[cadIndex].tableEntry[wattIndex].targetPosition;
+              count++;
+          }
+
+          if (count > 0) {
+              int32_t ret = (int32_t)(sum / count) * TABLE_DIVISOR;
+              SS2K_LOG(POWERTABLE_LOG_TAG, "Spline Lookup result: %dw %dcad %d", watts, cad, ret);
+              return ret;
+          } else {
+              return INT32_MIN; 
+          }
+      } else {
+          // Not enough wattage data for spline interpolation
+          return lookup(watts,cad);
+      }
+  } else {
+      // Not enough cadence data for spline interpolation
+      return lookup(watts,cad);
+  }
+}
+
 void PowerTable::fillTable() {
   // Horizontal Interpolation 
   for (int i = 0; i < POWERTABLE_CAD_SIZE; ++i) {
