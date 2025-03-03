@@ -59,7 +59,8 @@
         "set": "cpp",
         "iostream": "cpp",
         "*.dontuse": "cpp",
-        "core": "cpp"
+        "core": "cpp",
+        "complex": "cpp"
     },
     "cSpell.words": [
         "Appender",
