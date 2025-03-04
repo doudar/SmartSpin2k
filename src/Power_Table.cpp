@@ -455,6 +455,16 @@ void PowerTable::extrapFillTable() {
           y.push_back(it->second);
       }
 
+      if (x.size() == 1) {
+        int constantValue = static_cast<int>(std::round(y.front()));
+        for (int j = 0; j < POWERTABLE_WATT_SIZE; ++j) {
+            if (this->tableRow[i].tableEntry[j].targetPosition == INT16_MIN) {
+                this->tableRow[i].tableEntry[j].targetPosition = constantValue;
+            }
+        }
+        continue;
+    }
+
       if (x.size() == 2) {
           // Use linear extrapolation for two points
           double slope = (y[1] - y[0]) / (x[1] - x[0]);
@@ -520,6 +530,15 @@ void PowerTable::extrapFillTable() {
           y.push_back(it->second);
       }
 
+      if (x.size() == 1) {
+        int constantValue = static_cast<int>(std::round(y.front()));
+        for (int i = 0; i < POWERTABLE_CAD_SIZE; ++i) {
+            if (this->tableRow[i].tableEntry[j].targetPosition == INT16_MIN) {
+                this->tableRow[i].tableEntry[j].targetPosition = constantValue;
+            }
+        }
+        continue;
+    }
       if (x.size() == 2) {
           // Use linear extrapolation for two points
           double slope = (y[1] - y[0]) / (x[1] - x[0]);
