@@ -371,15 +371,14 @@ void PowerTable::fillTable() {
               this->tableRow[i].tableEntry[j].targetPosition = static_cast<int>(std::round(singleValue));
           }
           continue;
-      } 
-      if (x.size() == 2) {
+      } else if (x.size() == 2) {
           // If only 2 unique points, we perform linear interpolation
 
           for (int j : emptyIndices) {
 
             if (j < x.front() || j > x.back()) continue; 
 
-            double interpolated_value = y[0] + (y[1] - y[0]) * (j - x[0]) / (x[1] - x[1]); //interpolation formula 
+            double interpolated_value = y[0] + (y[1] - y[0]) * (j - x[0]) / (x[1] - x[0]); //interpolation formula 
 
             double minValue = *std::min_element(y.begin(), y.end());
             double maxValue = *std::max_element(y.begin(), y.end()); 
@@ -393,8 +392,7 @@ void PowerTable::fillTable() {
               }
           }
           continue;
-      } 
-      if (x.size() >= 3) {
+      } else if (x.size() >= 3) {
           // If we have 3 unique points, then we can perform cubic spline
           tk::spline s; // Initialize s for using in cubic spline
           s.set_points(x, y, tk::spline::cspline);
@@ -414,8 +412,10 @@ void PowerTable::fillTable() {
                 this->tableRow[i].tableEntry[j].targetPosition = tempValue;
             }
         }
-      } 
-
+      } else {
+          SS2K_LOG(POWERTABLE_LOG_TAG, "Error: No unique points found.");
+          continue;
+      }
   }
 
   // Vertical Interpolation
@@ -446,14 +446,13 @@ void PowerTable::fillTable() {
               this->tableRow[i].tableEntry[j].targetPosition = static_cast<int>(std::round(singleValue));
           }
           continue;
-      } 
-      if (x.size() == 2) {
+      } else if (x.size() == 2) {
 
           for (int i : emptyIndices) {
 
             if (i < x.front() || i > x.back()) continue; 
 
-            double interpolated_value = y[0] + (y[1] - y[0]) * (i - x[0]) / (x[1] - x[1]); //interpolation formula 
+            double interpolated_value = y[0] + (y[1] - y[0]) * (i - x[0]) / (x[1] - x[0]); //interpolation formula 
 
             double minValue = *std::min_element(y.begin(), y.end());
             double maxValue = *std::max_element(y.begin(), y.end()); 
@@ -467,8 +466,7 @@ void PowerTable::fillTable() {
               }
           }
           continue;
-      } 
-      if (x.size() >= 3) {
+      } else if (x.size() >= 3) {
           tk::spline s; // Initialize s for using in cubic spline
           s.set_points(x, y, tk::spline::cspline);
           for (int i : emptyIndices) {
@@ -486,7 +484,10 @@ void PowerTable::fillTable() {
                 this->tableRow[i].tableEntry[j].targetPosition = tempValue;
             }
         }
-      }
+      } else {
+        SS2K_LOG(POWERTABLE_LOG_TAG, "Error: No unique points found.");
+        continue;
+    }
   }
 }
 
