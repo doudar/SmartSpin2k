@@ -350,36 +350,25 @@ TestResults PowerTable::testNeighbors(int i, int j, int testValue) {
 void PowerTable::fillTable() {
   // Horizontal Interpolation
   for (int i = 0; i < POWERTABLE_CAD_SIZE; ++i) {
-      std::vector<double> x, y;
-      std::vector<int> emptyIndices;
+    std::map<double, double> unique_xy;
+    std::vector<int> emptyIndices;
 
-      // Collect data points
-      for (int j = 0; j < POWERTABLE_WATT_SIZE; ++j) {
-          if (this->tableRow[i].tableEntry[j].targetPosition != INT16_MIN) {
-              x.push_back(static_cast<double>(j));
-              y.push_back(static_cast<double>(this->tableRow[i].tableEntry[j].targetPosition));
-          } else {
-              emptyIndices.push_back(j);
-          }
-      }
+    // Collect known values for this row
+    for (int j = 0; j < POWERTABLE_WATT_SIZE; ++j) {
+        if (this->tableRow[i].tableEntry[j].targetPosition != INT16_MIN) {
+            unique_xy[j] = static_cast<double>(this->tableRow[i].tableEntry[j].targetPosition);
+        } else {
+            emptyIndices.push_back(j);
+        }
+    }
 
-      if (x.size() < 2) continue; // We skip if there are fewer than two unique points
+    if (unique_xy.size() < 2) continue; // Skip if not enough data
 
-      std::map<double, double> unique_xy;
-      for (size_t k = 0; k < x.size(); ++k) {
-          unique_xy[x[k]] = y[k]; // Get rid of duplicates so we only have unique points
-      }
-
-      // Clear x and y so we can put ONLY the unique points in
-      x.clear();
-      y.clear();
-
-      for (const auto& it : unique_xy) { // We put the unique points back into x and y
-          x.push_back(it.first);
-          y.push_back(it.second);
-      }
-
-      tk::spline s; // Initialize s for using in cubic spline
+    std::vector<double> x, y;
+    for (const auto& it : unique_xy) {
+        x.push_back(it.first);
+        y.push_back(it.second);
+    }
 
       if (x.size() == 1) {
           // If we only have one unique point, we fill the row with that value. Good for keeping data
@@ -388,15 +377,15 @@ void PowerTable::fillTable() {
               this->tableRow[i].tableEntry[j].targetPosition = static_cast<int>(std::round(singleValue));
           }
           continue;
-      } else if (x.size() == 2) {
+      } 
+      if (x.size() == 2) {
           // If only 2 unique points, we perform linear interpolation
-          for (int j : emptyIndices) {
-              double x0 = x[0];
-              double y0 = y[0];
-              double x1 = x[1];
-              double y1 = y[1];
+          double slope = (y[1] - y[0]) / (x[1] - x[0]);
+          double intercept = y[0] - slope * x[0];
 
-              double interpolated_value = y0 + (y1 - y0) * (j - x0) / (x1 - x0);
+          for (int j : emptyIndices) {
+
+              double interpolated_value = slope * j + intercept;
 
               interpolated_value = std::max(*std::min_element(y.begin(), y.end()), std::min(*std::max_element(y.begin(), y.end()), interpolated_value));
 
@@ -407,59 +396,46 @@ void PowerTable::fillTable() {
               }
           }
           continue;
-      } else if (x.size() >= 3) {
+      } 
+      if (x.size() >= 3) {
           // If we have 3 unique points, then we can perform cubic spline
+          tk::spline s; // Initialize s for using in cubic spline
           s.set_points(x, y, tk::spline::cspline);
-      } else {
-          // Sanity check just so we don't crash when we don't have a unique point, won't happen.
-          SS2K_LOG(POWERTABLE_LOG_TAG, "Error: No unique points found.");
-          continue;
-      }
+          for (int j : emptyIndices) {
+            double interpolated_value = s(j);
+            interpolated_value = std::max(*std::min_element(y.begin(), y.end()), std::min(*std::max_element(y.begin(), y.end()), interpolated_value));
+  
+            int tempValue = static_cast<int>(std::round(interpolated_value));
+  
+            if (this->testNeighbors(i, j, tempValue).allNeighborsPassed) {
+                this->tableRow[i].tableEntry[j].targetPosition = tempValue;
+            }
+        }
+      } 
 
-      // Continue with the interpolation/extrapolation.
-      for (int j : emptyIndices) {
-          double interpolated_value = s(j);
-          interpolated_value = std::max(*std::min_element(y.begin(), y.end()), std::min(*std::max_element(y.begin(), y.end()), interpolated_value));
-
-          int tempValue = static_cast<int>(std::round(interpolated_value));
-
-          if (this->testNeighbors(i, j, tempValue).allNeighborsPassed) {
-              this->tableRow[i].tableEntry[j].targetPosition = tempValue;
-          }
-      }
   }
 
-  // Vertical Interpolation (Similar changes)
+  // Vertical Interpolation
   for (int j = 0; j < POWERTABLE_WATT_SIZE; ++j) {
-      std::vector<double> x, y;
-      std::vector<int> emptyIndices;
+    std::map<double, double> unique_xy;
+    std::vector<int> emptyIndices;
 
-      // Collect data points
-      for (int i = 0; i < POWERTABLE_CAD_SIZE; ++i) {
-          if (this->tableRow[i].tableEntry[j].targetPosition != INT16_MIN) {
-              x.push_back(static_cast<double>(i));
-              y.push_back(static_cast<double>(this->tableRow[i].tableEntry[j].targetPosition));
-          } else {
-              emptyIndices.push_back(i);
-          }
-      }
+    // Collect known values for this column
+    for (int i = 0; i < POWERTABLE_CAD_SIZE; ++i) {
+        if (this->tableRow[i].tableEntry[j].targetPosition != INT16_MIN) {
+            unique_xy[i] = static_cast<double>(this->tableRow[i].tableEntry[j].targetPosition);
+        } else {
+            emptyIndices.push_back(i);
+        }
+    }
 
-      if (x.size() < 2) continue; // We skip if there are fewer than two unique points
+    if (unique_xy.size() < 2) continue;
 
-      std::map<double, double> unique_xy;
-      for (size_t k = 0; k < x.size(); ++k) {
-          unique_xy[x[k]] = y[k];
-      }
-
-      x.clear();
-      y.clear();
-
-      for (const auto& it : unique_xy) {
-          x.push_back(it.first);
-          y.push_back(it.second);
-      }
-
-      tk::spline s; // Initialize s for using in cubic spline
+    std::vector<double> x, y;
+    for (const auto& it : unique_xy) {
+        x.push_back(it.first);
+        y.push_back(it.second);
+    }
 
       if (x.size() == 1) {
           double singleValue = y.front();
@@ -467,14 +443,15 @@ void PowerTable::fillTable() {
               this->tableRow[i].tableEntry[j].targetPosition = static_cast<int>(std::round(singleValue));
           }
           continue;
-      } else if (x.size() == 2) {
-          for (int i : emptyIndices) {
-              double x0 = x[0];
-              double y0 = y[0];
-              double x1 = x[1];
-              double y1 = y[1];
+      } 
+      if (x.size() == 2) {
 
-              double interpolated_value = y0 + (y1 - y0) * (i - x0) / (x1 - x0);
+          double slope = (y[1] - y[0]) / (x[1] - x[0]);
+          double intercept = y[0] - slope * x[0];
+
+          for (int i : emptyIndices) {
+
+              double interpolated_value = slope * i + intercept;
 
               interpolated_value = std::max(*std::min_element(y.begin(), y.end()), std::min(*std::max_element(y.begin(), y.end()), interpolated_value));
 
@@ -485,53 +462,241 @@ void PowerTable::fillTable() {
               }
           }
           continue;
-      } else if (x.size() >= 3) {
+      } 
+      if (x.size() >= 3) {
+          tk::spline s; // Initialize s for using in cubic spline
           s.set_points(x, y, tk::spline::cspline);
-      } else {
-          SS2K_LOG(POWERTABLE_LOG_TAG, "Error: No unique points found.");
-          continue;
-      }
-
-      for (int i : emptyIndices) {
-          double interpolated_value = s(i);
-          interpolated_value = std::max(*std::min_element(y.begin(), y.end()), std::min(*std::max_element(y.begin(), y.end()), interpolated_value));
-
-          int tempValue = static_cast<int>(std::round(interpolated_value));
-
-          if (this->testNeighbors(i, j, tempValue).allNeighborsPassed) {
-              this->tableRow[i].tableEntry[j].targetPosition = tempValue;
-          }
+          for (int i : emptyIndices) {
+            double interpolated_value = s(i);
+            interpolated_value = std::max(*std::min_element(y.begin(), y.end()), std::min(*std::max_element(y.begin(), y.end()), interpolated_value));
+  
+            int tempValue = static_cast<int>(std::round(interpolated_value));
+  
+            if (this->testNeighbors(i, j, tempValue).allNeighborsPassed) {
+                this->tableRow[i].tableEntry[j].targetPosition = tempValue;
+            }
+        }
       }
   }
 }
 
-void PowerTable::extrapFillTable() {
-  // Horizontal extrapolation for each row
+/*
+void PowerTable::fillTable() {
+  // Horizontal Interpolation
   for (int i = 0; i < POWERTABLE_CAD_SIZE; ++i) {
-      std::map<double, double> knownPoints;
+
+    std::map<double, double> unique_xy;
+    std::vector<int> emptyIndices;
+
+    // Collect data points 
+    for (int j = 0; j < POWERTABLE_WATT_SIZE; ++j) {
+        if (this->tableRow[i].tableEntry[j].targetPosition != INT16_MIN) {
+            unique_xy[j] = static_cast<double>(this->tableRow[i].tableEntry[j].targetPosition); // Get all unique points
+        } else {
+            emptyIndices.push_back(j);
+        }
+    }
+
+    if (unique_xy.size() < 2) continue; // Make sure that we have more than 2 unique points 
+
+    std::vector<double> x, y;
+    for (const auto& it : unique_xy) { // Put the unique values in x and y 
+        x.push_back(it.first);
+        y.push_back(it.second);
+    } 
+
+      if (x.size() == 1) { // If we only have one unique point, we fill the row with that value. Good for keeping data
+          double singleValue = y.front();
+          for (int j : emptyIndices) {
+              this->tableRow[i].tableEntry[j].targetPosition = static_cast<int>(std::round(singleValue));
+          }
+          continue;
+      } else if (x.size() == 2) { // If only 2 unique points, we perform linear interpolation
+          for (int j : emptyIndices) {
+
+              double x0 = x[0];
+              double y0 = y[0];
+              double x1 = x[1];
+              double y1 = y[1];
+
+              double tempValue = y0 + (y1 - y0) * (j - x0) / (x1 - x0); // interpolation formula 
+              double minValue = *std::min_element(y.begin(), y.end()); 
+              double maxValue = *std::max_element(y.begin(), y.end()); 
+              double range = maxValue - minValue; 
+
+              double clampingFactor = 0.1 + 0.05 * std::abs((y.back() - y.front()) / (x.back() - x.front()));
+            
+              if (j < x.front() || j > x.back()) { // Extrapolate outside the range
+                tempValue = std::max(minValue - clampingFactor * range, std::min(tempValue, maxValue + clampingFactor * range));
+              } 
+              if (j > x.front() && j < x.back()) { // Interpoalte inside the range
+                tempValue = std::max(minValue, std::min(maxValue, tempValue)); //we stay inside the range of the points 
+              }
+
+              int roundedValue = static_cast<int>(std::round(tempValue));
+
+              if (this->testNeighbors(i, j, roundedValue).allNeighborsPassed) {
+                  this->tableRow[i].tableEntry[j].targetPosition = roundedValue;
+              }
+          }
+          continue;
+      } else if (x.size() >= 3) { // If we have 3 unique points, then we can perform cubic spline
+          
+          tk::spline s; // Initialize s for using in cubic spline
+          s.set_points(x, y, tk::spline::cspline);
+
+          for (int j : emptyIndices) {
+
+            double tempValue = s(j);
+            double minValue = *std::min_element(y.begin(), y.end());
+            double maxValue = *std::max_element(y.begin(), y.end()); 
+            double range = maxValue - minValue; 
+            double clampingFactor = 0.1 + 0.05 * std::abs((y.back() - y.front()) / (x.back() - x.front()));
+  
+            if (j < x.front() || j > x.back()) { // Extrapolate outside the range
+              tempValue = std::max(minValue - clampingFactor * range, std::min(tempValue, maxValue + clampingFactor * range));
+            } 
+            if (j > x.front() && j < x.back()) { // Interpoalte inside the range
+              tempValue = std::max(minValue, std::min(maxValue, tempValue)); //we stay inside the range of the points 
+            }
+  
+            int roundedValue = static_cast<int>(std::round(tempValue));
+  
+            if (this->testNeighbors(i, j, roundedValue).allNeighborsPassed) {
+                this->tableRow[i].tableEntry[j].targetPosition = roundedValue;
+            }
+        }
+
+      } else { // Saftey check just so we don't crash when we don't have a unique point, won't happen.
+
+          SS2K_LOG(POWERTABLE_LOG_TAG, "Error: No unique points found.");
+          continue;
+
+      }
+  }
+
+  // Vertical Interpolation 
+  for (int j = 0; j < POWERTABLE_WATT_SIZE; ++j) {
+
+    std::map<double, double> unique_xy;
+    std::vector<int> emptyIndices;
+
+    // Collect data points
+    for (int i = 0; i < POWERTABLE_CAD_SIZE; ++i) {
+        if (this->tableRow[i].tableEntry[j].targetPosition != INT16_MIN) {
+            unique_xy[i] = static_cast<double>(this->tableRow[i].tableEntry[j].targetPosition);
+        } else {
+            emptyIndices.push_back(i);
+        }
+    }
+
+    if (unique_xy.size() < 2) continue;
+
+    std::vector<double> x, y;
+
+    for (const auto& it : unique_xy) {
+        x.push_back(it.first);
+        y.push_back(it.second);
+    }
+
+      if (x.size() == 1) { // If we only have one unique point, we fill the row with that value. Good for keeping data
+          double singleValue = y.front();
+          for (int i : emptyIndices) {
+              this->tableRow[i].tableEntry[j].targetPosition = static_cast<int>(std::round(singleValue));
+          }
+          continue;
+      } else if (x.size() == 2) { // If only 2 unique points, we perform linear interpolation
+          for (int i : emptyIndices) {
+
+              double x0 = x[0];
+              double y0 = y[0];
+              double x1 = x[1];
+              double y1 = y[1];
+
+              double tempValue = y0 + (y1 - y0) * (i - x0) / (x1 - x0); //interpolation formula 
+              double minValue = *std::min_element(y.begin(), y.end()); 
+              double maxValue = *std::max_element(y.begin(), y.end()); 
+              double range = maxValue - minValue; 
+              double clampingFactor = 0.1 + 0.05 * std::abs((y.back() - y.front()) / (x.back() - x.front()));
+
+              if (i < x.front() || i > x.back()) { // Extrapolate outside the range
+                tempValue = std::max(minValue - clampingFactor * range, std::min(tempValue, maxValue + clampingFactor * range));
+              } 
+              if (i > x.front() && i < x.back()) { // Interpoalte inside the range
+                tempValue = std::max(minValue, std::min(maxValue, tempValue)); //we stay inside the range of the points 
+              }
+
+              int roundedValue = static_cast<int>(std::round(tempValue));
+
+              if (this->testNeighbors(i, j, roundedValue).allNeighborsPassed) {
+                  this->tableRow[i].tableEntry[j].targetPosition = roundedValue;
+              }
+          }
+          continue;
+      } else if (x.size() >= 3) { // If we have 3 unique points, then we can perform cubic spline
+
+          tk::spline s; // Initialize s for using in cubic spline
+          s.set_points(x, y, tk::spline::cspline);
+
+          for (int i : emptyIndices) {
+
+            double tempValue = s(i);
+            double minValue = *std::min_element(y.begin(), y.end()); 
+            double maxValue = *std::max_element(y.begin(), y.end()); 
+            double range = maxValue - minValue; 
+            double clampingFactor = 0.1 + 0.05 * std::abs((y.back() - y.front()) / (x.back() - x.front()));
+  
+            if (i < x.front() || i > x.back()) { // Extrapolate outside the range
+              tempValue = std::max(minValue - clampingFactor * range, std::min(tempValue, maxValue + clampingFactor * range));
+            } 
+            if (i > x.front() && i < x.back()) { // Interpoalte inside the range
+              tempValue = std::max(minValue, std::min(maxValue, tempValue)); //we stay inside the range of the points 
+            }
+  
+            int roundedValue = static_cast<int>(std::round(tempValue));
+  
+            if (this->testNeighbors(i, j, roundedValue).allNeighborsPassed) {
+                this->tableRow[i].tableEntry[j].targetPosition = roundedValue;
+            }
+        }
+
+      } else { // Saftey check just so we don't crash when we don't have a unique point, won't happen.
+
+          SS2K_LOG(POWERTABLE_LOG_TAG, "Error: No unique points found.");
+          continue;
+
+      }
+  }
+}
+*/
+
+void PowerTable::extrapFillTable() {
+  // Horizontal extrapolation 
+  for (int i = 0; i < POWERTABLE_CAD_SIZE; ++i) {
+      std::map<double, double> unique_xy;
       std::vector<int> emptyIndices;
 
       // Collect known values for this row
       for (int j = 0; j < POWERTABLE_WATT_SIZE; ++j) {
           if (this->tableRow[i].tableEntry[j].targetPosition != INT16_MIN) {
-              knownPoints[j] = static_cast<double>(this->tableRow[i].tableEntry[j].targetPosition);
+              unique_xy[j] = static_cast<double>(this->tableRow[i].tableEntry[j].targetPosition);
           } else {
               emptyIndices.push_back(j);
           }
       }
 
-      if (knownPoints.size() < 2) continue; // Skip if not enough data
+      if (unique_xy.size() < 2) continue; // Skip if not enough data
 
       std::vector<double> x, y;
-      for (const auto& pair : knownPoints) {
-          x.push_back(pair.first);
-          y.push_back(pair.second);
+      for (const auto& it : unique_xy) {
+          x.push_back(it.first);
+          y.push_back(it.second);
       }
 
       if (x.size() == 1) {
-          int constantValue = static_cast<int>(std::round(y.front()));
+          int singleValue = static_cast<int>(std::round(y.front()));
           for (int j : emptyIndices) {
-              this->tableRow[i].tableEntry[j].targetPosition = constantValue;
+              this->tableRow[i].tableEntry[j].targetPosition = singleValue;
           }
           continue;
       }
@@ -541,51 +706,52 @@ void PowerTable::extrapFillTable() {
           double intercept = y[0] - slope * x[0];
 
           for (int j : emptyIndices) {
-              double interpolatedValue = slope * j + intercept;
-              int roundedValue = static_cast<int>(std::round(interpolatedValue));
-              if (testNeighbors(i, j, roundedValue).allNeighborsPassed) {
-                  this->tableRow[i].tableEntry[j].targetPosition = roundedValue;
+              double extrapolated_value = slope * j + intercept;
+              int tempValue = static_cast<int>(std::round(extrapolated_value));
+              if (testNeighbors(i, j, tempValue).allNeighborsPassed) {
+                  this->tableRow[i].tableEntry[j].targetPosition = tempValue;
               }
           }
           continue;
       }
-
-      tk::spline s;
-      s.set_points(x, y, tk::spline::cspline);
-
-      for (int j : emptyIndices) {
-          double interpolatedValue = s(j);
-          double minVal = *std::min_element(y.begin(), y.end());
-          double maxVal = *std::max_element(y.begin(), y.end());
-          double range = maxVal - minVal;
-          interpolatedValue = std::max(minVal - 0.1 * range, std::min(interpolatedValue, maxVal + 0.1 * range));
-          int roundedValue = static_cast<int>(std::round(interpolatedValue));
-          if (testNeighbors(i, j, roundedValue).allNeighborsPassed) {
-              this->tableRow[i].tableEntry[j].targetPosition = roundedValue;
-          }
+      if(x.size() >= 3){
+        tk::spline s;
+        s.set_points(x, y, tk::spline::cspline);
+  
+        for (int j : emptyIndices) {
+            double extrapolated_value = s(j);
+            double minVal = *std::min_element(y.begin(), y.end());
+            double maxVal = *std::max_element(y.begin(), y.end());
+            double range = maxVal - minVal;
+            extrapolated_value = std::max(minVal - 0.1 * range, std::min(extrapolated_value, maxVal + 0.1 * range));
+            int tempValue = static_cast<int>(std::round(extrapolated_value));
+            if (testNeighbors(i, j, tempValue).allNeighborsPassed) {
+                this->tableRow[i].tableEntry[j].targetPosition = tempValue;
+            }
+        }
       }
   }
 
-  // Vertical extrapolation for each column
+  // Vertical extrapolation 
   for (int j = 0; j < POWERTABLE_WATT_SIZE; ++j) {
-      std::map<double, double> knownPoints;
+      std::map<double, double> unique_xy;
       std::vector<int> emptyIndices;
 
       // Collect known values for this column
       for (int i = 0; i < POWERTABLE_CAD_SIZE; ++i) {
           if (this->tableRow[i].tableEntry[j].targetPosition != INT16_MIN) {
-              knownPoints[i] = static_cast<double>(this->tableRow[i].tableEntry[j].targetPosition);
+              unique_xy[i] = static_cast<double>(this->tableRow[i].tableEntry[j].targetPosition);
           } else {
               emptyIndices.push_back(i);
           }
       }
 
-      if (knownPoints.size() < 2) continue;
+      if (unique_xy.size() < 2) continue;
 
       std::vector<double> x, y;
-      for (const auto& pair : knownPoints) {
-          x.push_back(pair.first);
-          y.push_back(pair.second);
+      for (const auto& it : unique_xy) {
+          x.push_back(it.first);
+          y.push_back(it.second);
       }
 
       if (x.size() == 1) {
@@ -601,28 +767,29 @@ void PowerTable::extrapFillTable() {
           double intercept = y[0] - slope * x[0];
 
           for (int i : emptyIndices) {
-              double interpolatedValue = slope * i + intercept;
-              int roundedValue = static_cast<int>(std::round(interpolatedValue));
-              if (testNeighbors(i, j, roundedValue).allNeighborsPassed) {
-                  this->tableRow[i].tableEntry[j].targetPosition = roundedValue;
+              double extrapolated_value = slope * i + intercept;
+              int tempValue = static_cast<int>(std::round(extrapolated_value));
+              if (testNeighbors(i, j, tempValue).allNeighborsPassed) {
+                  this->tableRow[i].tableEntry[j].targetPosition = tempValue;
               }
           }
           continue;
       }
-
-      tk::spline s;
-      s.set_points(x, y, tk::spline::cspline);
-
-      for (int i : emptyIndices) {
-          double interpolatedValue = s(i);
-          double minVal = *std::min_element(y.begin(), y.end());
-          double maxVal = *std::max_element(y.begin(), y.end());
-          double range = maxVal - minVal;
-          interpolatedValue = std::max(minVal - 0.1 * range, std::min(interpolatedValue, maxVal + 0.1 * range));
-          int roundedValue = static_cast<int>(std::round(interpolatedValue));
-          if (testNeighbors(i, j, roundedValue).allNeighborsPassed) {
-              this->tableRow[i].tableEntry[j].targetPosition = roundedValue;
-          }
+      if(x.size() >= 3){
+        tk::spline s;
+        s.set_points(x, y, tk::spline::cspline);
+  
+        for (int i : emptyIndices) {
+            double extrapolated_value = s(i);
+            double minVal = *std::min_element(y.begin(), y.end());
+            double maxVal = *std::max_element(y.begin(), y.end());
+            double range = maxVal - minVal;
+            extrapolated_value = std::max(minVal - 0.1 * range, std::min(extrapolated_value, maxVal + 0.1 * range));
+            int tempValue = static_cast<int>(std::round(extrapolated_value));
+            if (testNeighbors(i, j, tempValue).allNeighborsPassed) {
+                this->tableRow[i].tableEntry[j].targetPosition = tempValue;
+            }
+        }
       }
   }
 }
@@ -631,7 +798,7 @@ void PowerTable::extrapFillTable() {
 
 void PowerTable::extrapolateDiagonal() {
   for (int d = 1 - POWERTABLE_WATT_SIZE; d < POWERTABLE_CAD_SIZE; ++d) {
-      std::map<double, double> knownPoints;
+      std::map<double, double> unique_xy;
       std::vector<std::pair<int, int>> emptyIndices;
 
       // Collect known values for this diagonal
@@ -639,72 +806,67 @@ void PowerTable::extrapolateDiagonal() {
           int j = i - d;
           if (j >= 0 && j < POWERTABLE_WATT_SIZE) {
               if (this->tableRow[i].tableEntry[j].targetPosition != INT16_MIN) {
-                  knownPoints[i] = static_cast<double>(this->tableRow[i].tableEntry[j].targetPosition);
+                  unique_xy[i] = static_cast<double>(this->tableRow[i].tableEntry[j].targetPosition);
               } else {
                   emptyIndices.emplace_back(i, j);
               }
           }
       }
 
-      if (knownPoints.size() < 2) continue; // Skip if not enough data
+      if (unique_xy.size() < 2) continue; // Skip if not enough data
 
-      // Extract x and y values from map (already sorted and unique)
       std::vector<double> x, y;
-      for (const auto& pair : knownPoints) {
-          x.push_back(pair.first);
-          y.push_back(pair.second);
+      for (const auto& it : unique_xy) {
+          x.push_back(it.first);
+          y.push_back(it.second);
       }
 
-      // If only 1 unique value, fill all missing positions with it
       if (x.size() == 1) {
-          int constantValue = static_cast<int>(std::round(y.front()));
-          for (const auto& index : emptyIndices) {
-              this->tableRow[index.first].tableEntry[index.second].targetPosition = constantValue;
+          int singleValue = static_cast<int>(std::round(y.front()));
+          for (const auto& it : emptyIndices) {
+              this->tableRow[it.first].tableEntry[it.second].targetPosition = singleValue;
           }
           continue;
       }
 
-      // Handle linear interpolation for exactly two points
       if (x.size() == 2) {
           double slope = (y[1] - y[0]) / (x[1] - x[0]);
           double intercept = y[0] - slope * x[0];
 
-          for (const auto& index : emptyIndices) {
-              int i = index.first;
-              int j = index.second;
+          for (const auto& it : emptyIndices) {
+              int i = it.first;
+              int j = it.second;
 
-              double interpolatedValue = slope * i + intercept;
-              int roundedValue = static_cast<int>(std::round(interpolatedValue));
+              double extrapolated_value = slope * i + intercept;
+              int tempValue = static_cast<int>(std::round(extrapolated_value));
 
-              if (testNeighbors(i, j, roundedValue).allNeighborsPassed) {
-                  this->tableRow[i].tableEntry[j].targetPosition = roundedValue;
+              if (testNeighbors(i, j, tempValue).allNeighborsPassed) {
+                  this->tableRow[i].tableEntry[j].targetPosition = tempValue;
               }
           }
-          continue; // Avoid calling cubic spline with 2 points
+          continue; 
       }
 
-      // If there are at least 3 points, use cubic spline
       if (x.size() >= 3) {
           tk::spline s;
-          s.set_points(x, y, tk::spline::cspline); // Use cubic spline
+          s.set_points(x, y, tk::spline::cspline); 
 
-          for (const auto& index : emptyIndices) {
-              int i = index.first;
-              int j = index.second;
+          for (const auto& it : emptyIndices) {
+              int i = it.first;
+              int j = it.second;
 
               if (i < 0 || i >= POWERTABLE_CAD_SIZE || j < 0 || j >= POWERTABLE_WATT_SIZE) continue;
 
-              double interpolatedValue = s(static_cast<double>(i));
+              double extrapolated_value = s(static_cast<double>(i));
 
-              // Compute min/max for clamping
               double minVal = *std::min_element(y.begin(), y.end());
               double maxVal = *std::max_element(y.begin(), y.end());
               double range = maxVal - minVal;
-              interpolatedValue = std::max(minVal - 0.1 * range, std::min(interpolatedValue, maxVal + 0.1 * range));
+              extrapolated_value = std::max(minVal - 0.1 * range, std::min(extrapolated_value, maxVal + 0.1 * range));
 
-              int roundedValue = static_cast<int>(std::round(interpolatedValue));
-              if (testNeighbors(i, j, roundedValue).allNeighborsPassed) {
-                  this->tableRow[i].tableEntry[j].targetPosition = roundedValue;
+              int tempValue = static_cast<int>(std::round(extrapolated_value));
+              if (testNeighbors(i, j, tempValue).allNeighborsPassed) {
+                  this->tableRow[i].tableEntry[j].targetPosition = tempValue;
               }
           }
       }
