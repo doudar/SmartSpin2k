@@ -353,7 +353,7 @@ void PowerTable::fillTable() {
     std::map<double, double> unique_xy;
     std::vector<int> emptyIndices;
 
-    // Collect known values for this row
+    // Collect data points
     for (int j = 0; j < POWERTABLE_WATT_SIZE; ++j) {
         if (this->tableRow[i].tableEntry[j].targetPosition != INT16_MIN) {
             unique_xy[j] = static_cast<double>(this->tableRow[i].tableEntry[j].targetPosition);
@@ -420,7 +420,7 @@ void PowerTable::fillTable() {
     std::map<double, double> unique_xy;
     std::vector<int> emptyIndices;
 
-    // Collect known values for this column
+    // Collect data points
     for (int i = 0; i < POWERTABLE_CAD_SIZE; ++i) {
         if (this->tableRow[i].tableEntry[j].targetPosition != INT16_MIN) {
             unique_xy[i] = static_cast<double>(this->tableRow[i].tableEntry[j].targetPosition);
@@ -676,7 +676,7 @@ void PowerTable::extrapFillTable() {
       std::map<double, double> unique_xy;
       std::vector<int> emptyIndices;
 
-      // Collect known values for this row
+      // Collect data points
       for (int j = 0; j < POWERTABLE_WATT_SIZE; ++j) {
           if (this->tableRow[i].tableEntry[j].targetPosition != INT16_MIN) {
               unique_xy[j] = static_cast<double>(this->tableRow[i].tableEntry[j].targetPosition);
@@ -737,7 +737,7 @@ void PowerTable::extrapFillTable() {
       std::map<double, double> unique_xy;
       std::vector<int> emptyIndices;
 
-      // Collect known values for this column
+      // Collect data points
       for (int i = 0; i < POWERTABLE_CAD_SIZE; ++i) {
           if (this->tableRow[i].tableEntry[j].targetPosition != INT16_MIN) {
               unique_xy[i] = static_cast<double>(this->tableRow[i].tableEntry[j].targetPosition);
