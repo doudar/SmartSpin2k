@@ -732,8 +732,8 @@ void PowerTable::extrapFillTable() {
 
       std::vector<double> x, y;
       for (const auto& it : unique_xy) {
-          x.push_back(it.first);
-          y.push_back(it.second);
+          x.push_back(static_cast<double>(it.first));
+          y.push_back(static_cast<double>(it.second));
       }
 
       if (x.size() == 1) {
@@ -745,11 +745,11 @@ void PowerTable::extrapFillTable() {
       }
 
       if (x.size() == 2) {
-          double slope = (y[1] - y[0]) / (x[1] - x[0]);
-          double intercept = y[0] - slope * x[0];
 
           for (int j : emptyIndices) {
-              double extrapolated_value = slope * j + intercept;
+
+            double extrapolated_value = y[0] + (y[1] - y[0]) * (j - x[0]) / (x[1] - x[0]); //interpolation formula 
+
               int tempValue = static_cast<int>(std::round(extrapolated_value));
               if (testNeighbors(i, j, tempValue).allNeighborsPassed) {
                   this->tableRow[i].tableEntry[j].targetPosition = tempValue;
@@ -758,6 +758,19 @@ void PowerTable::extrapFillTable() {
           continue;
       }
       if(x.size() >= 3){
+
+        bool validForSpline = true;
+        for (size_t i = 1; i < x.size(); ++i) {
+            if (x[i] <= x[i - 1]) {  // Make sure x is in ascending order and not a duplicate
+                validForSpline = false;
+                break;
+            }
+        }
+        if (!validForSpline) {
+            SS2K_LOG(POWERTABLE_LOG_TAG, "Duplicate or non-increasing x-values detected!");
+            continue; // Skip spline interpolation
+        }
+
         tk::spline s;
         s.set_points(x, y, tk::spline::cspline);
   
@@ -793,8 +806,8 @@ void PowerTable::extrapFillTable() {
 
       std::vector<double> x, y;
       for (const auto& it : unique_xy) {
-          x.push_back(it.first);
-          y.push_back(it.second);
+          x.push_back(static_cast<double>(it.first));
+          y.push_back(static_cast<double>(it.second));
       }
 
       if (x.size() == 1) {
@@ -806,11 +819,11 @@ void PowerTable::extrapFillTable() {
       }
 
       if (x.size() == 2) {
-          double slope = (y[1] - y[0]) / (x[1] - x[0]);
-          double intercept = y[0] - slope * x[0];
 
           for (int i : emptyIndices) {
-              double extrapolated_value = slope * i + intercept;
+
+            double extrapolated_value = y[0] + (y[1] - y[0]) * (i - x[0]) / (x[1] - x[0]); //interpolation formula 
+
               int tempValue = static_cast<int>(std::round(extrapolated_value));
               if (testNeighbors(i, j, tempValue).allNeighborsPassed) {
                   this->tableRow[i].tableEntry[j].targetPosition = tempValue;
@@ -819,6 +832,19 @@ void PowerTable::extrapFillTable() {
           continue;
       }
       if(x.size() >= 3){
+
+        bool validForSpline = true;
+        for (size_t i = 1; i < x.size(); ++i) {
+            if (x[i] <= x[i - 1]) {  // Make sure x is in ascending order and not a duplicate
+                validForSpline = false;
+                break;
+            }
+        }
+        if (!validForSpline) {
+            SS2K_LOG(POWERTABLE_LOG_TAG, "Duplicate or non-increasing x-values detected!");
+            continue; // Skip spline interpolation
+        }
+
         tk::spline s;
         s.set_points(x, y, tk::spline::cspline);
   
@@ -873,14 +899,13 @@ void PowerTable::extrapolateDiagonal() {
       }
 
       if (x.size() == 2) {
-          double slope = (y[1] - y[0]) / (x[1] - x[0]);
-          double intercept = y[0] - slope * x[0];
 
           for (const auto& it : emptyIndices) {
               int i = it.first;
               int j = it.second;
 
-              double extrapolated_value = slope * i + intercept;
+              double extrapolated_value = y[0] + (y[1] - y[0]) * (i - x[0]) / (x[1] - x[0]); //interpolation formula 
+              
               int tempValue = static_cast<int>(std::round(extrapolated_value));
 
               if (testNeighbors(i, j, tempValue).allNeighborsPassed) {
