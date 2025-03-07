@@ -360,8 +360,8 @@ void PowerTable::fillTable() {
 
     std::vector<double> x, y;
     for (const auto& it : unique_xy) {
-        x.push_back(it.first);
-        y.push_back(it.second);
+        x.push_back(static_cast<double>(it.first));
+        y.push_back(static_cast<double>(it.second));
     }
 
       if (x.size() == 1) {
@@ -393,6 +393,19 @@ void PowerTable::fillTable() {
           }
           continue;
       } else if (x.size() >= 3) {
+
+          bool validForSpline = true;
+          for (size_t i = 1; i < x.size(); ++i) {
+              if (x[i] <= x[i - 1]) { // Make sure x is in ascending order and not a duplicate
+                  validForSpline = false;
+                  break;
+              }
+          }
+          if (!validForSpline) {
+              SS2K_LOG(POWERTABLE_LOG_TAG, "Duplicate or non-increasing x-values detected!");
+              continue; 
+          }
+
           // If we have 3 unique points, then we can perform cubic spline
           tk::spline s; // Initialize s for using in cubic spline
           s.set_points(x, y, tk::spline::cspline);
@@ -436,8 +449,8 @@ void PowerTable::fillTable() {
 
     std::vector<double> x, y;
     for (const auto& it : unique_xy) {
-        x.push_back(it.first);
-        y.push_back(it.second);
+        x.push_back(static_cast<double>(it.first));
+        y.push_back(static_cast<double>(it.second));
     }
 
       if (x.size() == 1) {
@@ -467,6 +480,20 @@ void PowerTable::fillTable() {
           }
           continue;
       } else if (x.size() >= 3) {
+
+        bool validForSpline = true;
+          for (size_t i = 1; i < x.size(); ++i) {
+              if (x[i] <= x[i - 1]) {  // Make sure x is in ascending order and not a duplicate
+                  validForSpline = false;
+                  break;
+              }
+          }
+          if (!validForSpline) {
+              SS2K_LOG(POWERTABLE_LOG_TAG, "Duplicate or non-increasing x-values detected!");
+              continue; // Skip spline interpolation
+          }
+
+
           tk::spline s; // Initialize s for using in cubic spline
           s.set_points(x, y, tk::spline::cspline);
           for (int i : emptyIndices) {
