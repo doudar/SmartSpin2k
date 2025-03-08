@@ -137,6 +137,9 @@ class PowerTable {
   void fillTable();
   void extrapFillTable();
   void extrapolateDiagonal();
+  void linearInterpolate(); 
+  void linearExtrapolate(); 
+  void linearExtrapolateDiag(); 
   int getNumEntries();
   // remove entries with < 1 readings
   void clean();
