@@ -10,6 +10,7 @@
       background-color: #03245c
     }
   </style>
+  <link rel="stylesheet" href="style.css">
 </head>
 
 <body>
@@ -234,15 +235,7 @@
       }
     }
 
-    function loadCss() {
-      const link = document.createElement('link');
-      link.rel = 'stylesheet';
-      link.href = 'style.css';
-      document.head.appendChild(link);
-    }
-
     window.addEventListener('load', () => {
-      setTimeout(loadCss, 100);
       requestConfigValues();
       setupLogging();
       setTimeout(requestRuntimeValues, 200);

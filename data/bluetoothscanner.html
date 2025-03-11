@@ -5,6 +5,7 @@
   <meta name="viewport" content="width=device-width,initial-scale=1">
   <title>SmartSpin2k Bluetooth Scanner</title>
   <style>html{background-color:#03245c}</style>
+  <link rel="stylesheet" href="style.css">
 </head>
 <body>
   <div class="page-container">
@@ -154,15 +155,7 @@
         .catch(error => console.error('Error:', error));
     }
 
-    function loadCss() {
-      const link = document.createElement('link');
-      link.rel = 'stylesheet';
-      link.href = 'style.css';
-      document.head.appendChild(link);
-    }
-
     window.addEventListener('load', () => {
-      setTimeout(loadCss, 100);
       requestConfigValues();
       
       // Retry loading if values are still default
