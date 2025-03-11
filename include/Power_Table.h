@@ -137,9 +137,9 @@ class PowerTable {
   void fillTable();
   void extrapFillTable();
   void extrapolateDiagonal();
-  void linearInterpolate(); 
-  void linearExtrapolate(); 
-  void linearExtrapolateDiag(); 
+  // double linearInterpolate(const std::vector<double>& x, const std::vector<double>& y, int j); 
+  // double linearExtrapolate(const std::vector<double>& x, const std::vector<double>& y, int j); 
+  //double linearExtrapolateDiag(); 
   int getNumEntries();
   // remove entries with < 1 readings
   void clean();
