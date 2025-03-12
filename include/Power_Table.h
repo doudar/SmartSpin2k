@@ -131,6 +131,8 @@ class PowerTable {
   // Display power table in log
   void toLog();
 
+  int PowerTable::estimateMissingValue(int primaryIndex, int secondaryIndex, bool isHorizontal);
+
  private:
   unsigned long lastSaveTime     = millis();
   TestResults testNeighbors(int i, int j, int value);

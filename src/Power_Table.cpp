@@ -389,6 +389,49 @@ double linearExtrapolate(const std::vector<double>& x, const std::vector<double>
   return y0 + (y1 - y0) * (j - x0) / (x1 - x0);
 }
 
+int PowerTable::estimateMissingValue(int primaryIndex, int secondaryIndex, bool isHorizontal) {
+  double estimated_value = 0.0;
+  int validNeighborCount = 0;
+  double sumValues = 0.0;
+  
+  // Expand search range to check nearby valid values
+  for (int offset = -2; offset <= 2; ++offset) {
+      int neighborIndex = secondaryIndex + offset;
+      if (neighborIndex < 0 || (isHorizontal ? neighborIndex >= POWERTABLE_WATT_SIZE : neighborIndex >= POWERTABLE_CAD_SIZE))
+          continue;
+
+      int value = isHorizontal ? this->tableRow[primaryIndex].tableEntry[neighborIndex].targetPosition
+                               : this->tableRow[neighborIndex].tableEntry[primaryIndex].targetPosition;
+      
+      if (value != INT16_MIN) {
+          sumValues += value;
+          validNeighborCount++;
+      }
+  }
+
+  // If enough neighbors are found, compute the average
+  if (validNeighborCount > 0) {
+      estimated_value = sumValues / validNeighborCount;
+  } else {
+      // Fallback: check adjacent rows (for horizontal) or adjacent columns (for vertical)
+      for (int offset = -1; offset <= 1; ++offset) {
+          int neighborIndex = primaryIndex + offset;
+          if (neighborIndex < 0 || (isHorizontal ? neighborIndex >= POWERTABLE_CAD_SIZE : neighborIndex >= POWERTABLE_WATT_SIZE))
+              continue;
+
+          int value = isHorizontal ? this->tableRow[neighborIndex].tableEntry[secondaryIndex].targetPosition
+                                   : this->tableRow[primaryIndex].tableEntry[neighborIndex].targetPosition;
+          
+          if (value != INT16_MIN) {
+              estimated_value = value;
+              break;
+          }
+      }
+  }
+
+  return static_cast<int>(std::round(estimated_value));
+}
+
 void PowerTable::fillTable() {
   // Horizontal Interpolation
   for (int i = 0; i < POWERTABLE_CAD_SIZE; ++i) {
@@ -417,23 +460,8 @@ void PowerTable::fillTable() {
         int x0 = static_cast<int>(x.front());
 
         for (int j : emptyIndices) {
-            double estimated_value = singleValue; // Default to the only known value
-
-            // Check for neighboring valid values
-            bool hasLeftNeighbor = (j > 0 && this->tableRow[i].tableEntry[j - 1].targetPosition != INT16_MIN);
-            bool hasRightNeighbor = (j < POWERTABLE_WATT_SIZE - 1 && this->tableRow[i].tableEntry[j + 1].targetPosition != INT16_MIN);
-
-            if (hasLeftNeighbor && hasRightNeighbor) {
-                // Blend using left and right known values for better accuracy
-                estimated_value = (this->tableRow[i].tableEntry[j - 1].targetPosition +
-                                  this->tableRow[i].tableEntry[j + 1].targetPosition) / 2.0;
-            } else if (hasLeftNeighbor) {
-                estimated_value = this->tableRow[i].tableEntry[j - 1].targetPosition;
-            } else if (hasRightNeighbor) {
-                estimated_value = this->tableRow[i].tableEntry[j + 1].targetPosition;
-            }
-
-            int tempValue = static_cast<int>(std::round(estimated_value));
+            
+            int tempValue = estimateMissingValue(i, j, true); 
 
             if (this->testNeighbors(i, j, tempValue).allNeighborsPassed) {
                 this->tableRow[i].tableEntry[j].targetPosition = tempValue;
@@ -536,24 +564,8 @@ void PowerTable::fillTable() {
         int x0 = static_cast<int>(x.front());
     
         for (int i : emptyIndices) {
-            double estimated_value = singleValue; // Default to the only known value
-    
-            // Check for neighboring valid values
-            bool hasLeftNeighbor = (i > 0 && this->tableRow[i - 1].tableEntry[x0].targetPosition != INT16_MIN);
-            bool hasRightNeighbor = (i < POWERTABLE_CAD_SIZE - 1 && this->tableRow[i + 1].tableEntry[x0].targetPosition != INT16_MIN);
-    
-            if (hasLeftNeighbor && hasRightNeighbor) {
-                // Blend using left and right known values for better accuracy
-                estimated_value = (this->tableRow[i - 1].tableEntry[x0].targetPosition +
-                                   this->tableRow[i + 1].tableEntry[x0].targetPosition) / 2.0;
-            } else if (hasLeftNeighbor) {
-                estimated_value = this->tableRow[i - 1].tableEntry[x0].targetPosition;
-            } else if (hasRightNeighbor) {
-                estimated_value = this->tableRow[i + 1].tableEntry[x0].targetPosition;
-            }
-    
-            int tempValue = static_cast<int>(std::round(estimated_value));
-    
+
+            int tempValue = estimateMissingValue(i, x0, false); 
             if (this->testNeighbors(i, x0, tempValue).allNeighborsPassed) {
                 this->tableRow[i].tableEntry[x0].targetPosition = tempValue;
             }
@@ -628,7 +640,6 @@ void PowerTable::fillTable() {
     }
   }
 }
-
 void PowerTable::extrapFillTable() {
   // Horizontal extrapolation 
   for (int i = 0; i < POWERTABLE_CAD_SIZE; ++i) {
