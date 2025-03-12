@@ -346,7 +346,7 @@ const char* const DEFAULT_PASSWORD = "password";
 #define BLE_CLIENT_STACK 6000
 
 // Uncomment to enable stack size debugging info
-// #define DEBUG_STACK
+#define DEBUG_STACK
 
 // Uncomment to enable sending Telegram debug messages back to the chat
 // specified in telegram_token.h

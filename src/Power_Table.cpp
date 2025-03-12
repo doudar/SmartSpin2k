@@ -342,186 +342,231 @@ TestResults PowerTable::testNeighbors(int i, int j, int testValue) {
 }
 
 void PowerTable::fillTable() {
+  #ifdef DEBUG_STACK
+  SS2K_LOG(POWERTABLE_LOG_TAG, "STACK: fillTable start - Free stack: %u bytes, Free heap: %u bytes, Min free heap: %u bytes",
+           uxTaskGetStackHighWaterMark(NULL), ESP.getFreeHeap(), ESP.getMinFreeHeap());
+  #endif
+  
   // Horizontal Interpolation
   for (int i = 0; i < POWERTABLE_CAD_SIZE; ++i) {
-    std::map<double, double> unique_xy;
+    std::map<int16_t, int16_t> unique_xy;
     std::vector<int> emptyIndices;
+    
+    #ifdef DEBUG_STACK
+    SS2K_LOG(POWERTABLE_LOG_TAG, "STACK: Horizontal iteration %d - After container init - Free stack: %u bytes, Free heap: %u bytes",
+             i, uxTaskGetStackHighWaterMark(NULL), ESP.getFreeHeap());
+    #endif
 
     // Collect data points
     for (int j = 0; j < POWERTABLE_WATT_SIZE; ++j) {
-        if (this->tableRow[i].tableEntry[j].targetPosition != INT16_MIN) {
-            unique_xy[j] = static_cast<double>(this->tableRow[i].tableEntry[j].targetPosition);
-        } else {
-            emptyIndices.push_back(j);
-        }
+      if (this->tableRow[i].tableEntry[j].targetPosition != INT16_MIN) {
+        unique_xy[j] = this->tableRow[i].tableEntry[j].targetPosition;
+      } else {
+        emptyIndices.push_back(j);
+      }
     }
 
-    if (unique_xy.size() < 2) continue; // Skip if not enough data
+    if (unique_xy.size() < 2) continue;  // Skip if not enough data
 
     std::vector<double> x, y;
     for (const auto& it : unique_xy) {
-        x.push_back(static_cast<double>(it.first));
-        y.push_back(static_cast<double>(it.second));
+      x.push_back(it.first);
+      y.push_back(it.second);
     }
 
-      if (x.size() == 1) {
-          // If we only have one unique point, we fill the row with that value. Good for keeping data
-          double singleValue = y.front();
-          for (int j : emptyIndices) {
-              this->tableRow[i].tableEntry[j].targetPosition = static_cast<int>(std::round(singleValue));
-          }
-          continue;
-      } else if (x.size() == 2) {
-          // If only 2 unique points, we perform linear interpolation
-
-          for (int j : emptyIndices) {
-
-            if (j < x.front() || j > x.back()) continue; 
-
-            double interpolated_value = y[0] + (y[1] - y[0]) * (j - x[0]) / (x[1] - x[0]); //interpolation formula 
-
-            double minValue = *std::min_element(y.begin(), y.end());
-            double maxValue = *std::max_element(y.begin(), y.end()); 
-
-              interpolated_value = std::max(minValue, std::min(maxValue, interpolated_value));
-
-              int tempValue = static_cast<int>(std::round(interpolated_value));
-
-              if (this->testNeighbors(i, j, tempValue).allNeighborsPassed) {
-                  this->tableRow[i].tableEntry[j].targetPosition = tempValue;
-              }
-          }
-          continue;
-      } else if (x.size() >= 3) {
-
-          bool validForSpline = true;
-          for (size_t i = 1; i < x.size(); ++i) {
-              if (x[i] <= x[i - 1]) { // Make sure x is in ascending order and not a duplicate
-                  validForSpline = false;
-                  break;
-              }
-          }
-          if (!validForSpline) {
-              SS2K_LOG(POWERTABLE_LOG_TAG, "Duplicate or non-increasing x-values detected!");
-              continue; 
-          }
-
-          // If we have 3 unique points, then we can perform cubic spline
-          tk::spline s; // Initialize s for using in cubic spline
-          s.set_points(x, y, tk::spline::cspline);
-          for (int j : emptyIndices) {
-
-            if (j < x.front() || j > x.back()) continue; 
-
-            double interpolated_value = s(j);
-            double minValue = *std::min_element(y.begin(), y.end());
-            double maxValue = *std::max_element(y.begin(), y.end()); 
-
-            interpolated_value = std::max(minValue, std::min(maxValue, interpolated_value));
-  
-            int tempValue = static_cast<int>(std::round(interpolated_value));
-  
-            if (this->testNeighbors(i, j, tempValue).allNeighborsPassed) {
-                this->tableRow[i].tableEntry[j].targetPosition = tempValue;
-            }
-        }
-      } else {
-          SS2K_LOG(POWERTABLE_LOG_TAG, "Error: No unique points found.");
-          continue;
+    #ifdef DEBUG_STACK
+    SS2K_LOG(POWERTABLE_LOG_TAG, "STACK: Horizontal iteration %d - Before interpolation with %zu vectors - Free stack: %u bytes, Free heap: %u bytes",
+             i, x.size(), uxTaskGetStackHighWaterMark(NULL), ESP.getFreeHeap());
+    #endif
+    
+    if (x.size() == 1) {
+      // If we only have one unique point, we fill the row with that value. Good for keeping data
+      int16_t singleValue = y.front();
+      for (int j : emptyIndices) {
+        this->tableRow[i].tableEntry[j].targetPosition = static_cast<int>(std::round(singleValue));
       }
+      continue;
+    } else if (x.size() == 2) {
+      // If only 2 unique points, we perform linear interpolation
+      #ifdef DEBUG_STACK
+      SS2K_LOG(POWERTABLE_LOG_TAG, "STACK: Horizontal iteration %d - Linear interpolation - Free stack: %u bytes, Free heap: %u bytes",
+               i, uxTaskGetStackHighWaterMark(NULL), ESP.getFreeHeap());
+      #endif
+
+      for (int j : emptyIndices) {
+        if (j < x.front() || j > x.back()) continue;
+
+        int16_t interpolated_value = round(static_cast<double>(y[0] + (y[1] - y[0]) * (j - x[0])) / static_cast<double>(x[1] - x[0]));  // interpolation formula
+
+        int16_t minValue = *std::min_element(y.begin(), y.end());
+        int16_t maxValue = *std::max_element(y.begin(), y.end());
+
+        interpolated_value = std::max(minValue, std::min(maxValue, interpolated_value));
+
+        int tempValue = static_cast<int>(std::round(interpolated_value));
+
+        if (this->testNeighbors(i, j, tempValue).allNeighborsPassed) {
+          this->tableRow[i].tableEntry[j].targetPosition = tempValue;
+        }
+      }
+      continue;
+    } else if (x.size() >= 3) {
+      #ifdef DEBUG_STACK
+      SS2K_LOG(POWERTABLE_LOG_TAG, "STACK: Horizontal iteration %d - Before spline with %zu points - Free stack: %u bytes, Free heap: %u bytes",
+               i, x.size(), uxTaskGetStackHighWaterMark(NULL), ESP.getFreeHeap());
+      #endif
+      
+      bool validForSpline = true;
+      for (size_t i = 1; i < x.size(); ++i) {
+        if (x[i] <= x[i - 1]) {  // Make sure x is in ascending order and not a duplicate
+          validForSpline = false;
+          break;
+        }
+      }
+      if (!validForSpline) {
+        SS2K_LOG(POWERTABLE_LOG_TAG, "Duplicate or non-increasing x-values detected!");
+        continue;
+      }
+
+      // If we have 3 unique points, then we can perform cubic spline
+      tk::spline s;  // Initialize s for using in cubic spline
+      s.set_points(x, y, tk::spline::cspline);
+      
+      #ifdef DEBUG_STACK
+      SS2K_LOG(POWERTABLE_LOG_TAG, "STACK: Horizontal iteration %d - After spline creation - Free stack: %u bytes, Free heap: %u bytes",
+               i, uxTaskGetStackHighWaterMark(NULL), ESP.getFreeHeap());
+      #endif
+      for (int j : emptyIndices) {
+        if (j < x.front() || j > x.back()) continue;
+
+        int16_t interpolated_value = s(j);
+        int16_t minValue           = *std::min_element(y.begin(), y.end());
+        int16_t maxValue           = *std::max_element(y.begin(), y.end());
+
+        interpolated_value = std::max(minValue, std::min(maxValue, interpolated_value));
+
+        int tempValue = static_cast<int>(std::round(interpolated_value));
+
+        if (this->testNeighbors(i, j, tempValue).allNeighborsPassed) {
+          this->tableRow[i].tableEntry[j].targetPosition = tempValue;
+        }
+      }
+    } else {
+      SS2K_LOG(POWERTABLE_LOG_TAG, "Error: No unique points found.");
+      continue;
+    }
   }
 
+  #ifdef DEBUG_STACK
+  SS2K_LOG(POWERTABLE_LOG_TAG, "STACK: Starting vertical interpolation - Free stack: %u bytes, Free heap: %u bytes",
+           uxTaskGetStackHighWaterMark(NULL), ESP.getFreeHeap());
+  #endif
+  
   // Vertical Interpolation
   for (int j = 0; j < POWERTABLE_WATT_SIZE; ++j) {
-    std::map<double, double> unique_xy;
+    std::map<int16_t, int16_t> unique_xy;
     std::vector<int> emptyIndices;
+    
+    #ifdef DEBUG_STACK
+    SS2K_LOG(POWERTABLE_LOG_TAG, "STACK: Vertical iteration %d - After container init - Free stack: %u bytes, Free heap: %u bytes",
+             j, uxTaskGetStackHighWaterMark(NULL), ESP.getFreeHeap());
+    #endif
 
     // Collect data points
     for (int i = 0; i < POWERTABLE_CAD_SIZE; ++i) {
-        if (this->tableRow[i].tableEntry[j].targetPosition != INT16_MIN) {
-            unique_xy[i] = static_cast<double>(this->tableRow[i].tableEntry[j].targetPosition);
-        } else {
-            emptyIndices.push_back(i);
-        }
+      if (this->tableRow[i].tableEntry[j].targetPosition != INT16_MIN) {
+        unique_xy[i] = this->tableRow[i].tableEntry[j].targetPosition;
+      } else {
+        emptyIndices.push_back(i);
+      }
     }
 
     if (unique_xy.size() < 2) continue;
 
     std::vector<double> x, y;
     for (const auto& it : unique_xy) {
-        x.push_back(static_cast<double>(it.first));
-        y.push_back(static_cast<double>(it.second));
+      x.push_back(it.first);
+      y.push_back(it.second);
     }
 
-      if (x.size() == 1) {
-          double singleValue = y.front();
-          for (int i : emptyIndices) {
-              this->tableRow[i].tableEntry[j].targetPosition = static_cast<int>(std::round(singleValue));
-          }
-          continue;
-      } else if (x.size() == 2) {
+    if (x.size() == 1) {
+      int16_t singleValue = y.front();
+      for (int i : emptyIndices) {
+        this->tableRow[i].tableEntry[j].targetPosition = singleValue;
+      }
+      continue;
+    } else if (x.size() == 2) {
+      for (int i : emptyIndices) {
+        if (i < x.front() || i > x.back()) continue;
 
-          for (int i : emptyIndices) {
+        int16_t interpolated_value = round(static_cast<double>(y[0] + (y[1] - y[0]) * (i - x[0])) / static_cast<double>(x[1] - x[0]));  // interpolation formula
 
-            if (i < x.front() || i > x.back()) continue; 
+        int16_t minValue = *std::min_element(y.begin(), y.end());
+        int16_t maxValue = *std::max_element(y.begin(), y.end());
 
-            double interpolated_value = y[0] + (y[1] - y[0]) * (i - x[0]) / (x[1] - x[0]); //interpolation formula 
+        interpolated_value = (std::max(minValue, std::min(maxValue, interpolated_value)));
 
-            double minValue = *std::min_element(y.begin(), y.end());
-            double maxValue = *std::max_element(y.begin(), y.end()); 
+        int tempValue = interpolated_value;
 
-            interpolated_value = std::max(minValue, std::min(maxValue, interpolated_value));
-
-            int tempValue = static_cast<int>(std::round(interpolated_value));
-
-              if (this->testNeighbors(i, j, tempValue).allNeighborsPassed) {
-                  this->tableRow[i].tableEntry[j].targetPosition = tempValue;
-              }
-          }
-          continue;
-      } else if (x.size() >= 3) {
-
-        bool validForSpline = true;
-          for (size_t i = 1; i < x.size(); ++i) {
-              if (x[i] <= x[i - 1]) {  // Make sure x is in ascending order and not a duplicate
-                  validForSpline = false;
-                  break;
-              }
-          }
-          if (!validForSpline) {
-              SS2K_LOG(POWERTABLE_LOG_TAG, "Duplicate or non-increasing x-values detected!");
-              continue; // Skip spline interpolation
-          }
-
-
-          tk::spline s; // Initialize s for using in cubic spline
-          s.set_points(x, y, tk::spline::cspline);
-          for (int i : emptyIndices) {
-
-            if (i < x.front() || i > x.back()) continue; 
-
-            double interpolated_value = s(i);
-            double minValue = *std::min_element(y.begin(), y.end());
-            double maxValue = *std::max_element(y.begin(), y.end()); 
-
-            interpolated_value = std::max(minValue, std::min(maxValue, interpolated_value));
-            int tempValue = static_cast<int>(std::round(interpolated_value));
-  
-            if (this->testNeighbors(i, j, tempValue).allNeighborsPassed) {
-                this->tableRow[i].tableEntry[j].targetPosition = tempValue;
-            }
+        if (this->testNeighbors(i, j, tempValue).allNeighborsPassed) {
+          this->tableRow[i].tableEntry[j].targetPosition = tempValue;
         }
-      } else {
-        SS2K_LOG(POWERTABLE_LOG_TAG, "Error: No unique points found.");
-        continue;
+      }
+      continue;
+    } else if (x.size() >= 3) {
+      #ifdef DEBUG_STACK
+      SS2K_LOG(POWERTABLE_LOG_TAG, "STACK: Vertical iteration %d - Before spline with %zu points - Free stack: %u bytes, Free heap: %u bytes",
+               j, x.size(), uxTaskGetStackHighWaterMark(NULL), ESP.getFreeHeap());
+      #endif
+      
+      bool validForSpline = true;
+      for (size_t i = 1; i < x.size(); ++i) {
+        if (x[i] <= x[i - 1]) {  // Make sure x is in ascending order and not a duplicate
+          validForSpline = false;
+          break;
+        }
+      }
+      if (!validForSpline) {
+        SS2K_LOG(POWERTABLE_LOG_TAG, "Duplicate or non-increasing x-values detected!");
+        continue;  // Skip spline interpolation
+      }
+
+      tk::spline s;  // Initialize s for using in cubic spline
+      s.set_points(x, y, tk::spline::cspline);
+      
+      #ifdef DEBUG_STACK
+      SS2K_LOG(POWERTABLE_LOG_TAG, "STACK: Vertical iteration %d - After spline creation - Free stack: %u bytes, Free heap: %u bytes",
+               j, uxTaskGetStackHighWaterMark(NULL), ESP.getFreeHeap());
+      #endif
+      for (int i : emptyIndices) {
+        if (i < x.front() || i > x.back()) continue;
+
+        int16_t interpolated_value = s(i);
+        int16_t minValue           = *std::min_element(y.begin(), y.end());
+        int16_t maxValue           = *std::max_element(y.begin(), y.end());
+
+        interpolated_value = std::max(minValue, std::min(maxValue, interpolated_value));
+        int tempValue      = interpolated_value;
+
+        if (this->testNeighbors(i, j, tempValue).allNeighborsPassed) {
+          this->tableRow[i].tableEntry[j].targetPosition = tempValue;
+        }
+      }
+    } else {
+      SS2K_LOG(POWERTABLE_LOG_TAG, "Error: No unique points found.");
+      continue;
     }
   }
+  
+  #ifdef DEBUG_STACK
+  SS2K_LOG(POWERTABLE_LOG_TAG, "STACK: fillTable end - Free stack: %u bytes, Free heap: %u bytes, Min free heap: %u bytes",
+           uxTaskGetStackHighWaterMark(NULL), ESP.getFreeHeap(), ESP.getMinFreeHeap());
+  #endif
 }
 
-
-//Old Fill Function 
-// void PowerTable::fillTable() {
-//   int tempValue = INT16_MIN;
+// Old Fill Function
+//  void PowerTable::fillTable() {
+//    int tempValue = INT16_MIN;
 
 //   // Fill each empty cell by linear interpolation
 //   for (int i = 0; i < POWERTABLE_CAD_SIZE; ++i) {
@@ -940,13 +985,13 @@ void PowerTable::newEntry(PowerBuffer& powerBuffer) {
               (this->testNeighbors(testResults.rightNeighbor.i, testResults.rightNeighbor.j, testResults.leftNeighbor.targetPosition).allNeighborsPassed))) {
           SS2K_LOG(POWERTABLE_LOG_TAG, "All test failed left (%d)(%d)(%d), readings (%d)", testResults.leftNeighbor.i, testResults.leftNeighbor.j,
                    testResults.leftNeighbor.targetPosition, this->tableRow[testResults.leftNeighbor.i].tableEntry[testResults.leftNeighbor.j].readings);
-          //this->tableRow[testResults.leftNeighbor.i].tableEntry[testResults.leftNeighbor.j].readings--;
+          // this->tableRow[testResults.leftNeighbor.i].tableEntry[testResults.leftNeighbor.j].readings--;
           this->downVoteData(testResults.leftNeighbor.i, testResults.leftNeighbor.j, targetPosition, testResults.leftNeighbor.targetPosition);
         }
       } else {
         SS2K_LOG(POWERTABLE_LOG_TAG, "Was not in range failed left (%d)(%d)(%d), readings (%d)", testResults.leftNeighbor.i, testResults.leftNeighbor.j,
                  testResults.leftNeighbor.targetPosition, this->tableRow[testResults.leftNeighbor.i].tableEntry[testResults.leftNeighbor.j].readings);
-        //this->tableRow[testResults.leftNeighbor.i].tableEntry[testResults.leftNeighbor.j].readings--;
+        // this->tableRow[testResults.leftNeighbor.i].tableEntry[testResults.leftNeighbor.j].readings--;
         this->downVoteData(testResults.leftNeighbor.i, testResults.leftNeighbor.j, targetPosition, testResults.leftNeighbor.targetPosition);
       }
     }
@@ -983,13 +1028,13 @@ void PowerTable::newEntry(PowerBuffer& powerBuffer) {
               (this->testNeighbors(testResults.leftNeighbor.i, testResults.leftNeighbor.j, testResults.rightNeighbor.targetPosition).allNeighborsPassed))) {
           SS2K_LOG(POWERTABLE_LOG_TAG, "All test failed right (%d)(%d)(%d), readings (%d)", testResults.rightNeighbor.i, testResults.rightNeighbor.j,
                    testResults.rightNeighbor.targetPosition, this->tableRow[testResults.rightNeighbor.i].tableEntry[testResults.rightNeighbor.j].readings);
-          //this->tableRow[testResults.rightNeighbor.i].tableEntry[testResults.rightNeighbor.j].readings--;
+          // this->tableRow[testResults.rightNeighbor.i].tableEntry[testResults.rightNeighbor.j].readings--;
           this->downVoteData(testResults.rightNeighbor.i, testResults.rightNeighbor.j, targetPosition, testResults.rightNeighbor.targetPosition);
         }
       } else {
         SS2K_LOG(POWERTABLE_LOG_TAG, "Was not in range failed right (%d)(%d)(%d), readings (%d)", testResults.rightNeighbor.i, testResults.rightNeighbor.j,
                  testResults.rightNeighbor.targetPosition, this->tableRow[testResults.rightNeighbor.i].tableEntry[testResults.rightNeighbor.j].readings);
-       // this->tableRow[testResults.rightNeighbor.i].tableEntry[testResults.rightNeighbor.j].readings--;
+        // this->tableRow[testResults.rightNeighbor.i].tableEntry[testResults.rightNeighbor.j].readings--;
         this->downVoteData(testResults.rightNeighbor.i, testResults.rightNeighbor.j, targetPosition, testResults.rightNeighbor.targetPosition);
       }
     }
@@ -1026,13 +1071,13 @@ void PowerTable::newEntry(PowerBuffer& powerBuffer) {
               (this->testNeighbors(testResults.bottomNeighbor.i, testResults.bottomNeighbor.j, testResults.topNeighbor.targetPosition).allNeighborsPassed))) {
           SS2K_LOG(POWERTABLE_LOG_TAG, "All test failed top (%d)(%d)(%d), readings (%d)", testResults.topNeighbor.i, testResults.topNeighbor.j,
                    testResults.topNeighbor.targetPosition, this->tableRow[testResults.topNeighbor.i].tableEntry[testResults.topNeighbor.j].readings);
-          //this->tableRow[testResults.topNeighbor.i].tableEntry[testResults.topNeighbor.j].readings--;
+          // this->tableRow[testResults.topNeighbor.i].tableEntry[testResults.topNeighbor.j].readings--;
           this->downVoteData(testResults.topNeighbor.i, testResults.topNeighbor.j, targetPosition, testResults.topNeighbor.targetPosition);
         }
       } else {
         SS2K_LOG(POWERTABLE_LOG_TAG, "Was not in range failed top (%d)(%d)(%d), readings (%d)", testResults.topNeighbor.i, testResults.topNeighbor.j,
                  testResults.topNeighbor.targetPosition, this->tableRow[testResults.topNeighbor.i].tableEntry[testResults.topNeighbor.j].readings);
-        //this->tableRow[testResults.topNeighbor.i].tableEntry[testResults.topNeighbor.j].readings--;
+        // this->tableRow[testResults.topNeighbor.i].tableEntry[testResults.topNeighbor.j].readings--;
         this->downVoteData(testResults.topNeighbor.i, testResults.topNeighbor.j, targetPosition, testResults.topNeighbor.targetPosition);
       }
     }
