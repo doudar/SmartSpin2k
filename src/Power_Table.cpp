@@ -7,7 +7,6 @@
 
 #include "Power_Table.h"
 #include "SS2KLog.h"
-#include "spline.h"
 #include "BLE_Custom_Characteristic.h"
 #include <LittleFS.h>
 #include <vector>
@@ -341,227 +340,241 @@ TestResults PowerTable::testNeighbors(int i, int j, int testValue) {
   return returnResult;
 }
 
+double linearInterpolate(const std::vector<double>& x, const std::vector<double>& y, double j) {
+
+  auto upper = std::upper_bound(x.begin(), x.end(), j);
+
+  if (upper == x.end()) return y.back();  // Extrapolate using last value
+  if (upper == x.begin()) return y.front();  // Extrapolate using first value
+
+  auto lower = upper - 1;
+  int x0 = *lower, x1 = *upper;
+  double y0 = y[lower - x.begin()], y1 = y[upper - x.begin()];
+
+  double interpolated_value = y0 + (y1 - y0) * (j - x0) / (x1 - x0);
+
+  // Ensure interpolated value stays within known range
+  double minValue = *std::min_element(y.begin(), y.end());
+  double maxValue = *std::max_element(y.begin(), y.end());
+  return std::max(minValue, std::min(maxValue, interpolated_value));
+}
+
+class CubicSpline {
+  public:
+      void set_points(const std::vector<double>& x, const std::vector<double>& y) {
+        int n = x.size() - 1;
+        h.resize(n);
+        alpha.resize(n + 1);
+        l.resize(n + 1);
+        mu.resize(n + 1);
+        z.resize(n + 1);
+        c.resize(n + 1);
+        b.resize(n);
+        d.resize(n);
+        this->x = x;
+        this->y = y;
+
+        for (int i = 0; i < n; ++i)
+            h[i] = x[i + 1] - x[i];
+
+        double f_prime_start = (y[1] - y[0]) / (x[1] - x[0]);
+        double f_prime_end = (y[n] - y[n - 1]) / (x[n] - x[n - 1]);
+
+        alpha[0] = (3.0 / h[0]) * (y[1] - y[0]) - 3.0 * f_prime_start;
+        alpha[n] = 3.0 * f_prime_end - (3.0 / h[n - 1]) * (y[n] - y[n - 1]);
+
+        for (int i = 1; i < n; ++i)
+            alpha[i] = (3.0 / h[i]) * (y[i + 1] - y[i]) - (3.0 / h[i - 1]) * (y[i] - y[i - 1]);
+
+        l[0] = 2.0 * h[0];
+        mu[0] = 0.5;
+        z[0] = alpha[0] / l[0];
+
+        for (int i = 1; i < n; ++i) {
+            l[i] = 2.0 * (x[i + 1] - x[i - 1]) - h[i - 1] * mu[i - 1];
+            mu[i] = h[i] / l[i];
+            z[i] = (alpha[i] - h[i - 1] * z[i - 1]) / l[i];
+        }
+
+        l[n] = h[n - 1] * (2.0 - mu[n - 1]);
+        z[n] = (alpha[n] - h[n - 1] * z[n - 1]) / l[n];
+        c[n] = z[n];
+
+        for (int j = n - 1; j >= 0; --j) {
+            c[j] = z[j] - mu[j] * c[j + 1];
+            b[j] = (y[j + 1] - y[j]) / h[j] - h[j] * (c[j + 1] + 2.0 * c[j]) / 3.0;
+            d[j] = (c[j + 1] - c[j]) / (3.0 * h[j]);
+        }
+    }
+
+    double interpolate(double x_val) const {
+        if (x_val < x.front()) {
+            double dx = x_val - x[0];
+            return y[0] + b[0] * dx + c[0] * dx * dx + d[0] * dx * dx * dx;
+        }
+        if (x_val > x.back()) {
+            int n = x.size() - 1;
+            double dx = x_val - x[n];
+            return y[n] + b[n - 1] * dx + c[n - 1] * dx * dx + d[n - 1] * dx * dx * dx;
+        }
+
+        int i = std::upper_bound(x.begin(), x.end(), x_val) - x.begin() - 1;
+        double dx = x_val - x[i];
+        return y[i] + b[i] * dx + c[i] * dx * dx + d[i] * dx * dx * dx;
+    }
+
+private:
+    std::vector<double> x, y, h, alpha, l, mu, z, c, b, d;
+};
+
 void PowerTable::fillTable() {
-  #ifdef DEBUG_STACK
-  SS2K_LOG(POWERTABLE_LOG_TAG, "STACK: fillTable start - Free stack: %u bytes, Free heap: %u bytes, Min free heap: %u bytes",
-           uxTaskGetStackHighWaterMark(NULL), ESP.getFreeHeap(), ESP.getMinFreeHeap());
-  #endif
-  
   // Horizontal Interpolation
   for (int i = 0; i < POWERTABLE_CAD_SIZE; ++i) {
-    std::map<int16_t, int16_t> unique_xy;
+    std::map<double, double> unique_xy;
     std::vector<int> emptyIndices;
-    
-    #ifdef DEBUG_STACK
-    SS2K_LOG(POWERTABLE_LOG_TAG, "STACK: Horizontal iteration %d - After container init - Free stack: %u bytes, Free heap: %u bytes",
-             i, uxTaskGetStackHighWaterMark(NULL), ESP.getFreeHeap());
-    #endif
 
     // Collect data points
     for (int j = 0; j < POWERTABLE_WATT_SIZE; ++j) {
-      if (this->tableRow[i].tableEntry[j].targetPosition != INT16_MIN) {
-        unique_xy[j] = this->tableRow[i].tableEntry[j].targetPosition;
-      } else {
-        emptyIndices.push_back(j);
-      }
+        if (this->tableRow[i].tableEntry[j].targetPosition != INT16_MIN) {
+            unique_xy[j] = static_cast<double>(this->tableRow[i].tableEntry[j].targetPosition);
+        } else {
+            emptyIndices.push_back(j);
+        }
     }
 
-    if (unique_xy.size() < 2) continue;  // Skip if not enough data
+    if (unique_xy.size() < 2) continue; // Skip if not enough data
 
     std::vector<double> x, y;
     for (const auto& it : unique_xy) {
-      x.push_back(it.first);
-      y.push_back(it.second);
+        x.push_back(static_cast<double>(it.first));
+        y.push_back(static_cast<double>(it.second));
     }
 
-    #ifdef DEBUG_STACK
-    SS2K_LOG(POWERTABLE_LOG_TAG, "STACK: Horizontal iteration %d - Before interpolation with %zu vectors - Free stack: %u bytes, Free heap: %u bytes",
-             i, x.size(), uxTaskGetStackHighWaterMark(NULL), ESP.getFreeHeap());
-    #endif
-    
     if (x.size() == 1) {
       // If we only have one unique point, we fill the row with that value. Good for keeping data
-      int16_t singleValue = y.front();
+      double singleValue = y.front();
       for (int j : emptyIndices) {
-        this->tableRow[i].tableEntry[j].targetPosition = static_cast<int>(std::round(singleValue));
+          this->tableRow[i].tableEntry[j].targetPosition = static_cast<int>(std::round(singleValue));
       }
       continue;
-    } else if (x.size() == 2) {
-      // If only 2 unique points, we perform linear interpolation
-      #ifdef DEBUG_STACK
-      SS2K_LOG(POWERTABLE_LOG_TAG, "STACK: Horizontal iteration %d - Linear interpolation - Free stack: %u bytes, Free heap: %u bytes",
-               i, uxTaskGetStackHighWaterMark(NULL), ESP.getFreeHeap());
-      #endif
+  } else if (x.size() == 2) {
 
-      for (int j : emptyIndices) {
-        if (j < x.front() || j > x.back()) continue;
+        for (int j : emptyIndices) {
 
-        int16_t interpolated_value = round(static_cast<double>(y[0] + (y[1] - y[0]) * (j - x[0])) / static_cast<double>(x[1] - x[0]));  // interpolation formula
+              double interpolated_value = linearInterpolate(x, y, j); 
 
-        int16_t minValue = *std::min_element(y.begin(), y.end());
-        int16_t maxValue = *std::max_element(y.begin(), y.end());
+              int tempValue = static_cast<int>(std::round(interpolated_value)); 
 
-        interpolated_value = std::max(minValue, std::min(maxValue, interpolated_value));
+              if (this->testNeighbors(i, j, tempValue).allNeighborsPassed) {
+                  this->tableRow[i].tableEntry[j].targetPosition = tempValue;
+              }
+          }
+          continue;
+      } else if (x.size() >= 3) {
 
-        int tempValue = static_cast<int>(std::round(interpolated_value));
+          bool validForSpline = true;
+          for (size_t i = 1; i < x.size(); ++i) {
+              if (x[i] <= x[i - 1]) { // Make sure x is in ascending order and not a duplicate
+                  validForSpline = false;
+                  break;
+              }
+          }
+          if (!validForSpline) {
+              SS2K_LOG(POWERTABLE_LOG_TAG, "Duplicate or non-increasing x-values detected!");
+              continue; 
+          }
 
-        if (this->testNeighbors(i, j, tempValue).allNeighborsPassed) {
-          this->tableRow[i].tableEntry[j].targetPosition = tempValue;
+          // If we have 3 unique points, then we can perform cubic spline
+            CubicSpline spline;
+            spline.set_points(x, y);
+
+            for (int j : emptyIndices) {
+                double interpolated_value = spline.interpolate(j);
+                int tempValue = static_cast<int>(std::round(interpolated_value));
+
+                if (this->testNeighbors(i, j, tempValue).allNeighborsPassed) {
+                    this->tableRow[i].tableEntry[j].targetPosition = tempValue;
+                }
+                
         }
+      } else {
+          SS2K_LOG(POWERTABLE_LOG_TAG, "Error: No unique points found.");
+          continue;
       }
-      continue;
-    } else if (x.size() >= 3) {
-      #ifdef DEBUG_STACK
-      SS2K_LOG(POWERTABLE_LOG_TAG, "STACK: Horizontal iteration %d - Before spline with %zu points - Free stack: %u bytes, Free heap: %u bytes",
-               i, x.size(), uxTaskGetStackHighWaterMark(NULL), ESP.getFreeHeap());
-      #endif
-      
-      bool validForSpline = true;
-      for (size_t i = 1; i < x.size(); ++i) {
-        if (x[i] <= x[i - 1]) {  // Make sure x is in ascending order and not a duplicate
-          validForSpline = false;
-          break;
-        }
-      }
-      if (!validForSpline) {
-        SS2K_LOG(POWERTABLE_LOG_TAG, "Duplicate or non-increasing x-values detected!");
-        continue;
-      }
-
-      // If we have 3 unique points, then we can perform cubic spline
-      tk::spline s;  // Initialize s for using in cubic spline
-      s.set_points(x, y, tk::spline::cspline);
-      
-      #ifdef DEBUG_STACK
-      SS2K_LOG(POWERTABLE_LOG_TAG, "STACK: Horizontal iteration %d - After spline creation - Free stack: %u bytes, Free heap: %u bytes",
-               i, uxTaskGetStackHighWaterMark(NULL), ESP.getFreeHeap());
-      #endif
-      for (int j : emptyIndices) {
-        if (j < x.front() || j > x.back()) continue;
-
-        int16_t interpolated_value = s(j);
-        int16_t minValue           = *std::min_element(y.begin(), y.end());
-        int16_t maxValue           = *std::max_element(y.begin(), y.end());
-
-        interpolated_value = std::max(minValue, std::min(maxValue, interpolated_value));
-
-        int tempValue = static_cast<int>(std::round(interpolated_value));
-
-        if (this->testNeighbors(i, j, tempValue).allNeighborsPassed) {
-          this->tableRow[i].tableEntry[j].targetPosition = tempValue;
-        }
-      }
-    } else {
-      SS2K_LOG(POWERTABLE_LOG_TAG, "Error: No unique points found.");
-      continue;
-    }
   }
 
-  #ifdef DEBUG_STACK
-  SS2K_LOG(POWERTABLE_LOG_TAG, "STACK: Starting vertical interpolation - Free stack: %u bytes, Free heap: %u bytes",
-           uxTaskGetStackHighWaterMark(NULL), ESP.getFreeHeap());
-  #endif
-  
   // Vertical Interpolation
   for (int j = 0; j < POWERTABLE_WATT_SIZE; ++j) {
-    std::map<int16_t, int16_t> unique_xy;
+    std::map<double, double> unique_xy;
     std::vector<int> emptyIndices;
-    
-    #ifdef DEBUG_STACK
-    SS2K_LOG(POWERTABLE_LOG_TAG, "STACK: Vertical iteration %d - After container init - Free stack: %u bytes, Free heap: %u bytes",
-             j, uxTaskGetStackHighWaterMark(NULL), ESP.getFreeHeap());
-    #endif
 
     // Collect data points
     for (int i = 0; i < POWERTABLE_CAD_SIZE; ++i) {
-      if (this->tableRow[i].tableEntry[j].targetPosition != INT16_MIN) {
-        unique_xy[i] = this->tableRow[i].tableEntry[j].targetPosition;
-      } else {
-        emptyIndices.push_back(i);
-      }
+        if (this->tableRow[i].tableEntry[j].targetPosition != INT16_MIN) {
+            unique_xy[i] = static_cast<double>(this->tableRow[i].tableEntry[j].targetPosition);
+        } else {
+            emptyIndices.push_back(i);
+        }
     }
 
     if (unique_xy.size() < 2) continue;
 
     std::vector<double> x, y;
     for (const auto& it : unique_xy) {
-      x.push_back(it.first);
-      y.push_back(it.second);
+        x.push_back(static_cast<double>(it.first));
+        y.push_back(static_cast<double>(it.second));
     }
 
     if (x.size() == 1) {
-      int16_t singleValue = y.front();
+      double singleValue = y.front();
       for (int i : emptyIndices) {
-        this->tableRow[i].tableEntry[j].targetPosition = singleValue;
+          this->tableRow[i].tableEntry[j].targetPosition = static_cast<int>(std::round(singleValue));
       }
       continue;
-    } else if (x.size() == 2) {
-      for (int i : emptyIndices) {
-        if (i < x.front() || i > x.back()) continue;
+  } else if (x.size() == 2) { 
+    
+        for (int i : emptyIndices) {
 
-        int16_t interpolated_value = round(static_cast<double>(y[0] + (y[1] - y[0]) * (i - x[0])) / static_cast<double>(x[1] - x[0]));  // interpolation formula
+              double interpolated_value = linearInterpolate(x, y, i); 
 
-        int16_t minValue = *std::min_element(y.begin(), y.end());
-        int16_t maxValue = *std::max_element(y.begin(), y.end());
+              int tempValue = static_cast<int>(std::round(interpolated_value));
 
-        interpolated_value = (std::max(minValue, std::min(maxValue, interpolated_value)));
+              if (this->testNeighbors(i, j, tempValue).allNeighborsPassed) {
+                  this->tableRow[i].tableEntry[j].targetPosition = tempValue;
+              }
+          }
+          continue;
+      } else if (x.size() >= 3) {
 
-        int tempValue = interpolated_value;
+        bool validForSpline = true;
+          for (size_t i = 1; i < x.size(); ++i) {
+              if (x[i] <= x[i - 1]) {  // Make sure x is in ascending order and not a duplicate
+                  validForSpline = false;
+                  break;
+              }
+          }
+          if (!validForSpline) {
+              SS2K_LOG(POWERTABLE_LOG_TAG, "Duplicate or non-increasing x-values detected!");
+              continue; // Skip spline interpolation
+          }
 
-        if (this->testNeighbors(i, j, tempValue).allNeighborsPassed) {
-          this->tableRow[i].tableEntry[j].targetPosition = tempValue;
+          CubicSpline spline;
+          spline.set_points(x, y);
+
+          for (int i : emptyIndices) {
+              double interpolated_value = spline.interpolate(i);
+              int tempValue = static_cast<int>(std::round(interpolated_value));
+
+              if (this->testNeighbors(i, j, tempValue).allNeighborsPassed) {
+                  this->tableRow[i].tableEntry[j].targetPosition = tempValue;
+              }
+              
         }
-      }
-      continue;
-    } else if (x.size() >= 3) {
-      #ifdef DEBUG_STACK
-      SS2K_LOG(POWERTABLE_LOG_TAG, "STACK: Vertical iteration %d - Before spline with %zu points - Free stack: %u bytes, Free heap: %u bytes",
-               j, x.size(), uxTaskGetStackHighWaterMark(NULL), ESP.getFreeHeap());
-      #endif
-      
-      bool validForSpline = true;
-      for (size_t i = 1; i < x.size(); ++i) {
-        if (x[i] <= x[i - 1]) {  // Make sure x is in ascending order and not a duplicate
-          validForSpline = false;
-          break;
-        }
-      }
-      if (!validForSpline) {
-        SS2K_LOG(POWERTABLE_LOG_TAG, "Duplicate or non-increasing x-values detected!");
-        continue;  // Skip spline interpolation
-      }
-
-      tk::spline s;  // Initialize s for using in cubic spline
-      s.set_points(x, y, tk::spline::cspline);
-      
-      #ifdef DEBUG_STACK
-      SS2K_LOG(POWERTABLE_LOG_TAG, "STACK: Vertical iteration %d - After spline creation - Free stack: %u bytes, Free heap: %u bytes",
-               j, uxTaskGetStackHighWaterMark(NULL), ESP.getFreeHeap());
-      #endif
-      for (int i : emptyIndices) {
-        if (i < x.front() || i > x.back()) continue;
-
-        int16_t interpolated_value = s(i);
-        int16_t minValue           = *std::min_element(y.begin(), y.end());
-        int16_t maxValue           = *std::max_element(y.begin(), y.end());
-
-        interpolated_value = std::max(minValue, std::min(maxValue, interpolated_value));
-        int tempValue      = interpolated_value;
-
-        if (this->testNeighbors(i, j, tempValue).allNeighborsPassed) {
-          this->tableRow[i].tableEntry[j].targetPosition = tempValue;
-        }
-      }
-    } else {
-      SS2K_LOG(POWERTABLE_LOG_TAG, "Error: No unique points found.");
-      continue;
+      } else {
+        SS2K_LOG(POWERTABLE_LOG_TAG, "Error: No unique points found.");
+        continue;
     }
   }
-  
-  #ifdef DEBUG_STACK
-  SS2K_LOG(POWERTABLE_LOG_TAG, "STACK: fillTable end - Free stack: %u bytes, Free heap: %u bytes, Min free heap: %u bytes",
-           uxTaskGetStackHighWaterMark(NULL), ESP.getFreeHeap(), ESP.getMinFreeHeap());
-  #endif
 }
 
 // Old Fill Function
