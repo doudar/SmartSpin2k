@@ -21,4 +21,5 @@ class BLE_Cycling_Power_Service {
   BLECharacteristic *cyclingPowerMeasurementCharacteristic;
   BLECharacteristic *cyclingPowerFeatureCharacteristic;
   BLECharacteristic *sensorLocationCharacteristic;
+  byte cpFeature[4] = {0, 0, 0, 0};
 };

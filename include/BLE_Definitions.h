@@ -12,7 +12,7 @@ struct FitnessMachineIndoorBikeDataFlags {
   enum Types : uint16_t {
     MoreDataBit                 = 1U << 0,
     AverageSpeedPresent         = 1U << 1,
-    InstantaneousCadencePresent = 1U << 2,    
+    InstantaneousCadencePresent = 1U << 2,
     AverageCadencePresent       = 1U << 3,
     TotalDistancePresent        = 1U << 4,
     ResistanceLevelPresent      = 1U << 5,
@@ -191,6 +191,27 @@ struct FtmsStatus {
   int length;
 };
 
+// https://www.bluetooth.com/specifications/specs/cpp-1-1-html/
+// See "4.4. Cycling Power Feature"
+struct CyclingPowerFeatureFlags {
+  enum Types : uint32_t {
+    PedalPowerBalanceSupported           = 1U << 0,
+    AccumulatedTorqueSupported           = 1U << 1,
+    WheelRevolutionDataSupported         = 1U << 2,
+    CrankRevolutionDataSupported         = 1U << 3,
+    ExtremeMagnitudesSupported           = 1U << 4,
+    ExtremesAnglesSupported              = 1U << 5,
+    TopBottomDeadSpotAnglesSupported     = 1U << 6,
+    AccumulatedEnergySupported           = 1U << 7,
+    ExtremeTorquesSupported              = 1U << 8,
+    OffsetCompensationIndicatorSupported = 1U << 9,
+  };
+};
+
+inline CyclingPowerFeatureFlags::Types operator|(CyclingPowerFeatureFlags::Types a, CyclingPowerFeatureFlags::Types b) {
+  return static_cast<CyclingPowerFeatureFlags::Types>(static_cast<int>(a) | static_cast<int>(b));
+}
+
 class CyclingPowerMeasurement {
  public:
   // Flags definition as per specification
@@ -255,6 +276,21 @@ class CyclingPowerMeasurement {
     return data;
   }
 };
+
+// https://www.bluetooth.com/specifications/specs/cscs-1-0/
+// See "3.2. CSC Feature"
+struct CyclingSpeedCadenceFeatureFlags {
+  enum Types : uint16_t {
+    WheelRevolutionDataSupported     = 1U << 0,
+    CrankRevolutionDataSupported     = 1U << 1,
+    MultipleSensorLocationsSupported = 1U << 2
+    // 3-15: Reserved for Future Use
+  };
+};
+
+inline CyclingSpeedCadenceFeatureFlags::Types operator|(CyclingSpeedCadenceFeatureFlags::Types a, CyclingSpeedCadenceFeatureFlags::Types b) {
+  return static_cast<CyclingSpeedCadenceFeatureFlags::Types>(static_cast<int>(a) | static_cast<int>(b));
+}
 
 class CscMeasurement {
  public:
