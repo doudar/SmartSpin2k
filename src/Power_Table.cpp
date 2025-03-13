@@ -348,22 +348,25 @@ TestResults PowerTable::testNeighbors(int i, int j, int testValue) {
 }
 
 double linearInterpolate(const std::vector<double>& x, const std::vector<double>& y, int j) {
-  // Find the closest two points for interpolation
   auto upper = std::upper_bound(x.begin(), x.end(), j);
-  if (upper == x.end()) return y.back();
-  if (upper == x.begin()) return y.front();
+
+  if (upper == x.end()) return y.back();  // Extrapolate using last value
+  if (upper == x.begin()) return y.front();  // Extrapolate using first value
 
   auto lower = upper - 1;
   int x0 = *lower, x1 = *upper;
   double y0 = y[lower - x.begin()], y1 = y[upper - x.begin()];
 
-  // Linear interpolation formula
-  return y0 + (y1 - y0) * (j - x0) / (x1 - x0);
+  double interpolated_value = y0 + (y1 - y0) * (j - x0) / (x1 - x0);
+
+  // Ensure interpolated value stays within known range
+  double minValue = *std::min_element(y.begin(), y.end());
+  double maxValue = *std::max_element(y.begin(), y.end());
+  return std::max(minValue, std::min(maxValue, interpolated_value));
 }
 
+
 double linearExtrapolate(const std::vector<double>& x, const std::vector<double>& y, int j) {
-  // If there's only one point, return it (flat extrapolation)
-  if (x.size() == 1) return y.front();
 
   // Left Extrapolation: j is smaller than the first known x
   if (j < x.front()) {
@@ -469,29 +472,12 @@ void PowerTable::fillTable() {
         }
         continue;
       } else if (x.size() == 2) {
-        double minValue = *std::min_element(y.begin(), y.end());
-        double maxValue = *std::max_element(y.begin(), y.end());
-    
-        int x0 = static_cast<int>(x[0]), x1 = static_cast<int>(x[1]);
-        double y0 = y[0], y1 = y[1];
-    
+
         for (int j : emptyIndices) {
-            double interpolated_value;
-    
-            if (j < x0) {
-                // Extrapolate using y0 (constant extrapolation)
-                interpolated_value = y0;
-            } else if (j > x1) {
-                // Extrapolate using y1
-                interpolated_value = y1;
-            } else {
-                // Linear interpolation
-                interpolated_value = y0 + (y1 - y0) * (j - x0) / (x1 - x0);
-            }
 
-              interpolated_value = std::max(minValue, std::min(maxValue, interpolated_value));
+              double interpolated_value = linearInterpolate(x, y, j); 
 
-              int tempValue = static_cast<int>(std::round(interpolated_value));
+              int tempValue = static_cast<int>(std::round(interpolated_value)); 
 
               if (this->testNeighbors(i, j, tempValue).allNeighborsPassed) {
                   this->tableRow[i].tableEntry[j].targetPosition = tempValue;
@@ -572,28 +558,10 @@ void PowerTable::fillTable() {
         }
         continue;
       } else if (x.size() == 2) { 
-
-        double minValue = *std::min_element(y.begin(), y.end());
-        double maxValue = *std::max_element(y.begin(), y.end());
-    
-        int x0 = static_cast<int>(x[0]), x1 = static_cast<int>(x[1]);
-        double y0 = y[0], y1 = y[1];
     
         for (int i : emptyIndices) {
-            double interpolated_value;
-    
-            if (i < x0) {
-                // Extrapolate using y0 (constant extrapolation)
-                interpolated_value = y0;
-            } else if (i > x1) {
-                // Extrapolate using y1
-                interpolated_value = y1;
-            } else {
-                // Linear interpolation
-                interpolated_value = y0 + (y1 - y0) * (i - x0) / (x1 - x0);
-            }
 
-              interpolated_value = std::max(minValue, std::min(maxValue, interpolated_value));
+              double interpolated_value = linearInterpolate(x, y, i); 
 
               int tempValue = static_cast<int>(std::round(interpolated_value));
 
@@ -668,17 +636,8 @@ void PowerTable::extrapFillTable() {
         int x0 = static_cast<int>(x.front());
     
         for (int j : emptyIndices) {
-            double estimated_value = singleValue; // Default to the only known value
-    
-            if (j < x0) {
-                // Left Extrapolation: Assign the first known value (flat extension)
-                estimated_value = singleValue;
-            } else if (j > x0) {
-                // Right Extrapolation: Assign the first known value (flat extension)
-                estimated_value = singleValue;
-            }
-    
-            int tempValue = static_cast<int>(std::round(estimated_value));
+            
+            int tempValue = estimateMissingValue(i, j, true); 
     
             if (this->testNeighbors(i, j, tempValue).allNeighborsPassed) {
                 this->tableRow[i].tableEntry[j].targetPosition = tempValue;
@@ -757,17 +716,8 @@ void PowerTable::extrapFillTable() {
         int x0 = static_cast<int>(x.front());
     
         for (int i : emptyIndices) {
-            double estimated_value = singleValue; // Default to the only known value
-    
-            if (i < x0) {
-                // Left Extrapolation: Assign the first known value (flat extension)
-                estimated_value = singleValue;
-            } else if (i > x0) {
-                // Right Extrapolation: Assign the first known value (flat extension)
-                estimated_value = singleValue;
-            }
-    
-            int tempValue = static_cast<int>(std::round(estimated_value));
+           
+            int tempValue = estimateMissingValue(i, x0, false); 
     
             if (this->testNeighbors(i, x0, tempValue).allNeighborsPassed) {
                 this->tableRow[i].tableEntry[x0].targetPosition = tempValue;
