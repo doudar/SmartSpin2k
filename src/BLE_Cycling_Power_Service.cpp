@@ -16,7 +16,15 @@ void BLE_Cycling_Power_Service::setupService(NimBLEServer *pServer, MyCallbacks 
   cyclingPowerFeatureCharacteristic     = pPowerMonitor->createCharacteristic(CYCLINGPOWERFEATURE_UUID, NIMBLE_PROPERTY::READ);
   sensorLocationCharacteristic          = pPowerMonitor->createCharacteristic(SENSORLOCATION_UUID, NIMBLE_PROPERTY::READ);
   byte cpsLocation[1]                   = {0b0101};    // sensor location 5 == left crank
-  byte cpFeature[1]                     = {0b001100};  // crank information & wheel revolution data present
+
+  CyclingPowerFeatureFlags::Types cpFeatureFlags = CyclingPowerFeatureFlags::WheelRevolutionDataSupported |
+                                                   CyclingPowerFeatureFlags::CrankRevolutionDataSupported;
+
+  cpFeature[0] = static_cast<uint8_t>(cpFeatureFlags & 0xFF);
+  cpFeature[1] = static_cast<uint8_t>((cpFeatureFlags >> 8) & 0xFF);
+  cpFeature[2] = static_cast<uint8_t>((cpFeatureFlags >> 16) & 0xFF);
+  cpFeature[3] = static_cast<uint8_t>((cpFeatureFlags >> 24) & 0xFF);
+
   cyclingPowerFeatureCharacteristic->setValue(cpFeature, sizeof(cpFeature));
   sensorLocationCharacteristic->setValue(cpsLocation, sizeof(cpsLocation));
   cyclingPowerMeasurementCharacteristic->setCallbacks(chrCallbacks);
