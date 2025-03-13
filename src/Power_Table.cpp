@@ -435,6 +435,66 @@ int PowerTable::estimateMissingValue(int primaryIndex, int secondaryIndex, bool 
   return static_cast<int>(std::round(estimated_value));
 }
 
+class CubicSpline {
+  public:
+      void set_points(const std::vector<double>& x, const std::vector<double>& y) {
+          int n = x.size() - 1;
+          h.resize(n);
+          alpha.resize(n + 1);
+          l.resize(n + 1);
+          mu.resize(n + 1);
+          z.resize(n + 1);
+          c.resize(n + 1);
+          b.resize(n);
+          d.resize(n);
+          this->x = x;
+          this->y = y;
+  
+          for (int i = 0; i < n; ++i)
+              h[i] = x[i + 1] - x[i];
+  
+          // Approximate first derivative using finite differences
+          double f_prime_start = (y[1] - y[0]) / (x[1] - x[0]);
+          double f_prime_end = (y[n] - y[n - 1]) / (x[n] - x[n - 1]);
+  
+          alpha[0] = (3.0 / h[0]) * (y[1] - y[0]) - 3.0 * f_prime_start;
+          alpha[n] = 3.0 * f_prime_end - (3.0 / h[n - 1]) * (y[n] - y[n - 1]);
+  
+          for (int i = 1; i < n; ++i)
+              alpha[i] = (3.0 / h[i]) * (y[i + 1] - y[i]) - (3.0 / h[i - 1]) * (y[i] - y[i - 1]);
+  
+          l[0] = 2.0 * h[0];
+          mu[0] = 0.5;
+          z[0] = alpha[0] / l[0];
+  
+          for (int i = 1; i < n; ++i) {
+              l[i] = 2.0 * (x[i + 1] - x[i - 1]) - h[i - 1] * mu[i - 1];
+              mu[i] = h[i] / l[i];
+              z[i] = (alpha[i] - h[i - 1] * z[i - 1]) / l[i];
+          }
+  
+          l[n] = h[n - 1] * (2.0 - mu[n - 1]);
+          z[n] = (alpha[n] - h[n - 1] * z[n - 1]) / l[n];
+          c[n] = z[n];
+  
+          for (int j = n - 1; j >= 0; --j) {
+              c[j] = z[j] - mu[j] * c[j + 1];
+              b[j] = (y[j + 1] - y[j]) / h[j] - h[j] * (c[j + 1] + 2.0 * c[j]) / 3.0;
+              d[j] = (c[j + 1] - c[j]) / (3.0 * h[j]);
+          }
+      }
+  
+      double interpolate(double x_val) {
+          if (x_val < x.front() || x_val > x.back()) return NAN; 
+          int i = std::upper_bound(x.begin(), x.end(), x_val) - x.begin() - 1;
+          double dx = x_val - x[i];
+          return y[i] + b[i] * dx + c[i] * dx * dx + d[i] * dx * dx * dx;
+      }
+  
+  private:
+      std::vector<double> x, y, h, alpha, l, mu, z, c, b, d;
+  };
+
 void PowerTable::fillTable() {
   // Horizontal Interpolation
   for (int i = 0; i < POWERTABLE_CAD_SIZE; ++i) {
@@ -499,23 +559,14 @@ void PowerTable::fillTable() {
           }
 
           // If we have 3 unique points, then we can perform cubic spline
-          tk::spline s; // Initialize s for using in cubic spline
-          s.set_points(x, y, tk::spline::cspline);
-          for (int j : emptyIndices) {
-
-            if (j < x.front() || j > x.back()) continue; 
-
-            double interpolated_value = s(j);
-            double minValue = *std::min_element(y.begin(), y.end());
-            double maxValue = *std::max_element(y.begin(), y.end()); 
-
-            interpolated_value = std::max(minValue, std::min(maxValue, interpolated_value));
-  
-            int tempValue = static_cast<int>(std::round(interpolated_value));
-  
-            if (this->testNeighbors(i, j, tempValue).allNeighborsPassed) {
-                this->tableRow[i].tableEntry[j].targetPosition = tempValue;
-            }
+            CubicSpline spline;
+            spline.set_points(x, y);
+            for (int j : emptyIndices) {
+                double interpolated_value = spline.interpolate(j);
+                int tempValue = static_cast<int>(std::round(interpolated_value));
+                if (this->testNeighbors(i, j, tempValue).allNeighborsPassed) {
+                    this->tableRow[i].tableEntry[j].targetPosition = tempValue;
+                }
         }
       } else {
           SS2K_LOG(POWERTABLE_LOG_TAG, "Error: No unique points found.");
@@ -584,23 +635,14 @@ void PowerTable::fillTable() {
               continue; // Skip spline interpolation
           }
 
-
-          tk::spline s; // Initialize s for using in cubic spline
-          s.set_points(x, y, tk::spline::cspline);
+          CubicSpline spline;
+          spline.set_points(x, y);
           for (int i : emptyIndices) {
-
-            if (i < x.front() || i > x.back()) continue; 
-
-            double interpolated_value = s(i);
-            double minValue = *std::min_element(y.begin(), y.end());
-            double maxValue = *std::max_element(y.begin(), y.end()); 
-
-            interpolated_value = std::max(minValue, std::min(maxValue, interpolated_value));
-            int tempValue = static_cast<int>(std::round(interpolated_value));
-  
-            if (this->testNeighbors(i, j, tempValue).allNeighborsPassed) {
-                this->tableRow[i].tableEntry[j].targetPosition = tempValue;
-            }
+              double interpolated_value = spline.interpolate(i);
+              int tempValue = static_cast<int>(std::round(interpolated_value));
+              if (this->testNeighbors(i, j, tempValue).allNeighborsPassed) {
+                  this->tableRow[i].tableEntry[j].targetPosition = tempValue;
+              }
         }
       } else {
         SS2K_LOG(POWERTABLE_LOG_TAG, "Error: No unique points found.");
