@@ -9,6 +9,7 @@
 
 #include "settings.h"
 #include "SmartSpin_parameters.h"
+#include <vector> 
 
 #define POWERTABLE_LOG_TAG   "PTable"
 #define RETURN_ERROR         INT32_MIN
@@ -127,6 +128,12 @@ class PowerTable {
 
   // Display power table in log
   void toLog();
+
+  // Fill table function shortened. 
+  void fillEmptyTable(int outerValue, const std::vector<int>& emptyIndices, const std::vector<double>& x, const std::vector<double>& y, bool horizontal); 
+
+  // Determine if we are doing horiziontal or vertical interpolation; 
+  void findTableDirection(bool horizontal);
 
  private:
   unsigned long lastSaveTime     = millis();

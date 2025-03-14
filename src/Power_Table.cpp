@@ -341,19 +341,18 @@ TestResults PowerTable::testNeighbors(int i, int j, int testValue) {
 }
 
 double linearInterpolate(const std::vector<double>& x, const std::vector<double>& y, double j) {
-
   auto upper = std::upper_bound(x.begin(), x.end(), j);
 
   if (upper == x.end()) return y.back();  // Extrapolate using last value
   if (upper == x.begin()) return y.front();  // Extrapolate using first value
 
+
   auto lower = upper - 1;
-  int x0 = *lower, x1 = *upper;
+  double x0 = *lower, x1 = *upper;
   double y0 = y[lower - x.begin()], y1 = y[upper - x.begin()];
 
   double interpolated_value = y0 + (y1 - y0) * (j - x0) / (x1 - x0);
 
-  // Ensure interpolated value stays within known range
   double minValue = *std::min_element(y.begin(), y.end());
   double maxValue = *std::max_element(y.begin(), y.end());
   return std::max(minValue, std::min(maxValue, interpolated_value));
@@ -408,172 +407,131 @@ class CubicSpline {
     }
 
     double interpolate(double x_val) const {
-        if (x_val < x.front()) {
-            double dx = x_val - x[0];
-            return y[0] + b[0] * dx + c[0] * dx * dx + d[0] * dx * dx * dx;
-        }
-        if (x_val > x.back()) {
-            int n = x.size() - 1;
-            double dx = x_val - x[n];
-            return y[n] + b[n - 1] * dx + c[n - 1] * dx * dx + d[n - 1] * dx * dx * dx;
-        }
+      if (x_val < x.front() || x_val > x.back()) {
+          return INT16_MIN; 
+      }
 
-        int i = std::upper_bound(x.begin(), x.end(), x_val) - x.begin() - 1;
-        double dx = x_val - x[i];
-        return y[i] + b[i] * dx + c[i] * dx * dx + d[i] * dx * dx * dx;
-    }
+      int i = std::upper_bound(x.begin(), x.end(), x_val) - x.begin() - 1;
+      double dx = x_val - x[i];
+      return y[i] + b[i] * dx + c[i] * dx * dx + d[i] * dx * dx * dx;
+  }
+
+  double extrapolate(double x_val) const {
+      if (x_val < x.front()) {
+          double dx = x_val - x[0];
+          return y[0] + b[0] * dx + c[0] * dx * dx + d[0] * dx * dx * dx;
+      }
+      if (x_val > x.back()) {
+          int n = x.size() - 1;
+          double dx = x_val - x[n];
+          return y[n] + b[n - 1] * dx + c[n - 1] * dx * dx + d[n - 1] * dx * dx * dx;
+      }
+      return INT16_MIN; 
+  }
 
 private:
-    std::vector<double> x, y, h, alpha, l, mu, z, c, b, d;
+  std::vector<double> x, y, h, alpha, l, mu, z, c, b, d;
 };
 
 void PowerTable::fillTable() {
-  // Horizontal Interpolation
-  for (int i = 0; i < POWERTABLE_CAD_SIZE; ++i) {
-    std::map<double, double> unique_xy;
-    std::vector<int> emptyIndices;
+  findTableDirection(true);  // Horizontal
+  findTableDirection(false); // Vertical
+}
 
-    // Collect data points
-    for (int j = 0; j < POWERTABLE_WATT_SIZE; ++j) {
-        if (this->tableRow[i].tableEntry[j].targetPosition != INT16_MIN) {
-            unique_xy[j] = static_cast<double>(this->tableRow[i].tableEntry[j].targetPosition);
-        } else {
-            emptyIndices.push_back(j);
-        }
-    }
+void PowerTable::findTableDirection(bool horizontal) { 
 
-    if (unique_xy.size() < 2) continue; // Skip if not enough data
+  // Check to see if we are going through row or column. 
+  int outerSize = horizontal ? POWERTABLE_CAD_SIZE : POWERTABLE_WATT_SIZE; 
+  int innerSize = horizontal ? POWERTABLE_WATT_SIZE : POWERTABLE_CAD_SIZE;
 
-    std::vector<double> x, y;
-    for (const auto& it : unique_xy) {
-        x.push_back(static_cast<double>(it.first));
-        y.push_back(static_cast<double>(it.second));
-    }
+  // Go through outerSize, could be row or column
+  for (int outerValue = 0; outerValue < outerSize; ++outerValue) {
+      std::map<double, double> unique_xy;
+      std::vector<int> emptyIndices;
 
-    if (x.size() == 1) {
-      // If we only have one unique point, we fill the row with that value. Good for keeping data
-      double singleValue = y.front();
-      for (int j : emptyIndices) {
-          this->tableRow[i].tableEntry[j].targetPosition = static_cast<int>(std::round(singleValue));
+      // Set a range either the row or column to find points 
+      int rangeStart = std::max(0, innerSize / 2 - 10); 
+      int rangeEnd = std::min(innerSize, innerSize / 2 + 10);
+
+      // Collect unique points
+      for (int innerValue = rangeStart; innerValue < rangeEnd; ++innerValue) {
+          int i = horizontal ? outerValue : innerValue;
+          int j = horizontal ? innerValue : outerValue;
+
+          if (this->tableRow[i].tableEntry[j].targetPosition != INT16_MIN) {
+              unique_xy[innerValue] = static_cast<double>(this->tableRow[i].tableEntry[j].targetPosition);
+          } else {
+              emptyIndices.push_back(innerValue);
+          }
       }
-      continue;
-  } else if (x.size() == 2) {
 
-        for (int j : emptyIndices) {
+      if (unique_xy.size() < 2) continue; // Skip if not enough points
 
-              double interpolated_value = linearInterpolate(x, y, j); 
-
-              int tempValue = static_cast<int>(std::round(interpolated_value)); 
-
-              if (this->testNeighbors(i, j, tempValue).allNeighborsPassed) {
-                  this->tableRow[i].tableEntry[j].targetPosition = tempValue;
-              }
-          }
-          continue;
-      } else if (x.size() >= 3) {
-
-          bool validForSpline = true;
-          for (size_t i = 1; i < x.size(); ++i) {
-              if (x[i] <= x[i - 1]) { // Make sure x is in ascending order and not a duplicate
-                  validForSpline = false;
-                  break;
-              }
-          }
-          if (!validForSpline) {
-              SS2K_LOG(POWERTABLE_LOG_TAG, "Duplicate or non-increasing x-values detected!");
-              continue; 
-          }
-
-          // If we have 3 unique points, then we can perform cubic spline
-            CubicSpline spline;
-            spline.set_points(x, y);
-
-            for (int j : emptyIndices) {
-                double interpolated_value = spline.interpolate(j);
-                int tempValue = static_cast<int>(std::round(interpolated_value));
-
-                if (this->testNeighbors(i, j, tempValue).allNeighborsPassed) {
-                    this->tableRow[i].tableEntry[j].targetPosition = tempValue;
-                }
-                
-        }
-      } else {
-          SS2K_LOG(POWERTABLE_LOG_TAG, "Error: No unique points found.");
-          continue;
+      std::vector<double> x, y;
+      for (const auto& it : unique_xy) {
+          x.push_back(static_cast<double>(it.first));
+          y.push_back(static_cast<double>(it.second));
       }
+
+      fillEmptyTable(outerValue, emptyIndices, x, y, horizontal);
   }
+}
 
-  // Vertical Interpolation
-  for (int j = 0; j < POWERTABLE_WATT_SIZE; ++j) {
-    std::map<double, double> unique_xy;
-    std::vector<int> emptyIndices;
+void PowerTable::fillEmptyTable(int outerValue, const std::vector<int>& emptyIndices, const std::vector<double>& x, const std::vector<double>& y, bool horizontal) {
 
-    // Collect data points
-    for (int i = 0; i < POWERTABLE_CAD_SIZE; ++i) {
-        if (this->tableRow[i].tableEntry[j].targetPosition != INT16_MIN) {
-            unique_xy[i] = static_cast<double>(this->tableRow[i].tableEntry[j].targetPosition);
-        } else {
-            emptyIndices.push_back(i);
-        }
-    }
+  // Check if innerSize is horizontal or vertical 
+  int innerSize = horizontal ? POWERTABLE_WATT_SIZE : POWERTABLE_CAD_SIZE;
 
-    if (unique_xy.size() < 2) continue;
-
-    std::vector<double> x, y;
-    for (const auto& it : unique_xy) {
-        x.push_back(static_cast<double>(it.first));
-        y.push_back(static_cast<double>(it.second));
-    }
-
-    if (x.size() == 1) {
+  if (x.size() == 1) { // If only one point, fill row with the value
       double singleValue = y.front();
-      for (int i : emptyIndices) {
+      for (int innerValue : emptyIndices) {
+          int i = horizontal ? outerValue : innerValue;
+          int j = horizontal ? innerValue : outerValue;
           this->tableRow[i].tableEntry[j].targetPosition = static_cast<int>(std::round(singleValue));
       }
-      continue;
-  } else if (x.size() == 2) { 
-    
-        for (int i : emptyIndices) {
+  } else if (x.size() == 2) { // If two points, we do linear interpolation
+      for (int innerValue : emptyIndices) {
+          int i = horizontal ? outerValue : innerValue;
+          int j = horizontal ? innerValue : outerValue;
 
-              double interpolated_value = linearInterpolate(x, y, i); 
+          double interpolated_value = linearInterpolate(x, y, innerValue);
 
-              int tempValue = static_cast<int>(std::round(interpolated_value));
+          int tempValue = static_cast<int>(std::round(interpolated_value));
 
-              if (this->testNeighbors(i, j, tempValue).allNeighborsPassed) {
-                  this->tableRow[i].tableEntry[j].targetPosition = tempValue;
-              }
+          if (this->testNeighbors(i, j, tempValue).allNeighborsPassed) {
+              this->tableRow[i].tableEntry[j].targetPosition = tempValue;
           }
-          continue;
-      } else if (x.size() >= 3) {
-
-        bool validForSpline = true;
-          for (size_t i = 1; i < x.size(); ++i) {
-              if (x[i] <= x[i - 1]) {  // Make sure x is in ascending order and not a duplicate
-                  validForSpline = false;
-                  break;
-              }
+      }
+  } else if (x.size() >= 3) { // If three points, we do cubic spline interpolation 
+      bool validForSpline = true;
+      for (size_t i = 1; i < x.size(); ++i) {
+          if (x[i] <= x[i - 1]) {
+              validForSpline = false;
+              break;
           }
-          if (!validForSpline) {
-              SS2K_LOG(POWERTABLE_LOG_TAG, "Duplicate or non-increasing x-values detected!");
-              continue; // Skip spline interpolation
+      }
+      if (!validForSpline) {
+          SS2K_LOG(POWERTABLE_LOG_TAG, "Duplicate or non-increasing x-values detected!");
+          return;
+      }
+
+      CubicSpline spline;
+      spline.set_points(x, y);
+
+      for (int innerValue : emptyIndices) {
+          int i = horizontal ? outerValue : innerValue;
+          int j = horizontal ? innerValue : outerValue;
+
+          double interpolated_value = spline.interpolate(innerValue);
+
+          int tempValue = static_cast<int>(std::round(interpolated_value));
+
+          if (this->testNeighbors(i, j, tempValue).allNeighborsPassed) {
+              this->tableRow[i].tableEntry[j].targetPosition = tempValue;
           }
-
-          CubicSpline spline;
-          spline.set_points(x, y);
-
-          for (int i : emptyIndices) {
-              double interpolated_value = spline.interpolate(i);
-              int tempValue = static_cast<int>(std::round(interpolated_value));
-
-              if (this->testNeighbors(i, j, tempValue).allNeighborsPassed) {
-                  this->tableRow[i].tableEntry[j].targetPosition = tempValue;
-              }
-              
-        }
-      } else {
-        SS2K_LOG(POWERTABLE_LOG_TAG, "Error: No unique points found.");
-        continue;
-    }
+      }
+  } else {
+      SS2K_LOG(POWERTABLE_LOG_TAG, "Error: No unique points found.");
   }
 }
 
