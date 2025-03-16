@@ -340,6 +340,25 @@ TestResults PowerTable::testNeighbors(int i, int j, int testValue) {
   return returnResult;
 }
 
+
+/**
+ * @brief Performs linear interpolation to estimate a value `j` based on the given
+ *        x and y data points.
+ *
+ * This function takes two vectors `x` and `y` representing a set of data points
+ * and a value `j` for which an interpolated value is to be calculated. If `j` is
+ * outside the range of `x`, the function extrapolates using the nearest boundary
+ * values. The result is clamped to the range of `y` to ensure it does not exceed
+ * the minimum or maximum values of the dataset.
+ *
+ * @param x A vector of x-coordinates (must be sorted in ascending order).
+ * @param y A vector of y-coordinates corresponding to the x-coordinates.
+ * @param j The x-coordinate for which the interpolated y-coordinate is to be calculated.
+ * 
+ * @return The interpolated y-coordinate corresponding to `j`. If interpolation fails
+ *         due to invalid input (e.g., duplicate x values), the function logs an error
+ *         and returns `INT16_MIN`.
+ */
 double linearInterpolate(const std::vector<double>& x, const std::vector<double>& y, double j) {
   auto upper = std::upper_bound(x.begin(), x.end(), j);
 
@@ -350,7 +369,11 @@ double linearInterpolate(const std::vector<double>& x, const std::vector<double>
   auto lower = upper - 1;
   double x0 = *lower, x1 = *upper;
   double y0 = y[lower - x.begin()], y1 = y[upper - x.begin()];
-
+  //log and comment if x1-x0 is 0
+  if (x1 - x0 == 0) {
+    SS2K_LOG(POWERTABLE_LOG_TAG, "Linear Interpolation failed, x1-x0 is 0");
+    return INT16_MIN;
+  }
   double interpolated_value = y0 + (y1 - y0) * (j - x0) / (x1 - x0);
 
   double minValue = *std::min_element(y.begin(), y.end());
@@ -495,6 +518,10 @@ void PowerTable::fillEmptyTable(int outerValue, const std::vector<int>& emptyInd
           int j = horizontal ? innerValue : outerValue;
 
           double interpolated_value = linearInterpolate(x, y, innerValue);
+          //check for return error
+          if (interpolated_value == INT16_MIN) {
+              return;
+          }
 
           int tempValue = static_cast<int>(std::round(interpolated_value));
 
@@ -1279,7 +1306,13 @@ bool PowerTable::_manageSaveState(bool canSkipReliabilityChecks) {
           this->tableRow[i].tableEntry[j].readings       = savedReadings;
         }
       }
-      averageOffset = std::accumulate(offsetDifferences.begin(), offsetDifferences.end(), 0.0) / offsetDifferences.size();
+      if (!offsetDifferences.empty()) {
+        averageOffset = std::accumulate(offsetDifferences.begin(), offsetDifferences.end(), 0.0) / offsetDifferences.size();
+      } else {
+        // Default value or handle empty case
+        averageOffset = 0;
+        SS2K_LOG(POWERTABLE_LOG_TAG, "Warning: No valid offset differences found");
+      }
     } else {
       // If both tables were created with homing, just load the values directly
       for (int i = 0; i < POWERTABLE_CAD_SIZE; i++) {
@@ -1322,6 +1355,15 @@ bool PowerTable::_manageSaveState(bool canSkipReliabilityChecks) {
 }
 
 bool PowerTable::_save() {
+  // Count valid readings before saving
+  int validReadings = getNumReadings();
+  
+  // Only proceed with saving if we have enough data to make the file useful
+  if (validReadings < 1) {
+    SS2K_LOG(POWERTABLE_LOG_TAG, "Not enough valid readings to save power table (%d)", validReadings);
+    return false;
+  }
+  
   // Delete existing file to avoid appending
   LittleFS.remove(POWER_TABLE_FILENAME);
 
@@ -1335,27 +1377,54 @@ bool PowerTable::_save() {
 
   // Write version and size
   int version = TABLE_VERSION;
-  file.write((uint8_t*)&version, sizeof(version));
+  if (file.write((uint8_t*)&version, sizeof(version)) != sizeof(version)) {
+    SS2K_LOG(POWERTABLE_LOG_TAG, "Failed to write version");
+    file.close();
+    return false;
+  }
 
-  int size = getNumReadings();
-  file.write((uint8_t*)&size, sizeof(size));
+  int size = validReadings;
+  if (file.write((uint8_t*)&size, sizeof(size)) != sizeof(size)) {
+    SS2K_LOG(POWERTABLE_LOG_TAG, "Failed to write size");
+    file.close();
+    return false;
+  }
 
   // Write homing state
   bool isHomed = rtConfig->getHomed();
-  file.write((uint8_t*)&isHomed, sizeof(isHomed));
+  if (file.write((uint8_t*)&isHomed, sizeof(isHomed)) != sizeof(isHomed)) {
+    SS2K_LOG(POWERTABLE_LOG_TAG, "Failed to write homing state");
+    file.close();
+    return false;
+  }
 
   // Write table entries
   for (int i = 0; i < POWERTABLE_CAD_SIZE; i++) {
     for (int j = 0; j < POWERTABLE_WATT_SIZE; j++) {
-      file.write((uint8_t*)&this->tableRow[i].tableEntry[j].targetPosition, sizeof(this->tableRow[i].tableEntry[j].targetPosition));
-      file.write((uint8_t*)&this->tableRow[i].tableEntry[j].readings, sizeof(this->tableRow[i].tableEntry[j].readings));
+      // Check write operations for success
+      if (file.write((uint8_t*)&this->tableRow[i].tableEntry[j].targetPosition,
+                     sizeof(this->tableRow[i].tableEntry[j].targetPosition)) !=
+          sizeof(this->tableRow[i].tableEntry[j].targetPosition)) {
+        SS2K_LOG(POWERTABLE_LOG_TAG, "Failed to write table entry position at [%d][%d]", i, j);
+        file.close();
+        return false;
+      }
+      
+      if (file.write((uint8_t*)&this->tableRow[i].tableEntry[j].readings,
+                     sizeof(this->tableRow[i].tableEntry[j].readings)) !=
+          sizeof(this->tableRow[i].tableEntry[j].readings)) {
+        SS2K_LOG(POWERTABLE_LOG_TAG, "Failed to write table entry readings at [%d][%d]", i, j);
+        file.close();
+        return false;
+      }
     }
   }
 
   // Close the file
   file.close();
-  lastSaveTime                    = millis();
+  lastSaveTime = millis();
   this->_hasBeenLoadedThisSession = true;
+  SS2K_LOG(POWERTABLE_LOG_TAG, "Power table saved successfully with %d readings", validReadings);
   return true;  // return successful
 }
 
