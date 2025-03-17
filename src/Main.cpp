@@ -39,8 +39,8 @@ Boards boards;
 Board currentBoard;
 
 ///////////// Initialize the Config /////////////
-ErgMode* ergMode                 = new ErgMode;
-PowerTable* powerTable           = new PowerTable;
+ErgMode *ergMode                 = new ErgMode;
+PowerTable *powerTable           = new PowerTable;
 SS2K *ss2k                       = new SS2K;
 userParameters *userConfig       = new userParameters;
 RuntimeParameters *rtConfig      = new RuntimeParameters;
@@ -120,6 +120,8 @@ void setup() {
   userPWC->loadFromLittleFS();
   userPWC->printFile();
   userPWC->saveToLittleFS();
+  // print littleFS free space and all file sizes on partition
+  Serial.printf("LittleFS Total Bytes:%lu, Used Bytes:%lu\n", LittleFS.totalBytes(), LittleFS.usedBytes());
 
   // Check for firmware update. It's important that this stays before BLE &
   // HTTP setup because otherwise they use too much traffic and the device
@@ -405,7 +407,7 @@ void SS2K::moveStepper() {
     ss2k->currentPosition  = stepper->getCurrentPosition();
     if (!ss2k->externalControl) {
       if ((rtConfig->getFTMSMode() == FitnessMachineControlPointProcedure::SetTargetPower)) {
-        #ifdef ERG_GUARDRAILS
+#ifdef ERG_GUARDRAILS
         // don't drive lower out of bounds. This is a final test that should never happen.
         if ((stepper->getCurrentPosition() > rtConfig->getTargetIncline()) && (rtConfig->watts.getValue() < rtConfig->watts.getTarget())) {
           rtConfig->setTargetIncline(stepper->getCurrentPosition() + 1);
@@ -414,7 +416,7 @@ void SS2K::moveStepper() {
         if ((stepper->getCurrentPosition() < rtConfig->getTargetIncline()) && (rtConfig->watts.getValue() > rtConfig->watts.getTarget())) {
           rtConfig->setTargetIncline(stepper->getCurrentPosition() - 1);
         }
-        #endif
+#endif
         ss2k->targetPosition = rtConfig->getTargetIncline();
       } else if (rtConfig->getFTMSMode() == FitnessMachineControlPointProcedure::SetTargetResistanceLevel) {
         rtConfig->setTargetIncline(ss2k->currentPosition + ((rtConfig->resistance.getTarget() - rtConfig->resistance.getValue()) * 20));
@@ -691,13 +693,13 @@ void SS2K::updateStepperSpeed(int speed) {
     speed = userConfig->getStepperSpeed();
   }
   int s = stepper->getSpeedInMilliHz() / 1000;
-  //Because the conversion to/from the TMC driver is not perfect, we need to allow a little bit of slop.
-  //Skip the update if the speed is within 5 of the target.
-  if (abs(s-speed) < 5) {
+  // Because the conversion to/from the TMC driver is not perfect, we need to allow a little bit of slop.
+  // Skip the update if the speed is within 5 of the target.
+  if (abs(s - speed) < 5) {
     return;
   }
   speed = speed;
-  //SS2K_LOG(MAIN_LOG_TAG, "StepperSpeed is now %d, %d", speed, s);
+  // SS2K_LOG(MAIN_LOG_TAG, "StepperSpeed is now %d, %d", speed, s);
   stepper->setSpeedInHz(speed);
 }
 

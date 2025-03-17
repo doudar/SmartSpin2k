@@ -162,10 +162,15 @@ int32_t PowerTable::lookup(int watts, int cad) {
         }
       }
       if (extrapRow1 != -1 && extrapRow2 != -1) {
-        int cad1          = extrapRow1 * POWERTABLE_CAD_INCREMENT + MINIMUM_TABLE_CAD;
-        int cad2          = extrapRow2 * POWERTABLE_CAD_INCREMENT + MINIMUM_TABLE_CAD;
-        int val1          = this->tableRow[extrapRow1].tableEntry[wattIndex].targetPosition;
-        int val2          = this->tableRow[extrapRow2].tableEntry[wattIndex].targetPosition;
+        int cad1 = extrapRow1 * POWERTABLE_CAD_INCREMENT + MINIMUM_TABLE_CAD;
+        int cad2 = extrapRow2 * POWERTABLE_CAD_INCREMENT + MINIMUM_TABLE_CAD;
+        int val1 = this->tableRow[extrapRow1].tableEntry[wattIndex].targetPosition;
+        int val2 = this->tableRow[extrapRow2].tableEntry[wattIndex].targetPosition;
+        // divide by 0 safety for if cad2 = cad1
+        if (cad2 == cad1) {
+          SS2K_LOG(POWERTABLE_LOG_TAG, "Extrapolate cadence lines were the same");
+          return INT32_MIN;
+        }
         extrapolatedValue = val1 + (val2 - val1) * (cad - cad1) / (cad2 - cad1);
         SS2K_LOG(POWERTABLE_LOG_TAG, "Lookup Extrapolated %d from %d, %d, for %dw %dcad", extrapolatedValue, val2, val1, watts, cad);
         return extrapolatedValue * TABLE_DIVISOR;
@@ -186,10 +191,15 @@ int32_t PowerTable::lookup(int watts, int cad) {
         }
       }
       if (extrapCol1 != -1 && extrapCol2 != -1) {
-        int watts1        = extrapCol1 * POWERTABLE_WATT_INCREMENT;
-        int watts2        = extrapCol2 * POWERTABLE_WATT_INCREMENT;
-        int val1          = this->tableRow[cadIndex].tableEntry[extrapCol1].targetPosition;
-        int val2          = this->tableRow[cadIndex].tableEntry[extrapCol2].targetPosition;
+        int watts1 = extrapCol1 * POWERTABLE_WATT_INCREMENT;
+        int watts2 = extrapCol2 * POWERTABLE_WATT_INCREMENT;
+        int val1   = this->tableRow[cadIndex].tableEntry[extrapCol1].targetPosition;
+        int val2   = this->tableRow[cadIndex].tableEntry[extrapCol2].targetPosition;
+        // divide by 0 safety for if cad2 = cad1
+        if (watts2 == watts1) {
+          SS2K_LOG(POWERTABLE_LOG_TAG, "Extrapolate watts were the same");
+          return INT32_MIN;
+        }
         extrapolatedValue = val1 + (val2 - val1) * (watts - watts1) / (watts2 - watts1);
         SS2K_LOG(POWERTABLE_LOG_TAG, "Lookup Extrapolated %d from %d, %d, for %dw %dcad", extrapolatedValue, val2, val1, watts, cad);
         return extrapolatedValue * TABLE_DIVISOR;
@@ -340,7 +350,6 @@ TestResults PowerTable::testNeighbors(int i, int j, int testValue) {
   return returnResult;
 }
 
-
 /**
  * @brief Performs linear interpolation to estimate a value `j` based on the given
  *        x and y data points.
@@ -354,7 +363,7 @@ TestResults PowerTable::testNeighbors(int i, int j, int testValue) {
  * @param x A vector of x-coordinates (must be sorted in ascending order).
  * @param y A vector of y-coordinates corresponding to the x-coordinates.
  * @param j The x-coordinate for which the interpolated y-coordinate is to be calculated.
- * 
+ *
  * @return The interpolated y-coordinate corresponding to `j`. If interpolation fails
  *         due to invalid input (e.g., duplicate x values), the function logs an error
  *         and returns `INT16_MIN`.
@@ -362,14 +371,13 @@ TestResults PowerTable::testNeighbors(int i, int j, int testValue) {
 double linearInterpolate(const std::vector<double>& x, const std::vector<double>& y, double j) {
   auto upper = std::upper_bound(x.begin(), x.end(), j);
 
-  if (upper == x.end()) return y.back();  // Extrapolate using last value
+  if (upper == x.end()) return y.back();     // Extrapolate using last value
   if (upper == x.begin()) return y.front();  // Extrapolate using first value
-
 
   auto lower = upper - 1;
   double x0 = *lower, x1 = *upper;
   double y0 = y[lower - x.begin()], y1 = y[upper - x.begin()];
-  //log and comment if x1-x0 is 0
+  // log and comment if x1-x0 is 0
   if (x1 - x0 == 0) {
     SS2K_LOG(POWERTABLE_LOG_TAG, "Linear Interpolation failed, x1-x0 is 0");
     return INT16_MIN;
@@ -382,183 +390,179 @@ double linearInterpolate(const std::vector<double>& x, const std::vector<double>
 }
 
 class CubicSpline {
-  public:
-      void set_points(const std::vector<double>& x, const std::vector<double>& y) {
-        int n = x.size() - 1;
-        h.resize(n);
-        alpha.resize(n + 1);
-        l.resize(n + 1);
-        mu.resize(n + 1);
-        z.resize(n + 1);
-        c.resize(n + 1);
-        b.resize(n);
-        d.resize(n);
-        this->x = x;
-        this->y = y;
+ public:
+  void set_points(const std::vector<double>& x, const std::vector<double>& y) {
+    int n = x.size() - 1;
+    h.resize(n);
+    alpha.resize(n + 1);
+    l.resize(n + 1);
+    mu.resize(n + 1);
+    z.resize(n + 1);
+    c.resize(n + 1);
+    b.resize(n);
+    d.resize(n);
+    this->x = x;
+    this->y = y;
 
-        for (int i = 0; i < n; ++i)
-            h[i] = x[i + 1] - x[i];
+    for (int i = 0; i < n; ++i) h[i] = x[i + 1] - x[i];
 
-        double f_prime_start = (y[1] - y[0]) / (x[1] - x[0]);
-        double f_prime_end = (y[n] - y[n - 1]) / (x[n] - x[n - 1]);
+    double f_prime_start = (y[1] - y[0]) / (x[1] - x[0]);
+    double f_prime_end   = (y[n] - y[n - 1]) / (x[n] - x[n - 1]);
 
-        alpha[0] = (3.0 / h[0]) * (y[1] - y[0]) - 3.0 * f_prime_start;
-        alpha[n] = 3.0 * f_prime_end - (3.0 / h[n - 1]) * (y[n] - y[n - 1]);
+    alpha[0] = (3.0 / h[0]) * (y[1] - y[0]) - 3.0 * f_prime_start;
+    alpha[n] = 3.0 * f_prime_end - (3.0 / h[n - 1]) * (y[n] - y[n - 1]);
 
-        for (int i = 1; i < n; ++i)
-            alpha[i] = (3.0 / h[i]) * (y[i + 1] - y[i]) - (3.0 / h[i - 1]) * (y[i] - y[i - 1]);
+    for (int i = 1; i < n; ++i) alpha[i] = (3.0 / h[i]) * (y[i + 1] - y[i]) - (3.0 / h[i - 1]) * (y[i] - y[i - 1]);
 
-        l[0] = 2.0 * h[0];
-        mu[0] = 0.5;
-        z[0] = alpha[0] / l[0];
+    l[0]  = 2.0 * h[0];
+    mu[0] = 0.5;
+    z[0]  = alpha[0] / l[0];
 
-        for (int i = 1; i < n; ++i) {
-            l[i] = 2.0 * (x[i + 1] - x[i - 1]) - h[i - 1] * mu[i - 1];
-            mu[i] = h[i] / l[i];
-            z[i] = (alpha[i] - h[i - 1] * z[i - 1]) / l[i];
-        }
-
-        l[n] = h[n - 1] * (2.0 - mu[n - 1]);
-        z[n] = (alpha[n] - h[n - 1] * z[n - 1]) / l[n];
-        c[n] = z[n];
-
-        for (int j = n - 1; j >= 0; --j) {
-            c[j] = z[j] - mu[j] * c[j + 1];
-            b[j] = (y[j + 1] - y[j]) / h[j] - h[j] * (c[j + 1] + 2.0 * c[j]) / 3.0;
-            d[j] = (c[j + 1] - c[j]) / (3.0 * h[j]);
-        }
+    for (int i = 1; i < n; ++i) {
+      l[i]  = 2.0 * (x[i + 1] - x[i - 1]) - h[i - 1] * mu[i - 1];
+      mu[i] = h[i] / l[i];
+      z[i]  = (alpha[i] - h[i - 1] * z[i - 1]) / l[i];
     }
 
-    double interpolate(double x_val) const {
-      if (x_val < x.front() || x_val > x.back()) {
-          return INT16_MIN; 
-      }
+    l[n] = h[n - 1] * (2.0 - mu[n - 1]);
+    z[n] = (alpha[n] - h[n - 1] * z[n - 1]) / l[n];
+    c[n] = z[n];
 
-      int i = std::upper_bound(x.begin(), x.end(), x_val) - x.begin() - 1;
-      double dx = x_val - x[i];
-      return y[i] + b[i] * dx + c[i] * dx * dx + d[i] * dx * dx * dx;
+    for (int j = n - 1; j >= 0; --j) {
+      c[j] = z[j] - mu[j] * c[j + 1];
+      b[j] = (y[j + 1] - y[j]) / h[j] - h[j] * (c[j + 1] + 2.0 * c[j]) / 3.0;
+      d[j] = (c[j + 1] - c[j]) / (3.0 * h[j]);
+    }
+  }
+
+  double interpolate(double x_val) const {
+    if (x_val < x.front() || x_val > x.back()) {
+      return INT16_MIN;
+    }
+
+    int i     = std::upper_bound(x.begin(), x.end(), x_val) - x.begin() - 1;
+    double dx = x_val - x[i];
+    return y[i] + b[i] * dx + c[i] * dx * dx + d[i] * dx * dx * dx;
   }
 
   double extrapolate(double x_val) const {
-      if (x_val < x.front()) {
-          double dx = x_val - x[0];
-          return y[0] + b[0] * dx + c[0] * dx * dx + d[0] * dx * dx * dx;
-      }
-      if (x_val > x.back()) {
-          int n = x.size() - 1;
-          double dx = x_val - x[n];
-          return y[n] + b[n - 1] * dx + c[n - 1] * dx * dx + d[n - 1] * dx * dx * dx;
-      }
-      return INT16_MIN; 
+    if (x_val < x.front()) {
+      double dx = x_val - x[0];
+      return y[0] + b[0] * dx + c[0] * dx * dx + d[0] * dx * dx * dx;
+    }
+    if (x_val > x.back()) {
+      int n     = x.size() - 1;
+      double dx = x_val - x[n];
+      return y[n] + b[n - 1] * dx + c[n - 1] * dx * dx + d[n - 1] * dx * dx * dx;
+    }
+    return INT16_MIN;
   }
 
-private:
+ private:
   std::vector<double> x, y, h, alpha, l, mu, z, c, b, d;
 };
 
 void PowerTable::fillTable() {
-  findTableDirection(true);  // Horizontal
-  findTableDirection(false); // Vertical
+  findTableDirection(true);   // Horizontal
+  findTableDirection(false);  // Vertical
 }
 
-void PowerTable::findTableDirection(bool horizontal) { 
-
-  // Check to see if we are going through row or column. 
-  int outerSize = horizontal ? POWERTABLE_CAD_SIZE : POWERTABLE_WATT_SIZE; 
+void PowerTable::findTableDirection(bool horizontal) {
+  // Check to see if we are going through row or column.
+  int outerSize = horizontal ? POWERTABLE_CAD_SIZE : POWERTABLE_WATT_SIZE;
   int innerSize = horizontal ? POWERTABLE_WATT_SIZE : POWERTABLE_CAD_SIZE;
 
   // Go through outerSize, could be row or column
   for (int outerValue = 0; outerValue < outerSize; ++outerValue) {
-      std::map<double, double> unique_xy;
-      std::vector<int> emptyIndices;
+    std::map<double, double> unique_xy;
+    std::vector<int> emptyIndices;
 
-      // Set a range either the row or column to find points 
-      int rangeStart = std::max(0, innerSize / 2 - 10); 
-      int rangeEnd = std::min(innerSize, innerSize / 2 + 10);
+    // Set a range either the row or column to find points
+    int rangeStart = std::max(0, innerSize / 2 - 10);
+    int rangeEnd   = std::min(innerSize, innerSize / 2 + 10);
 
-      // Collect unique points
-      for (int innerValue = rangeStart; innerValue < rangeEnd; ++innerValue) {
-          int i = horizontal ? outerValue : innerValue;
-          int j = horizontal ? innerValue : outerValue;
+    // Collect unique points
+    for (int innerValue = rangeStart; innerValue < rangeEnd; ++innerValue) {
+      int i = horizontal ? outerValue : innerValue;
+      int j = horizontal ? innerValue : outerValue;
 
-          if (this->tableRow[i].tableEntry[j].targetPosition != INT16_MIN) {
-              unique_xy[innerValue] = static_cast<double>(this->tableRow[i].tableEntry[j].targetPosition);
-          } else {
-              emptyIndices.push_back(innerValue);
-          }
+      if (this->tableRow[i].tableEntry[j].targetPosition != INT16_MIN) {
+        unique_xy[innerValue] = static_cast<double>(this->tableRow[i].tableEntry[j].targetPosition);
+      } else {
+        emptyIndices.push_back(innerValue);
       }
+    }
 
-      if (unique_xy.size() < 2) continue; // Skip if not enough points
+    if (unique_xy.size() < 2) continue;  // Skip if not enough points
 
-      std::vector<double> x, y;
-      for (const auto& it : unique_xy) {
-          x.push_back(static_cast<double>(it.first));
-          y.push_back(static_cast<double>(it.second));
-      }
+    std::vector<double> x, y;
+    for (const auto& it : unique_xy) {
+      x.push_back(static_cast<double>(it.first));
+      y.push_back(static_cast<double>(it.second));
+    }
 
-      fillEmptyTable(outerValue, emptyIndices, x, y, horizontal);
+    fillEmptyTable(outerValue, emptyIndices, x, y, horizontal);
   }
 }
 
 void PowerTable::fillEmptyTable(int outerValue, const std::vector<int>& emptyIndices, const std::vector<double>& x, const std::vector<double>& y, bool horizontal) {
-
-  // Check if innerSize is horizontal or vertical 
+  // Check if innerSize is horizontal or vertical
   int innerSize = horizontal ? POWERTABLE_WATT_SIZE : POWERTABLE_CAD_SIZE;
 
-  if (x.size() == 1) { // If only one point, fill row with the value
-      double singleValue = y.front();
-      for (int innerValue : emptyIndices) {
-          int i = horizontal ? outerValue : innerValue;
-          int j = horizontal ? innerValue : outerValue;
-          this->tableRow[i].tableEntry[j].targetPosition = static_cast<int>(std::round(singleValue));
-      }
-  } else if (x.size() == 2) { // If two points, we do linear interpolation
-      for (int innerValue : emptyIndices) {
-          int i = horizontal ? outerValue : innerValue;
-          int j = horizontal ? innerValue : outerValue;
+  if (x.size() == 1) {  // If only one point, fill row with the value
+    double singleValue = y.front();
+    for (int innerValue : emptyIndices) {
+      int i                                          = horizontal ? outerValue : innerValue;
+      int j                                          = horizontal ? innerValue : outerValue;
+      this->tableRow[i].tableEntry[j].targetPosition = static_cast<int>(std::round(singleValue));
+    }
+  } else if (x.size() == 2) {  // If two points, we do linear interpolation
+    for (int innerValue : emptyIndices) {
+      int i = horizontal ? outerValue : innerValue;
+      int j = horizontal ? innerValue : outerValue;
 
-          double interpolated_value = linearInterpolate(x, y, innerValue);
-          //check for return error
-          if (interpolated_value == INT16_MIN) {
-              return;
-          }
-
-          int tempValue = static_cast<int>(std::round(interpolated_value));
-
-          if (this->testNeighbors(i, j, tempValue).allNeighborsPassed) {
-              this->tableRow[i].tableEntry[j].targetPosition = tempValue;
-          }
-      }
-  } else if (x.size() >= 3) { // If three points, we do cubic spline interpolation 
-      bool validForSpline = true;
-      for (size_t i = 1; i < x.size(); ++i) {
-          if (x[i] <= x[i - 1]) {
-              validForSpline = false;
-              break;
-          }
-      }
-      if (!validForSpline) {
-          SS2K_LOG(POWERTABLE_LOG_TAG, "Duplicate or non-increasing x-values detected!");
-          return;
+      double interpolated_value = linearInterpolate(x, y, innerValue);
+      // check for return error
+      if (interpolated_value == INT16_MIN) {
+        return;
       }
 
-      CubicSpline spline;
-      spline.set_points(x, y);
+      int tempValue = static_cast<int>(std::round(interpolated_value));
 
-      for (int innerValue : emptyIndices) {
-          int i = horizontal ? outerValue : innerValue;
-          int j = horizontal ? innerValue : outerValue;
-
-          double interpolated_value = spline.interpolate(innerValue);
-
-          int tempValue = static_cast<int>(std::round(interpolated_value));
-
-          if (this->testNeighbors(i, j, tempValue).allNeighborsPassed) {
-              this->tableRow[i].tableEntry[j].targetPosition = tempValue;
-          }
+      if (this->testNeighbors(i, j, tempValue).allNeighborsPassed) {
+        this->tableRow[i].tableEntry[j].targetPosition = tempValue;
       }
+    }
+  } else if (x.size() >= 3) {  // If three points, we do cubic spline interpolation
+    bool validForSpline = true;
+    for (size_t i = 1; i < x.size(); ++i) {
+      if (x[i] <= x[i - 1]) {
+        validForSpline = false;
+        break;
+      }
+    }
+    if (!validForSpline) {
+      SS2K_LOG(POWERTABLE_LOG_TAG, "Duplicate or non-increasing x-values detected!");
+      return;
+    }
+
+    CubicSpline spline;
+    spline.set_points(x, y);
+
+    for (int innerValue : emptyIndices) {
+      int i = horizontal ? outerValue : innerValue;
+      int j = horizontal ? innerValue : outerValue;
+
+      double interpolated_value = spline.interpolate(innerValue);
+
+      int tempValue = static_cast<int>(std::round(interpolated_value));
+
+      if (this->testNeighbors(i, j, tempValue).allNeighborsPassed) {
+        this->tableRow[i].tableEntry[j].targetPosition = tempValue;
+      }
+    }
   } else {
-      SS2K_LOG(POWERTABLE_LOG_TAG, "Error: No unique points found.");
+    SS2K_LOG(POWERTABLE_LOG_TAG, "Error: No unique points found.");
   }
 }
 
@@ -1306,7 +1310,7 @@ bool PowerTable::_manageSaveState(bool canSkipReliabilityChecks) {
           this->tableRow[i].tableEntry[j].readings       = savedReadings;
         }
       }
-      if (!offsetDifferences.empty()) {
+      if (!offsetDifferences.empty() && offsetDifferences.size() >= MINIMUM_RELIABLE_POSITIONS) {
         averageOffset = std::accumulate(offsetDifferences.begin(), offsetDifferences.end(), 0.0) / offsetDifferences.size();
       } else {
         // Default value or handle empty case
@@ -1355,15 +1359,18 @@ bool PowerTable::_manageSaveState(bool canSkipReliabilityChecks) {
 }
 
 bool PowerTable::_save() {
+  // print littleFS free space and all file sizes on partition
+  Serial.printf("LittleFS Total Bytes:%d, Used Bytes:%d", LittleFS.totalBytes(), LittleFS.usedBytes());
+
   // Count valid readings before saving
   int validReadings = getNumReadings();
-  
+
   // Only proceed with saving if we have enough data to make the file useful
   if (validReadings < 1) {
     SS2K_LOG(POWERTABLE_LOG_TAG, "Not enough valid readings to save power table (%d)", validReadings);
     return false;
   }
-  
+
   // Delete existing file to avoid appending
   LittleFS.remove(POWER_TABLE_FILENAME);
 
@@ -1402,27 +1409,28 @@ bool PowerTable::_save() {
   for (int i = 0; i < POWERTABLE_CAD_SIZE; i++) {
     for (int j = 0; j < POWERTABLE_WATT_SIZE; j++) {
       // Check write operations for success
-      if (file.write((uint8_t*)&this->tableRow[i].tableEntry[j].targetPosition,
-                     sizeof(this->tableRow[i].tableEntry[j].targetPosition)) !=
+      if (file.write((uint8_t*)&this->tableRow[i].tableEntry[j].targetPosition, sizeof(this->tableRow[i].tableEntry[j].targetPosition)) !=
           sizeof(this->tableRow[i].tableEntry[j].targetPosition)) {
         SS2K_LOG(POWERTABLE_LOG_TAG, "Failed to write table entry position at [%d][%d]", i, j);
         file.close();
         return false;
       }
-      
-      if (file.write((uint8_t*)&this->tableRow[i].tableEntry[j].readings,
-                     sizeof(this->tableRow[i].tableEntry[j].readings)) !=
-          sizeof(this->tableRow[i].tableEntry[j].readings)) {
+
+      if (file.write((uint8_t*)&this->tableRow[i].tableEntry[j].readings, sizeof(this->tableRow[i].tableEntry[j].readings)) != sizeof(this->tableRow[i].tableEntry[j].readings)) {
         SS2K_LOG(POWERTABLE_LOG_TAG, "Failed to write table entry readings at [%d][%d]", i, j);
         file.close();
         return false;
       }
-    }
-  }
 
+      // log the raw data directly to serial
+      Serial.printf("%d, %d ", this->tableRow[i].tableEntry[j].targetPosition, this->tableRow[i].tableEntry[j].readings);
+    }
+    Serial.printf("\n");
+  }
   // Close the file
   file.close();
-  lastSaveTime = millis();
+  Serial.printf("file Size %lu\n", file.size());
+  lastSaveTime                    = millis();
   this->_hasBeenLoadedThisSession = true;
   SS2K_LOG(POWERTABLE_LOG_TAG, "Power table saved successfully with %d readings", validReadings);
   return true;  // return successful
@@ -1464,7 +1472,10 @@ int32_t PowerTable::lookupWatts(int cad, int32_t targetPosition) {
     int rightPos   = this->tableRow[cadIndex].tableEntry[rightWattIndex].targetPosition;
     int leftWatts  = leftWattIndex * POWERTABLE_WATT_INCREMENT;
     int rightWatts = rightWattIndex * POWERTABLE_WATT_INCREMENT;
-
+    // Divide by 0 safety
+    if (rightPos == leftPos) {
+      return leftWatts;
+    }
     // Linear interpolation
     int watts = leftWatts + (rightWatts - leftWatts) * (internalPosition - leftPos) / (rightPos - leftPos);
     SS2K_LOG(POWERTABLE_LOG_TAG, "LookupWatts interpolated %dw from pos %d, cad %d", watts, targetPosition, cad);
@@ -1479,6 +1490,11 @@ int32_t PowerTable::lookupWatts(int cad, int32_t targetPosition) {
     int watts1 = (leftWattIndex - 1) * POWERTABLE_WATT_INCREMENT;
     int watts2 = leftWattIndex * POWERTABLE_WATT_INCREMENT;
 
+    // divide by zero safety for pos1 == pos2
+    if (pos1 == pos2) {
+      return watts2;
+    }
+
     int watts = watts2 + (watts2 - watts1) * (internalPosition - pos2) / (pos2 - pos1);
     SS2K_LOG(POWERTABLE_LOG_TAG, "LookupWatts extrapolated high %dw from pos %d, cad %d", watts, targetPosition, cad);
     return watts;
@@ -1491,6 +1507,10 @@ int32_t PowerTable::lookupWatts(int cad, int32_t targetPosition) {
     int watts1 = rightWattIndex * POWERTABLE_WATT_INCREMENT;
     int watts2 = (rightWattIndex + 1) * POWERTABLE_WATT_INCREMENT;
 
+    // divide by zero safety for pos1 == pos2
+    if (pos1 == pos2) {
+      return watts2;
+    }
     int watts = watts1 + (watts1 - watts2) * (pos1 - internalPosition) / (pos1 - pos2);
     SS2K_LOG(POWERTABLE_LOG_TAG, "LookupWatts extrapolated low %dw from pos %d, cad %d", watts, targetPosition, cad);
     return watts;
