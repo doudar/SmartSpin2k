@@ -22,264 +22,8 @@
       <div id="saveStatus" class="status-message"></div>
       
       <form action="/send_settings">
-        <div class="settings-grid">
-          <!-- Network Settings -->
-          <div class="setting-group">
-            <h2>WiFi SSID</h2>
-            <p class="tooltip">
-              Network name
-              <span class="tooltiptext">
-                WiFi network name. If it doesn't exist I will create a network with this name.
-              </span>
-            </p>
-            <input type="text" id="ssid" name="ssid" value="loading" />
-          </div>
-          
-          <div class="setting-group">
-            <h2>WiFi Password</h2>
-            <p class="tooltip">
-              Network password
-              <span class="tooltiptext">
-                Password for the WiFi network.
-              </span>
-            </p>
-            <div class="input-group" style="padding: 0.5rem;">
-              <input type="password" id="password" name="password" value="loading" />
-              <label style="display: flex; align-items: center; gap: 0.5rem; margin-top: 0.5rem;">
-                <input type="checkbox" id="showpassword" name="showpassword" onclick="toggleShowPassword()">
-                Show Password
-              </label>
-            </div>
-          </div>
-          
-          <div class="setting-group">
-            <h2>Device Name</h2>
-            <p class="tooltip">
-              MDNS Name
-              <span class="tooltiptext">
-                DNS Name the device will use on the network.
-              </span>
-            </p>
-            <input type="text" id="deviceName" name="deviceName" value="loading" />
-          </div>
-          
-          <!-- Control Settings -->
-          <div class="setting-group">
-            <h2>Shift Amount</h2>
-            <p class="tooltip">
-              Sim Mode step size
-              <span class="tooltiptext">
-                Amount to move stepper per gear shift. Try to target ~30watt changes.
-              </span>
-            </p>
-            <div class="slider-group">
-              <div class="value-display">
-                <span id="shiftStepValue" class="gear-value">0</span>
-              </div>
-              <div style="display: flex; align-items: center; gap: 0.25rem; width: 100%; box-sizing: border-box;">
-               <button type="button" class="adjust-button" onclick="clickStep(document.getElementById('shiftStep'), '-')">-</button>
-               <input type="range" id="shiftStep" name="shiftStep" min="10" max="6000" value="0" step="50" class="slider-container"
-                 onchange="updateSliderAndSend(this, document.getElementById('shiftStepValue'))" />
-               <button type="button" class="adjust-button" onclick="clickStep(document.getElementById('shiftStep'), '+')">+</button>
-             </div>
-            </div>
-          </div>
-          
-          <div class="setting-group">
-            <h2>Incline Multiplier</h2>
-            <p class="tooltip">
-              Sim Mode hill effect
-              <span class="tooltiptext">
-                Increase to make incline changes more noticeable. Adjust until hills feel realistic.
-              </span>
-            </p>
-            <div class="slider-group">
-              <div class="value-display">
-                <span id="inclineMultiplierValue" class="gear-value">0</span><span>x</span>
-              </div>
-              <div style="display: flex; align-items: center; gap: 0.25rem; width: 100%; box-sizing: border-box;">
-                <button type="button" class="adjust-button" onclick="clickStep(document.getElementById('inclineMultiplier'), '-')">-</button>
-                <input type="range" id="inclineMultiplier" name="inclineMultiplier" value="0" min="1" max="10" step="1" class="slider-container"
-                  onchange="updateSliderAndSend(this, document.getElementById('inclineMultiplierValue'))" />
-                <button type="button" class="adjust-button" onclick="clickStep(document.getElementById('inclineMultiplier'), '+')">+</button>
-              </div>
-            </div>
-          </div>
-          
-          <div class="setting-group">
-            <h2>ERG Sensitivity</h2>
-            <p class="tooltip">
-              Response strength
-              <span class="tooltiptext">
-                Increase to make ERG Mode more aggressive.
-              </span>
-            </p>
-            <div class="slider-group">
-              <div class="value-display">
-                <span id="ERGSensitivityValue" class="gear-value">1.0</span>
-              </div>
-              <div style="display: flex; align-items: center; gap: 0.25rem; width: 100%; box-sizing: border-box;">
-                <button type="button" class="adjust-button" onclick="clickStep(document.getElementById('ERGSensitivity'), '-')">-</button>
-                <input type="range" id="ERGSensitivity" name="ERGSensitivity" value="1.0" min=".1" max="20" step=".1" class="slider-container"
-                  onchange="updateSliderAndSend(this, document.getElementById('ERGSensitivityValue'))" />
-                <button type="button" class="adjust-button" onclick="clickStep(document.getElementById('ERGSensitivity'), '+')">+</button>
-              </div>
-            </div>
-          </div>
-          
-          <div class="setting-group">
-            <h2>Min Brake Watts</h2>
-            <p class="tooltip">
-              Bike power floor
-              <span class="tooltiptext">
-                Set the minimum watts until stepper stops. 0 disables check.
-              </span>
-            </p>
-            <div class="slider-group">
-              <div class="value-display">
-                <span id="minWattsValue" class="gear-value">0</span><span>W</span>
-              </div>
-              <div style="display: flex; align-items: center; gap: 0.25rem; width: 100%; box-sizing: border-box;">
-                <button type="button" class="adjust-button" onclick="clickStep(document.getElementById('minWatts'), '-')">-</button>
-                <input type="range" id="minWatts" name="minWatts" min="0" max="200" value="0" step="5" class="slider-container"
-                  onchange="updateSliderAndSend(this, document.getElementById('minWattsValue'))" />
-                <button type="button" class="adjust-button" onclick="clickStep(document.getElementById('minWatts'), '+')">+</button>
-              </div>
-            </div>
-          </div>
-          
-          <div class="setting-group">
-            <h2>Max Brake Watts</h2>
-            <p class="tooltip">
-              Bike power ceiling
-              <span class="tooltiptext">
-                Set the most watts you've ever seen your bike absorb while you're pedaling. 0 disables check.
-              </span>
-            </p>
-            <div class="slider-group">
-              <div class="value-display">
-                <span id="maxWattsValue" class="gear-value">0</span><span>W</span>
-              </div>
-              <div style="display: flex; align-items: center; gap: 0.25rem; width: 100%; box-sizing: border-box;">
-                <button type="button" class="adjust-button" onclick="clickStep(document.getElementById('maxWatts'), '-')">-</button>
-                <input type="range" id="maxWatts" name="maxWatts" min="0" max="2000" value="0" step="25" class="slider-container"
-                  onchange="updateSliderAndSend(this, document.getElementById('maxWattsValue'))" />
-                <button type="button" class="adjust-button" onclick="clickStep(document.getElementById('maxWatts'), '+')">+</button>
-              </div>
-            </div>
-          </div>
-          
-          <div class="setting-group">
-            <h2>Stepper Motor Power</h2>
-            <p class="tooltip">
-              Motor current
-              <span class="tooltiptext">
-                Amount in milliamps for stepper motor. Set to the minimum required to move knob smoothly.
-              </span>
-            </p>
-            <div class="slider-group">
-              <div class="value-display">
-                <span id="stepperPowerValue" class="gear-value">0</span><span>ma</span>
-              </div>
-              <div style="display: flex; align-items: center; gap: 0.25rem; width: 100%; box-sizing: border-box;">
-                <button type="button" class="adjust-button" onclick="clickStep(document.getElementById('stepperPower'), '-')">-</button>
-                <input type="range" id="stepperPower" name="stepperPower" min="100" max="2000" value="0" step="100" class="slider-container"
-                  onchange="updateSliderAndSend(this, document.getElementById('stepperPowerValue'))" />
-                <button type="button" class="adjust-button" onclick="clickStep(document.getElementById('stepperPower'), '+')">+</button>
-              </div>
-            </div>
-          </div>
-          
-          <!-- Toggle Settings -->
-          <div class="setting-group">
-            <h2>Stepper StealthChop</h2>
-            <p class="tooltip">
-              Silent operation mode
-              <span class="tooltiptext">
-                Make stepper silent at expense of torque
-              </span>
-            </p>
-            <div class="toggle-group">
-              <label class="switch">
-                <input type="checkbox" name="stealthChop" id="stealthChop" onchange="sendSetting(this)">
-                <span class="slider"></span>
-              </label>
-            </div>
-          </div>
-          
-          <div class="setting-group">
-            <h2>Automatic Updates</h2>
-            <p class="tooltip">
-              OTA firmware
-              <span class="tooltiptext">
-                Check for new firmware on boot?
-              </span>
-            </p>
-            <div class="toggle-group">
-              <label class="switch">
-                <input type="checkbox" name="autoUpdate" id="autoUpdate" onchange="sendSetting(this)">
-                <span class="slider"></span>
-              </label>
-            </div>
-          </div>
-          
-          <div class="setting-group">
-            <h2>Stepper Motor Direction</h2>
-            <p class="tooltip">
-              Reverse rotation
-              <span class="tooltiptext">
-                Change Stepper Direction
-              </span>
-            </p>
-            <div class="toggle-group">
-              <label class="switch">
-                <input type="checkbox" name="stepperDir" id="stepperDir" onchange="sendSetting(this)">
-                <span class="slider"></span>
-              </label>
-            </div>
-          </div>
-          
-          <div class="setting-group">
-            <h2>Shifter Direction</h2>
-            <p class="tooltip">
-              Reverse input
-              <span class="tooltiptext">Change Shifter Direction</span>
-            </p>
-            <div class="toggle-group">
-              <label class="switch">
-                <input type="checkbox" name="shifterDir" id="shifterDir" onchange="sendSetting(this)">
-                <span class="slider"></span>
-              </label>
-            </div>
-          </div>
-          
-          <div class="setting-group">
-            <h2>UDP Logging</h2>
-            <p class="tooltip">
-              Network diagnostics
-              <span class="tooltiptext">Sending log-messages via UDP Port 10.000</span>
-            </p>
-            <div class="toggle-group">
-              <label class="switch">
-                <input type="checkbox" name="udpLogEnabled" id="udpLogEnabled" onchange="sendSetting(this)">
-                <span class="slider"></span>
-              </label>
-            </div>
-          </div>
-          
-          <div class="setting-group">
-            <h2>PowerTable For Power</h2>
-            <p class="tooltip">
-              Use internal calculation
-              <span class="tooltiptext">Use the PowerTable for Power instead of PM</span>
-            </p>
-            <div class="toggle-group">
-              <label class="switch">
-                <input type="checkbox" name="pTab4Pwr" id="pTab4Pwr" onchange="sendSetting(this)">
-                <span class="slider"></span>
-              </label>
-            </div>
-          </div>
+        <div id="settingsContainer" class="settings-grid">
+          <!-- Settings will be generated here by JavaScript -->
         </div>
         
         <div class="button-group">
@@ -306,8 +50,222 @@
       <a href="https://github.com/doudar/SmartSpin2k/wiki/Adjusting-SmartSpin2k-Settings" class="help-link">Need Help?</a>
     </footer>
   </div>
-
   <script>
+    // ======== Settings Configuration ========
+    // This object defines all settings that will be generated
+    const settingsConfig = {
+      ssid: {
+        type: 'text',
+        title: 'WiFi SSID',
+        tooltip: 'Network name',
+        tooltipText: 'WiFi network name. If it doesn\'t exist I will create a network with this name.',
+        defaultValue: 'loading'
+      },
+      password: {
+        type: 'password',
+        title: 'WiFi Password',
+        tooltip: 'Network password',
+        tooltipText: 'Password for the WiFi network.',
+        defaultValue: 'loading'
+      },
+      deviceName: {
+        type: 'text',
+        title: 'Device Name',
+        tooltip: 'MDNS Name',
+        tooltipText: 'DNS Name the device will use on the network.',
+        defaultValue: 'loading'
+      },
+      shiftStep: {
+        type: 'slider',
+        title: 'Shift Amount',
+        tooltip: 'Sim Mode step size',
+        tooltipText: 'Amount to move stepper per gear shift. Try to target ~30watt changes.',
+        min: 10, max: 6000, step: 50, 
+        defaultValue: 0,
+        unit: ''
+      },
+      inclineMultiplier: {
+        type: 'slider',
+        title: 'Incline Multiplier',
+        tooltip: 'Sim Mode hill effect',
+        tooltipText: 'Increase to make incline changes more noticeable. Adjust until hills feel realistic.',
+        min: 1, max: 10, step: 1,
+        defaultValue: 0,
+        unit: 'x'
+      },
+      ERGSensitivity: {
+        type: 'slider',
+        title: 'ERG Sensitivity',
+        tooltip: 'Response strength',
+        tooltipText: 'Increase to make ERG Mode more aggressive.',
+        min: 0.1, max: 20, step: 0.1,
+        defaultValue: 1.0,
+        unit: ''
+      },
+      minWatts: {
+        type: 'slider',
+        title: 'Min Brake Watts',
+        tooltip: 'Bike power floor',
+        tooltipText: 'Set the minimum watts until stepper stops. 0 disables check.',
+        min: 0, max: 200, step: 5,
+        defaultValue: 0,
+        unit: 'W'
+      },
+      maxWatts: {
+        type: 'slider',
+        title: 'Max Brake Watts',
+        tooltip: 'Bike power ceiling',
+        tooltipText: 'Set the most watts you\'ve ever seen your bike absorb while you\'re pedaling. 0 disables check.',
+        min: 0, max: 2000, step: 25,
+        defaultValue: 0,
+        unit: 'W'
+      },
+      stepperPower: {
+        type: 'slider',
+        title: 'Stepper Motor Power',
+        tooltip: 'Motor current',
+        tooltipText: 'Amount in milliamps for stepper motor. Set to the minimum required to move knob smoothly.',
+        min: 100, max: 2000, step: 100,
+        defaultValue: 0,
+        unit: 'ma'
+      },
+      stealthChop: {
+        type: 'toggle',
+        title: 'Stepper StealthChop',
+        tooltip: 'Silent operation mode',
+        tooltipText: 'Make stepper silent at expense of torque',
+        defaultValue: false
+      },
+      autoUpdate: {
+        type: 'toggle',
+        title: 'Automatic Updates',
+        tooltip: 'OTA firmware',
+        tooltipText: 'Check for new firmware on boot?',
+        defaultValue: false
+      },
+      stepperDir: {
+        type: 'toggle',
+        title: 'Stepper Motor Direction',
+        tooltip: 'Reverse rotation',
+        tooltipText: 'Change Stepper Direction',
+        defaultValue: false
+      },
+      shifterDir: {
+        type: 'toggle',
+        title: 'Shifter Direction',
+        tooltip: 'Reverse input',
+        tooltipText: 'Change Shifter Direction',
+        defaultValue: false
+      },
+      udpLogEnabled: {
+        type: 'toggle',
+        title: 'UDP Logging',
+        tooltip: 'Network diagnostics',
+        tooltipText: 'Sending log-messages via UDP Port 10.000',
+        defaultValue: false
+      },
+      pTab4Pwr: {
+        type: 'toggle',
+        title: 'PowerTable For Power',
+        tooltip: 'Use internal calculation',
+        tooltipText: 'Use the PowerTable for Power instead of PM',
+        defaultValue: false
+      }
+    };
+
+    // Generate HTML for text input settings
+    function createTextSetting(id, config) {
+      const isPassword = config.type === 'password';
+      let html = `
+        <div class="setting-group">
+          <h2>${config.title}</h2>
+          <p class="tooltip">
+            ${config.tooltip}
+            <span class="tooltiptext">
+              ${config.tooltipText}
+            </span>
+          </p>`;
+      
+      if (isPassword) {
+        html += `
+          <div class="input-group" style="padding: 0.5rem;">
+            <input type="${isPassword ? 'password' : 'text'}" id="${id}" name="${id}" value="${config.defaultValue}" />
+            <label style="display: flex; align-items: center; gap: 0.5rem; margin-top: 0.5rem;">
+              <input type="checkbox" id="showpassword" name="showpassword" onclick="toggleShowPassword()">
+              Show Password
+            </label>
+          </div>`;
+      } else {
+        html += `<input type="text" id="${id}" name="${id}" value="${config.defaultValue}" />`;
+      }
+      
+      html += `</div>`;
+      return html;
+    }
+
+    function createSliderSetting(id, config) {
+      return `
+        <div class="setting-group">
+          <h2>${config.title}</h2>
+          <p class="tooltip">
+            ${config.tooltip}
+            <span class="tooltiptext">
+              ${config.tooltipText}
+            </span>
+          </p>
+          <div class="slider-group">
+            <div class="value-display">
+              <span id="${id}Value" class="gear-value">${config.defaultValue}</span>${config.unit ? `<span>${config.unit}</span>` : ''}
+            </div>
+            <div style="display: flex; align-items: center; gap: 0.25rem; width: 100%; box-sizing: border-box;">
+              <button type="button" class="adjust-button" onclick="clickStep(document.getElementById('${id}'), '-')">-</button>
+              <input type="range" id="${id}" name="${id}" min="${config.min}" max="${config.max}" value="${config.defaultValue}" step="${config.step}" class="slider-container"
+                onchange="updateSliderAndSend(this, document.getElementById('${id}Value'))" />
+              <button type="button" class="adjust-button" onclick="clickStep(document.getElementById('${id}'), '+')">+</button>
+            </div>
+          </div>
+        </div>`;
+    }
+
+    function createToggleSetting(id, config) {
+      return `
+        <div class="setting-group">
+          <h2>${config.title}</h2>
+          <p class="tooltip">
+            ${config.tooltip}
+            <span class="tooltiptext">${config.tooltipText}</span>
+          </p>
+          <div class="toggle-group">
+            <label class="switch">
+              <input type="checkbox" name="${id}" id="${id}" onchange="sendSetting(this)">
+              <span class="slider"></span>
+            </label>
+          </div>
+        </div>`;
+    }
+
+    function generateSettings() {
+      const container = document.getElementById('settingsContainer');
+      let html = '';
+      
+      for (const [id, config] of Object.entries(settingsConfig)) {
+        switch (config.type) {
+          case 'text':
+          case 'password':
+            html += createTextSetting(id, config);
+            break;
+          case 'slider':
+            html += createSliderSetting(id, config);
+            break;
+          case 'toggle':
+            html += createToggleSetting(id, config);
+            break;
+        }
+      }
+      
+      container.innerHTML = html;
+    }
+
     let debounceTimer;
     const saveStatus = document.getElementById('saveStatus');
     const confirmDialog = document.getElementById('confirmDialog');
@@ -352,28 +310,25 @@
       xhttp.onreadystatechange = function () {
         if (this.readyState == 4 && this.status == 200) {
           var obj = JSON.parse(this.responseText);
-          document.getElementById("ssid").value = obj.ssid;
-          document.getElementById("password").value = obj.password;
-          document.getElementById("deviceName").value = obj.deviceName;
-          document.getElementById("shiftStep").value = obj.shiftStep;
-          document.getElementById("inclineMultiplier").value = obj.inclineMultiplier;
-          document.getElementById("ERGSensitivity").value = obj.ERGSensitivity;
-          document.getElementById("stepperPower").value = obj.stepperPower;
-          document.getElementById("minWatts").value = obj.minWatts;
-          document.getElementById("maxWatts").value = obj.maxWatts;
-          document.getElementById("stealthChop").checked = obj.stealthChop;
-          document.getElementById("autoUpdate").checked = obj.autoUpdate;
-          document.getElementById("stepperDir").checked = obj.stepperDir;
-          document.getElementById("shifterDir").checked = obj.shifterDir;
-          document.getElementById("udpLogEnabled").checked = !!obj.udpLogEnabled;
-          document.getElementById("pTab4Pwr").checked = !!obj.pTab4Pwr;
-          updateSlider(document.getElementById("shiftStep").value, document.getElementById("shiftStepValue"));
-          updateSlider(document.getElementById("inclineMultiplier").value, document.getElementById("inclineMultiplierValue"));
-          updateSlider(document.getElementById("ERGSensitivity").value, document.getElementById("ERGSensitivityValue"));
-          updateSlider(document.getElementById("stepperPower").value, document.getElementById("stepperPowerValue"));
-          updateSlider(document.getElementById("minWatts").value, document.getElementById("minWattsValue"));
-          updateSlider(document.getElementById("maxWatts").value, document.getElementById("maxWattsValue"));
-          document.getElementById("loadingWatermark").remove();
+          for (const key in obj) {
+            const el = document.getElementById(key);
+            if (el) {
+              if (el.type === 'checkbox') {
+                el.checked = !!obj[key];
+              } else {
+                el.value = obj[key];
+              }
+              const valueEl = document.getElementById(key + 'Value');
+              if (valueEl) {
+                updateSlider(obj[key], valueEl);
+              }
+            }
+          }
+          
+          const loadingWatermark = document.getElementById("loadingWatermark");
+          if (loadingWatermark) {
+            loadingWatermark.remove();
+          }
         } else {
           startConfigUpdate();
         }
@@ -414,7 +369,11 @@
           params.append(element.name, element.value);
         }
         
-        ['stealthChop', 'autoUpdate', 'stepperDir', 'shifterDir', 'udpLogEnabled', 'pTab4Pwr'].forEach(id => {
+        const toggleIds = Object.entries(settingsConfig)
+          .filter(([_, config]) => config.type === 'toggle')
+          .map(([id, _]) => id);
+        
+        toggleIds.forEach(id => {
           if (document.getElementById(id).checked) {
             params.append(id, 'true');
           }
@@ -427,6 +386,7 @@
     }
 
     window.addEventListener('load', () => {
+      generateSettings();
       startConfigUpdate();
     });
   </script>
