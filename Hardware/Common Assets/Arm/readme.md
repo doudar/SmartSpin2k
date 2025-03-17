@@ -5,6 +5,7 @@ Manufacturer|Model|Year|Arm Length (range)
 ----------: |:---:|:---:|:------:
 BH Fitness||Any|50
 Body Bike|Body Bike|Any|50 (Steep angle)
+BodyCraft|MAG|Any|35
 Bowflex|C6|Any|65
 Bowflex|C7|Any|45
 Bowflex|C6|Any|85
