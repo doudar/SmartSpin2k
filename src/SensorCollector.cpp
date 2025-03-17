@@ -27,9 +27,22 @@ void collectAndSet(NimBLEUUID charUUID, NimBLEUUID serviceUUID, NimBLEAddress ad
   logBufLength += snprintf(logBuf + logBufLength, kLogBufMaxLength - logBufLength, " | %s[", sensorData->getId().c_str());
   if (sensorData->hasHeartRate() && !rtConfig->hr.getSimulate()) {
     int heartRate = sensorData->getHeartRate();
-    rtConfig->hr.setValue(heartRate);
-    spinBLEClient.connectedHRM = true;
-    logBufLength += snprintf(logBuf + logBufLength, kLogBufMaxLength - logBufLength, " HR(%d)", heartRate % 1000);
+    static int zeroCount = 0;
+    zeroCount++;
+    if (heartRate > 0) {
+      rtConfig->hr.setValue(heartRate);
+      logBufLength += snprintf(logBuf + logBufLength, kLogBufMaxLength - logBufLength, " HR(%d)", heartRate % 1000);
+      spinBLEClient.connectedHRM = true;
+      zeroCount = 0;
+    }else{
+      //require 10 readings in a row before setting the HR to 0
+      logBufLength += snprintf(logBuf + logBufLength, kLogBufMaxLength - logBufLength, " HR IGNORED");
+      if (zeroCount > 10){
+        rtConfig->hr.setValue(0);
+        spinBLEClient.connectedHRM = false;
+        zeroCount = 0;
+      }
+    }
   }
 
   if (sensorData->hasCadence() && !rtConfig->cad.getSimulate()) {

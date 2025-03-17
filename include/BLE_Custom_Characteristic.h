@@ -83,4 +83,5 @@ class BLE_ss2kCustomCharacteristic {
 class ss2kCustomCharacteristicCallbacks : public NimBLECharacteristicCallbacks {
   void onWrite(NimBLECharacteristic* pCharacteristic, NimBLEConnInfo& connInfo) override;
   void onSubscribe(NimBLECharacteristic* pCharacteristic, NimBLEConnInfo& connInfo, uint16_t subValue) override;
+  void onStatus(NimBLECharacteristic* pCharacteristic, int code) override;
 };

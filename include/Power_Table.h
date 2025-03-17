@@ -9,7 +9,7 @@
 
 #include "settings.h"
 #include "SmartSpin_parameters.h"
-#include <vector>
+#include <vector> 
 
 #define POWERTABLE_LOG_TAG   "PTable"
 #define RETURN_ERROR         INT32_MIN

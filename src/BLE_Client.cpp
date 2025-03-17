@@ -201,14 +201,15 @@ bool SpinBLEClient::connectToServer() {
   NimBLEUUID serviceUUID;
   NimBLEUUID charUUID;
 
-  int successful = 0;
-  const NimBLEAdvertisedDevice *myDevice;
-  int device_number = -1;
+  int successful                         = 0;
+  const NimBLEAdvertisedDevice *myDevice = nullptr;
+  int device_number                      = -1;
 
   for (int i = 0; i < NUM_BLE_DEVICES; i++) {
     if (spinBLEClient.myBLEDevices[i].doConnect == true) {   // Client wants to be connected
       if (spinBLEClient.myBLEDevices[i].advertisedDevice) {  // Client is assigned
-        myDevice      = spinBLEClient.myBLEDevices[i].advertisedDevice;
+        myDevice = spinBLEClient.myBLEDevices[i].advertisedDevice;
+        SS2K_LOG(BLE_CLIENT_LOG_TAG, "Connecting slot %d", i);
         device_number = i;
         break;
       } else {
@@ -225,16 +226,21 @@ bool SpinBLEClient::connectToServer() {
     return false;
   }
   if (myDevice->getServiceUUIDCount() > 0) {
-    const BLEServiceInfo *serviceInfo = getDeviceServiceInfo(myDevice, String(myDevice->getName().c_str()));
+    String deviceName = myDevice->haveName() ? String(myDevice->getName().c_str()) : "Unknown";
+    SS2K_LOG(BLE_CLIENT_LOG_TAG, "Getting service info for device: %s with %d services",
+             deviceName.c_str(), myDevice->getServiceUUIDCount());
+    
+    const BLEServiceInfo *serviceInfo = getDeviceServiceInfo(myDevice, deviceName);
     if (!serviceInfo) {
-      SS2K_LOG(BLE_CLIENT_LOG_TAG, "No supported service UUID found");
+      SS2K_LOG(BLE_CLIENT_LOG_TAG, "No supported service UUID found for device: %s", deviceName.c_str());
       spinBLEClient.myBLEDevices[device_number].reset();
       return false;
     }
 
     serviceUUID = serviceInfo->serviceUUID;
     charUUID    = serviceInfo->characteristicUUID;
-    SS2K_LOG(BLE_CLIENT_LOG_TAG, "trying to connect to %s", serviceInfo->name.c_str());
+    SS2K_LOG(BLE_CLIENT_LOG_TAG, "Trying to connect to %s (Service UUID: %s)",
+             serviceInfo->name.c_str(), serviceUUID.toString().c_str());
   } else {
     SS2K_LOG(BLE_CLIENT_LOG_TAG, "Device has no Service UUID");
     spinBLEClient.myBLEDevices[device_number].reset();
@@ -256,7 +262,7 @@ bool SpinBLEClient::connectToServer() {
     if (pClient) {
       pClient->setConnectTimeout(500);
       SS2K_LOG(BLE_CLIENT_LOG_TAG, "Reusing Client");
-      if (!pClient->connect(myDevice, false)) {
+      if (!pClient->connect(myDevice)) {
         SS2K_LOG(BLE_CLIENT_LOG_TAG, "Reconnect failed ");
         this->reconnectTries--;
         SS2K_LOG(BLE_CLIENT_LOG_TAG, "%d left.", reconnectTries);
@@ -420,7 +426,13 @@ void MyClientCallback::onAuthenticationComplete(NimBLEConnInfo &connInfo) {
  * - If the device does not match the user configuration, it ignores the device.
  */
 void ScanCallbacks::onResult(const NimBLEAdvertisedDevice *advertisedDevice) {
-  //Serial.printf("Advertised Device found: %s\n", advertisedDevice->toString().c_str());
+  // Defensive check - we've seen null devices causing crashes
+  if (!advertisedDevice) {
+    SS2K_LOGE(BLE_CLIENT_LOG_TAG, "onResult received NULL advertisedDevice!");
+    return;
+  }
+  
+  Serial.printf("Advertised Device found: %s\n", advertisedDevice->toString().c_str());
   // Define granular constants for maximal reuse during logging
   const char *const MATCHED               = "Matched ";
   const char *const DIDNT_MATCH_THE_SAVED = " didn't match the saved: ";
@@ -448,7 +460,7 @@ void ScanCallbacks::onResult(const NimBLEAdvertisedDevice *advertisedDevice) {
           SS2K_LOG(BLE_CLIENT_LOG_TAG, "%s%s%s%s", THIS, REMOTE, DIDNT_MATCH_THE_SAVED, userConfig->getConnectedRemote());
           return;  // Ignore this device;
         } else {
-          SS2K_LOG(BLE_CLIENT_LOG_TAG, "%s %s%s", REMOTE, NAME, MATCHED, aDevName);
+          SS2K_LOG(BLE_CLIENT_LOG_TAG, "%s %s%s%s", REMOTE, NAME, MATCHED, aDevName.c_str());
         }
       }
     } else if (advertisedDevice->getServiceUUID() == HEARTSERVICE_UUID) {
@@ -461,7 +473,7 @@ void ScanCallbacks::onResult(const NimBLEAdvertisedDevice *advertisedDevice) {
           SS2K_LOG(BLE_CLIENT_LOG_TAG, "%s%s%s%s", THIS, HRM, DIDNT_MATCH_THE_SAVED, userConfig->getConnectedHeartMonitor());
           return;  // Ignore this device;
         } else {
-          SS2K_LOG(BLE_CLIENT_LOG_TAG, "%s %s%s", HRM, NAME, MATCHED, aDevName);
+          SS2K_LOG(BLE_CLIENT_LOG_TAG, "%s %s%s%s", HRM, NAME, MATCHED, aDevName.c_str());
         }
       }
     } else {
@@ -474,7 +486,7 @@ void ScanCallbacks::onResult(const NimBLEAdvertisedDevice *advertisedDevice) {
           SS2K_LOG(BLE_CLIENT_LOG_TAG, "%s%s%s%s", THIS, PM, DIDNT_MATCH_THE_SAVED, userConfig->getConnectedPowerMeter());
           return;  // Ignore this device;
         } else {
-          SS2K_LOG(BLE_CLIENT_LOG_TAG, "%s %s%s", PM, NAME, MATCHED, aDevName);
+          SS2K_LOG(BLE_CLIENT_LOG_TAG, "%s %s%s%s", PM, NAME, MATCHED, aDevName.c_str());
         }
       }
     }
@@ -500,7 +512,6 @@ void SpinBLEClient::scanProcess(int duration) {
   if (pBLEScan->isScanning()) {
     return;
   }
-  pBLEScan->clearResults();
   pBLEScan->start(duration, false, true);
   this->dontBlockScan = false;
 }
@@ -546,7 +557,7 @@ void ScanCallbacks::onScanEnd(const NimBLEScanResults &results, int reason) {
 
   String output;
   serializeJson(devices, output);
-  // SS2K_LOG(BLE_CLIENT_LOG_TAG, "Bluetooth Client Found Devices: %s", output.c_str());
+  // SS2K_LOG(BLE_CLIENT_LOG_TAG, "Found Devices: %s", output.c_str());
 #ifdef USE_TELEGRAM
   SEND_TO_TELEGRAM("Bluetooth Client Found Devices: " + output);
 #endif
@@ -730,17 +741,25 @@ bool SpinBLEAdvertisedDevice::enqueueData(uint8_t *data, size_t length, NimBLEUU
 
 NotifyData SpinBLEAdvertisedDevice::dequeueData() {
   NotifyData receivedNotifyData;
-  if (this->dataBufferQueue == nullptr) {
-    //  Serial.println("Queue not created.  Skipping dequeue of data.");
-    receivedNotifyData.length = 0;
-    return receivedNotifyData;
-  }
-  if (xQueueReceive(this->dataBufferQueue, &receivedNotifyData, 0) == pdTRUE) {
-    //  Serial.printf("Successfully dequeued data from queue. %d \n", receivedNotifyData.length);
-    return receivedNotifyData;
-  }
-  // Serial.println("buffer was empty");
+  // Initialize to safe values
   receivedNotifyData.length = 0;
+  memset(receivedNotifyData.data, 0, NOTIFY_DATA_QUEUE_SIZE);
+  
+  if (this->dataBufferQueue == nullptr) {
+    SS2K_LOGW(BLE_CLIENT_LOG_TAG, "Queue not created. Skipping dequeue of data.");
+    return receivedNotifyData;
+  }
+  
+  if (xQueueReceive(this->dataBufferQueue, &receivedNotifyData, 0) == pdTRUE) {
+    // Validate data length to prevent buffer overruns
+    if (receivedNotifyData.length > NOTIFY_DATA_QUEUE_SIZE) {
+      SS2K_LOGE(BLE_CLIENT_LOG_TAG, "Invalid data length %d (max %d). Discarding.",
+               receivedNotifyData.length, NOTIFY_DATA_QUEUE_SIZE);
+      receivedNotifyData.length = 0;
+    }
+  }
+  
+  // Return data (either valid dequeued data or empty initialized data)
   return receivedNotifyData;
 }
 
@@ -907,13 +926,26 @@ String SpinBLEClient::adevName2UniqueName(const NimBLEAdvertisedDevice *inDev) {
 }
 
 void SpinBLEAdvertisedDevice::set(const NimBLEAdvertisedDevice *device, int id, BLEUUID inServiceUUID, BLEUUID inCharUUID) {
+  // Defensive null check to prevent crashes
+  if (!device) {
+    SS2K_LOGE(BLE_CLIENT_LOG_TAG, "ERROR: Attempt to set null device!");
+    return;
+  }
+  
   SS2K_LOG(BLE_CLIENT_LOG_TAG, "Setting Device %s", device->getAddress().toString().c_str());
   this->advertisedDevice  = const_cast<const NimBLEAdvertisedDevice *>(device);
   this->peerAddress       = device->getAddress();
   this->connectedClientID = id;
   this->serviceUUID       = BLEUUID(inServiceUUID);
   this->charUUID          = BLEUUID(inCharUUID);
-  this->dataBufferQueue   = xQueueCreate(6, sizeof(NotifyData));
+  
+  // Create the queue if it doesn't exist
+  if (this->dataBufferQueue == nullptr) {
+    this->dataBufferQueue = xQueueCreate(6, sizeof(NotifyData));
+    if (this->dataBufferQueue == nullptr) {
+      SS2K_LOGE(BLE_CLIENT_LOG_TAG, "Failed to create data buffer queue!");
+    }
+  }
 
   // Only register services when we have a connected client
   if (id != BLE_HS_CONN_HANDLE_NONE) {

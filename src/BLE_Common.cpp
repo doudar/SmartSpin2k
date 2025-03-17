@@ -76,11 +76,10 @@ void BLECommunications() {
                   spinBLEClient.handleBattInfo(pClient, false);
                 }
 
-              } else if (!pClient->isConnected()) {  // This shouldn't ever be
-                                                     // called...
-                SS2K_LOG(BLE_COMMON_LOG_TAG, "Workaround connect");
-                _BLEd.doConnect = true;
-                //}
+              } else if (!pClient->isConnected()) {  // This is a workaround for a bug in NimBLE where onDisconnect() is not called automatically. 
+                MyClientCallback workaroundCallback;
+                workaroundCallback.onDisconnect(pClient, 0);
+                SS2K_LOG(BLE_COMMON_LOG_TAG, "Client %s not connected in communications loop", _BLEd.peerAddress.toString().c_str());
               }
             }
           }

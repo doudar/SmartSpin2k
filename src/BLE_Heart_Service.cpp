@@ -18,13 +18,34 @@ void BLE_Heart_Service::setupService(NimBLEServer *pServer, MyCharacteristicCall
   heartRateMeasurementCharacteristic->setValue(heartRateMeasurement, 2);
   heartRateMeasurementCharacteristic->setCallbacks(chrCallbacks);
   pHeartService->start();
-  //spinBLEServer.pServer->getAdvertising()->addServiceUUID(pHeartService->getUUID());
+}
+
+void BLE_Heart_Service::deinit() {
+  if (pHeartService != nullptr) {
+    if (heartRateMeasurementCharacteristic != nullptr) {
+      pHeartService->removeCharacteristic(heartRateMeasurementCharacteristic);
+      heartRateMeasurementCharacteristic = nullptr;
+    }
+    spinBLEServer.pServer->removeService(pHeartService);
+    pHeartService = nullptr;
+    spinBLEServer.pServer->getAdvertising()->stop();
+    SS2K_LOG(BLE_COMMON_LOG_TAG, "Heart Rate Service De-initialized");
+  }
 }
 
 void BLE_Heart_Service::update() {
-  /*if (!spinBLEServer.clientSubscribed.Heartrate) {
+  /* Check if heart rate monitor is connected
+  if (String(userConfig->getConnectedHeartMonitor()) == "none") {
+    deinit();
     return;
+  }
+
+  if (!pHeartService) {
+    // Re-initialize if needed, most likely after changing HRM from none to a specific device
+    MyCharacteristicCallbacks* chrCallbacks;
+    setupService(spinBLEServer.pServer, chrCallbacks);
   }*/
+ 
   byte heartRateMeasurement[2] = {0x00, (byte)rtConfig->hr.getValue()};
   heartRateMeasurementCharacteristic->setValue(heartRateMeasurement, 2);
   heartRateMeasurementCharacteristic->notify();
