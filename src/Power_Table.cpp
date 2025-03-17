@@ -418,9 +418,9 @@ void PowerTable::findTableDirection(bool horizontal) {
               unique_xy.emplace_back(innerValue, static_cast<double>(targetPos));
           } else {
               // Store a subset of empty indices (every 5th)
-              if (emptyIndices.empty() || innerValue - emptyIndices.back() >= 5) {
+
                   emptyIndices.push_back(innerValue);
-              }
+              
           }
       }
 
@@ -483,7 +483,7 @@ void PowerTable::fillEmptyTable(int outerValue, const std::vector<int>& emptyInd
           int i = horizontal ? outerValue : innerValue;
           int j = horizontal ? innerValue : outerValue;
 
-          double interpolated_value = s(j);
+          double interpolated_value = s(innerValue);
 
           double minValue = *std::min_element(y.begin(), y.end());
           double maxValue = *std::max_element(y.begin(), y.end());
@@ -809,24 +809,24 @@ void PowerTable::extrapolateEmptyIndices(int outerIndex, const std::vector<int>&
       int innerSize = horizontal ? POWERTABLE_WATT_SIZE : POWERTABLE_CAD_SIZE;
 
         if (x.size() == 1) {
-        int singleValue = static_cast<int>(std::round(y.front()));
-        for (int innerIndex : emptyIndices) {
-        int i = horizontal ? outerIndex : innerIndex;
-        int j = horizontal ? innerIndex : outerIndex;
-        this->tableRow[i].tableEntry[j].targetPosition = singleValue;
-        }
+          int singleValue = static_cast<int>(std::round(y.front()));
+          for (int innerIndex : emptyIndices) {
+            int i = horizontal ? outerIndex : innerIndex;
+            int j = horizontal ? innerIndex : outerIndex;
+            this->tableRow[i].tableEntry[j].targetPosition = singleValue;
+          }
         } else if (x.size() == 2) {
         for (int innerIndex : emptyIndices) {
-        int i = horizontal ? outerIndex : innerIndex;
-        int j = horizontal ? innerIndex : outerIndex;
+          int i = horizontal ? outerIndex : innerIndex;
+          int j = horizontal ? innerIndex : outerIndex;
 
-        double extrapolated_value = linearExtrapolate(x, y, innerIndex);
-        int tempValue = static_cast<int>(std::round(extrapolated_value));
+          double extrapolated_value = linearExtrapolate(x, y, innerIndex);
+          int tempValue = static_cast<int>(std::round(extrapolated_value));
 
-        if (testNeighbors(i, j, tempValue).allNeighborsPassed) {
-              this->tableRow[i].tableEntry[j].targetPosition = tempValue;
+          if (testNeighbors(i, j, tempValue).allNeighborsPassed) {
+                this->tableRow[i].tableEntry[j].targetPosition = tempValue;
+              }
             }
-          }
         } else if (x.size() >= 3) {
             bool validForSpline = true;
             for (size_t i = 1; i < x.size(); ++i) {
