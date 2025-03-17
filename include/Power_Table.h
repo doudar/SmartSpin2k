@@ -132,13 +132,13 @@ class PowerTable {
   // Display power table in log
   void toLog();
 
-  void fillEmptyTable(int outerValue, const std::vector<int>& emptyIndices, const std::vector<double>& x, const std::vector<double>& y, bool horizontal, bool useNaturalSpline);
+  void fillEmptyTable(int outerValue, const std::vector<int>& emptyIndices, const std::vector<double>& x, const std::vector<double>& y, bool horizontal);
 
   void findTableDirection(bool horizontal);
 
   void extrapFillTableDirection(bool horizontal); 
 
-  void extrapolateEmptyIndices(int outerIndex, const std::vector<int>& emptyIndices, const std::vector<double>& x, const std::vector<double>& y, bool horizontal, bool naturalSpline);
+  void extrapolateEmptyIndices(int outerIndex, const std::vector<int>& emptyIndices, const std::vector<double>& x, const std::vector<double>& y, bool horizontal);
  private:
   unsigned long lastSaveTime     = millis();
   TestResults testNeighbors(int i, int j, int value);
