@@ -7,6 +7,7 @@
 
 #include "BLE_Fitness_Machine_Service.h"
 #include <Constants.h>
+#include <vector>
 
 BLE_Fitness_Machine_Service::BLE_Fitness_Machine_Service()
     : pFitnessMachineService(nullptr),
@@ -18,8 +19,6 @@ BLE_Fitness_Machine_Service::BLE_Fitness_Machine_Service()
       fitnessMachinePowerRange(nullptr),
       fitnessMachineInclinationRange(nullptr),
       fitnessMachineTrainingStatus(nullptr) {}
-
-uint8_t ftmsTrainingStatus[2] = {0x00, 0x00};  // Initialize to Other state
 
 void BLE_Fitness_Machine_Service::setupService(NimBLEServer *pServer, MyCharacteristicCallbacks *chrCallbacks) {
   // Resistance, IPower, HeartRate
@@ -34,10 +33,6 @@ void BLE_Fitness_Machine_Service::setupService(NimBLEServer *pServer, MyCharacte
                                                   FitnessMachineTargetFlags::Types::ResistanceTargetSettingSupported |
                                                   FitnessMachineTargetFlags::Types::IndoorBikeSimulationParametersSupported |
                                                   FitnessMachineTargetFlags::Types::SpinDownControlSupported};
-  // Fitness Machine Indoor Bike Data Flags Setup
-  FitnessMachineIndoorBikeDataFlags::Types ftmsIBDFlags = FitnessMachineIndoorBikeDataFlags::InstantaneousCadencePresent |
-                                                          FitnessMachineIndoorBikeDataFlags::ResistanceLevelPresent | FitnessMachineIndoorBikeDataFlags::InstantaneousPowerPresent |
-                                                          FitnessMachineIndoorBikeDataFlags::HeartRatePresent;
 
   // Fitness Machine service setup
   pFitnessMachineService             = spinBLEServer.pServer->createService(FITNESSMACHINESERVICE_UUID);
@@ -51,9 +46,7 @@ void BLE_Fitness_Machine_Service::setupService(NimBLEServer *pServer, MyCharacte
   fitnessMachineTrainingStatus       = pFitnessMachineService->createCharacteristic(FITNESSMACHINETRAININGSTATUS_UUID, NIMBLE_PROPERTY::READ | NIMBLE_PROPERTY::NOTIFY);
 
   fitnessMachineFeature->setValue(ftmsFeature.bytes, sizeof(ftmsFeature));
-  ftmsIndoorBikeData[0] = static_cast<uint8_t>(ftmsIBDFlags & 0xFF);         // LSB, mask with 0xFF to get the lower 8 bits
-  ftmsIndoorBikeData[1] = static_cast<uint8_t>((ftmsIBDFlags >> 8) & 0xFF);  // MSB, shift right by 8 bits and mask with 0xFF
-  fitnessMachineIndoorBikeData->setValue(ftmsIndoorBikeData, sizeof(ftmsIndoorBikeData));
+
   fitnessMachineResistanceLevelRange->setValue(ftmsResistanceLevelRange, sizeof(ftmsResistanceLevelRange));
   fitnessMachinePowerRange->setValue(ftmsPowerRange, sizeof(ftmsPowerRange));
   fitnessMachineInclinationRange->setValue(ftmsInclinationRange, sizeof(ftmsInclinationRange));
@@ -64,15 +57,11 @@ void BLE_Fitness_Machine_Service::setupService(NimBLEServer *pServer, MyCharacte
 }
 
 void BLE_Fitness_Machine_Service::update() {
+  std::vector<uint8_t> ftmsIndoorBikeData;
+
   this->processFTMSWrite();
-  /*if (!spinBLEServer.clientSubscribed.IndoorBikeData) {
-    return;
-  }*/
-  float cadRaw      = rtConfig->cad.getValue();
-  int cad           = static_cast<int>(cadRaw * 2);
-  int watts         = rtConfig->watts.getValue();
-  int hr            = rtConfig->hr.getValue();
-  int res           = rtConfig->resistance.getValue();
+
+  // Calculate Speed for FTMS
   int speedFtmsUnit = 0;
   if (rtConfig->getSimulatedSpeed() > 5) {
     speedFtmsUnit = rtConfig->getSimulatedSpeed() * 100;
@@ -80,29 +69,50 @@ void BLE_Fitness_Machine_Service::update() {
     speedFtmsUnit = spinBLEServer.calculateSpeed() * 100;
   }
 
-  ftmsIndoorBikeData[2] = (uint8_t)(speedFtmsUnit & 0xff);
-  ftmsIndoorBikeData[3] = (uint8_t)(speedFtmsUnit >> 8);
+  // Rebuild ftmsIndoorBikeData vector with current values
+  ftmsIndoorBikeData.clear();
 
-  ftmsIndoorBikeData[4] = (uint8_t)(cad & 0xff);
-  ftmsIndoorBikeData[5] = (uint8_t)(cad >> 8);
+  // Fitness Machine Indoor Bike Data Flags Setup
+  FitnessMachineIndoorBikeDataFlags::Types ftmsIBDFlags = FitnessMachineIndoorBikeDataFlags::InstantaneousCadencePresent |
+                                                          FitnessMachineIndoorBikeDataFlags::ResistanceLevelPresent | FitnessMachineIndoorBikeDataFlags::InstantaneousPowerPresent;
 
-  ftmsIndoorBikeData[6] = (uint8_t)(res & 0xff);
-  ftmsIndoorBikeData[7] = (uint8_t)(res >> 8);
+  if (String(userConfig->getConnectedHeartMonitor()) != "none") {
+    ftmsIBDFlags = ftmsIBDFlags | FitnessMachineIndoorBikeDataFlags::HeartRatePresent;
+  }
 
-  ftmsIndoorBikeData[8] = (uint8_t)(watts & 0xff);
-  ftmsIndoorBikeData[9] = (uint8_t)(watts >> 8);
+  // Add flags
+  ftmsIndoorBikeData.push_back(static_cast<uint8_t>(ftmsIBDFlags & 0xFF));
+  ftmsIndoorBikeData.push_back(static_cast<uint8_t>((ftmsIBDFlags >> 8) & 0xFF));
 
-  ftmsIndoorBikeData[10] = (uint8_t)hr;
+  // Add speed
+  ftmsIndoorBikeData.push_back(static_cast<uint8_t>(speedFtmsUnit & 0xff));
+  ftmsIndoorBikeData.push_back(static_cast<uint8_t>(speedFtmsUnit >> 8));
 
-  fitnessMachineIndoorBikeData->setValue(ftmsIndoorBikeData, sizeof(ftmsIndoorBikeData));
-  fitnessMachineIndoorBikeData->notify();
+  // Add cadence. FTMS expects cadence in 0.5 RPM units
+  ftmsIndoorBikeData.push_back(static_cast<uint8_t>(static_cast<int>(rtConfig->cad.getValue() * 2) & 0xff));
+  ftmsIndoorBikeData.push_back(static_cast<uint8_t>(static_cast<int>(rtConfig->cad.getValue() * 2) >> 8));
+
+  // Add resistance
+  ftmsIndoorBikeData.push_back(static_cast<uint8_t>(rtConfig->resistance.getValue() & 0xff));
+  ftmsIndoorBikeData.push_back(static_cast<uint8_t>(rtConfig->resistance.getValue() >> 8));
+
+  // Add power
+  ftmsIndoorBikeData.push_back(static_cast<uint8_t>(rtConfig->watts.getValue() & 0xff));
+  ftmsIndoorBikeData.push_back(static_cast<uint8_t>(rtConfig->watts.getValue() >> 8));
+
+  // Add heart rate if HRM is connected
+  if (String(userConfig->getConnectedHeartMonitor()) != "none") {
+    ftmsIndoorBikeData.push_back(static_cast<uint8_t>(rtConfig->hr.getValue()));
+  }
+
+  fitnessMachineIndoorBikeData->notify(ftmsIndoorBikeData.data(), ftmsIndoorBikeData.size());
 
   const int kLogBufCapacity = 200;  // Data(30), Sep(data/2), Arrow(3), CharId(37), Sep(3), CharId(37), Sep(3), Name(10), Prefix(2), HR(7), SEP(1), CD(10), SEP(1), PW(8),
                                     // SEP(1), SD(7), Suffix(2), Nul(1), rounded up
   char logBuf[kLogBufCapacity];
-  const size_t ftmsIndoorBikeDataLength = sizeof(ftmsIndoorBikeData) / sizeof(ftmsIndoorBikeData[0]);
-  logCharacteristic(logBuf, kLogBufCapacity, ftmsIndoorBikeData, ftmsIndoorBikeDataLength, FITNESSMACHINESERVICE_UUID, fitnessMachineIndoorBikeData->getUUID(),
-                    "FTMS(IBD)[ HR(%d) CD(%.2f) PW(%d) SD(%.2f) ]", hr % 1000, fmodf(cadRaw, 1000.0), watts % 10000, fmodf((float)speedFtmsUnit / 100.0, 1000.0));
+  logCharacteristic(logBuf, kLogBufCapacity, ftmsIndoorBikeData.data(), ftmsIndoorBikeData.size(), FITNESSMACHINESERVICE_UUID, fitnessMachineIndoorBikeData->getUUID(),
+                    "FTMS(IBD)[ HR(%d) CD(%.2f) PW(%d) SD(%.2f) ]", rtConfig->hr.getValue() % 1000, fmodf(rtConfig->cad.getValue(), 1000.0), rtConfig->watts.getValue() % 10000,
+                    fmodf((float)speedFtmsUnit / 100.0, 1000.0));
 }
 
 // The things that happen when we receive a FitnessMachineControlPointProcedure from a Client.
@@ -113,9 +123,10 @@ void BLE_Fitness_Machine_Service::processFTMSWrite() {
     if (rxValue == "") {
       return;
     }
-    uint8_t returnValue[3]             = {FitnessMachineControlPointProcedure::ResponseCode, (uint8_t)rxValue[0], FitnessMachineControlPointResultCode::OpCodeNotSupported};
-    BLECharacteristic *pCharacteristic = NimBLEDevice::getServer()->getServiceByUUID(FITNESSMACHINESERVICE_UUID)->getCharacteristic(FITNESSMACHINECONTROLPOINT_UUID);
-    std::vector<uint8_t> ftmsStatus    = {FitnessMachineStatus::ReservedForFutureUse};
+    std::vector<uint8_t> returnValue        = {FitnessMachineControlPointProcedure::ResponseCode, (uint8_t)rxValue[0], FitnessMachineControlPointResultCode::OpCodeNotSupported};
+    BLECharacteristic *pCharacteristic      = NimBLEDevice::getServer()->getServiceByUUID(FITNESSMACHINESERVICE_UUID)->getCharacteristic(FITNESSMACHINECONTROLPOINT_UUID);
+    std::vector<uint8_t> ftmsStatus         = {FitnessMachineStatus::ReservedForFutureUse};
+    std::vector<uint8_t> ftmsTrainingStatus = {0x00, FitnessMachineTrainingStatus::Other};
 
     if (rxValue.length() >= 1) {
       uint8_t *pData            = reinterpret_cast<uint8_t *>(&rxValue[0]);
@@ -268,26 +279,9 @@ void BLE_Fitness_Machine_Service::processFTMSWrite() {
       ftmsStatus            = {FitnessMachineStatus::StartedOrResumedByUser};
       ftmsTrainingStatus[1] = FitnessMachineTrainingStatus::Other;  // 0x00;
     }
-    fitnessMachineStatusCharacteristic->setValue(ftmsStatus.data(), ftmsStatus.size());
-    //SS2K_LOG(FMTS_SERVER_LOG_TAG, "Calling notify %s -> %02x %02x", fitnessMachineStatusCharacteristic->getUUID().toString().c_str(), ftmsStatus[0], ftmsStatus[1]);
-    std::string characteristicValue = pCharacteristic->getValue();
-    std::string logValue;
-    for (size_t i = 0; i < characteristicValue.length(); ++i) {
-      char buf[4];
-      snprintf(buf, sizeof(buf), "%02x ", (unsigned char)characteristicValue[i]);
-      logValue += buf;
-    }
-    SS2K_LOG(FMTS_SERVER_LOG_TAG, "Calling notify %s -> %s", pCharacteristic->getUUID().toString().c_str(), logValue.c_str());
-    fitnessMachineControlPoint->setValue(returnValue, 3);
-    fitnessMachineTrainingStatus->setValue(ftmsTrainingStatus, 2);
-    fitnessMachineControlPoint->indicate();
-    /* only notify if the value has changed
-    static uint8_t _lastTrainingStatus[2] = {0x00, 0x00};
-    if (memcmp(_lastTrainingStatus, ftmsTrainingStatus, 2) != 0) {
-      memcpy(_lastTrainingStatus, ftmsTrainingStatus, 2);
-      fitnessMachineTrainingStatus->notify();
-    } */
-    fitnessMachineStatusCharacteristic->notify();
+    fitnessMachineControlPoint->indicate(returnValue.data(), returnValue.size());
+    fitnessMachineTrainingStatus->notify(ftmsTrainingStatus.data(), ftmsTrainingStatus.size());
+    fitnessMachineStatusCharacteristic->notify(ftmsStatus.data(), ftmsStatus.size());
   }
 }
 

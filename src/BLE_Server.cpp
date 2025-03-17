@@ -194,7 +194,7 @@ void MyCharacteristicCallbacks::onStatus(NimBLECharacteristic* pCharacteristic, 
     logValue += buf;
   }
 
-  SS2K_LOGW(BLE_SERVER_LOG_TAG, "Notification/Indication status code: %d for char: %s Data: %s", code, pCharacteristic->getUUID().toString().c_str(), logValue.c_str());
+  //SS2K_LOG(BLE_SERVER_LOG_TAG, "%s -> %s", pCharacteristic->getUUID().toString().c_str(), logValue.c_str());
 }
 
 void MyCharacteristicCallbacks::onSubscribe(NimBLECharacteristic* pCharacteristic, NimBLEConnInfo& connInfo, uint16_t subValue) {
