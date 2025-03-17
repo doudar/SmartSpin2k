@@ -13,6 +13,7 @@
 #include <HardwareSerial.h>
 #include "FastAccelStepper.h"
 #include "ERG_Mode.h"
+#include "Power_Table.h"
 #include "UdpAppender.h"
 #include "WebsocketAppender.h"
 #include "BLE_Custom_Characteristic.h"
@@ -38,6 +39,8 @@ Boards boards;
 Board currentBoard;
 
 ///////////// Initialize the Config /////////////
+ErgMode *ergMode                 = new ErgMode;
+PowerTable *powerTable           = new PowerTable;
 SS2K *ss2k                       = new SS2K;
 userParameters *userConfig       = new userParameters;
 RuntimeParameters *rtConfig      = new RuntimeParameters;
@@ -60,7 +63,7 @@ void SS2K::stopTasks() {
   SS2K_LOG(BLE_CLIENT_LOG_TAG, "Shutting Down all BLE services");
   spinBLEClient.reconnectTries        = 0;
   spinBLEClient.intentionalDisconnect = NUM_BLE_DEVICES;
-  if (NimBLEDevice::getInitialized()) {
+  if (NimBLEDevice::isInitialized()) {
     NimBLEDevice::deinit();
     ss2k->stopTasks();
   }
@@ -117,6 +120,8 @@ void setup() {
   userPWC->loadFromLittleFS();
   userPWC->printFile();
   userPWC->saveToLittleFS();
+  // print littleFS free space and all file sizes on partition
+  Serial.printf("LittleFS Total Bytes:%lu, Used Bytes:%lu\n", LittleFS.totalBytes(), LittleFS.usedBytes());
 
   // Check for firmware update. It's important that this stays before BLE &
   // HTTP setup because otherwise they use too much traffic and the device
@@ -165,7 +170,7 @@ void setup() {
                           NULL,                      /* parameter of the task */
                           20,                        /* priority of the task */
                           &maintenanceLoopTask,      /* Task handle to keep track of created task */
-                          1);                        /* pin task to core */
+                          0);                        /* pin task to core */
 }
 
 void loop() {  // Delete this task so we can make one that's more memory efficient.
@@ -190,7 +195,7 @@ void SS2K::maintenanceLoop(void *pvParameters) {
     // Run What used to be in the Stepper Task.
     ss2k->moveStepper();
     // Run what used to be in the ERG Mode Task.
-    powerTable->runERG();
+    ergMode->runERG();
     // Run what used to be in the WebClient Task.
     httpServer.webClientUpdate();
     // If we're in ERG mode, modify shift commands to inc/dec the target watts instead.
@@ -402,6 +407,7 @@ void SS2K::moveStepper() {
     ss2k->currentPosition  = stepper->getCurrentPosition();
     if (!ss2k->externalControl) {
       if ((rtConfig->getFTMSMode() == FitnessMachineControlPointProcedure::SetTargetPower)) {
+#ifdef ERG_GUARDRAILS
         // don't drive lower out of bounds. This is a final test that should never happen.
         if ((stepper->getCurrentPosition() > rtConfig->getTargetIncline()) && (rtConfig->watts.getValue() < rtConfig->watts.getTarget())) {
           rtConfig->setTargetIncline(stepper->getCurrentPosition() + 1);
@@ -410,6 +416,7 @@ void SS2K::moveStepper() {
         if ((stepper->getCurrentPosition() < rtConfig->getTargetIncline()) && (rtConfig->watts.getValue() > rtConfig->watts.getTarget())) {
           rtConfig->setTargetIncline(stepper->getCurrentPosition() - 1);
         }
+#endif
         ss2k->targetPosition = rtConfig->getTargetIncline();
       } else if (rtConfig->getFTMSMode() == FitnessMachineControlPointProcedure::SetTargetResistanceLevel) {
         rtConfig->setTargetIncline(ss2k->currentPosition + ((rtConfig->resistance.getTarget() - rtConfig->resistance.getValue()) * 20));
@@ -686,13 +693,13 @@ void SS2K::updateStepperSpeed(int speed) {
     speed = userConfig->getStepperSpeed();
   }
   int s = stepper->getSpeedInMilliHz() / 1000;
-  //Because the conversion to/from the TMC driver is not perfect, we need to allow a little bit of slop.
-  //Skip the update if the speed is within 5 of the target.
-  if (abs(s-speed) < 5) {
+  // Because the conversion to/from the TMC driver is not perfect, we need to allow a little bit of slop.
+  // Skip the update if the speed is within 5 of the target.
+  if (abs(s - speed) < 5) {
     return;
   }
   speed = speed;
-  //SS2K_LOG(MAIN_LOG_TAG, "StepperSpeed is now %d, %d", speed, s);
+  // SS2K_LOG(MAIN_LOG_TAG, "StepperSpeed is now %d, %d", speed, s);
   stepper->setSpeedInHz(speed);
 }
 

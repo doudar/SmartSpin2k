@@ -13,7 +13,7 @@
 class BLE_Cycling_Power_Service {
  public:
   BLE_Cycling_Power_Service();
-  void setupService(NimBLEServer *pServer, MyCallbacks *chrCallbacks);
+  void setupService(NimBLEServer *pServer, MyCharacteristicCallbacks *chrCallbacks);
   void update();
 
  private:

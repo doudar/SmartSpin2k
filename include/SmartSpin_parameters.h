@@ -123,6 +123,7 @@ class userParameters {
   int stepperSpeed;
   bool stepperDir;
   bool shifterDir;
+  bool pTab4Pwr              = false;
   bool udpLogEnabled         = false;
   int32_t hMin               = INT32_MIN;
   int32_t hMax               = INT32_MIN;
@@ -198,6 +199,9 @@ class userParameters {
 
   void setUdpLogEnabled(bool enabled) { udpLogEnabled = enabled; }
   bool getUdpLogEnabled() { return udpLogEnabled; }
+
+  void setPTab4Pwr(bool pTab) { pTab4Pwr = pTab; }
+  bool getPTab4Pwr() { return pTab4Pwr; }
 
   void setFoundDevices(String fdv) { foundDevices = fdv; }
   const char* getFoundDevices() { return foundDevices.c_str(); }

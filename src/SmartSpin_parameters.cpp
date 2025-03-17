@@ -67,6 +67,7 @@ void userParameters::setDefaults() {
   stepperDir            = true;
   shifterDir            = true;
   udpLogEnabled         = false;
+  pTab4Pwr              = false;
   hMin                  = INT32_MIN;
   hMax                  = INT32_MIN;
   homingSensitivity     = DEFAULT_HOMING_SENSITIVITY;
@@ -103,6 +104,7 @@ String userParameters::returnJSON() {
   doc["shifterDir"]            = shifterDir;
   doc["stepperDir"]            = stepperDir;
   doc["udpLogEnabled"]         = udpLogEnabled;
+  doc["pTab4Pwr"]              = pTab4Pwr;
   doc["hMin"]                  = hMin;
   doc["hMax"]                  = hMax;
   doc["homingSensitivity"]     = homingSensitivity;
@@ -154,6 +156,7 @@ void userParameters::saveToLittleFS() {
   doc["shifterDir"]    = shifterDir;
   doc["stepperDir"]    = stepperDir;
   doc["udpLogEnabled"] = udpLogEnabled;
+  doc["pTab4Pwr"]      = pTab4Pwr;
   doc["hMin"]          = hMin;
   doc["hMax"]          = hMax;
   doc["homingSensitivity"]     = homingSensitivity;
@@ -225,6 +228,9 @@ void userParameters::loadFromLittleFS() {
   }
   if (!doc["udpLogEnabled"].isNull()) {
     setUdpLogEnabled(doc["udpLogEnabled"]);
+  }
+  if (!doc["pTab4Pwr"].isNull()) {
+    setPTab4Pwr(doc["pTab4Pwr"]);
   }
   if (doc["powerCorrectionFactor"]) {
     setPowerCorrectionFactor(doc["powerCorrectionFactor"]);

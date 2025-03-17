@@ -23,6 +23,7 @@ void BLE_Wattbike_Service::setupService(NimBLEServer *pServer) {
 
   // Start the service
   pWattbikeService->start();
+  spinBLEServer.pServer->getAdvertising()->addServiceUUID(pWattbikeService->getUUID());
 }
 
 void BLE_Wattbike_Service::parseNemit() {

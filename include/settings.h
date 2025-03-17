@@ -224,11 +224,11 @@ const char* const DEFAULT_PASSWORD = "password";
 
 // Name of default Power Meter. any connects to anything, none connects to
 // nothing.
-#define CONNECTED_POWER_METER "any"
+#define CONNECTED_POWER_METER "none"
 
 // Name of default heart monitor. any connects to anything, none connects to
 // nothing.
-#define CONNECTED_HEART_MONITOR "any"
+#define CONNECTED_HEART_MONITOR "none"
 
 // Name of default remote. any connects to anything, none connects to
 // nothing.
@@ -253,8 +253,17 @@ const char* const DEFAULT_PASSWORD = "password";
 
 #define RUNTIMECONFIG_JSON_SIZE 1000 + DEBUG_LOG_BUFFER_SIZE
 
+// Uncomment to use guardrails for ERG mode in the stepper loop.
+// #define ERG_GUARDRAILS
+
+//Uncomment to enable the use of the power table for ERG mode.
+#define ERG_MODE_USE_POWER_TABLE
+
+// Uncomment to use the PID controller for ERG mode.
+#define ERG_MODE_USE_PID
+
 // PowerTable Version
-#define TABLE_VERSION 5
+#define TABLE_VERSION 6
 
 /* Number of entries in the ERG Power Lookup Table
  This is currently maintained as to keep memory usage lower and reduce the print output of the table.
@@ -274,6 +283,12 @@ const char* const DEFAULT_PASSWORD = "password";
 // Number of similar power samples to take before writing to the Power Table
 #define POWER_SAMPLES 5
 
+// Max downvotes that a neighbor can have
+#define MAX_NEIGHBOR_WEIGHT 2 * POWER_SAMPLES
+
+// Min downvotes that a neighbor can have
+#define MIN_NEIGHBOR_WEIGHT 0
+
 // How often in ms to save the power table if no new data is added and user is pedaling.
 #define POWER_TABLE_SAVE_INTERVAL 240000
 
@@ -286,6 +301,18 @@ const char* const DEFAULT_PASSWORD = "password";
 // Minimum positions recorded in the active table before attempting to load the saved table.
 // Increase this value if the offset for the loaded table is inaccurate.
 #define MINIMUM_RELIABLE_POSITIONS 3
+
+// Limit power table size to save memory
+#define TABLE_DIVISOR 100.0
+
+// Adds onto ERG_SENSITIVITY 
+#define PT_READING_RANGE 10.0
+
+//Max distance a failed neighbor can be horizontally from target position
+#define HORIZONTAL_NEIGHBOR_RANGE 0.6
+    
+//Max distance a failed neighbr can be vertically from target position
+#define VERTICAL_NEIGHBOR_RANGE 0.8
 
 // Temperature of the ESP32 at which to start reducing the power output of the stepper motor driver.
 #define THROTTLE_TEMP 90
@@ -305,21 +332,21 @@ const char* const DEFAULT_PASSWORD = "password";
 // Interval for polling ble battery updates
 #define BATTERY_UPDATE_INTERVAL_MILLIS 300000
 
-// Initial and web scan duration.
-#define DEFAULT_SCAN_DURATION 5
+// Initial and web scan duration in milliseconds
+#define DEFAULT_SCAN_DURATION 5000
 
 // Default homing sensitivity value
 #define DEFAULT_HOMING_SENSITIVITY 50
 
-// BLE automatic reconnect duration. Set this low to avoid interruption.
-#define BLE_RECONNECT_SCAN_DURATION 5
+// BLE automatic reconnect duration in milliseconds. Set this low to avoid interruption. 
+#define BLE_RECONNECT_SCAN_DURATION 5000
 
 // Task Stack Sizes
 #define MAIN_STACK       6500
 #define BLE_CLIENT_STACK 6000
 
 // Uncomment to enable stack size debugging info
-// #define DEBUG_STACK
+//#define DEBUG_STACK
 
 // Uncomment to enable sending Telegram debug messages back to the chat
 // specified in telegram_token.h
@@ -329,8 +356,14 @@ const char* const DEFAULT_PASSWORD = "password";
 // Calculation. Never sets userConfig->setSimulatedPower();
 // #define DEBUG_HR_TO_PWR
 
-// Uncomment to enable HR->PWR enhanced torquetable debugging.
-// #define DEBUG_TORQUETABLE
+// Uncomment to enable power table logging.
+#define DEBUG_POWERTABLE
+
+// Uncomment to enable BLE_TX_RX Logging
+// #define DEBUG_BLE_TX_RX
+
+// UNcomment to enable Custom Characteristic Logging
+// #define CUSTOM_CHAR_DEBUG
 
 #ifdef USE_TELEGRAM
 // Max number of telegram messages to send per session

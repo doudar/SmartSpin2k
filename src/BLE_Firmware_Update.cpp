@@ -181,7 +181,7 @@ void BLEFirmwareSetup() {
   pService->start();
 
   // 6. Start advertising
-  spinBLEServer.pServer->getAdvertising()->addServiceUUID(pService->getUUID());
+  // spinBLEServer.pServer->getAdvertising()->addServiceUUID(pService->getUUID());
 
   downloadFlag = false;
 }

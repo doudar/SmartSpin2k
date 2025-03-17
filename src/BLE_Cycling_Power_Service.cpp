@@ -9,7 +9,7 @@
 #include <Constants.h>
 
 BLE_Cycling_Power_Service::BLE_Cycling_Power_Service() : pPowerMonitor(nullptr), cyclingPowerFeatureCharacteristic(nullptr), sensorLocationCharacteristic(nullptr){}
-void BLE_Cycling_Power_Service::setupService(NimBLEServer *pServer, MyCallbacks *chrCallbacks) {
+void BLE_Cycling_Power_Service::setupService(NimBLEServer *pServer, MyCharacteristicCallbacks *chrCallbacks) {
   // Power Meter service setup
   pPowerMonitor                         = spinBLEServer.pServer->createService(CYCLINGPOWERSERVICE_UUID);
   cyclingPowerMeasurementCharacteristic = pPowerMonitor->createCharacteristic(CYCLINGPOWERMEASUREMENT_UUID, NIMBLE_PROPERTY::READ | NIMBLE_PROPERTY::NOTIFY);
@@ -21,6 +21,8 @@ void BLE_Cycling_Power_Service::setupService(NimBLEServer *pServer, MyCallbacks 
   sensorLocationCharacteristic->setValue(cpsLocation, sizeof(cpsLocation));
   cyclingPowerMeasurementCharacteristic->setCallbacks(chrCallbacks);
   pPowerMonitor->start();
+  //spinBLEServer.pServer->getAdvertising()->addServiceUUID(pPowerMonitor->getUUID());
+  
 }
 
 void BLE_Cycling_Power_Service::update() {

@@ -84,7 +84,7 @@ This characteristic allows for reading and writing various user configuration pa
 */
 
 #include <BLE_Common.h>
-#include <ERG_Mode.h>
+#include <Power_Table.h>
 #include <BLE_Custom_Characteristic.h>
 #include <Constants.h>
 
@@ -95,16 +95,34 @@ void BLE_ss2kCustomCharacteristic::setupService(NimBLEServer *pServer) {
   smartSpin2kCharacteristic->setValue(ss2kCustomCharacteristicValue, sizeof(ss2kCustomCharacteristicValue));
   smartSpin2kCharacteristic->setCallbacks(new ss2kCustomCharacteristicCallbacks());
   pSmartSpin2kService->start();
+  spinBLEServer.pServer->getAdvertising()->addServiceUUID(pSmartSpin2kService->getUUID());
 }
 
 void BLE_ss2kCustomCharacteristic::update() {}
 
-void ss2kCustomCharacteristicCallbacks::onWrite(BLECharacteristic *pCharacteristic) {
+void ss2kCustomCharacteristicCallbacks::onWrite(NimBLECharacteristic *pCharacteristic, NimBLEConnInfo &connInfo) {
   std::string rxValue = pCharacteristic->getValue();
+  // SS2K_LOG(CUSTOM_CHAR_LOG_TAG, "Write from %s", connInfo.getAddress().toString().c_str());
   BLE_ss2kCustomCharacteristic::process(rxValue);
 }
 
-void ss2kCustomCharacteristicCallbacks::onSubscribe(NimBLECharacteristic *pCharacteristic, ble_gap_conn_desc *desc, uint16_t subValue) { NimBLEDevice::setMTU(515); }
+void ss2kCustomCharacteristicCallbacks::onSubscribe(NimBLECharacteristic *pCharacteristic, NimBLEConnInfo &connInfo, uint16_t subValue) {
+  SS2K_LOG(CUSTOM_CHAR_LOG_TAG, "Subscribe from %s", connInfo.getAddress().toString().c_str());
+  NimBLEDevice::setMTU(515);
+}
+void ss2kCustomCharacteristicCallbacks::onStatus(NimBLECharacteristic *pCharacteristic, int code) {
+// loop through and accumulate the data into a C++ string
+#ifdef CUSTOM_CHAR_DEBUG
+  std::string characteristicValue = pCharacteristic->getValue();
+  std::string logValue;
+  for (size_t i = 0; i < characteristicValue.length(); ++i) {
+    char buf[4];
+    snprintf(buf, sizeof(buf), "%02x ", (unsigned char)characteristicValue[i]);
+    logValue += buf;
+  }
+  SS2K_LOG(CUSTOM_CHAR_LOG_TAG, "%s -> %s", pCharacteristic->getUUID().toString().c_str(), logValue.c_str());
+#endif
+}
 
 void BLE_ss2kCustomCharacteristic::notify(char _item, int tableRow) {
   // regular non power table update
@@ -670,13 +688,20 @@ void BLE_ss2kCustomCharacteristic::process(std::string rxValue) {
       }
       if (rxValue[0] == cc_write) {
         returnValue[0] = cc_success;
-        if (rxValue[2] >= 0 || rxValue[2] < POWERTABLE_CAD_SIZE) {
+        if (rxValue[2] >= 0 && rxValue[2] < POWERTABLE_CAD_SIZE) {
           for (int i = 0; i < POWERTABLE_WATT_SIZE; i++) {
-            powerTable->tableRow[rxValue[2]].tableEntry[i].targetPosition = (int16_t((uint8_t)(rxValue[i*2 + 3]) << 0 | (uint8_t)(rxValue[i*2 + 4]) << 8));
+            powerTable->tableRow[rxValue[2]].tableEntry[i].targetPosition = (int16_t((uint8_t)(rxValue[i * 2 + 3]) << 0 | (uint8_t)(rxValue[i * 2 + 4]) << 8));
+            // Ensure each entry has a valid reading count to be considered during loading
+            if (powerTable->tableRow[rxValue[2]].tableEntry[i].targetPosition != INT16_MIN) {
+              powerTable->tableRow[rxValue[2]].tableEntry[i].readings = MINIMUM_RELIABLE_POSITIONS + 1;
+            }
           }
+          // Save with explicit version management
+          powerTable->_hasBeenLoadedThisSession = true; // Prevent reload attempts
+          powerTable->saveFlag = true;
         } else {
-          //SS2K_LOG(CUSTOM_CHAR_LOG_TAG, "Table row invalid");
-          // Logging causes crashes in ISR
+          // SS2K_LOG(CUSTOM_CHAR_LOG_TAG, "Table row invalid");
+          //  Logging causes crashes in ISR
         }
       }
       break;
@@ -753,6 +778,20 @@ void BLE_ss2kCustomCharacteristic::process(std::string rxValue) {
         returnValue[0] = cc_success;
         userConfig->setHomingSensitivity(bytes_to_u16(rxValue[3], rxValue[2]));
         logBufLength += snprintf(logBuf + logBufLength, kLogBufCapacity - logBufLength, "(%d)", userConfig->getHomingSensitivity());
+      }
+      break;
+
+    case BLE_pTab4Pwr:  // 0x2D
+      logBufLength += snprintf(logBuf + logBufLength, kLogBufCapacity - logBufLength, "<-pTab4Pwr");
+      if (rxValue[0] == cc_read) {
+        returnValue[0] = cc_success;
+        returnValue[2] = (uint8_t)(userConfig->getPTab4Pwr());
+        returnLength += 1;
+      }
+      if (rxValue[0] == cc_write) {
+        returnValue[0] = cc_success;
+        userConfig->setPTab4Pwr(rxValue[2]);
+        logBufLength += snprintf(logBuf + logBufLength, kLogBufCapacity - logBufLength, "(%s)", userConfig->getPTab4Pwr() ? "true" : "false");
       }
       break;
 
@@ -923,6 +962,11 @@ void BLE_ss2kCustomCharacteristic::parseNemit() {
   if (userConfig->getHomingSensitivity() != _oldParams.getHomingSensitivity()) {
     _oldParams.setHomingSensitivity(userConfig->getHomingSensitivity());
     BLE_ss2kCustomCharacteristic::notify(BLE_homingSensitivity);
+    return;
+  }
+  if (userConfig->getPTab4Pwr() != _oldParams.getPTab4Pwr()) {
+    _oldParams.setPTab4Pwr(userConfig->getPTab4Pwr());
+    BLE_ss2kCustomCharacteristic::notify(BLE_pTab4Pwr);
     return;
   }
 }

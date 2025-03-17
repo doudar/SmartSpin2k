@@ -15,6 +15,7 @@
 #include "BLE_Custom_Characteristic.h"
 #include "BLE_Device_Information_Service.h"
 #include "BLE_Wattbike_Service.h"
+#include "BLE_SB20_Service.h"
 
 #include <ArduinoJson.h>
 #include <Constants.h>
@@ -25,7 +26,7 @@
 // BLE Server Settings
 SpinBLEServer spinBLEServer;
 
-static MyCallbacks chrCallbacks;
+static MyCharacteristicCallbacks chrCallbacks;
 
 BLE_Cycling_Speed_Cadence cyclingSpeedCadenceService;
 BLE_Cycling_Power_Service cyclingPowerService;
@@ -34,6 +35,7 @@ BLE_Fitness_Machine_Service fitnessMachineService;
 BLE_ss2kCustomCharacteristic ss2kCustomCharacteristic;
 BLE_Device_Information_Service deviceInformationService;
 BLE_Wattbike_Service wattbikeService;
+// BLE_SB20_Service sb20Service;
 
 void startBLEServer() {
   // Server Setup
@@ -42,6 +44,8 @@ void startBLEServer() {
   spinBLEServer.pServer->setCallbacks(new MyServerCallbacks());
 
   // start services
+  BLEAdvertising* pAdvertising = BLEDevice::getAdvertising();
+  pAdvertising->enableScanResponse(true);
   cyclingSpeedCadenceService.setupService(spinBLEServer.pServer, &chrCallbacks);
   cyclingPowerService.setupService(spinBLEServer.pServer, &chrCallbacks);
   heartService.setupService(spinBLEServer.pServer, &chrCallbacks);
@@ -49,25 +53,18 @@ void startBLEServer() {
   ss2kCustomCharacteristic.setupService(spinBLEServer.pServer);
   deviceInformationService.setupService(spinBLEServer.pServer);
   wattbikeService.setupService(spinBLEServer.pServer);  // No callback needed
+  // sb20Service.begin();
+  BLEFirmwareSetup();
 
-  BLEAdvertising *pAdvertising = BLEDevice::getAdvertising();
   // const std::string fitnessData = {0b00000001, 0b00100000, 0b00000000};
   // pAdvertising->setServiceData(FITNESSMACHINESERVICE_UUID, fitnessData);
-
-  pAdvertising->addServiceUUID(FITNESSMACHINESERVICE_UUID);
-  pAdvertising->addServiceUUID(CYCLINGPOWERSERVICE_UUID);
-  pAdvertising->addServiceUUID(CSCSERVICE_UUID);
-  pAdvertising->addServiceUUID(HEARTSERVICE_UUID);
-  pAdvertising->addServiceUUID(SMARTSPIN2K_SERVICE_UUID);
-  pAdvertising->addServiceUUID(WATTBIKE_SERVICE_UUID);
+  pAdvertising->setName(static_cast<const std::__cxx11::string&>(userConfig->getDeviceName()));
   pAdvertising->setMaxInterval(250);
   pAdvertising->setMinInterval(160);
-  pAdvertising->setScanResponse(true);
 
-  BLEFirmwareSetup();
-  BLEDevice::startAdvertising();
+  pAdvertising->start();
 
-  SS2K_LOG(BLE_SERVER_LOG_TAG, "Bluetooth Characteristic defined!");
+  SS2K_LOG(BLE_SERVER_LOG_TAG, "Bluetooth Characteristics defined!");
 }
 
 void SpinBLEServer::update() {
@@ -79,6 +76,7 @@ void SpinBLEServer::update() {
   cyclingSpeedCadenceService.update();
   fitnessMachineService.update();
   wattbikeService.parseNemit();  // Changed from update() to parseNemit()
+  /// sb20Service.notify();
 }
 
 double SpinBLEServer::calculateSpeed() {
@@ -127,8 +125,8 @@ void SpinBLEServer::updateWheelAndCrankRev() {
 }
 
 // Creating Server Connection Callbacks
-void MyServerCallbacks::onConnect(BLEServer *pServer, ble_gap_conn_desc *desc) {
-  SS2K_LOG(BLE_SERVER_LOG_TAG, "Bluetooth Remote Client Connected: %s Connected Clients: %d", NimBLEAddress(desc->peer_ota_addr).toString().c_str(), pServer->getConnectedCount());
+void MyServerCallbacks::onConnect(NimBLEServer* pServer, NimBLEConnInfo& connInfo) {
+  SS2K_LOG(BLE_SERVER_LOG_TAG, "Bluetooth Remote Client Connected: %s Connected Clients: %d", connInfo.getAddress().toString().c_str(), pServer->getConnectedCount());
 
   if (pServer->getConnectedCount() < CONFIG_BT_NIMBLE_MAX_CONNECTIONS - NUM_BLE_DEVICES) {
     BLEDevice::startAdvertising();
@@ -138,7 +136,7 @@ void MyServerCallbacks::onConnect(BLEServer *pServer, ble_gap_conn_desc *desc) {
   }
 }
 
-void MyServerCallbacks::onDisconnect(BLEServer *pServer) {
+void MyServerCallbacks::onDisconnect(NimBLEServer* pServer) {
   SS2K_LOG(BLE_SERVER_LOG_TAG, "Bluetooth Remote Client Disconnected. Remaining Clients: %d", pServer->getConnectedCount());
   BLEDevice::startAdvertising();
   // client disconnected while trying to write fw - reboot to clear the faulty upload.
@@ -148,27 +146,63 @@ void MyServerCallbacks::onDisconnect(BLEServer *pServer) {
   }
 }
 
-bool MyServerCallbacks::onConnParamsUpdateRequest(NimBLEClient *pClient, const ble_gap_upd_params *params) {
-  SS2K_LOG(BLE_SERVER_LOG_TAG, "Updated Server Connection Parameters for %s", pClient->getPeerAddress().toString().c_str());
+void MyServerCallbacks::onMTUChange(uint16_t MTU, NimBLEConnInfo& connInfo) {
+  SS2K_LOG(BLE_SERVER_LOG_TAG, "MTU updated: %u for connection ID: %u", MTU, connInfo.getConnHandle());
+}
+
+uint32_t MyServerCallbacks::onPassKeyDisplay() {
+  uint32_t passkey = 123456;  // Static passkey for demonstration
+  SS2K_LOG(BLE_SERVER_LOG_TAG, "Server Passkey Display: %u", passkey);
+  return passkey;
+}
+
+void MyServerCallbacks::onAuthenticationComplete(NimBLEConnInfo& connInfo) {
+  if (!connInfo.isEncrypted()) {
+    SS2K_LOG(BLE_SERVER_LOG_TAG, "Encrypt connection failed - disconnecting client");
+    NimBLEDevice::getServer()->disconnect(connInfo.getConnHandle());
+    return;
+  }
+  SS2K_LOG(BLE_SERVER_LOG_TAG, "Secured connection to: %s", connInfo.getAddress().toString().c_str());
+}
+
+bool MyServerCallbacks::onConnParamsUpdateRequest(uint16_t handle, const ble_gap_upd_params* params) {
+  SS2K_LOG(BLE_SERVER_LOG_TAG, "Updated Server Connection Parameters for handle: %d", handle);
   return true;
-};
+}
 
 // END SERVER CALLBACKS
 
-void MyCallbacks::onWrite(BLECharacteristic *pCharacteristic) {
+void MyCharacteristicCallbacks::onRead(NimBLECharacteristic* pCharacteristic, NimBLEConnInfo& connInfo) {
+  SS2K_LOG(BLE_SERVER_LOG_TAG, "Read from %s by client: %s", pCharacteristic->getUUID().toString().c_str(), connInfo.getAddress().toString().c_str());
+}
+
+void MyCharacteristicCallbacks::onWrite(NimBLECharacteristic* pCharacteristic, NimBLEConnInfo& connInfo) {
   if (pCharacteristic->getUUID() == FITNESSMACHINECONTROLPOINT_UUID) {
     spinBLEServer.writeCache.push(pCharacteristic->getValue());
   } else {
-    SS2K_LOG(BLE_SERVER_LOG_TAG, "Write to %s is not supported", pCharacteristic->getUUID().toString());
+    SS2K_LOG(BLE_SERVER_LOG_TAG, "Write to %s is not supported", pCharacteristic->getUUID().toString().c_str());
   }
 }
 
-void MyCallbacks::onSubscribe(NimBLECharacteristic *pCharacteristic, ble_gap_conn_desc *desc, uint16_t subValue) {
+void MyCharacteristicCallbacks::onStatus(NimBLECharacteristic* pCharacteristic, int code) {
+  // loop through and accumulate the data into a C++ string
+  std::string characteristicValue = pCharacteristic->getValue();
+  std::string logValue;
+  for (size_t i = 0; i < characteristicValue.length(); ++i) {
+    char buf[4];
+    snprintf(buf, sizeof(buf), "%02x ", (unsigned char)characteristicValue[i]);
+    logValue += buf;
+  }
+
+  //SS2K_LOG(BLE_SERVER_LOG_TAG, "%s -> %s", pCharacteristic->getUUID().toString().c_str(), logValue.c_str());
+}
+
+void MyCharacteristicCallbacks::onSubscribe(NimBLECharacteristic* pCharacteristic, NimBLEConnInfo& connInfo, uint16_t subValue) {
   String str       = "Client ID: ";
   NimBLEUUID pUUID = pCharacteristic->getUUID();
-  str += desc->conn_handle;
+  str += connInfo.getConnHandle();
   str += " Address: ";
-  str += std::string(NimBLEAddress(desc->peer_ota_addr)).c_str();
+  str += connInfo.getAddress().toString().c_str();
   if (subValue == 0) {
     str += " Unsubscribed to ";
     spinBLEServer.setClientSubscribed(pUUID, false);
@@ -242,8 +276,9 @@ void calculateInstPwrFromHR() {
   SS2K_LOG(BLE_SERVER_LOG_TAG, "Power From HR: %d", avgP);
 }
 
-void logCharacteristic(char *buffer, const size_t bufferCapacity, const byte *data, const size_t dataLength, const NimBLEUUID serviceUUID, const NimBLEUUID charUUID,
-                       const char *format, ...) {
+void logCharacteristic(char* buffer, const size_t bufferCapacity, const byte* data, const size_t dataLength, const NimBLEUUID serviceUUID, const NimBLEUUID charUUID,
+                       const char* format, ...) {
+#ifdef DEBUG_BLE_TX_RX
   int bufferLength = ss2k_log_hex_to_buffer(data, dataLength, buffer, 0, bufferCapacity);
   bufferLength += snprintf(buffer + bufferLength, bufferCapacity - bufferLength, "-> %s | %s | ", serviceUUID.toString().c_str(), charUUID.toString().c_str());
   va_list args;
@@ -254,5 +289,6 @@ void logCharacteristic(char *buffer, const size_t bufferCapacity, const byte *da
   SS2K_LOG(BLE_SERVER_LOG_TAG, "%s", buffer);
 #ifdef USE_TELEGRAM
   SEND_TO_TELEGRAM(String(buffer));
+#endif
 #endif
 }

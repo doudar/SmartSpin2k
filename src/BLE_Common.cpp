@@ -17,31 +17,47 @@
 
 bool hr2p = false;
 
+const BLEServiceInfo* getDeviceServiceInfo(const NimBLEAdvertisedDevice* advertisedDevice, const String& deviceName) {
+  if (!advertisedDevice->haveServiceUUID()) {
+    return nullptr;
+  }
+
+  for (const auto& service : SUPPORTED_SERVICES) {
+    // Special case for Flywheel which requires name check
+    if (service.serviceUUID == FLYWHEEL_UART_SERVICE_UUID) {
+      if (advertisedDevice->isAdvertisingService(service.serviceUUID) && deviceName == String(FLYWHEEL_BLE_NAME)) {
+        return &service;
+      }
+    }
+    // For all other services
+    else if (advertisedDevice->isAdvertisingService(service.serviceUUID)) {
+      return &service;
+    }
+  }
+
+  return nullptr;
+}
+
+bool isDeviceSupported(const NimBLEAdvertisedDevice* advertisedDevice, const String& deviceName) { return getDeviceServiceInfo(advertisedDevice, deviceName) != nullptr; }
+
 void BLECommunications() {
   static unsigned long int bleCommTimer = millis();
   if (((millis() - bleCommTimer) > BLE_NOTIFY_DELAY) && !ss2k->isUpdating) {
     bleCommTimer = millis();
     // **********************************Client***************************************
-    for (auto &_BLEd : spinBLEClient.myBLEDevices) {  // loop through discovered devices
+    for (auto& _BLEd : spinBLEClient.myBLEDevices) {  // loop through discovered devices
       if (_BLEd.connectedClientID != BLE_HS_CONN_HANDLE_NONE) {
-        SS2K_LOGW(BLE_COMMON_LOG_TAG, "Address: (%s) Client ID: (%d) SerUUID: (%s) CharUUID: (%s) HRM: (%s) PM: (%s) CSC: (%s) CT: (%s) doConnect: (%s) postConnect: (%s)",
-                  _BLEd.peerAddress.toString().c_str(), _BLEd.connectedClientID, _BLEd.serviceUUID.toString().c_str(), _BLEd.charUUID.toString().c_str(),
-                  _BLEd.isHRM ? "true" : "false", _BLEd.isPM ? "true" : "false", _BLEd.isCSC ? "true" : "false", _BLEd.isCT ? "true" : "false", _BLEd.doConnect ? "true" : "false",
-                  _BLEd.getPostConnected() ? "true" : "false");
         if (_BLEd.advertisedDevice) {                                                                // is device registered?
           if ((_BLEd.connectedClientID != BLE_HS_CONN_HANDLE_NONE) && (_BLEd.doConnect == false)) {  // client must not be in connection process
             if (BLEDevice::getClientByPeerAddress(_BLEd.peerAddress)) {                              // nullptr check
-              BLEClient *pClient = NimBLEDevice::getClientByPeerAddress(_BLEd.peerAddress);
+              BLEClient* pClient = NimBLEDevice::getClientByPeerAddress(_BLEd.peerAddress);
               // Client connected with a valid UUID registered
               if ((_BLEd.serviceUUID != BLEUUID((uint16_t)0x0000)) && (pClient->isConnected())) {
-                BLERemoteCharacteristic *pRemoteBLECharacteristic = pClient->getService(_BLEd.serviceUUID)->getCharacteristic(_BLEd.charUUID);
-
                 // Handle BLE HID Remotes
                 if (_BLEd.serviceUUID == HID_SERVICE_UUID) {
                   spinBLEClient.keepAliveBLE_HID(pClient);  // keep alive doesn't seem to help :(
                   continue;                                 // There is not data that needs to be dequeued for the remote, so got to the next device.
                 }
-
                 // Dequeue sensor data we stored during notifications
                 while (pdTRUE) {
                   NotifyData incomingNotifyData = _BLEd.dequeueData();
@@ -54,16 +70,16 @@ void BLECommunications() {
                   for (size_t i = 0; i < length; i++) {
                     pData[i] = incomingNotifyData.data[i];
                   }
-                  collectAndSet(pRemoteBLECharacteristic->getUUID(), _BLEd.serviceUUID, pRemoteBLECharacteristic->getRemoteService()->getClient()->getPeerAddress(), pData, length);
+                  collectAndSet(incomingNotifyData.charUUID, incomingNotifyData.serviceUUID, _BLEd.peerAddress, pData, length);
+                }
+                if (_BLEd.getPostConnected()) {
+                  spinBLEClient.handleBattInfo(pClient, false);
                 }
 
-                spinBLEClient.handleBattInfo(pClient, false);
-
-              } else if (!pClient->isConnected()) {  // This shouldn't ever be
-                                                     // called...                                                
-                SS2K_LOG(BLE_COMMON_LOG_TAG, "Workaround connect");
-                _BLEd.doConnect = true;
-                //}
+              } else if (!pClient->isConnected()) {  // This is a workaround for a bug in NimBLE where onDisconnect() is not called automatically. 
+                MyClientCallback workaroundCallback;
+                workaroundCallback.onDisconnect(pClient, 0);
+                SS2K_LOG(BLE_COMMON_LOG_TAG, "Client %s not connected in communications loop", _BLEd.peerAddress.toString().c_str());
               }
             }
           }
@@ -84,7 +100,7 @@ void BLECommunications() {
 #endif  // DEBUG_HR_TO_PWR
 
     // Set outputs to zero if we're not simulating or have connected devices.
-    if (!spinBLEClient.connectedPM && !hr2p && !rtConfig->watts.getSimulate() && !rtConfig->cad.getSimulate()) {
+    if (!spinBLEClient.connectedPM && !hr2p && !rtConfig->watts.getSimulate() && !rtConfig->cad.getSimulate() && !userConfig->getPTab4Pwr()) {
       rtConfig->cad.setValue(0);
       rtConfig->watts.setValue(0);
     }

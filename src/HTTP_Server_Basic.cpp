@@ -51,14 +51,14 @@ void _staSetup() {
 }
 
 void _APSetup() {
-  // WiFi.eraseAP(); //Needed if we switch back to espressif32 @6.5.0
+  //WiFi.eraseAP(); //Needed if we switch back to espressif32 @6.5.0
   WiFi.mode(WIFI_AP);
-  WiFi.setHostname("reset");  // Fixes a bug when switching Arduino Core Versions
-  WiFi.softAPsetHostname("reset");
-  WiFi.setHostname(userConfig->getDeviceName());
+  //WiFi.setHostname("reset");  // Fixes a bug when switching Arduino Core Versions
+  //WiFi.softAPsetHostname("reset");
+  //WiFi.setHostname(userConfig->getDeviceName());
   WiFi.softAPsetHostname(userConfig->getDeviceName());
   WiFi.enableAP(true);
-  vTaskDelay(500);  // Micro controller requires some time to reset the mode
+  vTaskDelay(500/portTICK_RATE_MS);  // Micro controller requires some time to reset the mode
 }
 
 // ********************************WIFI Setup*************************
@@ -93,15 +93,18 @@ void startWifi() {
 
   // Couldn't connect to existing network, Create SoftAP
   if (WiFi.status() != WL_CONNECTED) {
+    SS2K_LOG(HTTP_SERVER_LOG_TAG, "Starting AP Mode");
     _APSetup();
     if (strcmp(userConfig->getSsid(), DEVICE_NAME) == 0) {
       // If default SSID is still in use, let the user select a new password.
       // Else fall back to the default password.
       WiFi.softAP(userConfig->getDeviceName(), userConfig->getPassword());
+      SS2K_LOG(HTTP_SERVER_LOG_TAG, "Using Stored Password");
     } else {
+      SS2K_LOG(HTTP_SERVER_LOG_TAG, "Using Default Password");
       WiFi.softAP(userConfig->getDeviceName(), DEFAULT_PASSWORD);
     }
-    vTaskDelay(50);
+    vTaskDelay(50/portTICK_RATE_MS);
     myIP = WiFi.softAPIP();
     /* Setup the DNS server redirecting all the domains to the apIP */
     dnsServer.setErrorReplyCode(DNSReplyCode::NoError);
@@ -405,6 +408,7 @@ void HTTP_Server::start() {
                           1);               /* pin task to core 1 */
 #endif                                      // USE_TELEGRAM
   server.begin();
+  server.enableDelay(false);
   SS2K_LOG(HTTP_SERVER_LOG_TAG, "HTTP server started");
 }
 
@@ -414,9 +418,9 @@ void HTTP_Server::webClientUpdate() {
     _webClientTimer                = millis();
     static unsigned long mDnsTimer = millis();  // NOLINT: There is no overload in String for uint64_t
     server.handleClient();
-    if (WiFi.getMode() != WIFI_MODE_STA) {
-      dnsServer.processNextRequest();
-    }
+    //if (WiFi.getMode() != WIFI_MODE_STA) {
+    //  dnsServer.processNextRequest();
+    //}
     // Keep MDNS alive
     if ((millis() - mDnsTimer) > 30000) {
       MDNS.addServiceTxt("http", "_tcp", "lf", String(mDnsTimer));
@@ -538,6 +542,11 @@ void HTTP_Server::settingsProcessor() {
     userConfig->setUdpLogEnabled(true);
   } else if (wasSettingsUpdate) {
     userConfig->setUdpLogEnabled(false);
+  }
+  if (!server.arg("pTab4Pwr").isEmpty()) {
+    userConfig->setPTab4Pwr(true);
+  } else if (wasSettingsUpdate) {
+    userConfig->setPTab4Pwr(false);
   }
   if (!server.arg("stealthChop").isEmpty()) {
     userConfig->setStealthChop(true);
