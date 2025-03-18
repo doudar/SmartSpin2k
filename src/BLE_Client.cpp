@@ -227,9 +227,8 @@ bool SpinBLEClient::connectToServer() {
   }
   if (myDevice->getServiceUUIDCount() > 0) {
     String deviceName = myDevice->haveName() ? String(myDevice->getName().c_str()) : "Unknown";
-    SS2K_LOG(BLE_CLIENT_LOG_TAG, "Getting service info for device: %s with %d services",
-             deviceName.c_str(), myDevice->getServiceUUIDCount());
-    
+    SS2K_LOG(BLE_CLIENT_LOG_TAG, "Getting service info for device: %s with %d services", deviceName.c_str(), myDevice->getServiceUUIDCount());
+
     const BLEServiceInfo *serviceInfo = getDeviceServiceInfo(myDevice, deviceName);
     if (!serviceInfo) {
       SS2K_LOG(BLE_CLIENT_LOG_TAG, "No supported service UUID found for device: %s", deviceName.c_str());
@@ -239,8 +238,7 @@ bool SpinBLEClient::connectToServer() {
 
     serviceUUID = serviceInfo->serviceUUID;
     charUUID    = serviceInfo->characteristicUUID;
-    SS2K_LOG(BLE_CLIENT_LOG_TAG, "Trying to connect to %s (Service UUID: %s)",
-             serviceInfo->name.c_str(), serviceUUID.toString().c_str());
+    SS2K_LOG(BLE_CLIENT_LOG_TAG, "Trying to connect to %s (Service UUID: %s)", serviceInfo->name.c_str(), serviceUUID.toString().c_str());
   } else {
     SS2K_LOG(BLE_CLIENT_LOG_TAG, "Device has no Service UUID");
     spinBLEClient.myBLEDevices[device_number].reset();
@@ -361,12 +359,6 @@ void MyClientCallback::onDisconnect(NimBLEClient *pClient, int reason) {
     for (size_t i = 0; i < NUM_BLE_DEVICES; i++) {
       if (addr == spinBLEClient.myBLEDevices[i].peerAddress) {
         SS2K_LOG(BLE_CLIENT_LOG_TAG, "Detected %s Disconnect", spinBLEClient.myBLEDevices[i].serviceUUID.toString().c_str());
-        // did another task disconnect this device?
-        if (!spinBLEClient.intentionalDisconnect) {
-          spinBLEClient.myBLEDevices[i].doConnect = true;
-        } else {
-          spinBLEClient.intentionalDisconnect--;
-        }
         if ((spinBLEClient.myBLEDevices[i].charUUID == CYCLINGPOWERMEASUREMENT_UUID) || (spinBLEClient.myBLEDevices[i].charUUID == FITNESSMACHINEINDOORBIKEDATA_UUID) ||
             (spinBLEClient.myBLEDevices[i].charUUID == FLYWHEEL_UART_RX_UUID) || (spinBLEClient.myBLEDevices[i].charUUID == ECHELON_SERVICE_UUID) ||
             (spinBLEClient.myBLEDevices[i].charUUID == CYCLINGPOWERSERVICE_UUID) || (spinBLEClient.myBLEDevices[i].charUUID == CSCSERVICE_UUID)) {
@@ -380,7 +372,15 @@ void MyClientCallback::onDisconnect(NimBLEClient *pClient, int reason) {
         if ((spinBLEClient.myBLEDevices[i].charUUID == HID_REPORT_DATA_UUID)) {
           SS2K_LOG(BLE_CLIENT_LOG_TAG, "Deregistered Remote on Disconnect");
         }
-        spinBLEClient.myBLEDevices[i].reset();
+        // did another task disconnect this device?
+        if (!spinBLEClient.intentionalDisconnect) {
+          spinBLEClient.myBLEDevices[i].doConnect = true;
+          spinBLEClient.myBLEDevices[i].reset(false);
+        } else {
+          spinBLEClient.intentionalDisconnect--;
+          spinBLEClient.myBLEDevices[i].reset();
+        }
+        
       }
     }
     return;
@@ -431,7 +431,7 @@ void ScanCallbacks::onResult(const NimBLEAdvertisedDevice *advertisedDevice) {
     SS2K_LOGE(BLE_CLIENT_LOG_TAG, "onResult received NULL advertisedDevice!");
     return;
   }
-  
+
   Serial.printf("Advertised Device found: %s\n", advertisedDevice->toString().c_str());
   // Define granular constants for maximal reuse during logging
   const char *const MATCHED               = "Matched ";
@@ -744,21 +744,20 @@ NotifyData SpinBLEAdvertisedDevice::dequeueData() {
   // Initialize to safe values
   receivedNotifyData.length = 0;
   memset(receivedNotifyData.data, 0, NOTIFY_DATA_QUEUE_SIZE);
-  
+
   if (this->dataBufferQueue == nullptr) {
     SS2K_LOGW(BLE_CLIENT_LOG_TAG, "Queue not created. Skipping dequeue of data.");
     return receivedNotifyData;
   }
-  
+
   if (xQueueReceive(this->dataBufferQueue, &receivedNotifyData, 0) == pdTRUE) {
     // Validate data length to prevent buffer overruns
     if (receivedNotifyData.length > NOTIFY_DATA_QUEUE_SIZE) {
-      SS2K_LOGE(BLE_CLIENT_LOG_TAG, "Invalid data length %d (max %d). Discarding.",
-               receivedNotifyData.length, NOTIFY_DATA_QUEUE_SIZE);
+      SS2K_LOGE(BLE_CLIENT_LOG_TAG, "Invalid data length %d (max %d). Discarding.", receivedNotifyData.length, NOTIFY_DATA_QUEUE_SIZE);
       receivedNotifyData.length = 0;
     }
   }
-  
+
   // Return data (either valid dequeued data or empty initialized data)
   return receivedNotifyData;
 }
@@ -931,14 +930,14 @@ void SpinBLEAdvertisedDevice::set(const NimBLEAdvertisedDevice *device, int id, 
     SS2K_LOGE(BLE_CLIENT_LOG_TAG, "ERROR: Attempt to set null device!");
     return;
   }
-  
+
   SS2K_LOG(BLE_CLIENT_LOG_TAG, "Setting Device %s", device->getAddress().toString().c_str());
   this->advertisedDevice  = const_cast<const NimBLEAdvertisedDevice *>(device);
   this->peerAddress       = device->getAddress();
   this->connectedClientID = id;
   this->serviceUUID       = BLEUUID(inServiceUUID);
   this->charUUID          = BLEUUID(inCharUUID);
-  
+
   // Create the queue if it doesn't exist
   if (this->dataBufferQueue == nullptr) {
     this->dataBufferQueue = xQueueCreate(6, sizeof(NotifyData));
@@ -980,13 +979,24 @@ void SpinBLEAdvertisedDevice::set(const NimBLEAdvertisedDevice *device, int id, 
   // During initial discovery, just store the device info without registering services
 }
 
-void SpinBLEAdvertisedDevice::reset() {
+/**
+ * @brief Resets the state of the SpinBLEAdvertisedDevice instance.
+ *
+ * This method clears the internal state of the device, including connection
+ * identifiers, service and characteristic UUIDs, and various flags indicating
+ * the type of device and its connection status. Optionally, it can also reset
+ * the advertised device reference.
+ *
+ * @param resetAdvertisedDevice If true, the advertised device reference will
+ *                              be set to nullptr.
+ */
+void SpinBLEAdvertisedDevice::reset(bool resetAdvertisedDevice) {
   SS2K_LOG(BLE_CLIENT_LOG_TAG, "Resetting Device: %d", this->connectedClientID);
   if (this->isHRM) spinBLEClient.connectedHRM = false;
   if (this->isPM) spinBLEClient.connectedPM = false;
   if (this->isCSC) spinBLEClient.connectedCD = false;
   spinBLEClient.connectedSpeed = false;
-  advertisedDevice             = nullptr;
+  if (resetAdvertisedDevice) advertisedDevice = nullptr;
   // NimBLEAddress peerAddress;
   this->connectedClientID = BLE_HS_CONN_HANDLE_NONE;
   this->serviceUUID       = (uint16_t)0x0000;
