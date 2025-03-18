@@ -14,25 +14,20 @@ nav{align-items:center;width:100%}
 .brand{font-size:2.5rem;font-weight:700;text-align:center;text-shadow:0 4px 8px rgba(0,0,0,.5);margin:1rem 0;width:100%;letter-spacing:1px;color:var(--text)}
 nav a{color:var(--text);padding:.5rem}
 nav a:hover{text-decoration:underline}
-.menu-grid,.dev-tools-grid,.metrics-grid{display:grid;gap:1.5rem}
-.menu-grid,.dev-tools-grid{padding:2rem 0;grid-template-columns:repeat(auto-fit,minmax(300px,1fr))}
-.menu-grid{max-width:800px;margin:0 auto}
-.menu-item,.dev-tool-card,.metric-card,.status-group,.shifter-container,.debug-section,.scan-section,.upload-container,.device-status{background:var(--bg-overlay);border-radius:var(--radius-lg);padding:1.5rem;border:1px solid var(--border)}
-.menu-item,.dev-tool-card,.shifter-container{transition:.3s;box-shadow:var(--shadow-md);text-decoration:none;display:block}
+.dev-tools-grid,.metrics-grid{display:grid;gap:1.5rem}
+.dev-tools-grid{padding:2rem 0;grid-template-columns:repeat(auto-fit,minmax(300px,1fr))}
+.dev-tool-card,.metric-card,.status-group,.shifter-container,.debug-section,.scan-section,.upload-container,.device-status{background:var(--bg-overlay);border-radius:var(--radius-lg);padding:1.5rem;border:1px solid var(--border)}
+.dev-tool-card,.shifter-container{transition:.3s;box-shadow:var(--shadow-md);text-decoration:none;display:block}
 .device-status{background:rgba(3,37,76,.8)}
 .status-group,.device-status,.debug-section,.scan-section,.shifter-container,.upload-container{margin-bottom:1.5rem}
-.menu-item:hover,.dev-tool-card:hover,.shifter-container:hover{background:rgba(42,157,244,.15);border-color:rgba(42,157,244,.5);transform:translateY(-2px);box-shadow:var(--shadow-lg)}
-.menu-content{padding:.5rem}
-.menu-content h2{margin:0 0 .75rem;font-size:1.3rem;font-weight:600;color:var(--primary)}
-.menu-content p{margin:0;opacity:.9;font-size:1rem;line-height:1.5;color:var(--text)}
+.dev-tool-card:hover,.shifter-container:hover{background:rgba(42,157,244,.15);border-color:rgba(42,157,244,.5);transform:translateY(-2px);box-shadow:var(--shadow-lg)}
 .device-status h2,.status-group h2{margin:0 0 1.5rem;color:var(--primary);font-size:1.2rem;border-bottom:1px solid rgba(42,157,244,.3);padding-bottom:.5rem}
 .status-grid{display:grid;gap:1rem;grid-template-columns:repeat(auto-fit,minmax(250px,1fr))}
 .status-item{background:var(--bg-item);padding:1rem;border-radius:var(--radius-md);display:flex;flex-direction:column;gap:.5rem;font-weight:500;color:var(--primary)}
-.status-item label,.follow-toggle,.metric-label{color:var(--text-secondary);font-size:.9rem;margin-bottom:.5rem;text-transform:uppercase;letter-spacing:.5px}
-.status-item label,.follow-toggle{display:block}
-.status-item input,.debug-console,.gear-display{box-sizing:border-box;width:100%}
-.status-item input{padding:.75rem;background:var(--bg-overlay);border:1px solid var(--border);border-radius:var(--radius-sm);color:var(--primary);font-size:1.1rem;font-weight:500;text-align:center}
-.debug-header,.card-header{display:flex;justify-content:space-between;align-items:center;margin-bottom:1rem}
+.follow-toggle,.metric-label{color:var(--text-secondary);font-size:.9rem;margin-bottom:.5rem;text-transform:uppercase;letter-spacing:.5px}
+.follow-toggle{display:block}
+.debug-console,.gear-display{box-sizing:border-box;width:100%}
+.debug-header{display:flex;justify-content:space-between;align-items:center;margin-bottom:1rem}
 .debug-header h2{margin:0;color:var(--primary);font-size:1.2rem}
 .follow-toggle{display:flex;align-items:center;gap:.5rem}
 .debug-console{margin:0;padding:1rem;background-color:#000;background-image:radial-gradient(rgba(0,150,0,.75),#000 120%);height:40vh;resize:both;border:1px solid var(--border);border-radius:var(--radius-md);color:var(--text);font-family:Inconsolata,monospace;font-size:1.1rem;line-height:1.4;overflow:auto;text-shadow:0 0 4px rgba(200,200,200,.5)}
@@ -45,7 +40,7 @@ nav a:hover{text-decoration:underline}
 .shift-down{background:linear-gradient(to bottom,#e74c3c,#c0392b)}
 .shift-down:hover{background:linear-gradient(to bottom,#c0392b,#a93224)}
 .shift-arrow{font-size:1.5rem;line-height:1}
-.shift-label,.reset-defaults-button,.metric-label{text-transform:uppercase;letter-spacing:.5px}
+.shift-label,.metric-label{text-transform:uppercase;letter-spacing:.5px}
 .shift-label{font-size:1rem;letter-spacing:1px}
 .gear-display{background:var(--bg-item);padding:2rem;border-radius:var(--radius-md);text-align:center}
 .gear-label{display:block;font-size:1.2rem;margin-bottom:1rem;color:rgba(255,255,255,.9)}
@@ -71,7 +66,6 @@ nav a:hover{text-decoration:underline}
 .adjust-button{width:36px;height:36px;border:none;background:#03254c;color:var(--text);border-radius:50%;cursor:pointer;font-size:1rem;display:flex;align-items:center;justify-content:center;transition:background .2s;flex-shrink:0}
 .adjust-button:hover,input:checked+.slider{background:var(--primary)}
 .button-group{display:flex;gap:1rem;margin-top:2rem;justify-content:flex-end}
-.reset-defaults-button{font-size:1.1em;padding:1rem 2rem;border:2px solid rgba(255,255,255,.2);font-weight:600;animation:2s infinite pulse}
 .primary-button,.secondary-button,.warning-button{padding:.75rem 1.5rem;border:none;border-radius:var(--radius-sm);font-weight:500;cursor:pointer;transition:.2s}
 .primary-button{background:var(--primary);color:var(--text)}
 .primary-button:hover{background:#1b8fe3}
@@ -130,7 +124,7 @@ footer{margin-top:2rem;padding:1rem 0;border-top:1px solid var(--border);display
 @keyframes pulse{0%{box-shadow:0 0 0 0 rgba(220,53,69,.4)}70%{box-shadow:0 0 0 10px rgba(220,53,69,0)}100%{box-shadow:0 0 0 0 rgba(220,53,69,0)}}
 @media (max-width:768px){
 .input-group,.button-group,.value-display,.dev-links{flex-direction:column}
-.menu-grid,.status-grid,.metrics-grid,.dev-tools-grid{grid-template-columns:1fr}
+.status-grid,.metrics-grid,.dev-tools-grid{grid-template-columns:1fr}
 .number-input,.scan-button{width:100%}
 .settings-section{padding:1rem}
 .adjust-button{min-width:32px}
@@ -138,7 +132,7 @@ footer{margin-top:2rem;padding:1rem 0;border-top:1px solid var(--border);display
 .input-group{align-items:stretch}
 .unit{text-align:right}
 .shift-button{height:100px}
-.menu-item,.status-group,.metric-card{padding:1.25rem}
+.status-group,.metric-card{padding:1.25rem}
 .value-display{gap:.5rem;text-align:center}
 .auto-update{justify-content:center}
 .debug-console{height:50vh}
