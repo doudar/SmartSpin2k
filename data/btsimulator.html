@@ -72,7 +72,7 @@
             <div class="toggle-group" style="margin-top: 0.5rem;">
               <span>Auto Update</span>
               <label class="switch">
-                <input type="checkbox" id="autoUpdateWatts" onclick="autoUpdateWattsClick()">
+                <input type="checkbox" id="autoUpdateWatts" onclick="autoUpdateClick('wattsSlider', 5)">
                 <span class="slider"></span>
               </label>
             </div>
@@ -102,7 +102,7 @@
             <div class="toggle-group" style="margin-top: 0.5rem;">
               <span>Auto Update</span>
               <label class="switch">
-                <input type="checkbox" id="autoUpdateCadence" onclick="autoUpdateCadenceClick()">
+                <input type="checkbox" id="autoUpdateCadence" onclick="autoUpdateClick('cadSlider', 3)">
                 <span class="slider"></span>
               </label>
             </div>
@@ -198,11 +198,7 @@
         .catch(error => console.error('Error:', error));
     }
 
-    // Aliases for compatibility with existing code
-    function updateHrSlider() { updateSlider('hrSlider'); }
-    function updateWattsSlider() { updateSlider('wattsSlider'); }
-    function updateCadSlider() { updateSlider('cadSlider'); }
-    function updateTargetWattsSlider() { updateSlider('targetWattsSlider'); }
+    // All sliders now directly use updateSlider() with the proper ID
 
     function toggleTargetWattsCheckbox(element, updateServer) {
       document.getElementById("targetWattsSlider").disabled = !element.checked;
@@ -289,15 +285,6 @@
       }
     }
     
-    // Aliases for compatibility with existing code
-    function autoUpdateWattsClick() {
-      autoUpdateClick('wattsSlider', 5);
-    }
-    
-    function autoUpdateCadenceClick() {
-      autoUpdateClick('cadSlider', 3);
-    }
-
     window.addEventListener('load', () => {
       setTimeout(requestConfigValues, 500);
     });
