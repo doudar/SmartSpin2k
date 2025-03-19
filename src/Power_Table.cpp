@@ -369,249 +369,168 @@ TestResults PowerTable::testNeighbors(int i, int j, int testValue) {
  *         due to invalid input (e.g., duplicate x values), the function logs an error
  *         and returns `INT16_MIN`.
  */
-double linearInterpolate(const std::vector<double>& x, const std::vector<double>& y, double j) {
-  auto upper = std::upper_bound(x.begin(), x.end(), j);
+double linearInterpolate(const double* x, const double* y, size_t n, double j) {
+  auto upper = std::upper_bound(x, x + n, j);
 
-  if (upper == x.end()) return y.back();     // Extrapolate using last value
-  if (upper == x.begin()) return y.front();  // Extrapolate using first value
+  if (upper == x + n) return y[n - 1]; // Extrapolate using last value
+  if (upper == x) return y[0];         // Extrapolate using first value
 
   auto lower = upper - 1;
   double x0 = *lower, x1 = *upper;
-  double y0 = y[lower - x.begin()], y1 = y[upper - x.begin()];
-  // log and comment if x1-x0 is 0
+  double y0 = y[lower - x], y1 = y[upper - x];
+
+  // Log and comment if x1 - x0 is 0
   if (x1 - x0 == 0) {
-    SS2K_LOG(POWERTABLE_LOG_TAG, "Linear Interpolation failed, x1-x0 is 0");
-    return INT16_MIN;
-  }
-  double interpolated_value = y0 + (y1 - y0) * (j - x0) / (x1 - x0);
-
-  double minValue = *std::min_element(y.begin(), y.end());
-  double maxValue = *std::max_element(y.begin(), y.end());
-  return std::max(minValue, std::min(maxValue, interpolated_value));
-}
-
-class CubicSpline {
- public:
-  void set_points(const std::vector<double>& x, const std::vector<double>& y) {
-    int n = x.size() - 1;
-    h.resize(n);
-    alpha.resize(n + 1);
-    l.resize(n + 1);
-    mu.resize(n + 1);
-    z.resize(n + 1);
-    c.resize(n + 1);
-    b.resize(n);
-    d.resize(n);
-    this->x = x;
-    this->y = y;
-
-    for (int i = 0; i < n; ++i) h[i] = x[i + 1] - x[i];
-
-    double f_prime_start = (y[1] - y[0]) / (x[1] - x[0]);
-    double f_prime_end   = (y[n] - y[n - 1]) / (x[n] - x[n - 1]);
-
-    alpha[0] = (3.0 / h[0]) * (y[1] - y[0]) - 3.0 * f_prime_start;
-    alpha[n] = 3.0 * f_prime_end - (3.0 / h[n - 1]) * (y[n] - y[n - 1]);
-
-    for (int i = 1; i < n; ++i) alpha[i] = (3.0 / h[i]) * (y[i + 1] - y[i]) - (3.0 / h[i - 1]) * (y[i] - y[i - 1]);
-
-    l[0]  = 2.0 * h[0];
-    mu[0] = 0.5;
-    z[0]  = alpha[0] / l[0];
-
-    for (int i = 1; i < n; ++i) {
-      l[i]  = 2.0 * (x[i + 1] - x[i - 1]) - h[i - 1] * mu[i - 1];
-      mu[i] = h[i] / l[i];
-      z[i]  = (alpha[i] - h[i - 1] * z[i - 1]) / l[i];
-    }
-
-    l[n] = h[n - 1] * (2.0 - mu[n - 1]);
-    z[n] = (alpha[n] - h[n - 1] * z[n - 1]) / l[n];
-    c[n] = z[n];
-
-    for (int j = n - 1; j >= 0; --j) {
-      c[j] = z[j] - mu[j] * c[j + 1];
-      b[j] = (y[j + 1] - y[j]) / h[j] - h[j] * (c[j + 1] + 2.0 * c[j]) / 3.0;
-      d[j] = (c[j + 1] - c[j]) / (3.0 * h[j]);
-    }
-  }
-
-  double interpolate(double x_val) const {
-    if (x_val < x.front() || x_val > x.back()) {
+      SS2K_LOG(POWERTABLE_LOG_TAG, "Linear Interpolation failed, x1 - x0 is 0");
       return INT16_MIN;
-    }
-
-    int i     = std::upper_bound(x.begin(), x.end(), x_val) - x.begin() - 1;
-    double dx = x_val - x[i];
-    return y[i] + b[i] * dx + c[i] * dx * dx + d[i] * dx * dx * dx;
   }
-
-  double extrapolate(double x_val) const {
-    if (x_val < x.front()) {
-      double dx = x_val - x[0];
-      return y[0] + b[0] * dx + c[0] * dx * dx + d[0] * dx * dx * dx;
-    }
-    if (x_val > x.back()) {
-      int n     = x.size() - 1;
-      double dx = x_val - x[n];
-      return y[n] + b[n - 1] * dx + c[n - 1] * dx * dx + d[n - 1] * dx * dx * dx;
-    }
-    return INT16_MIN;
-  }
-
- private:
-  std::vector<double> x, y, h, alpha, l, mu, z, c, b, d;
-};
-
-
-double linearInterpolate(const std::vector<double>& x, const std::vector<double>& y, double j) {
-  auto upper = std::upper_bound(x.begin(), x.end(), j);
-
-  if (upper == x.end()) return y.back();  // Extrapolate using last value
-  if (upper == x.begin()) return y.front();  // Extrapolate using first value
-
-
-  auto lower = upper - 1;
-  double x0 = *lower, x1 = *upper;
-  double y0 = y[lower - x.begin()], y1 = y[upper - x.begin()];
 
   double interpolated_value = y0 + (y1 - y0) * (j - x0) / (x1 - x0);
 
-  double minValue = *std::min_element(y.begin(), y.end());
-  double maxValue = *std::max_element(y.begin(), y.end());
+  double minValue = *std::min_element(y, y + n);
+  double maxValue = *std::max_element(y, y + n);
   return std::max(minValue, std::min(maxValue, interpolated_value));
 }
 
-double linearExtrapolate(const std::vector<double>& x, const std::vector<double>& y, double j) {
-  if (j < x.front()) {
-      double x0 = x[0], x1 = x[1];
-      double y0 = y[0], y1 = y[1];
-      double slope = (y1 - y0) / (x1 - x0);
-      return y0 + slope * (j - x0);
-  } else if (j > x.back()) {
-      double x0 = x[x.size() - 2], x1 = x[x.size() - 1];
-      double y0 = y[y.size() - 2], y1 = y[y.size() - 1];
-      double slope = (y1 - y0) / (x1 - x0);
-      return y1 + slope * (j - x1);
+double linearExtrapolate(const double* x, const double* y, size_t n, double j) {
+  double x0, x1, y0, y1;
+
+  if (j < x[0]) {
+      x0 = x[0], x1 = x[1];
+      y0 = y[0], y1 = y[1];
+  } else if (j > x[n - 1]) {
+      x0 = x[n - 2], x1 = x[n - 1];
+      y0 = y[n - 2], y1 = y[n - 1];
   } else {
-        // Standard Linear Interpolation
-  auto upper = std::upper_bound(x.begin(), x.end(), j);
-  auto lower = upper - 1;
-  double x0 = *lower, x1 = *upper;
-  double y0 = y[lower - x.begin()], y1 = y[upper - x.begin()];
-  return y0 + (y1 - y0) * (j - x0) / (x1 - x0);
+      auto upper = std::upper_bound(x, x + n, j);
+      auto lower = upper - 1;
+      x0 = *lower, x1 = *upper;
+      y0 = y[lower - x], y1 = y[upper - x];
   }
+
+  if (x1 - x0 == 0) {
+      SS2K_LOG(POWERTABLE_LOG_TAG, "Linear Extrapolation failed, x1 - x0 is 0");
+      return INT16_MIN;
+  }
+
+  double slope = (y1 - y0) / (x1 - x0);
+  return y0 + slope * (j - x0);
 }
+
 
 class CubicSpline {
   public:
-      void set_points(const std::vector<double>& x, const std::vector<double>& y, bool natural = true) {
-          int n = x.size() - 1;
-          this->x = x;
-          this->y = y;
+      void set_points(const double* x_vals, const double* y_vals, size_t n, bool natural = true) {
+
+          if (n < 2) return; // Safe check to make sure we have enough points
   
-          h.resize(n);
-          alpha.resize(n + 1);
-          l.resize(n + 1);
-          mu.resize(n + 1);
-          z.resize(n + 1);
-          c.resize(n + 1, 0.0);
-          b.resize(n);
-          d.resize(n);
+          size_t last_index = n - 1;
+          x.assign(x_vals, x_vals + n);
+          y.assign(y_vals, y_vals + n);
   
-          // Compute h values
-          for (int i = 0; i < n; ++i)
+          h.resize(last_index);
+          alpha.resize(n);
+          l.resize(n);
+          mu.resize(n);
+          z.resize(n);
+          c.resize(n, 0.0);
+          b.resize(last_index);
+          d.resize(last_index);
+  
+          // Get h values
+          for (size_t i = 0; i < last_index; ++i)
               h[i] = x[i + 1] - x[i];
   
-          // Compute alpha values
-          for (int i = 1; i < n; ++i)
+          // gEt alpha values
+          for (size_t i = 1; i < last_index; ++i)
               alpha[i] = (3.0 / h[i]) * (y[i + 1] - y[i]) - (3.0 / h[i - 1]) * (y[i] - y[i - 1]);
   
-          // Boundary conditions
+          // Check if we are using natural or clamped spline calculations
           if (natural) {
-              alpha[0] = alpha[n] = 0.0;
+              alpha[0] = alpha[last_index] = 0.0;
           } else {
               double f_prime_start = (y[1] - y[0]) / h[0];
-              double f_prime_end = (y[n] - y[n - 1]) / h[n - 1];
-              alpha[0] = 3.0 * ( (y[1] - y[0]) / h[0] - f_prime_start );
-              alpha[n] = 3.0 * ( f_prime_end - (y[n] - y[n - 1]) / h[n - 1] );
+              double f_prime_end = (y[last_index] - y[last_index - 1]) / h[last_index - 1];
+              alpha[0] = 3.0 * ((y[1] - y[0]) / h[0] - f_prime_start);
+              alpha[last_index] = 3.0 * (f_prime_end - (y[last_index] - y[last_index - 1]) / h[last_index - 1]);
           }
   
-          // Compute l, mu, and z
+          // Get l, mu, and z
           l[0] = 1.0;
           mu[0] = z[0] = 0.0;
   
-          for (int i = 1; i < n; ++i) {
+          for (size_t i = 1; i < last_index; ++i) {
               l[i] = 2.0 * (x[i + 1] - x[i - 1]) - h[i - 1] * mu[i - 1];
               mu[i] = h[i] / l[i];
               z[i] = (alpha[i] - h[i - 1] * z[i - 1]) / l[i];
           }
   
-          l[n] = 1.0;
-          z[n] = c[n] = 0.0;
+          l[last_index] = 1.0;
+          z[last_index] = c[last_index] = 0.0;
   
-          for (int j = n - 1; j >= 0; --j) {
+          for (int j = last_index - 1; j >= 0; --j) {
               c[j] = z[j] - mu[j] * c[j + 1];
               b[j] = (y[j + 1] - y[j]) / h[j] - h[j] * (c[j + 1] + 2.0 * c[j]) / 3.0;
               d[j] = (c[j + 1] - c[j]) / (3.0 * h[j]);
           }
       }
-
-    double interpolate(double x_val) const {
-      if (x_val < x.front() || x_val > x.back()) {
-          return INT16_MIN; 
+  
+      double interpolate(double x_val) const {
+          if (x_val < x.front() || x_val > x.back()) {
+              return INT16_MIN; // Out of range
+          }
+  
+          int i = std::upper_bound(x.begin(), x.end(), x_val) - x.begin() - 1;
+          double dx = x_val - x[i];
+          return y[i] + b[i] * dx + c[i] * dx * dx + d[i] * dx * dx * dx;
       }
-
-      int i = std::upper_bound(x.begin(), x.end(), x_val) - x.begin() - 1;
-      double dx = x_val - x[i];
-      return y[i] + b[i] * dx + c[i] * dx * dx + d[i] * dx * dx * dx;
-  }
-
-  double extrapolate(double x_val) const {
-      if (x_val < x.front()) {
-          double dx = x_val - x[0];
-          return y[0] + b[0] * dx + c[0] * dx * dx + d[0] * dx * dx * dx;
+  
+      double extrapolate(double x_val) const {
+          if (x_val < x.front()) {
+              double dx = x_val - x[0];
+              return y[0] + b[0] * dx + c[0] * dx * dx + d[0] * dx * dx * dx;
+          }
+          if (x_val > x.back()) {
+              int n = x.size() - 1;
+              double dx = x_val - x[n];
+              return y[n] + b[n - 1] * dx + c[n - 1] * dx * dx + d[n - 1] * dx * dx * dx;
+          }
+          return INT16_MIN; // Out of range
       }
-      if (x_val > x.back()) {
-          int n = x.size() - 1;
-          double dx = x_val - x[n];
-          return y[n] + b[n - 1] * dx + c[n - 1] * dx * dx + d[n - 1] * dx * dx * dx;
+  
+  private:
+      std::vector<double> x, y, h, alpha, l, mu, z, c, b, d;
+  };
+  
+  // Function to determine if a natural spline should be used
+  bool shouldUseNaturalSpline(const double* x, const double* y, size_t n) {
+      if (n < 3) return true; // Default to natural spline for small data sets
+  
+      // Compute approximate first derivatives at endpoints
+      double startSlope = (y[1] - y[0]) / (x[1] - x[0]);
+      double endSlope = (y[n - 1] - y[n - 2]) / (x[n - 1] - x[n - 2]);
+  
+      // Adaptive slope threshold
+      double dataRange = *std::max_element(y, y + n) - *std::min_element(y, y + n);
+      double slopeThreshold = 0.1 * dataRange;
+  
+      // If slope changes significantly, consider using a clamped spline
+      if (std::abs(startSlope) > slopeThreshold || std::abs(endSlope) > slopeThreshold) {
+          return false; // Use clamped spline
       }
-      return INT16_MIN; 
+  
+      // Second derivative (curvature) check for smoothness
+      double secondDerivativeStart = (y[2] - 2 * y[1] + y[0]) / ((x[1] - x[0]) * (x[2] - x[1]));
+      double secondDerivativeEnd = (y[n - 1] - 2 * y[n - 2] + y[n - 3]) / 
+                                   ((x[n - 2] - x[n - 3]) * (x[n - 1] - x[n - 2]));
+  
+      double curvatureThreshold = 1.0; // Adjust based on expected smoothness
+      if (std::abs(secondDerivativeStart) > curvatureThreshold || std::abs(secondDerivativeEnd) > curvatureThreshold) {
+          return false; // Use clamped spline
+      }
+  
+      return true; // Default to natural spline
   }
-
-private:
-  std::vector<double> x, y, h, alpha, l, mu, z, c, b, d;
-};
-
-bool shouldUseNaturalSpline(const std::vector<double>& x, const std::vector<double>& y) {
-  if (x.size() < 3) return true;  // Default to natural spline for small data sets
-
-  // Compute approximate first derivatives at endpoints
-  double startSlope = (y[1] - y[0]) / (x[1] - x[0]);
-  double endSlope = (y[y.size() - 1] - y[y.size() - 2]) / (x[y.size() - 1] - x[y.size() - 2]);
-
-  // Adaptive slope threshold
-  double dataRange = *std::max_element(y.begin(), y.end()) - *std::min_element(y.begin(), y.end());
-  double slopeThreshold = 0.1 * dataRange;  
-
-  // If slope changes significantly, consider using a clamped spline
-  if (std::abs(startSlope) > slopeThreshold || std::abs(endSlope) > slopeThreshold) {
-      return false;  // Use clamped spline
-  }
-
-  // Second derivative (curvature) check for smoothness
-  double secondDerivativeStart = (y[2] - 2 * y[1] + y[0]) / ((x[1] - x[0]) * (x[2] - x[1]));
-  double secondDerivativeEnd = (y[y.size() - 1] - 2 * y[y.size() - 2] + y[y.size() - 3]) /
-                               ((x[y.size() - 2] - x[y.size() - 3]) * (x[y.size() - 1] - x[y.size() - 2]));
-
-  double curvatureThreshold = 1.0; // Adjust based on expected smoothness
-  if (std::abs(secondDerivativeStart) > curvatureThreshold || std::abs(secondDerivativeEnd) > curvatureThreshold) {
-      return false; // Use clamped spline
-  }
-
-  return true;  // Default to natural spline
-}
 
 void PowerTable::fillTable() {
   this->findTableDirection(true);  // Horizontal
@@ -643,7 +562,6 @@ void PowerTable::findTableDirection(bool horizontal) {
           if (targetPos != INT16_MIN) {
               unique_xy.emplace_back(innerValue, static_cast<double>(targetPos));
           } else {
-              // Store a subset of empty indices (every 5th)
               if (emptyIndices.empty() || innerValue - emptyIndices.back() >= 5) {
                   emptyIndices.push_back(innerValue);
               }
@@ -654,41 +572,41 @@ void PowerTable::findTableDirection(bool horizontal) {
 
       std::sort(unique_xy.begin(), unique_xy.end());
 
-      for (const auto& [xi, yi] : unique_xy) {
-          x.push_back(xi);
-          y.push_back(yi);
-      }
+      for (std::vector<std::pair<int, double>>::const_iterator it = unique_xy.begin(); it != unique_xy.end(); ++it) {
+        x.push_back(it->first);
+        y.push_back(it->second);
+    }
 
-      bool useNaturalSpline = shouldUseNaturalSpline(x, y);
-      fillEmptyTable(outerValue, emptyIndices, x, y, horizontal, useNaturalSpline);
+      bool useNaturalSpline = shouldUseNaturalSpline(x.data(), y.data(), x.size());
+      fillEmptyTable(outerValue, emptyIndices, x.data(), y.data(), x.size(), horizontal, useNaturalSpline);
   }
 }
 
-void PowerTable::fillEmptyTable(int outerValue, const std::vector<int>& emptyIndices, const std::vector<double>& x, const std::vector<double>& y, bool horizontal, bool useNaturalSpline) {
+void PowerTable::fillEmptyTable(int outerValue, const std::vector<int>& emptyIndices, const double* x, const double* y, size_t n, bool horizontal, bool useNaturalSpline) {
   int innerSize = horizontal ? POWERTABLE_WATT_SIZE : POWERTABLE_CAD_SIZE;
 
-  if (x.size() == 1) {  // If only one point, fill row with the value
-      double singleValue = y.front();
+  if (n == 1) {  // If only one point, fill row with the value
+      double singleValue = y[0];
       for (int innerValue : emptyIndices) {
           int i = horizontal ? outerValue : innerValue;
           int j = horizontal ? innerValue : outerValue;
           this->tableRow[i].tableEntry[j].targetPosition = static_cast<int>(std::round(singleValue));
       }
-  } else if (x.size() == 2) {  // If two points, do linear interpolation
+  } else if (n == 2) {  // If two points, do linear interpolation
       for (int innerValue : emptyIndices) {
           int i = horizontal ? outerValue : innerValue;
           int j = horizontal ? innerValue : outerValue;
 
-          double interpolated_value = linearInterpolate(x, y, innerValue);
+          double interpolated_value = linearInterpolate(x, y, n, innerValue);
           int tempValue = static_cast<int>(std::round(interpolated_value));
 
           if (this->testNeighbors(i, j, tempValue).allNeighborsPassed) {
               this->tableRow[i].tableEntry[j].targetPosition = tempValue;
           }
       }
-  } else if (x.size() >= 3) {  // If three or more points, use cubic spline interpolation
+  } else if (n >= 3) {  // If three or more points, use cubic spline interpolation
       bool validForSpline = true;
-      for (size_t i = 1; i < x.size(); ++i) {
+      for (size_t i = 1; i < n; ++i) {
           if (x[i] <= x[i - 1]) {
               validForSpline = false;
               break;
@@ -701,7 +619,7 @@ void PowerTable::fillEmptyTable(int outerValue, const std::vector<int>& emptyInd
 
       // Create and initialize the spline with the desired type (natural or clamped)
       CubicSpline spline;
-      spline.set_points(x, y, useNaturalSpline);
+      spline.set_points(x, y, n, useNaturalSpline);
 
       for (int innerValue : emptyIndices) {
           int i = horizontal ? outerValue : innerValue;
@@ -709,8 +627,8 @@ void PowerTable::fillEmptyTable(int outerValue, const std::vector<int>& emptyInd
 
           double interpolated_value = spline.interpolate(innerValue);
 
-          double minValue = *std::min_element(y.begin(), y.end());
-          double maxValue = *std::max_element(y.begin(), y.end());
+          double minValue = *std::min_element(y, y + n);
+          double maxValue = *std::max_element(y, y + n);
           interpolated_value = std::max(minValue, std::min(maxValue, interpolated_value));
 
           int tempValue = static_cast<int>(std::round(interpolated_value));
@@ -723,266 +641,6 @@ void PowerTable::fillEmptyTable(int outerValue, const std::vector<int>& emptyInd
       SS2K_LOG(POWERTABLE_LOG_TAG, "Error: No unique points found.");
   }
 }
-
-// void PowerTable::extrapFillTable() {
-//   // Find the center of the known data
-//   int sumRow = 0, sumCol = 0, count = 0;
-//   for (int i = 0; i < POWERTABLE_CAD_SIZE; ++i) {
-//     for (int j = 0; j < POWERTABLE_WATT_SIZE; ++j) {
-//       if (this->tableRow[i].tableEntry[j].targetPosition != INT16_MIN) {
-//         sumRow += i;
-//         sumCol += j;
-//         count++;
-//       }
-//     }
-//   }
-
-//   // prevent divide by zero
-//   if (count == 0) {
-//     return;
-//   }
-
-//   int centerRow = sumRow / count;
-//   int centerCol = sumCol / count;
-//   int tempValue = INT16_MIN;
-
-//   // Function to extrapolate a single cell based on its neighbors
-//   auto extrapolateCell = [&](int i, int j) {
-//     // Find nearest left non-empty cell
-//     int left = j - 1;
-//     while (left >= 0 && this->tableRow[i].tableEntry[left].targetPosition == INT16_MIN) left--;
-
-//     // Find nearest right non-empty cell
-//     int right = j + 1;
-//     while (right < POWERTABLE_WATT_SIZE && this->tableRow[i].tableEntry[right].targetPosition == INT16_MIN) right++;
-
-//     if (left >= 0 && right < POWERTABLE_WATT_SIZE) {
-//       // Linear extrapolation
-//       if (this->tableRow[i].tableEntry[left].targetPosition != INT16_MIN && this->tableRow[i].tableEntry[right].targetPosition != INT16_MIN) {
-//         if (j < left) {
-//           // Extrapolate to the left
-//           tempValue = this->tableRow[i].tableEntry[left].targetPosition -
-//                       (this->tableRow[i].tableEntry[right].targetPosition - this->tableRow[i].tableEntry[left].targetPosition) / (right - left) * (left - j);
-//           if (this->testNeighbors(i, j, tempValue).allNeighborsPassed) {
-//             this->tableRow[i].tableEntry[j].targetPosition = tempValue;
-//           }
-//         } else if (j > right) {
-//           // Extrapolate to the right
-//           tempValue = this->tableRow[i].tableEntry[right].targetPosition +
-//                       (this->tableRow[i].tableEntry[right].targetPosition - this->tableRow[i].tableEntry[left].targetPosition) / (right - left) * (j - right);
-//           if (this->testNeighbors(i, j, tempValue).allNeighborsPassed) {
-//             this->tableRow[i].tableEntry[j].targetPosition = tempValue;
-//           }
-//         }
-//       }
-//     } else if (left - 1 >= 0) {
-//       // Only left value available, extrapolate to the right
-//       if (this->tableRow[i].tableEntry[left].targetPosition != INT16_MIN && this->tableRow[i].tableEntry[left - 1].targetPosition != INT16_MIN) {
-//         tempValue = this->tableRow[i].tableEntry[left].targetPosition +
-//                     (j - left) * (left > 0 ? this->tableRow[i].tableEntry[left].targetPosition - this->tableRow[i].tableEntry[left - 1].targetPosition : 1);
-//         if (this->testNeighbors(i, j, tempValue).allNeighborsPassed) {
-//           this->tableRow[i].tableEntry[j].targetPosition = tempValue;
-//         }
-//       }
-//     } else if (right + 1 < POWERTABLE_WATT_SIZE) {
-//       // Only right value available, extrapolate to the left
-//       if (this->tableRow[i].tableEntry[right + 1].targetPosition != INT16_MIN && this->tableRow[i].tableEntry[right].targetPosition != INT16_MIN) {
-//         tempValue =
-//             this->tableRow[i].tableEntry[right].targetPosition -
-//             (right - j) * (right < POWERTABLE_WATT_SIZE - 1 ? this->tableRow[i].tableEntry[right + 1].targetPosition - this->tableRow[i].tableEntry[right].targetPosition : 1);
-//         if (this->testNeighbors(i, j, tempValue).allNeighborsPassed) {
-//           this->tableRow[i].tableEntry[j].targetPosition = tempValue;
-//         }
-//       }
-//     }
-//   };
-
-//   // Extrapolate horizontally and vertically starting from the center
-//   for (int distance = 0; distance <= std::max(centerRow, centerCol); ++distance) {
-//     for (int i = centerRow - distance; i <= centerRow + distance; ++i) {
-//       for (int j = centerCol - distance; j <= centerCol + distance; ++j) {
-//         if (i >= 0 && i < POWERTABLE_CAD_SIZE && j >= 0 && j < POWERTABLE_WATT_SIZE && this->tableRow[i].tableEntry[j].targetPosition == INT16_MIN) {
-//           extrapolateCell(i, j);
-//         }
-//       }
-//     }
-//   }
-//   // Extrapolate each empty cell
-//   for (int i = 0; i < POWERTABLE_CAD_SIZE; ++i) {
-//     // Extrapolate horizontally
-//     for (int j = 0; j < POWERTABLE_WATT_SIZE; ++j) {
-//       if (this->tableRow[i].tableEntry[j].targetPosition == INT16_MIN) {
-//         // Find nearest left non-empty cell
-//         int left = j - 1;
-//         while (left >= 0 && this->tableRow[i].tableEntry[left].targetPosition == INT16_MIN) left--;
-
-//         // Find nearest right non-empty cell
-//         int right = j + 1;
-//         while (right < POWERTABLE_WATT_SIZE && this->tableRow[i].tableEntry[right].targetPosition == INT16_MIN) right++;
-//         if (this->tableRow[i].tableEntry[left].targetPosition != INT16_MIN && this->tableRow[i].tableEntry[right].targetPosition != INT16_MIN) {
-//           if (left >= 0 && right < POWERTABLE_WATT_SIZE) {
-//             // Linear extrapolation
-//             if (j < left) {
-//               // Extrapolate to the left
-//               tempValue = this->tableRow[i].tableEntry[left].targetPosition -
-//                           (this->tableRow[i].tableEntry[right].targetPosition - this->tableRow[i].tableEntry[left].targetPosition) / (right - left) * (left - j);
-//               if (this->testNeighbors(i, j, tempValue).allNeighborsPassed) {
-//                 this->tableRow[i].tableEntry[j].targetPosition = tempValue;
-//               }
-
-//             } else if (j > right) {
-//               // Extrapolate to the right
-//               tempValue = this->tableRow[i].tableEntry[right].targetPosition +
-//                           (this->tableRow[i].tableEntry[right].targetPosition - this->tableRow[i].tableEntry[left].targetPosition) / (right - left) * (j - right);
-//               if (this->testNeighbors(i, j, tempValue).allNeighborsPassed) {
-//                 this->tableRow[i].tableEntry[j].targetPosition = tempValue;
-//               }
-//             }
-//           } else if (left >= 1) {
-//             // Only left value available, extrapolate to the right
-//             if (this->tableRow[i].tableEntry[left].targetPosition != INT16_MIN && this->tableRow[i].tableEntry[left - 1].targetPosition != INT16_MIN) {
-//               tempValue = this->tableRow[i].tableEntry[left].targetPosition +
-//                           (j - left) * (left > 0 ? this->tableRow[i].tableEntry[left].targetPosition - this->tableRow[i].tableEntry[left - 1].targetPosition : 1);
-//               if (this->testNeighbors(i, j, tempValue).allNeighborsPassed) {
-//                 this->tableRow[i].tableEntry[j].targetPosition = tempValue;
-//               }
-//             }
-//           } else if (right + 1 < POWERTABLE_WATT_SIZE) {
-//             // Only right value available, extrapolate to the left
-//             if (this->tableRow[i].tableEntry[right].targetPosition != INT16_MIN && this->tableRow[i].tableEntry[right + 1].targetPosition != INT16_MIN) {
-//               tempValue = this->tableRow[i].tableEntry[right].targetPosition -
-//                           (right - j) *
-//                               (right < POWERTABLE_WATT_SIZE - 1 ? this->tableRow[i].tableEntry[right + 1].targetPosition - this->tableRow[i].tableEntry[right].targetPosition : 1);
-//               if (this->testNeighbors(i, j, tempValue).allNeighborsPassed) {
-//                 this->tableRow[i].tableEntry[j].targetPosition = tempValue;
-//               }
-//             }
-//           }
-//         }
-//       }
-//     }
-//   }
-
-//   for (int j = 0; j < POWERTABLE_WATT_SIZE; ++j) {
-//     // Extrapolate vertically
-//     for (int i = 0; i < POWERTABLE_CAD_SIZE; ++i) {
-//       if (this->tableRow[i].tableEntry[j].targetPosition == INT16_MIN) {
-//         // Find nearest top non-empty cell
-//         int top = i - 1;
-//         while (top >= 0 && this->tableRow[top].tableEntry[j].targetPosition == INT16_MIN) top--;
-
-//         // Find nearest bottom non-empty cell
-//         int bottom = i + 1;
-//         while (bottom < POWERTABLE_CAD_SIZE && this->tableRow[bottom].tableEntry[j].targetPosition == INT16_MIN) bottom++;
-
-//         if (top >= 0 && bottom < POWERTABLE_CAD_SIZE) {
-//           // Linear extrapolation
-//           if (i < top) {
-//             // Extrapolate upwards
-//             tempValue = this->tableRow[top].tableEntry[j].targetPosition -
-//                         (this->tableRow[bottom].tableEntry[j].targetPosition - this->tableRow[top].tableEntry[j].targetPosition) / (bottom - top) * (top - i);
-//             if (this->testNeighbors(i, j, tempValue).allNeighborsPassed) {
-//               this->tableRow[i].tableEntry[j].targetPosition = tempValue;
-//             }
-//           } else if (i > bottom) {
-//             // Extrapolate downwards
-//             tempValue = this->tableRow[bottom].tableEntry[j].targetPosition +
-//                         (this->tableRow[bottom].tableEntry[j].targetPosition - this->tableRow[top].tableEntry[j].targetPosition) / (bottom - top) * (i - bottom);
-//             if (this->testNeighbors(i, j, tempValue).allNeighborsPassed) {
-//               this->tableRow[i].tableEntry[j].targetPosition = tempValue;
-//             }
-//           }
-//         } else if (top >= 1) {
-//           // Only top value available, extrapolate downwards
-//           if (this->tableRow[top].tableEntry[j].targetPosition != INT16_MIN && this->tableRow[top - 1].tableEntry[j].targetPosition != INT16_MIN) {
-//             tempValue = this->tableRow[top].tableEntry[j].targetPosition +
-//                         (i - top) * (top > 0 ? this->tableRow[top].tableEntry[j].targetPosition - this->tableRow[top - 1].tableEntry[j].targetPosition : 1);
-//             if (this->testNeighbors(i, j, tempValue).allNeighborsPassed) {
-//               this->tableRow[i].tableEntry[j].targetPosition = tempValue;
-//             } else {
-//             }
-//           }
-//         } else if (bottom + 1 < POWERTABLE_CAD_SIZE) {
-//           // Only bottom value available, extrapolate upwards
-//           if (this->tableRow[bottom].tableEntry[j].targetPosition != INT16_MIN && this->tableRow[bottom + 1].tableEntry[j].targetPosition != INT16_MIN) {
-//             tempValue = this->tableRow[bottom].tableEntry[j].targetPosition -
-//                         (bottom - i) *
-//                             (bottom < POWERTABLE_CAD_SIZE - 1 ? this->tableRow[bottom + 1].tableEntry[j].targetPosition - this->tableRow[bottom].tableEntry[j].targetPosition : 1);
-//             if (this->testNeighbors(i, j, tempValue).allNeighborsPassed) {
-//               this->tableRow[i].tableEntry[j].targetPosition = tempValue;
-//             }
-//           }
-//         }
-//       }
-//     }
-//   }
-// }
-
-// void PowerTable::extrapolateDiagonal() {
-//   int tempValue = INT16_MIN;
-
-//   for (int i = 0; i < POWERTABLE_CAD_SIZE; ++i) {
-//     for (int j = 0; j < POWERTABLE_WATT_SIZE; ++j) {
-//       if (this->tableRow[i].tableEntry[j].targetPosition == INT16_MIN) {
-//         // Find nearest top-left non-empty cell
-//         int topLeftRow = i - 1, topLeftCol = j - 1;
-//         while (topLeftRow >= 0 && topLeftCol >= 0 && this->tableRow[topLeftRow].tableEntry[topLeftCol].targetPosition == INT16_MIN) {
-//           topLeftRow--;
-//           topLeftCol--;
-//         }
-
-//         // Find nearest bottom-right non-empty cell
-//         int bottomRightRow = i + 1, bottomRightCol = j + 1;
-//         while (bottomRightRow < POWERTABLE_CAD_SIZE && bottomRightCol < POWERTABLE_WATT_SIZE &&
-//                this->tableRow[bottomRightRow].tableEntry[bottomRightCol].targetPosition == INT16_MIN) {
-//           bottomRightRow++;
-//           bottomRightCol++;
-//         }
-
-//         // Perform diagonal extrapolation (top-left to bottom-right)
-//         if (topLeftRow >= 0 && topLeftCol >= 0 && bottomRightRow < POWERTABLE_CAD_SIZE && bottomRightCol < POWERTABLE_WATT_SIZE) {
-//           tempValue =
-//               this->tableRow[topLeftRow].tableEntry[topLeftCol].targetPosition +
-//               ((this->tableRow[bottomRightRow].tableEntry[bottomRightCol].targetPosition - this->tableRow[topLeftRow].tableEntry[topLeftCol].targetPosition) * (j - topLeftCol)) /
-//                   (bottomRightCol - topLeftCol);
-
-//           if (testNeighbors(i, j, tempValue).allNeighborsPassed) {
-//             this->tableRow[i].tableEntry[j].targetPosition = tempValue;
-//           }
-//         }
-
-//         // If diagonal top-left to bottom-right is not enough, try top-right to bottom-left
-//         if (tempValue == INT16_MIN) {
-//           // Find nearest top-right non-empty cell
-//           int topRightRow = i - 1, topRightCol = j + 1;
-//           while (topRightRow >= 0 && topRightCol < POWERTABLE_WATT_SIZE && this->tableRow[topRightRow].tableEntry[topRightCol].targetPosition == INT16_MIN) {
-//             topRightRow--;
-//             topRightCol++;
-//           }
-
-//           // Find nearest bottom-left non-empty cell
-//           int bottomLeftRow = i + 1, bottomLeftCol = j - 1;
-//           while (bottomLeftRow < POWERTABLE_CAD_SIZE && bottomLeftCol >= 0 && this->tableRow[bottomLeftRow].tableEntry[bottomLeftCol].targetPosition == INT16_MIN) {
-//             bottomLeftRow++;
-//             bottomLeftCol--;
-//           }
-
-//           // Perform diagonal extrapolation (top-right to bottom-left)
-//           if (topRightRow >= 0 && topRightCol < POWERTABLE_WATT_SIZE && bottomLeftRow < POWERTABLE_CAD_SIZE && bottomLeftCol >= 0) {
-//             tempValue = this->tableRow[topRightRow].tableEntry[topRightCol].targetPosition +
-//                         ((this->tableRow[bottomLeftRow].tableEntry[bottomLeftCol].targetPosition - this->tableRow[topRightRow].tableEntry[topRightCol].targetPosition) *
-//                          (j - bottomLeftCol)) /
-//                             (topRightCol - bottomLeftCol);
-
-//             if (testNeighbors(i, j, tempValue).allNeighborsPassed) {
-//               this->tableRow[i].tableEntry[j].targetPosition = tempValue;
-//             }
-//           }
-//         }
-//       }
-//     }
-//   }
-// }
 
 void PowerTable::extrapFillTable() {
   extrapFillTableDirection(true);  // Horizontal
@@ -1019,85 +677,87 @@ void PowerTable::extrapFillTableDirection(bool horizontal) {
 
       std::sort(unique_xy.begin(), unique_xy.end());
 
-      for (const auto& it : unique_xy) {
-          x.push_back(static_cast<double>(it.first));
-          y.push_back(static_cast<double>(it.second));
-      }
+      for (std::vector<std::pair<int, double>>::const_iterator it = unique_xy.begin(); it != unique_xy.end(); ++it) {
+        x.push_back(it->first);
+        y.push_back(it->second);
+    }
 
       // Determine spline type (natural or clamped)
-      bool useNaturalSpline = shouldUseNaturalSpline(x, y);
+      bool useNaturalSpline = shouldUseNaturalSpline(x.data(), y.data(), x.size());
 
       // Fill empty table entries using the determined spline type
-      extrapolateEmptyIndices(outerIndex, emptyIndices, x, y, horizontal, useNaturalSpline);
+      extrapolateEmptyIndices(outerIndex, emptyIndices, x.data(), y.data(), x.size(), horizontal, useNaturalSpline);
   }
 }
 
-void PowerTable::extrapolateEmptyIndices(int outerIndex, const std::vector<int>& emptyIndices, const std::vector<double>& x, const std::vector<double>& y, bool horizontal, bool naturalSpline) {
-      int innerSize = horizontal ? POWERTABLE_WATT_SIZE : POWERTABLE_CAD_SIZE;
+void PowerTable::extrapolateEmptyIndices(int outerIndex, const std::vector<int>& emptyIndices, const double* x, const double* y, size_t n, bool horizontal, bool naturalSpline) {
 
-        if (x.size() == 1) {
-          int singleValue = static_cast<int>(std::round(y.front()));
-          for (int innerIndex : emptyIndices) {
-            int i = horizontal ? outerIndex : innerIndex;
-            int j = horizontal ? innerIndex : outerIndex;
-            this->tableRow[i].tableEntry[j].targetPosition = singleValue;
-          }
-        } else if (x.size() == 2) {
-          for (int innerIndex : emptyIndices) {
-            int i = horizontal ? outerIndex : innerIndex;
-            int j = horizontal ? innerIndex : outerIndex;
+  int innerSize = horizontal ? POWERTABLE_WATT_SIZE : POWERTABLE_CAD_SIZE;
 
-            double extrapolated_value = linearExtrapolate(x, y, innerIndex);
-            int tempValue = static_cast<int>(std::round(extrapolated_value));
+  if (n == 1) {
+      int singleValue = static_cast<int>(std::round(y[0]));
+      for (int innerIndex : emptyIndices) {
+          int i = horizontal ? outerIndex : innerIndex;
+          int j = horizontal ? innerIndex : outerIndex;
+          this->tableRow[i].tableEntry[j].targetPosition = singleValue;
+      }
+  } else if (n == 2) {
+      for (int innerIndex : emptyIndices) {
+          int i = horizontal ? outerIndex : innerIndex;
+          int j = horizontal ? innerIndex : outerIndex;
 
-            if (testNeighbors(i, j, tempValue).allNeighborsPassed) {
+          double extrapolated_value = linearExtrapolate(x, y, n, innerIndex);
+          int tempValue = static_cast<int>(std::round(extrapolated_value));
+
+          if (testNeighbors(i, j, tempValue).allNeighborsPassed) {
               this->tableRow[i].tableEntry[j].targetPosition = tempValue;
-            }
           }
-        } else if (x.size() >= 3) {
-        bool validForSpline = true;
-        for (size_t i = 1; i < x.size(); ++i) {
+      }
+  } else if (n >= 3) {
+      bool validForSpline = true;
+      for (size_t i = 1; i < n; ++i) {
           if (x[i] <= x[i - 1]) {
-            validForSpline = false;
-            break;
+              validForSpline = false;
+              break;
           }
-        }
-        if (!validForSpline) {
+      }
+      if (!validForSpline) {
           SS2K_LOG(POWERTABLE_LOG_TAG, "Duplicate or non-increasing x-values detected!");
           return;
-        }
+      }
 
-        CubicSpline spline;
-        spline.set_points(x, y, naturalSpline); // Pass spline type
+      CubicSpline spline;
+      spline.set_points(x, y, n, naturalSpline); // Pass pointer-based data
 
-        for (int innerIndex : emptyIndices) {
+      for (int innerIndex : emptyIndices) {
           int i = horizontal ? outerIndex : innerIndex;
           int j = horizontal ? innerIndex : outerIndex;
 
           double extrapolated_value = spline.extrapolate(innerIndex);
-          double minVal = *std::min_element(y.begin(), y.end());
-          double maxVal = *std::max_element(y.begin(), y.end());
+          double minVal = *std::min_element(y, y + n);
+          double maxVal = *std::max_element(y, y + n);
           double range = maxVal - minVal;
           extrapolated_value = std::max(minVal - 0.1 * range, std::min(extrapolated_value, maxVal + 0.1 * range));
           int tempValue = static_cast<int>(std::round(extrapolated_value));
 
-        if (testNeighbors(i, j, tempValue).allNeighborsPassed) {
-          this->tableRow[i].tableEntry[j].targetPosition = tempValue;
-        }
+          if (testNeighbors(i, j, tempValue).allNeighborsPassed) {
+              this->tableRow[i].tableEntry[j].targetPosition = tempValue;
+          }
       }
   }
 }
 
+
 void PowerTable::extrapolateDiagonal() {
-  std::vector<std::pair<double, double>> unique_xy; // Use vector for memory efficiency
+  std::vector<std::pair<double, double>> unique_xy;
   std::vector<std::pair<int, int>> emptyIndices;
 
-  // Iterate over different diagonals
+  // Iterate over different diagonals (sum of indices is constant)
   for (int sum = 0; sum < POWERTABLE_CAD_SIZE + POWERTABLE_WATT_SIZE - 1; ++sum) {
       unique_xy.clear();
       emptyIndices.clear();
 
-      // Collect known values for this diagonal (sum of indices is constant)
+      // Collect known values for this diagonal
       for (int i = 0; i < POWERTABLE_CAD_SIZE; ++i) {
           int j = sum - i;
           if (j >= 0 && j < POWERTABLE_WATT_SIZE) {
@@ -1111,73 +771,15 @@ void PowerTable::extrapolateDiagonal() {
 
       if (unique_xy.size() < 2) continue; // Skip if not enough data
 
-      std::sort(unique_xy.begin(), unique_xy.end()); // Sort by the 'x' coordinate (i)
+      std::sort(unique_xy.begin(), unique_xy.end());
 
       std::vector<double> x, y;
-      for (const auto& it : unique_xy) {
-          x.push_back(it.first);
-          y.push_back(it.second);
+      for (std::vector<std::pair<double, double>>::const_iterator it = unique_xy.begin(); it != unique_xy.end(); ++it) {
+          x.push_back(it->first);
+          y.push_back(it->second);
       }
 
-      if (x.size() == 1) {
-          int singleValue = static_cast<int>(std::round(y.front()));
-          for (const auto& it : emptyIndices) {
-              this->tableRow[it.first].tableEntry[it.second].targetPosition = singleValue;
-          }
-          continue;
-      }
-
-      if (x.size() == 2) {
-          for (const auto& it : emptyIndices) {
-              int i = it.first;
-              int j = it.second;
-
-              double extrapolated_value = linearExtrapolate(x, y, i);
-
-              int tempValue = static_cast<int>(std::round(extrapolated_value));
-
-              if (testNeighbors(i, j, tempValue).allNeighborsPassed) {
-                  this->tableRow[i].tableEntry[j].targetPosition = tempValue;
-              }
-          }
-          continue;
-      }
-
-      if (x.size() >= 3) {
-          bool validForSpline = true;
-          for (size_t k = 1; k < x.size(); ++k) {
-              if (x[k] <= x[k - 1]) {
-                  validForSpline = false;
-                  break;
-              }
-          }
-          if (!validForSpline) {
-              SS2K_LOG(POWERTABLE_LOG_TAG, "Duplicate or non-increasing x-values detected for diagonal!");
-              continue;
-          }
-
-          CubicSpline spline;
-          spline.set_points(x, y);
-
-          for (const auto& it : emptyIndices) {
-              int i = it.first;
-              int j = it.second;
-
-              if (i < 0 || i >= POWERTABLE_CAD_SIZE || j < 0 || j >= POWERTABLE_WATT_SIZE) continue;
-
-              double extrapolated_value = spline.extrapolate(i);
-
-              double minVal = *std::min_element(y.begin(), y.end());
-              double maxVal = *std::max_element(y.begin(), y.end());
-              double range = maxVal - minVal;
-              extrapolated_value = std::max(minVal - 0.1 * range, std::min(extrapolated_value, maxVal + 0.1 * range));
-
-              int tempValue = static_cast<int>(std::round(extrapolated_value));
-              if (testNeighbors(i, j, tempValue).allNeighborsPassed) {
-                  this->tableRow[i].tableEntry[j].targetPosition = tempValue;
-              }
-          }
-      }
+      extrapolateDiagonalEntries(emptyIndices, x.data(), y.data(), x.size());
   }
 
   // Iterate over other set of diagonals (where difference of indices is constant)
@@ -1206,67 +808,72 @@ void PowerTable::extrapolateDiagonal() {
           y.push_back(it.second);
       }
 
-      if (x.size() == 1) {
-          int singleValue = static_cast<int>(std::round(y.front()));
-          for (const auto& it : emptyIndices) {
-              this->tableRow[it.first].tableEntry[it.second].targetPosition = singleValue;
+      extrapolateDiagonalEntries(emptyIndices, x.data(), y.data(), x.size());
+  }
+}
+
+void PowerTable::extrapolateDiagonalEntries(const std::vector<std::pair<int, int>>& emptyIndices, const double* x, const double* y, size_t n) {
+
+  if (n == 1) {
+      int singleValue = static_cast<int>(std::round(y[0]));
+      for (std::vector<std::pair<int, int>>::const_iterator it = emptyIndices.begin(); it != emptyIndices.end(); ++it) {
+          this->tableRow[it->first].tableEntry[it->second].targetPosition = singleValue;
+      }
+      return;
+  }
+
+  if (n == 2) {
+      for (std::vector<std::pair<int, int>>::const_iterator it = emptyIndices.begin(); it != emptyIndices.end(); ++it) {
+          int i = it->first;
+          int j = it->second;
+
+          double extrapolated_value = linearExtrapolate(x, y, n, i);
+          int tempValue = static_cast<int>(std::round(extrapolated_value));
+
+          if (testNeighbors(i, j, tempValue).allNeighborsPassed) {
+              this->tableRow[i].tableEntry[j].targetPosition = tempValue;
           }
-          continue;
+      }
+      return;
+  }
+
+  if (n >= 3) {
+      bool validForSpline = true;
+      for (size_t k = 1; k < n; ++k) {
+          if (x[k] <= x[k - 1]) {
+              validForSpline = false;
+              break;
+          }
+      }
+      if (!validForSpline) {
+          SS2K_LOG(POWERTABLE_LOG_TAG, "Duplicate or non-increasing x-values detected for diagonal!");
+          return;
       }
 
-      if (x.size() == 2) {
-          for (const auto& it : emptyIndices) {
-              int i = it.first;
-              int j = it.second;
+      CubicSpline spline;
+      spline.set_points(x, y, n);
 
-              double extrapolated_value = linearExtrapolate(x, y, i);
+      for (std::vector<std::pair<int, int>>::const_iterator it = emptyIndices.begin(); it != emptyIndices.end(); ++it) {
+          int i = it->first;
+          int j = it->second;
 
-              int tempValue = static_cast<int>(std::round(extrapolated_value));
+          if (i < 0 || i >= POWERTABLE_CAD_SIZE || j < 0 || j >= POWERTABLE_WATT_SIZE) continue;
 
-              if (testNeighbors(i, j, tempValue).allNeighborsPassed) {
-                  this->tableRow[i].tableEntry[j].targetPosition = tempValue;
-              }
-          }
-          continue;
-      }
+          double extrapolated_value = spline.extrapolate(i);
 
-      if (x.size() >= 3) {
-          bool validForSpline = true;
-          for (size_t k = 1; k < x.size(); ++k) {
-              if (x[k] <= x[k - 1]) {
-                  validForSpline = false;
-                  break;
-              }
-          }
-          if (!validForSpline) {
-              SS2K_LOG(POWERTABLE_LOG_TAG, "Duplicate or non-increasing x-values detected for diagonal!");
-              continue;
-          }
+          double minVal = *std::min_element(y, y + n);
+          double maxVal = *std::max_element(y, y + n);
+          double range = maxVal - minVal;
+          extrapolated_value = std::max(minVal - 0.1 * range, std::min(extrapolated_value, maxVal + 0.1 * range));
 
-          CubicSpline spline;
-          spline.set_points(x, y);
-
-          for (const auto& it : emptyIndices) {
-              int i = it.first;
-              int j = it.second;
-
-              if (i < 0 || i >= POWERTABLE_CAD_SIZE || j < 0 || j >= POWERTABLE_WATT_SIZE) continue;
-
-              double extrapolated_value = spline.extrapolate(i);
-
-              double minVal = *std::min_element(y.begin(), y.end());
-              double maxVal = *std::max_element(y.begin(), y.end());
-              double range = maxVal - minVal;
-              extrapolated_value = std::max(minVal - 0.1 * range, std::min(extrapolated_value, maxVal + 0.1 * range));
-
-              int tempValue = static_cast<int>(std::round(extrapolated_value));
-              if (testNeighbors(i, j, tempValue).allNeighborsPassed) {
-                  this->tableRow[i].tableEntry[j].targetPosition = tempValue;
-              }
+          int tempValue = static_cast<int>(std::round(extrapolated_value));
+          if (testNeighbors(i, j, tempValue).allNeighborsPassed) {
+              this->tableRow[i].tableEntry[j].targetPosition = tempValue;
           }
       }
   }
 }
+
 
 int PowerTable::getNumEntries() {
   int ret = 0;
