@@ -81,8 +81,17 @@
         tooltip: 'Sim Mode step size',
         tooltipText: 'Amount to move stepper per gear shift. Try to target ~30watt changes.',
         min: 10, max: 6000, step: 50, 
-        defaultValue: 0,
+        defaultValue: 1200,
         unit: ''
+      },
+      powerCorrectionFactor: {
+        type: 'slider',
+        title: 'Power Multiplier',
+        tooltip: 'Power Meter Correction Factor',
+        tooltipText: 'Adjust this to calibrate the output of your power meter.',
+        min: 0.10, max: 2.10, step: 0.01,
+        defaultValue: 1.00,
+        unit: 'x'
       },
       inclineMultiplier: {
         type: 'slider',
@@ -90,7 +99,7 @@
         tooltip: 'Sim Mode hill effect',
         tooltipText: 'Increase to make incline changes more noticeable. Adjust until hills feel realistic.',
         min: 1, max: 10, step: 1,
-        defaultValue: 0,
+        defaultValue: 5,
         unit: 'x'
       },
       ERGSensitivity: {
@@ -167,7 +176,7 @@
       pTab4Pwr: {
         type: 'toggle',
         title: 'PowerTable For Power',
-        tooltip: 'Use internal calculation',
+        tooltip: 'Use cadence to calculate power output',
         tooltipText: 'Use the PowerTable for Power instead of PM',
         defaultValue: false
       }

@@ -21,81 +21,8 @@
       <h1 class="brand">System Status</h1>
 
       <div class="settings-section">
-        <!-- Network Status -->
-        <div class="status-group">
-          <h2>Network Configuration</h2>
-          <div class="status-grid">
-            <div class="status-item">
-              <label for="ssid">Network SSID</label>
-              <input type="text" id="ssid" name="ssid" value="loading" readonly>
-            </div>
-            <div class="status-item">
-              <label for="deviceName">MDNS Name</label>
-              <input type="text" id="deviceName" name="deviceName" value="loading" readonly>
-            </div>
-          </div>
-        </div>
-
-        <!-- Device Status -->
-        <div class="status-group">
-          <h2>Device Status</h2>
-          <div class="status-grid">
-            <div class="status-item">
-              <label for="simulatedWatts">Current Power</label>
-              <input type="text" id="simulatedWatts" name="simulatedWatts" value="loading" readonly>
-            </div>
-            <div class="status-item">
-              <label for="targetWatts">Target Power</label>
-              <input type="text" id="targetWatts" name="targetWatts" value="loading" readonly>
-            </div>
-            <div class="status-item">
-              <label for="simulatedHr">Heart Rate</label>
-              <input type="text" id="simulatedHr" name="simulatedHr" value="loading" readonly>
-            </div>
-            <div class="status-item">
-              <label for="simulatedCad">Cadence</label>
-              <input type="text" id="simulatedCad" name="simulatedCad" value="loading" readonly>
-            </div>
-          </div>
-        </div>
-
-        <!-- Configuration Status -->
-        <div class="status-group">
-          <h2>Configuration</h2>
-          <div class="status-grid">
-            <div class="status-item">
-              <label for="inclineMultiplier">Incline Multiplier</label>
-              <input type="text" id="inclineMultiplier" name="inclineMultiplier" value="loading" readonly>
-            </div>
-            <div class="status-item">
-              <label for="shiftStep">Shift Step</label>
-              <input type="text" id="shiftStep" name="shiftStep" value="loading" readonly>
-            </div>
-            <div class="status-item">
-              <label for="currentIncline">Current Incline</label>
-              <input type="text" id="currentIncline" name="currentIncline" value="loading" readonly>
-            </div>
-            <div class="status-item">
-              <label for="targetIncline">Target Incline</label>
-              <input type="text" id="targetIncline" name="targetIncline" value="loading" readonly>
-            </div>
-          </div>
-        </div>
-
-        <!-- Connected Devices -->
-        <div class="status-group">
-          <h2>Connected Devices</h2>
-          <div class="status-grid">
-            <div class="status-item">
-              <label for="connectedHeartMonitor">Heart Rate Monitor</label>
-              <input type="text" id="connectedHeartMonitor" name="connectedHeartMonitor" value="loading" readonly>
-            </div>
-            <div class="status-item">
-              <label for="connectedPowerMeter">Power Meter</label>
-              <input type="text" id="connectedPowerMeter" name="ConnectedPowerMeter" value="loading" readonly>
-            </div>
-          </div>
-        </div>
+        <div id="settings-container"></div>
+        <div id="runtime-container"></div>
 
         <!-- Debug Console -->
         <div class="debug-section">
@@ -121,9 +48,10 @@
     let lastLogMessageTime = 0;
     let websocket;
     let logEntries = [];
+    let updateCounter = 0;
     const maxLogentries = 1000;
+    const createdGroups = { settings: false, runtime: false };
 
-    // Visibility change handling
     document.addEventListener("visibilitychange", onVisibilityChanged);
     document.addEventListener("mozvisibilitychange", onVisibilityChanged);
     document.addEventListener("webkitvisibilitychange", onVisibilityChanged);
@@ -140,7 +68,13 @@
     function startUpdate() {
       if (!updateTimer) {
         updateTimer = setInterval(() => {
-          requestRuntimeValues();
+          updateCounter++;
+          if (updateCounter % 4 === 0) {
+            requestConfigValues();
+          } else {
+            requestRuntimeValues();
+          }
+          
           setupLogging();
         }, 2500);
       }
@@ -149,6 +83,66 @@
     function stopUpdate() {
       clearInterval(updateTimer);
       updateTimer = undefined;
+      updateCounter = 0; // Reset counter when updates are stopped
+    }
+
+    function formatKey(key) {
+      return key.replace(/([A-Z])/g, ' $1').replace(/^./, str => str.toUpperCase());
+    }
+
+    function updateValuesFromJson(data, groupType) {
+      const containerId = `${groupType}-container`;
+      const container = document.getElementById(containerId);
+      let groupCreated = createdGroups[groupType];
+
+      if (!groupCreated) {
+        const groupElement = document.createElement('div');
+        groupElement.className = 'status-group';
+        
+        const heading = document.createElement('h2');
+        heading.textContent = groupType === 'settings' ? 'Configuration' : 'Runtime Values';
+        groupElement.appendChild(heading);
+        
+        const grid = document.createElement('div');
+        grid.className = 'status-grid';
+        grid.id = `${groupType}-grid`;
+        groupElement.appendChild(grid);
+        
+        container.appendChild(groupElement);
+        createdGroups[groupType] = true;
+      }
+
+      const grid = document.getElementById(`${groupType}-grid`);
+      
+      Object.keys(data).forEach(key => {
+        if (key === 'password') return;
+        
+        const elementId = `${groupType}-${key}`;
+        let statusItem = document.getElementById(elementId);
+        
+        if (!statusItem) {
+          statusItem = document.createElement('div');
+          statusItem.className = 'status-item';
+          statusItem.id = elementId;
+          
+          const label = document.createElement('label');
+          label.setAttribute('for', key);
+          label.textContent = formatKey(key);
+          
+          const input = document.createElement('input');
+          input.type = 'text';
+          input.id = key;
+          input.name = key;
+          input.value = 'loading';
+          input.readOnly = true;
+          
+          statusItem.appendChild(label);
+          statusItem.appendChild(input);
+          grid.appendChild(statusItem);
+        }
+        
+        document.getElementById(key).value = data[key];
+      });
     }
 
     function requestConfigValues() {
@@ -158,12 +152,7 @@
       fetch('/configJSON')
         .then(response => response.json())
         .then(data => {
-          document.getElementById("ssid").value = data.ssid;
-          document.getElementById("connectedHeartMonitor").value = data.connectedHeartMonitor;
-          document.getElementById("deviceName").value = data.deviceName;
-          document.getElementById("shiftStep").value = data.shiftStep;
-          document.getElementById("inclineMultiplier").value = data.inclineMultiplier;
-          document.getElementById("connectedPowerMeter").value = data.connectedPowerMeter;
+          updateValuesFromJson(data, 'settings');
         })
         .catch(error => console.error('Error:', error))
         .finally(() => updatePending = false);
@@ -176,12 +165,7 @@
       fetch('/runtimeConfigJSON')
         .then(response => response.json())
         .then(data => {
-          document.getElementById("currentIncline").value = data.currentIncline;
-          document.getElementById("targetIncline").value = data.targetIncline;
-          document.getElementById("simulatedHr").value = data.hr;
-          document.getElementById("simulatedWatts").value = data.watts;
-          document.getElementById("targetWatts").value = data.targetWatts;
-          document.getElementById("simulatedCad").value = data.cad;
+          updateValuesFromJson(data, 'runtime');
         })
         .catch(error => console.error('Error:', error))
         .finally(() => updatePending = false);
@@ -251,8 +235,6 @@
       document.body.removeChild(a);
       URL.revokeObjectURL(url);
     });
-
   </script>
 </body>
-
 </html>

@@ -47,17 +47,12 @@
     function sendShift(direction) {
       const position = parseInt(shiftBox.value, 10);
       const newPosition = position + direction;
-      
-      // Optimistic UI update
-      shiftBox.value = newPosition;
-      
-      // Visual feedback
+      shiftBox.value = newPosition;   
       const button = direction > 0 ? 'shiftUp' : 'shiftDown';
       const elem = document.getElementById(button);
       elem.classList.add('active');
       setTimeout(() => elem.classList.remove('active'), 200);
 
-      // Send request
       fetch('/shift?value=' + direction, { method: 'GET' })
         .catch(error => {
           console.error('Shift error:', error);
@@ -80,7 +75,6 @@
         })
         .catch(() => startUpdate());
     }
-
 
     window.addEventListener('load', () => {
       setTimeout(requestConfigValues, 500);
