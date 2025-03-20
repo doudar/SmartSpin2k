@@ -22,7 +22,6 @@
 #include <DNSServer.h>
 #include <ArduinoJson.h>
 #include <BLE_Custom_Characteristic.h>
-#include <WiFiProv.h>
 
 File fsUploadFile;
 
@@ -34,14 +33,6 @@ DNSServer dnsServer;
 HTTP_Server httpServer;
 WiFiClientSecure client;
 WebServer server(80);
-
-#ifdef USE_TELEGRAM
-#include <UniversalTelegramBot.h>
-TaskHandle_t telegramTask;
-bool telegramMessageWaiting = false;
-UniversalTelegramBot bot(TELEGRAM_TOKEN, client);
-String telegramMessage = "";
-#endif  // USE_TELEGRAM
 
 void _staSetup() {
   WiFi.setHostname(userConfig->getDeviceName());
@@ -118,9 +109,6 @@ void startWifi() {
   MDNS.addService("http", "_tcp", 80);
   MDNS.addServiceTxt("http", "_tcp", "lf", "0");
   SS2K_LOG(HTTP_SERVER_LOG_TAG, "Connected to %s IP address: %s", userConfig->getSsid(), myIP.toString().c_str());
-#ifdef USE_TELEGRAM
-  SEND_TO_TELEGRAM("Connected to " + String(userConfig->getSsid()) + " IP address: " + myIP.toString());
-#endif
   SS2K_LOG(HTTP_SERVER_LOG_TAG, "Open http://%s.local/", userConfig->getDeviceName());
   WiFi.setTxPower(WIFI_POWER_19_5dBm);
 
@@ -398,15 +386,6 @@ void HTTP_Server::start() {
   /********************************************End Server
    * Handlers*******************************/
 
-#ifdef USE_TELEGRAM
-  xTaskCreatePinnedToCore(telegramUpdate,   /* Task function. */
-                          "telegramUpdate", /* name of task. */
-                          4900,             /* Stack size of task*/
-                          NULL,             /* parameter of the task */
-                          1,                /* priority of the task  - higher number is higher priority*/
-                          &telegramTask,    /* Task handle to keep track of created task */
-                          1);               /* pin task to core 1 */
-#endif                                      // USE_TELEGRAM
   server.begin();
   server.enableDelay(false);
   SS2K_LOG(HTTP_SERVER_LOG_TAG, "HTTP server started");
@@ -774,54 +753,3 @@ void HTTP_Server::FirmwareUpdate() {
   }
 }
 
-#ifdef USE_TELEGRAM
-// Function to handle sending telegram text to the non blocking task
-void sendTelegram(String textToSend) {
-  static int numberOfMessages = 0;
-  static uint64_t timeout     = 120000;  // reset every two minutes
-  static uint64_t startTime   = millis();
-
-  if (millis() - startTime > timeout) {  // Let one message send every two minutes
-    numberOfMessages = MAX_TELEGRAM_MESSAGES - 1;
-    telegramMessage += " " + String(userConfig->getSsid()) + " ";
-    startTime = millis();
-  }
-
-  if ((numberOfMessages < MAX_TELEGRAM_MESSAGES) && (WiFi.getMode() == WIFI_STA)) {
-    telegramMessage += "\n" + textToSend;
-    telegramMessageWaiting = true;
-    numberOfMessages++;
-  }
-}
-
-// Non blocking task to send telegram message
-void telegramUpdate(void *pvParameters) {
-  // client.setInsecure();
-  client.setCACert(TELEGRAM_CERTIFICATE_ROOT);
-  for (;;) {
-    static int telegramFailures = 0;
-    if (telegramMessageWaiting && internetConnection) {
-      telegramMessageWaiting = false;
-      bool rm                = (bot.sendMessage(TELEGRAM_CHAT_ID, telegramMessage, ""));
-      if (!rm) {
-        telegramFailures++;
-        SS2K_LOG(HTTP_SERVER_LOG_TAG, "Telegram failed to send! %s", TELEGRAM_CHAT_ID);
-        if (telegramFailures > 2) {
-          internetConnection = false;
-        }
-      } else {  // Success - reset Telegram Failures
-        telegramFailures = 0;
-      }
-
-      client.stop();
-      telegramMessage = "";
-    }
-#ifdef DEBUG_STACK
-    Serial.printf("Telegram: %d \n", uxTaskGetStackHighWaterMark(telegramTask));
-    Serial.printf("Web: %d \n", uxTaskGetStackHighWaterMark(webClientTask));
-    Serial.printf("Free: %d \n", ESP.getFreeHeap());
-#endif  // DEBUG_STACK
-    vTaskDelay(4000 / portTICK_RATE_MS);
-  }
-}
-#endif  // USE_TELEGRAM

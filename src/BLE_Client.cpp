@@ -558,9 +558,6 @@ void ScanCallbacks::onScanEnd(const NimBLEScanResults &results, int reason) {
   String output;
   serializeJson(devices, output);
   // SS2K_LOG(BLE_CLIENT_LOG_TAG, "Found Devices: %s", output.c_str());
-#ifdef USE_TELEGRAM
-  SEND_TO_TELEGRAM("Bluetooth Client Found Devices: " + output);
-#endif
   userConfig->setFoundDevices(output);  // Save the updated JSON document
 }
 

@@ -98,7 +98,4 @@ void collectAndSet(NimBLEUUID charUUID, NimBLEUUID serviceUUID, NimBLEAddress ad
   if (charUUID == PELOTON_DATA_UUID) lastTime = millis();
 #endif
 
-#ifdef USE_TELEGRAM
-  SEND_TO_TELEGRAM(String(logBuf));
-#endif
 }

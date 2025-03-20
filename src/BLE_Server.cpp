@@ -287,8 +287,5 @@ void logCharacteristic(char* buffer, const size_t bufferCapacity, const byte* da
   va_end(args);
 
   SS2K_LOG(BLE_SERVER_LOG_TAG, "%s", buffer);
-#ifdef USE_TELEGRAM
-  SEND_TO_TELEGRAM(String(buffer));
-#endif
 #endif
 }
