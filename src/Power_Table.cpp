@@ -551,8 +551,8 @@ void PowerTable::findTableDirection(bool horizontal) {
       x.clear();
       y.clear();
 
-      int rangeStart = std::max(0, innerSize / 2 - 10);
-      int rangeEnd = std::min(innerSize, innerSize / 2 + 10);
+      int rangeStart = std::max(0, innerSize / 2 - 5);
+      int rangeEnd = std::min(innerSize, innerSize / 2 + 5);
 
       for (int innerValue = rangeStart; innerValue < rangeEnd; ++innerValue) {
           int i = horizontal ? outerValue : innerValue;
@@ -562,9 +562,7 @@ void PowerTable::findTableDirection(bool horizontal) {
           if (targetPos != INT16_MIN) {
               unique_xy.emplace_back(innerValue, static_cast<double>(targetPos));
           } else {
-              if (emptyIndices.empty() || innerValue - emptyIndices.back() >= 5) {
                   emptyIndices.push_back(innerValue);
-              }
           }
       }
 
@@ -949,6 +947,8 @@ void PowerTable::newEntry(PowerBuffer& powerBuffer) {
     return;
   }
 
+  targetPosition = this->calculatePosition(watts, cad, targetPosition, k, i); 
+
   // Downvote out of position neighbors and discard entry if it doesn't match the logic of the table
   TestResults testResults = this->testNeighbors(k, i, targetPosition);
   if (!(testResults.bottomNeighbor.passedTest && testResults.topNeighbor.passedTest && testResults.rightNeighbor.passedTest && testResults.leftNeighbor.passedTest)) {
@@ -1127,20 +1127,20 @@ void PowerTable::newEntry(PowerBuffer& powerBuffer) {
   BLE_ss2kCustomCharacteristic::notify(0x27, k);
 }
 
-void PowerTable::enterData(int i, int j, int pos) {
-  if (this->tableRow[i].tableEntry[j].readings <= 0) {  // if first reading in this entry
-    this->tableRow[i].tableEntry[j].targetPosition = pos;
-    SS2K_LOG(POWERTABLE_LOG_TAG, "New entry recorded (%d)(%d)(%d)", i, j, this->tableRow[i].tableEntry[j].targetPosition);
+void PowerTable::enterData(int k, int i, int pos) {
+  if (this->tableRow[k].tableEntry[i].readings <= 0) {  // if first reading in this entry
+    this->tableRow[k].tableEntry[i].targetPosition = pos;
+    SS2K_LOG(POWERTABLE_LOG_TAG, "New entry recorded (%d)(%d)(%d)", k, i, this->tableRow[k].tableEntry[i].targetPosition);
   } else {  // Average and update the readings.
-    this->tableRow[i].tableEntry[j].targetPosition =
-        (pos + (this->tableRow[i].tableEntry[j].targetPosition * this->tableRow[i].tableEntry[j].readings)) / (this->tableRow[i].tableEntry[j].readings + 1.0);
-    SS2K_LOG(POWERTABLE_LOG_TAG, "Existing entry averaged (%d)(%d)(%d), readings(%d)", i, j, this->tableRow[i].tableEntry[j].targetPosition,
-             this->tableRow[i].tableEntry[j].readings);
-    if (this->tableRow[i].tableEntry[j].readings > POWER_SAMPLES * 2) {
-      this->tableRow[i].tableEntry[j].readings = POWER_SAMPLES * 2;  // keep from diluting recent readings too far.
+    this->tableRow[k].tableEntry[i].targetPosition =
+        (pos + (this->tableRow[k].tableEntry[i].targetPosition * this->tableRow[k].tableEntry[i].readings)) / (this->tableRow[k].tableEntry[i].readings + 1.0);
+    SS2K_LOG(POWERTABLE_LOG_TAG, "Existing entry averaged (%d)(%d)(%d), readings(%d)", k, i, this->tableRow[k].tableEntry[i].targetPosition,
+             this->tableRow[k].tableEntry[i].readings);
+    if (this->tableRow[k].tableEntry[i].readings > POWER_SAMPLES * 2) {
+      this->tableRow[k].tableEntry[i].readings = POWER_SAMPLES * 2;  // keep from diluting recent readings too far.
     }
   }
-  this->tableRow[i].tableEntry[j].readings++;
+  this->tableRow[k].tableEntry[i].readings++;
 
   if (this->getNumEntries() > 4) {
     int entries    = 0;
@@ -1154,6 +1154,58 @@ void PowerTable::enterData(int i, int j, int pos) {
       newEntries = getNumEntries();
     }
   }
+}
+
+float PowerTable::calculatePosition(float watts, float cad, float targetPos, int k, int i){
+
+    TestResults testResults = this->testNeighbors(k, i, targetPos); 
+
+    if(this->tableRow[k].tableEntry[i].targetPosition == INT16_MIN || 
+      !(testResults.bottomNeighbor.passedTest || testResults.topNeighbor.passedTest || testResults.rightNeighbor.passedTest || testResults.leftNeighbor.passedTest) ||
+      this->tableRow[k].tableEntry[i].targetPosition == targetPos) {
+      SS2K_LOG(POWERTABLE_LOG_TAG, "Keep old targetPosition: (%f)", targetPos); 
+      return targetPos; 
+    }
+
+    int wattPosition = POWERTABLE_WATT_INCREMENT * i; 
+    int cadPosition = MINIMUM_TABLE_CAD + (POWERTABLE_CAD_INCREMENT * k); 
+
+    float rightValue = 0.0f, leftValue = 0.0f, topValue = 0.0f, bottomValue = 0.0f; 
+
+    int cellValue = this->tableRow[k].tableEntry[i].targetPosition; 
+    float wattDelta = float(POWERTABLE_WATT_INCREMENT)/(abs(targetPos - float(cellValue)));
+    float cadDelta = float(POWERTABLE_CAD_INCREMENT)/(abs(targetPos - float(cellValue))); 
+
+    SS2K_LOG(POWERTABLE_LOG_TAG, "cellValue: (%d) wattDelta: (%f) cadDelta: (%f) allNeighborsPassed: (%d)", cellValue, wattDelta, cadDelta, testResults.allNeighborsPassed); 
+
+    int count = 0; 
+
+    if(testResults.rightNeighbor.passedTest){
+      float x = abs(watts - float(wattPosition + POWERTABLE_WATT_INCREMENT)); 
+      rightValue = targetPos - (x/wattDelta); 
+      count++; 
+    } 
+    if(testResults.leftNeighbor.passedTest){
+      float x = abs(watts - float(wattPosition - POWERTABLE_WATT_INCREMENT)); 
+      leftValue = targetPos - (x/wattDelta); 
+      count++; 
+    }
+    if(testResults.bottomNeighbor.passedTest){
+      float x = abs(cad - float(cadPosition + POWERTABLE_CAD_INCREMENT)); 
+      bottomValue = targetPos - (x/cadDelta); 
+      count++; 
+    }
+    if(testResults.topNeighbor.passedTest){
+      float x = abs(cad - float(cadPosition - POWERTABLE_CAD_INCREMENT)); 
+      topValue = targetPos - (x/cadDelta);
+      count++;  
+    }
+
+    targetPos = (rightValue + leftValue + topValue + bottomValue)/float(count);
+    SS2K_LOG(POWERTABLE_LOG_TAG, "rightValue: (%f) leftValue: (%f) bottomValue: (%f) topValue: (%f) New averaged targetPosition: (%f) count: (%d)", 
+    rightValue, leftValue, bottomValue, topValue, targetPos, count); 
+
+    return targetPos; 
 }
 
 // function for weighted downvoting

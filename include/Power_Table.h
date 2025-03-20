@@ -142,6 +142,8 @@ class PowerTable {
 
   void extrapolateDiagonalEntries(const std::vector<std::pair<int, int>>& emptyIndices, const double* x, const double* y, size_t n);
 
+  float calculatePosition(float watts, float cad, float targetPos, int i, int k);
+
  private:
   unsigned long lastSaveTime     = millis();
   TestResults testNeighbors(int i, int j, int value);
