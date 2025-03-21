@@ -20,6 +20,7 @@ LeMond|RevMaster|Any|75
 Life Fitness|ICG 8|Any|35-60
 Peloton|Bike|Any|75 (90 for slammed bars)
 PooBoo|?|Any|60-80
+PooBoo|616M2|Any|50
 Schwinn|IC4|Any|85
 Schwinn|AC|Any|20-40 (mount needs to go above SS2k)
 Spinning|L7|Any|20-40 (mount needs to go above SS2k)
