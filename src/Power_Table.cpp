@@ -1158,6 +1158,19 @@ void PowerTable::newEntry(PowerBuffer& powerBuffer) {
   BLE_ss2kCustomCharacteristic::notify(0x27, k);
 }
 
+/**
+ * @brief Updates or enters data into the power table for a specific row and entry.
+ * 
+ * This function records a new target position or averages the new position with 
+ * existing data for a specific table entry. It ensures that the number of readings 
+ * does not exceed a defined limit to prevent dilution of recent data. Additionally, 
+ * it triggers table filling and extrapolation processes if the number of entries 
+ * exceeds a threshold.
+ * 
+ * @param k The index of the table row to update.
+ * @param i The index of the table entry within the row to update.
+ * @param pos The new target position to record or average.
+ */
 void PowerTable::enterData(int k, int i, int pos) {
   if (this->tableRow[k].tableEntry[i].readings <= 0) {  // if first reading in this entry
     this->tableRow[k].tableEntry[i].targetPosition = pos;
@@ -1187,66 +1200,89 @@ void PowerTable::enterData(int k, int i, int pos) {
   }
 }
 
-float PowerTable::calculatePosition(float watts, float cad, float targetPos, int k, int i){
+/**
+ * @brief Calculates the target position for a given power table entry based on neighboring values.
+ *
+ * This function determines the new target position for a power table entry by analyzing its neighbors
+ * and applying weighted adjustments based on the differences in watts and cadence. If the current entry
+ * is invalid or does not pass neighbor tests, the function retains the old target position.
+ *
+ * @param watts The power in watts for the current entry.
+ * @param cad The cadence in RPM for the current entry.
+ * @param targetPos The current target position to be adjusted.
+ * @param k The cadence index in the power table.
+ * @param i The watt index in the power table.
+ * @return The calculated target position after applying adjustments based on neighbors.
+ */
+float PowerTable::calculatePosition(float watts, float cad, float targetPos, int k, int i) {
 
-    TestResults testResults = this->testNeighbors(k, i, targetPos); 
+  TestResults testResults = this->testNeighbors(k, i, targetPos); 
 
-    if(this->tableRow[k].tableEntry[i].targetPosition == INT16_MIN || 
-      !(testResults.bottomNeighbor.passedTest || testResults.topNeighbor.passedTest || testResults.rightNeighbor.passedTest || testResults.leftNeighbor.passedTest) ||
-      this->tableRow[k].tableEntry[i].targetPosition == targetPos) {
-      SS2K_LOG(POWERTABLE_LOG_TAG, "Keep old targetPosition: (%f)", targetPos); 
-      return targetPos; 
-    }
-
-    int wattPosition = POWERTABLE_WATT_INCREMENT * i; 
-    int cadPosition = MINIMUM_TABLE_CAD + (POWERTABLE_CAD_INCREMENT * k); 
-
-    float rightValue = 0.0f, leftValue = 0.0f, topValue = 0.0f, bottomValue = 0.0f; 
-
-    int cellValue = this->tableRow[k].tableEntry[i].targetPosition; 
-    float wattDelta = float(POWERTABLE_WATT_INCREMENT)/(abs(targetPos - float(cellValue)));
-    float cadDelta = float(POWERTABLE_CAD_INCREMENT)/(abs(targetPos - float(cellValue))); 
-
-    SS2K_LOG(POWERTABLE_LOG_TAG, "cellValue: (%d) wattDelta: (%f) cadDelta: (%f) allNeighborsPassed: (%d)", cellValue, wattDelta, cadDelta, testResults.allNeighborsPassed); 
-
-    int count = 0; 
-
-    if(testResults.rightNeighbor.passedTest){
-      float x = abs(watts - float(wattPosition + POWERTABLE_WATT_INCREMENT)); 
-      rightValue = targetPos - (x/wattDelta); 
-      count++; 
-    } 
-    if(testResults.leftNeighbor.passedTest){
-      float x = abs(watts - float(wattPosition - POWERTABLE_WATT_INCREMENT)); 
-      leftValue = targetPos - (x/wattDelta); 
-      count++; 
-    }
-    if(testResults.bottomNeighbor.passedTest){
-      float x = abs(cad - float(cadPosition + POWERTABLE_CAD_INCREMENT)); 
-      bottomValue = targetPos - (x/cadDelta); 
-      count++; 
-    }
-    if(testResults.topNeighbor.passedTest){
-      float x = abs(cad - float(cadPosition - POWERTABLE_CAD_INCREMENT)); 
-      topValue = targetPos - (x/cadDelta);
-      count++;  
-    }
-
-    targetPos = (rightValue + leftValue + topValue + bottomValue)/float(count);
-    SS2K_LOG(POWERTABLE_LOG_TAG, "rightValue: (%f) leftValue: (%f) bottomValue: (%f) topValue: (%f) New averaged targetPosition: (%f) count: (%d)", 
-    rightValue, leftValue, bottomValue, topValue, targetPos, count); 
-
+  if(this->tableRow[k].tableEntry[i].targetPosition == INT16_MIN || 
+    !(testResults.bottomNeighbor.passedTest || testResults.topNeighbor.passedTest || testResults.rightNeighbor.passedTest || testResults.leftNeighbor.passedTest) ||
+    this->tableRow[k].tableEntry[i].targetPosition == targetPos) {
+    SS2K_LOG(POWERTABLE_LOG_TAG, "Keep old targetPosition: (%f)", targetPos); 
     return targetPos; 
+  }
+
+  int wattPosition = POWERTABLE_WATT_INCREMENT * i; 
+  int cadPosition = MINIMUM_TABLE_CAD + (POWERTABLE_CAD_INCREMENT * k); 
+
+  float rightValue = 0.0f, leftValue = 0.0f, topValue = 0.0f, bottomValue = 0.0f; 
+
+  int cellValue = this->tableRow[k].tableEntry[i].targetPosition; 
+  float wattDelta = float(POWERTABLE_WATT_INCREMENT)/(abs(targetPos - float(cellValue)));
+  float cadDelta = float(POWERTABLE_CAD_INCREMENT)/(abs(targetPos - float(cellValue))); 
+
+  SS2K_LOG(POWERTABLE_LOG_TAG, "cellValue: (%d) wattDelta: (%f) cadDelta: (%f) allNeighborsPassed: (%d)", cellValue, wattDelta, cadDelta, testResults.allNeighborsPassed); 
+
+  int count = 0; 
+
+  if(testResults.rightNeighbor.passedTest){
+    float x = abs(watts - float(wattPosition + POWERTABLE_WATT_INCREMENT)); 
+    rightValue = targetPos - (x/wattDelta); 
+    count++; 
+  } 
+  if(testResults.leftNeighbor.passedTest){
+    float x = abs(watts - float(wattPosition - POWERTABLE_WATT_INCREMENT)); 
+    leftValue = targetPos - (x/wattDelta); 
+    count++; 
+  }
+  if(testResults.bottomNeighbor.passedTest){
+    float x = abs(cad - float(cadPosition + POWERTABLE_CAD_INCREMENT)); 
+    bottomValue = targetPos - (x/cadDelta); 
+    count++; 
+  }
+  if(testResults.topNeighbor.passedTest){
+    float x = abs(cad - float(cadPosition - POWERTABLE_CAD_INCREMENT)); 
+    topValue = targetPos - (x/cadDelta);
+    count++;  
+  }
+
+  targetPos = (rightValue + leftValue + topValue + bottomValue)/float(count);
+  SS2K_LOG(POWERTABLE_LOG_TAG, "rightValue: (%f) leftValue: (%f) bottomValue: (%f) topValue: (%f) New averaged targetPosition: (%f) count: (%d)", 
+  rightValue, leftValue, bottomValue, topValue, targetPos, count); 
+
+  return targetPos; 
 }
 
-// function for weighted downvoting
+/**
+ * @brief Calculates a penalty value for downvoting a neighbor entry in the power table.
+ *
+ * This function computes a penalty based on the difference between the target value
+ * and the neighbor value. The penalty is scaled by a predefined penalty factor and
+ * is used to reduce the reliability of a neighbor entry when it fails validation.
+ *
+ * @param targetValue The target position value being evaluated.
+ * @param neighborValue The neighbor position value being compared.
+ * @return The calculated penalty value to be applied to the neighbor entry.
+ */
 int weightedDownVote(int targetValue, int neighborValue) {
   // calculate diff between target and neighbor
   int delta = abs(targetValue - neighborValue);
   int penalty;
   float penaltyFactor = 0.2;
 
-  // currently consistently getting a 0 for neighbor value...
   SS2K_LOG(POWERTABLE_LOG_TAG, "WEIGHTED DOWNVOTING: Target Value: (%d), NeighborValue: (%d)", targetValue, neighborValue);
 
   penalty = (delta * penaltyFactor);
