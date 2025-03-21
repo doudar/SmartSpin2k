@@ -132,17 +132,21 @@ class PowerTable {
   // Display power table in log
   void toLog();
 
-  void fillEmptyTable(int outerValue, const std::vector<int>& emptyIndices, const double* x, const double* y, size_t n, bool horizontal, bool useNaturalSpline); 
+  void fillEmptyTable(int outerValue, const std::vector<int>& emptyIndices, const float* x, const float* y, size_t n, bool horizontal, bool useNaturalSpline);
 
   void findTableDirection(bool horizontal);
 
   void extrapFillTableDirection(bool horizontal); 
 
-  void extrapolateEmptyIndices(int outerIndex, const std::vector<int>& emptyIndices, const double* x, const double* y, size_t n, bool horizontal, bool naturalSpline); 
+  void extrapolateEmptyIndices(int outerIndex, const std::vector<int>& emptyIndices, const float* x, const float* y, size_t n, bool horizontal, bool naturalSpline);
 
-  void extrapolateDiagonalEntries(const std::vector<std::pair<int, int>>& emptyIndices, const double* x, const double* y, size_t n);
+  void extrapolateDiagonalEntries(const std::vector<std::pair<int, int>>& emptyIndices, const float* x, const float* y, size_t n);
 
   float calculatePosition(float watts, float cad, float targetPos, int i, int k);
+
+  float linearInterpolate(const float* x, const float* y, size_t n, float j);
+
+  float linearExtrapolate(const float* x, const float* y, size_t n, float j);
 
  private:
   unsigned long lastSaveTime     = millis();
