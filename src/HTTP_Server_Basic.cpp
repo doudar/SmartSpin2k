@@ -669,6 +669,7 @@ void HTTP_Server::FirmwareUpdate() {
   if (httpCode == HTTP_CODE_OK) {  // if version received
     bool updateAnyway = false;
     if (!LittleFS.exists("/index.html")) {
+      // force firmware update if index.html is missing
       // updateAnyway = true;
       SS2K_LOG(HTTP_SERVER_LOG_TAG, "  -index.html not found.");
     }
@@ -750,6 +751,8 @@ void HTTP_Server::FirmwareUpdate() {
     } else {  // don't update
       SS2K_LOG(HTTP_SERVER_LOG_TAG, "  - Current Version: %s", FIRMWARE_VERSION);
     }
+  }else{
+    SS2K_LOG(HTTP_SERVER_LOG_TAG, "Could not connect to Github. httpCode: %d", httpCode);
   }
 }
 
