@@ -10,6 +10,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Added
 
 ### Changed
+
+### Hardware
+
+
+## [25.3.13]
+
+### Added
+
+### Changed
 - Multiple html and css improvements. 
 ### Hardware
 
