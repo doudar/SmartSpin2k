@@ -141,7 +141,7 @@ void bleClientTask(void *pvParameters) {
   long int scanDelay = millis();
   spinBLEClient.checkBLEReconnect();
   for (;;) {
-    vTaskDelay(BLE_CLIENT_DELAY / portTICK_PERIOD_MS);  // Delay between loops.
+    delay(BLE_CLIENT_DELAY);  // Delay between loops.
 
     // disconnect all connected servers if we're updating via BLE
     if (ss2k->isUpdating) {
@@ -701,7 +701,7 @@ void SpinBLEClient::postConnect() {
           // appliance.
           if (userConfig->getFTMSControlPointWrite()) {
             writeCharacteristic->writeValue(FitnessMachineControlPointProcedure::RequestControl, 1);
-            vTaskDelay(BLE_NOTIFY_DELAY / portTICK_PERIOD_MS);
+            delay(BLE_NOTIFY_DELAY);
             SS2K_LOG(BLE_CLIENT_LOG_TAG, "Activated FTMS Training.");
           }
           writeCharacteristic->writeValue(FitnessMachineControlPointProcedure::StartOrResume, 1);

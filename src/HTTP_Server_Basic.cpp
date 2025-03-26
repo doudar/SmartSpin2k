@@ -48,7 +48,7 @@ void _APSetup() {
   //WiFi.setHostname(userConfig->getDeviceName());
   WiFi.softAPsetHostname(userConfig->getDeviceName());
   WiFi.enableAP(true);
-  vTaskDelay(500/portTICK_RATE_MS);  // Micro controller requires some time to reset the mode
+  delay(500);  // Micro controller requires some time to reset the mode
 }
 
 // ********************************WIFI Setup*************************
@@ -60,7 +60,7 @@ void startWifi() {
     SS2K_LOG(HTTP_SERVER_LOG_TAG, "Connecting to: %s", userConfig->getSsid());
     _staSetup();
     while (WiFi.status() != WL_CONNECTED) {
-      vTaskDelay(1000 / portTICK_RATE_MS);
+      delay(1000);
       SS2K_LOG(HTTP_SERVER_LOG_TAG, "Waiting for connection to be established...");
       i++;
       if (i > WIFI_CONNECT_TIMEOUT) {
@@ -69,7 +69,7 @@ void startWifi() {
         WiFi.disconnect(true, true);
         WiFi.setAutoReconnect(false);
         WiFi.mode(WIFI_MODE_NULL);
-        vTaskDelay(1000 / portTICK_RATE_MS);
+        delay(1000);
         break;
       }
     }
@@ -94,7 +94,7 @@ void startWifi() {
       SS2K_LOG(HTTP_SERVER_LOG_TAG, "Using Default Password");
       WiFi.softAP(userConfig->getDeviceName(), DEFAULT_PASSWORD);
     }
-    vTaskDelay(50/portTICK_RATE_MS);
+    delay(50);
     myIP = WiFi.softAPIP();
     /* Setup the DNS server redirecting all the domains to the apIP */
     dnsServer.setErrorReplyCode(DNSReplyCode::NoError);
@@ -680,9 +680,9 @@ void HTTP_Server::FirmwareUpdate() {
       SS2K_LOG(HTTP_SERVER_LOG_TAG, "Updating FileSystem");
       http.begin(DATA_UPDATEURL + String(DATA_FILELIST),
                  rootCACertificate);  // check version URL
-      vTaskDelay(100 / portTICK_PERIOD_MS);
+      delay(100);
       httpCode = http.GET();  // get data from version file
-      vTaskDelay(100 / portTICK_PERIOD_MS);
+      delay(100);
       StaticJsonDocument<500> doc;
       if (httpCode == HTTP_CODE_OK) {  // if version received
         String payload;
@@ -709,9 +709,9 @@ void HTTP_Server::FirmwareUpdate() {
         String fileName = "/" + v.as<String>();
         http.begin(DATA_UPDATEURL + fileName,
                    rootCACertificate);  // check version URL
-        vTaskDelay(100 / portTICK_PERIOD_MS);
+        delay(100);
         httpCode = http.GET();
-        vTaskDelay(100 / portTICK_PERIOD_MS);
+        delay(100);
         if (httpCode == HTTP_CODE_OK) {
           String payload;
           payload = http.getString();

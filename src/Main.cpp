@@ -103,7 +103,7 @@ void setup() {
   if (!LittleFS.begin(false)) {
     SS2K_LOG(MAIN_LOG_TAG, "An Error has occurred while mounting LittleFS.");
     LittleFS.format();                     // Format so that the settings can be saved.
-    vTaskDelay(100 / portTICK_PERIOD_MS);  // Provide some time for the format to happen.
+    delay(100);  // Provide some time for the format to happen.
   }
 
   // Load Config
@@ -184,7 +184,7 @@ void SS2K::maintenanceLoop(void *pvParameters) {
   static bool isScanning              = false;
 
   while (true) {
-    vTaskDelay(5 / portTICK_RATE_MS);
+    delay(5);
 
     // Run what used to be in the BLECommunications Task.
     BLECommunications();
@@ -240,11 +240,11 @@ void SS2K::maintenanceLoop(void *pvParameters) {
     // Handle flag set for rebooting
     if (ss2k->rebootFlag) {
       static bool _loopOnce = false;
-      vTaskDelay(1000 / portTICK_RATE_MS);
+      delay(1000);
       // Let the main task loop complete once before rebooting
       if (_loopOnce) {
         // Important to keep this delay high in order to allow coms to finish.
-        vTaskDelay(1000 / portTICK_RATE_MS);
+        delay(1000);
         ESP.restart();
       }
       _loopOnce = true;
@@ -390,9 +390,9 @@ void SS2K::FTMSModeShiftModifier() {
 
 void SS2K::restartWifi() {
   httpServer.stop();
-  vTaskDelay(100 / portTICK_RATE_MS);
+  delay(100);
   stopWifi();
-  vTaskDelay(100 / portTICK_RATE_MS);
+  delay(100);
   startWifi();
   httpServer.start();
 }
@@ -482,7 +482,7 @@ void SS2K::moveStepper() {
     if (_stepperDir != userConfig->getStepperDir()) {  // User changed the config direction of the stepper wires
       _stepperDir = userConfig->getStepperDir();
       while (stepper->isRunning()) {  // Wait until the motor stops running
-        vTaskDelay(100 / portTICK_PERIOD_MS);
+        delay(100);
       }
       stepper->setDirectionPin(currentBoard.dirPin, _stepperDir);
     }
@@ -529,15 +529,15 @@ void SS2K::resetIfShiftersHeld() {
     SS2K_LOG(MAIN_LOG_TAG, "Resetting to defaults via shifter buttons.");
     for (int x = 0; x < 10; x++) {  // blink fast to acknowledge
       digitalWrite(LED_PIN, HIGH);
-      vTaskDelay(200 / portTICK_PERIOD_MS);
+      delay(200);
       digitalWrite(LED_PIN, LOW);
     }
     for (int i = 0; i < 20; i++) {
       LittleFS.format();
       userConfig->setDefaults();
-      vTaskDelay(200 / portTICK_PERIOD_MS);
+      delay(200);
       userConfig->saveToLittleFS();
-      vTaskDelay(200 / portTICK_PERIOD_MS);
+      delay(200);
     }
     ESP.restart();
   }
@@ -583,22 +583,22 @@ void SS2K::goHome(bool bothDirections) {
     SS2K_LOG(MAIN_LOG_TAG, "Updating driver...");
     fitnessMachineService.spinDown(0x01);
     updateStepperPower(userConfig->getStepperPower() * .2);
-    vTaskDelay(50 / portTICK_PERIOD_MS);
+    delay(50);
     driver.irun(0x02);  // low power
-    vTaskDelay(50 / portTICK_PERIOD_MS);
+    delay(50);
     driver.ihold(0x01);
-    vTaskDelay(50 / portTICK_PERIOD_MS);
+    delay(50);
     int threshold = 0;
     bool stalled  = false;
     // Back off limit in case we are alread here.
     stepper->move(userConfig->getShiftStep(), true);
     this->updateStepperSpeed(1500);
-    vTaskDelay(500 / portTICK_PERIOD_MS);
+    delay(500);
     stepper->runBackward();
-    vTaskDelay(250 / portTICK_PERIOD_MS);
+    delay(250);
     threshold = driver.SG_RESULT();
     Serial.printf("%d ", driver.SG_RESULT());
-    vTaskDelay(300 / portTICK_PERIOD_MS);
+    delay(300);
     fitnessMachineService.spinDown(0x04);
     while (!stalled) {
       if (abs(rtConfig->getShifterPosition() - ss2k->lastShifterPosition)) {  // let the user abort with the shift button.
@@ -609,10 +609,10 @@ void SS2K::goHome(bool bothDirections) {
       stalled = (driver.SG_RESULT() < threshold - userConfig->getHomingSensitivity());
     }
     stepper->forceStop();
-    vTaskDelay(100 / portTICK_PERIOD_MS);
+    delay(100);
     stepper->moveTo(stepper->getCurrentPosition() + userConfig->getShiftStep());
     while (stepper->isRunning()) {
-      vTaskDelay(10 / portTICK_PERIOD_MS);
+      delay(10);
     }
     stepper->setCurrentPosition((int32_t)0);
     ss2k->setTargetPosition(0);
@@ -623,12 +623,12 @@ void SS2K::goHome(bool bothDirections) {
     if (bothDirections) {
       // Back off limit in case we are alread here.
       this->updateStepperSpeed(1500);
-      vTaskDelay(500 / portTICK_PERIOD_MS);
+      delay(500);
       stepper->runForward();
-      vTaskDelay(1000 / portTICK_PERIOD_MS);  // wait until stable
+      delay(1000);  // wait until stable
       threshold = driver.SG_RESULT();         // take reading
       Serial.printf("%d ", driver.SG_RESULT());
-      vTaskDelay(250 / portTICK_PERIOD_MS);
+      delay(250);
       while (!stalled) {
         if (abs(rtConfig->getShifterPosition() - ss2k->lastShifterPosition)) {  // let the user abort with the shift button.
           userConfig->setHMin(INT32_MIN);
@@ -639,7 +639,7 @@ void SS2K::goHome(bool bothDirections) {
       }
       stepper->forceStop();
       fitnessMachineService.spinDown(0x02);
-      vTaskDelay(500 / portTICK_PERIOD_MS);
+      delay(500);
       rtConfig->setMaxStep(stepper->getCurrentPosition() - 200);
       SS2K_LOG(MAIN_LOG_TAG, "Max Position found: %d.", rtConfig->getMaxStep());
       this->updateStepperSpeed();
