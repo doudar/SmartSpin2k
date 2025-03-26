@@ -11,7 +11,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 -Root CA certificates are now updated automatically during every build. 
 
 ### Changed
-- Multiple html and css improvements. 
+- Multiple html and css improvements.
+- Added CSC sensor selection in BLE Scanner html.
 ### Hardware
 
 
