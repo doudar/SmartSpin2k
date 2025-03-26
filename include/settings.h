@@ -254,7 +254,7 @@ const char* const DEFAULT_PASSWORD = "password";
 #define RUNTIMECONFIG_JSON_SIZE 1000 + DEBUG_LOG_BUFFER_SIZE
 
 // Uncomment to use guardrails for ERG mode in the stepper loop.
-// #define ERG_GUARDRAILS
+#define ERG_GUARDRAILS
 
 //Uncomment to enable the use of the power table for ERG mode.
 #define ERG_MODE_USE_POWER_TABLE
@@ -348,10 +348,6 @@ const char* const DEFAULT_PASSWORD = "password";
 // Uncomment to enable stack size debugging info
 //#define DEBUG_STACK
 
-// Uncomment to enable sending Telegram debug messages back to the chat
-// specified in telegram_token.h
-// #define USE_TELEGRAM
-
 // Uncomment to enable HR->PWR debugging info. Always displays HR->PWR
 // Calculation. Never sets userConfig->setSimulatedPower();
 // #define DEBUG_HR_TO_PWR
@@ -365,16 +361,3 @@ const char* const DEFAULT_PASSWORD = "password";
 // UNcomment to enable Custom Characteristic Logging
 // #define CUSTOM_CHAR_DEBUG
 
-#ifdef USE_TELEGRAM
-// Max number of telegram messages to send per session
-#define MAX_TELEGRAM_MESSAGES 1
-// Filler definitions for if telegram_token.h is not included (because it has
-// sensitive information). Do not change these as this file is tracked and
-// therefore public. Enter your own Telegram info into telegram_token.h
-#if __has_include("telegram_token.h")
-#include "telegram_token.h"
-#else
-#define TELEGRAM_TOKEN   "1234567890:ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghi"
-#define TELEGRAM_CHAT_ID "1234567890"
-#endif
-#endif

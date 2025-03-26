@@ -111,6 +111,9 @@ class PowerTable {
   // returns incline for wattTarget. Null if not found.
   int32_t lookup(int watts, int cad);
 
+  // returns 
+  int32_t splineLookup(int watts, int cad); 
+
   // returns watts for given cadence and target position. Returns RETURN_ERROR if not found.
   int32_t lookupWatts(int cad, int32_t targetPosition);
 
@@ -129,11 +132,21 @@ class PowerTable {
   // Display power table in log
   void toLog();
 
-  // Fill table function shortened. 
-  void fillEmptyTable(int outerValue, const std::vector<int>& emptyIndices, const std::vector<double>& x, const std::vector<double>& y, bool horizontal); 
+  void fillEmptyTable(int outerValue, const std::vector<int>& emptyIndices, const float* x, const float* y, size_t n, bool horizontal, bool useNaturalSpline);
 
-  // Determine if we are doing horiziontal or vertical interpolation; 
   void findTableDirection(bool horizontal);
+
+  void extrapFillTableDirection(bool horizontal); 
+
+  void extrapolateEmptyIndices(int outerIndex, const std::vector<int>& emptyIndices, const float* x, const float* y, size_t n, bool horizontal, bool naturalSpline);
+
+  void extrapolateDiagonalEntries(const std::vector<std::pair<int, int>>& emptyIndices, const float* x, const float* y, size_t n);
+
+  float calculatePosition(float watts, float cad, float targetPos, int i, int k);
+
+  float linearInterpolate(const float* x, const float* y, size_t n, float j);
+
+  float linearExtrapolate(const float* x, const float* y, size_t n, float j);
 
  private:
   unsigned long lastSaveTime     = millis();

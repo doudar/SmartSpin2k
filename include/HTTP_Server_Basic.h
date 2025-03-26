@@ -30,15 +30,6 @@ class HTTP_Server {
   HTTP_Server() { internetConnection = false; }
 };
 
-#ifdef USE_TELEGRAM
-#define SEND_TO_TELEGRAM(message) sendTelegram(message);
-
-void sendTelegram(String textToSend);
-void telegramUpdate(void *pvParameters);
-#else
-#define SEND_TO_TELEGRAM(message) (void)message
-#endif
-
 // wifi Function
 void startWifi();
 void stopWifi();

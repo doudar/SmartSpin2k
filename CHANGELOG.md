@@ -8,8 +8,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+-Root CA certificates are now updated automatically during every build. 
 
 ### Changed
+- Added CSC sensor selection in BLE Scanner html.
+
 
 ### Hardware
 
@@ -20,6 +23,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 - Multiple html and css improvements. 
+- 
 ### Hardware
 
 
