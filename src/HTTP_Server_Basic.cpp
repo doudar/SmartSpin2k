@@ -31,7 +31,6 @@ IPAddress myIP;
 const byte DNS_PORT = 53;
 DNSServer dnsServer;
 HTTP_Server httpServer;
-WiFiClientSecure client;
 WebServer server(80);
 
 void _staSetup() {
@@ -646,8 +645,8 @@ void HTTP_Server::stop() {
 
 void HTTP_Server::FirmwareUpdate() {
   HTTPClient http;
-  // WiFiClientSecure client;
-  client.setCACert(rootCACertificate);
+  WiFiClientSecure localClient;
+  localClient.setCACert(rootCACertificate);
   SS2K_LOG(HTTP_SERVER_LOG_TAG, "Checking for newer firmware:");
   http.begin(userConfig->getFirmwareUpdateURL() + String(FW_VERSIONFILE),
              rootCACertificate);  // check version URL
@@ -693,6 +692,7 @@ void HTTP_Server::FirmwareUpdate() {
         DeserializationError error = deserializeJson(doc, payload);
         if (error) {
           SS2K_LOG(HTTP_SERVER_LOG_TAG, "Failed to read file list");
+          http.end(); // Make sure to end HTTP before returning
           return;
         }
         httpServer.internetConnection = true;
@@ -700,6 +700,9 @@ void HTTP_Server::FirmwareUpdate() {
         SS2K_LOG(HTTP_SERVER_LOG_TAG, "error downloading %s %d", DATA_FILELIST, httpCode);
         httpServer.internetConnection = false;
       }
+      // End HTTP connection after file list download
+      http.end();
+      
       JsonArray files = doc.as<JsonArray>();
       // iterate through file list and download files individually
       for (JsonVariant v : files) {
@@ -717,6 +720,7 @@ void HTTP_Server::FirmwareUpdate() {
           File file = LittleFS.open(fileName, FILE_WRITE, true);
           if (!file) {
             SS2K_LOG(HTTP_SERVER_LOG_TAG, "Failed to create file, %s", fileName);
+            http.end(); // End HTTP before returning
             return;
           }
           file.print(payload);
@@ -727,13 +731,15 @@ void HTTP_Server::FirmwareUpdate() {
           SS2K_LOG(HTTP_SERVER_LOG_TAG, "Error downloading %s %d", fileName, httpCode);
           httpServer.internetConnection = false;
         }
+        // End HTTP connection after each file download
+        http.end();
       }
 
       //////// Update Firmware /////////
       if (((availableVer > currentVer) || updateAnyway) && (userConfig->getAutoUpdate())) {
         SS2K_LOG(HTTP_SERVER_LOG_TAG, "New firmware detected!");
         SS2K_LOG(HTTP_SERVER_LOG_TAG, "Upgrading from %s to %s", FIRMWARE_VERSION, payload.c_str());
-        t_httpUpdate_return ret = httpUpdate.update(client, userConfig->getFirmwareUpdateURL() + String(FW_BINFILE));
+        t_httpUpdate_return ret = httpUpdate.update(localClient, userConfig->getFirmwareUpdateURL() + String(FW_BINFILE));
         switch (ret) {
           case HTTP_UPDATE_FAILED:
             SS2K_LOG(HTTP_SERVER_LOG_TAG, "HTTP_UPDATE_FAILED Error %d : %s", httpUpdate.getLastError(), httpUpdate.getLastErrorString().c_str());
@@ -754,5 +760,6 @@ void HTTP_Server::FirmwareUpdate() {
   }else{
     SS2K_LOG(HTTP_SERVER_LOG_TAG, "Could not connect to Github. httpCode: %d", httpCode);
   }
+  // localClient will be automatically destroyed when the function exits
 }
 
