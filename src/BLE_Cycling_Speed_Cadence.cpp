@@ -14,8 +14,14 @@ void BLE_Cycling_Speed_Cadence::setupService(NimBLEServer *pServer, MyCharacteri
   pCyclingSpeedCadenceService = pServer->createService(CSCSERVICE_UUID);
   cscMeasurement              = pCyclingSpeedCadenceService->createCharacteristic(CSCMEASUREMENT_UUID, NIMBLE_PROPERTY::NOTIFY);
   cscFeature                  = pCyclingSpeedCadenceService->createCharacteristic(CSCFEATURE_UUID, NIMBLE_PROPERTY::READ);
-  byte cscFeatureFlags[1]     = {0b11};
-  cscFeature->setValue(cscFeatureFlags, sizeof(cscFeatureFlags));
+  
+  CyclingSpeedCadenceFeatureFlags::Types cscFeatureFlags = CyclingSpeedCadenceFeatureFlags::WheelRevolutionDataSupported | 
+                                                           CyclingSpeedCadenceFeatureFlags::CrankRevolutionDataSupported;
+
+  cscFeatureBytes[0] = static_cast<uint8_t>(cscFeatureFlags & 0xFF);
+  cscFeatureBytes[1] = static_cast<uint8_t>((cscFeatureFlags >> 8) & 0xFF);
+
+  cscFeature->setValue(cscFeatureBytes, sizeof(cscFeatureBytes));
   cscMeasurement->setCallbacks(chrCallbacks);
   pCyclingSpeedCadenceService->start();
   //spinBLEServer.pServer->getAdvertising()->addServiceUUID(pCyclingSpeedCadenceService->getUUID());

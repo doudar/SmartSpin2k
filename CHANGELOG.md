@@ -11,8 +11,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 -Root CA certificates are now updated automatically during every build. 
 
 ### Changed
-- Multiple html and css improvements.
 - Added CSC sensor selection in BLE Scanner html.
+
+
+### Hardware
+
+
+## [25.3.13]
+
+### Added
+
+### Changed
+- Multiple html and css improvements. 
+- 
 ### Hardware
 
 
@@ -22,6 +33,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 -PID loop for ERG mode instead of P loop.
+- Fixed flags in CPS and CSC which were causing issues in GTA Bike. Thanks @matthewsshirley !
 
 ### Hardware
 
