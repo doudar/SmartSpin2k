@@ -1535,6 +1535,9 @@ bool PowerTable::_save() {
 }
 
 int32_t PowerTable::lookupWatts(int cad, int32_t targetPosition) {
+  if(cad<1) {
+    return 0;
+  }
   // Convert targetPosition from external format (xTABLE_DIVISOR) to internal format
   int16_t internalPosition = targetPosition / TABLE_DIVISOR;
 

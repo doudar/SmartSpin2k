@@ -60,7 +60,7 @@ void ErgMode::runERG() {
     // userConfig->setPTab4Pwr(true);
     // rtConfig->setHomed(true);
 
-    if ((!spinBLEClient.connectedPM || userConfig->getPTab4Pwr()) && rtConfig->cad.getValue() && rtConfig->getHomed()) {
+    if (userConfig->getPTab4Pwr() && rtConfig->getHomed()) {
       // Lookup watts using the Power Table.
       pTabUsed4Pwr = true;
       if (powerTable->_hasBeenLoadedThisSession) {
