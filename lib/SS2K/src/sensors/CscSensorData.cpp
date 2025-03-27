@@ -8,6 +8,7 @@
 #include "Data.h"
 #include "endian.h"
 #include "sensors/CscSensorData.h"
+#include "Arduino.h"
 
 bool CscSensorData::hasHeartRate() { return false; }
 
@@ -89,15 +90,13 @@ void CscSensorData::decode(uint8_t *data, size_t length) {
             cadence = this->cadence;
           }
           this->cadence = cadence;
-          this->missedReadingCount = 0;
-        } else {
-          this->missedReadingCount++;
-        }
-      } else {                               // the crank rev probably didn't update
-        if (this->missedReadingCount > 2) {  // Require three consecutive readings before setting 0 cadence
+          this->lastUpdateTime = millis();
+        } 
+      } else {                               
+        unsigned long currentTime = millis();
+        if (currentTime - lastUpdateTime > 5000) {  // Require five seconds before setting 0 cadence
           this->cadence = 0;
         }
-        this->missedReadingCount++;
       }
     }
 

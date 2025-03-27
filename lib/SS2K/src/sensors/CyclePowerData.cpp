@@ -8,6 +8,7 @@
 #include "Data.h"
 #include "endian.h"
 #include "sensors/CyclePowerData.h"
+#include "Arduino.h"
 
 bool CyclePowerData::hasHeartRate() { return false; }
 
@@ -35,7 +36,16 @@ void CyclePowerData::decode(uint8_t *data, size_t length) {
   // Instantaneous power is always present. Do that first.
   // first calculate which fields are present. Power is always 2 & 3, cadence
   // can move depending on the flags.
-  this->power = get_le16(&data[cPos]);
+  int newPower = get_le16(&data[cPos]);
+  // check newPower is greater than zero. If not, wait 5 seconds before setting zero
+  if (newPower > 0) {
+    this->power = newPower;
+  } else {
+    unsigned long currentTime = millis();
+    if (currentTime - lastUpdateTime > 5000) {  // Require five seconds before setting 0 power
+      this->power = 0;
+    }
+  }
   cPos += 2;
 
   if (bitRead(flags, 0)) {
@@ -86,16 +96,14 @@ void CyclePowerData::decode(uint8_t *data, size_t length) {
           //                Leave cadence unchanged
           cadence = this->cadence;
         }
-        this->cadence            = cadence;
-        this->missedReadingCount = 0;
-      } else {
-        this->missedReadingCount++;
+        this->cadence        = cadence;
+        this->lastUpdateTime = millis();
       }
-    } else {                               // the crank rev probably didn't update
-      if (this->missedReadingCount > 2) {  // Require three consecutive readings before setting 0 cadence
+    } else {
+      unsigned long currentTime = millis();
+      if (currentTime - lastUpdateTime > 5000) {  // Require five seconds before setting 0 cadence
         this->cadence = 0;
       }
-      this->missedReadingCount++;
     }
   }
 }

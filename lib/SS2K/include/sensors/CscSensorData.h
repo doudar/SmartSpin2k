@@ -26,11 +26,11 @@ class CscSensorData : public SensorData {
   void decode(uint8_t *data, size_t length);
 
  private:
-  float cadence = nanf("");
-  float speed = nanf("");
-  uint32_t lastWheelEventTime = 0;
-  uint32_t lastCrankEventTime = 0;
+  float cadence                 = nanf("");
+  float speed                   = nanf("");
+  uint32_t lastWheelEventTime   = 0;
+  uint32_t lastCrankEventTime   = 0;
   uint32_t lastWheelRevolutions = 0;
   uint32_t lastCrankRevolutions = 0;
-  uint8_t missedReadingCount = 0;
+  unsigned long lastUpdateTime  = 0;
 };
