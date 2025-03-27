@@ -5,10 +5,17 @@
  * SPDX-License-Identifier: GPL-2.0-only
  */
 
+#include <chrono>
 #include "Data.h"
 #include "endian.h"
 #include "sensors/CscSensorData.h"
-#include "Arduino.h"
+
+// Replacement for Arduino's millis() using standard C++
+static unsigned long getTimeMillis() {
+  return std::chrono::duration_cast<std::chrono::milliseconds>(
+    std::chrono::steady_clock::now().time_since_epoch()
+  ).count();
+}
 
 bool CscSensorData::hasHeartRate() { return false; }
 
@@ -90,10 +97,10 @@ void CscSensorData::decode(uint8_t *data, size_t length) {
             cadence = this->cadence;
           }
           this->cadence = cadence;
-          this->lastUpdateTime = millis();
-        } 
-      } else {                               
-        unsigned long currentTime = millis();
+          this->lastUpdateTime = getTimeMillis();
+        }
+      } else {
+        unsigned long currentTime = getTimeMillis();
         if (currentTime - lastUpdateTime > 5000) {  // Require five seconds before setting 0 cadence
           this->cadence = 0;
         }

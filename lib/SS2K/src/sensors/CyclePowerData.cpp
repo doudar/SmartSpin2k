@@ -5,10 +5,17 @@
  * SPDX-License-Identifier: GPL-2.0-only
  */
 
+#include <chrono>
 #include "Data.h"
 #include "endian.h"
 #include "sensors/CyclePowerData.h"
-#include "Arduino.h"
+
+// Replacement for Arduino's millis() using standard C++
+static unsigned long getTimeMillis() {
+  return std::chrono::duration_cast<std::chrono::milliseconds>(
+    std::chrono::steady_clock::now().time_since_epoch()
+  ).count();
+}
 
 bool CyclePowerData::hasHeartRate() { return false; }
 
@@ -40,9 +47,10 @@ void CyclePowerData::decode(uint8_t *data, size_t length) {
   // check newPower is greater than zero. If not, wait 5 seconds before setting zero
   if (newPower > 0) {
     this->power = newPower;
+    this->lastPwrUpdateTime = getTimeMillis();
   } else {
-    unsigned long currentTime = millis();
-    if (currentTime - lastUpdateTime > 5000) {  // Require five seconds before setting 0 power
+    unsigned long currentTime = getTimeMillis();
+    if (currentTime - lastPwrUpdateTime > 5000) {  // Require five seconds before setting 0 power
       this->power = 0;
     }
   }
@@ -97,11 +105,11 @@ void CyclePowerData::decode(uint8_t *data, size_t length) {
           cadence = this->cadence;
         }
         this->cadence        = cadence;
-        this->lastUpdateTime = millis();
+        this->lastCadUpdateTime = getTimeMillis();
       }
     } else {
-      unsigned long currentTime = millis();
-      if (currentTime - lastUpdateTime > 5000) {  // Require five seconds before setting 0 cadence
+      unsigned long currentTime = getTimeMillis();
+      if (currentTime - lastCadUpdateTime > 5000) {  // Require five seconds before setting 0 cadence
         this->cadence = 0;
       }
     }
