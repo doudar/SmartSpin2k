@@ -657,6 +657,7 @@ void SS2K::goHome(bool bothDirections) {
   userConfig->saveToLittleFS();
   rtConfig->setHomed(true);
   this->setupTMCStepperDriver(true);
+  rtConfig->setShifterPosition(0);
   ss2k->setTargetPosition(0);
 }
 
