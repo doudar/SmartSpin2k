@@ -1,0 +1,29 @@
+{
+    "device_name": "SHIFTR 123456",
+    "trainer_device": "Tacx Neo 54321",
+    "trainer_devices": [
+        "Tacx Vortex 12345",
+        "Tacx Neo 54321"
+    ],
+    "virtual_shifting": true,
+    "virtual_shifting_mode": 1,
+    "virtual_shifting_modes": [
+        {
+        "name": "Basic Resistance",
+        "value": 0
+        },
+        {
+        "name": "Target Power",
+        "value": 1
+        },
+        {
+        "name": "Track Resistance",
+        "value": 2
+        }
+    ],
+    "chainring_teeth": 34,
+    "sprocket_teeth": 14,
+    "grade_smoothing": true,
+    "difficulty": 100,
+    "ftms_emulation": true
+}

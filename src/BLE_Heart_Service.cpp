@@ -4,8 +4,8 @@
  *
  * SPDX-License-Identifier: GPL-2.0-only
  */
-
 #include "BLE_Heart_Service.h"
+#include "DirConManager.h"
 #include <Constants.h>
 
 BLE_Heart_Service::BLE_Heart_Service() : pHeartService(nullptr), heartRateMeasurementCharacteristic(nullptr) {}
@@ -18,6 +18,9 @@ void BLE_Heart_Service::setupService(NimBLEServer *pServer, MyCharacteristicCall
   heartRateMeasurementCharacteristic->setValue(heartRateMeasurement, 2);
   heartRateMeasurementCharacteristic->setCallbacks(chrCallbacks);
   pHeartService->start();
+  
+  // Add service UUID to DirCon MDNS
+  DirConManager::addBleServiceUuid(pHeartService->getUUID());
 }
 
 void BLE_Heart_Service::deinit() {

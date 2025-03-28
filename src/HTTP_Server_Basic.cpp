@@ -11,6 +11,7 @@
 #include "HTTP_Server_Basic.h"
 #include "cert.h"
 #include "SS2KLog.h"
+#include "DirConManager.h"
 #include <WebServer.h>
 #include <HTTPClient.h>
 #include <HTTPUpdate.h>
@@ -109,6 +110,14 @@ void startWifi() {
   MDNS.addServiceTxt("http", "_tcp", "lf", "0");
   SS2K_LOG(HTTP_SERVER_LOG_TAG, "Connected to %s IP address: %s", userConfig->getSsid(), myIP.toString().c_str());
   SS2K_LOG(HTTP_SERVER_LOG_TAG, "Open http://%s.local/", userConfig->getDeviceName());
+  
+  // Initialize DirCon MDNS service
+  if (DirConManager::start()) {
+    SS2K_LOG(HTTP_SERVER_LOG_TAG, "DirCon service started successfully");
+  } else {
+    SS2K_LOG(HTTP_SERVER_LOG_TAG, "Error starting DirCon service");
+  }
+  
   WiFi.setTxPower(WIFI_POWER_19_5dBm);
 
   if (WiFi.getMode() == WIFI_STA) {
@@ -126,6 +135,8 @@ void startWifi() {
 
 void stopWifi() {
   SS2K_LOG(HTTP_SERVER_LOG_TAG, "Closing connection to: %s", userConfig->getSsid());
+  // Stop DirCon service before disconnecting WiFi
+  DirConManager::stop();
   WiFi.disconnect();
 }
 

@@ -4,8 +4,8 @@
  *
  * SPDX-License-Identifier: GPL-2.0-only
  */
-
 #include "BLE_Cycling_Power_Service.h"
+#include "DirConManager.h"
 #include <Constants.h>
 
 BLE_Cycling_Power_Service::BLE_Cycling_Power_Service() : pPowerMonitor(nullptr), cyclingPowerFeatureCharacteristic(nullptr), sensorLocationCharacteristic(nullptr){}
@@ -31,6 +31,8 @@ void BLE_Cycling_Power_Service::setupService(NimBLEServer *pServer, MyCharacteri
   pPowerMonitor->start();
   //spinBLEServer.pServer->getAdvertising()->addServiceUUID(pPowerMonitor->getUUID());
   
+  // Add service UUID to DirCon MDNS
+  DirConManager::addBleServiceUuid(pPowerMonitor->getUUID());
 }
 
 void BLE_Cycling_Power_Service::update() {

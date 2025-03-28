@@ -1,0 +1,206 @@
+# Nice article: https://piolabs.com/blog/insights/cicd-testing-coverage-versioning.html
+name: Build and Release
+on:
+  workflow_dispatch:
+  push:
+      branches: [ main, develop ]
+
+jobs:
+  versioning:
+    name: Determine version, Build and Release
+    permissions: write-all
+
+    runs-on: ubuntu-latest
+    outputs:
+      branchname: ${{ steps.versioninfo.outputs.branchname }}
+      commithash: ${{ steps.versioninfo.outputs.commithash }}
+      buildtimestamp: ${{ steps.versioninfo.outputs.buildtimestamp }}
+      lastmajordigit: ${{ steps.versioninfo.outputs.lastmajordigit }}
+      lastminordigit: ${{ steps.versioninfo.outputs.lastminordigit }}
+      lastpatchdigit: ${{ steps.versioninfo.outputs.lastpatchdigit }}
+      lastversion: ${{ steps.versioninfo.outputs.lastversion }}
+      nextmajordigit: ${{ steps.selectversion.outputs.nextmajordigit }}
+      nextminordigit: ${{ steps.selectversion.outputs.nextminordigit }}
+      nextpatchdigit: ${{ steps.selectversion.outputs.nextpatchdigit }}
+      buildversion: ${{ steps.selectversion.outputs.buildversion }}
+      buildversionfilename: ${{ steps.selectversion.outputs.buildversionfilename }}
+
+    steps:
+      - name: Enable caching
+        uses: actions/cache@v3
+        with:
+          path: |
+            ~/.cache/pip
+            ~/.platformio/.cache
+          key: ${{ runner.os }}-pio
+
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+    
+      - name: Get version data
+        id: versioninfo
+        run: |
+          echo "extract branch name from github_ref '${{ github.ref }}'"
+          declare branchname=$(echo "${{ github.ref }}" | cut -d'/' -f 3-)
+          echo "clean branch name = $branchname"
+          echo "extract commit short hash : $(git rev-parse --short HEAD)"
+          declare commithash=$(git rev-parse --short HEAD)
+          echo "extract build timestamp"
+          declare buildtimestamp=$(date "+%Y-%b-%d-%H:%M:%S")
+          echo "buildtimestamp = $buildtimestamp"
+          declare fulltag=$(git describe --tag $(git rev-parse --verify refs/remotes/origin/main))
+          echo "fulltag = [$fulltag]"
+          declare versiontag=$(echo $fulltag | cut -d'-' -f1)
+          echo "extract SemVer numbers from version tag [$versiontag]"
+          declare -i lastmajordigit=$(echo $versiontag | cut -c 2- | cut -d'.' -f1)
+          echo "lastmajordigit = $lastmajordigit"
+          declare -i lastminordigit=$(echo $versiontag | cut -c 1- | cut -d'.' -f2)
+          echo "lastminordigit = $lastminordigit"
+          declare -i lastpatchdigit=$(echo $versiontag | cut -c 1- | cut -d'.' -f3)
+          echo "lastpatchdigit = $lastpatchdigit"
+          declare lastversion="v$lastmajordigit.$lastminordigit.$lastpatchdigit"
+          echo "output variables to GitHub Actions"
+          echo "branchname=$branchname" >> $GITHUB_OUTPUT
+          echo "lastmajordigit=$lastmajordigit" >> $GITHUB_OUTPUT
+          echo "lastminordigit=$lastminordigit" >> $GITHUB_OUTPUT
+          echo "lastpatchdigit=$lastpatchdigit" >> $GITHUB_OUTPUT
+          echo "commithash=$commithash" >> $GITHUB_OUTPUT
+          echo "buildtimestamp=$buildtimestamp" >> $GITHUB_OUTPUT
+          echo "lastversion=$lastversion" >> $GITHUB_OUTPUT
+
+      - name: Determine which version to build
+        id: selectversion
+        run: |
+          echo "Triggered from Branch : ${{ steps.versioninfo.outputs.branchname }}"
+          echo "Commit hash           : ${{ steps.versioninfo.outputs.commithash }}"
+          echo "Last version          : ${{ steps.versioninfo.outputs.lastversion }}"
+          echo "  Major               : ${{ steps.versioninfo.outputs.lastmajordigit }}"
+          echo "  Minor               : ${{ steps.versioninfo.outputs.lastminordigit }}"
+          echo "  Patch               : ${{ steps.versioninfo.outputs.lastpatchdigit }}"
+          if [ "${{ steps.versioninfo.outputs.branchname }}" == "main" ]; then
+            echo "Triggered from merge on main branch with commit title : ${{ github.event.head_commit.message }}"
+            if [[ "${{ github.event.head_commit.message }}" == *"major"* ]]; then
+              echo "Incrementing Major versionDigit"
+              declare -i nextmajordigit=${{ steps.versioninfo.outputs.lastmajordigit }}+1
+              declare -i nextminordigit=0
+              declare -i nextpatchdigit=0
+              declare buildversion="v$nextmajordigit.$nextminordigit.$nextpatchdigit"
+              declare buildversionfilename=$(echo "SHIFTR-${buildversion}")
+
+            elif [[ "${{ github.event.head_commit.message }}" == *"minor"* ]]; then
+              echo "Incrementing Minor versionDigit"
+              declare -i nextmajordigit=${{ steps.versioninfo.outputs.lastmajordigit }}
+              declare -i nextminordigit=${{ steps.versioninfo.outputs.lastminordigit }}+1
+              declare -i nextpatchdigit=0
+              declare buildversion="v$nextmajordigit.$nextminordigit.$nextpatchdigit"
+              declare buildversionfilename=$(echo "SHIFTR-${buildversion}")
+            else
+              echo "Incrementing Patch versionDigit"
+              declare -i nextmajordigit=${{ steps.versioninfo.outputs.lastmajordigit }}
+              declare -i nextminordigit=${{ steps.versioninfo.outputs.lastminordigit }}
+              declare -i nextpatchdigit=${{ steps.versioninfo.outputs.lastpatchdigit }}+1
+              declare buildversion="v$nextmajordigit.$nextminordigit.$nextpatchdigit"
+              declare buildversionfilename=$(echo "SHIFTR-${buildversion}")
+            fi
+          else
+            echo "Not on main branch -> development version"
+            declare -i nextmajordigit=${{ steps.versioninfo.outputs.lastmajordigit }}
+            declare -i nextminordigit=${{ steps.versioninfo.outputs.lastminordigit }}
+            declare -i nextpatchdigit=${{ steps.versioninfo.outputs.lastpatchdigit }}
+            declare buildversion="v$nextmajordigit.$nextminordigit.$nextpatchdigit-${{ steps.versioninfo.outputs.commithash }}"
+            declare buildversionfilename=$(echo "SHIFTR-${buildversion}")
+          fi
+          echo "Building Version : $buildversion"
+          echo "  Major          : $nextmajordigit"
+          echo "  Minor          : $nextminordigit"
+          echo "  Patch          : $nextpatchdigit"
+          echo "Filename         : $buildversionfilename"
+          echo "output variables to GitHub Actions"
+          echo "nextmajordigit=$nextmajordigit" >> $GITHUB_OUTPUT
+          echo "nextminordigit=$nextminordigit" >> $GITHUB_OUTPUT
+          echo "nextpatchdigit=$nextpatchdigit" >> $GITHUB_OUTPUT
+          echo "buildversion=$buildversion" >> $GITHUB_OUTPUT
+          echo "buildversionfilename=$buildversionfilename" >> $GITHUB_OUTPUT
+
+      - name: Show Build info
+        id: showbuildinfo
+        run: |
+          echo "Build Version   : ${{ steps.selectversion.outputs.buildversion }}"
+          echo "  Major         : ${{ steps.selectversion.outputs.nextmajordigit }}"
+          echo "  Minor         : ${{ steps.selectversion.outputs.nextminordigit }}"
+          echo "  Patch         : ${{ steps.selectversion.outputs.nextpatchdigit }}"
+          echo "Build Filename  : ${{ steps.selectversion.outputs.buildversionfilename }}.bin"
+          echo "Build Timestamp : ${{ steps.versioninfo.outputs.buildtimestamp }}"
+
+      - name: Save Build info
+        uses: "DamianReeves/write-file-action@master"
+        with:
+          path: include/Version.h
+          write-mode: overwrite
+          contents: |
+            // ##########################################################################
+            // ### This file is generated by build and Continuous Integration scripts ###
+            // ###   .github/workflows/build.py for local development environment     ###
+            // ###   .github/workflows/build.yml for CI environment                   ###
+            // ### Changes will be overwritten on the next build!                     ###
+            // ##########################################################################
+
+            #ifndef VERSION_H
+            #define VERSION_H
+            #define VERSION "${{ steps.selectversion.outputs.buildversion }}"
+            #define VERSION_MAJOR ${{ steps.selectversion.outputs.nextmajordigit }}
+            #define VERSION_MINOR ${{ steps.selectversion.outputs.nextminordigit }}
+            #define VERSION_PATCH ${{ steps.selectversion.outputs.nextpatchdigit }}
+            #define VERSION_BUILD "${{ steps.versioninfo.outputs.commithash }}"
+            #define VERSION_TIMESTAMP "${{ steps.versioninfo.outputs.buildtimestamp }}"
+            #endif
+
+      - name: Verify Build info
+        run: |
+          cat include/Version.h
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.9"
+
+      - name: Install PlatformIO Core
+        run: pip install --upgrade platformio
+
+      - name: Build
+        run: |
+          pio run -e wt32-eth01
+
+      - name: Attach Binary to Workflow run
+        id: attachbinarytoworkflowrun
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ steps.selectversion.outputs.buildversionfilename }}.bin
+          path: .pio/build/wt32-eth01/firmware.bin
+          if-no-files-found: error
+
+      - name: Release when on main branch
+        id: createrelease
+        uses: actions/create-release@v1
+        if: ${{ steps.versioninfo.outputs.branchname == 'main'}}
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          tag_name: ${{ steps.selectversion.outputs.buildversion }}
+          release_name: Release ${{ steps.selectversion.outputs.buildversion }}
+          draft: false
+          prerelease: false
+
+      - name: Attach Binary to Release
+        id: attachbinarytorelease
+        uses: actions/upload-release-asset@v1
+        if: ${{ steps.versioninfo.outputs.branchname == 'main'}}
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          upload_url: ${{ steps.createrelease.outputs.upload_url }}
+          asset_path: .pio/build/wt32-eth01/firmware.bin
+          asset_name: ${{ steps.selectversion.outputs.buildversionfilename }}.bin
+          asset_content_type: application/octet-stream

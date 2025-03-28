@@ -4,8 +4,8 @@
  *
  * SPDX-License-Identifier: GPL-2.0-only
  */
-
 #include "BLE_Fitness_Machine_Service.h"
+#include "DirConManager.h"
 #include <Constants.h>
 #include <vector>
 
@@ -54,6 +54,9 @@ void BLE_Fitness_Machine_Service::setupService(NimBLEServer *pServer, MyCharacte
   fitnessMachineControlPoint->setCallbacks(chrCallbacks);
   pFitnessMachineService->start();
   spinBLEServer.pServer->getAdvertising()->addServiceUUID(pFitnessMachineService->getUUID());
+
+  // Add service UUID to DirCon MDNS
+  DirConManager::addBleServiceUuid(pFitnessMachineService->getUUID());
 }
 
 void BLE_Fitness_Machine_Service::update() {

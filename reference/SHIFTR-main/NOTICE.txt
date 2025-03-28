@@ -1,0 +1,23 @@
+SHIFTR
+Copyright 2024 SHIFTR contributors
+
+This product includes software from the IotWebConf project (MIT License)
+https://github.com/prampec/IotWebConf
+
+This product includes software from the NimBLE-Arduino project (Apache 2.0)
+https://github.com/h2zero/NimBLE-Arduino
+
+This product includes software from the arduino-timer project (BSD, 3-clause)
+https://github.com/contrem/arduino-timer
+
+This product includes software from the AsyncTCP project (LGPL-3.0 License)
+https://github.com/me-no-dev/AsyncTCP
+
+This product includes software from the uleb128 project (MIT License)
+https://github.com/bolderflight/uleb128
+
+This product includes code from the shelly-homekit project (Apache 2.0)
+https://github.com/mongoose-os-apps/shelly-homekit
+
+This product includes code from the qdomyos-zwift project (GPL-3.0 License) 
+https://github.com/cagnulein/qdomyos-zwift

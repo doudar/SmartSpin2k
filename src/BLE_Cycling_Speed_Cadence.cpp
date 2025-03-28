@@ -4,8 +4,8 @@
  *
  * SPDX-License-Identifier: GPL-2.0-only
  */
-
 #include "BLE_Cycling_Speed_Cadence.h"
+#include "DirConManager.h"
 #include <Constants.h>
 
 BLE_Cycling_Speed_Cadence::BLE_Cycling_Speed_Cadence() : pCyclingSpeedCadenceService(nullptr), cscMeasurement(nullptr), cscFeature(nullptr) {}
@@ -25,6 +25,9 @@ void BLE_Cycling_Speed_Cadence::setupService(NimBLEServer *pServer, MyCharacteri
   cscMeasurement->setCallbacks(chrCallbacks);
   pCyclingSpeedCadenceService->start();
   //spinBLEServer.pServer->getAdvertising()->addServiceUUID(pCyclingSpeedCadenceService->getUUID());
+  
+  // Add service UUID to DirCon MDNS
+  DirConManager::addBleServiceUuid(pCyclingSpeedCadenceService->getUUID());
 }
 
 void BLE_Cycling_Speed_Cadence::update() {

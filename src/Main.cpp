@@ -21,6 +21,7 @@
 #include "settings.h"
 #include "BLE_Wattbike_Service.h"
 #include "BLE_Fitness_Machine_Service.h"
+#include "DirConManager.h"
 
 // Stepper Motor Serial
 HardwareSerial stepperSerial(2);
@@ -198,6 +199,8 @@ void SS2K::maintenanceLoop(void *pvParameters) {
     ergMode->runERG();
     // Run what used to be in the WebClient Task.
     httpServer.webClientUpdate();
+    // Update DirCon protocol
+    DirConManager::update();
     // If we're in ERG mode, modify shift commands to inc/dec the target watts instead.
     ss2k->FTMSModeShiftModifier();
     // If we have a resistance bike attached, slow down when we're close to the limits.
