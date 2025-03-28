@@ -704,23 +704,6 @@ void SS2K::updateStepperSpeed(int speed) {
   stepper->setSpeedInHz(speed);
 }
 
-// Checks the driver temperature and throttles power if above threshold.
-void SS2K::checkDriverTemperature() {
-  static bool overTemp = false;
-  if (static_cast<int>(temperatureRead()) > THROTTLE_TEMP) {  // Start throttling driver power at 72C on the ESP32
-    uint8_t throttledPower = (THROTTLE_TEMP - static_cast<int>(temperatureRead())) + currentBoard.pwrScaler;
-    driver.irun(throttledPower);
-    SS2K_LOG(MAIN_LOG_TAG, "Over temp! Driver is throttling down! ESP32 @ %f C", temperatureRead());
-    overTemp = true;
-  } else if (static_cast<int>(temperatureRead()) < THROTTLE_TEMP) {
-    if (overTemp) {
-      SS2K_LOG(MAIN_LOG_TAG, "Temperature is now under control. Driver current reset.");
-      driver.irun(currentBoard.pwrScaler);
-    }
-    overTemp = false;
-  }
-}
-
 void SS2K::txSerial() {  // Serial.printf(" Before TX ");
   if (PELOTON_TX && (txCheck >= 1)) {
     static int alternate = 0;

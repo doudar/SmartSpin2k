@@ -64,7 +64,6 @@ class SS2K {
   void updateStepperPower(int pwr = 0);
   void updateStealthChop();
   void updateStepperSpeed(int speed = 0);
-  void checkDriverTemperature();
   void FTMSModeShiftModifier();
   static void rxSerial(void);
   void txSerial();
