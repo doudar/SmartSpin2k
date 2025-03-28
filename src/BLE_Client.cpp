@@ -760,23 +760,6 @@ NotifyData SpinBLEAdvertisedDevice::dequeueData() {
   return receivedNotifyData;
 }
 
-// Was changed in notify-Buffer - - may not be needed **********************************************************************
-void SpinBLEAdvertisedDevice::print() {
-  char logBuf[250];
-  char *logBufP = logBuf;
-  logBufP += sprintf(logBufP, "Address: (%s)", peerAddress.toString().c_str());
-  logBufP += sprintf(logBufP, " Client ID: (%d)", connectedClientID);
-  logBufP += sprintf(logBufP, " SerUUID: (%s)", serviceUUID.toString().c_str());
-  logBufP += sprintf(logBufP, " CharUUID: (%s)", charUUID.toString().c_str());
-  logBufP += sprintf(logBufP, " HRM: (%s)", isHRM ? "true" : "false");
-  logBufP += sprintf(logBufP, " PM: (%s)", isPM ? "true" : "false");
-  logBufP += sprintf(logBufP, " CSC: (%s)", isCSC ? "true" : "false");
-  logBufP += sprintf(logBufP, " CT: (%s)", isCT ? "true" : "false");
-  logBufP += sprintf(logBufP, " doConnect: (%s)", doConnect ? "true" : "false");
-  strcat(logBufP, "|");
-  SS2K_LOG(BLE_CLIENT_LOG_TAG, "%s", String(logBuf));
-}
-
 void SpinBLEClient::connectBLE_HID(NimBLEClient *pClient) {
   NimBLERemoteService *pSvc        = nullptr;
   NimBLERemoteCharacteristic *pChr = nullptr;
