@@ -208,7 +208,7 @@ const char* const DEFAULT_PASSWORD = "password";
 #define LED_PIN 2
 
 // Max tries that BLE client will perform on reconnect
-#define MAX_RECONNECT_TRIES 3
+#define MAX_RECONNECT_TRIES 1
 
 // loop speed for the SmartSpin2k BLE communications
 #define BLE_NOTIFY_DELAY 503
@@ -339,7 +339,7 @@ const char* const DEFAULT_PASSWORD = "password";
 #define DEFAULT_HOMING_SENSITIVITY 50
 
 // BLE automatic reconnect duration in milliseconds. Set this low to avoid interruption. 
-#define BLE_RECONNECT_SCAN_DURATION 5000
+#define BLE_RECONNECT_SCAN_DURATION 1000
 
 // Task Stack Sizes
 #define MAIN_STACK       6500

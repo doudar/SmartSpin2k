@@ -50,7 +50,7 @@ void CyclePowerData::decode(uint8_t *data, size_t length) {
     this->lastPwrUpdateTime = getTimeMillis();
   } else {
     unsigned long currentTime = getTimeMillis();
-    if (currentTime - lastPwrUpdateTime > 5000) {  // Require five seconds before setting 0 power
+    if (currentTime - lastPwrUpdateTime > 2500) {  // Require five seconds before setting 0 power
       this->power = 0;
     }
   }
@@ -109,7 +109,7 @@ void CyclePowerData::decode(uint8_t *data, size_t length) {
       }
     } else {
       unsigned long currentTime = getTimeMillis();
-      if (currentTime - lastCadUpdateTime > 5000) {  // Require five seconds before setting 0 cadence
+      if (currentTime - lastCadUpdateTime > 2500) {  // Require five seconds before setting 0 cadence
         this->cadence = 0;
       }
     }

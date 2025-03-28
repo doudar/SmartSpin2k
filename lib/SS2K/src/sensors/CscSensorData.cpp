@@ -82,7 +82,7 @@ void CscSensorData::decode(uint8_t *data, size_t length) {
       // Handle timer wraparound (16-bit timer)
       uint16_t timeDiff = (crankEventTime >= lastCrankEventTime) ?
                          (crankEventTime - lastCrankEventTime) :
-                         (65535 - lastCrankEventTime + crankEventTime);
+                         (UINT16_MAX - lastCrankEventTime + crankEventTime);
       
       if (timeDiff > 0) {
         // Time is in 1/1024th of a second
@@ -101,7 +101,7 @@ void CscSensorData::decode(uint8_t *data, size_t length) {
         }
       } else {
         unsigned long currentTime = getTimeMillis();
-        if (currentTime - lastUpdateTime > 5000) {  // Require five seconds before setting 0 cadence
+        if (currentTime - lastUpdateTime > 2500) {  // Require five seconds before setting 0 cadence
           this->cadence = 0;
         }
       }
