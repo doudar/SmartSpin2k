@@ -20,7 +20,6 @@ class ErgMode {
   void runERG();
   void computeErg();
   void computeResistance();
-  void _writeLogHeader();
   void _writeLog(float currentIncline, float newIncline, int currentSetPoint, int newSetPoint, int currentWatts, int newWatts, int currentCadence, int newCadence);
 
  private:

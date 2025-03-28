@@ -193,7 +193,6 @@ class SpinBLEClient {
   boolean doScan                 = false;
   bool dontBlockScan             = true;
   int intentionalDisconnect      = 0;
-  int noReadingIn                = 0;
   long int cscCumulativeCrankRev = 0;
   double cscLastCrankEvtTime     = 0.0;
   long int cscCumulativeWheelRev = 0;
