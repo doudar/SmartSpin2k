@@ -361,3 +361,6 @@ const char* const DEFAULT_PASSWORD = "password";
 // UNcomment to enable Custom Characteristic Logging
 // #define CUSTOM_CHAR_DEBUG
 
+// Uncomment to enable DirCon message logging to serial monitor (not logger)
+#define DEBUG_DIRCON_MESSAGES
+

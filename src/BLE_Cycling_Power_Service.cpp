@@ -62,11 +62,19 @@ void BLE_Cycling_Power_Service::update() {
 
   cyclingPowerMeasurementCharacteristic->setValue(&byteArray[0], byteArray.size());
   cyclingPowerMeasurementCharacteristic->notify();
+  
+  // Also notify DirCon TCP clients
+  DirConManager::notifyCharacteristic(
+    NimBLEUUID(CYCLINGPOWERSERVICE_UUID),
+    cyclingPowerMeasurementCharacteristic->getUUID(),
+    &byteArray[0],
+    byteArray.size()
+  );
 
   const int kLogBufCapacity = 150;
   char logBuf[kLogBufCapacity];
   const size_t byteArrayLength = byteArray.size();
 
   logCharacteristic(logBuf, kLogBufCapacity, &byteArray[0], byteArrayLength, CYCLINGPOWERSERVICE_UUID, cyclingPowerMeasurementCharacteristic->getUUID(),
-                    "CPS(CPM)[ CD(%.2f) PW(%d) ]", cadence > 0 ? fmodf(cadence, 1000.0) : 0, power % 10000);
+                   "CPS(CPM)[ CD(%.2f) PW(%d) ]", cadence > 0 ? fmodf(cadence, 1000.0) : 0, power % 10000);
 }

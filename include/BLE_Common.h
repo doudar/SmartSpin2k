@@ -17,6 +17,7 @@
 #include "Main.h"
 #include "BLE_Definitions.h"
 #include "BLE_Wattbike_Service.h"
+#include "BLE_SB20_Service.h"
 #include "Constants.h"
 
 //Client size allocated to the queue for receiving characteristic data

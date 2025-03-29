@@ -157,6 +157,14 @@ void setup() {
 
   ss2k->startTasks();
   httpServer.start();
+  
+  // Start DirCon TCP server for direct control over the bike trainer
+  SS2K_LOG(MAIN_LOG_TAG, "Starting DirCon TCP service");
+  if (DirConManager::start()) {
+    SS2K_LOG(MAIN_LOG_TAG, "DirCon TCP service started successfully");
+  } else {
+    SS2K_LOG(MAIN_LOG_TAG, "Failed to start DirCon TCP service");
+  }
 
   ss2k->resetIfShiftersHeld();
   SS2K_LOG(MAIN_LOG_TAG, "Creating Shifter Interrupts");

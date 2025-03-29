@@ -8,20 +8,17 @@
 #include "Main.h"
 #include "SS2KLog.h"
 #include "BLE_Common.h"
+#include <ArduinoJson.h>
+#include <Constants.h>
+#include <NimBLEDevice.h>
+#include <cmath>
+#include <limits>
 #include "BLE_Cycling_Speed_Cadence.h"
 #include "BLE_Cycling_Power_Service.h"
 #include "BLE_Heart_Service.h"
 #include "BLE_Fitness_Machine_Service.h"
 #include "BLE_Custom_Characteristic.h"
 #include "BLE_Device_Information_Service.h"
-#include "BLE_Wattbike_Service.h"
-#include "BLE_SB20_Service.h"
-
-#include <ArduinoJson.h>
-#include <Constants.h>
-#include <NimBLEDevice.h>
-#include <cmath>
-#include <limits>
 
 // BLE Server Settings
 SpinBLEServer spinBLEServer;

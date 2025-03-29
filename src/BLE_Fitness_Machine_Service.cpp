@@ -110,6 +110,9 @@ void BLE_Fitness_Machine_Service::update() {
 
   fitnessMachineIndoorBikeData->notify(ftmsIndoorBikeData.data(), ftmsIndoorBikeData.size());
 
+  // Also notify DirCon TCP clients about Indoor Bike Data
+  DirConManager::notifyCharacteristic(NimBLEUUID(FITNESSMACHINESERVICE_UUID), fitnessMachineIndoorBikeData->getUUID(), ftmsIndoorBikeData.data(), ftmsIndoorBikeData.size());
+
   const int kLogBufCapacity = 200;  // Data(30), Sep(data/2), Arrow(3), CharId(37), Sep(3), CharId(37), Sep(3), Name(10), Prefix(2), HR(7), SEP(1), CD(10), SEP(1), PW(8),
                                     // SEP(1), SD(7), Suffix(2), Nul(1), rounded up
   char logBuf[kLogBufCapacity];
@@ -285,6 +288,9 @@ void BLE_Fitness_Machine_Service::processFTMSWrite() {
     fitnessMachineControlPoint->indicate(returnValue.data(), returnValue.size());
     fitnessMachineTrainingStatus->notify(ftmsTrainingStatus.data(), ftmsTrainingStatus.size());
     fitnessMachineStatusCharacteristic->notify(ftmsStatus.data(), ftmsStatus.size());
+
+    // Also notify DirCon TCP clients
+    DirConManager::notifyCharacteristic(NimBLEUUID(FITNESSMACHINESERVICE_UUID), fitnessMachineControlPoint->getUUID(), returnValue.data(), returnValue.size());
   }
 }
 
