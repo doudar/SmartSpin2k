@@ -53,7 +53,7 @@ void BLE_Cycling_Speed_Cadence::update() {
   auto byteArray = csc.toByteArray();
 
   cscMeasurement->setValue(&byteArray[0], byteArray.size());
-  cscMeasurement->notify();
+  spinBLEServer.notifyBLE(cscMeasurement, spinBLEServer.clientSubscribed.CyclingSpeedCadence);
 
   const int kLogBufCapacity = 150;
   char logBuf[kLogBufCapacity];

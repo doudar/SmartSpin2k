@@ -36,9 +36,7 @@ void BLE_Cycling_Power_Service::setupService(NimBLEServer *pServer, MyCharacteri
 }
 
 void BLE_Cycling_Power_Service::update() {
-  /*if (!spinBLEServer.clientSubscribed.CyclingPowerMeasurement) {
-    return;
-  }*/
+
   int power     = rtConfig->watts.getValue();
   float cadence = rtConfig->cad.getValue();
 
@@ -61,7 +59,7 @@ void BLE_Cycling_Power_Service::update() {
   auto byteArray = cpm.toByteArray();
 
   cyclingPowerMeasurementCharacteristic->setValue(&byteArray[0], byteArray.size());
-  cyclingPowerMeasurementCharacteristic->notify();
+  spinBLEServer.notifyBLE(cyclingPowerMeasurementCharacteristic, spinBLEServer.clientSubscribed.CyclingPowerMeasurement);
   
   // Also notify DirCon TCP clients
   DirConManager::notifyCharacteristic(

@@ -309,7 +309,6 @@ bool DirConManager::processDirConMessage(DirConMessage* message, size_t clientIn
       std::vector<NimBLEUUID> services = getAvailableServices();
       for (NimBLEUUID& service : services) {
         // Add each service UUID to the response
-        Serial.printf("Telling client %s is availiable", service.toString().c_str());
         response.AdditionalUUIDs.push_back(service);
       }
 

@@ -312,7 +312,7 @@ void SS2K::maintenanceLoop(void *pvParameters) {
 
 #ifdef DEBUG_STACK
       Serial.printf("Main Task: %d \n", uxTaskGetStackHighWaterMark(maintenanceLoopTask));
-      Serial.printf("Free Heap: %d \n", ESP.getFreeHeap());
+      Serial.printf("Min  Heap: %d \n", esp_get_minimum_free_heap_size());
       Serial.printf("Best Blok: %d \n", heap_caps_get_largest_free_block(MALLOC_CAP_8BIT));
 #endif  // DEBUG_STACK
 
