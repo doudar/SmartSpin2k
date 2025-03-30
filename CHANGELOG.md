@@ -23,7 +23,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 - Multiple html and css improvements. 
-- 
+- Lookup uses existing interpolate and extrapolate functions. 
 ### Hardware
 
 
@@ -32,7 +32,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Added
 
 ### Changed
--PID loop for ERG mode instead of P loop.
+- PID loop for ERG mode instead of P loop.
 - Fixed flags in CPS and CSC which were causing issues in GTA Bike. Thanks @matthewsshirley !
 
 ### Hardware
