@@ -58,8 +58,7 @@ void BLE_Cycling_Power_Service::update() {
 
   auto byteArray = cpm.toByteArray();
 
-  cyclingPowerMeasurementCharacteristic->setValue(&byteArray[0], byteArray.size());
-  spinBLEServer.notifyBLE(cyclingPowerMeasurementCharacteristic, spinBLEServer.clientSubscribed.CyclingPowerMeasurement);
+  cyclingPowerMeasurementCharacteristic->notify(&byteArray[0], byteArray.size());
   
   // Also notify DirCon TCP clients
   DirConManager::notifyCharacteristic(

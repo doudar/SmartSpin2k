@@ -202,33 +202,16 @@ void MyCharacteristicCallbacks::onSubscribe(NimBLECharacteristic* pCharacteristi
   str += connInfo.getAddress().toString().c_str();
   if (subValue == 0) {
     str += " Unsubscribed to ";
-    spinBLEServer.setClientSubscribed(pUUID, false);
   } else if (subValue == 1) {
     str += " Subscribed to notifications for ";
-    spinBLEServer.setClientSubscribed(pUUID, true);
   } else if (subValue == 2) {
     str += " Subscribed to indications for ";
-    spinBLEServer.setClientSubscribed(pUUID, true);
   } else if (subValue == 3) {
     str += " Subscribed to notifications and indications for ";
-    spinBLEServer.setClientSubscribed(pUUID, true);
   }
   str += std::string(pCharacteristic->getUUID()).c_str();
 
   SS2K_LOG(BLE_SERVER_LOG_TAG, "%s", str.c_str());
-}
-
-// This might be worth depreciating. With multiple clients connected (SS2k App, + Training App), it at least needs to be an int, not a bool.
-void SpinBLEServer::setClientSubscribed(NimBLEUUID pUUID, bool subscribe) {
-  if (pUUID == HEARTCHARACTERISTIC_UUID) {
-    spinBLEServer.clientSubscribed.Heartrate = subscribe;
-  } else if (pUUID == CYCLINGPOWERMEASUREMENT_UUID) {
-    spinBLEServer.clientSubscribed.CyclingPowerMeasurement = subscribe;
-  } else if (pUUID == FITNESSMACHINEINDOORBIKEDATA_UUID) {
-    spinBLEServer.clientSubscribed.IndoorBikeData = subscribe;
-  } else if (pUUID == CSCMEASUREMENT_UUID) {
-    spinBLEServer.clientSubscribed.CyclingSpeedCadence = subscribe;
-  }
 }
 
 // Return number of clients connected to our server.

@@ -86,27 +86,13 @@ class SpinBLEServer {
   // Helper Function to clean up the BLE Services
 
  public:
-  struct {
-    bool Heartrate : 1;
-    bool CyclingPowerMeasurement : 1;
-    bool IndoorBikeData : 1;
-    bool CyclingSpeedCadence : 1;
-  } clientSubscribed;
   int spinDownFlag      = 0;
   NimBLEServer* pServer = nullptr;
-  void setClientSubscribed(NimBLEUUID pUUID, bool subscribe);
   void notifyShift();
   double calculateSpeed();
   void update();
   // Queue to store writes to any of the callbacks to the server
   std::queue<std::string> writeCache;
-  SpinBLEServer() { memset(&clientSubscribed, 0, sizeof(clientSubscribed)); }
-  //Helper function to check subscription first
-  void notifyBLE(NimBLECharacteristic* pChar, bool isSubscribed) {
-    if (isSubscribed) {
-      pChar->notify();
-    }
-  }
 };
 
 class MyCharacteristicCallbacks : public NimBLECharacteristicCallbacks {

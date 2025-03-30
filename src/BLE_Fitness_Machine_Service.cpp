@@ -108,8 +108,8 @@ void BLE_Fitness_Machine_Service::update() {
     ftmsIndoorBikeData.push_back(static_cast<uint8_t>(rtConfig->hr.getValue()));
   }
 
-  fitnessMachineIndoorBikeData->setValue(ftmsIndoorBikeData.data(), ftmsIndoorBikeData.size());
-  spinBLEServer.notifyBLE(fitnessMachineIndoorBikeData, spinBLEServer.clientSubscribed.IndoorBikeData);
+  fitnessMachineIndoorBikeData->notify(ftmsIndoorBikeData.data(), ftmsIndoorBikeData.size());
+
 
   // Also notify DirCon TCP clients about Indoor Bike Data
   DirConManager::notifyCharacteristic(NimBLEUUID(FITNESSMACHINESERVICE_UUID), fitnessMachineIndoorBikeData->getUUID(), ftmsIndoorBikeData.data(), ftmsIndoorBikeData.size());
@@ -298,8 +298,7 @@ void BLE_Fitness_Machine_Service::processFTMSWrite() {
 
 bool BLE_Fitness_Machine_Service::spinDown(uint8_t response) {
   uint8_t spinStatus[2] = {FitnessMachineStatus::SpinDownStatus, response};
-  fitnessMachineStatusCharacteristic->setValue(spinStatus, 2);
-  fitnessMachineStatusCharacteristic->notify();
+  fitnessMachineStatusCharacteristic->notify(spinStatus, 2);
   /*std::string rxValue = fitnessMachineStatusCharacteristic->getValue();
   if (rxValue[0] != 0x14) {
    return false;
