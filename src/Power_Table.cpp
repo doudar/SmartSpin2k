@@ -138,135 +138,117 @@ void PowerTable::setStepperMinMax() {
 }
 
 int32_t PowerTable::lookup(int watts, int cad) {
-  int cadIndex  = round(((float)cad - (float)MINIMUM_TABLE_CAD) / (float)POWERTABLE_CAD_INCREMENT);
+  
+  int cadIndex = round(((float)cad - (float)MINIMUM_TABLE_CAD) / (float)POWERTABLE_CAD_INCREMENT);
   int wattIndex = round((float)watts / (float)POWERTABLE_WATT_INCREMENT);
 
   // If request is outside table limits, perform linear extrapolation
   if (cad < MINIMUM_TABLE_CAD || cad > (MINIMUM_TABLE_CAD + (POWERTABLE_CAD_SIZE - 1) * POWERTABLE_CAD_INCREMENT) ||
       watts > (POWERTABLE_WATT_SIZE - 1) * POWERTABLE_WATT_INCREMENT) {
-    // Perform linear extrapolation based on existing data
-    int extrapolatedValue = INT16_MIN;
 
-    // Extrapolation for cadence out of bounds
-    if (cad < MINIMUM_TABLE_CAD || cad > (MINIMUM_TABLE_CAD + (POWERTABLE_CAD_SIZE - 1) * POWERTABLE_CAD_INCREMENT)) {
-      int extrapRow1 = -1, extrapRow2 = -1;
-      for (int i = 0; i < POWERTABLE_CAD_SIZE; ++i) {
-        if (this->tableRow[i].tableEntry[wattIndex].targetPosition != INT16_MIN) {
-          extrapRow1 = i;
-          break;
-        }
-      }
-      for (int i = POWERTABLE_CAD_SIZE - 1; i >= 0; --i) {
-        if (this->tableRow[i].tableEntry[wattIndex].targetPosition != INT16_MIN) {
-          extrapRow2 = i;
-          break;
-        }
-      }
-      if (extrapRow1 != -1 && extrapRow2 != -1) {
-        int cad1 = extrapRow1 * POWERTABLE_CAD_INCREMENT + MINIMUM_TABLE_CAD;
-        int cad2 = extrapRow2 * POWERTABLE_CAD_INCREMENT + MINIMUM_TABLE_CAD;
-        int val1 = this->tableRow[extrapRow1].tableEntry[wattIndex].targetPosition;
-        int val2 = this->tableRow[extrapRow2].tableEntry[wattIndex].targetPosition;
-        // divide by 0 safety for if cad2 = cad1
-        if (cad2 == cad1) {
-          SS2K_LOG(POWERTABLE_LOG_TAG, "Extrapolate cadence lines were the same");
-          return INT32_MIN;
-        }
-        extrapolatedValue = val1 + (val2 - val1) * (cad - cad1) / (cad2 - cad1);
-        SS2K_LOG(POWERTABLE_LOG_TAG, "Lookup Extrapolated %d from %d, %d, for %dw %dcad", extrapolatedValue, val2, val1, watts, cad);
-        return extrapolatedValue * TABLE_DIVISOR;
-      }
-    }
+      int extrapolatedValue = INT32_MIN;
 
-    // Extrapolation for watts out of bounds
-    if (watts > (POWERTABLE_WATT_SIZE - 1) * POWERTABLE_WATT_INCREMENT) {
-      int extrapCol1 = -1, extrapCol2 = -1;
-      for (int j = POWERTABLE_WATT_SIZE - 1; j >= 0; j--) {
-        if (this->tableRow[cadIndex].tableEntry[j].targetPosition != INT16_MIN) {
-          if (extrapCol2 == -1) {
-            extrapCol2 = j;
-          } else {
-            extrapCol1 = j;
-            break;
+      // Cadence extrapolation
+      if (cad < MINIMUM_TABLE_CAD || cad > (MINIMUM_TABLE_CAD + (POWERTABLE_CAD_SIZE - 1) * POWERTABLE_CAD_INCREMENT)) {
+          std::vector<float> cadValue; // cadence value
+          std::vector<float> positionValue; // target position value 
+
+          for (int i = 0; i < POWERTABLE_CAD_SIZE; ++i) {
+              if (this->tableRow[i].tableEntry[wattIndex].targetPosition != INT16_MIN) {
+                  cadValue.push_back(static_cast<float>(i * POWERTABLE_CAD_INCREMENT + MINIMUM_TABLE_CAD)); 
+                  positionValue.push_back(static_cast<float>(this->tableRow[i].tableEntry[wattIndex].targetPosition)); 
+              }
           }
-        }
+
+          if (cadValue.size() >= 2) {
+              extrapolatedValue = static_cast<int>(linearExtrapolate(cadValue.data(), positionValue.data(), cadValue.size(), static_cast<float>(cad))); 
+              SS2K_LOG(POWERTABLE_LOG_TAG, "Lookup Extrapolated (Cadence) (%d) for (%dw) (%dcad)", extrapolatedValue, watts, cad);
+              return extrapolatedValue * TABLE_DIVISOR;
+          } else {
+              SS2K_LOG(POWERTABLE_LOG_TAG, "Not enough data to extrapolate cadence for (%dw) (%dcad)", watts, cad);
+          }
       }
-      if (extrapCol1 != -1 && extrapCol2 != -1) {
-        int watts1 = extrapCol1 * POWERTABLE_WATT_INCREMENT;
-        int watts2 = extrapCol2 * POWERTABLE_WATT_INCREMENT;
-        int val1   = this->tableRow[cadIndex].tableEntry[extrapCol1].targetPosition;
-        int val2   = this->tableRow[cadIndex].tableEntry[extrapCol2].targetPosition;
-        // divide by 0 safety for if cad2 = cad1
-        if (watts2 == watts1) {
-          SS2K_LOG(POWERTABLE_LOG_TAG, "Extrapolate watts were the same");
-          return INT32_MIN;
-        }
-        extrapolatedValue = val1 + (val2 - val1) * (watts - watts1) / (watts2 - watts1);
-        SS2K_LOG(POWERTABLE_LOG_TAG, "Lookup Extrapolated %d from %d, %d, for %dw %dcad", extrapolatedValue, val2, val1, watts, cad);
-        return extrapolatedValue * TABLE_DIVISOR;
+
+      // Watt extrapolation 
+      if (watts > (POWERTABLE_WATT_SIZE - 1) * POWERTABLE_WATT_INCREMENT) {
+          std::vector<float> wattValue; // watt value
+          std::vector<float> positionValue; // target position value
+
+          if (cadIndex >= 0 && cadIndex < POWERTABLE_CAD_SIZE) {
+              for (int j = 0; j < POWERTABLE_WATT_SIZE; ++j) {
+                  if (this->tableRow[cadIndex].tableEntry[j].targetPosition != INT16_MIN) {
+                    wattValue.push_back(static_cast<float>(j * POWERTABLE_WATT_INCREMENT)); 
+                      positionValue.push_back(static_cast<float>(this->tableRow[cadIndex].tableEntry[j].targetPosition));
+                  }
+              }
+
+              if (wattValue.size() >= 2) {
+                  extrapolatedValue = static_cast<int>(linearExtrapolate(wattValue.data(), positionValue.data(), wattValue.size(), static_cast<float>(watts))); // watts as float
+                  SS2K_LOG(POWERTABLE_LOG_TAG, "Lookup Extrapolated (Watts) (%d) for (%dw) (%dcad)", extrapolatedValue, watts, cad);
+                  return extrapolatedValue * TABLE_DIVISOR;
+              } else {
+                  SS2K_LOG(POWERTABLE_LOG_TAG, "Not enough data to extrapolate watts for (%dw) (%dcad)", watts, cad);
+              }
+          } else {
+              SS2K_LOG(POWERTABLE_LOG_TAG, "Cadence index out of bounds for watt extrapolation at (%dw) (%dcad)", watts, cad);
+          }
       }
-    }
-    // Not enough data.
-    return INT32_MIN;
+
+      return INT32_MIN; // Not enough data for extrapolation
   }
 
-  // Edge cases out of the way, we should be able to interpolate.
+  // **Interpolation using Nearest Neighbors**
   TestResults neighbors = testNeighbors(cadIndex, wattIndex, INT16_MIN);
-  double x1             = neighbors.leftNeighbor.j * POWERTABLE_WATT_INCREMENT;
-  double x2             = neighbors.rightNeighbor.j * POWERTABLE_WATT_INCREMENT;
-  double y1             = neighbors.topNeighbor.i * POWERTABLE_CAD_INCREMENT + MINIMUM_TABLE_CAD;
-  double y2             = neighbors.bottomNeighbor.i * POWERTABLE_CAD_INCREMENT + MINIMUM_TABLE_CAD;
 
-  double Q11 = neighbors.leftNeighbor.targetPosition;
-  double Q12 = neighbors.rightNeighbor.targetPosition;
-  double Q21 = neighbors.topNeighbor.targetPosition;
-  double Q22 = neighbors.bottomNeighbor.targetPosition;
-
-  double R1 = INT16_MIN;
-  double R2 = INT16_MIN;
-  double R3 = INT16_MIN;
-
-  SS2K_LOG(POWERTABLE_LOG_TAG, "Lookup debug %.0f X1 %.0f X2 %.0f Y1 %.0f Y2 %.0f", x1, x2, y1, y2);
+  float xWatt[2];
+  float yWatt[2];
 
   if (neighbors.leftNeighbor.found && neighbors.rightNeighbor.found) {
-    // Watt result
-    R1 = Q11 + (((watts - x1) / (x2 - x1)) * (Q12 - Q11));
-    SS2K_LOG(POWERTABLE_LOG_TAG, "Lookup used neighbors L %.0f R %.0f R1 %.0f", Q11, Q12, R1);
+      xWatt[0] = static_cast<float>(neighbors.leftNeighbor.j * POWERTABLE_WATT_INCREMENT); // Watts as float
+      xWatt[1] = static_cast<float>(neighbors.rightNeighbor.j * POWERTABLE_WATT_INCREMENT); // Watts as float
+      yWatt[0] = static_cast<float>(neighbors.leftNeighbor.targetPosition); // targetPosition as float
+      yWatt[1] = static_cast<float>(neighbors.rightNeighbor.targetPosition); // targetPosition as float
+  } else {
+      xWatt[0] = xWatt[1] = 0.0f; // Dummy values
+      yWatt[0] = yWatt[1] = INT16_MIN; // Indicate not found
   }
+
+  float R1 = (neighbors.leftNeighbor.found && neighbors.rightNeighbor.found)
+             ? linearInterpolate(xWatt, yWatt, 2, static_cast<float>(watts)) // watts as float
+             : INT16_MIN;
+
+  float xCad[2];
+  float yCad[2];
+
   if (neighbors.topNeighbor.found && neighbors.bottomNeighbor.found) {
-    // CAD result
-    R2 = Q21 + (((cad - y1) / (y2 - y1)) * (Q22 - Q21));
-    SS2K_LOG(POWERTABLE_LOG_TAG, "Lookup used neighbors U %.0f D %.0f R2 %.0f", Q21, Q22, R2);
-  }
-  // Do we have a position at this entry?
-  if (this->tableRow[cadIndex].tableEntry[wattIndex].targetPosition != INT16_MIN) {
-    R3 = this->tableRow[cadIndex].tableEntry[wattIndex].targetPosition;
-    SS2K_LOG(POWERTABLE_LOG_TAG, "Lookup used actual %d R3 %.0f", this->tableRow[cadIndex].tableEntry[wattIndex].targetPosition, R3);
+      xCad[0] = static_cast<float>(neighbors.topNeighbor.i * POWERTABLE_CAD_INCREMENT + MINIMUM_TABLE_CAD); // Cadence as float
+      xCad[1] = static_cast<float>(neighbors.bottomNeighbor.i * POWERTABLE_CAD_INCREMENT + MINIMUM_TABLE_CAD); // Cadence as float
+      yCad[0] = static_cast<float>(neighbors.topNeighbor.targetPosition); // targetPosition as float
+      yCad[1] = static_cast<float>(neighbors.bottomNeighbor.targetPosition); // targetPosition as float
+  } else {
+      xCad[0] = xCad[1] = 0.0f; // Dummy values
+      yCad[0] = yCad[1] = INT16_MIN; // Indicate not found
   }
 
-  int sum   = 0;
+  float R2 = (neighbors.topNeighbor.found && neighbors.bottomNeighbor.found)
+             ? linearInterpolate(xCad, yCad, 2, static_cast<float>(cad)) // cad as float
+             : INT16_MIN;
+
+  float R3 = (cadIndex >= 0 && cadIndex < POWERTABLE_CAD_SIZE && wattIndex >= 0 && wattIndex < POWERTABLE_WATT_SIZE &&
+              this->tableRow[cadIndex].tableEntry[wattIndex].targetPosition != INT16_MIN)
+             ? static_cast<float>(this->tableRow[cadIndex].tableEntry[wattIndex].targetPosition) // Direct value as float
+             : INT16_MIN;
+
+  float sum = 0;
   int count = 0;
+  if (R1 != INT16_MIN) sum += R1, count++;
+  if (R2 != INT16_MIN) sum += R2, count++;
+  if (R3 != INT16_MIN) sum += R3, count++;
 
-  if (R1 != INT16_MIN) {
-    sum += R1;
-    count++;
-  }
-  if (R2 != INT16_MIN) {
-    sum += R2;
-    count++;
-  }
-  if (R3 != INT16_MIN) {
-    sum += R3;
-    count++;
-  }
+  if (count == 0) return INT16_MIN;
 
-  if (count == 0) {
-    // Handle the case where all values are invalid.
-    return INT16_MIN;
-  }
-
-  int ret = (sum / count) * TABLE_DIVISOR;
-  SS2K_LOG(POWERTABLE_LOG_TAG, "Lookup result: %dw %dcad %d", watts, cad, ret);
+  int ret = static_cast<int>(round(sum / count)) * TABLE_DIVISOR;
+  SS2K_LOG(POWERTABLE_LOG_TAG, "Lookup result: (%dw) (%dcad) (%d) (R1:%.2f, R2:%.2f, R3:%.2f)", watts, cad, ret, R1, R2, R3);
   return ret;
 }
 
@@ -1539,7 +1521,7 @@ int32_t PowerTable::lookupWatts(int cad, int32_t targetPosition) {
     return 0;
   }
   // Convert targetPosition from external format (xTABLE_DIVISOR) to internal format
-  int16_t internalPosition = targetPosition / TABLE_DIVISOR;
+  float internalPosition = targetPosition / TABLE_DIVISOR;
 
   // Calculate cadence index
   int cadIndex = round(((float)cad - (float)MINIMUM_TABLE_CAD) / (float)POWERTABLE_CAD_INCREMENT);
@@ -1552,72 +1534,33 @@ int32_t PowerTable::lookupWatts(int cad, int32_t targetPosition) {
   }
 
   // Find closest positions and corresponding watts in the row
-  int leftWattIndex  = -1;
-  int rightWattIndex = -1;
+  std::vector<float> wattValue;
+  std::vector<float> positionValue;
 
-  // Search for closest positions
   for (int j = 0; j < POWERTABLE_WATT_SIZE; j++) {
     if (this->tableRow[cadIndex].tableEntry[j].targetPosition != INT16_MIN) {
-      if (this->tableRow[cadIndex].tableEntry[j].targetPosition <= internalPosition) {
-        leftWattIndex = j;
-      } else {
-        rightWattIndex = j;
-        break;
-      }
+      wattValue.push_back(static_cast<float>(j * POWERTABLE_WATT_INCREMENT));
+      positionValue.push_back(static_cast<float>(this->tableRow[cadIndex].tableEntry[j].targetPosition));
     }
   }
 
-  // If we found valid positions on both sides, interpolate
-  if (leftWattIndex != -1 && rightWattIndex != -1) {
-    int leftPos    = this->tableRow[cadIndex].tableEntry[leftWattIndex].targetPosition;
-    int rightPos   = this->tableRow[cadIndex].tableEntry[rightWattIndex].targetPosition;
-    int leftWatts  = leftWattIndex * POWERTABLE_WATT_INCREMENT;
-    int rightWatts = rightWattIndex * POWERTABLE_WATT_INCREMENT;
-    // Divide by 0 safety
-    if (rightPos == leftPos) {
-      return leftWatts;
-    }
-    // Linear interpolation
-    int watts = leftWatts + (rightWatts - leftWatts) * (internalPosition - leftPos) / (rightPos - leftPos);
-    SS2K_LOG(POWERTABLE_LOG_TAG, "LookupWatts interpolated %dw from pos %d, cad %d", watts, targetPosition, cad);
-    return watts;
+  if (wattValue.size() < 2) {
+    SS2K_LOG(POWERTABLE_LOG_TAG, "LookupWatts failed - not enough data for cad %d", cad);
+    return RETURN_ERROR;
   }
 
-  // If we only found positions on one side, extrapolate
-  if (leftWattIndex != -1 && leftWattIndex > 0) {
-    // Extrapolate using two leftmost points
-    int pos1   = this->tableRow[cadIndex].tableEntry[leftWattIndex - 1].targetPosition;
-    int pos2   = this->tableRow[cadIndex].tableEntry[leftWattIndex].targetPosition;
-    int watts1 = (leftWattIndex - 1) * POWERTABLE_WATT_INCREMENT;
-    int watts2 = leftWattIndex * POWERTABLE_WATT_INCREMENT;
-
-    // divide by zero safety for pos1 == pos2
-    if (pos1 == pos2) {
-      return watts2;
-    }
-
-    int watts = watts2 + (watts2 - watts1) * (internalPosition - pos2) / (pos2 - pos1);
-    SS2K_LOG(POWERTABLE_LOG_TAG, "LookupWatts extrapolated high %dw from pos %d, cad %d", watts, targetPosition, cad);
-    return watts;
+  float result;
+  if (internalPosition < positionValue.front()) {
+    result = linearExtrapolate(wattValue.data(), positionValue.data(), wattValue.size(), static_cast<float>(internalPosition));
+  } else if (internalPosition > positionValue.back()) {
+    result = linearExtrapolate(wattValue.data(), positionValue.data(), wattValue.size(), static_cast<float>(internalPosition));
+  } else {
+    result = linearInterpolate(wattValue.data(), positionValue.data(), wattValue.size(), static_cast<float>(internalPosition));
   }
 
-  if (rightWattIndex != -1 && rightWattIndex < POWERTABLE_WATT_SIZE - 1) {
-    // Extrapolate using two rightmost points
-    int pos1   = this->tableRow[cadIndex].tableEntry[rightWattIndex].targetPosition;
-    int pos2   = this->tableRow[cadIndex].tableEntry[rightWattIndex + 1].targetPosition;
-    int watts1 = rightWattIndex * POWERTABLE_WATT_INCREMENT;
-    int watts2 = (rightWattIndex + 1) * POWERTABLE_WATT_INCREMENT;
-
-    // divide by zero safety for pos1 == pos2
-    if (pos1 == pos2) {
-      return watts2;
-    }
-    int watts = watts1 + (watts1 - watts2) * (pos1 - internalPosition) / (pos1 - pos2);
-    SS2K_LOG(POWERTABLE_LOG_TAG, "LookupWatts extrapolated low %dw from pos %d, cad %d", watts, targetPosition, cad);
-    return watts;
-  }
-  SS2K_LOG(POWERTABLE_LOG_TAG, "LookupWatts failed to find a value for pos %d, cad %d", targetPosition, cad);
-  return RETURN_ERROR;
+  int watts = static_cast<int>(result);
+  SS2K_LOG(POWERTABLE_LOG_TAG, "LookupWatts computed %dw from pos %d, cad %d", watts, targetPosition, cad);
+  return watts;
 }
 
 // Reset the PowerTable to 0;
