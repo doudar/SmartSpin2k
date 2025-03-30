@@ -281,7 +281,7 @@ const char* const DEFAULT_PASSWORD = "password";
 #define POWERTABLE_CAD_INCREMENT 5
 
 // Number of similar power samples to take before writing to the Power Table
-#define POWER_SAMPLES 5
+#define POWER_SAMPLES 10
 
 // Max downvotes that a neighbor can have
 #define MAX_NEIGHBOR_WEIGHT 2 * POWER_SAMPLES
@@ -346,14 +346,14 @@ const char* const DEFAULT_PASSWORD = "password";
 #define BLE_CLIENT_STACK 6000
 
 // Uncomment to enable stack size debugging info
-//#define DEBUG_STACK
+#define DEBUG_STACK
 
 // Uncomment to enable HR->PWR debugging info. Always displays HR->PWR
 // Calculation. Never sets userConfig->setSimulatedPower();
 // #define DEBUG_HR_TO_PWR
 
 // Uncomment to enable power table logging.
-#define DEBUG_POWERTABLE
+// #define DEBUG_POWERTABLE
 
 // Uncomment to enable BLE_TX_RX Logging
 // #define DEBUG_BLE_TX_RX
@@ -362,5 +362,5 @@ const char* const DEFAULT_PASSWORD = "password";
 // #define CUSTOM_CHAR_DEBUG
 
 // Uncomment to enable DirCon message logging to serial monitor (not logger)
-#define DEBUG_DIRCON_MESSAGES
+// #define DEBUG_DIRCON_MESSAGES
 

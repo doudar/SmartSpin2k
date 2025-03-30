@@ -55,6 +55,8 @@ public:
     // Parse received message data
     size_t parse(uint8_t* data, size_t len, uint8_t sequenceNumber);
 
+    static void printVectorBytesToSerial(const std::vector<uint8_t>& data, bool isIncoming);
+
 private:
     bool isRequest(int last_seq_number);
     std::vector<uint8_t> encodedMessage;

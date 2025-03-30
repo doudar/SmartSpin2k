@@ -30,7 +30,7 @@ void printRawBytesToSerial(const uint8_t* data, size_t length, bool isIncoming) 
   Serial.println();
 }
 
-void printVectorBytesToSerial(const std::vector<uint8_t>& data, bool isIncoming) {
+void DirConMessage::printVectorBytesToSerial(const std::vector<uint8_t>& data, bool isIncoming) {
   if (data.size() > 0) {
     printRawBytesToSerial(data.data(), data.size(), isIncoming);
   }
@@ -40,18 +40,7 @@ void printVectorBytesToSerial(const std::vector<uint8_t>& data, bool isIncoming)
 // Helper functions for UUID conversion - matching the expected DirCon protocol format
 void uuidToBytes(NimBLEUUID& uuid, std::vector<uint8_t>& message) {
   // Log the UUID being processed for debugging
-  SS2K_LOG(DIRCON_LOG_TAG, "Processing UUID: %s", uuid.toString().c_str());
-
-  // UUID validation
-  //if (uuid.equals(NimBLEUUID()) || uuid.toString() == "00000000-0000-0000-0000-000000000000") {
-   // SS2K_LOG(DIRCON_LOG_TAG, "Invalid UUID, using zeros");
-   // for (size_t i = 0; i < 16; i++) {
-   //   message.push_back(0);
-   // }
-  //  return;
- // }
-
-  // Convert UUID to 128-bit format
+  //SS2K_LOG(DIRCON_LOG_TAG, "Processing UUID: %s", uuid.toString().c_str());
 
   uint8_t *uuidBytes = (uint8_t*)uuid.to128().getBase();
 
@@ -67,7 +56,7 @@ NimBLEUUID bytesToUuid(uint8_t* data, size_t offset) {
   NimBLEUUID uUidOut(ptr, 16);
   NimBLEUUID reversed = uUidOut.reverseByteOrder();
 
-  SS2K_LOG(DIRCON_LOG_TAG, "Derived UUID: %s", reversed.toString().c_str());
+  //SS2K_LOG(DIRCON_LOG_TAG, "Derived UUID: %s", reversed.toString().c_str());
 
   return reversed;
 }
@@ -164,14 +153,6 @@ std::vector<uint8_t>* DirConMessage::encode(uint8_t sequenceNumber) {
       }
     }
   }
-
-#ifdef DEBUG_DIRCON_MESSAGES
-  // Print the outgoing raw message bytes to serial
-  if (this->Identifier != DIRCON_MSGID_ERROR) {
-    printVectorBytesToSerial(this->encodedMessage, false);
-  }
-#endif
-
   return &(this->encodedMessage);
 }
 
