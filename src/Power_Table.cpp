@@ -395,69 +395,93 @@ float PowerTable::linearExtrapolate(const float* x, const float* y, size_t n, fl
   return y0 + slope * (j - x0);
 }
 
-  void CubicSpline::set_points(const float* x_vals, const float* y_vals, size_t n, bool natural = true) {
-          if (n < 2) return; // Safe check to make sure we have enough points
-  
-          size_t last_index = n - 1;
-          x.assign(x_vals, x_vals + n);
-          y.assign(y_vals, y_vals + n);
-  
-          h.resize(last_index);
-          alpha.resize(n, 0.0f);
-          l.resize(n, 0.0f);
-          mu.resize(n, 0.0f);
-          z.resize(n, 0.0f);
-          c.resize(n, 0.0f);
-          b.resize(last_index, 0.0f);
-          d.resize(last_index, 0.0f);
-  
-          // Get h values
-          for (size_t i = 0; i < last_index; ++i) {
-              h[i] = x[i + 1] - x[i];
-              if (h[i] == 0.0f) {
-                  SS2K_LOG(POWERTABLE_LOG_TAG, "CubicSpline: Duplicate x values detected.");
-                  return;
-              }
-          }
-  
-          // Get alpha values
-          for (size_t i = 1; i < last_index; ++i) {
-              alpha[i] = (3.0f / h[i]) * (y[i + 1] - y[i]) - (3.0f / h[i - 1]) * (y[i] - y[i - 1]);
-          }
-  
-          // Check if we are using natural or clamped spline calculations
-          if (natural) {
-              alpha[0] = alpha[last_index] = 0.0f;
-          } else {
-              float f_prime_start = (y[1] - y[0]) / h[0];
-              float f_prime_end = (y[last_index] - y[last_index - 1]) / h[last_index - 1];
-              alpha[0] = 3.0f * (f_prime_start - (y[1] - y[0]) / h[0]);
-              alpha[last_index] = 3.0f * ((y[last_index] - y[last_index - 1]) / h[last_index - 1] - f_prime_end);
-          }
-  
-          // Get l, mu, and z
-          l[0] = 1.0f;
-          mu[0] = z[0] = 0.0f;
-  
-          for (size_t i = 1; i < last_index; ++i) {
-              l[i] = 2.0f * (x[i + 1] - x[i - 1]) - h[i - 1] * mu[i - 1];
-              if (l[i] == 0.0f) {
-                  SS2K_LOG(POWERTABLE_LOG_TAG, "CubicSpline: Zero denominator detected in l[i].");
-                  return;
-              }
-              mu[i] = h[i] / l[i];
-              z[i] = (alpha[i] - h[i - 1] * z[i - 1]) / l[i];
-          }
-  
-          l[last_index] = 1.0f;
-          z[last_index] = c[last_index] = 0.0f;
-  
-          for (int j = last_index - 1; j >= 0; --j) {
-              c[j] = z[j] - mu[j] * c[j + 1];
-              b[j] = (y[j + 1] - y[j]) / h[j] - h[j] * (c[j + 1] + 2.0f * c[j]) / 3.0f;
-              d[j] = (c[j + 1] - c[j]) / (3.0f * h[j]);
-          }
-      }
+void CubicSpline::set_points(const float* x_vals, const float* y_vals, size_t n, bool natural = true) {
+  if (n < 2) return; // Safe check to make sure we have enough points
+
+  size_t last_index = n - 1;
+
+  // Use std::vector::reserve to avoid unnecessary reallocations
+  x.reserve(n);
+  y.reserve(n);
+  h.reserve(last_index);
+  alpha.reserve(n);
+  l.reserve(n);
+  mu.reserve(n);
+  z.reserve(n);
+  c.reserve(n);
+  b.reserve(last_index);
+  d.reserve(last_index);
+
+  x.assign(x_vals, x_vals + n);
+  y.assign(y_vals, y_vals + n);
+
+  // Use stack-allocated arrays for temporary variables to reduce heap usage
+  float h_stack[last_index];
+  float alpha_stack[n];
+  float l_stack[n];
+  float mu_stack[n];
+  float z_stack[n];
+  float c_stack[n];
+  float b_stack[last_index];
+  float d_stack[last_index];
+
+  // Get h values
+  for (size_t i = 0; i < last_index; ++i) {
+    h_stack[i] = x[i + 1] - x[i];
+    if (h_stack[i] == 0.0f) {
+      SS2K_LOG(POWERTABLE_LOG_TAG, "CubicSpline: Duplicate x values detected.");
+    return;
+    }
+  }
+
+  // Get alpha values
+  for (size_t i = 1; i < last_index; ++i) {
+    alpha_stack[i] = (3.0f / h_stack[i]) * (y[i + 1] - y[i]) - (3.0f / h_stack[i - 1]) * (y[i] - y[i - 1]);
+  }
+
+  // Check if we are using natural or clamped spline calculations
+  if (natural) {
+    alpha_stack[0] = alpha_stack[last_index] = 0.0f;
+  } else {
+    float f_prime_start = (y[1] - y[0]) / h_stack[0];
+    float f_prime_end = (y[last_index] - y[last_index - 1]) / h_stack[last_index - 1];
+    alpha_stack[0] = 3.0f * (f_prime_start - (y[1] - y[0]) / h_stack[0]);
+    alpha_stack[last_index] = 3.0f * ((y[last_index] - y[last_index - 1]) / h_stack[last_index - 1] - f_prime_end);
+  }
+
+  // Get l, mu, and z
+  l_stack[0] = 1.0f;
+  mu_stack[0] = z_stack[0] = 0.0f;
+
+  for (size_t i = 1; i < last_index; ++i) {
+    l_stack[i] = 2.0f * (x[i + 1] - x[i - 1]) - h_stack[i - 1] * mu_stack[i - 1];
+    if (l_stack[i] == 0.0f) {
+      SS2K_LOG(POWERTABLE_LOG_TAG, "CubicSpline: Zero denominator detected in l[i].");
+    return;
+  }
+    mu_stack[i] = h_stack[i] / l_stack[i];
+    z_stack[i] = (alpha_stack[i] - h_stack[i - 1] * z_stack[i - 1]) / l_stack[i];
+  }
+
+  l_stack[last_index] = 1.0f;
+  z_stack[last_index] = c_stack[last_index] = 0.0f;
+
+  for (int j = last_index - 1; j >= 0; --j) {
+    c_stack[j] = z_stack[j] - mu_stack[j] * c_stack[j + 1];
+    b_stack[j] = (y[j + 1] - y[j]) / h_stack[j] - h_stack[j] * (c_stack[j + 1] + 2.0f * c_stack[j]) / 3.0f;
+    d_stack[j] = (c_stack[j + 1] - c_stack[j]) / (3.0f * h_stack[j]);
+  }
+
+  // Assign stack-allocated arrays back to member variables
+  h.assign(h_stack, h_stack + last_index);
+  alpha.assign(alpha_stack, alpha_stack + n);
+  l.assign(l_stack, l_stack + n);
+  mu.assign(mu_stack, mu_stack + n);
+  z.assign(z_stack, z_stack + n);
+  c.assign(c_stack, c_stack + n);
+  b.assign(b_stack, b_stack + last_index);
+  d.assign(d_stack, d_stack + last_index);
+}
   
     float CubicSpline::interpolate(float x_val) const {
           if (x_val < x.front() || x_val > x.back()) {
