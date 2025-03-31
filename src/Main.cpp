@@ -21,6 +21,7 @@
 #include "settings.h"
 #include "BLE_Wattbike_Service.h"
 #include "BLE_Fitness_Machine_Service.h"
+#include "DirConManager.h"
 
 // Stepper Motor Serial
 HardwareSerial stepperSerial(2);
@@ -156,6 +157,14 @@ void setup() {
 
   ss2k->startTasks();
   httpServer.start();
+  
+  // Start DirCon TCP server for direct control over the bike trainer
+  SS2K_LOG(MAIN_LOG_TAG, "Starting DirCon TCP service");
+  if (DirConManager::start()) {
+    SS2K_LOG(MAIN_LOG_TAG, "DirCon TCP service started successfully");
+  } else {
+    SS2K_LOG(MAIN_LOG_TAG, "Failed to start DirCon TCP service");
+  }
 
   ss2k->resetIfShiftersHeld();
   SS2K_LOG(MAIN_LOG_TAG, "Creating Shifter Interrupts");
@@ -198,6 +207,8 @@ void SS2K::maintenanceLoop(void *pvParameters) {
     ergMode->runERG();
     // Run what used to be in the WebClient Task.
     httpServer.webClientUpdate();
+    // Update DirCon protocol
+    DirConManager::update();
     // If we're in ERG mode, modify shift commands to inc/dec the target watts instead.
     ss2k->FTMSModeShiftModifier();
     // If we have a resistance bike attached, slow down when we're close to the limits.
@@ -301,7 +312,7 @@ void SS2K::maintenanceLoop(void *pvParameters) {
 
 #ifdef DEBUG_STACK
       Serial.printf("Main Task: %d \n", uxTaskGetStackHighWaterMark(maintenanceLoopTask));
-      Serial.printf("Free Heap: %d \n", ESP.getFreeHeap());
+      Serial.printf("Min  Heap: %d \n", esp_get_minimum_free_heap_size());
       Serial.printf("Best Blok: %d \n", heap_caps_get_largest_free_block(MALLOC_CAP_8BIT));
 #endif  // DEBUG_STACK
 

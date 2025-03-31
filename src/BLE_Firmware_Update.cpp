@@ -32,7 +32,6 @@ String fileExtension = "";
 static esp_ota_handle_t otaHandler             = 0;
 static const esp_partition_t *update_partition = NULL;
 
-uint8_t txValue   = 0;
 int bufferCount   = 0;
 bool downloadFlag = false;
 
@@ -104,15 +103,14 @@ class otaCallback : public BLECharacteristicCallbacks {
       if (esp_ota_write(otaHandler, (uint8_t *)rxData.c_str(), rxData.length()) != ESP_OK) {
         Serial.printf("Error: write to flash failed");
         downloadFlag = false;
-        pTxCharacteristic->setValue(&txValue, 0x04);
-        pTxCharacteristic->notify();
+        pTxCharacteristic->notify(0x04, 1);
         return;
       } else {
         bufferCount = 1;
         // Serial.printf("%d bytes", rxData.length());
         //  Notify the iOS app so next batch can be sent
         Serial.printf(".");
-        pTxCharacteristic->setValue(&txValue, 0x02);
+        // pTxCharacteristic->setValue(0x02, sizeof(uint8_t));
         // pTxCharacteristic->notify();
       }
 
@@ -131,12 +129,10 @@ class otaCallback : public BLECharacteristicCallbacks {
         if (esp_ota_end(otaHandler) != ESP_OK) {
           Serial.printf("OTA end failed ");
           downloadFlag = false;
-          pTxCharacteristic->setValue(&txValue, 0x04);
-          pTxCharacteristic->notify();
+          pTxCharacteristic->notify(0x04, sizeof(uint8_t));
           return;
         }
-        pTxCharacteristic->setValue(&txValue, 0x05);
-        pTxCharacteristic->notify();
+        pTxCharacteristic->notify(0x05, sizeof(uint8_t));
         //-----------------------------------------------------------------
         // Clear download flag and restart the ESP32 if the firmware
         // update was successful
@@ -153,8 +149,7 @@ class otaCallback : public BLECharacteristicCallbacks {
           // Something went wrong, the upload was not successful
           //------------------------------------------------------------
           Serial.printf("Upload Error");
-          pTxCharacteristic->setValue(&txValue, 4);
-          pTxCharacteristic->notify();
+          pTxCharacteristic->notify(0x04, sizeof(uint8_t));
           downloadFlag = false;
           esp_ota_end(otaHandler);
           return;

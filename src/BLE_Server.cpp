@@ -8,20 +8,17 @@
 #include "Main.h"
 #include "SS2KLog.h"
 #include "BLE_Common.h"
+#include <ArduinoJson.h>
+#include <Constants.h>
+#include <NimBLEDevice.h>
+#include <cmath>
+#include <limits>
 #include "BLE_Cycling_Speed_Cadence.h"
 #include "BLE_Cycling_Power_Service.h"
 #include "BLE_Heart_Service.h"
 #include "BLE_Fitness_Machine_Service.h"
 #include "BLE_Custom_Characteristic.h"
 #include "BLE_Device_Information_Service.h"
-#include "BLE_Wattbike_Service.h"
-#include "BLE_SB20_Service.h"
-
-#include <ArduinoJson.h>
-#include <Constants.h>
-#include <NimBLEDevice.h>
-#include <cmath>
-#include <limits>
 
 // BLE Server Settings
 SpinBLEServer spinBLEServer;
@@ -205,33 +202,16 @@ void MyCharacteristicCallbacks::onSubscribe(NimBLECharacteristic* pCharacteristi
   str += connInfo.getAddress().toString().c_str();
   if (subValue == 0) {
     str += " Unsubscribed to ";
-    spinBLEServer.setClientSubscribed(pUUID, false);
   } else if (subValue == 1) {
     str += " Subscribed to notifications for ";
-    spinBLEServer.setClientSubscribed(pUUID, true);
   } else if (subValue == 2) {
     str += " Subscribed to indications for ";
-    spinBLEServer.setClientSubscribed(pUUID, true);
   } else if (subValue == 3) {
     str += " Subscribed to notifications and indications for ";
-    spinBLEServer.setClientSubscribed(pUUID, true);
   }
   str += std::string(pCharacteristic->getUUID()).c_str();
 
   SS2K_LOG(BLE_SERVER_LOG_TAG, "%s", str.c_str());
-}
-
-// This might be worth depreciating. With multiple clients connected (SS2k App, + Training App), it at least needs to be an int, not a bool.
-void SpinBLEServer::setClientSubscribed(NimBLEUUID pUUID, bool subscribe) {
-  if (pUUID == HEARTCHARACTERISTIC_UUID) {
-    spinBLEServer.clientSubscribed.Heartrate = subscribe;
-  } else if (pUUID == CYCLINGPOWERMEASUREMENT_UUID) {
-    spinBLEServer.clientSubscribed.CyclingPowerMeasurement = subscribe;
-  } else if (pUUID == FITNESSMACHINEINDOORBIKEDATA_UUID) {
-    spinBLEServer.clientSubscribed.IndoorBikeData = subscribe;
-  } else if (pUUID == CSCMEASUREMENT_UUID) {
-    spinBLEServer.clientSubscribed.CyclingSpeedCadence = subscribe;
-  }
 }
 
 // Return number of clients connected to our server.

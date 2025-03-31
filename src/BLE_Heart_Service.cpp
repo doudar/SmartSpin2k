@@ -4,8 +4,8 @@
  *
  * SPDX-License-Identifier: GPL-2.0-only
  */
-
 #include "BLE_Heart_Service.h"
+#include "DirConManager.h"
 #include <Constants.h>
 
 BLE_Heart_Service::BLE_Heart_Service() : pHeartService(nullptr), heartRateMeasurementCharacteristic(nullptr) {}
@@ -18,6 +18,9 @@ void BLE_Heart_Service::setupService(NimBLEServer *pServer, MyCharacteristicCall
   heartRateMeasurementCharacteristic->setValue(heartRateMeasurement, 2);
   heartRateMeasurementCharacteristic->setCallbacks(chrCallbacks);
   pHeartService->start();
+  
+  // Add service UUID to DirCon MDNS
+  DirConManager::addBleServiceUuid(pHeartService->getUUID());
 }
 
 void BLE_Heart_Service::deinit() {
@@ -47,8 +50,8 @@ void BLE_Heart_Service::update() {
   }*/
  
   byte heartRateMeasurement[2] = {0x00, (byte)rtConfig->hr.getValue()};
-  heartRateMeasurementCharacteristic->setValue(heartRateMeasurement, 2);
-  heartRateMeasurementCharacteristic->notify();
+  heartRateMeasurementCharacteristic->notify(heartRateMeasurement, 2);
+  DirConManager::notifyCharacteristic(NimBLEUUID(HEARTSERVICE_UUID), heartRateMeasurementCharacteristic->getUUID(), heartRateMeasurement, 2);
 
   const int kLogBufCapacity = 125;  // Data(10), Sep(data/2), Arrow(3), CharId(37), Sep(3), CharId(37), Sep(3), Name(8), Prefix(2), HR(7), Suffix(2), Nul(1), rounded up
   char logBuf[kLogBufCapacity];

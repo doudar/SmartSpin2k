@@ -4,8 +4,8 @@
  *
  * SPDX-License-Identifier: GPL-2.0-only
  */
-
 #include "BLE_Cycling_Power_Service.h"
+#include "DirConManager.h"
 #include <Constants.h>
 
 BLE_Cycling_Power_Service::BLE_Cycling_Power_Service() : pPowerMonitor(nullptr), cyclingPowerFeatureCharacteristic(nullptr), sensorLocationCharacteristic(nullptr){}
@@ -31,12 +31,12 @@ void BLE_Cycling_Power_Service::setupService(NimBLEServer *pServer, MyCharacteri
   pPowerMonitor->start();
   //spinBLEServer.pServer->getAdvertising()->addServiceUUID(pPowerMonitor->getUUID());
   
+  // Add service UUID to DirCon MDNS
+  DirConManager::addBleServiceUuid(pPowerMonitor->getUUID());
 }
 
 void BLE_Cycling_Power_Service::update() {
-  /*if (!spinBLEServer.clientSubscribed.CyclingPowerMeasurement) {
-    return;
-  }*/
+
   int power     = rtConfig->watts.getValue();
   float cadence = rtConfig->cad.getValue();
 
@@ -58,13 +58,20 @@ void BLE_Cycling_Power_Service::update() {
 
   auto byteArray = cpm.toByteArray();
 
-  cyclingPowerMeasurementCharacteristic->setValue(&byteArray[0], byteArray.size());
-  cyclingPowerMeasurementCharacteristic->notify();
+  cyclingPowerMeasurementCharacteristic->notify(&byteArray[0], byteArray.size());
+  
+  // Also notify DirCon TCP clients
+  DirConManager::notifyCharacteristic(
+    NimBLEUUID(CYCLINGPOWERSERVICE_UUID),
+    cyclingPowerMeasurementCharacteristic->getUUID(),
+    &byteArray[0],
+    byteArray.size()
+  );
 
   const int kLogBufCapacity = 150;
   char logBuf[kLogBufCapacity];
   const size_t byteArrayLength = byteArray.size();
 
   logCharacteristic(logBuf, kLogBufCapacity, &byteArray[0], byteArrayLength, CYCLINGPOWERSERVICE_UUID, cyclingPowerMeasurementCharacteristic->getUUID(),
-                    "CPS(CPM)[ CD(%.2f) PW(%d) ]", cadence > 0 ? fmodf(cadence, 1000.0) : 0, power % 10000);
+                   "CPS(CPM)[ CD(%.2f) PW(%d) ]", cadence > 0 ? fmodf(cadence, 1000.0) : 0, power % 10000);
 }
