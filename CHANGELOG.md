@@ -12,6 +12,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 - Added CSC sensor selection in BLE Scanner html.
+- Turned moving neighbors into a function, moved cubicspline class to power_table.h, merged dircon2, and changed added set_points changes
 
 
 ### Hardware
