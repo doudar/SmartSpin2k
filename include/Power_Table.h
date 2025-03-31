@@ -148,6 +148,9 @@ class PowerTable {
 
   float linearExtrapolate(const float* x, const float* y, size_t n, float j);
 
+  void processNeighbor(int k, int i, float targetPosition, int neighbor_i, int neighbor_j, int neighbor_targetPosition,
+    int oppositeNeighbor_i, int oppositeNeighbor_j, int oppositeNeighbor_targetPosition, float rangeFactor);  
+
  private:
   unsigned long lastSaveTime     = millis();
   TestResults testNeighbors(int i, int j, int value);
@@ -158,5 +161,19 @@ class PowerTable {
   // remove entries with < 1 readings
   void clean();
 };
+
+class CubicSpline {
+  public:
+      void set_points(const float* x_vals, const float* y_vals, size_t n, bool natural);
+  
+      float interpolate(float x_val) const;
+  
+      float extrapolate(float x_val) const;
+      
+      bool shouldUseNaturalSpline(const float* x, const float* y, size_t n);
+  
+  private:
+      std::vector<float> x, y, h, alpha, l, mu, z, c, b, d;
+  };
 
 extern PowerTable* powerTable;

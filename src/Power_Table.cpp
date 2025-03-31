@@ -395,9 +395,7 @@ float PowerTable::linearExtrapolate(const float* x, const float* y, size_t n, fl
   return y0 + slope * (j - x0);
 }
 
-class CubicSpline {
-  public:
-      void set_points(const float* x_vals, const float* y_vals, size_t n, bool natural = true) {
+  void CubicSpline::set_points(const float* x_vals, const float* y_vals, size_t n, bool natural = true) {
           if (n < 2) return; // Safe check to make sure we have enough points
   
           size_t last_index = n - 1;
@@ -461,7 +459,7 @@ class CubicSpline {
           }
       }
   
-      float interpolate(float x_val) const {
+    float CubicSpline::interpolate(float x_val) const {
           if (x_val < x.front() || x_val > x.back()) {
               return INT16_MIN; // Out of range
           }
@@ -471,7 +469,7 @@ class CubicSpline {
           return y[i] + b[i] * dx + c[i] * dx * dx + d[i] * dx * dx * dx;
       }
   
-      float extrapolate(float x_val) const {
+    float CubicSpline::extrapolate(float x_val) const {
           if (x_val < x.front()) {
               float dx = x_val - x[0];
               return y[0] + b[0] * dx + c[0] * dx * dx + d[0] * dx * dx * dx;
@@ -483,42 +481,39 @@ class CubicSpline {
           }
           return INT16_MIN; // Out of range
       }
+      
+    bool CubicSpline::shouldUseNaturalSpline(const float* x, const float* y, size_t n) {
+        if (n < 3) return true; // Default to natural spline for small data sets
+    
+        // Compute approximate first derivatives at endpoints
+        float startSlope = (y[1] - y[0]) / (x[1] - x[0]);
+        float endSlope = (y[n - 1] - y[n - 2]) / (x[n - 1] - x[n - 2]);
+    
+        // Adaptive slope threshold
+        float dataRange = *std::max_element(y, y + n) - *std::min_element(y, y + n);
+        float slopeThreshold = 0.1f * dataRange;
+    
+        if (std::abs(startSlope) > slopeThreshold || std::abs(endSlope) > slopeThreshold) {
+            return false; // Use clamped spline
+        }
+    
+        if (n < 4) return true; // Not enough points for second derivative check
+    
+        // Compute second derivatives safely
+        float h0 = x[1] - x[0], h1 = x[2] - x[1];
+        if (h0 == 0.0f || h1 == 0.0f) return true; // Avoid division by zero
+    
+        float secondDerivativeStart = (y[2] - 2 * y[1] + y[0]) / (h0 * h1);
+    
+        float hn1 = x[n - 2] - x[n - 3], hn2 = x[n - 1] - x[n - 2];
+        if (hn1 == 0.0f || hn2 == 0.0f) return true; // Avoid division by zero
+    
+        float secondDerivativeEnd = (y[n - 1] - 2 * y[n - 2] + y[n - 3]) / (hn1 * hn2);
+    
+        float curvatureThreshold = 1.0f;
+        return !(std::abs(secondDerivativeStart) > curvatureThreshold || std::abs(secondDerivativeEnd) > curvatureThreshold);
+  }
   
-  private:
-      std::vector<float> x, y, h, alpha, l, mu, z, c, b, d;
-  };
-
-  bool shouldUseNaturalSpline(const float* x, const float* y, size_t n) {
-    if (n < 3) return true; // Default to natural spline for small data sets
-
-    // Compute approximate first derivatives at endpoints
-    float startSlope = (y[1] - y[0]) / (x[1] - x[0]);
-    float endSlope = (y[n - 1] - y[n - 2]) / (x[n - 1] - x[n - 2]);
-
-    // Adaptive slope threshold
-    float dataRange = *std::max_element(y, y + n) - *std::min_element(y, y + n);
-    float slopeThreshold = 0.1f * dataRange;
-
-    if (std::abs(startSlope) > slopeThreshold || std::abs(endSlope) > slopeThreshold) {
-        return false; // Use clamped spline
-    }
-
-    if (n < 4) return true; // Not enough points for second derivative check
-
-    // Compute second derivatives safely
-    float h0 = x[1] - x[0], h1 = x[2] - x[1];
-    if (h0 == 0.0f || h1 == 0.0f) return true; // Avoid division by zero
-
-    float secondDerivativeStart = (y[2] - 2 * y[1] + y[0]) / (h0 * h1);
-
-    float hn1 = x[n - 2] - x[n - 3], hn2 = x[n - 1] - x[n - 2];
-    if (hn1 == 0.0f || hn2 == 0.0f) return true; // Avoid division by zero
-
-    float secondDerivativeEnd = (y[n - 1] - 2 * y[n - 2] + y[n - 3]) / (hn1 * hn2);
-
-    float curvatureThreshold = 1.0f;
-    return !(std::abs(secondDerivativeStart) > curvatureThreshold || std::abs(secondDerivativeEnd) > curvatureThreshold);
-}
 
 void PowerTable::fillTable() {
   this->findTableDirection(true);  // Horizontal
@@ -574,7 +569,8 @@ void PowerTable::findTableDirection(bool horizontal) {
           continue;
       }
 
-      bool useNaturalSpline = shouldUseNaturalSpline(x.data(), y.data(), x.size());
+      CubicSpline spline; 
+      bool useNaturalSpline = spline.shouldUseNaturalSpline(x.data(), y.data(), x.size());
 
       // Store values
       prevX = x;
@@ -700,8 +696,8 @@ void PowerTable::findTableDirection(bool horizontal) {
             continue;
         }
 
-        // Determine spline type (natural or clamped)
-        bool useNaturalSpline = shouldUseNaturalSpline(x.data(), y.data(), x.size());
+        CubicSpline spline; 
+        bool useNaturalSpline = spline.shouldUseNaturalSpline(x.data(), y.data(), x.size());
 
         prevX = x;
         prevY = y;
@@ -968,169 +964,31 @@ void PowerTable::newEntry(PowerBuffer& powerBuffer) {
 
     // test which bit fields didn't match
     if (!testResults.leftNeighbor.passedTest) {
-      avgPosition = (targetPosition + testResults.leftNeighbor.targetPosition) / 2;  // calculate the average
-
-      SS2K_LOG(POWERTABLE_LOG_TAG, "Left failed at: (%d) Target pos: (%f) Avg pos: (%d)", testResults.leftNeighbor.targetPosition, targetPosition, avgPosition);
-
-      if (testResults.leftNeighbor.targetPosition <= targetPosition + (500 * pow(TABLE_DIVISOR, -HORIZONTAL_NEIGHBOR_RANGE)) &&
-          (int)targetPosition != testResults.leftNeighbor.targetPosition) {  // check if the cadence is the same and positions are within a set range in this case its 30.
-
-        if (this->testNeighbors(k, i, avgPosition).allNeighborsPassed) {  // checks if the avg position with the current watts and cadence is valid
-          SS2K_LOG(POWERTABLE_LOG_TAG, "Avg postion is valid with current cadence and watts! Avg position: %d", avgPosition);
-
-          this->enterData(k, i, avgPosition);
-        }
-
-        if (this->testNeighbors(testResults.leftNeighbor.i, testResults.leftNeighbor.j, targetPosition).allNeighborsPassed) {  // check if the current position moved left is valid
-          SS2K_LOG(POWERTABLE_LOG_TAG, "Current Position moved left was valid! Current position: %f", targetPosition);
-
-          this->enterData(testResults.leftNeighbor.i, testResults.leftNeighbor.j, targetPosition);  // enter the data
-        }
-
-        if (this->testNeighbors(testResults.rightNeighbor.i, testResults.rightNeighbor.j, testResults.leftNeighbor.targetPosition)
-                .allNeighborsPassed) {  // checks if the failed nighbor is valid with the right neighbors cadence and watts
-          SS2K_LOG(POWERTABLE_LOG_TAG, "Left Neighbors position was valid with Right Neighbors cadence and watts! Left Neighbor Position: %d",
-                   testResults.leftNeighbor.targetPosition);
-
-          this->enterData(testResults.rightNeighbor.i, testResults.rightNeighbor.j, testResults.leftNeighbor.targetPosition);
-        }
-
-        // still downvote data if all the tests fail
-        if (!((this->testNeighbors(testResults.leftNeighbor.i, testResults.leftNeighbor.j, targetPosition).allNeighborsPassed) ||
-              (this->testNeighbors(k, i, avgPosition).allNeighborsPassed) ||
-              (this->testNeighbors(testResults.rightNeighbor.i, testResults.rightNeighbor.j, testResults.leftNeighbor.targetPosition).allNeighborsPassed))) {
-          SS2K_LOG(POWERTABLE_LOG_TAG, "All test failed left (%d)(%d)(%d), readings (%d)", testResults.leftNeighbor.i, testResults.leftNeighbor.j,
-                   testResults.leftNeighbor.targetPosition, this->tableRow[testResults.leftNeighbor.i].tableEntry[testResults.leftNeighbor.j].readings);
-          this->downVoteData(testResults.leftNeighbor.i, testResults.leftNeighbor.j, targetPosition, testResults.leftNeighbor.targetPosition);
-        }
-      } else {
-        SS2K_LOG(POWERTABLE_LOG_TAG, "Was not in range failed left (%d)(%d)(%d), readings (%d)", testResults.leftNeighbor.i, testResults.leftNeighbor.j,
-                 testResults.leftNeighbor.targetPosition, this->tableRow[testResults.leftNeighbor.i].tableEntry[testResults.leftNeighbor.j].readings);
-        this->downVoteData(testResults.leftNeighbor.i, testResults.leftNeighbor.j, targetPosition, testResults.leftNeighbor.targetPosition);
-      }
+      SS2K_LOG(POWERTABLE_LOG_TAG, "Left neighbor position (%d) failed with watts=%f, cad=%f, targetPosition=%f, (%d)(%d)", testResults.leftNeighbor.targetPosition, watts, cad, targetPosition, k, i); 
+      this->processNeighbor(k, i, targetPosition, testResults.leftNeighbor.i, testResults.leftNeighbor.j, testResults.leftNeighbor.targetPosition,
+        testResults.rightNeighbor.i, testResults.rightNeighbor.j, testResults.rightNeighbor.targetPosition,
+        HORIZONTAL_NEIGHBOR_RANGE);
     }
 
     if (!testResults.rightNeighbor.passedTest) {
-      avgPosition = (targetPosition + testResults.rightNeighbor.targetPosition) / 2;
-
-      SS2K_LOG(POWERTABLE_LOG_TAG, "Right failed at: (%d) Target pos: (%f) Avg pos: (%d)", testResults.rightNeighbor.targetPosition, targetPosition, avgPosition);
-
-      if (testResults.rightNeighbor.targetPosition >= targetPosition - (500 * pow(TABLE_DIVISOR, -HORIZONTAL_NEIGHBOR_RANGE)) &&
-          (int)targetPosition != testResults.rightNeighbor.targetPosition) {
-        if (this->testNeighbors(k, i, avgPosition).allNeighborsPassed) {
-          SS2K_LOG(POWERTABLE_LOG_TAG, "Avg postion is valid with current cadence and watts! Avg position: %d", avgPosition);
-
-          this->enterData(k, i, avgPosition);
-        }
-
-        if (this->testNeighbors(testResults.rightNeighbor.i, testResults.rightNeighbor.j, (float)targetPosition).allNeighborsPassed) {
-          SS2K_LOG(POWERTABLE_LOG_TAG, "Current Position moved right was valid! Current position: %f", targetPosition);
-
-          this->enterData(testResults.rightNeighbor.i, testResults.rightNeighbor.j, targetPosition);
-        }
-
-        if (this->testNeighbors(testResults.leftNeighbor.i, testResults.leftNeighbor.j, testResults.rightNeighbor.targetPosition).allNeighborsPassed) {
-          SS2K_LOG(POWERTABLE_LOG_TAG, "Right Neighbors position was valid with Left Neighbors cadence and watts! Right Neighbor Position: %d",
-                   testResults.rightNeighbor.targetPosition);
-
-          this->enterData(testResults.leftNeighbor.i, testResults.leftNeighbor.j, testResults.rightNeighbor.targetPosition);
-        }
-
-        // still downvote data if all the tests fail
-        if (!((this->testNeighbors(testResults.rightNeighbor.i, testResults.rightNeighbor.j, targetPosition).allNeighborsPassed) ||
-              (this->testNeighbors(k, i, avgPosition).allNeighborsPassed) ||
-              (this->testNeighbors(testResults.leftNeighbor.i, testResults.leftNeighbor.j, testResults.rightNeighbor.targetPosition).allNeighborsPassed))) {
-          SS2K_LOG(POWERTABLE_LOG_TAG, "All test failed right (%d)(%d)(%d), readings (%d)", testResults.rightNeighbor.i, testResults.rightNeighbor.j,
-                   testResults.rightNeighbor.targetPosition, this->tableRow[testResults.rightNeighbor.i].tableEntry[testResults.rightNeighbor.j].readings);
-          this->downVoteData(testResults.rightNeighbor.i, testResults.rightNeighbor.j, targetPosition, testResults.rightNeighbor.targetPosition);
-        }
-      } else {
-        SS2K_LOG(POWERTABLE_LOG_TAG, "Was not in range failed right (%d)(%d)(%d), readings (%d)", testResults.rightNeighbor.i, testResults.rightNeighbor.j,
-                 testResults.rightNeighbor.targetPosition, this->tableRow[testResults.rightNeighbor.i].tableEntry[testResults.rightNeighbor.j].readings);
-        this->downVoteData(testResults.rightNeighbor.i, testResults.rightNeighbor.j, targetPosition, testResults.rightNeighbor.targetPosition);
-      }
+      SS2K_LOG(POWERTABLE_LOG_TAG, "Right neighbor position (%d) failed with watts=%f, cad=%f, targetPosition=%f, (%d)(%d)", testResults.rightNeighbor.targetPosition, watts, cad, targetPosition, k, i); 
+      this->processNeighbor(k, i, targetPosition, testResults.rightNeighbor.i, testResults.rightNeighbor.j, testResults.rightNeighbor.targetPosition,
+        testResults.leftNeighbor.i, testResults.leftNeighbor.j, testResults.leftNeighbor.targetPosition,
+        HORIZONTAL_NEIGHBOR_RANGE);
     }
 
     if (!testResults.topNeighbor.passedTest) {
-      avgPosition = (targetPosition + testResults.topNeighbor.targetPosition) / 2;
-
-      SS2K_LOG(POWERTABLE_LOG_TAG, "Top failed at: (%d) Target pos: (%f) Avg pos: (%d)", testResults.topNeighbor.targetPosition, targetPosition, avgPosition);
-
-      if (testResults.topNeighbor.targetPosition >= targetPosition - (500 * pow(TABLE_DIVISOR, -VERTICAL_NEIGHBOR_RANGE)) &&
-          (int)targetPosition != testResults.topNeighbor.targetPosition) {
-        if (this->testNeighbors(k, i, avgPosition).allNeighborsPassed) {
-          SS2K_LOG(POWERTABLE_LOG_TAG, "Avg postion is valid with current cadence and watts! Avg position: %d", avgPosition);
-
-          this->enterData(k, i, avgPosition);
-        }
-
-        if (this->testNeighbors(testResults.topNeighbor.i, testResults.topNeighbor.j, targetPosition).allNeighborsPassed) {
-          SS2K_LOG(POWERTABLE_LOG_TAG, "Current Position moved up was valid! Current position: %f", targetPosition);
-
-          this->enterData(testResults.topNeighbor.i, testResults.topNeighbor.j, targetPosition);
-        }
-
-        if (this->testNeighbors(testResults.bottomNeighbor.i, testResults.bottomNeighbor.j, testResults.topNeighbor.targetPosition).allNeighborsPassed) {
-          SS2K_LOG(POWERTABLE_LOG_TAG, "Top Neighbors position was valid with Bottom Neighbors cadence and watts! Top Neighbor Position: %d",
-                   testResults.topNeighbor.targetPosition);
-
-          this->enterData(testResults.bottomNeighbor.i, testResults.bottomNeighbor.j, testResults.topNeighbor.targetPosition);
-        }
-
-        // still downvote data if all the tests fail
-        if (!((this->testNeighbors(testResults.topNeighbor.i, testResults.topNeighbor.j, targetPosition).allNeighborsPassed) ||
-              (this->testNeighbors(k, i, avgPosition).allNeighborsPassed) ||
-              (this->testNeighbors(testResults.bottomNeighbor.i, testResults.bottomNeighbor.j, testResults.topNeighbor.targetPosition).allNeighborsPassed))) {
-          SS2K_LOG(POWERTABLE_LOG_TAG, "All test failed top (%d)(%d)(%d), readings (%d)", testResults.topNeighbor.i, testResults.topNeighbor.j,
-                   testResults.topNeighbor.targetPosition, this->tableRow[testResults.topNeighbor.i].tableEntry[testResults.topNeighbor.j].readings);
-          this->downVoteData(testResults.topNeighbor.i, testResults.topNeighbor.j, targetPosition, testResults.topNeighbor.targetPosition);
-        }
-      } else {
-        SS2K_LOG(POWERTABLE_LOG_TAG, "Was not in range failed top (%d)(%d)(%d), readings (%d)", testResults.topNeighbor.i, testResults.topNeighbor.j,
-                 testResults.topNeighbor.targetPosition, this->tableRow[testResults.topNeighbor.i].tableEntry[testResults.topNeighbor.j].readings);
-        this->downVoteData(testResults.topNeighbor.i, testResults.topNeighbor.j, targetPosition, testResults.topNeighbor.targetPosition);
-      }
+      SS2K_LOG(POWERTABLE_LOG_TAG, "Top neighbor position (%d) failed with watts=%f, cad=%f, targetPosition=%f, (%d)(%d)", testResults.topNeighbor.targetPosition, watts, cad, targetPosition, k, i); 
+      this->processNeighbor(k, i, targetPosition, testResults.topNeighbor.i, testResults.topNeighbor.j, testResults.topNeighbor.targetPosition,
+        testResults.bottomNeighbor.i, testResults.bottomNeighbor.j, testResults.bottomNeighbor.targetPosition,
+        VERTICAL_NEIGHBOR_RANGE);
     }
 
     if (!testResults.bottomNeighbor.passedTest) {
-      avgPosition = (targetPosition + testResults.bottomNeighbor.targetPosition) / 2;
-
-      SS2K_LOG(POWERTABLE_LOG_TAG, "Bottom failed at: (%d) Target pos: (%f) Avg pos: (%d)", testResults.bottomNeighbor.targetPosition, targetPosition, avgPosition);
-
-      if (testResults.bottomNeighbor.targetPosition <= targetPosition + (500 * pow(TABLE_DIVISOR, -VERTICAL_NEIGHBOR_RANGE)) &&
-          (int)targetPosition != testResults.bottomNeighbor.targetPosition) {
-        if (this->testNeighbors(k, i, avgPosition).allNeighborsPassed) {
-          SS2K_LOG(POWERTABLE_LOG_TAG, "Avg postion is valid with current cadence and watts! Avg position: %d", avgPosition);
-
-          this->enterData(k, i, avgPosition);
-        }
-
-        if (this->testNeighbors(testResults.bottomNeighbor.i, testResults.bottomNeighbor.j, targetPosition).allNeighborsPassed) {
-          SS2K_LOG(POWERTABLE_LOG_TAG, "Current Position moved down is valid! Current position: %f", targetPosition);
-
-          this->enterData(testResults.bottomNeighbor.i, testResults.bottomNeighbor.j, targetPosition);
-        }
-
-        if (this->testNeighbors(testResults.topNeighbor.i, testResults.topNeighbor.j, testResults.bottomNeighbor.targetPosition).allNeighborsPassed) {
-          SS2K_LOG(POWERTABLE_LOG_TAG, "Bottom Neighbors position was valid with Top Neighbors cadence and watts! Bottom Neighbor Position: %d",
-                   testResults.topNeighbor.targetPosition);
-
-          this->enterData(testResults.topNeighbor.i, testResults.topNeighbor.j, testResults.bottomNeighbor.targetPosition);
-        }
-
-        // still downvote data if all the tests fail
-        if (!((this->testNeighbors(testResults.bottomNeighbor.i, testResults.bottomNeighbor.j, targetPosition).allNeighborsPassed) ||
-              (this->testNeighbors(k, i, avgPosition).allNeighborsPassed) ||
-              (this->testNeighbors(testResults.topNeighbor.i, testResults.topNeighbor.j, testResults.bottomNeighbor.targetPosition).allNeighborsPassed))) {
-          SS2K_LOG(POWERTABLE_LOG_TAG, "All test failed bottom (%d)(%d)(%d), readings (%d)", testResults.topNeighbor.i, testResults.topNeighbor.j,
-                   testResults.topNeighbor.targetPosition, this->tableRow[testResults.topNeighbor.i].tableEntry[testResults.topNeighbor.j].readings);
-          this->downVoteData(testResults.bottomNeighbor.i, testResults.bottomNeighbor.j, targetPosition, testResults.bottomNeighbor.targetPosition);
-        }
-      } else {
-        SS2K_LOG(POWERTABLE_LOG_TAG, "Was not in range failed bottom (%d)(%d)(%d), readings (%d)", testResults.bottomNeighbor.i, testResults.bottomNeighbor.j,
-                 testResults.bottomNeighbor.targetPosition, this->tableRow[testResults.bottomNeighbor.i].tableEntry[testResults.bottomNeighbor.j].readings);
-        this->downVoteData(testResults.bottomNeighbor.i, testResults.bottomNeighbor.j, targetPosition, testResults.bottomNeighbor.targetPosition);
-      }
+      SS2K_LOG(POWERTABLE_LOG_TAG, "Bottom neighbor position (%d) failed with watts=%f, cad=%f, targetPosition=%f, (%d)(%d)", testResults.bottomNeighbor.targetPosition, watts, cad, targetPosition, k, i); 
+      this->processNeighbor(k, i, targetPosition, testResults.bottomNeighbor.i, testResults.bottomNeighbor.j, testResults.bottomNeighbor.targetPosition,
+        testResults.topNeighbor.i, testResults.topNeighbor.j, testResults.topNeighbor.targetPosition,
+        VERTICAL_NEIGHBOR_RANGE);
     }
     return;
   }
@@ -1179,6 +1037,42 @@ void PowerTable::enterData(int k, int i, int pos) {
       this->extrapolateDiagonal();
       newEntries = getNumEntries();
     }
+  }
+}
+
+void PowerTable::processNeighbor(int k, int i, float targetPosition, int neighbor_i, int neighbor_j, int neighbor_targetPosition,
+  int oppositeNeighbor_i, int oppositeNeighbor_j, int oppositeNeighbor_targetPosition, float rangeFactor) {
+
+  float avgPosition = (targetPosition + neighbor_targetPosition) / 2;
+  float positionThreshold = 500 * pow(TABLE_DIVISOR, -rangeFactor);
+
+    if (std::abs(neighbor_targetPosition - targetPosition) <= positionThreshold &&
+    static_cast<int>(targetPosition) != neighbor_targetPosition) {
+
+    if (this->testNeighbors(k, i, avgPosition).allNeighborsPassed) {
+      SS2K_LOG(POWERTABLE_LOG_TAG, "Avg postion is valid with current cadence and watts! Avg position: %d", avgPosition);
+      this->enterData(k, i, avgPosition);
+    }
+    if (this->testNeighbors(neighbor_i, neighbor_j, targetPosition).allNeighborsPassed) {
+      SS2K_LOG(POWERTABLE_LOG_TAG, "Current Position was valid! Current position: %f", targetPosition);
+      this->enterData(neighbor_i, neighbor_j, targetPosition);
+    }
+    if (this->testNeighbors(oppositeNeighbor_i, oppositeNeighbor_j, neighbor_targetPosition).allNeighborsPassed) {
+      SS2K_LOG(POWERTABLE_LOG_TAG, "Neighbor position was moved from! Neighbor Position: %d", neighbor_targetPosition);
+      this->enterData(oppositeNeighbor_i, oppositeNeighbor_j, neighbor_targetPosition);
+    }
+
+    if (!(this->testNeighbors(neighbor_i, neighbor_j, targetPosition).allNeighborsPassed ||
+    this->testNeighbors(k, i, avgPosition).allNeighborsPassed ||
+    this->testNeighbors(oppositeNeighbor_i, oppositeNeighbor_j, neighbor_targetPosition).allNeighborsPassed)) {
+      SS2K_LOG(POWERTABLE_LOG_TAG, "All test failed at (%d)(%d)(%d), readings (%d)", oppositeNeighbor_i, oppositeNeighbor_j,
+        oppositeNeighbor_targetPosition, this->tableRow[oppositeNeighbor_i].tableEntry[oppositeNeighbor_j].readings);
+      this->downVoteData(neighbor_i, neighbor_j, targetPosition, neighbor_targetPosition);
+    }
+  } else {
+    SS2K_LOG(POWERTABLE_LOG_TAG, "Was not in range failed at (%d)(%d)(%d), readings (%d)", oppositeNeighbor_i, oppositeNeighbor_j,
+      oppositeNeighbor_targetPosition, this->tableRow[oppositeNeighbor_i].tableEntry[oppositeNeighbor_j].readings);
+  this->downVoteData(neighbor_i, neighbor_j, targetPosition, neighbor_targetPosition);
   }
 }
 
