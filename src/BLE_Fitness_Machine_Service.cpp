@@ -4,8 +4,8 @@
  *
  * SPDX-License-Identifier: GPL-2.0-only
  */
-
 #include "BLE_Fitness_Machine_Service.h"
+#include "DirConManager.h"
 #include <Constants.h>
 #include <vector>
 
@@ -54,6 +54,9 @@ void BLE_Fitness_Machine_Service::setupService(NimBLEServer *pServer, MyCharacte
   fitnessMachineControlPoint->setCallbacks(chrCallbacks);
   pFitnessMachineService->start();
   spinBLEServer.pServer->getAdvertising()->addServiceUUID(pFitnessMachineService->getUUID());
+
+  // Add service UUID to DirCon MDNS
+  DirConManager::addBleServiceUuid(pFitnessMachineService->getUUID());
 }
 
 void BLE_Fitness_Machine_Service::update() {
@@ -106,6 +109,10 @@ void BLE_Fitness_Machine_Service::update() {
   }
 
   fitnessMachineIndoorBikeData->notify(ftmsIndoorBikeData.data(), ftmsIndoorBikeData.size());
+
+
+  // Also notify DirCon TCP clients about Indoor Bike Data
+  DirConManager::notifyCharacteristic(NimBLEUUID(FITNESSMACHINESERVICE_UUID), fitnessMachineIndoorBikeData->getUUID(), ftmsIndoorBikeData.data(), ftmsIndoorBikeData.size());
 
   const int kLogBufCapacity = 200;  // Data(30), Sep(data/2), Arrow(3), CharId(37), Sep(3), CharId(37), Sep(3), Name(10), Prefix(2), HR(7), SEP(1), CD(10), SEP(1), PW(8),
                                     // SEP(1), SD(7), Suffix(2), Nul(1), rounded up
@@ -279,16 +286,19 @@ void BLE_Fitness_Machine_Service::processFTMSWrite() {
       ftmsStatus            = {FitnessMachineStatus::StartedOrResumedByUser};
       ftmsTrainingStatus[1] = FitnessMachineTrainingStatus::Other;  // 0x00;
     }
+    //not checking for subscription because a write request would have triggererd this
     fitnessMachineControlPoint->indicate(returnValue.data(), returnValue.size());
     fitnessMachineTrainingStatus->notify(ftmsTrainingStatus.data(), ftmsTrainingStatus.size());
     fitnessMachineStatusCharacteristic->notify(ftmsStatus.data(), ftmsStatus.size());
+
+    // Also notify DirCon TCP clients
+    DirConManager::notifyCharacteristic(NimBLEUUID(FITNESSMACHINESERVICE_UUID), fitnessMachineControlPoint->getUUID(), returnValue.data(), returnValue.size());
   }
 }
 
 bool BLE_Fitness_Machine_Service::spinDown(uint8_t response) {
   uint8_t spinStatus[2] = {FitnessMachineStatus::SpinDownStatus, response};
-  fitnessMachineStatusCharacteristic->setValue(spinStatus, 2);
-  fitnessMachineStatusCharacteristic->notify();
+  fitnessMachineStatusCharacteristic->notify(spinStatus, 2);
   /*std::string rxValue = fitnessMachineStatusCharacteristic->getValue();
   if (rxValue[0] != 0x14) {
    return false;

@@ -17,10 +17,11 @@
 #include "Main.h"
 #include "BLE_Definitions.h"
 #include "BLE_Wattbike_Service.h"
+#include "BLE_SB20_Service.h"
 #include "Constants.h"
 
-//Client size allocated to the queue for receiving characteristic data
-#define NOTIFY_DATA_QUEUE_SIZE 25
+// Client size allocated to the queue for receiving characteristic data
+#define NOTIFY_DATA_QUEUE_SIZE   25
 #define NOTIFY_DATA_QUEUE_LENGTH 10
 
 // Vector of supported BLE services and their corresponding characteristic UUIDs
@@ -82,23 +83,16 @@ class MyServerCallbacks : public NimBLEServerCallbacks {
 class SpinBLEServer {
  private:
   void updateWheelAndCrankRev();
+  // Helper Function to clean up the BLE Services
 
  public:
-  struct {
-    bool Heartrate : 1;
-    bool CyclingPowerMeasurement : 1;
-    bool IndoorBikeData : 1;
-    bool CyclingSpeedCadence : 1;
-  } clientSubscribed;
   int spinDownFlag      = 0;
   NimBLEServer* pServer = nullptr;
-  void setClientSubscribed(NimBLEUUID pUUID, bool subscribe);
   void notifyShift();
   double calculateSpeed();
   void update();
   // Queue to store writes to any of the callbacks to the server
   std::queue<std::string> writeCache;
-  SpinBLEServer() { memset(&clientSubscribed, 0, sizeof(clientSubscribed)); }
 };
 
 class MyCharacteristicCallbacks : public NimBLECharacteristicCallbacks {
@@ -133,8 +127,6 @@ void bleClientTask(void* pvParameters);
 // BLEUUID charUUIDs[4] = {FITNESSMACHINEINDOORBIKEDATA_UUID,
 // CYCLINGPOWERMEASUREMENT_UUID, HEARTCHARACTERISTIC_UUID,
 // FLYWHEEL_UART_TX_UUID};
-
-
 
 typedef struct NotifyData {
   NimBLEUUID serviceUUID;

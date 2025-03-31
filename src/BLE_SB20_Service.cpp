@@ -38,7 +38,6 @@ void BLE_SB20_Service::notify() {
   currentData.power     = rtConfig->watts.getValue();
   currentData.heartrate = rtConfig->hr.getValue();
 
-  pCharacteristic->setValue((uint8_t *)&currentData, sizeof(currentData));
-  pCharacteristic->notify();
+  pCharacteristic->notify((uint8_t *)&currentData, sizeof(currentData));
   SS2K_LOG(SS2K_LOG_TAG,"SB20 data sent: Gear=%d, Cadence=%d, Power=%d, HR=%d\n", currentData.gear, currentData.cadence, currentData.power, currentData.heartrate);
 }

@@ -16,6 +16,7 @@ class BLE_Fitness_Machine_Service {
   void setupService(NimBLEServer *pServer, MyCharacteristicCallbacks *chrCallbacks);
   void update();
   bool spinDown(uint8_t response);
+  void processFTMSWrite();
 
  private:
   BLEService *pFitnessMachineService;
@@ -27,7 +28,6 @@ class BLE_Fitness_Machine_Service {
   BLECharacteristic *fitnessMachinePowerRange;
   BLECharacteristic *fitnessMachineInclinationRange;
   BLECharacteristic *fitnessMachineTrainingStatus;
-  void processFTMSWrite();
 };
 
 extern BLE_Fitness_Machine_Service fitnessMachineService;

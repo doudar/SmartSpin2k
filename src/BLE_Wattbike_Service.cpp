@@ -8,6 +8,7 @@
 #include "BLE_Wattbike_Service.h"
 #include "BLE_Common.h"
 #include <Constants.h>
+#include "DirConManager.h"
 
 BLE_Wattbike_Service::BLE_Wattbike_Service() : pWattbikeService(nullptr), wattbikeReadCharacteristic(nullptr), wattbikeWriteCharacteristic(nullptr) {}
 
@@ -69,6 +70,7 @@ void BLE_Wattbike_Service::update() {
   // Update the characteristic
   wattbikeReadCharacteristic->setValue(gearData, sizeof(gearData));
   wattbikeReadCharacteristic->notify();
+  DirConManager::notifyCharacteristic(NimBLEUUID(WATTBIKE_SERVICE_UUID), wattbikeReadCharacteristic->getUUID(), gearData, sizeof(gearData));
 
   // Log the update
   const int kLogBufCapacity = 100;

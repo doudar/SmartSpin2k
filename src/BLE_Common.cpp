@@ -110,7 +110,7 @@ void BLECommunications() {
 
     spinBLEClient.postConnect();
 
-    if (connectedClientCount() > 0 && !ss2k->isUpdating) {
+    if (!ss2k->isUpdating) {
       spinBLEServer.update();
 
 #ifdef INTERNAL_ERG_4EXT_FTMS
