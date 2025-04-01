@@ -252,84 +252,84 @@ int32_t PowerTable::lookup(int watts, int cad) {
   return ret;
 }
 
-// returns class of all neighbors that are found and within expected values.
+/**
+ * @brief Tests the neighbors of a given cell in the power table for specific conditions.
+ *
+ * This function evaluates the neighbors (left, right, top, bottom) of a specified cell
+ * in the power table. It determines whether each neighbor exists, retrieves its position,
+ * and checks if it satisfies a given test condition. The results are stored in a 
+ * `TestResults` structure, which includes information about each neighbor's position, 
+ * whether it was found, and whether it passed the test condition.
+ *
+ * @param i The row index of the cell to test.
+ * @param j The column index of the cell to test.
+ * @param testValue The value to test against each neighbor's target position.
+ * @return A `TestResults` structure containing the results of the neighbor tests.
+ */
 TestResults PowerTable::testNeighbors(int i, int j, int testValue) {
   TestResults returnResult;
-  // Get the neighbors
-  // Check left neighbor
-  if (j > 0) {
-    for (int left = j - 1; left >= 0; --left) {
-      if (this->tableRow[i].tableEntry[left].targetPosition != INT16_MIN) {
-        returnResult.leftNeighbor.targetPosition = this->tableRow[i].tableEntry[left].targetPosition;
-        returnResult.leftNeighbor.i              = i;
-        returnResult.leftNeighbor.j              = left;
-        returnResult.leftNeighbor.found          = 1;
+  
+  // Define direction parameters (start limit, end limit, step, row change, column change)
+  const struct {
+    int startLimit;
+    int endLimit;
+    int step;
+    int rowChange;
+    int colChange;
+    TestResults::Neighbor* neighbor;
+    bool (*testPredicate)(int16_t, int);
+  } directions[] = {
+    // Left: decreasing j, same i
+    {j > 0 ? j - 1 : -1, -1, -1, 0, 0, &returnResult.leftNeighbor,
+     [](int16_t pos, int test) { return pos < test || pos == INT16_MIN; }},
+    // Right: increasing j, same i
+    {j < POWERTABLE_WATT_SIZE - 1 ? j + 1 : POWERTABLE_WATT_SIZE, POWERTABLE_WATT_SIZE, 1, 0, 0,
+     &returnResult.rightNeighbor, [](int16_t pos, int test) { return pos > test || pos == INT16_MIN; }},
+    // Top: decreasing i, same j
+    {i > 0 ? i - 1 : -1, -1, -1, 1, 0, &returnResult.topNeighbor,
+     [](int16_t pos, int test) { return pos > test || pos == INT16_MIN; }},
+    // Bottom: increasing i, same j
+    {i < POWERTABLE_CAD_SIZE - 1 ? i + 1 : POWERTABLE_CAD_SIZE, POWERTABLE_CAD_SIZE, 1, 1, 0,
+     &returnResult.bottomNeighbor, [](int16_t pos, int test) { return pos < test || pos == INT16_MIN; }}
+  };
+
+  // Process each direction
+  for (const auto& dir : directions) {
+    // Skip if outside bounds
+    if (dir.startLimit == -1 || dir.startLimit == POWERTABLE_WATT_SIZE ||
+        dir.startLimit == POWERTABLE_CAD_SIZE) {
+      continue;
+    }
+
+    // Search for neighbor in this direction
+    for (int idx = dir.startLimit; idx != dir.endLimit; idx += dir.step) {
+      int row = dir.rowChange ? idx : i;
+      int col = dir.rowChange ? j : idx;
+      
+      if (this->tableRow[row].tableEntry[col].targetPosition != INT16_MIN) {
+        dir.neighbor->targetPosition = this->tableRow[row].tableEntry[col].targetPosition;
+        dir.neighbor->i = row;
+        dir.neighbor->j = col;
+        dir.neighbor->found = 1;
         break;
       }
     }
-  }
-
-  if (returnResult.leftNeighbor.targetPosition < testValue || returnResult.leftNeighbor.targetPosition == INT16_MIN) {
-    returnResult.leftNeighbor.passedTest = 1;
-  }
-
-  // Check right neighbor
-  if (j < POWERTABLE_WATT_SIZE - 1) {
-    for (int right = j + 1; right < POWERTABLE_WATT_SIZE; ++right) {
-      if (this->tableRow[i].tableEntry[right].targetPosition != INT16_MIN) {
-        returnResult.rightNeighbor.targetPosition = this->tableRow[i].tableEntry[right].targetPosition;
-        returnResult.rightNeighbor.i              = i;
-        returnResult.rightNeighbor.j              = right;
-        returnResult.rightNeighbor.found          = 1;
-        break;
-      }
+    // Test if neighbor passes test condition.
+    if (dir.testPredicate(dir.neighbor->targetPosition, testValue)) {
+      dir.neighbor->passedTest = 1;
     }
   }
-
-  if (returnResult.rightNeighbor.targetPosition > testValue || returnResult.rightNeighbor.targetPosition == INT16_MIN) {
-    returnResult.rightNeighbor.passedTest = 1;
-  }
-
-  // Check top neighbor
-  if (i > 0) {
-    for (int up = i - 1; up >= 0; --up) {
-      if (this->tableRow[up].tableEntry[j].targetPosition != INT16_MIN) {
-        returnResult.topNeighbor.targetPosition = this->tableRow[up].tableEntry[j].targetPosition;
-        returnResult.topNeighbor.i              = up;
-        returnResult.topNeighbor.j              = j;
-        returnResult.topNeighbor.found          = 1;
-        break;
-      }
-    }
-  }
-
-  if (returnResult.topNeighbor.targetPosition > testValue || returnResult.topNeighbor.targetPosition == INT16_MIN) {
-    returnResult.topNeighbor.passedTest = 1;
-  }
-
-  // Check bottom neighbor
-  if (i < POWERTABLE_CAD_SIZE - 1) {
-    for (int down = i + 1; down < POWERTABLE_CAD_SIZE; ++down) {
-      if (this->tableRow[down].tableEntry[j].targetPosition != INT16_MIN) {
-        returnResult.bottomNeighbor.targetPosition = this->tableRow[down].tableEntry[j].targetPosition;
-        returnResult.bottomNeighbor.i              = down;
-        returnResult.bottomNeighbor.j              = j;
-        returnResult.bottomNeighbor.found          = 1;
-        break;
-      }
-    }
-  }
-
-  if (returnResult.bottomNeighbor.targetPosition < testValue || returnResult.bottomNeighbor.targetPosition == INT16_MIN) {
-    returnResult.bottomNeighbor.passedTest = 1;
-  }
-
-  if (returnResult.bottomNeighbor.found && returnResult.topNeighbor.found && returnResult.rightNeighbor.found && returnResult.leftNeighbor.found) {
+  // Check if all neighbors were found.
+  if (returnResult.bottomNeighbor.found && returnResult.topNeighbor.found &&
+      returnResult.rightNeighbor.found && returnResult.leftNeighbor.found) {
     returnResult.allNeighborsFound = 1;
   }
-  if (returnResult.bottomNeighbor.passedTest && returnResult.topNeighbor.passedTest && returnResult.rightNeighbor.passedTest && returnResult.leftNeighbor.passedTest) {
+  // Check if all neighbors passed tests.
+  if (returnResult.bottomNeighbor.passedTest && returnResult.topNeighbor.passedTest &&
+      returnResult.rightNeighbor.passedTest && returnResult.leftNeighbor.passedTest) {
     returnResult.allNeighborsPassed = 1;
   }
+  
   return returnResult;
 }
 
@@ -396,7 +396,13 @@ float PowerTable::linearExtrapolate(const float* x, const float* y, size_t n, fl
 }
 
 void CubicSpline::set_points(const float* x_vals, const float* y_vals, size_t n, bool natural = true) {
-  if (n < 2) return; // Safe check to make sure we have enough points
+  // Safe check to make sure we have enough points
+  if (n < 2) return; 
+  //Make sure we have enough heap memory available before allocating vectors
+  if (esp_get_free_heap_size() < 20000) {
+    SS2K_LOG(POWERTABLE_LOG_TAG, "CubicSpline: Not enough heap memory available.");
+    return;
+  }
 
   size_t last_index = n - 1;
 

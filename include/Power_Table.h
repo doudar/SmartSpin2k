@@ -58,6 +58,7 @@ class TableRow {
 };
 
 class TestResults {
+  public:
   struct Neighbor {
     unsigned int found : 1;
     unsigned int passedTest : 1;
