@@ -1055,6 +1055,10 @@ void PowerTable::enterData(int k, int i, int pos) {
     int newEntries = 1;
     // loop until we can't calculate any new data
     while (entries < newEntries) {
+      if(esp_get_free_heap_size() < 20000){
+        SS2K_LOG(POWERTABLE_LOG_TAG ,"Heap too low");
+        return;
+      }
       entries = newEntries;
       this->fillTable();
       this->extrapFillTable();
