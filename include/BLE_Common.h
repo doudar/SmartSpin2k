@@ -16,7 +16,7 @@
 #include <vector>
 #include "Main.h"
 #include "BLE_Definitions.h"
-#include "BLE_Wattbike_Service.h"
+//#include "BLE_Wattbike_Service.h"
 #include "BLE_SB20_Service.h"
 #include "Constants.h"
 
@@ -104,7 +104,7 @@ class MyCharacteristicCallbacks : public NimBLECharacteristicCallbacks {
 };
 
 extern SpinBLEServer spinBLEServer;
-extern BLE_Wattbike_Service wattbikeService;
+//extern BLE_Wattbike_Service wattbikeService;
 
 void startBLEServer();
 void logCharacteristic(char* buffer, const size_t bufferCapacity, const byte* data, const size_t dataLength, const NimBLEUUID serviceUUID, const NimBLEUUID charUUID,
