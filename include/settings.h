@@ -269,7 +269,7 @@ const char* const DEFAULT_PASSWORD = "password";
  This is currently maintained as to keep memory usage lower and reduce the print output of the table.
  It can be depreciated in the future should we decide to remove logging of the torque table. Then it should be calculated in ERG_Mode.cpp
  by dividing userConfig->getMaxWatts() by POWERTABLE_INCREMENT.  */
-#define POWERTABLE_WATT_SIZE 40
+#define POWERTABLE_WATT_SIZE 30
 
 // Size of the second dimension of the table. The base (starting point) is calculated off of MINUMUM_TABLE_CAD
 #define POWERTABLE_CAD_SIZE 10
@@ -343,8 +343,8 @@ const char* const DEFAULT_PASSWORD = "password";
 
 // Task Stack Sizes
 // In theory you can subtract whatever is left in the report from DEBUG_STACK for each task
-#define MAIN_STACK       6500 - 2000 
-#define BLE_CLIENT_STACK 6000 - 2000
+#define MAIN_STACK       4500
+#define BLE_CLIENT_STACK 6000 //Scans and connects to BLE devices. Holds the BLE Notify Data. 
 
 // Uncomment to enable stack size debugging info
 #define DEBUG_STACK
@@ -363,5 +363,5 @@ const char* const DEFAULT_PASSWORD = "password";
 // #define CUSTOM_CHAR_DEBUG
 
 // Uncomment to enable DirCon message logging to serial monitor (not logger)
-// #define DEBUG_DIRCON_MESSAGES
+#define DEBUG_DIRCON_MESSAGES
 

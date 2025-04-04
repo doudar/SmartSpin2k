@@ -16,7 +16,7 @@
 #include <vector>
 #include "Main.h"
 #include "BLE_Definitions.h"
-#include "BLE_Wattbike_Service.h"
+//#include "BLE_Wattbike_Service.h"
 #include "BLE_SB20_Service.h"
 #include "Constants.h"
 
@@ -104,7 +104,7 @@ class MyCharacteristicCallbacks : public NimBLECharacteristicCallbacks {
 };
 
 extern SpinBLEServer spinBLEServer;
-extern BLE_Wattbike_Service wattbikeService;
+//extern BLE_Wattbike_Service wattbikeService;
 
 void startBLEServer();
 void logCharacteristic(char* buffer, const size_t bufferCapacity, const byte* data, const size_t dataLength, const NimBLEUUID serviceUUID, const NimBLEUUID charUUID,
@@ -168,7 +168,7 @@ class SpinBLEAdvertisedDevice {
   bool getPostConnected() { return isPostConnected; }
   void set(const NimBLEAdvertisedDevice* device, int id = BLE_HS_CONN_HANDLE_NONE, BLEUUID inServiceUUID = (uint16_t)0x0000, BLEUUID inCharUUID = (uint16_t)0x0000);
   void reset(bool resetAdvertisedDevice = true);
-  bool enqueueData(uint8_t data[NOTIFY_DATA_QUEUE_SIZE], size_t length, NimBLEUUID serviceUUID, NimBLEUUID charUUID);
+  bool enqueueData(uint8_t *data, size_t length, NimBLEUUID serviceUUID, NimBLEUUID charUUID);
   NotifyData dequeueData();
 };
 

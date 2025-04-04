@@ -56,7 +56,7 @@
 #endif
 #define SS2K_LOG(tag, format, ...) ss2k_log_write(ESP_LOG_ERROR, tag, format, ##__VA_ARGS__);
 
-#define LOG_BUFFER_SIZE_BYTES 6000
+#define LOG_BUFFER_SIZE_BYTES 1000
 class LogHandler {
  public:
   LogHandler();

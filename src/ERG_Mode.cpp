@@ -21,7 +21,8 @@
 // Create a torque table representing 0w-1000w in 50w increments.
 // i.e. powerTable[1] corresponds to the incline required for 50w. powerTable[2] is the incline required for 100w and so on.
 
-static unsigned long int ergTimer = millis();
+
+static unsigned long ergTimer = millis();
 
 void ErgMode::runERG() {
   static ErgMode ergMode;
@@ -34,13 +35,6 @@ void ErgMode::runERG() {
   if ((millis() - ergTimer) > ERG_MODE_DELAY) {
     // reset the timer.
     ergTimer = millis();
-    // be quiet while updating via BLE
-    if (ss2k->isUpdating) {
-      return;
-    }
-    if (spinBLEServer.spinDownFlag) {
-      return;
-    }
 
     static unsigned long int saveFlagCooldown = 0;
     // save powertable if saveFlag has been set for 10 seconds using a saveFlagCooldown timer

@@ -8,12 +8,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
--Root CA certificates are now updated automatically during every build. 
+-Root CA certificates are now updated automatically during every build.
 
 ### Changed
 - Added CSC sensor selection in BLE Scanner html.
 - Turned moving neighbors into a function, moved cubicspline class to power_table.h, merged dircon2, and changed added set_points changes
 
+### Fixed
+- Fixed stack smashing protection failure in SpinBLEAdvertisedDevice::enqueueData by adding a buffer size check to prevent overflow when handling BLE notifications larger than the buffer size
 
 ### Hardware
 

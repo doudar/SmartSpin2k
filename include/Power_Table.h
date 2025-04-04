@@ -9,15 +9,16 @@
 
 #include "settings.h"
 #include "SmartSpin_parameters.h"
-#include <vector> 
+#include <vector>
 
-#define POWERTABLE_LOG_TAG   "PTable"
-#define RETURN_ERROR         INT32_MIN
+#define POWERTABLE_LOG_TAG         "PTable"
+#define RETURN_ERROR               INT32_MIN
+#define FREE_HEAP_FOR_COMPLEX_MATH 30000
 
 class PowerEntry {
  public:
   int watts;
-  int resistance; 
+  int resistance;
   int32_t targetPosition;
   int cad;
   int readings;
@@ -27,7 +28,7 @@ class PowerEntry {
     this->targetPosition = 0;
     this->cad            = 0;
     this->readings       = 0;
-    this->resistance     = 0; 
+    this->resistance     = 0;
   }
 };
 
@@ -58,6 +59,7 @@ class TableRow {
 };
 
 class TestResults {
+ public:
   struct Neighbor {
     unsigned int found : 1;
     unsigned int passedTest : 1;
@@ -90,7 +92,7 @@ class TestResults {
 
 class PowerTable {
  public:
-  bool saveFlag = false;
+  bool saveFlag                  = false;
   bool _hasBeenLoadedThisSession = false;
   TableRow tableRow[POWERTABLE_CAD_SIZE];
 
@@ -103,16 +105,16 @@ class PowerTable {
   // Catalogs a new entry into the power table.
   void newEntry(PowerBuffer& powerBuffer);
 
-  // enters data into power table 
-  void enterData(int i, int j, int pos); 
+  // enters data into power table
+  void enterData(int i, int j, int pos);
 
-  void downVoteData(int i, int j, float target, int neighbor); 
+  void downVoteData(int i, int j, float target, int neighbor);
 
   // returns incline for wattTarget. Null if not found.
   int32_t lookup(int watts, int cad);
 
-  // returns 
-  int32_t splineLookup(int watts, int cad); 
+  // returns
+  int32_t splineLookup(int watts, int cad);
 
   // returns watts for given cadence and target position. Returns RETURN_ERROR if not found.
   int32_t lookupWatts(int cad, int32_t targetPosition);
@@ -136,7 +138,7 @@ class PowerTable {
 
   void findTableDirection(bool horizontal);
 
-  void extrapFillTableDirection(bool horizontal); 
+  void extrapFillTableDirection(bool horizontal);
 
   void extrapolateEmptyIndices(int outerIndex, const std::vector<int>& emptyIndices, const float* x, const float* y, size_t n, bool horizontal, bool naturalSpline);
 
@@ -148,11 +150,11 @@ class PowerTable {
 
   float linearExtrapolate(const float* x, const float* y, size_t n, float j);
 
-  void processNeighbor(int k, int i, float targetPosition, int neighbor_i, int neighbor_j, int neighbor_targetPosition,
-    int oppositeNeighbor_i, int oppositeNeighbor_j, int oppositeNeighbor_targetPosition, float rangeFactor);  
+  void processNeighbor(int k, int i, float targetPosition, int neighbor_i, int neighbor_j, int neighbor_targetPosition, int oppositeNeighbor_i, int oppositeNeighbor_j,
+                       int oppositeNeighbor_targetPosition, float rangeFactor);
 
  private:
-  unsigned long lastSaveTime     = millis();
+  unsigned long lastSaveTime = millis();
   TestResults testNeighbors(int i, int j, int value);
   void fillTable();
   void extrapFillTable();
@@ -163,17 +165,17 @@ class PowerTable {
 };
 
 class CubicSpline {
-  public:
-      void set_points(const float* x_vals, const float* y_vals, size_t n, bool natural);
-  
-      float interpolate(float x_val) const;
-  
-      float extrapolate(float x_val) const;
-      
-      bool shouldUseNaturalSpline(const float* x, const float* y, size_t n);
-  
-  private:
-      std::vector<float> x, y, h, alpha, l, mu, z, c, b, d;
-  };
+ public:
+  void set_points(const float* x_vals, const float* y_vals, size_t n, bool natural);
+
+  float interpolate(float x_val) const;
+
+  float extrapolate(float x_val) const;
+
+  bool shouldUseNaturalSpline(const float* x, const float* y, size_t n);
+
+ private:
+  std::vector<float> x, y, h, alpha, l, mu, z, c, b, d;
+};
 
 extern PowerTable* powerTable;
