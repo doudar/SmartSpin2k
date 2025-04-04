@@ -41,9 +41,6 @@ const BLEServiceInfo* getDeviceServiceInfo(const NimBLEAdvertisedDevice* adverti
 bool isDeviceSupported(const NimBLEAdvertisedDevice* advertisedDevice, const String& deviceName) { return getDeviceServiceInfo(advertisedDevice, deviceName) != nullptr; }
 
 void BLECommunications() {
-  static unsigned long int bleCommTimer = millis();
-  if (((millis() - bleCommTimer) > BLE_NOTIFY_DELAY) && !ss2k->isUpdating) {
-    bleCommTimer = millis();
     // **********************************Client***************************************
     for (auto& _BLEd : spinBLEClient.myBLEDevices) {  // loop through discovered devices
       if (_BLEd.connectedClientID != BLE_HS_CONN_HANDLE_NONE) {
@@ -76,7 +73,7 @@ void BLECommunications() {
                   spinBLEClient.handleBattInfo(pClient, false);
                 }
 
-              } else if (!pClient->isConnected()) {  // This is a workaround for a bug in NimBLE where onDisconnect() is not called automatically. 
+              } else if (!pClient->isConnected()) {  // This is a workaround for a bug in NimBLE where onDisconnect() is not called automatically.
                 MyClientCallback workaroundCallback;
                 workaroundCallback.onDisconnect(pClient, 0);
                 SS2K_LOG(BLE_COMMON_LOG_TAG, "Client %s not connected in communications loop", _BLEd.peerAddress.toString().c_str());
@@ -136,5 +133,4 @@ void BLECommunications() {
     } else {
       digitalWrite(LED_PIN, HIGH);
     }
-  }
 }

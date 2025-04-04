@@ -138,7 +138,7 @@ void subscribeToAllNotifications(NimBLEClient *pClient) {
  * when the DEBUG_STACK macro is defined.
  */
 void bleClientTask(void *pvParameters) {
-  long int scanDelay = millis();
+  unsigned long scanDelay = millis();
   spinBLEClient.checkBLEReconnect();
   for (;;) {
     delay(BLE_CLIENT_DELAY);  // Delay between loops.
@@ -160,12 +160,9 @@ void bleClientTask(void *pvParameters) {
     }
 
     // Scan for BLE devices that we should connect to this client
-    if ((millis() - scanDelay) > ((BLE_RECONNECT_SCAN_DURATION) * 2)) {
+    if ((millis() - scanDelay) > (BLE_RECONNECT_SCAN_DURATION * 2)) {
       spinBLEClient.checkBLEReconnect();
       scanDelay = millis();
-#ifdef DEBUG_STACK
-      Serial.printf("BLEClient: %d \n", uxTaskGetStackHighWaterMark(BLEClientTask));
-#endif  // DEBUG_STACK
     }
 
     if (spinBLEClient.doScan && (!ss2k->isUpdating)) {
@@ -433,7 +430,7 @@ void ScanCallbacks::onResult(const NimBLEAdvertisedDevice *advertisedDevice) {
     return;
   }
 
-  Serial.printf("Advertised Device found: %s\n", advertisedDevice->toString().c_str());
+  Serial.printf("Device found: %s\n", advertisedDevice->haveName() ? advertisedDevice->getName().c_str() : advertisedDevice->getAddress().toString().c_str());
   // Define granular constants for maximal reuse during logging
   const char *const MATCHED               = "Matched ";
   const char *const DIDNT_MATCH_THE_SAVED = " didn't match the saved: ";
@@ -513,7 +510,7 @@ void SpinBLEClient::scanProcess(int duration) {
   if (pBLEScan->isScanning()) {
     return;
   }
-  pBLEScan->start(duration, false, true);
+  pBLEScan->start(duration, false, false);
   this->dontBlockScan = false;
 }
 
@@ -558,7 +555,7 @@ void ScanCallbacks::onScanEnd(const NimBLEScanResults &results, int reason) {
 
   String output;
   serializeJson(devices, output);
-  // SS2K_LOG(BLE_CLIENT_LOG_TAG, "Found Devices: %s", output.c_str());
+  SS2K_LOG(BLE_CLIENT_LOG_TAG, "Found Devices: %s", output.c_str());
   userConfig->setFoundDevices(output);  // Save the updated JSON document
 }
 
@@ -580,7 +577,7 @@ void SpinBLEClient::removeDuplicates(NimBLEClient *pClient) {
       if ((tBLEd.serviceUUID == oldBLEd.serviceUUID) && (tBLEd.peerAddress != oldBLEd.peerAddress)) {
         if (BLEDevice::getClientByPeerAddress(oldBLEd.peerAddress)) {
           if (BLEDevice::getClientByPeerAddress(oldBLEd.peerAddress)->isConnected()) {
-            SS2K_LOG(BLE_CLIENT_LOG_TAG, "%s Matched another service.  Disconnecting: %s", tBLEd.peerAddress.toString().c_str(), oldBLEd.peerAddress.toString().c_str());
+            SS2K_LOG(BLE_CLIENT_LOG_TAG, "%s Detected as a duplicate.  Disconnecting: %s", tBLEd.peerAddress.toString().c_str(), oldBLEd.peerAddress.toString().c_str());
             NimBLEDevice::deleteClient(BLEDevice::getClientByPeerAddress(oldBLEd.peerAddress));
             oldBLEd.reset();
             spinBLEClient.intentionalDisconnect++;
@@ -718,6 +715,12 @@ bool SpinBLEAdvertisedDevice::enqueueData(uint8_t *data, size_t length, NimBLEUU
   if (!uxQueueSpacesAvailable(this->dataBufferQueue)) {
     // Serial.println("No space available in queue. Skipping enqueue of data.");
     return pdFALSE;
+  }
+
+  // Ensure we don't exceed the buffer size to prevent stack smashing
+  if (length > NOTIFY_DATA_QUEUE_SIZE) {
+    SS2K_LOGW(BLE_CLIENT_LOG_TAG, "BLE data length (%d) exceeds buffer size (%d), truncating", length, NOTIFY_DATA_QUEUE_SIZE);
+    length = NOTIFY_DATA_QUEUE_SIZE;
   }
 
   notifyData.length      = length;

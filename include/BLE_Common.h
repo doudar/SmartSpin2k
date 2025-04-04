@@ -168,7 +168,7 @@ class SpinBLEAdvertisedDevice {
   bool getPostConnected() { return isPostConnected; }
   void set(const NimBLEAdvertisedDevice* device, int id = BLE_HS_CONN_HANDLE_NONE, BLEUUID inServiceUUID = (uint16_t)0x0000, BLEUUID inCharUUID = (uint16_t)0x0000);
   void reset(bool resetAdvertisedDevice = true);
-  bool enqueueData(uint8_t data[NOTIFY_DATA_QUEUE_SIZE], size_t length, NimBLEUUID serviceUUID, NimBLEUUID charUUID);
+  bool enqueueData(uint8_t *data, size_t length, NimBLEUUID serviceUUID, NimBLEUUID charUUID);
   NotifyData dequeueData();
 };
 

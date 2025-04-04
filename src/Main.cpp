@@ -19,7 +19,7 @@
 #include "BLE_Custom_Characteristic.h"
 #include <Constants.h>
 #include "settings.h"
-//#include "BLE_Wattbike_Service.h"
+// #include "BLE_Wattbike_Service.h"
 #include "BLE_Fitness_Machine_Service.h"
 #include "DirConManager.h"
 
@@ -103,8 +103,8 @@ void setup() {
   SS2K_LOG(MAIN_LOG_TAG, "Mounting Filesystem");
   if (!LittleFS.begin(false)) {
     SS2K_LOG(MAIN_LOG_TAG, "An Error has occurred while mounting LittleFS.");
-    LittleFS.format();                     // Format so that the settings can be saved.
-    delay(100);  // Provide some time for the format to happen.
+    LittleFS.format();  // Format so that the settings can be saved.
+    delay(100);         // Provide some time for the format to happen.
   }
 
   // Load Config
@@ -114,6 +114,7 @@ void setup() {
 
   // if we have homing data, use that instead.
   if (userConfig->getHMax() != INT32_MIN && userConfig->getHMin() != INT32_MIN) {
+    SS2K_LOG(MAIN_LOG_TAG, "Using homing data from config file.");
     spinBLEServer.spinDownFlag = 1;
   }
 
@@ -157,7 +158,7 @@ void setup() {
 
   ss2k->startTasks();
   httpServer.start();
-  
+
   // Start DirCon TCP server for direct control over the bike trainer
   SS2K_LOG(MAIN_LOG_TAG, "Starting DirCon TCP service");
   if (DirConManager::start()) {
@@ -187,7 +188,6 @@ void loop() {  // Delete this task so we can make one that's more memory efficie
 }
 
 void SS2K::maintenanceLoop(void *pvParameters) {
-  static unsigned long intervalTimer  = millis();
   static unsigned long intervalTimer2 = millis();
   static unsigned long rebootTimer    = millis();
   static bool isScanning              = false;
@@ -195,22 +195,39 @@ void SS2K::maintenanceLoop(void *pvParameters) {
   while (true) {
     delay(5);
 
-    // Run what used to be in the BLECommunications Task.
-    BLECommunications();
+    // be quiet while updating via BLE
+    if (!ss2k->isUpdating) {
+      static unsigned long bleTimer = millis();
+      // 500ms
+      if ((millis() - bleTimer) > BLE_NOTIFY_DELAY) {
+        BLECommunications();
+        logHandler.writeLogs();
+        webSocketAppender.Loop();
+        bleTimer = millis();
+      }
+      // Don't do these if updating and in spindown mode.
+      if (!spinBLEServer.spinDownFlag) {
+        static unsigned long ergTimer = millis();
+        ss2k->moveStepper();
+        ss2k->FTMSModeShiftModifier();
+        // 700ms
+        if ((millis() - ergTimer) > ERG_MODE_DELAY) {
+          ergMode->runERG();
+          ergTimer = millis();
+        }
+      }
+      // wattbikeService.parseNemit();
+    }
+
     // send BLE notification for any userConfig values that changed.
     BLE_ss2kCustomCharacteristic::parseNemit();
     // Update Zwift Gear UI if shift happened
-    // wattbikeService.parseNemit();
-    // Run What used to be in the Stepper Task.
-    ss2k->moveStepper();
-    // Run what used to be in the ERG Mode Task.
-    ergMode->runERG();
-    // Run what used to be in the WebClient Task.
+
     httpServer.webClientUpdate();
     // Update DirCon protocol
     DirConManager::update();
     // If we're in ERG mode, modify shift commands to inc/dec the target watts instead.
-    ss2k->FTMSModeShiftModifier();
+
     // If we have a resistance bike attached, slow down when we're close to the limits.
     if (ss2k->pelotonIsConnected && !rtConfig->getHomed() && !spinBLEServer.spinDownFlag) {
       int speed           = userConfig->getStepperSpeed();
@@ -278,13 +295,6 @@ void SS2K::maintenanceLoop(void *pvParameters) {
       userPWC->saveToLittleFS();
     }
 
-    // Things to do every one seconds
-    if ((millis() - intervalTimer) > 1003) {
-      logHandler.writeLogs();
-      webSocketAppender.Loop();
-      intervalTimer = millis();
-    }
-
     // Things to do every 6 seconds
     if ((millis() - intervalTimer2) > 6007) {
       // reboot every half hour if not in use.
@@ -296,7 +306,7 @@ void SS2K::maintenanceLoop(void *pvParameters) {
         // Inactivity detected
         if (((millis() - rebootTimer) > 1800000)) {
           // Timer expired
-          SS2K_LOGW(MAIN_LOG_TAG, "Rebooting due to inactivity.");
+          SS2K_LOG(MAIN_LOG_TAG, "Rebooting due to inactivity.");
           ss2k->rebootFlag = true;
           logHandler.writeLogs();
           webSocketAppender.Loop();
@@ -312,9 +322,14 @@ void SS2K::maintenanceLoop(void *pvParameters) {
 
 #ifdef DEBUG_STACK
       Serial.printf("Main Task: %d \n", uxTaskGetStackHighWaterMark(maintenanceLoopTask));
+      Serial.printf("BLEClient: %d \n", uxTaskGetStackHighWaterMark(BLEClientTask));
       Serial.printf("Min  Heap: %d \n", esp_get_minimum_free_heap_size());
+      Serial.printf("Free Heap: %d \n", esp_get_free_heap_size());
       Serial.printf("Best Blok: %d \n", heap_caps_get_largest_free_block(MALLOC_CAP_8BIT));
 #endif  // DEBUG_STACK
+      // Log userParameters
+      SS2K_LOG(MAIN_LOG_TAG, "PM Con %d, HRM Con %d, W %d, Cad %d, HR %d, Gear %d, Target Position %f", spinBLEClient.connectedPM, spinBLEClient.connectedHRM,
+               rtConfig->watts.getValue(), rtConfig->cad.getValue(), rtConfig->hr.getValue(), rtConfig->getShifterPosition(), ss2k->targetPosition);
 
       intervalTimer2 = millis();
     }
@@ -324,9 +339,6 @@ void SS2K::maintenanceLoop(void *pvParameters) {
 #endif  // UNIT_TEST
 
 void SS2K::FTMSModeShiftModifier() {
-  if (spinBLEServer.spinDownFlag) {
-    return;
-  }
   int shiftDelta = rtConfig->getShifterPosition() - ss2k->lastShifterPosition;
   if (shiftDelta) {  // Shift detected
     switch (rtConfig->getFTMSMode()) {
@@ -409,9 +421,6 @@ void SS2K::restartWifi() {
 }
 
 void SS2K::moveStepper() {
-  if (spinBLEServer.spinDownFlag) {
-    return;
-  }
   bool _stepperDir = userConfig->getStepperDir();
   if (stepper) {
     ss2k->stepperIsRunning = stepper->isRunning();
@@ -636,8 +645,8 @@ void SS2K::goHome(bool bothDirections) {
       this->updateStepperSpeed(1500);
       delay(500);
       stepper->runForward();
-      delay(1000);  // wait until stable
-      threshold = driver.SG_RESULT();         // take reading
+      delay(1000);                     // wait until stable
+      threshold = driver.SG_RESULT();  // take reading
       Serial.printf("%d ", driver.SG_RESULT());
       delay(250);
       while (!stalled) {
