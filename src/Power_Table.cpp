@@ -341,6 +341,10 @@ TestResults PowerTable::testNeighbors(int i, int j, int testValue) {
  *         and returns `INT16_MIN`.
  */
 float PowerTable::linearInterpolate(const float* x, const float* y, size_t n, float j) {
+  if (esp_get_free_heap_size() < FREE_HEAP_FOR_COMPLEX_MATH) {
+    SS2K_LOG(POWERTABLE_LOG_TAG, "Linear Interpolate: Not enough heap memory available.");
+    return INT16_MIN;
+  }
   auto upper = std::upper_bound(x, x + n, j);
 
   if (upper == x + n) return y[n - 1];  // Extrapolate using last value
@@ -359,6 +363,11 @@ float PowerTable::linearInterpolate(const float* x, const float* y, size_t n, fl
 }
 
 float PowerTable::linearExtrapolate(const float* x, const float* y, size_t n, float j) {
+  if (esp_get_free_heap_size() < FREE_HEAP_FOR_COMPLEX_MATH) {
+    SS2K_LOG(POWERTABLE_LOG_TAG, "Linear Extrapolate: Not enough heap memory available.");
+    return INT16_MIN;
+  }
+
   float x0, x1, y0, y1;
 
   if (j < x[0]) {
@@ -461,6 +470,10 @@ float CubicSpline::interpolate(float x_val) const {
 }
 
 float CubicSpline::extrapolate(float x_val) const {
+  if (esp_get_free_heap_size() < FREE_HEAP_FOR_COMPLEX_MATH) {
+    SS2K_LOG(POWERTABLE_LOG_TAG, "Extrapolate: Not enough heap memory available.");
+    return INT16_MIN;
+  }
   if (x_val < x.front()) {
     float dx = x_val - x[0];
     return y[0] + b[0] * dx + c[0] * dx * dx + d[0] * dx * dx * dx;
