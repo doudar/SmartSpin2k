@@ -138,8 +138,6 @@ void subscribeToAllNotifications(NimBLEClient *pClient) {
  * when the DEBUG_STACK macro is defined.
  */
 void bleClientTask(void *pvParameters) {
-  unsigned long scanDelay = millis();
-  spinBLEClient.checkBLEReconnect();
   for (;;) {
     delay(BLE_CLIENT_DELAY);  // Delay between loops.
 
@@ -160,7 +158,8 @@ void bleClientTask(void *pvParameters) {
     }
 
     // Scan for BLE devices that we should connect to this client
-    if ((millis() - scanDelay) > (BLE_RECONNECT_SCAN_DURATION * 2)) {
+    static unsigned long scanDelay = millis();
+    if ((millis() - scanDelay) > BLE_RECONNECT_SCAN_DURATION) {
       spinBLEClient.checkBLEReconnect();
       scanDelay = millis();
     }
@@ -168,6 +167,8 @@ void bleClientTask(void *pvParameters) {
     if (spinBLEClient.doScan && (!ss2k->isUpdating)) {
       spinBLEClient.scanProcess(DEFAULT_SCAN_DURATION);
     }
+
+    spinBLEClient.postConnect();
 
     // Connect BLE Servers to this client
     for (int x = 0; x < NUM_BLE_DEVICES; x++) {
@@ -180,6 +181,7 @@ void bleClientTask(void *pvParameters) {
         }
       }
     }
+
     // Spin Down process for the Server. It's here because it needs to be non-blocking for the maintenance loop.
     // Checking for cadence also so that we don't home when nobody is around.
     if (spinBLEServer.spinDownFlag && rtConfig->cad.getValue()) {
@@ -255,8 +257,8 @@ bool SpinBLEClient::connectToServer() {
      */
     pClient = NimBLEDevice::getClientByPeerAddress(myDevice->getAddress());
     if (pClient) {
-      pClient->setConnectTimeout(500);
-      pClient->setConnectionParams(24, 48, 0, 200);
+      pClient->setConnectTimeout(1000);
+      pClient->setConnectionParams(24, 96, 1, 500);
       SS2K_LOG(BLE_CLIENT_LOG_TAG, "Reusing Client");
       if (!pClient->connect(myDevice)) {
         SS2K_LOG(BLE_CLIENT_LOG_TAG, "Reconnect failed ");
@@ -298,11 +300,11 @@ bool SpinBLEClient::connectToServer() {
      *  connections. Timeout should be a multiple of the interval, minimum is 100ms.
      *  Min interval: 12 * 1.25ms = 15, Max interval: 12 * 1.25ms = 15, 0 latency, 51 * 10ms = 510ms timeout
      */
-    pClient->setConnectionParams(24, 48, 0, 200);
+    pClient->setConnectionParams(24, 96, 1, 500);
     /** Set how long we are willing to wait for the connection to complete (seconds), default is 30. */
     pClient->setConnectTimeout(5000);  // 5 seconds
 
-    if (!pClient->connect(myDevice, false)) {
+    if (!pClient->connect(myDevice)) {
       SS2K_LOG(BLE_CLIENT_LOG_TAG, " - Failed to connect client");
       /** Created a client but failed to connect, don't need to keep it as it has no data */
       spinBLEClient.myBLEDevices[device_number].reset();
@@ -329,8 +331,12 @@ bool SpinBLEClient::connectToServer() {
 
   /** Now we can read/write/subscribe the characteristics of the services we are interested in */
   NimBLERemoteService *pSvc = nullptr;
-
-  pSvc = pClient->getService(serviceUUID);
+  pSvc                      = pClient->getService(serviceUUID);
+  if (!pSvc) {
+    pClient->getServices(true);
+    SS2K_LOG(BLE_CLIENT_LOG_TAG, "Refreshing services");
+    pSvc = pClient->getService(serviceUUID);
+  }
   if (pSvc) { /** make sure it's not null */
     this->reconnectTries                                = MAX_RECONNECT_TRIES;
     spinBLEClient.myBLEDevices[device_number].doConnect = false;
@@ -378,7 +384,6 @@ void MyClientCallback::onDisconnect(NimBLEClient *pClient, int reason) {
           spinBLEClient.intentionalDisconnect--;
           spinBLEClient.myBLEDevices[i].reset();
         }
-        
       }
     }
     return;
@@ -836,7 +841,7 @@ void SpinBLEClient::keepAliveBLE_HID(NimBLEClient *pClient) {
 }
 
 void SpinBLEClient::checkBLEReconnect() {
-  if ((String(userConfig->getConnectedHeartMonitor()) != "none") && !(spinBLEClient.connectedHRM)) {
+  if ((String(userConfig->getConnectedHeartMonitor()) != "none") && !spinBLEClient.connectedHRM) {
     this->doScan = true;
     SS2K_LOG(BLE_CLIENT_LOG_TAG, "No HRM Connected");
   }

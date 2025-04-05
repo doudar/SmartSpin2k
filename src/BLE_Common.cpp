@@ -105,8 +105,6 @@ void BLECommunications() {
       rtConfig->hr.setValue(0);
     }
 
-    spinBLEClient.postConnect();
-
     if (!ss2k->isUpdating) {
       spinBLEServer.update();
 
