@@ -359,7 +359,6 @@ float PowerTable::linearInterpolate(const float* x, const float* y, size_t n, fl
 }
 
 float PowerTable::linearExtrapolate(const float* x, const float* y, size_t n, float j) {
-
   float x0, x1, y0, y1;
 
   if (j < x[0]) {
@@ -385,63 +384,37 @@ float PowerTable::linearExtrapolate(const float* x, const float* y, size_t n, fl
 }
 
 void CubicSpline::set_points(const float* x_vals, const float* y_vals, size_t n, bool natural = true) {
-  if (n < 2) return;  // Safe check to make sure we have enough points
-  size_t last_index = n - 1;
+  if (n < 2) return;  // Ensure sufficient points
+
   x.assign(x_vals, x_vals + n);
   y.assign(y_vals, y_vals + n);
 
-  h.resize(last_index);
-  alpha.resize(n, 0.0f);
-  l.resize(n, 0.0f);
-  mu.resize(n, 0.0f);
-  z.resize(n, 0.0f);
+  std::vector<float> h(n - 1), alpha(n, 0.0f);
   c.resize(n, 0.0f);
-  b.resize(last_index, 0.0f);
-  d.resize(last_index, 0.0f);
+  b.resize(n - 1, 0.0f);
+  d.resize(n - 1, 0.0f);
 
-  // Get h values
-  for (size_t i = 0; i < last_index; ++i) {
+  for (size_t i = 0; i < n - 1; ++i) {
     h[i] = x[i + 1] - x[i];
-    if (h[i] == 0.0f) {
-      SS2K_LOG(POWERTABLE_LOG_TAG, "CubicSpline: Duplicate x values detected.");
-      return;
-    }
+    if (h[i] == 0.0f) return;  // Avoid duplicate x values
   }
 
-  // Get alpha values
-  for (size_t i = 1; i < last_index; ++i) {
+  for (size_t i = 1; i < n - 1; ++i) {
     alpha[i] = (3.0f / h[i]) * (y[i + 1] - y[i]) - (3.0f / h[i - 1]) * (y[i] - y[i - 1]);
   }
 
-  // Check if we are using natural or clamped spline calculations
-  if (natural) {
-    alpha[0] = alpha[last_index] = 0.0f;
-  } else {
-    float f_prime_start = (y[1] - y[0]) / h[0];
-    float f_prime_end   = (y[last_index] - y[last_index - 1]) / h[last_index - 1];
-    alpha[0]            = 3.0f * (f_prime_start - (y[1] - y[0]) / h[0]);
-    alpha[last_index]   = 3.0f * ((y[last_index] - y[last_index - 1]) / h[last_index - 1] - f_prime_end);
+  float l = 1.0f, mu = 0.0f, z = 0.0f, prev_l = 1.0f, prev_z = 0.0f;
+
+  for (size_t i = 1; i < n - 1; ++i) {
+    l = 2.0f * (x[i + 1] - x[i - 1]) - h[i - 1] * mu;
+    mu = h[i] / l;
+    z = (alpha[i] - h[i - 1] * prev_z) / l;
+    prev_z = z;
+    prev_l = l;
   }
 
-  // Get l, mu, and z
-  l[0]  = 1.0f;
-  mu[0] = z[0] = 0.0f;
-
-  for (size_t i = 1; i < last_index; ++i) {
-    l[i] = 2.0f * (x[i + 1] - x[i - 1]) - h[i - 1] * mu[i - 1];
-    if (l[i] == 0.0f) {
-      SS2K_LOG(POWERTABLE_LOG_TAG, "CubicSpline: Zero denominator detected in l[i].");
-      return;
-    }
-    mu[i] = h[i] / l[i];
-    z[i]  = (alpha[i] - h[i - 1] * z[i - 1]) / l[i];
-  }
-
-  l[last_index] = 1.0f;
-  z[last_index] = c[last_index] = 0.0f;
-
-  for (int j = last_index - 1; j >= 0; --j) {
-    c[j] = z[j] - mu[j] * c[j + 1];
+  for (int j = n - 2; j >= 0; --j) {
+    c[j] = z - mu * c[j + 1];
     b[j] = (y[j + 1] - y[j]) / h[j] - h[j] * (c[j + 1] + 2.0f * c[j]) / 3.0f;
     d[j] = (c[j + 1] - c[j]) / (3.0f * h[j]);
   }
@@ -947,35 +920,22 @@ void PowerTable::newEntry(PowerBuffer& powerBuffer) {
 
   // Downvote out of position neighbors and discard entry if it doesn't match the logic of the table
   TestResults testResults = this->testNeighbors(k, i, targetPosition);
+
+  auto handleNeighborFailure = [&](const char* direction, const TestResults::Neighbor& neighbor, const TestResults::Neighbor& oppositeNeighbor, float rangeFactor) {
+    if (!neighbor.passedTest) {
+      SS2K_LOG(POWERTABLE_LOG_TAG, "%s neighbor position (%d) failed with watts=%f, cad=%f, targetPosition=%f, (%d)(%d)", direction, neighbor.targetPosition, watts, cad,
+               targetPosition, k, i);
+      this->processNeighbor(k, i, targetPosition, neighbor.i, neighbor.j, neighbor.targetPosition, oppositeNeighbor.i, oppositeNeighbor.j, oppositeNeighbor.targetPosition,
+                            rangeFactor);
+    }
+  };
+
+  handleNeighborFailure("Left", testResults.leftNeighbor, testResults.rightNeighbor, HORIZONTAL_NEIGHBOR_RANGE);
+  handleNeighborFailure("Right", testResults.rightNeighbor, testResults.leftNeighbor, HORIZONTAL_NEIGHBOR_RANGE);
+  handleNeighborFailure("Top", testResults.topNeighbor, testResults.bottomNeighbor, VERTICAL_NEIGHBOR_RANGE);
+  handleNeighborFailure("Bottom", testResults.bottomNeighbor, testResults.topNeighbor, VERTICAL_NEIGHBOR_RANGE);
+
   if (!(testResults.bottomNeighbor.passedTest && testResults.topNeighbor.passedTest && testResults.rightNeighbor.passedTest && testResults.leftNeighbor.passedTest)) {
-    // test which bit fields didn't match
-    if (!testResults.leftNeighbor.passedTest) {
-      SS2K_LOG(POWERTABLE_LOG_TAG, "Left neighbor position (%d) failed with watts=%f, cad=%f, targetPosition=%f, (%d)(%d)", testResults.leftNeighbor.targetPosition, watts, cad,
-               targetPosition, k, i);
-      this->processNeighbor(k, i, targetPosition, testResults.leftNeighbor.i, testResults.leftNeighbor.j, testResults.leftNeighbor.targetPosition, testResults.rightNeighbor.i,
-                            testResults.rightNeighbor.j, testResults.rightNeighbor.targetPosition, HORIZONTAL_NEIGHBOR_RANGE);
-    }
-
-    if (!testResults.rightNeighbor.passedTest) {
-      SS2K_LOG(POWERTABLE_LOG_TAG, "Right neighbor position (%d) failed with watts=%f, cad=%f, targetPosition=%f, (%d)(%d)", testResults.rightNeighbor.targetPosition, watts, cad,
-               targetPosition, k, i);
-      this->processNeighbor(k, i, targetPosition, testResults.rightNeighbor.i, testResults.rightNeighbor.j, testResults.rightNeighbor.targetPosition, testResults.leftNeighbor.i,
-                            testResults.leftNeighbor.j, testResults.leftNeighbor.targetPosition, HORIZONTAL_NEIGHBOR_RANGE);
-    }
-
-    if (!testResults.topNeighbor.passedTest) {
-      SS2K_LOG(POWERTABLE_LOG_TAG, "Top neighbor position (%d) failed with watts=%f, cad=%f, targetPosition=%f, (%d)(%d)", testResults.topNeighbor.targetPosition, watts, cad,
-               targetPosition, k, i);
-      this->processNeighbor(k, i, targetPosition, testResults.topNeighbor.i, testResults.topNeighbor.j, testResults.topNeighbor.targetPosition, testResults.bottomNeighbor.i,
-                            testResults.bottomNeighbor.j, testResults.bottomNeighbor.targetPosition, VERTICAL_NEIGHBOR_RANGE);
-    }
-
-    if (!testResults.bottomNeighbor.passedTest) {
-      SS2K_LOG(POWERTABLE_LOG_TAG, "Bottom neighbor position (%d) failed with watts=%f, cad=%f, targetPosition=%f, (%d)(%d)", testResults.bottomNeighbor.targetPosition, watts, cad,
-               targetPosition, k, i);
-      this->processNeighbor(k, i, targetPosition, testResults.bottomNeighbor.i, testResults.bottomNeighbor.j, testResults.bottomNeighbor.targetPosition, testResults.topNeighbor.i,
-                            testResults.topNeighbor.j, testResults.topNeighbor.targetPosition, VERTICAL_NEIGHBOR_RANGE);
-    }
     return;
   }
 
@@ -1016,42 +976,70 @@ void PowerTable::enterData(int k, int i, int pos) {
     int newEntries = 1;
     // loop until we can't calculate any new data
     while (entries < newEntries) {
-      // if heap too low, break out of loop
-      if (esp_get_free_heap_size() < FREE_HEAP_FOR_COMPLEX_MATH) {
-        SS2K_LOG(POWERTABLE_LOG_TAG, "Not enough heap memory available.");
-        break;
-      }
       entries = newEntries;
-      this->fillTable();
-      this->extrapFillTable();
-      this->extrapolateDiagonal();
+      for (int step = 0; step < 3; ++step) {
+        if (esp_get_free_heap_size() < FREE_HEAP_FOR_COMPLEX_MATH) {
+          SS2K_LOG(POWERTABLE_LOG_TAG, "Heap too low for step %d.", step);
+          return;
+        }
+        switch (step) {
+          case 0:
+            this->fillTable();
+            break;
+          case 1:
+            this->extrapFillTable();
+            break;
+          case 2:
+            this->extrapolateDiagonal();
+            break;
+        }
+      }
       newEntries = getNumEntries();
     }
   }
 }
 
+/**
+ * @brief Processes a neighbor entry in the power table to validate and update data based on position thresholds.
+ *
+ * This function evaluates the relationship between a target position and its neighboring positions
+ * in the power table. It calculates an average position, checks if the neighbor's position is within
+ * a valid range, and performs actions such as logging, entering data, or downvoting data based on the results.
+ *
+ * @param k The row index of the current position in the power table.
+ * @param i The column index of the current position in the power table.
+ * @param targetPosition The target position value for the current entry.
+ * @param neighbor_i The row index of the neighboring position.
+ * @param neighbor_j The column index of the neighboring position.
+ * @param neighbor_targetPosition The target position value of the neighboring entry.
+ * @param oppositeNeighbor_i The row index of the opposite neighboring position.
+ * @param oppositeNeighbor_j The column index of the opposite neighboring position.
+ * @param oppositeNeighbor_targetPosition The target position value of the opposite neighboring entry.
+ * @param rangeFactor A factor used to calculate the position threshold for validation.
+ */
 void PowerTable::processNeighbor(int k, int i, float targetPosition, int neighbor_i, int neighbor_j, int neighbor_targetPosition, int oppositeNeighbor_i, int oppositeNeighbor_j,
                                  int oppositeNeighbor_targetPosition, float rangeFactor) {
   float avgPosition       = (targetPosition + neighbor_targetPosition) / 2;
   float positionThreshold = 500 * pow(TABLE_DIVISOR, -rangeFactor);
 
-  if (std::abs(neighbor_targetPosition - targetPosition) <= positionThreshold && static_cast<int>(targetPosition) != neighbor_targetPosition) {
-    if (this->testNeighbors(k, i, avgPosition).allNeighborsPassed) {
-      SS2K_LOG(POWERTABLE_LOG_TAG, "Avg postion is valid with current cadence and watts! Avg position: %d", avgPosition);
-      this->enterData(k, i, avgPosition);
+  auto handleNeighbor = [&](int test_i, int test_j, float testPosition, const char* logMessage) {
+    if (this->testNeighbors(test_i, test_j, testPosition).allNeighborsPassed) {
+      SS2K_LOG(POWERTABLE_LOG_TAG, logMessage, testPosition);
+      this->enterData(test_i, test_j, testPosition);
+      return true;
     }
-    if (this->testNeighbors(neighbor_i, neighbor_j, targetPosition).allNeighborsPassed) {
-      SS2K_LOG(POWERTABLE_LOG_TAG, "Current Position was valid! Current position: %f", targetPosition);
-      this->enterData(neighbor_i, neighbor_j, targetPosition);
-    }
-    if (this->testNeighbors(oppositeNeighbor_i, oppositeNeighbor_j, neighbor_targetPosition).allNeighborsPassed) {
-      SS2K_LOG(POWERTABLE_LOG_TAG, "Neighbor position was moved from! Neighbor Position: %d", neighbor_targetPosition);
-      this->enterData(oppositeNeighbor_i, oppositeNeighbor_j, neighbor_targetPosition);
-    }
+    return false;
+  };
 
-    if (!(this->testNeighbors(neighbor_i, neighbor_j, targetPosition).allNeighborsPassed || this->testNeighbors(k, i, avgPosition).allNeighborsPassed ||
-          this->testNeighbors(oppositeNeighbor_i, oppositeNeighbor_j, neighbor_targetPosition).allNeighborsPassed)) {
-      SS2K_LOG(POWERTABLE_LOG_TAG, "All test failed at (%d)(%d)(%d), readings (%d)", oppositeNeighbor_i, oppositeNeighbor_j, oppositeNeighbor_targetPosition,
+  if (std::abs(neighbor_targetPosition - targetPosition) <= positionThreshold && static_cast<int>(targetPosition) != neighbor_targetPosition) {
+    bool anyPassed = false;
+
+    anyPassed |= handleNeighbor(k, i, avgPosition, "Avg position is valid with current cadence and watts! Avg position: %f");
+    anyPassed |= handleNeighbor(neighbor_i, neighbor_j, targetPosition, "Current Position was valid! Current position: %f");
+    anyPassed |= handleNeighbor(oppositeNeighbor_i, oppositeNeighbor_j, neighbor_targetPosition, "Neighbor position was moved from! Neighbor Position: %d");
+
+    if (!anyPassed) {
+      SS2K_LOG(POWERTABLE_LOG_TAG, "All tests failed at (%d)(%d)(%d), readings (%d)", oppositeNeighbor_i, oppositeNeighbor_j, oppositeNeighbor_targetPosition,
                this->tableRow[oppositeNeighbor_i].tableEntry[oppositeNeighbor_j].readings);
       this->downVoteData(neighbor_i, neighbor_j, targetPosition, neighbor_targetPosition);
     }
