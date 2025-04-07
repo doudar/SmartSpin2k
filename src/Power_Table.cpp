@@ -979,7 +979,7 @@ void PowerTable::enterData(int k, int i, int pos) {
       entries = newEntries;
       for (int step = 0; step < 3; ++step) {
         if (esp_get_free_heap_size() < FREE_HEAP_FOR_COMPLEX_MATH) {
-          SS2K_LOG(POWERTABLE_LOG_TAG, "Heap too low for step %d.", step);
+          SS2K_LOG(POWERTABLE_LOG_TAG, "%d Heap too low for step %d.", esp_get_free_heap_size(),step);
           return;
         }
         switch (step) {
