@@ -406,9 +406,9 @@ void CubicSpline::set_points(const float* x_vals, const float* y_vals, size_t n,
   float l = 1.0f, mu = 0.0f, z = 0.0f, prev_l = 1.0f, prev_z = 0.0f;
 
   for (size_t i = 1; i < n - 1; ++i) {
-    l = 2.0f * (x[i + 1] - x[i - 1]) - h[i - 1] * mu;
-    mu = h[i] / l;
-    z = (alpha[i] - h[i - 1] * prev_z) / l;
+    l      = 2.0f * (x[i + 1] - x[i - 1]) - h[i - 1] * mu;
+    mu     = h[i] / l;
+    z      = (alpha[i] - h[i - 1] * prev_z) / l;
     prev_z = z;
     prev_l = l;
   }
@@ -979,7 +979,7 @@ void PowerTable::enterData(int k, int i, int pos) {
       entries = newEntries;
       for (int step = 0; step < 3; ++step) {
         if (esp_get_free_heap_size() < FREE_HEAP_FOR_COMPLEX_MATH) {
-          SS2K_LOG(POWERTABLE_LOG_TAG, "%d Heap too low for step %d.", esp_get_free_heap_size(),step);
+          SS2K_LOG(POWERTABLE_LOG_TAG, "%d Heap too low for step %d.", esp_get_free_heap_size(), step);
           return;
         }
         switch (step) {
@@ -1077,41 +1077,29 @@ float PowerTable::calculatePosition(float watts, float cad, float targetPos, int
   int wattPosition = POWERTABLE_WATT_INCREMENT * i;
   int cadPosition  = MINIMUM_TABLE_CAD + (POWERTABLE_CAD_INCREMENT * k);
 
-  float rightValue = 0.0f, leftValue = 0.0f, topValue = 0.0f, bottomValue = 0.0f;
+  float deltas[] = {float(POWERTABLE_WATT_INCREMENT), float(POWERTABLE_WATT_INCREMENT), float(POWERTABLE_CAD_INCREMENT), float(POWERTABLE_CAD_INCREMENT)};
+  float positions[] = {float(wattPosition + POWERTABLE_WATT_INCREMENT), float(wattPosition - POWERTABLE_WATT_INCREMENT),
+                       float(cadPosition + POWERTABLE_CAD_INCREMENT), float(cadPosition - POWERTABLE_CAD_INCREMENT)};
+  bool passedTests[] = {testResults.rightNeighbor.passedTest, testResults.leftNeighbor.passedTest,
+                        testResults.bottomNeighbor.passedTest, testResults.topNeighbor.passedTest};
 
-  int cellValue   = this->tableRow[k].tableEntry[i].targetPosition;
-  float wattDelta = float(POWERTABLE_WATT_INCREMENT) / (abs(targetPos - float(cellValue)));
-  float cadDelta  = float(POWERTABLE_CAD_INCREMENT) / (abs(targetPos - float(cellValue)));
-
-  SS2K_LOG(POWERTABLE_LOG_TAG, "cellValue: (%d) wattDelta: (%f) cadDelta: (%f) allNeighborsPassed: (%d)", cellValue, wattDelta, cadDelta, testResults.allNeighborsPassed);
-
+  float totalValue = 0.0f;
   int count = 0;
 
-  if (testResults.rightNeighbor.passedTest) {
-    float x    = abs(watts - float(wattPosition + POWERTABLE_WATT_INCREMENT));
-    rightValue = targetPos - (x / wattDelta);
-    count++;
-  }
-  if (testResults.leftNeighbor.passedTest) {
-    float x   = abs(watts - float(wattPosition - POWERTABLE_WATT_INCREMENT));
-    leftValue = targetPos - (x / wattDelta);
-    count++;
-  }
-  if (testResults.bottomNeighbor.passedTest) {
-    float x     = abs(cad - float(cadPosition + POWERTABLE_CAD_INCREMENT));
-    bottomValue = targetPos - (x / cadDelta);
-    count++;
-  }
-  if (testResults.topNeighbor.passedTest) {
-    float x  = abs(cad - float(cadPosition - POWERTABLE_CAD_INCREMENT));
-    topValue = targetPos - (x / cadDelta);
-    count++;
+  for (int idx = 0; idx < 4; ++idx) {
+    if (passedTests[idx]) {
+      float delta = deltas[idx] / abs(targetPos - float(this->tableRow[k].tableEntry[i].targetPosition));
+      float x = abs((idx < 2 ? watts : cad) - positions[idx]);
+      totalValue += targetPos - (x / delta);
+      count++;
+    }
   }
 
-  targetPos = (rightValue + leftValue + topValue + bottomValue) / float(count);
-  SS2K_LOG(POWERTABLE_LOG_TAG, "rightValue: (%f) leftValue: (%f) bottomValue: (%f) topValue: (%f) New averaged targetPosition: (%f) count: (%d)", rightValue, leftValue,
-           bottomValue, topValue, targetPos, count);
+  if (count > 0) {
+    targetPos = totalValue / float(count);
+  }
 
+  SS2K_LOG(POWERTABLE_LOG_TAG, "New averaged targetPosition: (%f) count: (%d)", targetPos, count);
   return targetPos;
 }
 

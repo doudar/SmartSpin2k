@@ -18,10 +18,6 @@
 #include <numeric>
 #include <unordered_map>
 
-// Create a torque table representing 0w-1000w in 50w increments.
-// i.e. powerTable[1] corresponds to the incline required for 50w. powerTable[2] is the incline required for 100w and so on.
-
-
 static unsigned long ergTimer = millis();
 
 void ErgMode::runERG() {
@@ -45,14 +41,10 @@ void ErgMode::runERG() {
       }
       if ((millis() - saveFlagCooldown) > 10000) {
         powerTable->_save();
-        saveFlagCooldown = 0;
-        powerTable->saveFlag         = false;
+        saveFlagCooldown     = 0;
+        powerTable->saveFlag = false;
       }
     }
-
-    // values hard set for testing:
-    // userConfig->setPTab4Pwr(true);
-    // rtConfig->setHomed(true);
 
     if (userConfig->getPTab4Pwr() && rtConfig->getHomed()) {
       // Lookup watts using the Power Table.
@@ -177,7 +169,7 @@ void ErgMode::computeErg() {
 void ErgMode::_setPointChangeState(int newCadence, Measurement& newWatts) {
   int32_t tableResult = powerTable->lookup(newWatts.getTarget(), newCadence);
 
-  // Sanity check for targets
+  // Test current watts against the table result. If We're already lower or higher than target, flag the result as a return error.
   if (tableResult != RETURN_ERROR) {
     if (rtConfig->watts.getValue() > newWatts.getTarget() && tableResult > ss2k->getCurrentPosition()) {
       SS2K_LOG(ERG_MODE_LOG_TAG, "Table Result Failed High Test: %d", tableResult);
@@ -191,10 +183,9 @@ void ErgMode::_setPointChangeState(int newCadence, Measurement& newWatts) {
 
   // Handle return errors
   if (tableResult == RETURN_ERROR) {
-    int wattChange  = newWatts.getTarget() - newWatts.getValue();
-    float deviation = ((float)wattChange * 100.0) / ((float)newWatts.getTarget());
-    float factor    = abs(deviation) > 10 ? userConfig->getERGSensitivity() * 2 : userConfig->getERGSensitivity() / 2;
-    tableResult     = ss2k->getCurrentPosition() + (wattChange * factor);
+    SS2K_LOG(ERG_MODE_LOG_TAG, "Lookup Error. Using PID");
+    _inSetpointState(newCadence, newWatts);
+    return;
   }
 
   SS2K_LOG(ERG_MODE_LOG_TAG, "SetPoint changed:%dw PowerTable Result: %d", newWatts.getTarget(), tableResult);
@@ -202,13 +193,13 @@ void ErgMode::_setPointChangeState(int newCadence, Measurement& newWatts) {
 
   if (rtConfig->getTargetIncline() != ss2k->getCurrentPosition()) {  // add some time to wait while the knob moves to target position.
     int timeToAdd = abs(ss2k->getCurrentPosition() - rtConfig->getTargetIncline());
-    if (timeToAdd > 5000) {  // 5 seconds
+    if (timeToAdd > 4000) {  // 4 seconds
       SS2K_LOG(ERG_MODE_LOG_TAG, "Capping ERG seek time to 5 seconds");
-      timeToAdd = 5000;
+      timeToAdd = 4000;
     }
     ergTimer += timeToAdd;
   }
-  ergTimer += (ERG_MODE_DELAY * 2);  // Wait for power meter to register new watts
+  ergTimer += (ERG_MODE_DELAY);  // Wait for power meter to register new watts
 }
 
 // INTRODUCING PID CONTROL LOOP
@@ -274,27 +265,6 @@ void ErgMode::_inSetpointState(int newCadence, Measurement& newWatts) {
   // Apply the new values
   _updateValues(newCadence, newWatts, newIncline);
 }
-
-// OLD PI FUNCTION
-//  void ErgMode::_inSetpointState(int newCadence, Measurement& newWatts) {
-//    // retrieves the current Watt output
-//    int watts = newWatts.getValue();
-
-//   // setpoint_form_trainer - current_torque => Amount to increase or decrease incline
-//   int wattChange = newWatts.getTarget() - watts;
-
-//   // Calculates how far current power is from the target power, measred as a percentage of target
-//   float deviation = ((float)wattChange * 100.0) / ((float)newWatts.getTarget());
-
-//   // retrieves the sensitivity from adjustments from userConfig
-//   float factor = abs(deviation) > 10 ? userConfig->getERGSensitivity() : userConfig->getERGSensitivity() / 2;
-
-//   // Adjusts the incline
-//   float newIncline = ss2k->getCurrentPosition() + (wattChange * factor);
-
-//   // passes to apply new cadence, power measurement and incline settings
-//   _updateValues(newCadence, newWatts, newIncline);
-// }
 
 void ErgMode::_updateValues(int newCadence, Measurement& newWatts, float newIncline) {
   rtConfig->setTargetIncline(newIncline);
