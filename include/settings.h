@@ -354,7 +354,7 @@ const char* const DEFAULT_PASSWORD = "password";
 // #define DEBUG_HR_TO_PWR
 
 // Uncomment to enable power table logging.
-#define DEBUG_POWERTABLE
+// #define DEBUG_POWERTABLE
 
 // Uncomment to enable BLE_TX_RX Logging
 // #define DEBUG_BLE_TX_RX
