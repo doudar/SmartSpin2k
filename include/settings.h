@@ -354,7 +354,7 @@ const char* const DEFAULT_PASSWORD = "password";
 // #define DEBUG_HR_TO_PWR
 
 // Uncomment to enable power table logging.
-// #define DEBUG_POWERTABLE
+#define DEBUG_POWERTABLE
 
 // Uncomment to enable BLE_TX_RX Logging
 // #define DEBUG_BLE_TX_RX
@@ -363,5 +363,5 @@ const char* const DEFAULT_PASSWORD = "password";
 // #define CUSTOM_CHAR_DEBUG
 
 // Uncomment to enable DirCon message logging to serial monitor (not logger)
-#define DEBUG_DIRCON_MESSAGES
+// #define DEBUG_DIRCON_MESSAGES
 
