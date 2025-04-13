@@ -11,6 +11,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 - Fixed flags in CPS and CSC which were causing issues in GTA Bike. Thanks @matthewsshirley !
+- updated cert.h
 
 ### Hardware
 
