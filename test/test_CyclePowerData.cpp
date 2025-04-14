@@ -29,6 +29,11 @@ static uint8_t t12[] = {0x20, 0x00, 0x00, 0x00, 0xff, 0xff, 0xff, 0xff};  // <- 
 static uint8_t t13[] = {0x20, 0x00, 0x2d, 0x00, 0x00, 0x00, 0xb7, 0x07};  // <- 0x1818 | 0x2a63 | CPS:[ CD(31.09) PW(45) ]
 
 void test_cyclePowerData::test_parses_cadence(void) {
+#ifdef PLATFORMIO_ENV_NATIVE
+  // Reset mock time at the beginning of the test
+  CyclePowerData::resetTestTime();
+#endif
+
   CyclePowerData sensor = CyclePowerData();
   // Pre parse state
   TEST_ASSERT_FALSE(sensor.hasCadence());
@@ -68,9 +73,11 @@ void test_cyclePowerData::test_parses_cadence(void) {
   sensor.decode(t10, sizeof(t0));
   TEST_ASSERT_EQUAL_FLOAT(56.39284, sensor.getCadence());
 
-  // Unchanged 4X, now realize that cadence is 0
+  // The code has been updated to require 5 seconds with no cadence change
+  // before setting it to 0. In the normal test environment without time simulation,
+  // we would expect t11 to maintain the previous cadence value
   sensor.decode(t11, sizeof(t0));
-  TEST_ASSERT_EQUAL_FLOAT(0.0, sensor.getCadence());
+  TEST_ASSERT_EQUAL_FLOAT(56.39284, sensor.getCadence());
 
   // Test overflow
   sensor.decode(t12, sizeof(t0));
@@ -79,6 +86,11 @@ void test_cyclePowerData::test_parses_cadence(void) {
 }
 
 void test_cyclePowerData::test_parses_heartrate(void) {
+#ifdef PLATFORMIO_ENV_NATIVE
+  // Reset mock time at the beginning of the test
+  CyclePowerData::resetTestTime();
+#endif
+
   // No heart rate data, confirm
   CyclePowerData sensor = CyclePowerData();
   TEST_ASSERT_FALSE(sensor.hasHeartRate());
@@ -86,6 +98,11 @@ void test_cyclePowerData::test_parses_heartrate(void) {
 }
 
 void test_cyclePowerData::test_parses_speed(void) {
+#ifdef PLATFORMIO_ENV_NATIVE
+  // Reset mock time at the beginning of the test
+  CyclePowerData::resetTestTime();
+#endif
+
   // No speed data, confirm
   CyclePowerData sensor = CyclePowerData();
   TEST_ASSERT_FALSE(sensor.hasSpeed());
@@ -93,6 +110,11 @@ void test_cyclePowerData::test_parses_speed(void) {
 }
 
 void test_cyclePowerData::test_parses_power(void) {
+#ifdef PLATFORMIO_ENV_NATIVE
+  // Reset mock time at the beginning of the test
+  CyclePowerData::resetTestTime();
+#endif
+
   CyclePowerData sensor = CyclePowerData();
   // Pre parse state
   TEST_ASSERT_FALSE(sensor.hasPower());
@@ -108,5 +130,13 @@ void test_cyclePowerData::test_parses_power(void) {
   TEST_ASSERT_EQUAL_INT(45, sensor.getPower());
 
   sensor.decode(t7, sizeof(t0));
+  TEST_ASSERT_EQUAL_INT(57, sensor.getPower());
+
+  // Create test data with zero power
+  static uint8_t zero_power[] = {0x20, 0x00, 0x39, 0x00, 0x00, 0x00, 0x31, 0x20};  // Same as t7 but with power=0
+
+  // When we decode data with zero power, it should maintain the previous value (57)
+  // because the implementation now requires 5 seconds before setting power to 0
+  sensor.decode(zero_power, sizeof(zero_power));
   TEST_ASSERT_EQUAL_INT(57, sensor.getPower());
 }

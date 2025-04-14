@@ -24,6 +24,11 @@ class CyclePowerData : public SensorData {
   float getSpeed();
   int getResistance();
   void decode(uint8_t *data, size_t length);
+  #ifdef PLATFORMIO_ENV_NATIVE
+    // For testing purposes - allows setting mock time
+    static void setTestTime(unsigned long time);
+    static void resetTestTime();
+  #endif
 
  private:
   int power                       = INT_MIN;

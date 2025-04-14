@@ -10,12 +10,37 @@
 #include "endian.h"
 #include "sensors/CyclePowerData.h"
 
+#ifdef PLATFORMIO_ENV_NATIVE
+// For testing in native environment
+static unsigned long mockTimeMillis = 0;
+static bool useMockTime = false;
+
+unsigned long getTimeMillis() {
+  if (useMockTime) {
+    return mockTimeMillis;
+  }
+  return std::chrono::duration_cast<std::chrono::milliseconds>(
+    std::chrono::steady_clock::now().time_since_epoch()
+  ).count();
+}
+
+void CyclePowerData::setTestTime(unsigned long time) {
+  mockTimeMillis = time;
+  useMockTime = true;
+}
+
+// Reset mock time to use real time
+void CyclePowerData::resetTestTime() {
+  useMockTime = false;
+}
+#else
 // Replacement for Arduino's millis() using standard C++
 static unsigned long getTimeMillis() {
   return std::chrono::duration_cast<std::chrono::milliseconds>(
     std::chrono::steady_clock::now().time_since_epoch()
   ).count();
 }
+#endif
 
 bool CyclePowerData::hasHeartRate() { return false; }
 
@@ -44,7 +69,7 @@ void CyclePowerData::decode(uint8_t *data, size_t length) {
   // first calculate which fields are present. Power is always 2 & 3, cadence
   // can move depending on the flags.
   int newPower = get_le16(&data[cPos]);
-  // check newPower is greater than zero. If not, wait 5 seconds before setting zero
+  // check newPower is greater than zero. If not, wait 2.5 seconds before setting zero
   if (newPower > 0) {
     this->power = newPower;
     this->lastPwrUpdateTime = getTimeMillis();
@@ -109,7 +134,7 @@ void CyclePowerData::decode(uint8_t *data, size_t length) {
       }
     } else {
       unsigned long currentTime = getTimeMillis();
-      if (currentTime - lastCadUpdateTime > 2500) {  // Require five seconds before setting 0 cadence
+      if (currentTime - lastCadUpdateTime > 2500) {  // Wait 2.5 seconds before setting 0 cadence
         this->cadence = 0;
       }
     }
