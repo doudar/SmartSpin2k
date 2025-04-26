@@ -178,7 +178,7 @@ void setup() {
                           "maintenanceLoopFunction", /* name of task. */
                           MAIN_STACK,                /* Stack size of task */
                           NULL,                      /* parameter of the task */
-                          20,                        /* priority of the task */
+                          2,                        /* priority of the task */
                           &maintenanceLoopTask,      /* Task handle to keep track of created task */
                           0);                        /* pin task to core */
 }

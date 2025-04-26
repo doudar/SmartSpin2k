@@ -257,7 +257,7 @@ bool SpinBLEClient::connectToServer() {
      */
     pClient = NimBLEDevice::getClientByPeerAddress(myDevice->getAddress());
     if (pClient) {
-      pClient->setConnectTimeout(1000);
+      pClient->setConnectTimeout(10000);
       pClient->setConnectionParams(24, 96, 1, 500);
       SS2K_LOG(BLE_CLIENT_LOG_TAG, "Reusing Client");
       if (!pClient->connect(myDevice)) {
