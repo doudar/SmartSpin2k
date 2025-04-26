@@ -55,7 +55,7 @@ void startBLEServer() {
 
   // const std::string fitnessData = {0b00000001, 0b00100000, 0b00000000};
   // pAdvertising->setServiceData(FITNESSMACHINESERVICE_UUID, fitnessData);
-  pAdvertising->setName(static_cast<const std::__cxx11::string&>(userConfig->getDeviceName()));
+  pAdvertising->setName(userConfig->getDeviceName());
   pAdvertising->setMaxInterval(250);
   pAdvertising->setMinInterval(160);
 

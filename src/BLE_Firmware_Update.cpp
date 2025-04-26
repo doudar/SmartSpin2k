@@ -74,7 +74,12 @@ class otaCallback : public BLECharacteristicCallbacks {
       // esp_ota_begin can take a while to complete as it erase the flash partition (3-5 seconds)
       // so make sure there's no timeout on the client side (iOS) that triggers before that.
       //------------------------------------------------------------------------------------------
-      esp_task_wdt_init(10, false);
+      esp_task_wdt_config_t wdt_config = {
+          .timeout_ms = 10000, // 10 seconds
+          .idle_core_mask = 0,
+          .trigger_panic = false
+      };
+      esp_task_wdt_init(&wdt_config);
 
       // if (BLECommunicationTask != NULL) {
       //   SS2K_LOG(MAIN_LOG_TAG, "Stop BLE Tasks");
