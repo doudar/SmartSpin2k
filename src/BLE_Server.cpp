@@ -147,21 +147,6 @@ void MyServerCallbacks::onMTUChange(uint16_t MTU, NimBLEConnInfo& connInfo) {
   SS2K_LOG(BLE_SERVER_LOG_TAG, "MTU updated: %u for connection ID: %u", MTU, connInfo.getConnHandle());
 }
 
-uint32_t MyServerCallbacks::onPassKeyDisplay() {
-  uint32_t passkey = 123456;  // Static passkey for demonstration
-  SS2K_LOG(BLE_SERVER_LOG_TAG, "Server Passkey Display: %u", passkey);
-  return passkey;
-}
-
-void MyServerCallbacks::onAuthenticationComplete(NimBLEConnInfo& connInfo) {
-  if (!connInfo.isEncrypted()) {
-    SS2K_LOG(BLE_SERVER_LOG_TAG, "Encrypt connection failed - disconnecting client");
-    NimBLEDevice::getServer()->disconnect(connInfo.getConnHandle());
-    return;
-  }
-  SS2K_LOG(BLE_SERVER_LOG_TAG, "Secured connection to: %s", connInfo.getAddress().toString().c_str());
-}
-
 bool MyServerCallbacks::onConnParamsUpdateRequest(uint16_t handle, const ble_gap_upd_params* params) {
   SS2K_LOG(BLE_SERVER_LOG_TAG, "Updated Server Connection Parameters for handle: %d", handle);
   return true;

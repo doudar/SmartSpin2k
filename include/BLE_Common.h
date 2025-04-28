@@ -71,12 +71,10 @@ const BLEServiceInfo* getDeviceServiceInfo(const NimBLEAdvertisedDevice* adverti
 // *****************************Server****************************
 class MyServerCallbacks : public NimBLEServerCallbacks {
  public:
-  void onConnect(NimBLEServer* pServer, NimBLEConnInfo& connInfo);
-  void onDisconnect(NimBLEServer* pServer);
-  void onMTUChange(uint16_t MTU, NimBLEConnInfo& connInfo);
-  uint32_t onPassKeyDisplay();
-  void onAuthenticationComplete(NimBLEConnInfo& connInfo);
-  bool onConnParamsUpdateRequest(uint16_t handle, const ble_gap_upd_params* params);
+   void onConnect(NimBLEServer* pServer, NimBLEConnInfo& connInfo);
+   void onDisconnect(NimBLEServer* pServer);
+   void onMTUChange(uint16_t MTU, NimBLEConnInfo& connInfo);
+   bool onConnParamsUpdateRequest(uint16_t handle, const ble_gap_upd_params* params);
 };
 
 // TODO add the rest of the server to this class
@@ -229,9 +227,6 @@ class MyClientCallback : public NimBLEClientCallbacks {
  public:
   void onConnect(NimBLEClient* pClient) override;
   void onDisconnect(NimBLEClient* pClient, int reason) override;
-  void onPassKeyEntry(NimBLEConnInfo& connInfo) override;
-  void onConfirmPasskey(NimBLEConnInfo& connInfo, uint32_t pass_key) override;
-  void onAuthenticationComplete(NimBLEConnInfo& connInfo) override;
 };
 
 extern SpinBLEClient spinBLEClient;

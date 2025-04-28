@@ -194,7 +194,7 @@ void DirConManager::checkForNewClients() {
     return;
   }
 
-  WiFiClient newClient = tcpServer->available();
+  WiFiClient newClient = tcpServer->accept();
   if (!newClient) {
     return;
   }

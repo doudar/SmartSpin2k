@@ -146,16 +146,19 @@ void setup() {
   ss2k->setupTMCStepperDriver();
 
   SS2K_LOG(MAIN_LOG_TAG, "Setting up cpu Tasks");
-  disableCore0WDT();  // Disable the watchdog timer on core 0 (so long stepper
+
+  //disableCore0WDT();  // Disable the watchdog timer on core 0 (so long stepper
                       // moves don't cause problems)
 
   digitalWrite(LED_PIN, HIGH);
-
+  Serial.println("Starting BLE");
   // Configure and Initialize Logger
   logHandler.addAppender(&webSocketAppender);
+  Serial.println("Starting BLE");
   logHandler.addAppender(&udpAppender);
+  Serial.println("Starting BLE");
   logHandler.initialize();
-
+  Serial.println("Starting BLE");
   ss2k->startTasks();
   httpServer.start();
 
@@ -170,15 +173,15 @@ void setup() {
   ss2k->resetIfShiftersHeld();
   SS2K_LOG(MAIN_LOG_TAG, "Creating Shifter Interrupts");
   // Setup Interrupts so shifters work anytime
-  attachInterrupt(digitalPinToInterrupt(currentBoard.shiftUpPin), ss2k->shiftUp, CHANGE);
-  attachInterrupt(digitalPinToInterrupt(currentBoard.shiftDownPin), ss2k->shiftDown, CHANGE);
+  attachInterrupt(digitalPinToInterrupt(currentBoard.shiftUpPin), ss2k->handleShift, CHANGE);
+  attachInterrupt(digitalPinToInterrupt(currentBoard.shiftDownPin), ss2k->handleShift, CHANGE);
   digitalWrite(LED_PIN, HIGH);
 
   xTaskCreatePinnedToCore(SS2K::maintenanceLoop,     /* Task function. */
                           "maintenanceLoopFunction", /* name of task. */
                           MAIN_STACK,                /* Stack size of task */
                           NULL,                      /* parameter of the task */
-                          2,                        /* priority of the task */
+                          2,                         /* priority of the task */
                           &maintenanceLoopTask,      /* Task handle to keep track of created task */
                           0);                        /* pin task to core */
 }
@@ -509,32 +512,24 @@ void SS2K::moveStepper() {
   }
 }
 
-bool IRAM_ATTR SS2K::deBounce() {
-  if ((millis() - lastDebounceTime) > debounceDelay) {  // <----------------This should be assigned it's own task and just switch a global bool whatever the reading is at, it's
-                                                        // been there for longer than the debounce delay, so take it as the actual current state: if the button state has changed:
-    lastDebounceTime = millis();
+bool SS2K::deBounce() {
+  if ((millis() - ss2k->lastDebounceTime) >
+      ss2k->debounceDelay) {  // <----------------This should be assigned it's own task and just switch a global bool whatever the reading is at, it's
+                              // been there for longer than the debounce delay, so take it as the actual current state: if the button state has changed:
+    ss2k->lastDebounceTime = millis();
     return true;
   }
-
   return false;
 }
 
 ///////////// Interrupt Functions /////////////
-void IRAM_ATTR SS2K::shiftUp() {  // Handle the shift up interrupt IRAM_ATTR is to keep the interrupt code in ram always
+void ARDUINO_ISR_ATTR SS2K::handleShift() {  // Handle the shift up interrupt IRAM_ATTR is to keep the interrupt code in ram always
   if (ss2k->deBounce()) {
     if (!digitalRead(currentBoard.shiftUpPin)) {  // double checking to make sure the interrupt wasn't triggered by emf
       rtConfig->setShifterPosition(rtConfig->getShifterPosition() - 1 + userConfig->getShifterDir() * 2);
       // Stop homing initiation
       spinBLEServer.spinDownFlag = 0;
-    } else {
-      ss2k->lastDebounceTime = 0;
-    }  // Probably Triggered by EMF, reset the debounce
-  }
-}
-
-void IRAM_ATTR SS2K::shiftDown() {  // Handle the shift down interrupt
-  if (ss2k->deBounce()) {
-    if (!digitalRead(currentBoard.shiftDownPin)) {  // double checking to make sure the interrupt wasn't triggered by emf
+    } else if (!digitalRead(currentBoard.shiftDownPin)) {  // double checking to make sure the interrupt wasn't triggered by emf
       rtConfig->setShifterPosition(rtConfig->getShifterPosition() + 1 - userConfig->getShifterDir() * 2);
       // Stop homing initiation
       spinBLEServer.spinDownFlag = 0;
