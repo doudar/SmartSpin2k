@@ -311,7 +311,7 @@ const char* const DEFAULT_PASSWORD = "password";
 //Max distance a failed neighbor can be horizontally from target position
 #define HORIZONTAL_NEIGHBOR_RANGE 0.6
     
-//Max distance a failed neighbr can be vertically from target position
+//Max distance a failed neighbor can be vertically from target position
 #define VERTICAL_NEIGHBOR_RANGE 0.8
 
 // Temperature of the ESP32 at which to start reducing the power output of the stepper motor driver.
@@ -347,7 +347,7 @@ const char* const DEFAULT_PASSWORD = "password";
 #define BLE_CLIENT_STACK 6000 //Scans and connects to BLE devices. Holds the BLE Notify Data. 
 
 // Uncomment to enable stack size debugging info
-// #define DEBUG_STACK
+#define DEBUG_STACK
 
 // Uncomment to enable HR->PWR debugging info. Always displays HR->PWR
 // Calculation. Never sets userConfig->setSimulatedPower();
