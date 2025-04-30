@@ -680,20 +680,20 @@ void BLE_ss2kCustomCharacteristic::process(std::string rxValue) {
         }
         returnString += (uint8_t)row;
         for (int i = 0; i < POWERTABLE_WATT_SIZE; i++) {
-          returnString += (uint8_t)(powerTable->tableRow[row].tableEntry[i].targetPosition & 0xff);
-          returnString += (uint8_t)(powerTable->tableRow[row].tableEntry[i].targetPosition >> 8);
-          Serial.printf("%02x%02x ", (uint8_t)(powerTable->tableRow[row].tableEntry[i].targetPosition & 0xff),
-                        (uint8_t)(powerTable->tableRow[row].tableEntry[i].targetPosition >> 8));
+          returnString += (uint8_t)(powerTable->ptData.tableRow[row].tableEntry[i].targetPosition & 0xff);
+          returnString += (uint8_t)(powerTable->ptData.tableRow[row].tableEntry[i].targetPosition >> 8);
+          Serial.printf("%02x%02x ", (uint8_t)(powerTable->ptData.tableRow[row].tableEntry[i].targetPosition & 0xff),
+                        (uint8_t)(powerTable->ptData.tableRow[row].tableEntry[i].targetPosition >> 8));
         }
       }
       if (rxValue[0] == cc_write) {
         returnValue[0] = cc_success;
         if (rxValue[2] >= 0 && rxValue[2] < POWERTABLE_CAD_SIZE) {
           for (int i = 0; i < POWERTABLE_WATT_SIZE; i++) {
-            powerTable->tableRow[rxValue[2]].tableEntry[i].targetPosition = (int16_t((uint8_t)(rxValue[i * 2 + 3]) << 0 | (uint8_t)(rxValue[i * 2 + 4]) << 8));
+            powerTable->ptData.tableRow[rxValue[2]].tableEntry[i].targetPosition = (int16_t((uint8_t)(rxValue[i * 2 + 3]) << 0 | (uint8_t)(rxValue[i * 2 + 4]) << 8));
             // Ensure each entry has a valid reading count to be considered during loading
-            if (powerTable->tableRow[rxValue[2]].tableEntry[i].targetPosition != INT16_MIN) {
-              powerTable->tableRow[rxValue[2]].tableEntry[i].readings = MINIMUM_RELIABLE_POSITIONS + 1;
+            if (powerTable->ptData.tableRow[rxValue[2]].tableEntry[i].targetPosition != INT16_MIN) {
+              powerTable->ptData.tableRow[rxValue[2]].tableEntry[i].readings = MINIMUM_RELIABLE_POSITIONS + 1;
             }
           }
           // Save with explicit version management
