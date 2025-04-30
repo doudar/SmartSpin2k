@@ -42,10 +42,9 @@ class SS2K {
   bool resetPowerTableFlag = false;
   bool isUpdating          = false;
 
-  bool IRAM_ATTR deBounce();
-  static void IRAM_ATTR maintenanceLoop(void *pvParameters);
-  static void IRAM_ATTR shiftUp();
-  static void IRAM_ATTR shiftDown();
+  static bool deBounce();
+  static void ARDUINO_ISR_ATTR maintenanceLoop(void *pvParameters);
+  static void ARDUINO_ISR_ATTR handleShift();
   static void moveStepper();
 
   // the position the stepper motor will move to

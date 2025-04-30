@@ -55,7 +55,7 @@ void startBLEServer() {
 
   // const std::string fitnessData = {0b00000001, 0b00100000, 0b00000000};
   // pAdvertising->setServiceData(FITNESSMACHINESERVICE_UUID, fitnessData);
-  pAdvertising->setName(static_cast<const std::__cxx11::string&>(userConfig->getDeviceName()));
+  pAdvertising->setName(userConfig->getDeviceName());
   pAdvertising->setMaxInterval(250);
   pAdvertising->setMinInterval(160);
 
@@ -145,21 +145,6 @@ void MyServerCallbacks::onDisconnect(NimBLEServer* pServer) {
 
 void MyServerCallbacks::onMTUChange(uint16_t MTU, NimBLEConnInfo& connInfo) {
   SS2K_LOG(BLE_SERVER_LOG_TAG, "MTU updated: %u for connection ID: %u", MTU, connInfo.getConnHandle());
-}
-
-uint32_t MyServerCallbacks::onPassKeyDisplay() {
-  uint32_t passkey = 123456;  // Static passkey for demonstration
-  SS2K_LOG(BLE_SERVER_LOG_TAG, "Server Passkey Display: %u", passkey);
-  return passkey;
-}
-
-void MyServerCallbacks::onAuthenticationComplete(NimBLEConnInfo& connInfo) {
-  if (!connInfo.isEncrypted()) {
-    SS2K_LOG(BLE_SERVER_LOG_TAG, "Encrypt connection failed - disconnecting client");
-    NimBLEDevice::getServer()->disconnect(connInfo.getConnHandle());
-    return;
-  }
-  SS2K_LOG(BLE_SERVER_LOG_TAG, "Secured connection to: %s", connInfo.getAddress().toString().c_str());
 }
 
 bool MyServerCallbacks::onConnParamsUpdateRequest(uint16_t handle, const ble_gap_upd_params* params) {

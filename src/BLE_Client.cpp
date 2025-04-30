@@ -257,7 +257,7 @@ bool SpinBLEClient::connectToServer() {
      */
     pClient = NimBLEDevice::getClientByPeerAddress(myDevice->getAddress());
     if (pClient) {
-      pClient->setConnectTimeout(1000);
+      pClient->setConnectTimeout(10000);
       pClient->setConnectionParams(24, 96, 1, 500);
       SS2K_LOG(BLE_CLIENT_LOG_TAG, "Reusing Client");
       if (!pClient->connect(myDevice)) {
@@ -390,28 +390,6 @@ void MyClientCallback::onDisconnect(NimBLEClient *pClient, int reason) {
   }
 }
 
-void MyClientCallback::onPassKeyEntry(NimBLEConnInfo &connInfo) {
-  SS2K_LOG(BLE_CLIENT_LOG_TAG, "Client Passkey Entry");
-  /** This should prompt the user to enter the passkey displayed on the peer device */
-  NimBLEDevice::injectPassKey(connInfo, 123456);
-}
-
-void MyClientCallback::onConfirmPasskey(NimBLEConnInfo &connInfo, uint32_t pass_key) {
-  SS2K_LOG(BLE_CLIENT_LOG_TAG, "The passkey YES/NO number: %" PRIu32, pass_key);
-  /** Inject false if passkeys don't match. */
-  NimBLEDevice::injectConfirmPasskey(connInfo, true);
-}
-
-void MyClientCallback::onAuthenticationComplete(NimBLEConnInfo &connInfo) {
-  if (!connInfo.isEncrypted()) {
-    SS2K_LOG(BLE_CLIENT_LOG_TAG, "Encrypt connection failed - disconnecting");
-    /** Find the client with the connection handle provided in connInfo */
-    NimBLEDevice::getClientByHandle(connInfo.getConnHandle())->disconnect();
-    return;
-  }
-  SS2K_LOG(BLE_CLIENT_LOG_TAG, "Starting BLE work!");
-}
-
 /**
  * @brief Callback function that is called when a BLE device is found during scanning.
  *
@@ -521,7 +499,7 @@ void SpinBLEClient::scanProcess(int duration) {
 
 void ScanCallbacks::onScanEnd(const NimBLEScanResults &results, int reason) {
   int count = results.getCount();
-  StaticJsonDocument<1000> devices;
+  JsonDocument devices;
 
   // Check if 'devices' JSON document already exists and has content; if so, deserialize it.
   const char *foundDevicesJson = userConfig->getFoundDevices();
@@ -536,7 +514,7 @@ void ScanCallbacks::onScanEnd(const NimBLEScanResults &results, int reason) {
     bool isDuplicate = false;
     for (JsonPair kv : devices.as<JsonObject>()) {
       JsonObject obj = kv.value().as<JsonObject>();
-      if (obj.containsKey("name") && obj["name"] == spinBLEClient.adevName2UniqueName(d)) {
+      if (obj["name"] && obj["name"] == spinBLEClient.adevName2UniqueName(d)) {
         isDuplicate = true;
         break;
       }
