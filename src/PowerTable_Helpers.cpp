@@ -97,10 +97,10 @@ int32_t PTHelpers::lookup(int watts, int cad, PTData& ptData) {
 
       if (cadValue.size() >= 2) {
         extrapolatedValue = static_cast<int>(linearExtrapolate(cadValue.data(), positionValue.data(), cadValue.size(), static_cast<float>(cad)));
-        SS2K_LOG(POWERTABLE_LOG_TAG, "Lookup Extrapolated (Cadence) (%d) for (%dw) (%dcad)", extrapolatedValue, watts, cad);
+        SS2K_LOG(PTDATA_LOG_TAG, "Lookup Extrapolated (Cadence) (%d) for (%dw) (%dcad)", extrapolatedValue, watts, cad);
         return extrapolatedValue * TABLE_DIVISOR;
       } else {
-        SS2K_LOG(POWERTABLE_LOG_TAG, "Not enough data to extrapolate cadence for (%dw) (%dcad)", watts, cad);
+        SS2K_LOG(PTDATA_LOG_TAG, "Not enough data to extrapolate cadence for (%dw) (%dcad)", watts, cad);
       }
     }
 
@@ -119,13 +119,13 @@ int32_t PTHelpers::lookup(int watts, int cad, PTData& ptData) {
 
         if (wattValue.size() >= 2) {
           extrapolatedValue = static_cast<int>(linearExtrapolate(wattValue.data(), positionValue.data(), wattValue.size(), static_cast<float>(watts)));  // watts as float
-          SS2K_LOG(POWERTABLE_LOG_TAG, "Lookup Extrapolated (Watts) (%d) for (%dw) (%dcad)", extrapolatedValue, watts, cad);
+          SS2K_LOG(PTDATA_LOG_TAG, "Lookup Extrapolated (Watts) (%d) for (%dw) (%dcad)", extrapolatedValue, watts, cad);
           return extrapolatedValue * TABLE_DIVISOR;
         } else {
-          SS2K_LOG(POWERTABLE_LOG_TAG, "Not enough data to extrapolate watts for (%dw) (%dcad)", watts, cad);
+          SS2K_LOG(PTDATA_LOG_TAG, "Not enough data to extrapolate watts for (%dw) (%dcad)", watts, cad);
         }
       } else {
-        SS2K_LOG(POWERTABLE_LOG_TAG, "Cadence index out of bounds for watt extrapolation at (%dw) (%dcad)", watts, cad);
+        SS2K_LOG(PTDATA_LOG_TAG, "Cadence index out of bounds for watt extrapolation at (%dw) (%dcad)", watts, cad);
       }
     }
 
@@ -181,7 +181,7 @@ int32_t PTHelpers::lookup(int watts, int cad, PTData& ptData) {
   if (count == 0) return INT16_MIN;
 
   int ret = static_cast<int>(round(sum / count)) * TABLE_DIVISOR;
-  SS2K_LOG(POWERTABLE_LOG_TAG, "Lookup result: (%dw) (%dcad) (%d) (R1:%.2f, R2:%.2f, R3:%.2f)", watts, cad, ret, R1, R2, R3);
+  SS2K_LOG(PTDATA_LOG_TAG, "Lookup result: (%dw) (%dcad) (%d) (R1:%.2f, R2:%.2f, R3:%.2f)", watts, cad, ret, R1, R2, R3);
   return ret;
 }
 
@@ -217,7 +217,7 @@ void PTHelpers::fillEmptyTable(int outerValue, const std::vector<int>& emptyIndi
       }
     }
     if (!validForSpline) {
-      SS2K_LOG(POWERTABLE_LOG_TAG, "Duplicate or non-increasing x-values detected!");
+      SS2K_LOG(PTDATA_LOG_TAG, "Duplicate or non-increasing x-values detected!");
       return;
     }
 
@@ -242,7 +242,7 @@ void PTHelpers::fillEmptyTable(int outerValue, const std::vector<int>& emptyIndi
       }
     }
   } else {
-    SS2K_LOG(POWERTABLE_LOG_TAG, "Error: No unique points found.");
+    SS2K_LOG(PTDATA_LOG_TAG, "Error: No unique points found.");
   }
 }
 
@@ -278,7 +278,7 @@ void PTHelpers::extrapolateEmptyIndices(int outerIndex, const std::vector<int>& 
       }
     }
     if (!validForSpline) {
-      SS2K_LOG(POWERTABLE_LOG_TAG, "Duplicate or non-increasing x-values detected!");
+      SS2K_LOG(PTDATA_LOG_TAG, "Duplicate or non-increasing x-values detected!");
       return;
     }
 
@@ -398,7 +398,7 @@ void PTHelpers::extrapolateDiagonalEntries(const std::vector<std::pair<int, int>
       }
     }
     if (!validForSpline) {
-      SS2K_LOG(POWERTABLE_LOG_TAG, "Duplicate or non-increasing x-values detected for diagonal!");
+      SS2K_LOG(PTDATA_LOG_TAG, "Duplicate or non-increasing x-values detected for diagonal!");
       return;
     }
 
@@ -443,7 +443,7 @@ float PTHelpers::linearExtrapolate(const float* x, const float* y, size_t n, flo
   }
 
   if (x1 - x0 == 0) {
-    SS2K_LOG(POWERTABLE_LOG_TAG, "Linear Extrapolation failed, x1 - x0 is 0");
+    SS2K_LOG(PTDATA_LOG_TAG, "Linear Extrapolation failed, x1 - x0 is 0");
     return INT16_MIN;
   }
 
@@ -548,7 +548,7 @@ int32_t PTHelpers::lookupWatts(int cad, int32_t targetPosition, PTData& ptData) 
   }
 
   if (wattValue.size() < 2) {
-    SS2K_LOG(POWERTABLE_LOG_TAG, "LookupWatts failed - not enough data for cad %d", cad);
+    SS2K_LOG(PTDATA_LOG_TAG, "LookupWatts failed - not enough data for cad %d", cad);
     return RETURN_ERROR;
   }
 
@@ -562,7 +562,7 @@ int32_t PTHelpers::lookupWatts(int cad, int32_t targetPosition, PTData& ptData) 
   }
 
   int watts = static_cast<int>(result);
-  SS2K_LOG(POWERTABLE_LOG_TAG, "LookupWatts computed %dw from pos %d, cad %d", watts, targetPosition, cad);
+  SS2K_LOG(PTDATA_LOG_TAG, "LookupWatts computed %dw from pos %d, cad %d", watts, targetPosition, cad);
   return watts;
 }
 
@@ -595,7 +595,7 @@ float PTHelpers::linearInterpolate(const float* x, const float* y, size_t n, flo
   float y0 = y[lower - x], y1 = y[upper - x];
 
   if (x1 - x0 == 0) {
-    SS2K_LOG(POWERTABLE_LOG_TAG, "Linear Interpolation failed, x1 - x0 is 0");
+    SS2K_LOG(PTDATA_LOG_TAG, "Linear Interpolation failed, x1 - x0 is 0");
     return INT16_MIN;
   }
 

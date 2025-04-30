@@ -695,7 +695,7 @@ void HTTP_Server::FirmwareUpdate() {
       delay(100);
       httpCode = http.GET();  // get data from version file
       delay(100);
-      StaticJsonDocument<500> doc;
+      JsonDocument doc;
       if (httpCode == HTTP_CODE_OK) {  // if version received
         String payload;
         payload = http.getString();  // save received version

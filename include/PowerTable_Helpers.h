@@ -10,7 +10,7 @@
 #include "SmartSpin_parameters.h"
 #include <vector>
 
-#define POWERTABLE_LOG_TAG "PTData"
+#define PTDATA_LOG_TAG "PTData"
 
 #define RETURN_ERROR               INT32_MIN
 #define FREE_HEAP_FOR_COMPLEX_MATH 30000
