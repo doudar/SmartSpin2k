@@ -682,8 +682,8 @@ void BLE_ss2kCustomCharacteristic::process(std::string rxValue) {
         for (int i = 0; i < POWERTABLE_WATT_SIZE; i++) {
           returnString += (uint8_t)(powerTable->ptData.tableRow[row].tableEntry[i].targetPosition & 0xff);
           returnString += (uint8_t)(powerTable->ptData.tableRow[row].tableEntry[i].targetPosition >> 8);
-          Serial.printf("%02x%02x ", (uint8_t)(powerTable->ptData.tableRow[row].tableEntry[i].targetPosition & 0xff),
-                        (uint8_t)(powerTable->ptData.tableRow[row].tableEntry[i].targetPosition >> 8));
+          //  Serial.printf("%02x%02x ", (uint8_t)(powerTable->ptData.tableRow[row].tableEntry[i].targetPosition & 0xff),
+          //               (uint8_t)(powerTable->ptData.tableRow[row].tableEntry[i].targetPosition >> 8));
         }
       }
       if (rxValue[0] == cc_write) {
@@ -697,8 +697,8 @@ void BLE_ss2kCustomCharacteristic::process(std::string rxValue) {
             }
           }
           // Save with explicit version management
-          powerTable->_hasBeenLoadedThisSession = true; // Prevent reload attempts
-          powerTable->saveFlag = true;
+          powerTable->_hasBeenLoadedThisSession = true;  // Prevent reload attempts
+          powerTable->saveFlag                  = true;
         } else {
           // SS2K_LOG(CUSTOM_CHAR_LOG_TAG, "Table row invalid");
           //  Logging causes crashes in ISR
@@ -801,7 +801,7 @@ void BLE_ss2kCustomCharacteristic::process(std::string rxValue) {
       break;
   }
 
-  SS2K_LOG(CUSTOM_CHAR_LOG_TAG, "%s", logBuf);
+  //SS2K_LOG(CUSTOM_CHAR_LOG_TAG, "%s", logBuf);
   if (returnString == "") {
     pCharacteristic->setValue(returnValue, returnLength);
   } else {  // Need to send a string instead

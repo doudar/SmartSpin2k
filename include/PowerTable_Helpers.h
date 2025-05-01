@@ -119,6 +119,7 @@ class PTHelpers {
   void findTableDirection(bool horizontal, PTData& ptData);
   void fillTable(PTData& ptData);
   int32_t lookupWatts(int cad, int32_t targetPosition, PTData& ptData);
+  int32_t extrapolateCadenceWatts(int cad, float targetPosition, PTData& ptData);
   void extrapolateDiagonalEntries(const std::vector<std::pair<int, int>>& emptyIndices, const float* x, const float* y, size_t n, PTData& ptData);
   void extrapolateDiagonal(PTData& ptData);
 };
