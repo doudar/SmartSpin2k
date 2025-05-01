@@ -54,6 +54,11 @@ TestResults PTHelpers::testNeighbors(int i, int j, int testValue, PTData& ptData
     for (int idx = dir.startLimit; idx != dir.endLimit; idx += dir.step) {
       int row = dir.rowChange ? idx : i;
       int col = dir.rowChange ? j : idx;
+      
+      // Add detailed debugging for right neighbor
+      if (!dir.rowChange && dir.step > 0 && idx > j) {
+        SS2K_LOG(PTDATA_LOG_TAG, "Right search: idx=%d, col=%d, val=%d", idx, col, ptData.tableRow[row].tableEntry[col].targetPosition);
+      }
 
       if (ptData.tableRow[row].tableEntry[col].targetPosition != INT16_MIN) {
         dir.neighbor->targetPosition = ptData.tableRow[row].tableEntry[col].targetPosition;
@@ -76,6 +81,9 @@ TestResults PTHelpers::testNeighbors(int i, int j, int testValue, PTData& ptData
   if (returnResult.bottomNeighbor.passedTest && returnResult.topNeighbor.passedTest && returnResult.rightNeighbor.passedTest && returnResult.leftNeighbor.passedTest) {
     returnResult.allNeighborsPassed = 1;
   }
+  //Log the results of the neighbors found and passed tests, and the neighbor values
+SS2K_LOG(PTDATA_LOG_TAG, "Neighbors Found: %d %d %d %d", returnResult.leftNeighbor.found, returnResult.rightNeighbor.found, returnResult.topNeighbor.found,
+           returnResult.bottomNeighbor.found);
 
   return returnResult;
 }
@@ -83,6 +91,9 @@ TestResults PTHelpers::testNeighbors(int i, int j, int testValue, PTData& ptData
 int32_t PTHelpers::lookup(int watts, int cad, PTData& ptData) {
   int cadIndex  = round(((float)cad - (float)MINIMUM_TABLE_CAD) / (float)POWERTABLE_CAD_INCREMENT);
   int wattIndex = round((float)watts / (float)POWERTABLE_WATT_INCREMENT);
+  
+  SS2K_LOG(PTDATA_LOG_TAG, "Lookup indices: cadIndex=%d, wattIndex=%d (cad=%d, watts=%d)",
+           cadIndex, wattIndex, cad, watts);
 
   // If request is outside table limits, perform linear extrapolation
   if (cad < MINIMUM_TABLE_CAD || cad > (MINIMUM_TABLE_CAD + (POWERTABLE_CAD_SIZE - 1) * POWERTABLE_CAD_INCREMENT) ||
@@ -144,36 +155,35 @@ int32_t PTHelpers::lookup(int watts, int cad, PTData& ptData) {
   float xWatt[2];
   float yWatt[2];
 
+  float R1 = INT16_MIN;
   if (neighbors.leftNeighbor.found && neighbors.rightNeighbor.found) {
     xWatt[0] = static_cast<float>(neighbors.leftNeighbor.j * POWERTABLE_WATT_INCREMENT);   // Watts as float
     xWatt[1] = static_cast<float>(neighbors.rightNeighbor.j * POWERTABLE_WATT_INCREMENT);  // Watts as float
     yWatt[0] = static_cast<float>(neighbors.leftNeighbor.targetPosition);                  // targetPosition as float
     yWatt[1] = static_cast<float>(neighbors.rightNeighbor.targetPosition);                 // targetPosition as float
-  } else {
-    xWatt[0] = xWatt[1] = 0.0f;       // Dummy values
-    yWatt[0] = yWatt[1] = INT16_MIN;  // Indicate not found
+    // Log the neighbors found and their values
+    SS2K_LOG(PTDATA_LOG_TAG, "Left Neighbor: (%d) (%d) (%d)", neighbors.leftNeighbor.i, neighbors.leftNeighbor.j, neighbors.leftNeighbor.targetPosition);
+    // Only proceed with interpolation if both neighbors have valid values
+    if (yWatt[0] != INT16_MIN && yWatt[1] != INT16_MIN) {
+      R1 = linearInterpolate(xWatt, yWatt, 2, static_cast<float>(watts));  // watts as float
+    }
   }
-
-  //R1 is the result of linear interpolation between left and right neighbors
-  float R1 = (neighbors.leftNeighbor.found && neighbors.rightNeighbor.found) ? linearInterpolate(xWatt, yWatt, 2, static_cast<float>(watts))  // watts as float
-                                                                             : INT16_MIN;
 
   float xCad[2];
   float yCad[2];
+  float R2 = INT16_MIN;
 
   if (neighbors.topNeighbor.found && neighbors.bottomNeighbor.found) {
     xCad[0] = static_cast<float>(neighbors.topNeighbor.i * POWERTABLE_CAD_INCREMENT + MINIMUM_TABLE_CAD);     // Cadence as float
     xCad[1] = static_cast<float>(neighbors.bottomNeighbor.i * POWERTABLE_CAD_INCREMENT + MINIMUM_TABLE_CAD);  // Cadence as float
     yCad[0] = static_cast<float>(neighbors.topNeighbor.targetPosition);                                       // targetPosition as float
     yCad[1] = static_cast<float>(neighbors.bottomNeighbor.targetPosition);                                    // targetPosition as float
-  } else {
-    xCad[0] = xCad[1] = 0.0f;       // Dummy values
-    yCad[0] = yCad[1] = INT16_MIN;  // Indicate not found
+    
+    // Only proceed with interpolation if both neighbors have valid values
+    if (yCad[0] != INT16_MIN && yCad[1] != INT16_MIN) {
+      R2 = linearInterpolate(xCad, yCad, 2, static_cast<float>(cad));  // cad as float
+    }
   }
-
-  //R2 is the result of linear interpolation between top and bottom neighbors
-  float R2 = (neighbors.topNeighbor.found && neighbors.bottomNeighbor.found) ? linearInterpolate(xCad, yCad, 2, static_cast<float>(cad))  // cad as float
-                                                                             : INT16_MIN;
   //R3 is the result of direct lookup in the table
   float R3 = (cadIndex >= 0 && cadIndex < POWERTABLE_CAD_SIZE && wattIndex >= 0 && wattIndex < POWERTABLE_WATT_SIZE &&
               ptData.tableRow[cadIndex].tableEntry[wattIndex].targetPosition != INT16_MIN)
@@ -527,6 +537,7 @@ void PTHelpers::findTableDirection(bool horizontal, PTData& ptData) {
   }
 }
 
+// Use the powertable to preform a reverse lookup of the target position to find the watts at a given cadence.
 int32_t PTHelpers::lookupWatts(int cad, int32_t targetPosition, PTData& ptData) {
   if (cad < 1) {
     return 0;
@@ -544,33 +555,77 @@ int32_t PTHelpers::lookupWatts(int cad, int32_t targetPosition, PTData& ptData) 
     cadIndex = POWERTABLE_CAD_SIZE - 1;
   }
 
-  // Find closest positions and corresponding watts in the row
-  std::vector<float> wattValue;
-  std::vector<float> positionValue;
+  // Find closest positions and corresponding watts in the current cadence row
+  std::vector<float> positionValue;  // x-coordinates (independent variable)
+  std::vector<float> wattValue;      // y-coordinates (dependent variable)
 
   for (int j = 0; j < POWERTABLE_WATT_SIZE; j++) {
     if (ptData.tableRow[cadIndex].tableEntry[j].targetPosition != INT16_MIN) {
-      wattValue.push_back(static_cast<float>(j * POWERTABLE_WATT_INCREMENT));
       positionValue.push_back(static_cast<float>(ptData.tableRow[cadIndex].tableEntry[j].targetPosition));
+      wattValue.push_back(static_cast<float>(j * POWERTABLE_WATT_INCREMENT));
     }
   }
 
+  // If we don't have enough data in current cadence row, try to get data from adjacent rows
+  if (wattValue.size() < 2) {
+    SS2K_LOG(PTDATA_LOG_TAG, "Not enough data in current cadence row %d, checking adjacent rows", cadIndex);
+    
+    // Try rows above current cadence (lower cadence)
+    for (int i = cadIndex - 1; i >= 0 && wattValue.size() < 2; i--) {
+      for (int j = 0; j < POWERTABLE_WATT_SIZE; j++) {
+        if (ptData.tableRow[i].tableEntry[j].targetPosition != INT16_MIN) {
+          positionValue.push_back(static_cast<float>(ptData.tableRow[i].tableEntry[j].targetPosition));
+          wattValue.push_back(static_cast<float>(j * POWERTABLE_WATT_INCREMENT));
+        }
+      }
+    }
+    
+    // Try rows below current cadence (higher cadence)
+    for (int i = cadIndex + 1; i < POWERTABLE_CAD_SIZE && wattValue.size() < 2; i++) {
+      for (int j = 0; j < POWERTABLE_WATT_SIZE; j++) {
+        if (ptData.tableRow[i].tableEntry[j].targetPosition != INT16_MIN) {
+          positionValue.push_back(static_cast<float>(ptData.tableRow[i].tableEntry[j].targetPosition));
+          wattValue.push_back(static_cast<float>(j * POWERTABLE_WATT_INCREMENT));
+        }
+      }
+    }
+  }
+
+  // If we still don't have enough data, return error
   if (wattValue.size() < 2) {
     SS2K_LOG(PTDATA_LOG_TAG, "LookupWatts failed - not enough data for cad %d", cad);
     return RETURN_ERROR;
   }
 
-  float result;
-  if (internalPosition < positionValue.front()) {
-    result = linearExtrapolate(wattValue.data(), positionValue.data(), wattValue.size(), static_cast<float>(internalPosition));
-  } else if (internalPosition > positionValue.back()) {
-    result = linearExtrapolate(wattValue.data(), positionValue.data(), wattValue.size(), static_cast<float>(internalPosition));
-  } else {
-    result = linearInterpolate(wattValue.data(), positionValue.data(), wattValue.size(), static_cast<float>(internalPosition));
+  // Sort the arrays based on position values to ensure correct interpolation
+  std::vector<std::pair<float, float>> posWattPairs;
+  for (size_t i = 0; i < positionValue.size(); i++) {
+    posWattPairs.emplace_back(positionValue[i], wattValue[i]);
+  }
+  std::sort(posWattPairs.begin(), posWattPairs.end());
+  
+  // Rebuild sorted arrays
+  positionValue.clear();
+  wattValue.clear();
+  for (const auto& pair : posWattPairs) {
+    positionValue.push_back(pair.first);
+    wattValue.push_back(pair.second);
   }
 
-  int watts = static_cast<int>(result);
+  // Now perform interpolation/extrapolation with correct array order
+  // Position is x (independent), watts is y (dependent)
+  float result;
+  if (internalPosition < positionValue.front()) {
+    result = linearExtrapolate(positionValue.data(), wattValue.data(), positionValue.size(), static_cast<float>(internalPosition));
+  } else if (internalPosition > positionValue.back()) {
+    result = linearExtrapolate(positionValue.data(), wattValue.data(), positionValue.size(), static_cast<float>(internalPosition));
+  } else {
+    result = linearInterpolate(positionValue.data(), wattValue.data(), positionValue.size(), static_cast<float>(internalPosition));
+  }
+
+  int watts = static_cast<int>(round(result));
   SS2K_LOG(PTDATA_LOG_TAG, "LookupWatts computed %dw from pos %d, cad %d", watts, targetPosition, cad);
+  if (watts < 0) watts = 0; // Ensure watts is non-negative
   return watts;
 }
 

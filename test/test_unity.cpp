@@ -56,8 +56,10 @@ void setup() {
   
   // Power Table Lookup Tests
   {
-    TestLookup test;
-    RUN_TEST(test.test_lookup_values);
+    TestPTLookupResistance test;
+    RUN_TEST(test.test_pt_lookup_resistance);
+    TestPTLookupWatts test2;
+    RUN_TEST(test2.test_pt_lookup_watts);
   }
 
   UNITY_END();

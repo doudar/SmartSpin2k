@@ -27,7 +27,12 @@ class TestPowerBuffer {
   static void set__should_set_values__expect_values_added_to_correct_index(void);
 };
 
-class TestLookup {
+class TestPTLookupResistance {
  public:
-  static void test_lookup_values(void);
+  static void test_pt_lookup_resistance(void);
 };
+
+class TestPTLookupWatts {
+  public:
+   static void test_pt_lookup_watts(void);
+ };
