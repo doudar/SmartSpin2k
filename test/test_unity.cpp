@@ -53,6 +53,12 @@ void setup() {
     RUN_TEST(test.test_parses_heartrate);
     RUN_TEST(test.test_parses_speed);
   }
+  
+  // Power Table Lookup Tests
+  {
+    TestLookup test;
+    RUN_TEST(test.test_lookup_values);
+  }
 
   UNITY_END();
 }

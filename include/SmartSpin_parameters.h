@@ -7,7 +7,7 @@
 
 #pragma once
 
-#ifndef UNIT_TEST
+#ifndef PLATFORMIO_ENV_NATIVE
 #include <Arduino.h>
 #else
 #include <ArduinoFake.h>

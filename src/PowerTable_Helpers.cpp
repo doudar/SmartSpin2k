@@ -9,7 +9,12 @@
 
 //if building PLATFORMIO_ENV_NATIVE environment define SS2K_LOG as Serial.printf(), else include the SS2KLog.h.
 #ifdef PLATFORMIO_ENV_NATIVE
-#define SS2K_LOG(tag, format, ...) Serial.printf(format, __VA_ARGS__)
+#define SS2K_LOG(tag, format, ...)
+#include <math.h>
+#include <stdint.h>
+#include <algorithm>
+#include <iterator>
+#include <cmath>
 #else
 #include "SS2KLog.h"
 #endif
@@ -194,7 +199,7 @@ void PTHelpers::fillEmptyTable(int outerValue, const std::vector<int>& emptyIndi
     for (int innerValue : emptyIndices) {
       int i                                           = horizontal ? outerValue : innerValue;
       int j                                           = horizontal ? innerValue : outerValue;
-      ptData.tableRow[i].tableEntry[j].targetPosition = static_cast<int>(std::round(singleValue));
+      ptData.tableRow[i].tableEntry[j].targetPosition = static_cast<int>(round(singleValue));
     }
   } else if (n == 2) {  // If two points, do linear interpolation
     for (int innerValue : emptyIndices) {
@@ -202,7 +207,7 @@ void PTHelpers::fillEmptyTable(int outerValue, const std::vector<int>& emptyIndi
       int j = horizontal ? innerValue : outerValue;
 
       float interpolated_value = linearInterpolate(x, y, n, innerValue);
-      int tempValue            = static_cast<int>(std::round(interpolated_value));
+      int tempValue            = static_cast<int>(round(interpolated_value));
 
       if (testNeighbors(i, j, tempValue, ptData).allNeighborsPassed) {
         ptData.tableRow[i].tableEntry[j].targetPosition = tempValue;
@@ -235,7 +240,7 @@ void PTHelpers::fillEmptyTable(int outerValue, const std::vector<int>& emptyIndi
       float maxValue     = *std::max_element(y, y + n);
       interpolated_value = std::max(minValue, std::min(maxValue, interpolated_value));
 
-      int tempValue = static_cast<int>(std::round(interpolated_value));
+      int tempValue = static_cast<int>(round(interpolated_value));
 
       if (this->testNeighbors(i, j, tempValue, ptData).allNeighborsPassed) {
         ptData.tableRow[i].tableEntry[j].targetPosition = tempValue;
@@ -251,7 +256,7 @@ void PTHelpers::extrapolateEmptyIndices(int outerIndex, const std::vector<int>& 
   int innerSize = horizontal ? POWERTABLE_WATT_SIZE : POWERTABLE_CAD_SIZE;
 
   if (n == 1) {
-    int singleValue = static_cast<int>(std::round(y[0]));
+    int singleValue = static_cast<int>(round(y[0]));
     for (int innerIndex : emptyIndices) {
       int i                                           = horizontal ? outerIndex : innerIndex;
       int j                                           = horizontal ? innerIndex : outerIndex;
@@ -263,7 +268,7 @@ void PTHelpers::extrapolateEmptyIndices(int outerIndex, const std::vector<int>& 
       int j = horizontal ? innerIndex : outerIndex;
 
       float extrapolated_value = linearExtrapolate(x, y, n, innerIndex);
-      int tempValue            = static_cast<int>(std::round(extrapolated_value));
+      int tempValue            = static_cast<int>(round(extrapolated_value));
 
       if (testNeighbors(i, j, tempValue, ptData).allNeighborsPassed) {
         ptData.tableRow[i].tableEntry[j].targetPosition = tempValue;
@@ -294,7 +299,7 @@ void PTHelpers::extrapolateEmptyIndices(int outerIndex, const std::vector<int>& 
       float maxVal             = *std::max_element(y, y + n);
       float range              = maxVal - minVal;
       extrapolated_value       = std::max(minVal - 0.1f * range, std::min(extrapolated_value, maxVal + 0.1f * range));
-      int tempValue            = static_cast<int>(std::round(extrapolated_value));
+      int tempValue            = static_cast<int>(round(extrapolated_value));
 
       if (testNeighbors(i, j, tempValue, ptData).allNeighborsPassed) {
         ptData.tableRow[i].tableEntry[j].targetPosition = tempValue;
@@ -367,7 +372,7 @@ void PTHelpers::extrapFillTableDirection(bool horizontal, PTData& ptData) {
 
 void PTHelpers::extrapolateDiagonalEntries(const std::vector<std::pair<int, int>>& emptyIndices, const float* x, const float* y, size_t n, PTData& ptData) {
   if (n == 1) {
-    int singleValue = static_cast<int>(std::round(y[0]));
+    int singleValue = static_cast<int>(round(y[0]));
     for (const auto& it : emptyIndices) {
       ptData.tableRow[it.first].tableEntry[it.second].targetPosition = singleValue;
     }
@@ -380,7 +385,7 @@ void PTHelpers::extrapolateDiagonalEntries(const std::vector<std::pair<int, int>
       int j = it.second;
 
       float extrapolated_value = linearExtrapolate(x, y, n, i);
-      int tempValue            = static_cast<int>(std::round(extrapolated_value));
+      int tempValue            = static_cast<int>(round(extrapolated_value));
 
       if (testNeighbors(i, j, tempValue, ptData).allNeighborsPassed) {
         ptData.tableRow[i].tableEntry[j].targetPosition = tempValue;
@@ -418,7 +423,7 @@ void PTHelpers::extrapolateDiagonalEntries(const std::vector<std::pair<int, int>
       float range        = maxVal - minVal;
       extrapolated_value = std::max(minVal - 0.1f * range, std::min(extrapolated_value, maxVal + 0.1f * range));
 
-      int tempValue = static_cast<int>(std::round(extrapolated_value));
+      int tempValue = static_cast<int>(round(extrapolated_value));
       if (testNeighbors(i, j, tempValue, ptData).allNeighborsPassed) {
         ptData.tableRow[i].tableEntry[j].targetPosition = tempValue;
       }
@@ -728,7 +733,7 @@ bool CubicSpline::shouldUseNaturalSpline(const float* x, const float* y, size_t 
   float dataRange      = *std::max_element(y, y + n) - *std::min_element(y, y + n);
   float slopeThreshold = 0.1f * dataRange;
 
-  if (std::abs(startSlope) > slopeThreshold || std::abs(endSlope) > slopeThreshold) {
+  if (abs(startSlope) > slopeThreshold || abs(endSlope) > slopeThreshold) {
     return false;  // Use clamped spline
   }
 
@@ -746,5 +751,5 @@ bool CubicSpline::shouldUseNaturalSpline(const float* x, const float* y, size_t 
   float secondDerivativeEnd = (y[n - 1] - 2 * y[n - 2] + y[n - 3]) / (hn1 * hn2);
 
   float curvatureThreshold = 1.0f;
-  return !(std::abs(secondDerivativeStart) > curvatureThreshold || std::abs(secondDerivativeEnd) > curvatureThreshold);
+  return !(abs(secondDerivativeStart) > curvatureThreshold || abs(secondDerivativeEnd) > curvatureThreshold);
 }

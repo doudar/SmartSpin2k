@@ -26,3 +26,8 @@ class TestPowerBuffer {
  public:
   static void set__should_set_values__expect_values_added_to_correct_index(void);
 };
+
+class TestLookup {
+ public:
+  static void test_lookup_values(void);
+};
