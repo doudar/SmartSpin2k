@@ -9,7 +9,8 @@
 
 //if building PLATFORMIO_ENV_NATIVE environment define SS2K_LOG as Serial.printf(), else include the SS2KLog.h.
 #ifdef PLATFORMIO_ENV_NATIVE
-#define SS2K_LOG(tag, format, ...)
+#include <cstdio>
+#define SS2K_LOG(tag, format, ...) printf("[%s] " format "\n", tag, ##__VA_ARGS__)
 #include <math.h>
 #include <stdint.h>
 #include <algorithm>
@@ -153,6 +154,7 @@ int32_t PTHelpers::lookup(int watts, int cad, PTData& ptData) {
     yWatt[0] = yWatt[1] = INT16_MIN;  // Indicate not found
   }
 
+  //R1 is the result of linear interpolation between left and right neighbors
   float R1 = (neighbors.leftNeighbor.found && neighbors.rightNeighbor.found) ? linearInterpolate(xWatt, yWatt, 2, static_cast<float>(watts))  // watts as float
                                                                              : INT16_MIN;
 
@@ -169,9 +171,10 @@ int32_t PTHelpers::lookup(int watts, int cad, PTData& ptData) {
     yCad[0] = yCad[1] = INT16_MIN;  // Indicate not found
   }
 
+  //R2 is the result of linear interpolation between top and bottom neighbors
   float R2 = (neighbors.topNeighbor.found && neighbors.bottomNeighbor.found) ? linearInterpolate(xCad, yCad, 2, static_cast<float>(cad))  // cad as float
                                                                              : INT16_MIN;
-
+  //R3 is the result of direct lookup in the table
   float R3 = (cadIndex >= 0 && cadIndex < POWERTABLE_CAD_SIZE && wattIndex >= 0 && wattIndex < POWERTABLE_WATT_SIZE &&
               ptData.tableRow[cadIndex].tableEntry[wattIndex].targetPosition != INT16_MIN)
                  ? static_cast<float>(ptData.tableRow[cadIndex].tableEntry[wattIndex].targetPosition)  // Direct value as float
