@@ -277,6 +277,9 @@ const char* const DEFAULT_PASSWORD = "password";
 // Size of increments (in watts) for the ERG Lookup Table. This needs to be a decimal for proper calculation.
 #define POWERTABLE_WATT_INCREMENT 30
 
+// Where does the CAD portion of the table start?
+#define MINIMUM_TABLE_CAD 60
+
 // Size of increments (in CAD) for the ERG Lookup Table. This needs to be a decimal for proper calculation.
 #define POWERTABLE_CAD_INCREMENT 5
 
@@ -294,9 +297,6 @@ const char* const DEFAULT_PASSWORD = "password";
 
 // Normal cadence value (used in power table and other areas)
 #define NORMAL_CAD 90
-
-// Where does the CAD portion of the table start?
-#define MINIMUM_TABLE_CAD 60
 
 // Minimum positions recorded in the active table before attempting to load the saved table.
 // Increase this value if the offset for the loaded table is inaccurate.

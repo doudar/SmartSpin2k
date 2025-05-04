@@ -56,10 +56,13 @@ void setup() {
   
   // Power Table Lookup Tests
   {
-    TestPTLookupResistance test;
-    RUN_TEST(test.test_pt_lookup_resistance);
-    TestPTLookupWatts test2;
-    RUN_TEST(test2.test_pt_lookup_watts);
+   TestLinearExtrapolate test3;
+   RUN_TEST(test3.test_linear_extrapolate);
+   TestPTLookupResistance test;
+   RUN_TEST(test.test_pt_lookup_resistance);
+   TestPTLookupWatts test2;
+   RUN_TEST(test2.test_pt_lookup_watts);
+   RUN_TEST(test2.test_debug_neighbors);
   }
 
   UNITY_END();
