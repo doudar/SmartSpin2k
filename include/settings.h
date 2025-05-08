@@ -305,9 +305,6 @@ const char* const DEFAULT_PASSWORD = "password";
 // Limit power table size to save memory
 #define TABLE_DIVISOR 100.0
 
-// Adds onto ERG_SENSITIVITY 
-#define PT_READING_RANGE 10.0
-
 //Max distance a failed neighbor can be horizontally from target position
 #define HORIZONTAL_NEIGHBOR_RANGE 0.6
     

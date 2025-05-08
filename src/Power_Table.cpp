@@ -26,7 +26,7 @@ void PowerBuffer::set(int i) {
 }
 
 void PowerBuffer::reset() {
-  SS2K_LOG(POWERTABLE_LOG_TAG, "Power Table Reset");
+  SS2K_LOG(POWERTABLE_LOG_TAG, "Power Buffer Reset");
   for (int i = 0; i < POWER_SAMPLES; i++) {
     this->powerEntry[i].readings       = 0;
     this->powerEntry[i].cad            = 0;
@@ -58,12 +58,11 @@ void PowerTable::processPowerValue(PowerBuffer& powerBuffer, int cadence, Measur
 
     int currentPos = ss2k->getCurrentPosition() / TABLE_DIVISOR;
     int targetPos  = powerBuffer.powerEntry[0].targetPosition;
-    int range      = PT_READING_RANGE + ERG_SENSITIVITY;
+    int range      = (userConfig->getShiftStep() / 2) / TABLE_DIVISOR;
 
     if (currentPos >= (targetPos - range) && currentPos <= (targetPos + range)) {
       for (int i = 1; i < POWER_SAMPLES; i++) {
         if (powerBuffer.powerEntry[i].readings == 0) {
-          SS2K_LOG(POWERTABLE_LOG_TAG, "Success!");
           powerBuffer.set(i);  // Add additional readings to the buffer.
           break;
         }
@@ -75,6 +74,7 @@ void PowerTable::processPowerValue(PowerBuffer& powerBuffer, int cadence, Measur
         powerBuffer.reset();
       }
     } else {  // Reading was outside the range - clear the buffer and start over.
+      SS2K_LOG(POWERTABLE_LOG_TAG, "Entry into buffer was outside the range. Clearing buffer.");
       powerBuffer.reset();
     }
   }
