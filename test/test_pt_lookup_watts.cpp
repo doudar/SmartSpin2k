@@ -1,4 +1,3 @@
-
 /*
  * Copyright (C) 2020  Anthony Doud & Joel Baranick
  * All rights reserved
@@ -19,7 +18,8 @@
 #include "data_helpers.cpp"
 
 void TestPTLookupWatts::test_pt_lookup_watts(void) {
-  printf("Starting lookup test\n");
+  std::ofstream outFile("test/output/test_pt_lookup_watts.txt", std::ios::trunc);
+  outFile << "Starting lookup test\n";
 
   // Create a test power table with simple values
   PTData ptData;
@@ -33,9 +33,9 @@ void TestPTLookupWatts::test_pt_lookup_watts(void) {
 
   // Lambda function for reusable lookup and logging
   auto performLookup = [&](int cad, int resistance) {
-    printf("Calling lookup CAD %d, with Resistance: %d", cad, resistance);
+    outFile << "Calling lookup CAD " << cad << ", with Resistance: " << resistance;
     int32_t result = helpers.lookupWatts(cad, resistance, ptData);
-    printf("Lookup returned: %dw\n", result);
+    outFile << "Lookup returned: " << result << "w\n";
     return result;
   };
 
@@ -56,11 +56,11 @@ void TestPTLookupWatts::test_pt_lookup_watts(void) {
   
   int32_t previousMaxWatts = INT32_MIN;  // Track max watts from previous cadence
   
-  printf("Testing cadence range %d-%d with %d resistance points\n", minCadence, maxCadence, resistancePoints);
+  outFile << "Testing cadence range " << minCadence << "-" << maxCadence << " with " << resistancePoints << " resistance points\n";
   
   // Iterate through each cadence value
   for (int cadence = minCadence; cadence <= maxCadence; cadence += cadenceStep) {
-    printf("\n--- Testing cadence %d ---\n", cadence);
+    outFile << "\n--- Testing cadence " << cadence << " ---\n";
     
     int32_t previousWatts = INT32_MIN;  // Track previous watts within this cadence
     int32_t maxWattsForCadence = INT32_MIN;  // Track max watts for this cadence
@@ -95,13 +95,12 @@ void TestPTLookupWatts::test_pt_lookup_watts(void) {
       //   "Max watts should increase with higher cadence"
       // );
       
-      printf("Max watts increased from %d to %d when cadence changed from %d to %d\n",
-             previousMaxWatts, maxWattsForCadence, cadence - cadenceStep, cadence);
+      outFile << "Max watts increased from " << previousMaxWatts << " to " << maxWattsForCadence << " when cadence changed from " << (cadence - cadenceStep) << " to " << cadence << "\n";
     }
     
     previousMaxWatts = maxWattsForCadence;
   }
 
   // Print additional debug info
-  printf("Test completed\n");
+  outFile << "Test completed\n";
 }

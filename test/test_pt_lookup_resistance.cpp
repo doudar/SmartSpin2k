@@ -1,4 +1,3 @@
-
 /*
  * Copyright (C) 2020  Anthony Doud & Joel Baranick
  * All rights reserved
@@ -18,7 +17,8 @@
 #include "data_helpers.cpp"
 
 void TestPTLookupResistance::test_pt_lookup_resistance(void) {
-  printf("Starting lookup test\n");
+  std::ofstream outFile("test/output/test_pt_lookup_resistance.txt", std::ios::trunc);
+  outFile << "Starting lookup test\n";
 
   // Create a test power table with simple values
   PTData ptData;
@@ -32,9 +32,9 @@ void TestPTLookupResistance::test_pt_lookup_resistance(void) {
 
   // Lambda function for reusable lookup and logging
   auto performLookup = [&](int cadValue, int wattValue) {
-    printf("Calling lookup with cadence: %d, watts: %d\n", cadValue, wattValue);
+    outFile << "Calling lookup with cadence: " << cadValue << ", watts: " << wattValue << "\n";
     int32_t result = helpers.lookup(wattValue, cadValue, ptData);
-    printf("Lookup returned: %d \n", result);
+    outFile << "Lookup returned: " << result << "\n";
     return result;
   };
 
@@ -53,5 +53,6 @@ void TestPTLookupResistance::test_pt_lookup_resistance(void) {
   }
 
   // Print additional debug info
-  printf("Test completed\n");
+  outFile << "Test completed\n";
+  outFile.close();
 }

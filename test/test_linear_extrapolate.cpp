@@ -16,7 +16,8 @@
 #include "data_helpers.cpp"
 
 void TestLinearExtrapolate::test_linear_extrapolate(void) {
-  printf("Starting linear extrapolation test\n");
+  std::ofstream outFile("test/output/test_linear_extrapolate.txt", std::ios::trunc);
+  outFile << "Starting linear extrapolation test\n";
   
   // Create a test power table and load data from the .ptab file
   PTData ptData;
@@ -27,7 +28,7 @@ void TestLinearExtrapolate::test_linear_extrapolate(void) {
   PTHelpers helpers;
   
   // Test low cadence extrapolation (below MINIMUM_TABLE_CAD which is 60 RPM)
-  printf("\n--- Testing low cadence extrapolation ---\n");
+  outFile << "\n--- Testing low cadence extrapolation ---\n";
   
   // For each power column, extract data points for known cadences
   // and test extrapolation for cadences below the table minimum
@@ -47,7 +48,7 @@ void TestLinearExtrapolate::test_linear_extrapolate(void) {
       continue;
     }
     
-    printf("Testing low cadence extrapolation for %dW...\n", wattValue);
+    outFile << "Testing low cadence extrapolation for " << wattValue << "W...\n";
     
     // Extract cadence and target position data for this wattage
     std::vector<float> cadValues;
@@ -63,13 +64,13 @@ void TestLinearExtrapolate::test_linear_extrapolate(void) {
     // Test cadence values below minimum (50, 40, 30 RPM)
     for (int testCadence = 50; testCadence >= 30; testCadence -= 10) {
       float extrapolated = helpers.linearExtrapolate(cadValues.data(), positionValues.data(), cadValues.size(), static_cast<float>(testCadence));
-      printf("  Cadence %d RPM -> Extrapolated position: %f\n", testCadence, extrapolated);
+      outFile << "  Cadence " << testCadence << " RPM -> Extrapolated position: " << extrapolated << "\n";
       
       // For low cadence, position values should be higher than minimum cadence positions
       // (resistance needs to increase at lower cadences)
       if (positionValues.size() >= 2) {
         float expectedTrend = positionValues[0] + (positionValues[0] - positionValues[1]) * ((cadValues[0] - testCadence) / (cadValues[1] - cadValues[0]));
-        printf("  Expected trend value: %f\n", expectedTrend);
+        outFile << "  Expected trend value: " << expectedTrend << "\n";
         
         // Test that extrapolated value is close to expected trend
         // Allow some tolerance for numeric differences
@@ -84,7 +85,7 @@ void TestLinearExtrapolate::test_linear_extrapolate(void) {
   }
   
   // Test high cadence extrapolation (above the highest in table which is 105 RPM)
-  printf("\n--- Testing high cadence extrapolation ---\n");
+  outFile << "\n--- Testing high cadence extrapolation ---\n";
   
   // For each power column, extract data points and test extrapolation for high cadences
   for (int wattIndex = 0; wattIndex < POWERTABLE_WATT_SIZE; wattIndex++) {
@@ -103,7 +104,7 @@ void TestLinearExtrapolate::test_linear_extrapolate(void) {
       continue;
     }
     
-    printf("Testing high cadence extrapolation for %dW...\n", wattValue);
+    outFile << "Testing high cadence extrapolation for " << wattValue << "W...\n";
     
     // Extract cadence and target position data for this wattage
     std::vector<float> cadValues;
@@ -119,7 +120,7 @@ void TestLinearExtrapolate::test_linear_extrapolate(void) {
     // Test cadence values above maximum (110, 120, 130 RPM)
     for (int testCadence = 110; testCadence <= 130; testCadence += 10) {
       float extrapolated = helpers.linearExtrapolate(cadValues.data(), positionValues.data(), cadValues.size(), static_cast<float>(testCadence));
-      printf("  Cadence %d RPM -> Extrapolated position: %f\n", testCadence, extrapolated);
+      outFile << "  Cadence " << testCadence << " RPM -> Extrapolated position: " << extrapolated << "\n";
       
       // For high cadence, position values should be lower than maximum cadence positions
       // (resistance needs to decrease at higher cadences)
@@ -131,7 +132,7 @@ void TestLinearExtrapolate::test_linear_extrapolate(void) {
                            (positionValues[lastIdx] - positionValues[secondLastIdx]) * 
                            ((testCadence - cadValues[lastIdx]) / (cadValues[lastIdx] - cadValues[secondLastIdx]));
         
-        printf("  Expected trend value: %f\n", expectedTrend);
+        outFile << "  Expected trend value: " << expectedTrend << "\n";
         
         // Test that extrapolated value is close to expected trend
         // Allow some tolerance for numeric differences
@@ -146,7 +147,7 @@ void TestLinearExtrapolate::test_linear_extrapolate(void) {
   }
   
   // Direct test with controlled values
-  printf("\n--- Testing linearExtrapolate with controlled values ---\n");
+  outFile << "\n--- Testing linearExtrapolate with controlled values ---\n";
   
   // Test case 1: Simple linear extrapolation below range
   {
@@ -155,7 +156,7 @@ void TestLinearExtrapolate::test_linear_extrapolate(void) {
     
     // Extrapolate to x=50
     float result = helpers.linearExtrapolate(x, y, 3, 50.0f);
-    printf("Extrapolate x=50: Expected ~120, Got %f\n", result);
+    outFile << "Extrapolate x=50: Expected ~120, Got " << result << "\n";
     TEST_ASSERT_FLOAT_WITHIN_MESSAGE(5.0f, 120.0f, result, "Simple low extrapolation failed");
   }
   
@@ -166,9 +167,10 @@ void TestLinearExtrapolate::test_linear_extrapolate(void) {
     
     // Extrapolate to x=120
     float result = helpers.linearExtrapolate(x, y, 3, 120.0f);
-    printf("Extrapolate x=120: Expected ~10, Got %f\n", result);
+    outFile << "Extrapolate x=120: Expected ~10, Got " << result << "\n";
     TEST_ASSERT_FLOAT_WITHIN_MESSAGE(5.0f, 10.0f, result, "Simple high extrapolation failed");
   }
   
-  printf("Test completed\n");
+  outFile << "Test completed\n";
+  outFile.close();
 }
