@@ -32,6 +32,19 @@ class PowerEntry {
   }
 };
 
+struct ptIndex {
+  int8_t wattIndex;
+  int8_t cadIndex;
+  ptIndex() {
+    this->wattIndex = INT8_MIN;
+    this->cadIndex = INT8_MIN;
+  }
+
+  bool operator==(const ptIndex& other) const {
+    return wattIndex == other.wattIndex && cadIndex == other.cadIndex;
+  }
+};
+
 class PowerBuffer {
  public:
   PowerEntry powerEntry[POWER_SAMPLES];
@@ -69,15 +82,12 @@ class TestResults {
   struct Neighbor {
     unsigned int found : 1;
     unsigned int passedTest : 1;
-    int8_t i;
-    int8_t j;
+    ptIndex index;
     int16_t targetPosition;
 
     Neighbor() {
       found          = false;
       passedTest     = false;
-      i              = INT8_MIN;
-      j              = INT8_MIN;
       targetPosition = INT16_MIN;
     }
   };
@@ -109,7 +119,7 @@ class CubicSpline {
 
 class PTHelpers {
  public:
-  TestResults testNeighbors(int i, int j, int value, PTData& ptData);
+  TestResults testNeighbors(ptIndex index, int value, PTData& ptData);
   int32_t lookup(int watts, int cad, PTData& ptData);
   void fillEmptyTable(int outerValue, const std::vector<int>& emptyIndices, const float* x, const float* y, size_t n, bool horizontal, bool useNaturalSpline, PTData& ptData);
   void extrapolateEmptyIndices(int outerIndex, const std::vector<int>& emptyIndices, const float* x, const float* y, size_t n, bool horizontal, bool naturalSpline, PTData& ptData);
@@ -117,9 +127,10 @@ class PTHelpers {
   float linearExtrapolate(const float* x, const float* y, size_t n, float j);
   float linearInterpolate(const float* x, const float* y, size_t n, float j);
   void findTableDirection(bool horizontal, PTData& ptData);
-  void fillTable(PTData& ptData);
+  void standardFill(PTData& ptData);
   int32_t lookupWatts(int cad, int32_t targetPosition, PTData& ptData);
   int32_t extrapolateCadenceWatts(int cad, float targetPosition, PTData& ptData);
-  void extrapolateDiagonalEntries(const std::vector<std::pair<int, int>>& emptyIndices, const float* x, const float* y, size_t n, PTData& ptData);
+  void extrapolateDiagonalEntries(const std::vector<ptIndex>& emptyIndices, const float* x, const float* y, size_t n, PTData& ptData);
   void extrapolateDiagonal(PTData& ptData);
+  ptIndex calculateIndex(int watts, int cad);
 };

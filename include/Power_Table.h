@@ -17,6 +17,7 @@ class PowerTable {
  public:
   bool saveFlag                  = false;
   bool _hasBeenLoadedThisSession = false;
+  bool fillTableFlag           = false;
 
   PTData ptData;
   PTHelpers ptHelpers;
@@ -30,10 +31,13 @@ class PowerTable {
   // Catalogs a new entry into the power table.
   void newEntry(PowerBuffer& powerBuffer);
 
-  // enters data into power table
-  void enterData(int i, int j, int pos);
+  // Interpolates and extrapolates the power table.
+  void fillTable();
 
-  void downVoteData(int i, int j, float target, int neighbor);
+  // enters data into power table
+  void enterData(ptIndex index, int pos);
+
+  void downVoteData(ptIndex index, float target, int neighbor);
 
   // returns target position for given cadence and watts. Returns RETURN_ERROR if not found.
   int32_t lookup(int watts, int cad) { return this->ptHelpers.lookup(watts, cad, this->ptData); }
@@ -61,14 +65,14 @@ class PowerTable {
 
   void fillEmptyTable(int outerValue, const std::vector<int>& emptyIndices, const float* x, const float* y, size_t n, bool horizontal, bool useNaturalSpline);
 
-  float calculatePosition(float watts, float cad, float targetPos, int i, int k);
+  float calculatePosition(float watts, float cad, float targetPos, ptIndex index);
 
-  void processNeighbor(int k, int i, float targetPosition, int neighbor_i, int neighbor_j, int neighbor_targetPosition, int oppositeNeighbor_i, int oppositeNeighbor_j,
+  void processNeighbor(ptIndex index, float targetPosition, ptIndex neighborIndex, int neighbor_targetPosition, ptIndex oppositeNeighborIndex,
                        int oppositeNeighbor_targetPosition, float rangeFactor);
 
  private:
   unsigned long lastSaveTime = millis();
-  
+
   void extrapFillTable();
   int getNumEntries();
   // remove entries with < 1 readings

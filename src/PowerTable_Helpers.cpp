@@ -21,7 +21,7 @@
 #include "SS2KLog.h"
 #endif
 
-TestResults PTHelpers::testNeighbors(int i, int j, int testValue, PTData& ptData) {
+TestResults PTHelpers::testNeighbors(ptIndex index, int testValue, PTData& ptData) {
   TestResults returnResult;
 
   // Define direction parameters (start limit, end limit, step, row change, column change)
@@ -33,16 +33,17 @@ TestResults PTHelpers::testNeighbors(int i, int j, int testValue, PTData& ptData
     int colChange;
     TestResults::Neighbor* neighbor;
     bool (*testPredicate)(int16_t, int);
-  } directions[] = {// Left: decreasing j, same i
-                    {j > 0 ? j - 1 : -1, -1, -1, 0, 0, &returnResult.leftNeighbor, [](int16_t pos, int test) { return pos < test || pos == INT16_MIN; }},
-                    // Right: increasing j, same i
-                    {j < POWERTABLE_WATT_SIZE - 1 ? j + 1 : POWERTABLE_WATT_SIZE, POWERTABLE_WATT_SIZE, 1, 0, 0, &returnResult.rightNeighbor,
-                     [](int16_t pos, int test) { return pos > test || pos == INT16_MIN; }},
-                    // Top: decreasing i, same j
-                    {i > 0 ? i - 1 : -1, -1, -1, 1, 0, &returnResult.topNeighbor, [](int16_t pos, int test) { return pos > test || pos == INT16_MIN; }},
-                    // Bottom: increasing i, same j
-                    {i < POWERTABLE_CAD_SIZE - 1 ? i + 1 : POWERTABLE_CAD_SIZE, POWERTABLE_CAD_SIZE, 1, 1, 0, &returnResult.bottomNeighbor,
-                     [](int16_t pos, int test) { return pos < test || pos == INT16_MIN; }}};
+  } directions[] = {
+      // Left: decreasing j, same i
+      {index.wattIndex > 0 ? index.wattIndex - 1 : -1, -1, -1, 0, 0, &returnResult.leftNeighbor, [](int16_t pos, int test) { return pos < test || pos == INT16_MIN; }},
+      // Right: increasing j, same i
+      {index.wattIndex < POWERTABLE_WATT_SIZE - 1 ? index.wattIndex + 1 : POWERTABLE_WATT_SIZE, POWERTABLE_WATT_SIZE, 1, 0, 0, &returnResult.rightNeighbor,
+       [](int16_t pos, int test) { return pos > test || pos == INT16_MIN; }},
+      // Top: decreasing i, same j
+      {index.cadIndex > 0 ? index.cadIndex - 1 : -1, -1, -1, 1, 0, &returnResult.topNeighbor, [](int16_t pos, int test) { return pos > test || pos == INT16_MIN; }},
+      // Bottom: increasing i, same j
+      {index.cadIndex < POWERTABLE_CAD_SIZE - 1 ? index.cadIndex + 1 : POWERTABLE_CAD_SIZE, POWERTABLE_CAD_SIZE, 1, 1, 0, &returnResult.bottomNeighbor,
+       [](int16_t pos, int test) { return pos < test || pos == INT16_MIN; }}};
 
   // Process each direction
   for (const auto& dir : directions) {
@@ -56,26 +57,21 @@ TestResults PTHelpers::testNeighbors(int i, int j, int testValue, PTData& ptData
       // Vertical direction (top/bottom) - check against CAD_SIZE
       skipDirection = (dir.startLimit < 0 || dir.startLimit >= POWERTABLE_CAD_SIZE);
     }
-    
+
     if (skipDirection) {
       continue;
     }
 
     // Search for neighbor in this direction
     for (int idx = dir.startLimit; idx != dir.endLimit; idx += dir.step) {
-      int row = dir.rowChange ? idx : i;
-      int col = dir.rowChange ? j : idx;
-
-      // Debugging can be re-enabled if needed
-      // if (!dir.rowChange && dir.step > 0 && idx > j) {
-      //   SS2K_LOG(PTDATA_LOG_TAG, "Right search: idx=%d, col=%d, val=%d", idx, col, ptData.tableRow[row].tableEntry[col].targetPosition);
-      // }
+      int row = dir.rowChange ? idx : index.cadIndex;
+      int col = dir.rowChange ? index.wattIndex : idx;
 
       if (ptData.tableRow[row].tableEntry[col].targetPosition != INT16_MIN) {
-        dir.neighbor->targetPosition = ptData.tableRow[row].tableEntry[col].targetPosition;
-        dir.neighbor->i              = row;
-        dir.neighbor->j              = col;
-        dir.neighbor->found          = 1;
+        dir.neighbor->targetPosition  = ptData.tableRow[row].tableEntry[col].targetPosition;
+        dir.neighbor->index.cadIndex  = row;
+        dir.neighbor->index.wattIndex = col;
+        dir.neighbor->found           = 1;
         break;
       }
     }
@@ -92,20 +88,22 @@ TestResults PTHelpers::testNeighbors(int i, int j, int testValue, PTData& ptData
   if (returnResult.bottomNeighbor.passedTest && returnResult.topNeighbor.passedTest && returnResult.rightNeighbor.passedTest && returnResult.leftNeighbor.passedTest) {
     returnResult.allNeighborsPassed = 1;
   }
-  // Log the results of the neighbors found and passed tests, and the neighbor values
-
-   SS2K_LOG(PTDATA_LOG_TAG, "Neighbors Found: %d %d %d %d Neighbor Values: %d %d %d %d", returnResult.leftNeighbor.found, returnResult.rightNeighbor.found, returnResult.topNeighbor.found,
-           returnResult.bottomNeighbor.found, returnResult.leftNeighbor.targetPosition, returnResult.rightNeighbor.targetPosition, returnResult.topNeighbor.targetPosition,
-           returnResult.bottomNeighbor.targetPosition);
 
   return returnResult;
 }
 
-int32_t PTHelpers::lookup(int watts, int cad, PTData& ptData) {
-  int cadIndex  = round(((float)cad - (float)MINIMUM_TABLE_CAD) / (float)POWERTABLE_CAD_INCREMENT);
-  int wattIndex = round((float)watts / (float)POWERTABLE_WATT_INCREMENT);
+// Calculate index in the table for the given watts and cadence
+ptIndex PTHelpers::calculateIndex(int watts, int cad) {
+  ptIndex index;
+  index.wattIndex = round((float)watts / (float)POWERTABLE_WATT_INCREMENT);
+  index.cadIndex  = round(((float)cad - (float)MINIMUM_TABLE_CAD) / (float)POWERTABLE_CAD_INCREMENT);
 
-  // SS2K_LOG(PTDATA_LOG_TAG, "Lookup indices: cadIndex=%d, wattIndex=%d (cad=%d, watts=%d)", cadIndex, wattIndex, cad, watts);
+  // SS2K_LOG(PTDATA_LOG_TAG, "Calculated indices: wattIndex=%d, CadIndex=%d (cad=%d, watts=%d)", index.wattIndex, index.CadIndex, cad, watts);
+  return index;
+}
+
+int32_t PTHelpers::lookup(int watts, int cad, PTData& ptData) {
+  ptIndex index = calculateIndex(watts, cad);
 
   // If request is outside table limits, perform linear extrapolation
   if (cad < MINIMUM_TABLE_CAD || cad > (MINIMUM_TABLE_CAD + (POWERTABLE_CAD_SIZE - 1) * POWERTABLE_CAD_INCREMENT) ||
@@ -118,15 +116,15 @@ int32_t PTHelpers::lookup(int watts, int cad, PTData& ptData) {
       std::vector<float> positionValue;  // target position value
 
       for (int i = 0; i < POWERTABLE_CAD_SIZE; ++i) {
-        if (ptData.tableRow[i].tableEntry[wattIndex].targetPosition != INT16_MIN) {
+        if (ptData.tableRow[i].tableEntry[index.wattIndex].targetPosition != INT16_MIN) {
           cadValue.push_back(static_cast<float>(i * POWERTABLE_CAD_INCREMENT + MINIMUM_TABLE_CAD));
-          positionValue.push_back(static_cast<float>(ptData.tableRow[i].tableEntry[wattIndex].targetPosition));
+          positionValue.push_back(static_cast<float>(ptData.tableRow[i].tableEntry[index.wattIndex].targetPosition));
         }
       }
 
       if (cadValue.size() >= 2) {
         extrapolatedValue = static_cast<int>(linearExtrapolate(cadValue.data(), positionValue.data(), cadValue.size(), static_cast<float>(cad)));
-        //SS2K_LOG(PTDATA_LOG_TAG, "Lookup Extrapolated (Cadence) (%d) for (%dw) (%dcad)", extrapolatedValue, watts, cad);
+        // SS2K_LOG(PTDATA_LOG_TAG, "Lookup Extrapolated (Cadence) (%d) for (%dw) (%dcad)", extrapolatedValue, watts, cad);
         return extrapolatedValue * TABLE_DIVISOR;
       } else {
         SS2K_LOG(PTDATA_LOG_TAG, "Not enough data to extrapolate cadence for (%dw) (%dcad)", watts, cad);
@@ -138,11 +136,11 @@ int32_t PTHelpers::lookup(int watts, int cad, PTData& ptData) {
       std::vector<float> wattValue;      // watt value
       std::vector<float> positionValue;  // target position value
 
-      if (cadIndex >= 0 && cadIndex < POWERTABLE_CAD_SIZE) {
+      if (index.cadIndex >= 0 && index.cadIndex < POWERTABLE_CAD_SIZE) {
         for (int j = 0; j < POWERTABLE_WATT_SIZE; ++j) {
-          if (ptData.tableRow[cadIndex].tableEntry[j].targetPosition != INT16_MIN) {
+          if (ptData.tableRow[index.cadIndex].tableEntry[j].targetPosition != INT16_MIN) {
             wattValue.push_back(static_cast<float>(j * POWERTABLE_WATT_INCREMENT));
-            positionValue.push_back(static_cast<float>(ptData.tableRow[cadIndex].tableEntry[j].targetPosition));
+            positionValue.push_back(static_cast<float>(ptData.tableRow[index.cadIndex].tableEntry[j].targetPosition));
           }
         }
 
@@ -162,17 +160,17 @@ int32_t PTHelpers::lookup(int watts, int cad, PTData& ptData) {
   }
 
   // **Interpolation using Nearest Neighbors**
-  TestResults neighbors = testNeighbors(cadIndex, wattIndex, INT16_MIN, ptData);
+  TestResults neighbors = testNeighbors(index, INT16_MIN, ptData);
 
   float xWatt[2];
   float yWatt[2];
 
   float R1 = INT16_MIN;
   if (neighbors.leftNeighbor.found && neighbors.rightNeighbor.found) {
-    xWatt[0] = static_cast<float>(neighbors.leftNeighbor.j * POWERTABLE_WATT_INCREMENT);   // Watts as float
-    xWatt[1] = static_cast<float>(neighbors.rightNeighbor.j * POWERTABLE_WATT_INCREMENT);  // Watts as float
-    yWatt[0] = static_cast<float>(neighbors.leftNeighbor.targetPosition);                  // targetPosition as float
-    yWatt[1] = static_cast<float>(neighbors.rightNeighbor.targetPosition);                 // targetPosition as float
+    xWatt[0] = static_cast<float>(neighbors.leftNeighbor.index.wattIndex * POWERTABLE_WATT_INCREMENT);   // Watts as float
+    xWatt[1] = static_cast<float>(neighbors.rightNeighbor.index.wattIndex * POWERTABLE_WATT_INCREMENT);  // Watts as float
+    yWatt[0] = static_cast<float>(neighbors.leftNeighbor.targetPosition);                                // targetPosition as float
+    yWatt[1] = static_cast<float>(neighbors.rightNeighbor.targetPosition);                               // targetPosition as float
     // Log the neighbors found and their values
     // SS2K_LOG(PTDATA_LOG_TAG, "Left Neighbor: (%d) (%d) (%d)", neighbors.leftNeighbor.i, neighbors.leftNeighbor.j, neighbors.leftNeighbor.targetPosition);
     // Only proceed with interpolation if both neighbors have valid values
@@ -186,10 +184,10 @@ int32_t PTHelpers::lookup(int watts, int cad, PTData& ptData) {
   float R2 = INT16_MIN;
 
   if (neighbors.topNeighbor.found && neighbors.bottomNeighbor.found) {
-    xCad[0] = static_cast<float>(neighbors.topNeighbor.i * POWERTABLE_CAD_INCREMENT + MINIMUM_TABLE_CAD);     // Cadence as float
-    xCad[1] = static_cast<float>(neighbors.bottomNeighbor.i * POWERTABLE_CAD_INCREMENT + MINIMUM_TABLE_CAD);  // Cadence as float
-    yCad[0] = static_cast<float>(neighbors.topNeighbor.targetPosition);                                       // targetPosition as float
-    yCad[1] = static_cast<float>(neighbors.bottomNeighbor.targetPosition);                                    // targetPosition as float
+    xCad[0] = static_cast<float>(neighbors.topNeighbor.index.cadIndex * POWERTABLE_CAD_INCREMENT + MINIMUM_TABLE_CAD);     // Cadence as float
+    xCad[1] = static_cast<float>(neighbors.bottomNeighbor.index.cadIndex * POWERTABLE_CAD_INCREMENT + MINIMUM_TABLE_CAD);  // Cadence as float
+    yCad[0] = static_cast<float>(neighbors.topNeighbor.targetPosition);                                                    // targetPosition as float
+    yCad[1] = static_cast<float>(neighbors.bottomNeighbor.targetPosition);                                                 // targetPosition as float
 
     // Only proceed with interpolation if both neighbors have valid values
     if (yCad[0] != INT16_MIN && yCad[1] != INT16_MIN) {
@@ -197,9 +195,9 @@ int32_t PTHelpers::lookup(int watts, int cad, PTData& ptData) {
     }
   }
   // R3 is the result of direct lookup in the table
-  float R3 = (cadIndex >= 0 && cadIndex < POWERTABLE_CAD_SIZE && wattIndex >= 0 && wattIndex < POWERTABLE_WATT_SIZE &&
-              ptData.tableRow[cadIndex].tableEntry[wattIndex].targetPosition != INT16_MIN)
-                 ? static_cast<float>(ptData.tableRow[cadIndex].tableEntry[wattIndex].targetPosition)  // Direct value as float
+  float R3 = (index.cadIndex >= 0 && index.cadIndex < POWERTABLE_CAD_SIZE && index.wattIndex >= 0 && index.wattIndex < POWERTABLE_WATT_SIZE &&
+              ptData.tableRow[index.cadIndex].tableEntry[index.wattIndex].targetPosition != INT16_MIN)
+                 ? static_cast<float>(ptData.tableRow[index.cadIndex].tableEntry[index.wattIndex].targetPosition)  // Direct value as float
                  : INT16_MIN;
 
   float sum = 0;
@@ -218,24 +216,25 @@ int32_t PTHelpers::lookup(int watts, int cad, PTData& ptData) {
 void PTHelpers::fillEmptyTable(int outerValue, const std::vector<int>& emptyIndices, const float* x, const float* y, size_t n, bool horizontal, bool useNaturalSpline,
                                PTData& ptData) {
   int innerSize = horizontal ? POWERTABLE_WATT_SIZE : POWERTABLE_CAD_SIZE;
+  ptIndex index;
 
   if (n == 1) {  // If only one point, fill row with the value
     float singleValue = y[0];
     for (int innerValue : emptyIndices) {
-      int i                                           = horizontal ? outerValue : innerValue;
-      int j                                           = horizontal ? innerValue : outerValue;
-      ptData.tableRow[i].tableEntry[j].targetPosition = static_cast<int>(round(singleValue));
+      index.cadIndex                                                             = horizontal ? outerValue : innerValue;
+      index.wattIndex                                                            = horizontal ? innerValue : outerValue;
+      ptData.tableRow[index.cadIndex].tableEntry[index.wattIndex].targetPosition = static_cast<int>(round(singleValue));
     }
   } else if (n == 2) {  // If two points, do linear interpolation
     for (int innerValue : emptyIndices) {
-      int i = horizontal ? outerValue : innerValue;
-      int j = horizontal ? innerValue : outerValue;
+      index.cadIndex = horizontal ? outerValue : innerValue;
+      index.wattIndex = horizontal ? innerValue : outerValue;
 
       float interpolated_value = linearInterpolate(x, y, n, innerValue);
       int tempValue            = static_cast<int>(round(interpolated_value));
 
-      if (testNeighbors(i, j, tempValue, ptData).allNeighborsPassed) {
-        ptData.tableRow[i].tableEntry[j].targetPosition = tempValue;
+      if (testNeighbors(index, tempValue, ptData).allNeighborsPassed) {
+        ptData.tableRow[index.cadIndex].tableEntry[index.wattIndex].targetPosition = tempValue;
       }
     }
   } else if (n >= 3) {  // If three or more points, use cubic spline interpolation
@@ -256,8 +255,8 @@ void PTHelpers::fillEmptyTable(int outerValue, const std::vector<int>& emptyIndi
     spline.set_points(x, y, n);
 
     for (int innerValue : emptyIndices) {
-      int i = horizontal ? outerValue : innerValue;
-      int j = horizontal ? innerValue : outerValue;
+      index.cadIndex  = horizontal ? outerValue : innerValue;
+      index.wattIndex = horizontal ? innerValue : outerValue;
 
       float interpolated_value = spline.interpolate(innerValue);
 
@@ -267,8 +266,8 @@ void PTHelpers::fillEmptyTable(int outerValue, const std::vector<int>& emptyIndi
 
       int tempValue = static_cast<int>(round(interpolated_value));
 
-      if (this->testNeighbors(i, j, tempValue, ptData).allNeighborsPassed) {
-        ptData.tableRow[i].tableEntry[j].targetPosition = tempValue;
+      if (this->testNeighbors(index, tempValue, ptData).allNeighborsPassed) {
+        ptData.tableRow[index.cadIndex].tableEntry[index.wattIndex].targetPosition = tempValue;
       }
     }
   } else {
@@ -279,24 +278,24 @@ void PTHelpers::fillEmptyTable(int outerValue, const std::vector<int>& emptyIndi
 void PTHelpers::extrapolateEmptyIndices(int outerIndex, const std::vector<int>& emptyIndices, const float* x, const float* y, size_t n, bool horizontal, bool naturalSpline,
                                         PTData& ptData) {
   int innerSize = horizontal ? POWERTABLE_WATT_SIZE : POWERTABLE_CAD_SIZE;
-
+  ptIndex index;
   if (n == 1) {
     int singleValue = static_cast<int>(round(y[0]));
     for (int innerIndex : emptyIndices) {
-      int i                                           = horizontal ? outerIndex : innerIndex;
-      int j                                           = horizontal ? innerIndex : outerIndex;
-      ptData.tableRow[i].tableEntry[j].targetPosition = singleValue;
+      index.cadIndex                                                             = horizontal ? outerIndex : innerIndex;
+      index.wattIndex                                                            = horizontal ? innerIndex : outerIndex;
+      ptData.tableRow[index.cadIndex].tableEntry[index.wattIndex].targetPosition = singleValue;
     }
   } else if (n == 2) {
     for (int innerIndex : emptyIndices) {
-      int i = horizontal ? outerIndex : innerIndex;
-      int j = horizontal ? innerIndex : outerIndex;
+      index.cadIndex  = horizontal ? outerIndex : innerIndex;
+      index.wattIndex = horizontal ? innerIndex : outerIndex;
 
       float extrapolated_value = linearExtrapolate(x, y, n, innerIndex);
       int tempValue            = static_cast<int>(round(extrapolated_value));
 
-      if (testNeighbors(i, j, tempValue, ptData).allNeighborsPassed) {
-        ptData.tableRow[i].tableEntry[j].targetPosition = tempValue;
+      if (testNeighbors(index, tempValue, ptData).allNeighborsPassed) {
+        ptData.tableRow[index.cadIndex].tableEntry[index.wattIndex].targetPosition = tempValue;
       }
     }
   } else if (n >= 3) {
@@ -316,8 +315,8 @@ void PTHelpers::extrapolateEmptyIndices(int outerIndex, const std::vector<int>& 
     spline.set_points(x, y, n);  // Pass pointer-based data
 
     for (int innerIndex : emptyIndices) {
-      int i = horizontal ? outerIndex : innerIndex;
-      int j = horizontal ? innerIndex : outerIndex;
+      index.cadIndex  = horizontal ? outerIndex : innerIndex;
+      index.wattIndex = horizontal ? innerIndex : outerIndex;
 
       float extrapolated_value = spline.extrapolate(innerIndex);
       float minVal             = *std::min_element(y, y + n);
@@ -326,8 +325,8 @@ void PTHelpers::extrapolateEmptyIndices(int outerIndex, const std::vector<int>& 
       extrapolated_value       = std::max(minVal - 0.1f * range, std::min(extrapolated_value, maxVal + 0.1f * range));
       int tempValue            = static_cast<int>(round(extrapolated_value));
 
-      if (testNeighbors(i, j, tempValue, ptData).allNeighborsPassed) {
-        ptData.tableRow[i].tableEntry[j].targetPosition = tempValue;
+      if (testNeighbors(index, tempValue, ptData).allNeighborsPassed) {
+        ptData.tableRow[index.cadIndex].tableEntry[index.wattIndex].targetPosition = tempValue;
       }
     }
   }
@@ -355,14 +354,14 @@ void PTHelpers::extrapFillTableDirection(bool horizontal, PTData& ptData) {
 
     int rangeStart = std::max(0, innerSize / 2 - 10);
     int rangeEnd   = std::min(innerSize, innerSize / 2 + 10);
-
+    ptIndex index;
     // Collect data points
     for (int innerIndex = rangeStart; innerIndex < rangeEnd; ++innerIndex) {
-      int i = horizontal ? outerIndex : innerIndex;
-      int j = horizontal ? innerIndex : outerIndex;
+      index.cadIndex  = horizontal ? outerIndex : innerIndex;
+      index.wattIndex = horizontal ? innerIndex : outerIndex;
 
-      if (ptData.tableRow[i].tableEntry[j].targetPosition != INT16_MIN) {
-        unique_xy.emplace_back(innerIndex, static_cast<float>(ptData.tableRow[i].tableEntry[j].targetPosition));
+      if (ptData.tableRow[index.cadIndex].tableEntry[index.wattIndex].targetPosition != INT16_MIN) {
+        unique_xy.emplace_back(innerIndex, static_cast<float>(ptData.tableRow[index.cadIndex].tableEntry[index.wattIndex].targetPosition));
       } else {
         emptyIndices.push_back(innerIndex);
       }
@@ -395,25 +394,24 @@ void PTHelpers::extrapFillTableDirection(bool horizontal, PTData& ptData) {
   }
 }
 
-void PTHelpers::extrapolateDiagonalEntries(const std::vector<std::pair<int, int>>& emptyIndices, const float* x, const float* y, size_t n, PTData& ptData) {
+void PTHelpers::extrapolateDiagonalEntries(const std::vector<ptIndex>& emptyIndices, const float* x, const float* y, size_t n, PTData& ptData) {
   if (n == 1) {
     int singleValue = static_cast<int>(round(y[0]));
     for (const auto& it : emptyIndices) {
-      ptData.tableRow[it.first].tableEntry[it.second].targetPosition = singleValue;
+      ptData.tableRow[it.cadIndex].tableEntry[it.wattIndex].targetPosition = singleValue;
     }
     return;
   }
-
+  ptIndex index;
   if (n == 2) {
     for (const auto& it : emptyIndices) {
-      int i = it.first;
-      int j = it.second;
+      index = it;
 
-      float extrapolated_value = linearExtrapolate(x, y, n, i);
+      float extrapolated_value = linearExtrapolate(x, y, n, index.cadIndex);
       int tempValue            = static_cast<int>(round(extrapolated_value));
 
-      if (testNeighbors(i, j, tempValue, ptData).allNeighborsPassed) {
-        ptData.tableRow[i].tableEntry[j].targetPosition = tempValue;
+      if (testNeighbors(index, tempValue, ptData).allNeighborsPassed) {
+        ptData.tableRow[index.cadIndex].tableEntry[index.wattIndex].targetPosition = tempValue;
       }
     }
     return;
@@ -436,12 +434,11 @@ void PTHelpers::extrapolateDiagonalEntries(const std::vector<std::pair<int, int>
     spline.set_points(x, y, n);
 
     for (const auto& it : emptyIndices) {
-      int i = it.first;
-      int j = it.second;
+      index = it;
 
-      if (i < 0 || i >= POWERTABLE_CAD_SIZE || j < 0 || j >= POWERTABLE_WATT_SIZE) continue;
+      if (index.cadIndex < 0 || index.cadIndex >= POWERTABLE_CAD_SIZE || index.wattIndex < 0 || index.wattIndex >= POWERTABLE_WATT_SIZE) continue;
 
-      float extrapolated_value = spline.extrapolate(i);
+      float extrapolated_value = spline.extrapolate(index.cadIndex);
 
       float minVal       = *std::min_element(y, y + n);
       float maxVal       = *std::max_element(y, y + n);
@@ -449,8 +446,8 @@ void PTHelpers::extrapolateDiagonalEntries(const std::vector<std::pair<int, int>
       extrapolated_value = std::max(minVal - 0.1f * range, std::min(extrapolated_value, maxVal + 0.1f * range));
 
       int tempValue = static_cast<int>(round(extrapolated_value));
-      if (testNeighbors(i, j, tempValue, ptData).allNeighborsPassed) {
-        ptData.tableRow[i].tableEntry[j].targetPosition = tempValue;
+      if (testNeighbors(index, tempValue, ptData).allNeighborsPassed) {
+        ptData.tableRow[index.cadIndex].tableEntry[index.wattIndex].targetPosition = tempValue;
       }
     }
   }
@@ -481,7 +478,7 @@ float PTHelpers::linearExtrapolate(const float* x, const float* y, size_t n, flo
   return y0 + slope * (j - x0);
 }
 
-void PTHelpers::fillTable(PTData& ptData) {
+void PTHelpers::standardFill(PTData& ptData) {
   findTableDirection(true, ptData);   // Horizontal
   findTableDirection(false, ptData);  // Vertical
 }
@@ -699,10 +696,10 @@ float CubicSpline::extrapolate(float x_val) const {
 
 void PTHelpers::extrapolateDiagonal(PTData& ptData) {
   std::vector<std::pair<float, float>> unique_xy;
-  std::vector<std::pair<int, int>> emptyIndices;
+  std::vector<ptIndex> emptyIndices;
 
   std::vector<float> prevX, prevY;
-  std::vector<std::pair<int, int>> prevEmptyIndices;
+  std::vector<ptIndex> prevEmptyIndices;
   bool prevSplineValid = false;
 
   int midCAD  = POWERTABLE_CAD_SIZE / 2;
@@ -717,13 +714,16 @@ void PTHelpers::extrapolateDiagonal(PTData& ptData) {
     int rangeEnd   = std::min(POWERTABLE_CAD_SIZE, sum / 2 + 10);
 
     // Collect known values for this diagonal
-    for (int i = rangeStart; i < rangeEnd; ++i) {
-      int j = sum - i;
-      if (j >= 0 && j < POWERTABLE_WATT_SIZE) {
-        if (ptData.tableRow[i].tableEntry[j].targetPosition != INT16_MIN) {
-          unique_xy.emplace_back(i, static_cast<float>(ptData.tableRow[i].tableEntry[j].targetPosition));
-        } else {
-          emptyIndices.emplace_back(i, j);
+    ptIndex tIndex;
+    for (tIndex.cadIndex = rangeStart; tIndex.cadIndex < rangeEnd; ++tIndex.cadIndex) {
+      tIndex.wattIndex = sum - tIndex.cadIndex;
+      if (tIndex.wattIndex >= 0 && tIndex.wattIndex < POWERTABLE_WATT_SIZE) {
+        if (ptData.tableRow[tIndex.cadIndex].tableEntry[tIndex.wattIndex].targetPosition != INT16_MIN) {
+          unique_xy.emplace_back(tIndex.cadIndex, static_cast<float>(ptData.tableRow[tIndex.cadIndex].tableEntry[tIndex.wattIndex].targetPosition));        } else {
+          ptIndex newIndex;
+          newIndex.cadIndex = tIndex.cadIndex;
+          newIndex.wattIndex = tIndex.wattIndex;
+          emptyIndices.push_back(newIndex);
         }
       }
     }

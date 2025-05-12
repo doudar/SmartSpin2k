@@ -201,32 +201,30 @@ void PowerTable::newEntry(PowerBuffer& powerBuffer) {
   // clean previously extrapolated data so we don't fill with trash.
   this->clean();
   // To start working on the PowerTable, we need to calculate position in the table for the new entry
-  int i = round(watts / (float)POWERTABLE_WATT_INCREMENT);
-  int k = round((cad - (float)MINIMUM_TABLE_CAD) / (float)POWERTABLE_CAD_INCREMENT);
-  SS2K_LOG(POWERTABLE_LOG_TAG, "Averaged Entry: watts=%f, cad=%f, targetPosition=%f, (%d)(%d)", watts, cad, targetPosition, k, i);
 
-  // Ensure k is within valid range
-  if ((k < 0) || (k > (POWERTABLE_CAD_SIZE - 1))) {
-    SS2K_LOG(POWERTABLE_LOG_TAG, "Cad index was out of range %d", k);
-    return;
-  }
-  // Ensure i is within valid range
-  if (i < 0 || i > (POWERTABLE_WATT_SIZE - 1)) {
-    SS2K_LOG(POWERTABLE_LOG_TAG, "Watt index was out of range %d max %d", i, POWERTABLE_WATT_SIZE - 1);
+  ptIndex index = ptHelpers.calculateIndex(watts, cad);
+  SS2K_LOG(POWERTABLE_LOG_TAG, "Averaged Entry: watts=%f, cad=%f, targetPosition=%f, (%d)(%d)", watts, cad, targetPosition, index.cadIndex, index.wattIndex);
+
+  if ((index.cadIndex < 0) || (index.cadIndex > (POWERTABLE_CAD_SIZE - 1))) {
+    SS2K_LOG(POWERTABLE_LOG_TAG, "Cad index was out of range %d", index.cadIndex);
     return;
   }
 
-  targetPosition = this->calculatePosition(watts, cad, targetPosition, k, i);
+  if (index.wattIndex < 0 || index.wattIndex > (POWERTABLE_WATT_SIZE - 1)) {
+    SS2K_LOG(POWERTABLE_LOG_TAG, "Watt index was out of range %d max %d", index.wattIndex, POWERTABLE_WATT_SIZE - 1);
+    return;
+  }
+
+  targetPosition = this->calculatePosition(watts, cad, targetPosition, index);
 
   // Downvote out of position neighbors and discard entry if it doesn't match the logic of the table
-  TestResults testResults = ptHelpers.testNeighbors(k, i, targetPosition, ptData);
+  TestResults testResults = ptHelpers.testNeighbors(index, targetPosition, ptData);
 
   auto handleNeighborFailure = [&](const char* direction, const TestResults::Neighbor& neighbor, const TestResults::Neighbor& oppositeNeighbor, float rangeFactor) {
     if (!neighbor.passedTest) {
       SS2K_LOG(POWERTABLE_LOG_TAG, "%s neighbor position (%d) failed with watts=%f, cad=%f, targetPosition=%f, (%d)(%d)", direction, neighbor.targetPosition, watts, cad,
-               targetPosition, k, i);
-      this->processNeighbor(k, i, targetPosition, neighbor.i, neighbor.j, neighbor.targetPosition, oppositeNeighbor.i, oppositeNeighbor.j, oppositeNeighbor.targetPosition,
-                            rangeFactor);
+               targetPosition, index.cadIndex, index.wattIndex);
+      this->processNeighbor(index, targetPosition, neighbor.index, neighbor.targetPosition, oppositeNeighbor.index, oppositeNeighbor.targetPosition, rangeFactor);
     }
   };
 
@@ -239,8 +237,8 @@ void PowerTable::newEntry(PowerBuffer& powerBuffer) {
     return;
   }
 
-  this->enterData(k, i, (int)targetPosition);
-  BLE_ss2kCustomCharacteristic::notify(0x27, k);
+  this->enterData(index, (int)targetPosition);
+  BLE_ss2kCustomCharacteristic::notify(0x27, index.cadIndex);
 }
 
 /**
@@ -251,81 +249,94 @@ void PowerTable::newEntry(PowerBuffer& powerBuffer) {
  * does not exceed a defined limit to prevent dilution of recent data. Additionally,
  * it triggers table filling and extrapolation processes if the number of entries
  * exceeds a threshold.
- *
- * @param k The index of the table row to update.
- * @param i The index of the table entry within the row to update.
+ * @param index The index of the table entry
  * @param pos The new target position to record or average.
  */
-void PowerTable::enterData(int k, int i, int pos) {
-  if (this->ptData.tableRow[k].tableEntry[i].readings <= 0) {  // if first reading in this entry
-    this->ptData.tableRow[k].tableEntry[i].targetPosition = pos;
-    SS2K_LOG(POWERTABLE_LOG_TAG, "New entry recorded (%d)(%d)(%d)", k, i, this->ptData.tableRow[k].tableEntry[i].targetPosition);
+void PowerTable::enterData(ptIndex index, int pos) {
+  if (this->ptData.tableRow[index.cadIndex].tableEntry[index.wattIndex].readings <= 0) {  // if first reading in this entry
+    this->ptData.tableRow[index.cadIndex].tableEntry[index.wattIndex].targetPosition = pos;
+    SS2K_LOG(POWERTABLE_LOG_TAG, "New entry recorded (%d)(%d)(%d)", index.cadIndex, index.wattIndex,
+             this->ptData.tableRow[index.cadIndex].tableEntry[index.wattIndex].targetPosition);
   } else {  // Average and update the readings.
-    this->ptData.tableRow[k].tableEntry[i].targetPosition =
-        (pos + (this->ptData.tableRow[k].tableEntry[i].targetPosition * this->ptData.tableRow[k].tableEntry[i].readings)) / (this->ptData.tableRow[k].tableEntry[i].readings + 1.0);
-    SS2K_LOG(POWERTABLE_LOG_TAG, "Existing entry averaged (%d)(%d)(%d), readings(%d)", k, i, this->ptData.tableRow[k].tableEntry[i].targetPosition,
-             this->ptData.tableRow[k].tableEntry[i].readings);
-    if (this->ptData.tableRow[k].tableEntry[i].readings > POWER_SAMPLES * 2) {
-      this->ptData.tableRow[k].tableEntry[i].readings = POWER_SAMPLES * 2;  // keep from diluting recent readings too far.
+    this->ptData.tableRow[index.cadIndex].tableEntry[index.wattIndex].targetPosition =
+        (pos + (this->ptData.tableRow[index.cadIndex].tableEntry[index.wattIndex].targetPosition * this->ptData.tableRow[index.cadIndex].tableEntry[index.wattIndex].readings)) /
+        (this->ptData.tableRow[index.cadIndex].tableEntry[index.wattIndex].readings + 1.0);
+    SS2K_LOG(POWERTABLE_LOG_TAG, "Existing entry averaged (%d)(%d)(%d), readings(%d)", index.cadIndex, index.wattIndex,
+             this->ptData.tableRow[index.cadIndex].tableEntry[index.wattIndex].targetPosition, this->ptData.tableRow[index.cadIndex].tableEntry[index.wattIndex].readings);
+    if (this->ptData.tableRow[index.cadIndex].tableEntry[index.wattIndex].readings > POWER_SAMPLES * 2) {
+      this->ptData.tableRow[index.cadIndex].tableEntry[index.wattIndex].readings = POWER_SAMPLES * 2;  // keep from diluting recent readings too far.
     }
   }
-  this->ptData.tableRow[k].tableEntry[i].readings++;
+  this->ptData.tableRow[index.cadIndex].tableEntry[index.wattIndex].readings++;
+  fillTableFlag = true;  // set flag to fill table
+}
 
+void PowerTable::fillTable() {
+  static int entries     = 0;
+  static int newEntries  = 0;
+  static int8_t step     = 0;
+  static int prevEntries = 0;
+
+  if (!fillTableFlag) {
+    entries     = 0;
+    newEntries  = 0;
+    prevEntries = 0;
+    step        = 0;
+    return;
+  }
   if (this->getNumEntries() > 4) {
-    int entries    = 0;
-    int newEntries = 1;
-    // loop until we can't calculate any new data
-    while (entries < newEntries) {
-      entries = newEntries;
-      for (int step = 0; step < 3; ++step) {
-        if (esp_get_free_heap_size() < FREE_HEAP_FOR_COMPLEX_MATH) {
-          SS2K_LOG(POWERTABLE_LOG_TAG, "%d Heap too low for step %d.", esp_get_free_heap_size(), step);
-          return;
-        }
-        switch (step) {
-          case 0:
-            ptHelpers.fillTable(ptData);
-            break;
-          case 1:
-            this->extrapFillTable();
-            break;
-          case 2:
-            ptHelpers.extrapolateDiagonal(ptData);
-            break;
-        }
-      }
-      newEntries = getNumEntries();
+    // set flag to stop execution after we can't add any more entries.
+    if (esp_get_free_heap_size() < FREE_HEAP_FOR_COMPLEX_MATH) {
+      SS2K_LOG(POWERTABLE_LOG_TAG, "%d Heap too low for step %d.", esp_get_free_heap_size(), step);
+      return;
     }
+    entries = getNumEntries();
+    if (step == 0) {
+      SS2K_LOG(POWERTABLE_LOG_TAG, "Fill start with %d entries", entries);
+      prevEntries = entries;
+      ptHelpers.standardFill(ptData);
+    } else if (step == 1) {
+      this->extrapFillTable();
+    } else if (step == 2) {
+      ptHelpers.extrapolateDiagonal(ptData);
+    }
+    newEntries = getNumEntries();
+    SS2K_LOG(POWERTABLE_LOG_TAG, "Fill step %d added %d new entries", step, newEntries - prevEntries);
+    if (newEntries > prevEntries) {
+      prevEntries = newEntries;
+    } else if (step == 2) {
+      SS2K_LOG(POWERTABLE_LOG_TAG, "No more entries can be added, stopping fill.");
+      fillTableFlag = false;
+      step          = -1;
+    }
+    step = (step + 1) % 3;
   }
 }
 
 /**
- * @brief Processes a neighbor entry in the power table to validate and update data based on position thresholds.
+ * @brief Processes a neighbor entry in the power table.
  *
- * This function evaluates the relationship between a target position and its neighboring positions
- * in the power table. It calculates an average position, checks if the neighbor's position is within
- * a valid range, and performs actions such as logging, entering data, or downvoting data based on the results.
+ * This function checks if the target position of a neighbor entry is within a certain range
+ * of the current entry's target position. If so, it attempts to enter or update data for the
+ * neighbor entry based on various conditions. If all tests fail, it downvotes the neighbor entry.
  *
- * @param k The row index of the current position in the power table.
- * @param i The column index of the current position in the power table.
- * @param targetPosition The target position value for the current entry.
- * @param neighbor_i The row index of the neighboring position.
- * @param neighbor_j The column index of the neighboring position.
- * @param neighbor_targetPosition The target position value of the neighboring entry.
- * @param oppositeNeighbor_i The row index of the opposite neighboring position.
- * @param oppositeNeighbor_j The column index of the opposite neighboring position.
- * @param oppositeNeighbor_targetPosition The target position value of the opposite neighboring entry.
- * @param rangeFactor A factor used to calculate the position threshold for validation.
+ * @param index The index of the current entry.
+ * @param targetPosition The target position of the current entry.
+ * @param neighborIndex The index of the neighbor entry.
+ * @param neighbor_targetPosition The target position of the neighbor entry.
+ * @param oppositeNeighborIndex The index of the opposite neighbor entry.
+ * @param oppositeNeighbor_targetPosition The target position of the opposite neighbor entry.
+ * @param rangeFactor A factor used to determine the range for comparison.
  */
-void PowerTable::processNeighbor(int k, int i, float targetPosition, int neighbor_i, int neighbor_j, int neighbor_targetPosition, int oppositeNeighbor_i, int oppositeNeighbor_j,
+void PowerTable::processNeighbor(ptIndex index, float targetPosition, ptIndex neighborIndex, int neighbor_targetPosition, ptIndex oppositeNeighborIndex,
                                  int oppositeNeighbor_targetPosition, float rangeFactor) {
   float avgPosition       = (targetPosition + neighbor_targetPosition) / 2;
   float positionThreshold = 500 * pow(TABLE_DIVISOR, -rangeFactor);
 
-  auto handleNeighbor = [&](int test_i, int test_j, float testPosition, const char* logMessage) {
-    if (ptHelpers.testNeighbors(test_i, test_j, testPosition, ptData).allNeighborsPassed) {
+  auto handleNeighbor = [&](ptIndex testIndex, float testPosition, const char* logMessage) {
+    if (ptHelpers.testNeighbors(testIndex, testPosition, ptData).allNeighborsPassed) {
       SS2K_LOG(POWERTABLE_LOG_TAG, logMessage, testPosition);
-      this->enterData(test_i, test_j, testPosition);
+      this->enterData(testIndex, testPosition);
       return true;
     }
     return false;
@@ -334,19 +345,19 @@ void PowerTable::processNeighbor(int k, int i, float targetPosition, int neighbo
   if (std::abs(neighbor_targetPosition - targetPosition) <= positionThreshold && static_cast<int>(targetPosition) != neighbor_targetPosition) {
     bool anyPassed = false;
 
-    anyPassed |= handleNeighbor(k, i, avgPosition, "Avg position is valid with current cadence and watts! Avg position: %f");
-    anyPassed |= handleNeighbor(neighbor_i, neighbor_j, targetPosition, "Current Position was valid! Current position: %f");
-    anyPassed |= handleNeighbor(oppositeNeighbor_i, oppositeNeighbor_j, neighbor_targetPosition, "Neighbor position was moved from! Neighbor Position: %d");
+    anyPassed |= handleNeighbor(index, avgPosition, "Avg position is valid with current cadence and watts! Avg position: %f");
+    anyPassed |= handleNeighbor(neighborIndex, targetPosition, "Current Position was valid! Current position: %f");
+    anyPassed |= handleNeighbor(oppositeNeighborIndex, neighbor_targetPosition, "Neighbor position was moved from! Neighbor Position: %d");
 
     if (!anyPassed) {
-      SS2K_LOG(POWERTABLE_LOG_TAG, "All tests failed at (%d)(%d)(%d), readings (%d)", oppositeNeighbor_i, oppositeNeighbor_j, oppositeNeighbor_targetPosition,
-               this->ptData.tableRow[oppositeNeighbor_i].tableEntry[oppositeNeighbor_j].readings);
-      this->downVoteData(neighbor_i, neighbor_j, targetPosition, neighbor_targetPosition);
+      SS2K_LOG(POWERTABLE_LOG_TAG, "All tests failed at (%d)(%d)(%d), readings (%d)", oppositeNeighborIndex.cadIndex, oppositeNeighborIndex.wattIndex,
+               oppositeNeighbor_targetPosition, this->ptData.tableRow[oppositeNeighborIndex.cadIndex].tableEntry[oppositeNeighborIndex.wattIndex].readings);
+      this->downVoteData(index, targetPosition, neighbor_targetPosition);
     }
   } else {
-    SS2K_LOG(POWERTABLE_LOG_TAG, "Was not in range failed at (%d)(%d)(%d), readings (%d)", oppositeNeighbor_i, oppositeNeighbor_j, oppositeNeighbor_targetPosition,
-             this->ptData.tableRow[oppositeNeighbor_i].tableEntry[oppositeNeighbor_j].readings);
-    this->downVoteData(neighbor_i, neighbor_j, targetPosition, neighbor_targetPosition);
+    SS2K_LOG(POWERTABLE_LOG_TAG, "Was not in range failed at (%d)(%d)(%d), readings (%d)", oppositeNeighborIndex.cadIndex, oppositeNeighborIndex.wattIndex,
+             oppositeNeighbor_targetPosition, this->ptData.tableRow[oppositeNeighborIndex.cadIndex].tableEntry[oppositeNeighborIndex.wattIndex].readings);
+    this->downVoteData(neighborIndex, targetPosition, neighbor_targetPosition);
   }
 }
 
@@ -364,18 +375,18 @@ void PowerTable::processNeighbor(int k, int i, float targetPosition, int neighbo
  * @param i The watt index in the power table.
  * @return The calculated target position after applying adjustments based on neighbors.
  */
-float PowerTable::calculatePosition(float watts, float cad, float targetPos, int k, int i) {
-  TestResults testResults = ptHelpers.testNeighbors(k, i, targetPos, ptData);
+float PowerTable::calculatePosition(float watts, float cad, float targetPos, ptIndex index) {
+  TestResults testResults = ptHelpers.testNeighbors(index, targetPos, ptData);
 
-  if (this->ptData.tableRow[k].tableEntry[i].targetPosition == INT16_MIN ||
+  if (this->ptData.tableRow[index.cadIndex].tableEntry[index.wattIndex].targetPosition == INT16_MIN ||
       !(testResults.bottomNeighbor.passedTest || testResults.topNeighbor.passedTest || testResults.rightNeighbor.passedTest || testResults.leftNeighbor.passedTest) ||
-      this->ptData.tableRow[k].tableEntry[i].targetPosition == targetPos) {
-    SS2K_LOG(POWERTABLE_LOG_TAG, "Keep old targetPosition: (%f)", targetPos);
+      this->ptData.tableRow[index.cadIndex].tableEntry[index.wattIndex].targetPosition == targetPos) {
+    SS2K_LOG(POWERTABLE_LOG_TAG, "index.cadIndexeep old targetPosition: (%f)", targetPos);
     return targetPos;
   }
 
-  int wattPosition = POWERTABLE_WATT_INCREMENT * i;
-  int cadPosition  = MINIMUM_TABLE_CAD + (POWERTABLE_CAD_INCREMENT * k);
+  int wattPosition = POWERTABLE_WATT_INCREMENT * index.wattIndex;
+  int cadPosition  = MINIMUM_TABLE_CAD + (POWERTABLE_CAD_INCREMENT * index.cadIndex);
 
   float deltas[]     = {float(POWERTABLE_WATT_INCREMENT), float(POWERTABLE_WATT_INCREMENT), float(POWERTABLE_CAD_INCREMENT), float(POWERTABLE_CAD_INCREMENT)};
   float positions[]  = {float(wattPosition + POWERTABLE_WATT_INCREMENT), float(wattPosition - POWERTABLE_WATT_INCREMENT), float(cadPosition + POWERTABLE_CAD_INCREMENT),
@@ -387,7 +398,7 @@ float PowerTable::calculatePosition(float watts, float cad, float targetPos, int
 
   for (int idx = 0; idx < 4; ++idx) {
     if (passedTests[idx]) {
-      float delta = deltas[idx] / abs(targetPos - float(this->ptData.tableRow[k].tableEntry[i].targetPosition));
+      float delta = deltas[idx] / abs(targetPos - float(this->ptData.tableRow[index.cadIndex].tableEntry[index.wattIndex].targetPosition));
       float x     = abs((idx < 2 ? watts : cad) - positions[idx]);
       totalValue += targetPos - (x / delta);
       count++;
@@ -427,16 +438,28 @@ int weightedDownVote(int targetValue, int neighborValue) {
   return penalty;
 }
 
-void PowerTable::downVoteData(int i, int j, float target, int neighbor) {
+/**
+ * @brief Applies a downvote penalty to a specific entry in the power table.
+ *
+ * This function reduces the number of readings for a specific entry in the power table
+ * based on a calculated penalty. If the resulting number of readings falls below zero,
+ * it is set to zero. This is used to penalize entries that have failed validation.
+ *
+ * @param index The index of the table entry to be downvoted.
+ * @param target The target position value for the entry.
+ * @param neighbor The neighbor position value for the entry. (used to calculate penalty)
+ */
+void PowerTable::downVoteData(ptIndex index, float target, int neighbor) {
   // determine penalty amount before applying to failed neighbor
   int penalty = weightedDownVote(target, neighbor);
 
-  if (this->ptData.tableRow[i].tableEntry[j].readings < penalty) {
-    this->ptData.tableRow[i].tableEntry[j].readings = 0;
+  if (this->ptData.tableRow[index.cadIndex].tableEntry[index.wattIndex].readings < penalty) {
+    this->ptData.tableRow[index.cadIndex].tableEntry[index.wattIndex].readings = 0;
   } else {
-    this->ptData.tableRow[i].tableEntry[j].readings -= penalty;
+    this->ptData.tableRow[index.cadIndex].tableEntry[index.wattIndex].readings -= penalty;
   }
-  SS2K_LOG(POWERTABLE_LOG_TAG, "PT failed (%d)(%d)(%d), readings (%d)", i, j, neighbor, this->ptData.tableRow[i].tableEntry[j].readings);
+  SS2K_LOG(POWERTABLE_LOG_TAG, "PT failed (%d)(%d)(%d), readings (%d)", index.cadIndex, index.wattIndex, neighbor,
+           this->ptData.tableRow[index.cadIndex].tableEntry[index.wattIndex].readings);
 }
 
 bool PowerTable::_manageSaveState(bool canSkipReliabilityChecks) {

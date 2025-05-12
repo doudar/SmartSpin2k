@@ -147,8 +147,8 @@ void setup() {
 
   SS2K_LOG(MAIN_LOG_TAG, "Setting up cpu Tasks");
 
-  //disableCore0WDT();  // Disable the watchdog timer on core 0 (so long stepper
-                      // moves don't cause problems)
+  // disableCore0WDT();  // Disable the watchdog timer on core 0 (so long stepper
+  //  moves don't cause problems)
 
   digitalWrite(LED_PIN, HIGH);
   Serial.println("Starting BLE");
@@ -210,14 +210,10 @@ void SS2K::maintenanceLoop(void *pvParameters) {
       }
       // Don't do these if updating and in spindown mode.
       if (!spinBLEServer.spinDownFlag) {
-        static unsigned long ergTimer = millis();
         ss2k->moveStepper();
         ss2k->FTMSModeShiftModifier();
-        // 700ms
-        if ((millis() - ergTimer) > ERG_MODE_DELAY) {
-          ergMode->runERG();
-          ergTimer = millis();
-        }
+        ergMode->runERG();
+        powerTable->fillTable();
       }
       // wattbikeService.parseNemit();
     }
@@ -387,9 +383,11 @@ void SS2K::FTMSModeShiftModifier() {
       {
         SS2K_LOG(MAIN_LOG_TAG, "Shift %+d pos %d tgt %d min %d max %d r_min %d r_max %d", shiftDelta, rtConfig->getShifterPosition(), ss2k->targetPosition, rtConfig->getMinStep(),
                  rtConfig->getMaxStep(), rtConfig->getMinResistance(), rtConfig->getMaxResistance());
-
-        if (((ss2k->targetPosition + shiftDelta * userConfig->getShiftStep()) < rtConfig->getMinStep()) ||
-            ((ss2k->targetPosition + shiftDelta * userConfig->getShiftStep()) > rtConfig->getMaxStep())) {
+        // Block Shifts further out of bounds
+        if (((ss2k->targetPosition + shiftDelta * userConfig->getShiftStep()) < rtConfig->getMinStep()) && (shiftDelta < 0)) {
+          SS2K_LOG(MAIN_LOG_TAG, "Shift Blocked by stepper limits.");
+          rtConfig->setShifterPosition(ss2k->lastShifterPosition);
+        } else if ((ss2k->targetPosition + shiftDelta * userConfig->getShiftStep()) > rtConfig->getMaxStep() && (shiftDelta > 0)) {
           SS2K_LOG(MAIN_LOG_TAG, "Shift Blocked by stepper limits.");
           rtConfig->setShifterPosition(ss2k->lastShifterPosition);
         } else if (rtConfig->getHomed()) {
