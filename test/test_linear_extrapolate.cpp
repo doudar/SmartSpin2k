@@ -27,87 +27,49 @@ void TestLinearExtrapolate::test_linear_extrapolate(void) {
   // Create helpers object
   PTHelpers helpers;
 
-  // Test low cadence extrapolation (below MINIMUM_TABLE_CAD which is 60 RPM)
-  outFile << "\n--- Testing low cadence extrapolation ---\n";
-
   // For each power column, extract data points for known cadences
-  // and test extrapolation for cadences below the table minimum
+  // and test extrapolation for cadences below and above the range
   for (int wattIndex = 0; wattIndex < POWERTABLE_WATT_SIZE; wattIndex++) {
     int wattValue = wattIndex * POWERTABLE_WATT_INCREMENT;
 
-    // Skip columns with insufficient data
-    int validDataPoints = 0;
-    for (int i = 0; i < POWERTABLE_CAD_SIZE; i++) {
-      if (ptData.tableRow[i].tableEntry[wattIndex].targetPosition != INT16_MIN) {
-        validDataPoints++;
-      }
-    }
-
+    // Extract cadence and target position data for this wattage
+    std::pair<std::vector<float>, std::vector<float>> xy = helpers.getColumn(wattIndex, ptData);
+    
     // Need at least 2 data points for extrapolation
-    if (validDataPoints < 2) {
+    if (xy.first.size() < 2) {
       continue;
     }
 
-    outFile << "\n\nTesting low cadence extrapolation for " << wattValue << "W...\n";
-
-    // Extract cadence and target position data for this wattage
-    std::vector<float> cadValues;
-    std::vector<float> positionValues;
-
-    for (int i = 0; i < POWERTABLE_CAD_SIZE; i++) {
-      if (ptData.tableRow[i].tableEntry[wattIndex].targetPosition != INT16_MIN) {
-        cadValues.push_back(static_cast<float>(i * POWERTABLE_CAD_INCREMENT + MINIMUM_TABLE_CAD));
-        positionValues.push_back(static_cast<float>(ptData.tableRow[i].tableEntry[wattIndex].targetPosition));
-        outFile << "Cadence: " << cadValues.back() << ", Position: " << positionValues.back() << "\n";
-      }
-    }
+    outFile << "\n\nTesting cadence extrapolation for " << wattValue << "W...\n";
 
     // Test cadence values below minimum (50, 40, 30 RPM)
-    for (int testCadence = 70; testCadence >= 30; testCadence -= 1) {
-      float extrapolated = helpers.linearExtrapolate(cadValues.data(), positionValues.data(), cadValues.size(), static_cast<float>(testCadence));
+    for (int testCadence = 0; testCadence <= 130; testCadence += 1) {
+      float extrapolated = helpers.linearExtrapolate(xy, xy.first.size(), static_cast<float>(testCadence));
       outFile << "Cadence " << testCadence << " RPM -> Extrapolated position: " << extrapolated << "\n";
     }
   }
 
-  // Test high cadence extrapolation (above the highest in table which is 105 RPM)
-  outFile << "\n--- Testing high cadence extrapolation ---\n";
+  // For each row, extract data points for known wattages
+  // and test extrapolation for wattages below and above the range
+  for (int cadIndex = 0; cadIndex < POWERTABLE_CAD_SIZE; cadIndex++) {
+    int cadValue = MINIMUM_TABLE_CAD + cadIndex * POWERTABLE_CAD_INCREMENT;
 
-  // For each power column, extract data points and test extrapolation for high cadences
-  for (int wattIndex = 0; wattIndex < POWERTABLE_WATT_SIZE; wattIndex++) {
-    int wattValue = wattIndex * POWERTABLE_WATT_INCREMENT;
-
-    // Skip columns with insufficient data
-    int validDataPoints = 0;
-    for (int i = 0; i < POWERTABLE_CAD_SIZE; i++) {
-      if (ptData.tableRow[i].tableEntry[wattIndex].targetPosition != INT16_MIN) {
-        validDataPoints++;
-      }
-    }
-
+    // Extract wattage and target position data for this cadence
+    std::pair<std::vector<float>, std::vector<float>> xy = helpers.getRow(cadIndex, ptData);
+    
     // Need at least 2 data points for extrapolation
-    if (validDataPoints < 2) {
+    if (xy.first.size() < 2) {
       continue;
     }
 
-    outFile << "\n\nTesting high cadence extrapolation for " << wattValue << "W...\n";
+    outFile << "\n\nTesting wattage extrapolation for " << cadValue << " RPM...\n";
 
-    // Extract cadence and target position data for this wattage
-    std::vector<float> cadValues;
-    std::vector<float> positionValues;
-
-    for (int i = 0; i < POWERTABLE_CAD_SIZE; i++) {
-      if (ptData.tableRow[i].tableEntry[wattIndex].targetPosition != INT16_MIN) {
-        cadValues.push_back(static_cast<float>(i * POWERTABLE_CAD_INCREMENT + MINIMUM_TABLE_CAD));
-        positionValues.push_back(static_cast<float>(ptData.tableRow[i].tableEntry[wattIndex].targetPosition));
-        outFile << "Cadence: " << cadValues.back() << ", Position: " << positionValues.back() << "\n";
-      }
+    // Test watt values below minimum (50, 40, 30 W)
+    for (int testWatt = 0; testWatt <= 800; testWatt += 10) {
+      float extrapolated = helpers.linearExtrapolate(xy, xy.first.size(), static_cast<float>(testWatt));
+      outFile << "Watt " << testWatt << " W -> Extrapolated position: " << extrapolated << "\n";
     }
 
-    // Test cadence values above maximum (110, 120, 130 RPM)
-    for (int testCadence = 110; testCadence <= 130; testCadence += 10) {
-      float extrapolated = helpers.linearExtrapolate(cadValues.data(), positionValues.data(), cadValues.size(), static_cast<float>(testCadence));
-      outFile << "Cadence " << testCadence << " RPM -> Extrapolated position: " << extrapolated << "\n";
-    }
   }
 
   // Direct test with controlled values
@@ -115,22 +77,22 @@ void TestLinearExtrapolate::test_linear_extrapolate(void) {
 
   // Test case 1: Simple linear extrapolation below range
   {
-    float x[] = {60.0f, 65.0f, 70.0f};
-    float y[] = {100.0f, 90.0f, 80.0f};  // Decreasing values with increasing x
+    std::vector<float> x = {60.0f, 65.0f, 70.0f};
+    std::vector<float> y = {100.0f, 90.0f, 80.0f};  // Decreasing values with increasing x
 
     // Extrapolate to x=50
-    float result = helpers.linearExtrapolate(x, y, 3, 50.0f);
+    float result = helpers.linearExtrapolate(std::make_pair(x, y), 3, 50.0f);
     outFile << "Extrapolate x=50: Expected ~120, Got " << result << "\n";
     TEST_ASSERT_FLOAT_WITHIN_MESSAGE(5.0f, 120.0f, result, "Simple low extrapolation failed");
   }
 
   // Test case 2: Simple linear extrapolation above range
   {
-    float x[] = {80.0f, 90.0f, 100.0f};
-    float y[] = {50.0f, 40.0f, 30.0f};  // Decreasing values with increasing x
+    std::vector<float> x = {80.0f, 90.0f, 100.0f};
+    std::vector<float> y = {50.0f, 40.0f, 30.0f};  // Decreasing values with increasing x
 
     // Extrapolate to x=120
-    float result = helpers.linearExtrapolate(x, y, 3, 120.0f);
+    float result = helpers.linearExtrapolate(std::make_pair(x, y), 3, 120.0f);
     outFile << "Extrapolate x=120: Expected ~10, Got " << result << "\n";
     TEST_ASSERT_FLOAT_WITHIN_MESSAGE(5.0f, 10.0f, result, "Simple high extrapolation failed");
   }

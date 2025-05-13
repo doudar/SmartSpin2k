@@ -18,11 +18,11 @@
 #include <map>
 #include <cstdint>
 
-#define SS2K_LOG(tag, format, ...)                       \
-  {                                                      \
-    char buffer[1024];                                   \
+#define SS2K_LOG(tag, format, ...)                                \
+  {                                                               \
+    char buffer[1024];                                            \
     std::snprintf(buffer, sizeof(buffer), format, ##__VA_ARGS__); \
-    std::cout << "[" << tag << "] " << buffer << std::endl; \
+    std::cout << "[" << tag << "] " << buffer << std::endl;       \
   }
 #else
 #include "SS2KLog.h"
@@ -112,6 +112,70 @@ ptIndex PTHelpers::calculateIndex(int watts, int cad) {
   return index;
 }
 
+// find the number of data points in the table
+int PTHelpers::dataPoints(PTData& ptData) {
+  int count = 0;
+  for (int i = 0; i < POWERTABLE_CAD_SIZE; ++i) {
+    for (int j = 0; j < POWERTABLE_WATT_SIZE; ++j) {
+      if (ptData.tableRow[i].tableEntry[j].targetPosition != INT16_MIN) {
+        count++;
+      }
+    }
+  }
+  return count;
+}
+
+/**
+ * @brief Retrieves the x and y values from a specific row of the power table.
+ * 
+ * This function extracts the x and y values from the specified row of the power table
+ * in the provided PTData object. It skips entries where the target position is set
+ * to INT16_MIN, which indicates an invalid or uninitialized entry.
+ * 
+ * @param row The index of the row to retrieve data from.
+ * @param ptData Reference to the PTData object containing the power table data.
+ * @return A pair of vectors:
+ *         - The first vector contains the x values (watt increments).
+ *         - The second vector contains the y values (target positions).
+ */
+std::pair<std::vector<float>, std::vector<float>> PTHelpers::getRow(int row, PTData& ptData) {
+  std::vector<float> xValues;
+  std::vector<float> yValues;
+  for (int j = 0; j < POWERTABLE_WATT_SIZE; ++j) {
+    if (ptData.tableRow[row].tableEntry[j].targetPosition != INT16_MIN) {
+      xValues.push_back(static_cast<float>(j * POWERTABLE_WATT_INCREMENT));
+      yValues.push_back(static_cast<float>(ptData.tableRow[row].tableEntry[j].targetPosition));
+    }
+  }
+  return {xValues, yValues};
+}
+
+/**
+ * @brief Extracts the x and y values for a specific column from the power table data.
+ * 
+ * This function iterates through the rows of the power table data and retrieves
+ * the x and y values for the specified column. The x values are calculated based
+ * on the cadence index, and the y values are extracted from the target position
+ * of the table entries. Only valid entries (where the target position is not 
+ * INT16_MIN) are included in the result.
+ * 
+ * @param column The index of the column to extract data from.
+ * @param ptData Reference to the PTData structure containing the power table data.
+ * @return A pair of vectors, where the first vector contains the x values and the 
+ *         second vector contains the corresponding y values.
+ */
+std::pair<std::vector<float>, std::vector<float>> PTHelpers::getColumn(int column, PTData& ptData) {
+  std::vector<float> xValues;
+  std::vector<float> yValues;
+  for (int i = 0; i < POWERTABLE_CAD_SIZE; ++i) {
+    if (ptData.tableRow[i].tableEntry[column].targetPosition != INT16_MIN) {
+      xValues.push_back(static_cast<float>(MINIMUM_TABLE_CAD + i * POWERTABLE_CAD_INCREMENT));
+      yValues.push_back(static_cast<float>(ptData.tableRow[i].tableEntry[column].targetPosition));
+    }
+  }
+  return {xValues, yValues};
+}
+
 int32_t PTHelpers::lookup(int watts, int cad, PTData& ptData) {
   ptIndex index = calculateIndex(watts, cad);
 
@@ -120,30 +184,23 @@ int32_t PTHelpers::lookup(int watts, int cad, PTData& ptData) {
   const int MAX_CAD_VAL  = MINIMUM_TABLE_CAD + (POWERTABLE_CAD_SIZE - 1) * POWERTABLE_CAD_INCREMENT;
   const int MIN_WATT_VAL = 0;  // Assuming watts index start from 0
   const int MAX_WATT_VAL = (POWERTABLE_WATT_SIZE - 1) * POWERTABLE_WATT_INCREMENT;
+  int ptDataSize = dataPoints(ptData);
+  std::pair<std::vector<float>, std::vector<float>> dataPoints;
 
   bool isCadOutOfTable = cad < MIN_CAD_VAL || cad > MAX_CAD_VAL;
   // Watts < 0 is also out of table, ensure watts is not negative before typical checks
   bool isWattOutOfTable = watts < MIN_WATT_VAL || watts > MAX_WATT_VAL;
 
-  // ---- A. Handle Out-of-Table Extrapolation ----
-  if (isCadOutOfTable || isWattOutOfTable) {
+  // ---- A. Handle Out-of-Table simple Extrapolation ----
+  if (isCadOutOfTable && !isWattOutOfTable) {
     // A.1. Attempt Cadence Extrapolation if cadence is out of bounds
     if (isCadOutOfTable) {
       int targetWattIndex = index.wattIndex;
       // Clamp targetWattIndex to be within table bounds for selecting the column
       if (targetWattIndex < 0) targetWattIndex = 0;
-      if (targetWattIndex >= POWERTABLE_WATT_SIZE) targetWattIndex = POWERTABLE_WATT_SIZE - 1;
-
-      std::vector<float> cadPoints;
-      std::vector<float> posPoints;
-      for (int i = 0; i < POWERTABLE_CAD_SIZE; ++i) {
-        if (ptData.tableRow[i].tableEntry[targetWattIndex].targetPosition != INT16_MIN) {
-          cadPoints.push_back(static_cast<float>(MINIMUM_TABLE_CAD + i * POWERTABLE_CAD_INCREMENT));
-          posPoints.push_back(static_cast<float>(ptData.tableRow[i].tableEntry[targetWattIndex].targetPosition));
-        }
-      }
-      if (cadPoints.size() >= 2) {
-        float extrapolatedVal = linearExtrapolate(cadPoints.data(), posPoints.data(), cadPoints.size(), static_cast<float>(cad));
+      dataPoints = getColumn(targetWattIndex, ptData);
+      if (dataPoints.first.size() >= 2) {
+        float extrapolatedVal = linearExtrapolate(dataPoints, dataPoints.first.size(), static_cast<float>(cad));
         if (extrapolatedVal != INT16_MIN && !std::isnan(extrapolatedVal) && !std::isinf(extrapolatedVal)) {
           return static_cast<int32_t>(round(extrapolatedVal)) * TABLE_DIVISOR;
         }
@@ -151,33 +208,22 @@ int32_t PTHelpers::lookup(int watts, int cad, PTData& ptData) {
     }
 
     // A.2. Attempt Watt Extrapolation if watts are out of bounds
-    // This will run if:
-    //    - Cadence was in-bounds, but watts were out.
-    //    - Cadence was out-of-bounds, but cadence extrapolation failed (didn't return).
-    if (isWattOutOfTable) {
+    if (isWattOutOfTable && !isCadOutOfTable) {
       int targetCadIndex = index.cadIndex;
+      dataPoints.first.clear();
+      dataPoints.second.clear();
       // Clamp targetCadIndex to be within table bounds for selecting the row
       if (targetCadIndex < 0) targetCadIndex = 0;
-      if (targetCadIndex >= POWERTABLE_CAD_SIZE) targetCadIndex = POWERTABLE_CAD_SIZE - 1;
+      
+      dataPoints = getRow(targetCadIndex, ptData);
 
-      std::vector<float> wattPoints;
-      std::vector<float> posPoints;
-      for (int j = 0; j < POWERTABLE_WATT_SIZE; ++j) {
-        if (ptData.tableRow[targetCadIndex].tableEntry[j].targetPosition != INT16_MIN) {
-          wattPoints.push_back(static_cast<float>(j * POWERTABLE_WATT_INCREMENT));
-          posPoints.push_back(static_cast<float>(ptData.tableRow[targetCadIndex].tableEntry[j].targetPosition));
-        }
-      }
-      if (wattPoints.size() >= 2) {
-        float extrapolatedVal = linearExtrapolate(wattPoints.data(), posPoints.data(), wattPoints.size(), static_cast<float>(watts));
+      if (dataPoints.first.size() >= 2) {
+        float extrapolatedVal = linearExtrapolate(dataPoints, dataPoints.first.size(), static_cast<float>(watts));
         if (extrapolatedVal != INT16_MIN && !std::isnan(extrapolatedVal) && !std::isinf(extrapolatedVal)) {
           return static_cast<int32_t>(round(extrapolatedVal)) * TABLE_DIVISOR;
         }
       }
     }
-    // If we're still here, it means some dimension was out of bounds,
-    // and the corresponding extrapolation attempt either wasn't applicable,
-    // didn't have enough data, or failed.
     return INT32_MIN;
   }
 
@@ -199,7 +245,7 @@ int32_t PTHelpers::lookup(int watts, int cad, PTData& ptData) {
                          static_cast<float>(neighbors.rightNeighbor.index.wattIndex * POWERTABLE_WATT_INCREMENT)};
     float yWattPts[2] = {static_cast<float>(neighbors.leftNeighbor.targetPosition), static_cast<float>(neighbors.rightNeighbor.targetPosition)};
     if (xWattPts[0] != xWattPts[1]) {  // Avoid division by zero
-      R1 = linearExtrapolate(xWattPts, yWattPts, 2, static_cast<float>(watts));
+      R1 = linearExtrapolate(std::make_pair(std::vector<float>(xWattPts, xWattPts + 2), std::vector<float>(yWattPts, yWattPts + 2)), 2, static_cast<float>(watts));
     } else if (fabs(xWattPts[0] - static_cast<float>(watts)) < 1e-3) {  // If points are same and at target watts
       R1 = yWattPts[0];
     }
@@ -211,7 +257,7 @@ int32_t PTHelpers::lookup(int watts, int cad, PTData& ptData) {
                         static_cast<float>(neighbors.bottomNeighbor.index.cadIndex * POWERTABLE_CAD_INCREMENT + MINIMUM_TABLE_CAD)};
     float yCadPts[2] = {static_cast<float>(neighbors.topNeighbor.targetPosition), static_cast<float>(neighbors.bottomNeighbor.targetPosition)};
     if (xCadPts[0] != xCadPts[1]) {  // Avoid division by zero
-      R2 = linearExtrapolate(xCadPts, yCadPts, 2, static_cast<float>(cad));
+      R2 = linearExtrapolate(std::make_pair(std::vector<float>(xCadPts, xCadPts + 2), std::vector<float>(yCadPts, yCadPts + 2)), 2, static_cast<float>(cad));
     } else if (fabs(xCadPts[0] - static_cast<float>(cad)) < 1e-3) {  // If points are same and at target cadence
       R2 = yCadPts[0];
     }
@@ -241,13 +287,13 @@ int32_t PTHelpers::lookup(int watts, int cad, PTData& ptData) {
   return INT32_MIN;  // All lookup methods failed
 }
 
-void PTHelpers::fillEmptyTable(int outerValue, const std::vector<int>& emptyIndices, const float* x, const float* y, size_t n, bool horizontal, bool useNaturalSpline,
+void PTHelpers::fillEmptyTable(int outerValue, const std::vector<int>& emptyIndices, std::pair<std::vector<float>, std::vector<float>> xy, size_t n, bool horizontal, bool useNaturalSpline,
                                PTData& ptData) {
   int innerSize = horizontal ? POWERTABLE_WATT_SIZE : POWERTABLE_CAD_SIZE;
   ptIndex index;
 
   if (n == 1) {  // If only one point, fill row with the value
-    float singleValue = y[0];
+    float singleValue = xy.second[0];
     for (int innerValue : emptyIndices) {
       index.cadIndex                                                             = horizontal ? outerValue : innerValue;
       index.wattIndex                                                            = horizontal ? innerValue : outerValue;
@@ -258,7 +304,7 @@ void PTHelpers::fillEmptyTable(int outerValue, const std::vector<int>& emptyIndi
       index.cadIndex  = horizontal ? outerValue : innerValue;
       index.wattIndex = horizontal ? innerValue : outerValue;
 
-      float interpolated_value = linearExtrapolate(x, y, n, innerValue);
+      float interpolated_value = linearExtrapolate(xy, n, innerValue);
       int tempValue            = static_cast<int>(round(interpolated_value));
 
       if (testNeighbors(index, tempValue, ptData).allNeighborsPassed) {
@@ -268,7 +314,7 @@ void PTHelpers::fillEmptyTable(int outerValue, const std::vector<int>& emptyIndi
   } else if (n >= 3) {  // If three or more points, use cubic spline interpolation
     bool validForSpline = true;
     for (size_t i = 1; i < n; ++i) {
-      if (x[i] <= x[i - 1]) {
+      if (xy.first[i] <= xy.first[i - 1]) {
         validForSpline = false;
         break;
       }
@@ -280,16 +326,15 @@ void PTHelpers::fillEmptyTable(int outerValue, const std::vector<int>& emptyIndi
 
     // Create and initialize the spline with the desired type (natural or clamped)
     CubicSpline spline;
-    spline.set_points(x, y, n);
+    spline.set_points(xy, n);
 
     for (int innerValue : emptyIndices) {
       index.cadIndex  = horizontal ? outerValue : innerValue;
       index.wattIndex = horizontal ? innerValue : outerValue;
 
       float interpolated_value = spline.interpolate(innerValue);
-
-      float minValue     = *std::min_element(y, y + n);
-      float maxValue     = *std::max_element(y, y + n);
+      float minValue     = *std::min_element(xy.second.begin(), xy.second.end());
+      float maxValue     = *std::max_element(xy.second.begin(), xy.second.end());
       interpolated_value = std::max(minValue, std::min(maxValue, interpolated_value));
 
       int tempValue = static_cast<int>(round(interpolated_value));
@@ -303,12 +348,12 @@ void PTHelpers::fillEmptyTable(int outerValue, const std::vector<int>& emptyIndi
   }
 }
 
-void PTHelpers::extrapolateEmptyIndices(int outerIndex, const std::vector<int>& emptyIndices, const float* x, const float* y, size_t n, bool horizontal, bool naturalSpline,
+void PTHelpers::extrapolateEmptyIndices(int outerIndex, const std::vector<int>& emptyIndices, std::pair<std::vector<float>, std::vector<float>> xy, size_t n, bool horizontal, bool naturalSpline,
                                         PTData& ptData) {
   int innerSize = horizontal ? POWERTABLE_WATT_SIZE : POWERTABLE_CAD_SIZE;
   ptIndex index;
   if (n == 1) {
-    int singleValue = static_cast<int>(round(y[0]));
+    int singleValue = static_cast<int>(round(xy.second[0]));
     for (int innerIndex : emptyIndices) {
       index.cadIndex                                                             = horizontal ? outerIndex : innerIndex;
       index.wattIndex                                                            = horizontal ? innerIndex : outerIndex;
@@ -319,7 +364,7 @@ void PTHelpers::extrapolateEmptyIndices(int outerIndex, const std::vector<int>& 
       index.cadIndex  = horizontal ? outerIndex : innerIndex;
       index.wattIndex = horizontal ? innerIndex : outerIndex;
 
-      float extrapolated_value = linearExtrapolate(x, y, n, innerIndex);
+      float extrapolated_value = linearExtrapolate(xy, n, innerIndex);
       int tempValue            = static_cast<int>(round(extrapolated_value));
 
       if (testNeighbors(index, tempValue, ptData).allNeighborsPassed) {
@@ -329,7 +374,7 @@ void PTHelpers::extrapolateEmptyIndices(int outerIndex, const std::vector<int>& 
   } else if (n >= 3) {
     bool validForSpline = true;
     for (size_t i = 1; i < n; ++i) {
-      if (x[i] <= x[i - 1]) {
+      if (xy.first[i] <= xy.first[i - 1]) {
         validForSpline = false;
         break;
       }
@@ -340,15 +385,15 @@ void PTHelpers::extrapolateEmptyIndices(int outerIndex, const std::vector<int>& 
     }
 
     CubicSpline spline;
-    spline.set_points(x, y, n);  // Pass pointer-based data
+    spline.set_points(xy, n);  // Pass pointer-based data
 
     for (int innerIndex : emptyIndices) {
       index.cadIndex  = horizontal ? outerIndex : innerIndex;
       index.wattIndex = horizontal ? innerIndex : outerIndex;
 
       float extrapolated_value = spline.extrapolate(innerIndex);
-      float minVal             = *std::min_element(y, y + n);
-      float maxVal             = *std::max_element(y, y + n);
+      float minVal             = *std::min_element(xy.second.begin(), xy.second.end());
+      float maxVal             = *std::max_element(xy.second.begin(), xy.second.end());
       float range              = maxVal - minVal;
       extrapolated_value       = std::max(minVal - 0.1f * range, std::min(extrapolated_value, maxVal + 0.1f * range));
       int tempValue            = static_cast<int>(round(extrapolated_value));
@@ -409,7 +454,7 @@ void PTHelpers::extrapFillTableDirection(bool horizontal, PTData& ptData) {
     }
 
     CubicSpline spline;
-    bool useNaturalSpline = spline.shouldUseNaturalSpline(x.data(), y.data(), x.size());
+    bool useNaturalSpline = spline.shouldUseNaturalSpline(std::make_pair(x, y), x.size());
 
     prevX             = x;
     prevY             = y;
@@ -418,13 +463,13 @@ void PTHelpers::extrapFillTableDirection(bool horizontal, PTData& ptData) {
     prevSplineValid   = true;
 
     // Fill empty table entries using the determined spline type
-    extrapolateEmptyIndices(outerIndex, emptyIndices, x.data(), y.data(), x.size(), horizontal, useNaturalSpline, ptData);
+    extrapolateEmptyIndices(outerIndex, emptyIndices, std::make_pair(x, y), x.size(), horizontal, useNaturalSpline, ptData);
   }
 }
 
-void PTHelpers::extrapolateDiagonalEntries(const std::vector<ptIndex>& emptyIndices, const float* x, const float* y, size_t n, PTData& ptData) {
+void PTHelpers::extrapolateDiagonalEntries(const std::vector<ptIndex>& emptyIndices, std::pair<std::vector<float>, std::vector<float>> xy, size_t n, PTData& ptData) {
   if (n == 1) {
-    int singleValue = static_cast<int>(round(y[0]));
+    int singleValue = static_cast<int>(round(xy.second[0]));
     for (const auto& it : emptyIndices) {
       ptData.tableRow[it.cadIndex].tableEntry[it.wattIndex].targetPosition = singleValue;
     }
@@ -435,7 +480,7 @@ void PTHelpers::extrapolateDiagonalEntries(const std::vector<ptIndex>& emptyIndi
     for (const auto& it : emptyIndices) {
       index = it;
 
-      float extrapolated_value = linearExtrapolate(x, y, n, index.cadIndex);
+      float extrapolated_value = linearExtrapolate(xy, n, index.cadIndex);
       int tempValue            = static_cast<int>(round(extrapolated_value));
 
       if (testNeighbors(index, tempValue, ptData).allNeighborsPassed) {
@@ -448,7 +493,7 @@ void PTHelpers::extrapolateDiagonalEntries(const std::vector<ptIndex>& emptyIndi
   if (n >= 3) {
     bool validForSpline = true;
     for (size_t k = 1; k < n; ++k) {
-      if (x[k] <= x[k - 1]) {
+      if (xy.first[k] <= xy.first[k - 1]) {
         validForSpline = false;
         break;
       }
@@ -459,7 +504,7 @@ void PTHelpers::extrapolateDiagonalEntries(const std::vector<ptIndex>& emptyIndi
     }
 
     CubicSpline spline;
-    spline.set_points(x, y, n);
+    spline.set_points(xy, n);
 
     for (const auto& it : emptyIndices) {
       index = it;
@@ -468,8 +513,8 @@ void PTHelpers::extrapolateDiagonalEntries(const std::vector<ptIndex>& emptyIndi
 
       float extrapolated_value = spline.extrapolate(index.cadIndex);
 
-      float minVal       = *std::min_element(y, y + n);
-      float maxVal       = *std::max_element(y, y + n);
+      float minVal       = *std::min_element(xy.second.begin(), xy.second.end());
+      float maxVal       = *std::max_element(xy.second.begin(), xy.second.end());
       float range        = maxVal - minVal;
       extrapolated_value = std::max(minVal - 0.1f * range, std::min(extrapolated_value, maxVal + 0.1f * range));
 
@@ -482,27 +527,28 @@ void PTHelpers::extrapolateDiagonalEntries(const std::vector<ptIndex>& emptyIndi
 }
 
 /**
- * @brief Performs linear extrapolation or interpolation to estimate the value of a function
- *        at a given point `j` based on the provided data points.
+ * @brief Estimates the y-coordinate corresponding to a given x-coordinate `j` 
+ *        using linear extrapolation or interpolation based on provided data points.
  *
- * This function takes two arrays `x` and `y` representing the x-coordinates and y-coordinates
- * of data points, respectively, and estimates the y-coordinate corresponding to the given
- * x-coordinate `j`. If `j` is outside the range of `x`, the function extrapolates using the
- * nearest two points. If `j` is within the range of `x`, the function interpolates using the
- * two nearest points.
+ * This function takes a pair of vectors `xy` representing the x-coordinates and 
+ * y-coordinates of data points, respectively, and estimates the y-coordinate 
+ * corresponding to the given x-coordinate `j`. If `j` is outside the range of `x`, 
+ * the function extrapolates using the nearest two points. If `j` is within the 
+ * range of `x`, the function interpolates using the two nearest points.
  *
- * @param x Pointer to an array of x-coordinates (must be sorted in ascending order).
- * @param y Pointer to an array of y-coordinates corresponding to the x-coordinates.
- * @param n The number of elements in the `x` and `y` arrays.
+ * @param xy A pair of vectors where the first vector contains x-coordinates 
+ *           (must be sorted in ascending order) and the second vector contains 
+ *           the corresponding y-coordinates.
+ * @param n The number of elements in the `xy` pair.
  * @param j The x-coordinate for which the y-coordinate is to be estimated.
  * @return The estimated y-coordinate corresponding to `j`. If the calculation fails
  *         (e.g., due to division by zero), the function returns `INT16_MIN`.
  */
-float PTHelpers::linearExtrapolate(const float* x, const float* y, size_t n, float j) {
+float PTHelpers::linearExtrapolate(std::pair<std::vector<float>, std::vector<float>> xy, size_t n, float j) {
   float x0, x1, y0, y1;
 
-    x0 = x[0], x1 = x[n - 1];
-    y0 = y[0], y1 = y[n - 1];
+  x0 = xy.first[0], x1 = xy.first[n - 1];
+  y0 = xy.second[0], y1 = xy.second[n - 1];
 
   if (x1 - x0 == 0) {
     SS2K_LOG(PTDATA_LOG_TAG, "Linear Extrapolation failed, x1 - x0 is 0");
@@ -568,7 +614,7 @@ void PTHelpers::findTableDirection(bool horizontal, PTData& ptData) {
     }
 
     CubicSpline spline;
-    bool useNaturalSpline = spline.shouldUseNaturalSpline(x.data(), y.data(), x.size());
+    bool useNaturalSpline = spline.shouldUseNaturalSpline(std::make_pair(x, y), x.size());
 
     // Store values
     prevX             = x;
@@ -577,7 +623,7 @@ void PTHelpers::findTableDirection(bool horizontal, PTData& ptData) {
     prevNaturalSpline = useNaturalSpline;
     prevSplineValid   = true;
 
-    fillEmptyTable(outerValue, emptyIndices, x.data(), y.data(), x.size(), horizontal, useNaturalSpline, ptData);
+    fillEmptyTable(outerValue, emptyIndices, std::make_pair(x, y), x.size(), horizontal, useNaturalSpline, ptData);
   }
 }
 
@@ -633,11 +679,11 @@ int32_t PTHelpers::extrapolateCadenceWatts(int cad, float targetPosition, PTData
   return closestWatts;
 }
 
-void CubicSpline::set_points(const float* x_vals, const float* y_vals, size_t n) {
+void CubicSpline::set_points(std::pair<std::vector<float>, std::vector<float>> xy, size_t n) {
   if (n < 2) return;  // Ensure sufficient points
 
-  x.assign(x_vals, x_vals + n);
-  y.assign(y_vals, y_vals + n);
+  x.assign(xy.first.begin(), xy.first.end());
+  y.assign(xy.second.begin(), xy.second.end());
 
   std::vector<float> h(n - 1), alpha(n, 0.0f);
   c.resize(n, 0.0f);
@@ -748,19 +794,19 @@ void PTHelpers::extrapolateDiagonal(PTData& ptData) {
     prevEmptyIndices = emptyIndices;
     prevSplineValid  = true;
 
-    extrapolateDiagonalEntries(emptyIndices, x.data(), y.data(), x.size(), ptData);
+    extrapolateDiagonalEntries(emptyIndices, std::make_pair(x, y), x.size(), ptData);
   }
 }
 
-bool CubicSpline::shouldUseNaturalSpline(const float* x, const float* y, size_t n) {
+bool CubicSpline::shouldUseNaturalSpline(std::pair<std::vector<float>, std::vector<float>> xy, size_t n) {
   if (n < 3) return true;  // Default to natural spline for small data sets
 
   // Compute approximate first derivatives at endpoints
-  float startSlope = (y[1] - y[0]) / (x[1] - x[0]);
-  float endSlope   = (y[n - 1] - y[n - 2]) / (x[n - 1] - x[n - 2]);
+  float startSlope = (xy.second[1] - xy.second[0]) / (xy.first[1] - xy.first[0]);
+  float endSlope   = (xy.second[n - 1] - xy.second[n - 2]) / (xy.first[n - 1] - xy.first[n - 2]);
 
   // Adaptive slope threshold
-  float dataRange      = *std::max_element(y, y + n) - *std::min_element(y, y + n);
+  float dataRange      = *std::max_element(xy.second.begin(), xy.second.end()) - *std::min_element(xy.second.begin(), xy.second.end());
   float slopeThreshold = 0.1f * dataRange;
 
   if (abs(startSlope) > slopeThreshold || abs(endSlope) > slopeThreshold) {
@@ -770,15 +816,15 @@ bool CubicSpline::shouldUseNaturalSpline(const float* x, const float* y, size_t 
   if (n < 4) return true;  // Not enough points for second derivative check
 
   // Compute second derivatives safely
-  float h0 = x[1] - x[0], h1 = x[2] - x[1];
+  float h0 = xy.first[1] - xy.first[0], h1 = xy.first[2] - xy.first[1];
   if (h0 == 0.0f || h1 == 0.0f) return true;  // Avoid division by zero
 
-  float secondDerivativeStart = (y[2] - 2 * y[1] + y[0]) / (h0 * h1);
+  float secondDerivativeStart = (xy.second[2] - 2 * xy.second[1] + xy.second[0]) / (h0 * h1);
 
-  float hn1 = x[n - 2] - x[n - 3], hn2 = x[n - 1] - x[n - 2];
+  float hn1 = xy.first[n - 2] - xy.first[n - 3], hn2 = xy.first[n - 1] - xy.first[n - 2];
   if (hn1 == 0.0f || hn2 == 0.0f) return true;  // Avoid division by zero
 
-  float secondDerivativeEnd = (y[n - 1] - 2 * y[n - 2] + y[n - 3]) / (hn1 * hn2);
+  float secondDerivativeEnd = (xy.second[n - 1] - 2 * xy.second[n - 2] + xy.second[n - 3]) / (hn1 * hn2);
 
   float curvatureThreshold = 1.0f;
   return !(abs(secondDerivativeStart) > curvatureThreshold || abs(secondDerivativeEnd) > curvatureThreshold);

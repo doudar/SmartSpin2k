@@ -37,12 +37,10 @@ struct ptIndex {
   int8_t cadIndex;
   ptIndex() {
     this->wattIndex = INT8_MIN;
-    this->cadIndex = INT8_MIN;
+    this->cadIndex  = INT8_MIN;
   }
 
-  bool operator==(const ptIndex& other) const {
-    return wattIndex == other.wattIndex && cadIndex == other.cadIndex;
-  }
+  bool operator==(const ptIndex& other) const { return wattIndex == other.wattIndex && cadIndex == other.cadIndex; }
 };
 
 class PowerBuffer {
@@ -107,29 +105,34 @@ class TestResults {
 };
 
 class CubicSpline {
-  public:
-   void set_points(const float* x_vals, const float* y_vals, size_t n);
-   float interpolate(float x_val) const; 
-   float extrapolate(float x_val) const;
-   bool shouldUseNaturalSpline(const float* x, const float* y, size_t n);
- 
-  private:
-   std::vector<float> x, y, h, alpha, l, mu, z, c, b, d;
- };
+ public:
+  void set_points(std::pair<std::vector<float>, std::vector<float>> xy, size_t n);
+  float interpolate(float x_val) const;
+  float extrapolate(float x_val) const;
+  bool shouldUseNaturalSpline(std::pair<std::vector<float>, std::vector<float>> xy, size_t n);
+
+ private:
+  std::vector<float> x, y, h, alpha, l, mu, z, c, b, d;
+};
 
 class PTHelpers {
  public:
   TestResults testNeighbors(ptIndex index, int value, PTData& ptData);
   int32_t lookup(int watts, int cad, PTData& ptData);
-  void fillEmptyTable(int outerValue, const std::vector<int>& emptyIndices, const float* x, const float* y, size_t n, bool horizontal, bool useNaturalSpline, PTData& ptData);
-  void extrapolateEmptyIndices(int outerIndex, const std::vector<int>& emptyIndices, const float* x, const float* y, size_t n, bool horizontal, bool naturalSpline, PTData& ptData);
+  void fillEmptyTable(int outerValue, const std::vector<int>& emptyIndices, std::pair<std::vector<float>, std::vector<float>> xy, size_t n, bool horizontal, bool useNaturalSpline,
+                      PTData& ptData);
+  void extrapolateEmptyIndices(int outerIndex, const std::vector<int>& emptyIndices, std::pair<std::vector<float>, std::vector<float>> xy, size_t n, bool horizontal,
+                               bool naturalSpline, PTData& ptData);
   void extrapFillTableDirection(bool horizontal, PTData& ptData);
-  float linearExtrapolate(const float* x, const float* y, size_t n, float j);
+  float linearExtrapolate(std::pair<std::vector<float>, std::vector<float>> xy, size_t n, float j);
   void findTableDirection(bool horizontal, PTData& ptData);
   void standardFill(PTData& ptData);
   int32_t lookupWatts(int cad, int32_t targetPosition, PTData& ptData);
   int32_t extrapolateCadenceWatts(int cad, float targetPosition, PTData& ptData);
-  void extrapolateDiagonalEntries(const std::vector<ptIndex>& emptyIndices, const float* x, const float* y, size_t n, PTData& ptData);
+  void extrapolateDiagonalEntries(const std::vector<ptIndex>& emptyIndices, std::pair<std::vector<float>, std::vector<float>> xy, size_t n, PTData& ptData);
   void extrapolateDiagonal(PTData& ptData);
   ptIndex calculateIndex(int watts, int cad);
+  int dataPoints(PTData& ptData);
+  std::pair<std::vector<float>, std::vector<float>> getRow(int row, PTData& ptData);
+  std::pair<std::vector<float>, std::vector<float>> getColumn(int column, PTData& ptData);
 };

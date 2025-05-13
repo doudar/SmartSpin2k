@@ -298,7 +298,7 @@ void PowerTable::fillTable() {
     } else if (step == 1) {
       this->extrapFillTable();
     } else if (step == 2) {
-      ptHelpers.extrapolateDiagonal(ptData);
+      //ptHelpers.extrapolateDiagonal(ptData);
     }
     newEntries = getNumEntries();
     SS2K_LOG(POWERTABLE_LOG_TAG, "Fill step %d added %d new entries", step, newEntries - prevEntries);
