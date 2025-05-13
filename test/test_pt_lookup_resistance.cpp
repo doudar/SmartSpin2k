@@ -32,7 +32,7 @@ void TestPTLookupResistance::test_pt_lookup_resistance(void) {
 
   // Lambda function for reusable lookup and logging
   auto performLookup = [&](int cadValue, int wattValue) {
-    outFile << "Calling lookup with cadence: " << cadValue << ", watts: " << wattValue << "\n";
+    outFile << "Calling lookup with cadence: " << cadValue << ", watts: " << wattValue << " ";
     int32_t result = helpers.lookup(wattValue, cadValue, ptData);
     outFile << "Lookup returned: " << result << "\n";
     return result;
@@ -47,7 +47,9 @@ void TestPTLookupResistance::test_pt_lookup_resistance(void) {
       int32_t result = performLookup(cadValue, wattValue);
 
       // Ensure the value is higher than the previous value on the same line
-      //TEST_ASSERT_TRUE(result > previousValue);
+      if (result < previousValue) {
+        outFile << "Error: Lookup value " << result << " is less than previous value " << previousValue << " for cadence " << cadValue << ", watts " << wattValue << "\n";
+      }
       previousValue = result;
     }
   }

@@ -33,7 +33,7 @@ void TestPTLookupWatts::test_debug_neighbors(void) {
 
   // List of (cadence, watts) pairs to test
   std::vector<std::pair<int, int>> testPairs = {
-    {60, 270}, {65, 150}, {70, 300}, {80, 120}, {85, 390}
+    {30, 270},{40, 270},{50, 270},{55, 270},{58, 270},{60, 270}, {62, 270}, {63, 270}, {64, 270}, {85, 390}, {60,355}, {58, 355}, {55,355}, {105, 355}, {102,355}
   };
 
   for (const auto& pair : testPairs) {

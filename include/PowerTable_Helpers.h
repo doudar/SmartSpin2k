@@ -125,7 +125,6 @@ class PTHelpers {
   void extrapolateEmptyIndices(int outerIndex, const std::vector<int>& emptyIndices, const float* x, const float* y, size_t n, bool horizontal, bool naturalSpline, PTData& ptData);
   void extrapFillTableDirection(bool horizontal, PTData& ptData);
   float linearExtrapolate(const float* x, const float* y, size_t n, float j);
-  float linearInterpolate(const float* x, const float* y, size_t n, float j);
   void findTableDirection(bool horizontal, PTData& ptData);
   void standardFill(PTData& ptData);
   int32_t lookupWatts(int cad, int32_t targetPosition, PTData& ptData);
