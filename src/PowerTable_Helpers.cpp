@@ -17,14 +17,12 @@
 #include <iterator>
 #include <map>
 #include <cstdint>
-#include <global_log.h>
 
-extern std::ofstream outFile;  // Ensure the test sets the correct log file
-#define SS2K_LOG(tag, format, ...)       \
-  if (outFile.is_open()) {               \
-    std::ostringstream oss;              \
-    oss << "[" << tag << "] " << format; \
-    outFile << oss.str() << std::endl;   \
+#define SS2K_LOG(tag, format, ...)                       \
+  {                                                      \
+    char buffer[1024];                                   \
+    std::snprintf(buffer, sizeof(buffer), format, ##__VA_ARGS__); \
+    std::cout << "[" << tag << "] " << buffer << std::endl; \
   }
 #else
 #include "SS2KLog.h"
