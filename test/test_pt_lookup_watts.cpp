@@ -44,11 +44,11 @@ void TestPTLookupWatts::test_pt_lookup_watts(void) {
 
   // Define test cadence range
   int minCadence  = 40;
-  int maxCadence  = 60;
-  int cadenceStep = 3;
+  int maxCadence  = 110;
+  int cadenceStep = 10;
 
-#define MIN_TEST_RANGE     4000
-#define MAX_TEST_RANGE     30000
+#define MIN_TEST_RANGE     0
+#define MAX_TEST_RANGE     300
 #define POINTS_PER_CADENCE 10
   // Define resistance test points (using a smaller range for testing efficiency)
   int resistancePoints = POINTS_PER_CADENCE;
@@ -70,10 +70,10 @@ void TestPTLookupWatts::test_pt_lookup_watts(void) {
       int32_t watts = performLookup(cadence, resistance);
 
       // Check that watts increase as resistance increases for the same cadence
-      if (previousWatts != INT32_MIN) {
+      if ((previousWatts != INT32_MIN) && (watts < previousWatts)) {
         // TEST_ASSERT_TRUE_MESSAGE(
         //  watts >= previousWatts,
-        outFile << "Watts should increase or stay the same as resistance increases";
+        outFile << "Watts should increase or stay the same as resistance increases. Previous watts: " << previousWatts << ", Current watts: " << watts << "\n";
         // );
       }
 

@@ -127,11 +127,11 @@ int PTHelpers::dataPoints(PTData& ptData) {
 
 /**
  * @brief Retrieves the x and y values from a specific row of the power table.
- * 
+ *
  * This function extracts the x and y values from the specified row of the power table
  * in the provided PTData object. It skips entries where the target position is set
  * to INT16_MIN, which indicates an invalid or uninitialized entry.
- * 
+ *
  * @param row The index of the row to retrieve data from.
  * @param ptData Reference to the PTData object containing the power table data.
  * @return A pair of vectors:
@@ -141,6 +141,9 @@ int PTHelpers::dataPoints(PTData& ptData) {
 std::pair<std::vector<float>, std::vector<float>> PTHelpers::getRow(int row, PTData& ptData) {
   std::vector<float> xValues;
   std::vector<float> yValues;
+  // clamp row to be within table bounds
+  if (row < 0) row = 0;
+  if (row >= POWERTABLE_CAD_SIZE) row = POWERTABLE_CAD_SIZE - 1;
   for (int j = 0; j < POWERTABLE_WATT_SIZE; ++j) {
     if (ptData.tableRow[row].tableEntry[j].targetPosition != INT16_MIN) {
       xValues.push_back(static_cast<float>(j * POWERTABLE_WATT_INCREMENT));
@@ -152,21 +155,24 @@ std::pair<std::vector<float>, std::vector<float>> PTHelpers::getRow(int row, PTD
 
 /**
  * @brief Extracts the x and y values for a specific column from the power table data.
- * 
+ *
  * This function iterates through the rows of the power table data and retrieves
  * the x and y values for the specified column. The x values are calculated based
  * on the cadence index, and the y values are extracted from the target position
- * of the table entries. Only valid entries (where the target position is not 
+ * of the table entries. Only valid entries (where the target position is not
  * INT16_MIN) are included in the result.
- * 
+ *
  * @param column The index of the column to extract data from.
  * @param ptData Reference to the PTData structure containing the power table data.
- * @return A pair of vectors, where the first vector contains the x values and the 
+ * @return A pair of vectors, where the first vector contains the x values and the
  *         second vector contains the corresponding y values.
  */
 std::pair<std::vector<float>, std::vector<float>> PTHelpers::getColumn(int column, PTData& ptData) {
   std::vector<float> xValues;
   std::vector<float> yValues;
+  // clamp column to be within table bounds
+  if (column < 0) column = 0;
+  if (column >= POWERTABLE_WATT_SIZE) column = POWERTABLE_WATT_SIZE - 1;
   for (int i = 0; i < POWERTABLE_CAD_SIZE; ++i) {
     if (ptData.tableRow[i].tableEntry[column].targetPosition != INT16_MIN) {
       xValues.push_back(static_cast<float>(MINIMUM_TABLE_CAD + i * POWERTABLE_CAD_INCREMENT));
@@ -184,7 +190,7 @@ int32_t PTHelpers::lookup(int watts, int cad, PTData& ptData) {
   const int MAX_CAD_VAL  = MINIMUM_TABLE_CAD + (POWERTABLE_CAD_SIZE - 1) * POWERTABLE_CAD_INCREMENT;
   const int MIN_WATT_VAL = 0;  // Assuming watts index start from 0
   const int MAX_WATT_VAL = (POWERTABLE_WATT_SIZE - 1) * POWERTABLE_WATT_INCREMENT;
-  int ptDataSize = dataPoints(ptData);
+  int ptDataSize         = dataPoints(ptData);
   std::pair<std::vector<float>, std::vector<float>> dataPoints;
 
   bool isCadOutOfTable = cad < MIN_CAD_VAL || cad > MAX_CAD_VAL;
@@ -214,7 +220,7 @@ int32_t PTHelpers::lookup(int watts, int cad, PTData& ptData) {
       dataPoints.second.clear();
       // Clamp targetCadIndex to be within table bounds for selecting the row
       if (targetCadIndex < 0) targetCadIndex = 0;
-      
+
       dataPoints = getRow(targetCadIndex, ptData);
 
       if (dataPoints.first.size() >= 2) {
@@ -264,8 +270,8 @@ int32_t PTHelpers::lookup(int watts, int cad, PTData& ptData) {
   }
 
   // Combine R1, R2, R3
-  float sum = 0;
-  int count = 0;
+  float sum   = 0;
+  float count = 0;
 
   if (R1 != INT16_MIN && !std::isnan(R1) && !std::isinf(R1)) {
     sum += R1;
@@ -287,8 +293,8 @@ int32_t PTHelpers::lookup(int watts, int cad, PTData& ptData) {
   return INT32_MIN;  // All lookup methods failed
 }
 
-void PTHelpers::fillEmptyTable(int outerValue, const std::vector<int>& emptyIndices, std::pair<std::vector<float>, std::vector<float>> xy, size_t n, bool horizontal, bool useNaturalSpline,
-                               PTData& ptData) {
+void PTHelpers::fillEmptyTable(int outerValue, const std::vector<int>& emptyIndices, std::pair<std::vector<float>, std::vector<float>> xy, size_t n, bool horizontal,
+                               bool useNaturalSpline, PTData& ptData) {
   int innerSize = horizontal ? POWERTABLE_WATT_SIZE : POWERTABLE_CAD_SIZE;
   ptIndex index;
 
@@ -333,9 +339,9 @@ void PTHelpers::fillEmptyTable(int outerValue, const std::vector<int>& emptyIndi
       index.wattIndex = horizontal ? innerValue : outerValue;
 
       float interpolated_value = spline.interpolate(innerValue);
-      float minValue     = *std::min_element(xy.second.begin(), xy.second.end());
-      float maxValue     = *std::max_element(xy.second.begin(), xy.second.end());
-      interpolated_value = std::max(minValue, std::min(maxValue, interpolated_value));
+      float minValue           = *std::min_element(xy.second.begin(), xy.second.end());
+      float maxValue           = *std::max_element(xy.second.begin(), xy.second.end());
+      interpolated_value       = std::max(minValue, std::min(maxValue, interpolated_value));
 
       int tempValue = static_cast<int>(round(interpolated_value));
 
@@ -348,8 +354,8 @@ void PTHelpers::fillEmptyTable(int outerValue, const std::vector<int>& emptyIndi
   }
 }
 
-void PTHelpers::extrapolateEmptyIndices(int outerIndex, const std::vector<int>& emptyIndices, std::pair<std::vector<float>, std::vector<float>> xy, size_t n, bool horizontal, bool naturalSpline,
-                                        PTData& ptData) {
+void PTHelpers::extrapolateEmptyIndices(int outerIndex, const std::vector<int>& emptyIndices, std::pair<std::vector<float>, std::vector<float>> xy, size_t n, bool horizontal,
+                                        bool naturalSpline, PTData& ptData) {
   int innerSize = horizontal ? POWERTABLE_WATT_SIZE : POWERTABLE_CAD_SIZE;
   ptIndex index;
   if (n == 1) {
@@ -527,17 +533,17 @@ void PTHelpers::extrapolateDiagonalEntries(const std::vector<ptIndex>& emptyIndi
 }
 
 /**
- * @brief Estimates the y-coordinate corresponding to a given x-coordinate `j` 
+ * @brief Estimates the y-coordinate corresponding to a given x-coordinate `j`
  *        using linear extrapolation or interpolation based on provided data points.
  *
- * This function takes a pair of vectors `xy` representing the x-coordinates and 
- * y-coordinates of data points, respectively, and estimates the y-coordinate 
- * corresponding to the given x-coordinate `j`. If `j` is outside the range of `x`, 
- * the function extrapolates using the nearest two points. If `j` is within the 
+ * This function takes a pair of vectors `xy` representing the x-coordinates and
+ * y-coordinates of data points, respectively, and estimates the y-coordinate
+ * corresponding to the given x-coordinate `j`. If `j` is outside the range of `x`,
+ * the function extrapolates using the nearest two points. If `j` is within the
  * range of `x`, the function interpolates using the two nearest points.
  *
- * @param xy A pair of vectors where the first vector contains x-coordinates 
- *           (must be sorted in ascending order) and the second vector contains 
+ * @param xy A pair of vectors where the first vector contains x-coordinates
+ *           (must be sorted in ascending order) and the second vector contains
  *           the corresponding y-coordinates.
  * @param n The number of elements in the `xy` pair.
  * @param j The x-coordinate for which the y-coordinate is to be estimated.
@@ -633,50 +639,113 @@ int32_t PTHelpers::lookupWatts(int cad, int32_t targetPosition, PTData& ptData) 
     return 0;
   }
 
-  int watts = extrapolateCadenceWatts(cad, targetPosition, ptData);  // Extrapolate watts for the given cadence and target position
+  int watts = extrapolateWattsFromCadence(cad, targetPosition, ptData);  // Extrapolate watts for the given cadence and target position
   SS2K_LOG(PTDATA_LOG_TAG, "LookupWatts computed %dw from pos %d, cad %d", watts, targetPosition, cad);
   if (watts < 0) watts = 0;  // Ensure watts is non-negative
   return watts;
 }
 
-// Brute force unified function for extrapolating watts using cadence and resistance.
-int32_t PTHelpers::extrapolateCadenceWatts(int cad, float targetPosition, PTData& ptData) {
-  int maxWatts      = (POWERTABLE_WATT_SIZE - 1) * POWERTABLE_WATT_INCREMENT;
-  int closestWatts  = 0;
-  int minDifference = std::numeric_limits<int>::max();
-  int rangeStart    = 0;
-  int rangeEnd      = maxWatts;
+int PTHelpers::extrapolateWattsFromCadence(int cad, int32_t targetPosition, PTData& ptData) {
+  int watts = 0;
+  if (cad < 1) {
+    return 0;
+  }
+  ptIndex index       = calculateIndex(0, cad);  // Ensure the index is calculated for the given cadence
+  bool inCadenceRange = index.cadIndex >= 0 && index.cadIndex < POWERTABLE_CAD_SIZE;
+  bool inWattRange    = index.wattIndex >= 0 && index.wattIndex < POWERTABLE_WATT_SIZE;
 
-  auto searchWithIncrement = [&](int increment) {
-    int newRangeStart = rangeStart;
-    int newRangeEnd   = rangeEnd;
+  std::pair<std::vector<float>, std::vector<float>> xy = getRow(index.cadIndex, ptData);  // Get the row data for the given cadence
+  // because this is a reverse lookup, we need to swap the pair
+  std::swap(xy.first, xy.second);
 
-    for (int watts = rangeStart; watts <= rangeEnd; watts += increment) {
-      int32_t position   = lookup(watts, cad, ptData);  // Convert to internal format
-      int32_t difference = fabs(position - targetPosition);
+  // Most accurate method if we have data in the table
+  // Use lower_bound and upper_bound to find the closest points while keeping them associated in the vector
+  auto lower = std::lower_bound(xy.first.begin(), xy.first.end(), static_cast<float>(targetPosition));
+  auto upper = std::upper_bound(xy.first.begin(), xy.first.end(), static_cast<float>(targetPosition));
 
-      if (difference < minDifference) {
-        minDifference = difference;
-        closestWatts  = watts;
-        newRangeStart = std::max(0, watts - increment);
-        newRangeEnd   = std::min(maxWatts, watts + increment);
-        if (difference == 0) {
-          SS2K_LOG(PTDATA_LOG_TAG, "Exact match found for %d watts", watts);
-          break;  // Stop searching if an exact match is found
-        }
-      }
-    }
+  // Ensure the iterators are within bounds and retrieve the associated values from xy.second
+  float lowerX = (lower != xy.first.begin()) ? *(lower - 1) : *lower;
+  float upperX = (upper != xy.first.end()) ? *upper : *(upper - 1);
 
-    rangeStart = newRangeStart;
-    rangeEnd   = newRangeEnd;
-  };
+  float lowerY = (lower != xy.first.begin()) ? xy.second[std::distance(xy.first.begin(), lower - 1)] : xy.second[std::distance(xy.first.begin(), lower)];
+  float upperY = (upper != xy.first.end()) ? xy.second[std::distance(xy.first.begin(), upper)] : xy.second[std::distance(xy.first.begin(), upper - 1)];
 
-  for (int increment : {100, 50, 25, 1}) {
-    searchWithIncrement(increment);
-    if (minDifference == 0) return closestWatts;
+  if (lowerX == upperX && xy.first.size() > 1) {
+    // If lower and upper are the same, we need to use different values
+    if(upper < xy.first.end())
+    upperX = *(upper + 1);
+    upperY = xy.second[std::distance(xy.first.begin(), (upper + 1))];
   }
 
-  return closestWatts;
+  return watts = linearExtrapolate(std::make_pair(std::vector<float>{lowerX, upperX}, std::vector<float>{lowerY, upperY}), 2, static_cast<float>(targetPosition));
+
+  if (watts < 1) {
+    // log lowerX, lowerY, upperX, upperY
+    SS2K_LOG(PTDATA_LOG_TAG, "LookupWatts: lowerX=%.2f, lowerY=%.2f, upperX=%.2f, upperY=%.2f", lowerX, lowerY, upperX, upperY);
+  }
+
+  // If cadence is outside the table, do bilinear extrapolation using nearest cadence rows
+  if (!inCadenceRange && xy.first.size() >= 2) {
+    // Get the nearest row for the given cadence
+    auto row = getRow(index.cadIndex, ptData);
+
+    // Find two closest targetPositions in each row, ensure they are at least 2 indices apart
+    float resLow = 0, resHigh = 0;
+    int colLow = -1, colHigh = -1;
+    if (row.first.size() >= 2) {
+      auto lower   = std::lower_bound(row.second.begin(), row.second.end(), static_cast<float>(targetPosition));
+      auto upper   = std::upper_bound(row.second.begin(), row.second.end(), static_cast<float>(targetPosition));
+      int lowerIdx = std::distance(row.second.begin(), lower);
+      int upperIdx = std::distance(row.second.begin(), upper);
+      if (lowerIdx > 0 && (upperIdx - lowerIdx) < 4 && upperIdx < (int)row.first.size()) {
+        lowerIdx = std::max(0, lowerIdx - 1);
+        upperIdx = std::min((int)row.first.size() - 1, upperIdx + 1);
+      }
+      if (lowerIdx == upperIdx) {
+        if (upperIdx < (int)row.first.size() - 1)
+          upperIdx++;
+        else if (lowerIdx > 0)
+          lowerIdx--;
+      }
+      colLow  = lowerIdx;
+      colHigh = upperIdx;
+      // Use getColumn for each watt index
+      auto colLowData  = getColumn(colLow, ptData);
+      auto colHighData = getColumn(colHigh, ptData);
+      // Swap for reverse lookup
+      std::swap(colLowData.first, colLowData.second);
+      std::swap(colHighData.first, colHighData.second);
+      // loop through and print all column data
+      for (int i = 0; i < colLowData.first.size(); i++) {
+        SS2K_LOG(PTDATA_LOG_TAG, "colLowData[%d]: %f, %f", i, colLowData.first[i], colLowData.second[i]);
+      }
+      for (int i = 0; i < colHighData.first.size(); i++) {
+        SS2K_LOG(PTDATA_LOG_TAG, "colHighData[%d]: %f, %f", i, colHighData.first[i], colHighData.second[i]);
+      }
+      // Ensure we have enough data points to perform extrapolation
+      if (colLowData.first.size() >= 2) {
+        resLow = linearExtrapolate(colLowData, colLowData.first.size(), static_cast<float>(cad));
+        SS2K_LOG(PTDATA_LOG_TAG, "colLowData: Using getColumn(%d) for cadence %.2f gives resLow=%.2f", colLow, (float)cad, resLow);
+      }
+      if (colHighData.first.size() >= 2) {
+        resHigh = linearExtrapolate(colHighData, colHighData.first.size(), static_cast<float>(cad));
+        SS2K_LOG(PTDATA_LOG_TAG, "colHighData: Using getColumn(%d) for cadence %.2f gives resHigh=%.2f", colHigh, (float)cad, resHigh);
+      }
+    }
+    // Now interpolate/extrapolate between the two watt columns
+    if (colLow != -1 && colHigh != -1 && colLow != colHigh) {
+      SS2K_LOG(PTDATA_LOG_TAG, "Bilinear: Using (resLow=%d, wattsLow=%.2f) and (resHigh=%d, wattsHigh=%.2f) for resistance %.2f", colLow, resLow, colHigh, resHigh,
+               (float)targetPosition);
+      float result = linearExtrapolate(std::make_pair(std::vector<float>{resLow, resHigh}, std::vector<float>{static_cast<float>(colLow * POWERTABLE_WATT_INCREMENT),
+                                                                                                              static_cast<float>(colHigh * POWERTABLE_WATT_INCREMENT)}),
+                                       2, static_cast<float>(targetPosition));
+      if (result < 0) result = 0;
+      if (result > 2000) result = 2000;
+      return static_cast<int>(round(result));
+    }
+  }
+
+  return watts;
 }
 
 void CubicSpline::set_points(std::pair<std::vector<float>, std::vector<float>> xy, size_t n) {
