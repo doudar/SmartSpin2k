@@ -17,12 +17,13 @@
 #include <iterator>
 #include <map>
 #include <cstdint>
+std::ofstream outFile("test/output/test_PowerTable_Helpers.txt", std::ios::trunc);
 
 #define SS2K_LOG(tag, format, ...)                                \
   {                                                               \
     char buffer[1024];                                            \
     std::snprintf(buffer, sizeof(buffer), format, ##__VA_ARGS__); \
-    std::cout << "[" << tag << "] " << buffer << std::endl;       \
+    outFile << "[" << tag << "] " << buffer << std::endl;         \
   }
 #else
 #include "SS2KLog.h"
@@ -108,7 +109,7 @@ ptIndex PTHelpers::calculateIndex(int watts, int cad) {
   index.wattIndex = round((float)watts / (float)POWERTABLE_WATT_INCREMENT);
   index.cadIndex  = round(((float)cad - (float)MINIMUM_TABLE_CAD) / (float)POWERTABLE_CAD_INCREMENT);
 
-  // SS2K_LOG(PTDATA_LOG_TAG, "Calculated indices: wattIndex=%d, CadIndex=%d (cad=%d, watts=%d)", index.wattIndex, index.CadIndex, cad, watts);
+  // SS2K_LOG(PTDATA_LOG_TAG, "Calculated indices: wattIndex=%d, CadIndex=%d (cad=%d, watts=%d)", index.wattIndex, index.cadIndex, cad, watts);
   return index;
 }
 
@@ -653,8 +654,59 @@ int PTHelpers::extrapolateWattsFromCadence(int cad, int32_t targetPosition, PTDa
   ptIndex index       = calculateIndex(0, cad);  // Ensure the index is calculated for the given cadence
   bool inCadenceRange = index.cadIndex >= 0 && index.cadIndex < POWERTABLE_CAD_SIZE;
   bool inWattRange    = index.wattIndex >= 0 && index.wattIndex < POWERTABLE_WATT_SIZE;
+  std::pair<std::vector<float>, std::vector<float>> xyUsed4Offset;
 
-  std::pair<std::vector<float>, std::vector<float>> xy = getRow(index.cadIndex, ptData);  // Get the row data for the given cadence
+  std::pair<std::vector<float>, std::vector<float>> xy;  // Get the row data for the given cadence
+
+  if (true) {
+    float offset = 0.0;
+    // if (!inCadenceRange) {
+    std::pair<std::vector<float>, std::vector<float>> newxy;
+    int cadDelta = (index.cadIndex < 0) ? index.cadIndex : index.cadIndex - POWERTABLE_CAD_SIZE - 1;
+    if (index.cadIndex <= 0) {
+      xy            = getRow(0, ptData);
+      xyUsed4Offset = getRow(1, ptData);
+      SS2K_LOG(PTDATA_LOG_TAG, "LookupWatts: index.cadIndex == %d", index.cadIndex);
+    }
+    if (index.cadIndex >= POWERTABLE_CAD_SIZE - 1) {
+      xy            = getRow(POWERTABLE_CAD_SIZE - 2, ptData);
+      xyUsed4Offset = getRow(POWERTABLE_CAD_SIZE - 1, ptData);
+      SS2K_LOG(PTDATA_LOG_TAG, "LookupWatts: index.cadIndex == %d", index.cadIndex);
+    }
+    for (int i = 0; i < xy.second.size(); i++) {
+      bool found = false;
+      for (int j = 0; j < xyUsed4Offset.second.size(); j++) {
+        if (xy.first[i] == xyUsed4Offset.first[j]) {
+          offset     = (((xyUsed4Offset.second[j] - xy.second[i]) * cadDelta) + offset) / 2;
+          bool found = true;
+        }
+      }
+    }
+    for (int i = 0; i < xy.first.size(); i++) {
+      if (index.cadIndex < 0) {
+        xy.second[i] = xy.second[i] + offset;
+      }
+      if (index.cadIndex > POWERTABLE_CAD_SIZE - 1) {
+        xy.second[i] = xy.second[i] - offset;
+      }
+    }
+  }
+  if (!inCadenceRange) {
+    // print everything in xy and xyUsed4Offset
+    for (int i = 0; i < xyUsed4Offset.first.size(); i++) {
+      SS2K_LOG(PTDATA_LOG_TAG, "xyUsed4Offset[%d]: %f, %f", i, xyUsed4Offset.first[i], xyUsed4Offset.second[i]);
+    }
+  }
+  if (inCadenceRange) {
+    SS2K_LOG(PTDATA_LOG_TAG, "Cadence was in range %d", index.cadIndex);
+    xy = getRow(index.cadIndex, ptData);
+  }
+
+  // print everything in xy
+  for (int i = 0; i < xy.first.size(); i++) {
+    SS2K_LOG(PTDATA_LOG_TAG, "xy[%d]: %f, %f", i, xy.first[i], xy.second[i]);
+  }
+
   // because this is a reverse lookup, we need to swap the pair
   std::swap(xy.first, xy.second);
 
@@ -672,8 +724,7 @@ int PTHelpers::extrapolateWattsFromCadence(int cad, int32_t targetPosition, PTDa
 
   if (lowerX == upperX && xy.first.size() > 1) {
     // If lower and upper are the same, we need to use different values
-    if(upper < xy.first.end())
-    upperX = *(upper + 1);
+    if (upper < xy.first.end()) upperX = *(upper + 1);
     upperY = xy.second[std::distance(xy.first.begin(), (upper + 1))];
   }
 

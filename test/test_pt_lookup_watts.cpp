@@ -44,8 +44,8 @@ void TestPTLookupWatts::test_pt_lookup_watts(void) {
 
   // Define test cadence range
   int minCadence  = 40;
-  int maxCadence  = 110;
-  int cadenceStep = 10;
+  int maxCadence  = 130;
+  int cadenceStep = 5;
 
 #define MIN_TEST_RANGE     0
 #define MAX_TEST_RANGE     300
