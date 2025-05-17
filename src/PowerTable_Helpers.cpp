@@ -641,7 +641,7 @@ int32_t PTHelpers::lookupWatts(int cad, int32_t targetPosition, PTData& ptData) 
   }
 
   int watts = extrapolateWattsFromCadence(cad, targetPosition, ptData);  // Extrapolate watts for the given cadence and target position
-  SS2K_LOG(PTDATA_LOG_TAG, "LookupWatts computed %dw from pos %d, cad %d", watts, targetPosition, cad);
+  //SS2K_LOG(PTDATA_LOG_TAG, "LookupWatts computed %dw from pos %d, cad %d", watts, targetPosition, cad);
   if (watts < 0) watts = 0;  // Ensure watts is non-negative
   return watts;
 }
@@ -661,17 +661,17 @@ int PTHelpers::extrapolateWattsFromCadence(int cad, int32_t targetPosition, PTDa
   if (true) {
     float offset = 0.0;
     // if (!inCadenceRange) {
-    std::pair<std::vector<float>, std::vector<float>> newxy;
-    int cadDelta = (index.cadIndex < 0) ? index.cadIndex : index.cadIndex - POWERTABLE_CAD_SIZE - 1;
-    if (index.cadIndex <= 0) {
+    // std::pair<std::vector<float>, std::vector<float>> newxy;
+    int cadDelta = (index.cadIndex < 0) ? index.cadIndex : index.cadIndex - (POWERTABLE_CAD_SIZE - 1);
+    if (index.cadIndex < 0) {
       xy            = getRow(0, ptData);
       xyUsed4Offset = getRow(1, ptData);
-      SS2K_LOG(PTDATA_LOG_TAG, "LookupWatts: index.cadIndex == %d", index.cadIndex);
+      // SS2K_LOG(PTDATA_LOG_TAG, "LookupWatts: index.cadIndex == %d, xy %f, xyused4Offset %f, cadDelta %d", index.cadIndex, xy.second[0], xyUsed4Offset.second[0], cadDelta);
     }
-    if (index.cadIndex >= POWERTABLE_CAD_SIZE - 1) {
-      xy            = getRow(POWERTABLE_CAD_SIZE - 2, ptData);
-      xyUsed4Offset = getRow(POWERTABLE_CAD_SIZE - 1, ptData);
-      SS2K_LOG(PTDATA_LOG_TAG, "LookupWatts: index.cadIndex == %d", index.cadIndex);
+    if (index.cadIndex > POWERTABLE_CAD_SIZE - 1) {
+      xy            = getRow(POWERTABLE_CAD_SIZE - 1, ptData);
+      xyUsed4Offset = getRow(POWERTABLE_CAD_SIZE - 2, ptData);
+      // SS2K_LOG(PTDATA_LOG_TAG, "LookupWatts: index.cadIndex == %d, xy %f, xyused4Offset %f, cadDelta %d", index.cadIndex, xy.second[0], xyUsed4Offset.second[0], cadDelta);
     }
     for (int i = 0; i < xy.second.size(); i++) {
       bool found = false;
@@ -690,22 +690,23 @@ int PTHelpers::extrapolateWattsFromCadence(int cad, int32_t targetPosition, PTDa
         xy.second[i] = xy.second[i] - offset;
       }
     }
+    // SS2K_LOG(PTDATA_LOG_TAG, "LookupWatts: offset = %f", offset);
   }
   if (!inCadenceRange) {
     // print everything in xy and xyUsed4Offset
     for (int i = 0; i < xyUsed4Offset.first.size(); i++) {
-      SS2K_LOG(PTDATA_LOG_TAG, "xyUsed4Offset[%d]: %f, %f", i, xyUsed4Offset.first[i], xyUsed4Offset.second[i]);
+      // SS2K_LOG(PTDATA_LOG_TAG, "xyUsed4Offset[%d]: %f, %f", i, xyUsed4Offset.first[i], xyUsed4Offset.second[i]);
     }
   }
   if (inCadenceRange) {
-    SS2K_LOG(PTDATA_LOG_TAG, "Cadence was in range %d", index.cadIndex);
+    // SS2K_LOG(PTDATA_LOG_TAG, "Cadence was in range %d", index.cadIndex);
     xy = getRow(index.cadIndex, ptData);
   }
 
   // print everything in xy
-  for (int i = 0; i < xy.first.size(); i++) {
-    SS2K_LOG(PTDATA_LOG_TAG, "xy[%d]: %f, %f", i, xy.first[i], xy.second[i]);
-  }
+  // for (int i = 0; i < xy.first.size(); i++) {
+  //  SS2K_LOG(PTDATA_LOG_TAG, "xy[%d]: %f, %f", i, xy.first[i], xy.second[i]);
+  // }
 
   // because this is a reverse lookup, we need to swap the pair
   std::swap(xy.first, xy.second);
@@ -716,85 +717,21 @@ int PTHelpers::extrapolateWattsFromCadence(int cad, int32_t targetPosition, PTDa
   auto upper = std::upper_bound(xy.first.begin(), xy.first.end(), static_cast<float>(targetPosition));
 
   // Ensure the iterators are within bounds and retrieve the associated values from xy.second
-  float lowerX = (lower != xy.first.begin()) ? *(lower - 1) : *lower;
-  float upperX = (upper != xy.first.end()) ? *upper : *(upper - 1);
+  float lowerX = (lower != xy.first.begin()) ? *(lower - 1) : *(lower + 1);
+  float upperX = (upper != xy.first.end()) ? *upper : *(upper - 2);
 
-  float lowerY = (lower != xy.first.begin()) ? xy.second[std::distance(xy.first.begin(), lower - 1)] : xy.second[std::distance(xy.first.begin(), lower)];
-  float upperY = (upper != xy.first.end()) ? xy.second[std::distance(xy.first.begin(), upper)] : xy.second[std::distance(xy.first.begin(), upper - 1)];
+  float lowerY = (lower != xy.first.begin()) ? xy.second[std::distance(xy.first.begin(), lower - 1)] : xy.second[std::distance(xy.first.begin(), lower + 1)];
+  float upperY = (upper != xy.first.end()) ? xy.second[std::distance(xy.first.begin(), upper)] : xy.second[std::distance(xy.first.begin(), upper - 2)];
 
-  if (lowerX == upperX && xy.first.size() > 1) {
-    // If lower and upper are the same, we need to use different values
-    if (upper < xy.first.end()) upperX = *(upper + 1);
-    upperY = xy.second[std::distance(xy.first.begin(), (upper + 1))];
-  }
+  // log lowerX, upperX, lowerY, upperY
+  // SS2K_LOG(PTDATA_LOG_TAG, "LookupWatts: lowerX %f, upperX %f, lowerY %f, upperY %f", lowerX, upperX, lowerY, upperY);
+  watts = linearExtrapolate(std::make_pair(std::vector<float>{lowerX, upperX}, std::vector<float>{lowerY, upperY}), 2, static_cast<float>(targetPosition));
 
-  return watts = linearExtrapolate(std::make_pair(std::vector<float>{lowerX, upperX}, std::vector<float>{lowerY, upperY}), 2, static_cast<float>(targetPosition));
+  // minor change for when cadence changes within cadence increment. We will assume 1watt per rpm from the center of the cadence increment
+  watts += cad - (index.cadIndex * POWERTABLE_CAD_INCREMENT + MINIMUM_TABLE_CAD);
 
-  if (watts < 1) {
-    // log lowerX, lowerY, upperX, upperY
-    SS2K_LOG(PTDATA_LOG_TAG, "LookupWatts: lowerX=%.2f, lowerY=%.2f, upperX=%.2f, upperY=%.2f", lowerX, lowerY, upperX, upperY);
-  }
-
-  // If cadence is outside the table, do bilinear extrapolation using nearest cadence rows
-  if (!inCadenceRange && xy.first.size() >= 2) {
-    // Get the nearest row for the given cadence
-    auto row = getRow(index.cadIndex, ptData);
-
-    // Find two closest targetPositions in each row, ensure they are at least 2 indices apart
-    float resLow = 0, resHigh = 0;
-    int colLow = -1, colHigh = -1;
-    if (row.first.size() >= 2) {
-      auto lower   = std::lower_bound(row.second.begin(), row.second.end(), static_cast<float>(targetPosition));
-      auto upper   = std::upper_bound(row.second.begin(), row.second.end(), static_cast<float>(targetPosition));
-      int lowerIdx = std::distance(row.second.begin(), lower);
-      int upperIdx = std::distance(row.second.begin(), upper);
-      if (lowerIdx > 0 && (upperIdx - lowerIdx) < 4 && upperIdx < (int)row.first.size()) {
-        lowerIdx = std::max(0, lowerIdx - 1);
-        upperIdx = std::min((int)row.first.size() - 1, upperIdx + 1);
-      }
-      if (lowerIdx == upperIdx) {
-        if (upperIdx < (int)row.first.size() - 1)
-          upperIdx++;
-        else if (lowerIdx > 0)
-          lowerIdx--;
-      }
-      colLow  = lowerIdx;
-      colHigh = upperIdx;
-      // Use getColumn for each watt index
-      auto colLowData  = getColumn(colLow, ptData);
-      auto colHighData = getColumn(colHigh, ptData);
-      // Swap for reverse lookup
-      std::swap(colLowData.first, colLowData.second);
-      std::swap(colHighData.first, colHighData.second);
-      // loop through and print all column data
-      for (int i = 0; i < colLowData.first.size(); i++) {
-        SS2K_LOG(PTDATA_LOG_TAG, "colLowData[%d]: %f, %f", i, colLowData.first[i], colLowData.second[i]);
-      }
-      for (int i = 0; i < colHighData.first.size(); i++) {
-        SS2K_LOG(PTDATA_LOG_TAG, "colHighData[%d]: %f, %f", i, colHighData.first[i], colHighData.second[i]);
-      }
-      // Ensure we have enough data points to perform extrapolation
-      if (colLowData.first.size() >= 2) {
-        resLow = linearExtrapolate(colLowData, colLowData.first.size(), static_cast<float>(cad));
-        SS2K_LOG(PTDATA_LOG_TAG, "colLowData: Using getColumn(%d) for cadence %.2f gives resLow=%.2f", colLow, (float)cad, resLow);
-      }
-      if (colHighData.first.size() >= 2) {
-        resHigh = linearExtrapolate(colHighData, colHighData.first.size(), static_cast<float>(cad));
-        SS2K_LOG(PTDATA_LOG_TAG, "colHighData: Using getColumn(%d) for cadence %.2f gives resHigh=%.2f", colHigh, (float)cad, resHigh);
-      }
-    }
-    // Now interpolate/extrapolate between the two watt columns
-    if (colLow != -1 && colHigh != -1 && colLow != colHigh) {
-      SS2K_LOG(PTDATA_LOG_TAG, "Bilinear: Using (resLow=%d, wattsLow=%.2f) and (resHigh=%d, wattsHigh=%.2f) for resistance %.2f", colLow, resLow, colHigh, resHigh,
-               (float)targetPosition);
-      float result = linearExtrapolate(std::make_pair(std::vector<float>{resLow, resHigh}, std::vector<float>{static_cast<float>(colLow * POWERTABLE_WATT_INCREMENT),
-                                                                                                              static_cast<float>(colHigh * POWERTABLE_WATT_INCREMENT)}),
-                                       2, static_cast<float>(targetPosition));
-      if (result < 0) result = 0;
-      if (result > 2000) result = 2000;
-      return static_cast<int>(round(result));
-    }
-  }
+  if (watts < 0) watts = 0;
+  if (watts > 1500) watts = 1500;
 
   return watts;
 }
