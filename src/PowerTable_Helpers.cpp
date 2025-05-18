@@ -640,7 +640,7 @@ int32_t PTHelpers::lookupWatts(int cad, int32_t targetPosition, PTData& ptData) 
     return 0;
   }
 
-  int watts = extrapolateWattsFromCadence(cad, targetPosition, ptData);  // Extrapolate watts for the given cadence and target position
+  int watts = extrapolateWattsFromCadence(cad, targetPosition/TABLE_DIVISOR, ptData);  // Extrapolate watts for the given cadence and target position
   //SS2K_LOG(PTDATA_LOG_TAG, "LookupWatts computed %dw from pos %d, cad %d", watts, targetPosition, cad);
   if (watts < 0) watts = 0;  // Ensure watts is non-negative
   return watts;
@@ -703,10 +703,10 @@ int PTHelpers::extrapolateWattsFromCadence(int cad, int32_t targetPosition, PTDa
     xy = getRow(index.cadIndex, ptData);
   }
 
-  // print everything in xy
-  // for (int i = 0; i < xy.first.size(); i++) {
-  //  SS2K_LOG(PTDATA_LOG_TAG, "xy[%d]: %f, %f", i, xy.first[i], xy.second[i]);
-  // }
+   //print everything in xy
+   for (int i = 0; i < xy.first.size(); i++) {
+    Serial.printf("xy[%d]: %f, %f\n", i, xy.first[i], xy.second[i]);
+  }
 
   // because this is a reverse lookup, we need to swap the pair
   std::swap(xy.first, xy.second);
