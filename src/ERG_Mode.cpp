@@ -46,24 +46,6 @@ void ErgMode::runERG() {
       }
     }
 
-    if (userConfig->getPTab4Pwr() && rtConfig->getHomed()) {
-      // Lookup watts using the Power Table.
-      pTabUsed4Pwr = true;
-      if (powerTable->_hasBeenLoadedThisSession) {
-        rtConfig->watts.setValue(powerTable->lookupWatts(rtConfig->cad.getValue(), ss2k->getCurrentPosition()));
-      } else {
-        // only run _manageSaveState every 5 seconds
-        static unsigned long int saveStateTimer = millis();
-        if ((millis() - saveStateTimer) > 5000) {
-          // load the power table, true to skip checks.
-          powerTable->_manageSaveState(true);
-          saveStateTimer = millis();
-        }
-      }
-    } else {
-      pTabUsed4Pwr = false;
-    }
-
     if (rtConfig->cad.getValue() > 0 && rtConfig->watts.getValue() > 0) {
       hasConnectedPowerMeter = spinBLEClient.connectedPM;
       simulationRunning      = rtConfig->watts.getTarget();
@@ -103,6 +85,30 @@ void ErgMode::runERG() {
       userConfig->saveToLittleFS();
     }
     loopCounter++;
+  }
+
+  if (userConfig->getPTab4Pwr() && rtConfig->getHomed()) {
+    // only do this twice as often as ERG_MODE_DELAY
+    static unsigned long int pTab4pwrTimer = millis();
+    if (millis() - pTab4pwrTimer > ERG_MODE_DELAY / 2) {
+      // reset the timer.
+      pTab4pwrTimer = millis();
+      // Lookup watts using the Power Table.
+      pTabUsed4Pwr = true;
+      if (powerTable->_hasBeenLoadedThisSession) {
+        rtConfig->watts.setValue(powerTable->lookupWatts(rtConfig->cad.getValue(), ss2k->getCurrentPosition()));
+      } else {
+        // only run _manageSaveState every 5 seconds
+        static unsigned long int saveStateTimer = millis();
+        if ((millis() - saveStateTimer) > 5000) {
+          // load the power table, true to skip checks.
+          powerTable->_manageSaveState(true);
+          saveStateTimer = millis();
+        }
+      }
+    }
+  } else {
+    pTabUsed4Pwr = false;
   }
 }
 
