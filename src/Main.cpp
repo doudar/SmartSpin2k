@@ -170,6 +170,16 @@ void setup() {
     SS2K_LOG(MAIN_LOG_TAG, "Failed to start DirCon TCP service");
   }
 
+  #ifdef TEST_PTAB4PWR
+  userConfig->setHMin(0);
+  userConfig->setHMax(27000);
+  rtConfig->setMaxStep(userConfig->getHMax());
+  rtConfig->setMinStep(userConfig->getHMin());
+  rtConfig->setHomed(true);
+  userConfig->setPTab4Pwr(true);
+  spinBLEServer.spinDownFlag = 0;
+  #endif
+
   ss2k->resetIfShiftersHeld();
   SS2K_LOG(MAIN_LOG_TAG, "Creating Shifter Interrupts");
   // Setup Interrupts so shifters work anytime
@@ -327,7 +337,7 @@ void SS2K::maintenanceLoop(void *pvParameters) {
       SS2K_LOG(MAIN_LOG_TAG, "Best Block: %d", heap_caps_get_largest_free_block(MALLOC_CAP_8BIT));
 #endif  // DEBUG_STACK
       // Log userParameters
-      SS2K_LOG(MAIN_LOG_TAG, "PM Con %d, HRM Con %d, W %d, Cad %d, HR %d, Gear %d, Target Position %f", spinBLEClient.connectedPM, spinBLEClient.connectedHRM,
+      SS2K_LOG(MAIN_LOG_TAG, "PM Con %d, HRM Con %d, W %d, Cad %d, HR %d, Gear %d, Target Position %d", spinBLEClient.connectedPM, spinBLEClient.connectedHRM,
                rtConfig->watts.getValue(), rtConfig->cad.getValue(), rtConfig->hr.getValue(), rtConfig->getShifterPosition(), ss2k->targetPosition);
 
       intervalTimer2 = millis();

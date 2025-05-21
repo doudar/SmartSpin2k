@@ -640,8 +640,8 @@ int32_t PTHelpers::lookupWatts(int cad, int32_t targetPosition, PTData& ptData) 
     return 0;
   }
 
-  int watts = extrapolateWattsFromCadence(cad, targetPosition/TABLE_DIVISOR, ptData);  // Extrapolate watts for the given cadence and target position
-  //SS2K_LOG(PTDATA_LOG_TAG, "LookupWatts computed %dw from pos %d, cad %d", watts, targetPosition, cad);
+  int watts = extrapolateWattsFromCadence(cad, targetPosition / TABLE_DIVISOR, ptData);  // Extrapolate watts for the given cadence and target position
+  // SS2K_LOG(PTDATA_LOG_TAG, "LookupWatts computed %dw from pos %d, cad %d", watts, targetPosition, cad);
   if (watts < 0) watts = 0;  // Ensure watts is non-negative
   return watts;
 }
@@ -657,11 +657,11 @@ int PTHelpers::extrapolateWattsFromCadence(int cad, int32_t targetPosition, PTDa
   std::pair<std::vector<float>, std::vector<float>> xyUsed4Offset;
 
   std::pair<std::vector<float>, std::vector<float>> xy;  // Get the row data for the given cadence
+  std::pair<std::vector<float>, std::vector<float>> newxy;
 
-  if (true) {
+  if (!inCadenceRange) {
     float offset = 0.0;
     // if (!inCadenceRange) {
-    // std::pair<std::vector<float>, std::vector<float>> newxy;
     int cadDelta = (index.cadIndex < 0) ? index.cadIndex : index.cadIndex - (POWERTABLE_CAD_SIZE - 1);
     if (index.cadIndex < 0) {
       xy            = getRow(0, ptData);
@@ -683,29 +683,24 @@ int PTHelpers::extrapolateWattsFromCadence(int cad, int32_t targetPosition, PTDa
       }
     }
     for (int i = 0; i < xy.first.size(); i++) {
+      newxy.first.push_back(xy.first[i]);
       if (index.cadIndex < 0) {
-        xy.second[i] = xy.second[i] + offset;
+        newxy.second.push_back(xy.second[i] + offset);
       }
       if (index.cadIndex > POWERTABLE_CAD_SIZE - 1) {
-        xy.second[i] = xy.second[i] - offset;
+        newxy.second.push_back(xy.second[i] - offset);
       }
     }
+    xy = newxy;
     // SS2K_LOG(PTDATA_LOG_TAG, "LookupWatts: offset = %f", offset);
-  }
-  if (!inCadenceRange) {
-    // print everything in xy and xyUsed4Offset
-    for (int i = 0; i < xyUsed4Offset.first.size(); i++) {
-      // SS2K_LOG(PTDATA_LOG_TAG, "xyUsed4Offset[%d]: %f, %f", i, xyUsed4Offset.first[i], xyUsed4Offset.second[i]);
-    }
-  }
-  if (inCadenceRange) {
+  } else {
     // SS2K_LOG(PTDATA_LOG_TAG, "Cadence was in range %d", index.cadIndex);
     xy = getRow(index.cadIndex, ptData);
   }
 
-   //print everything in xy
-   for (int i = 0; i < xy.first.size(); i++) {
-    Serial.printf("xy[%d]: %f, %f\n", i, xy.first[i], xy.second[i]);
+  // print everything in xy
+  for (int i = 0; i < xy.first.size(); i++) {
+    //Serial.printf("xy[%d]: %f, %f\n", i, xy.first[i], xy.second[i]);
   }
 
   // because this is a reverse lookup, we need to swap the pair
