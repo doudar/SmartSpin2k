@@ -42,3 +42,8 @@ class TestLinearExtrapolate {
   public:
    static void test_linear_extrapolate(void);
 };
+
+class TestWritePowerTable {
+  public:
+    static void test_save_and_load(void);
+};

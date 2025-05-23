@@ -70,6 +70,8 @@ void setup() {
    TestPTLookupWatts test2;
    RUN_TEST(test2.test_pt_lookup_watts);
    RUN_TEST(test2.test_debug_neighbors);
+   TestWritePowerTable test4;
+   RUN_TEST(test4.test_save_and_load);
   }
 
   UNITY_END();

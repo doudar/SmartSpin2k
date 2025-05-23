@@ -49,3 +49,37 @@ static void loadCSVToPTData(const std::string& filePath, PTData& ptData) {
 
     file.close();
 }
+
+// Helper function to save PTData to CSV file
+static void savePTDataToCSV(const PTData& ptData, const std::string& filePath) {
+    std::ofstream file(filePath);
+    if (!file.is_open()) {
+        printf("Failed to create file: %s\n", filePath.c_str());
+        return;
+    }
+
+    // Write header row
+    file << "Cadence/Power";
+    for (int watt = 0; watt < POWERTABLE_WATT_SIZE; watt++) {
+        file << "," << watt * 30 << "W"; // Assuming 30W increments
+    }
+    file << std::endl;
+
+    // Write data rows
+    for (int cad = 0; cad < POWERTABLE_CAD_SIZE; cad++) {
+        file << (60 + cad * 5) << "RPM"; // Assuming 5 RPM increments starting at 60
+        
+        for (int watt = 0; watt < POWERTABLE_WATT_SIZE; watt++) {
+            file << ",";
+            if (ptData.tableRow[cad].tableEntry[watt].targetPosition != INT16_MIN) {
+                file << ptData.tableRow[cad].tableEntry[watt].targetPosition;
+            }
+            // If the value is INT16_MIN, leave the cell empty
+        }
+        file << std::endl;
+    }
+
+    file.close();
+    printf("Successfully saved power table to: %s\n", filePath.c_str());
+}
+
