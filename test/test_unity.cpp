@@ -8,6 +8,13 @@
 #include <unity.h>
 #include "test.h"
 
+#ifndef ARDUINO
+#include <sys/stat.h> // For mkdir
+#include <sys/types.h> // For mode_t, often required with sys/stat.h
+#include <errno.h>    // For errno and EEXIST
+#include <stdio.h>    // For perror
+#endif
+
 // Basic test functions
 void test_dummy_function(void) { TEST_ASSERT_EQUAL(1, 1); }
 
@@ -75,6 +82,25 @@ void loop() {
 // For native testing
 #ifndef ARDUINO
 int main(int argc, char **argv) {
+  // Create test/output directory if it doesn't exist for native builds
+  const char* dir_path = "test/output";
+  // Attempt to create the directory. 
+  // On POSIX systems, mkdir requires <sys/stat.h> and <sys/types.h>.
+  // Mode 0777 gives read, write, execute permissions for owner, group, and others.
+  int result = mkdir(dir_path, 0777);
+
+  if (result == -1) {
+    // If mkdir failed, check why
+    if (errno != EEXIST) {
+      // EEXIST means the directory already exists, which is not an error for our purpose.
+      // For any other error, print it.
+      perror("Error creating directory test/output");
+      // Depending on requirements, you might want to exit here or let tests proceed/fail.
+    }
+    // If errno is EEXIST, directory already exists, which is fine.
+  }
+  // Note: For Windows, you would typically use _mkdir(dir_path) from <direct.h>.
+
   setup();
   return 0;
 }
