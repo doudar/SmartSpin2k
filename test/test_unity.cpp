@@ -72,6 +72,8 @@ void setup() {
    RUN_TEST(test2.test_debug_neighbors);
    TestWritePowerTable test4;
    RUN_TEST(test4.test_save_and_load);
+   TestTableFill test5;
+   RUN_TEST(test5.test_fill_incomplete_table);
   }
 
   UNITY_END();

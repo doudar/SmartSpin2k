@@ -47,3 +47,8 @@ class TestWritePowerTable {
   public:
     static void test_save_and_load(void);
 };
+
+class TestTableFill {
+  public:
+    static void test_fill_incomplete_table(void);
+};

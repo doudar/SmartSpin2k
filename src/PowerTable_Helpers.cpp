@@ -636,14 +636,42 @@ void PTHelpers::findTableDirection(bool horizontal, PTData& ptData) {
 
 // Use the powertable to preform a reverse lookup of the target position to find the watts at a given cadence.
 int32_t PTHelpers::lookupWatts(int cad, int32_t targetPosition, PTData& ptData) {
-  if (cad < 1) {
+  if (cad < POWERTABLE_CAD_INCREMENT * 2) {
     return 0;
   }
 
-  int watts = extrapolateWattsFromCadence(cad, targetPosition / TABLE_DIVISOR, ptData);  // Extrapolate watts for the given cadence and target position
-  // SS2K_LOG(PTDATA_LOG_TAG, "LookupWatts computed %dw from pos %d, cad %d", watts, targetPosition, cad);
-  if (watts < 0) watts = 0;  // Ensure watts is non-negative
-  return watts;
+  // Calculate center point value
+  int centerWatts = extrapolateWattsFromCadence(cad, targetPosition / TABLE_DIVISOR, ptData);
+  
+  // Sample additional points for Gaussian smoothing
+  int cadLower = cad - POWERTABLE_CAD_INCREMENT;
+  int cadHigher = cad + POWERTABLE_CAD_INCREMENT;
+  int32_t posLower = targetPosition - 500;
+  int32_t posHigher = targetPosition + 500;
+  
+  // Calculate watts for the additional points
+  int wattsLowerCad = extrapolateWattsFromCadence(cadLower, targetPosition / TABLE_DIVISOR, ptData);
+  int wattsHigherCad = extrapolateWattsFromCadence(cadHigher, targetPosition / TABLE_DIVISOR, ptData);
+  int wattsLowerPos = extrapolateWattsFromCadence(cad, posLower / TABLE_DIVISOR, ptData);
+  int wattsHigherPos = extrapolateWattsFromCadence(cad, posHigher / TABLE_DIVISOR, ptData);
+  
+  // Apply Gaussian weights (center point has highest weight)
+  const float centerWeight = 0.5f;
+  const float adjacentWeight = 0.125f; // Each adjacent point gets 1/8 weight
+  
+  // Calculate weighted average
+  float weightedSum = centerWatts * centerWeight +
+                     wattsLowerCad * adjacentWeight +
+                     wattsHigherCad * adjacentWeight +
+                     wattsLowerPos * adjacentWeight +
+                     wattsHigherPos * adjacentWeight;
+  
+  int smoothedWatts = static_cast<int>(round(weightedSum));
+  
+  // Ensure non-negative value
+  if (smoothedWatts < 0) smoothedWatts = 0;
+  
+  return smoothedWatts;
 }
 
 int PTHelpers::extrapolateWattsFromCadence(int cad, int32_t targetPosition, PTData& ptData) {
