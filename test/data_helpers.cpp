@@ -50,6 +50,127 @@ static void loadCSVToPTData(const std::string& filePath, PTData& ptData) {
     file.close();
 }
 
+// Function to create a heatmap visualization of the power table data
+static void createPowerTableHeatmap(const std::string& inputFilePath, const std::string& outputFilePath) {
+    PTData ptData;
+    
+    // Load the power table data
+    loadCSVToPTData(inputFilePath, ptData);
+    
+    // Find min and max values for color mapping
+    int16_t minValue = INT16_MAX;
+    int16_t maxValue = INT16_MIN;
+    
+    for (int row = 0; row < POWERTABLE_CAD_SIZE; row++) {
+        for (int col = 0; col < POWERTABLE_WATT_SIZE; col++) {
+            int16_t val = ptData.tableRow[row].tableEntry[col].targetPosition;
+            if (val != INT16_MIN) { // Skip empty cells
+                minValue = std::min(minValue, val);
+                maxValue = std::max(maxValue, val);
+            }
+        }
+    }
+    
+    // Create an HTML file with a colored table
+    std::ofstream htmlFile(outputFilePath);
+    if (!htmlFile.is_open()) {
+        printf("Failed to create output file: %s\n", outputFilePath.c_str());
+        return;
+    }
+    
+    // HTML header
+    htmlFile << "<!DOCTYPE html>\n";
+    htmlFile << "<html>\n<head>\n";
+    htmlFile << "<title>Power Table Heatmap</title>\n";
+    htmlFile << "<style>\n";
+    htmlFile << "  body { font-family: Arial, sans-serif; margin: 20px; }\n";
+    htmlFile << "  table { border-collapse: collapse; margin: 0 auto; }\n";
+    htmlFile << "  td { width: 40px; height: 30px; text-align: center; border: 1px solid #ddd; }\n";
+    htmlFile << "  .legend-container { display: flex; flex-direction: column; align-items: center; margin-top: 40px; }\n";
+    htmlFile << "  .legend { width: 300px; height: 20px; margin-bottom: 10px; }\n";
+    htmlFile << "  .legend-labels { display: flex; flex-direction: row; justify-content: space-between; width: 300px; }\n";
+    htmlFile << "  .empty-cell { background-color: white; }\n";
+    htmlFile << "  .header-cell { font-weight: bold; background-color: #f2f2f2; }\n";
+    htmlFile << "</style>\n";
+    htmlFile << "</head>\n<body>\n";
+    
+    // Table title
+    htmlFile << "<h2>Power Table Heatmap</h2>\n";
+    
+    // Function to map value to color (blue to red gradient)
+    auto valueToColor = [minValue, maxValue](int16_t value) -> std::string {
+        if (value == INT16_MIN) {
+            return std::string("white"); // White for empty cells
+        }
+        
+        // Normalize value to [0, 1]
+        float normalized = static_cast<float>(value - minValue) / (maxValue - minValue);
+        
+        // Map to blue (0) -> purple (0.5) -> red (1)
+        int r = std::min(255, static_cast<int>(255 * normalized));
+        int b = std::min(255, static_cast<int>(255 * (1.0f - normalized)));
+        int g = 0; // Keep green at 0 for more vivid colors
+        
+        char colorHex[8];
+        sprintf(colorHex, "#%02X%02X%02X", r, g, b);
+        return std::string(colorHex);
+    };
+    
+    // Begin table
+    htmlFile << "<table>\n";
+    
+    // Table header row with watt values
+    htmlFile << "  <tr>\n    <td class=\"header-cell\">CAD/WATTS</td>\n"; // Corner cell
+    for (int col = 0; col < POWERTABLE_WATT_SIZE; col++) {
+        htmlFile << "    <td class=\"header-cell\">" << col * POWERTABLE_WATT_INCREMENT << "W</td>\n";
+    }
+    htmlFile << "  </tr>\n";
+    
+    // Table data
+    for (int row = 0; row < POWERTABLE_CAD_SIZE; row++) {
+        htmlFile << "  <tr>\n";
+        // Row header with cadence
+        htmlFile << "    <td class=\"header-cell\">" << (MINIMUM_TABLE_CAD + row * POWERTABLE_CAD_INCREMENT) << "RPM</td>\n";
+        
+        // Data cells
+        for (int col = 0; col < POWERTABLE_WATT_SIZE; col++) {
+            int16_t value = ptData.tableRow[row].tableEntry[col].targetPosition;
+            std::string cellColor = valueToColor(value);
+            
+            htmlFile << "    <td style=\"background-color: " << cellColor << ";\"";
+            if (value == INT16_MIN) {
+                htmlFile << " class=\"empty-cell\"";
+            }
+            htmlFile << ">";
+            
+            if (value != INT16_MIN) {
+                htmlFile << value;
+            }
+            htmlFile << "</td>\n";
+        }
+        
+        htmlFile << "  </tr>\n";
+    }
+    
+    htmlFile << "</table>\n";
+    
+    // Add horizontal color legend
+    htmlFile << "<div class=\"legend-container\">\n";
+    htmlFile << "  <div class=\"legend\" style=\"background: linear-gradient(to right, blue, purple, red);\"></div>\n";
+    htmlFile << "  <div class=\"legend-labels\">\n";
+    htmlFile << "    <div>" << minValue << " (Min)</div>\n";
+    htmlFile << "    <div>" << "Resistance" << "</div>\n";
+    htmlFile << "    <div>" << maxValue << " (Max)</div>\n";
+    htmlFile << "  </div>\n";
+    htmlFile << "</div>\n";
+    
+    // HTML footer
+    htmlFile << "</body>\n</html>\n";
+    
+    htmlFile.close();
+    printf("Heatmap visualization saved to: %s\n", outputFilePath.c_str());
+}
+
 // Helper function to save PTData to CSV file
 static void savePTDataToCSV(const PTData& ptData, const std::string& filePath) {
     std::ofstream file(filePath);
@@ -81,5 +202,19 @@ static void savePTDataToCSV(const PTData& ptData, const std::string& filePath) {
 
     file.close();
     printf("Successfully saved power table to: %s\n", filePath.c_str());
+    
+    // Generate heatmap visualization in the same folder
+    // Create the heatmap output path by replacing .ptab extension with .html
+    std::string heatmapPath = filePath;
+    size_t extPos = heatmapPath.find_last_of('.');
+    if (extPos != std::string::npos) {
+        heatmapPath.replace(extPos, heatmapPath.length() - extPos, ".html");
+    } else {
+        heatmapPath += ".html";
+    }
+    
+    // Create the heatmap using the same data
+    createPowerTableHeatmap(filePath, heatmapPath);
+    printf("Heatmap visualization automatically created at: %s\n", heatmapPath.c_str());
 }
 
