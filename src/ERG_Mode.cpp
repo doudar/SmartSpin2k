@@ -89,6 +89,7 @@ void ErgMode::runERG() {
 
   if (userConfig->getPTab4Pwr() && rtConfig->getHomed()) {
     // only do this twice as often as ERG_MODE_DELAY
+    static int previousPower = 0;
     static unsigned long int pTab4pwrTimer = millis();
     if (millis() - pTab4pwrTimer > ERG_MODE_DELAY / 2) {
       // reset the timer.
@@ -96,7 +97,9 @@ void ErgMode::runERG() {
       // Lookup watts using the Power Table.
       pTabUsed4Pwr = true;
       if (powerTable->_hasBeenLoadedThisSession) {
-        rtConfig->watts.setValue(powerTable->lookupWatts(rtConfig->cad.getValue(), ss2k->getCurrentPosition()));
+        //Instead of directly outputting this, we should smooth the output by averaging it with the last value.
+        rtConfig->watts.setValue((previousPower + powerTable->lookupWatts(rtConfig->cad.getValue(), ss2k->getCurrentPosition()))/2);
+        previousPower = rtConfig->watts.getValue();
       } else {
         // only run _manageSaveState every 5 seconds
         static unsigned long int saveStateTimer = millis();
