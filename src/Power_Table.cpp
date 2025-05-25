@@ -381,7 +381,7 @@ float PowerTable::calculatePosition(float watts, float cad, float targetPos, ptI
   if (this->ptData.tableRow[index.cadIndex].tableEntry[index.wattIndex].targetPosition == INT16_MIN ||
       !(testResults.bottomNeighbor.passedTest || testResults.topNeighbor.passedTest || testResults.rightNeighbor.passedTest || testResults.leftNeighbor.passedTest) ||
       this->ptData.tableRow[index.cadIndex].tableEntry[index.wattIndex].targetPosition == targetPos) {
-    SS2K_LOG(POWERTABLE_LOG_TAG, "index.cadIndexeep old targetPosition: (%f)", targetPos);
+    SS2K_LOG(POWERTABLE_LOG_TAG, "index.cadIndex old targetPosition: (%f)", targetPos);
     return targetPos;
   }
 
@@ -396,7 +396,7 @@ float PowerTable::calculatePosition(float watts, float cad, float targetPos, ptI
   float totalValue = 0.0f;
   int count        = 0;
 
-  for (int idx = 0; idx < 4; ++idx) {
+  for (int idx = 0; idx < sizeof(passedTests/passedTests[0]) ; ++idx) {
     if (passedTests[idx]) {
       float delta = deltas[idx] / abs(targetPos - float(this->ptData.tableRow[index.cadIndex].tableEntry[index.wattIndex].targetPosition));
       float x     = abs((idx < 2 ? watts : cad) - positions[idx]);

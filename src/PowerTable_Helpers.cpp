@@ -42,39 +42,36 @@ TestResults PTHelpers::testNeighbors(ptIndex index, int testValue, PTData& ptDat
     TestResults::Neighbor* neighbor;
     bool (*testPredicate)(int16_t, int);
   } directions[] = {
-      // Left: decreasing j, same i
-      {index.wattIndex > 0 ? index.wattIndex - 1 : -1, -1, -1, 0, 0, &returnResult.leftNeighbor, [](int16_t pos, int test) { return pos < test || pos == INT16_MIN; }},
-      // Right: increasing j, same i
+      // Left: decreasing j, same i, lower target position
+      {index.wattIndex > 0 ? index.wattIndex - 1 : -1, -1, -1, 0, 0, &returnResult.leftNeighbor, [](int16_t pos, int test) { return pos <= test || pos == INT16_MIN; }},
+      // Right: increasing j, same i, higher target position
       {index.wattIndex < POWERTABLE_WATT_SIZE - 1 ? index.wattIndex + 1 : POWERTABLE_WATT_SIZE, POWERTABLE_WATT_SIZE, 1, 0, 0, &returnResult.rightNeighbor,
-       [](int16_t pos, int test) { return pos > test || pos == INT16_MIN; }},
-      // Top: decreasing i, same j
-      {index.cadIndex > 0 ? index.cadIndex - 1 : -1, -1, -1, 1, 0, &returnResult.topNeighbor, [](int16_t pos, int test) { return pos > test || pos == INT16_MIN; }},
-      // Bottom: increasing i, same j
+       [](int16_t pos, int test) { return pos >= test || pos == INT16_MIN; }},
+      // Top: decreasing i, same j, lower target position
+      {index.cadIndex > 0 ? index.cadIndex - 1 : -1, -1, -1, 1, 0, &returnResult.topNeighbor, [](int16_t pos, int test) { return pos <= test || pos == INT16_MIN; }},
+      // Bottom: increasing i, same j, lower target position
       {index.cadIndex < POWERTABLE_CAD_SIZE - 1 ? index.cadIndex + 1 : POWERTABLE_CAD_SIZE, POWERTABLE_CAD_SIZE, 1, 1, 0, &returnResult.bottomNeighbor,
-       [](int16_t pos, int test) { return pos < test || pos == INT16_MIN; }}};
+       [](int16_t pos, int test) { return pos >= test || pos == INT16_MIN; }}};
 
   // Process each direction
   for (const auto& dir : directions) {
-    // Skip if outside bounds
-    // More selective bounds checking based on direction type (horizontal vs vertical)
     bool skipDirection = false;
     if (dir.rowChange == 0) {
-      // Horizontal direction (left/right) - check against WATT_SIZE
       skipDirection = (dir.startLimit < 0 || dir.startLimit >= POWERTABLE_WATT_SIZE);
     } else {
-      // Vertical direction (top/bottom) - check against CAD_SIZE
       skipDirection = (dir.startLimit < 0 || dir.startLimit >= POWERTABLE_CAD_SIZE);
     }
 
     if (skipDirection) {
+      // If we are at the edge and can't search, treat as passing the test (neighbor not found)
+      dir.neighbor->passedTest = 1;
       continue;
     }
 
-    // Search for neighbor in this direction
+    bool found = false;
     for (int idx = dir.startLimit; idx != dir.endLimit; idx += dir.step) {
       int row = dir.rowChange ? idx : index.cadIndex;
       int col = dir.rowChange ? index.wattIndex : idx;
-      // Only consider neighbors within table bounds
       if (row < 0 || row >= POWERTABLE_CAD_SIZE || col < 0 || col >= POWERTABLE_WATT_SIZE) {
         continue;
       }
@@ -83,11 +80,16 @@ TestResults PTHelpers::testNeighbors(ptIndex index, int testValue, PTData& ptDat
         dir.neighbor->index.cadIndex  = row;
         dir.neighbor->index.wattIndex = col;
         dir.neighbor->found           = 1;
+        found = true;
         break;
       }
     }
-    // Test if neighbor passes test condition.
-    if (dir.testPredicate(dir.neighbor->targetPosition, testValue)) {
+    if (found) {
+      if (dir.testPredicate(dir.neighbor->targetPosition, testValue)) {
+        dir.neighbor->passedTest = 1;
+      }
+    } else {
+      // If we reached the table limit and found no neighbor, pass the test in this direction
       dir.neighbor->passedTest = 1;
     }
   }
@@ -438,7 +440,7 @@ void PTHelpers::extrapFillTableDirection(bool horizontal, PTData& ptData) {
     // Collect data points
     for (int innerIndex = rangeStart; innerIndex < rangeEnd; ++innerIndex) {
       index.cadIndex  = horizontal ? outerIndex : innerIndex;
-      index.wattIndex = horizontal ? innerIndex : outerIndex;
+      index.wattIndex = horizontal ? innerIndex : outerValue;
 
       if (ptData.tableRow[index.cadIndex].tableEntry[index.wattIndex].targetPosition != INT16_MIN) {
         unique_xy.emplace_back(innerIndex, static_cast<float>(ptData.tableRow[index.cadIndex].tableEntry[index.wattIndex].targetPosition));

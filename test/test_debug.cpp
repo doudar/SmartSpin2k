@@ -50,8 +50,14 @@ void TestPTLookupWatts::test_debug_neighbors(void) {
     TestResults result = helpers.testNeighbors(currentIndex, INT16_MIN, ptData);
     outFile << "Left neighbor: found=" << result.leftNeighbor.found << ", pos=" << result.leftNeighbor.targetPosition << ", cadIndex=" << static_cast<int>(result.leftNeighbor.index.cadIndex) << ", wattIndex=" << static_cast<int>(result.leftNeighbor.index.wattIndex) << "\n";
     outFile << "Right neighbor: found=" << result.rightNeighbor.found << ", pos=" << result.rightNeighbor.targetPosition << ", cadIndex=" << static_cast<int>(result.rightNeighbor.index.cadIndex) << ", wattIndex=" << static_cast<int>(result.rightNeighbor.index.wattIndex) << "\n";
+    outFile << "Top neighbor: found=" << result.topNeighbor.found << ", pos=" << result.topNeighbor.targetPosition << ", cadIndex=" << static_cast<int>(result.topNeighbor.index.cadIndex) << ", wattIndex=" << static_cast<int>(result.topNeighbor.index.wattIndex) << "\n";
+    outFile << "Bottom neighbor: found=" << result.bottomNeighbor.found << ", pos=" << result.bottomNeighbor.targetPosition << ", cadIndex=" << static_cast<int>(result.bottomNeighbor.index.cadIndex) << ", wattIndex=" << static_cast<int>(result.bottomNeighbor.index.wattIndex) << "\n";
     int32_t lookupResult = helpers.lookup(watts, cadence, ptData);
     outFile << "Lookup result for " << cadence << "rpm, " << watts << "w: " << lookupResult << "\n";
+    //print all neighbors found value
+    outFile << "All neighbors found: " << result.allNeighborsFound << "\n";
+    //print all neighbors passed value
+    outFile << "All neighbors passed: " << result.allNeighborsPassed << "\n";
   }
   outFile.close();
 }

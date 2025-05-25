@@ -109,7 +109,7 @@ const char* const DEFAULT_PASSWORD = "password";
 // This is used to set the lower travel limit for the motor.
 #define MIN_ECHELON_RESISTANCE 5
 
-// Maximum resistance on a Peloton Bike.
+// Maximum resistance on a Echelon Bike.
 // This is used to set the upper travel limit for the motor.
 #define MAX_ECHELON_RESISTANCE 30
 
