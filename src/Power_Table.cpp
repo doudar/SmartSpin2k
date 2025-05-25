@@ -137,11 +137,6 @@ void PowerTable::setStepperMinMax() {
   }
 }
 
-void PowerTable::extrapFillTable() {
-  ptHelpers.extrapFillTableDirection(true, ptData);   // Horizontal
-  ptHelpers.extrapFillTableDirection(false, ptData);  // Vertical
-}
-
 int PowerTable::getNumEntries() {
   int ret = 0;
   for (int i = 0; i < POWERTABLE_CAD_SIZE; i++) {
@@ -294,11 +289,11 @@ void PowerTable::fillTable() {
     if (step == 0) {
       SS2K_LOG(POWERTABLE_LOG_TAG, "Fill start with %d entries", entries);
       prevEntries = entries;
-      ptHelpers.standardFill(ptData);
+      ptHelpers.splineFill(ptData);
     } else if (step == 1) {
-      this->extrapFillTable();
+      ptHelpers.linearFill(ptData);
     } else if (step == 2) {
-      // ptHelpers.extrapolateDiagonal(ptData);
+      // NOT IMPLEMENTED YET
     }
     newEntries = getNumEntries();
     SS2K_LOG(POWERTABLE_LOG_TAG, "Fill step %d added %d new entries", step, newEntries - prevEntries);

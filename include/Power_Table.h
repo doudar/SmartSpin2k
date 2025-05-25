@@ -72,8 +72,7 @@ class PowerTable {
 
  private:
   unsigned long lastSaveTime = millis();
-
-  void extrapFillTable();
+  
   int getNumEntries();
   // remove entries with < 1 readings
   void clean();

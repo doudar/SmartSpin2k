@@ -38,8 +38,8 @@ void TestTableFill::test_fill_incomplete_table(void) {
   // Fill the incomplete table
   while (previousFilledPoints < filledPoints) {
     previousFilledPoints = filledPoints;
-    helpers.standardFill(ptData);
-    logFile << "Applied standardFill to the table\n";
+    helpers.splineFill(ptData);
+    logFile << "Applied splineFill to the table\n";
 
     // Count filled data points
     filledPoints = helpers.dataPoints(ptData);
@@ -48,39 +48,7 @@ void TestTableFill::test_fill_incomplete_table(void) {
   }
 
   // loop through the table and check for INT16_MIN values
-  for (int i = 0; i < POWERTABLE_CAD_SIZE; i++) {
-    for (int j = 0; j < POWERTABLE_WATT_SIZE; j++) {
-      if (ptData.tableRow[i].tableEntry[j].targetPosition == INT16_MIN) {
-        // lookup resistance for this position using watts and cadence
-        int watts      = j * POWERTABLE_WATT_INCREMENT;
-        int cad        = i * POWERTABLE_CAD_INCREMENT + MINIMUM_TABLE_CAD;
-        int resistance = helpers.lookup(watts, cad, ptData) / TABLE_DIVISOR;
-        ptIndex index;
-        index.wattIndex     = j;
-        index.cadIndex      = i;
-        TestResults results = helpers.testNeighbors(index, resistance, ptData);
-        logFile << "All neighbors passed: " << results.allNeighborsPassed << "\n";
-        if (results.allNeighborsPassed == 1) {
-          ptData.tableRow[i].tableEntry[j].targetPosition = resistance;
-        } else {  // log the failure to in insert the value
-          logFile << "Failed to fill position (" << i << ", " << j << ") with resistance: " << resistance << "\n";
-        }// log failed neighbor resistance values
-          logFile << "Left neighbor: found=" << results.leftNeighbor.found << ", pos=" << results.leftNeighbor.targetPosition
-                  << ", cadIndex=" << static_cast<int>(results.leftNeighbor.index.cadIndex) << ", wattIndex=" << static_cast<int>(results.leftNeighbor.index.wattIndex)
-                  << ", passed=" << results.leftNeighbor.passedTest << "\n";
-          logFile << "Right neighbor: found=" << results.rightNeighbor.found << ", pos=" << results.rightNeighbor.targetPosition
-                  << ", cadIndex=" << static_cast<int>(results.rightNeighbor.index.cadIndex) << ", wattIndex=" << static_cast<int>(results.rightNeighbor.index.wattIndex)
-                  << ", passed=" << results.rightNeighbor.passedTest << "\n";
-          logFile << "Top neighbor: found=" << results.topNeighbor.found << ", pos=" << results.topNeighbor.targetPosition
-                  << ", cadIndex=" << static_cast<int>(results.topNeighbor.index.cadIndex) << ", wattIndex=" << static_cast<int>(results.topNeighbor.index.wattIndex)
-                  << ", passed=" << results.topNeighbor.passedTest << "\n";
-          logFile << "Bottom neighbor: found=" << results.bottomNeighbor.found << ", pos=" << results.bottomNeighbor.targetPosition
-                  << ", cadIndex=" << static_cast<int>(results.bottomNeighbor.index.cadIndex) << ", wattIndex=" << static_cast<int>(results.bottomNeighbor.index.wattIndex)
-                  << ", passed=" << results.bottomNeighbor.passedTest << "\n";
-        logFile << "Filled position (" << i << ", " << j << ") with resistance: " << resistance << "\n";
-      }
-    }
-  }
+  helpers.linearFill(ptData);
   // Save the filled power table
   const std::string outputFilePath = "test/output/power_table_filled.ptab";
   savePTDataToCSV(ptData, outputFilePath);

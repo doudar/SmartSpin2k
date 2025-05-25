@@ -88,15 +88,15 @@ void DirConManager::update() {
   checkForNewClients();
 
   // Handle data from connected clients
-    handleClientData();
+  handleClientData();
 }
 
 // returns true if we have clients connected
 int DirConManager::connectedClients() {
-    int connectedClients = 0;
+  int connectedClients = 0;
   for (int i = 0; i < DIRCON_MAX_CLIENTS; i++) {
     if (dirConClients[i].connected()) {
-        connectedClients ++;
+      connectedClients++;
     }
   }
   return connectedClients;

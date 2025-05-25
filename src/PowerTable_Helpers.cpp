@@ -372,26 +372,7 @@ void PTHelpers::extrapolateEmptyIndices(int outerIndex, const std::vector<int>& 
                                         bool naturalSpline, PTData& ptData) {
   int innerSize = horizontal ? POWERTABLE_WATT_SIZE : POWERTABLE_CAD_SIZE;
   ptIndex index;
-  if (n == 1) {
-    int singleValue = static_cast<int>(round(xy.second[0]));
-    for (int innerIndex : emptyIndices) {
-      index.cadIndex                                                             = horizontal ? outerIndex : innerIndex;
-      index.wattIndex                                                            = horizontal ? innerIndex : outerIndex;
-      ptData.tableRow[index.cadIndex].tableEntry[index.wattIndex].targetPosition = singleValue;
-    }
-  } else if (n == 2) {
-    for (int innerIndex : emptyIndices) {
-      index.cadIndex  = horizontal ? outerIndex : innerIndex;
-      index.wattIndex = horizontal ? innerIndex : outerIndex;
-
-      float extrapolated_value = linearExtrapolate(xy, n, innerIndex);
-      int tempValue            = static_cast<int>(round(extrapolated_value));
-
-      if (testNeighbors(index, tempValue, ptData).allNeighborsPassed) {
-        ptData.tableRow[index.cadIndex].tableEntry[index.wattIndex].targetPosition = tempValue;
-      }
-    }
-  } else if (n >= 3) {
+  if (n >= 3) {
     bool validForSpline = true;
     for (size_t i = 1; i < n; ++i) {
       if (xy.first[i] <= xy.first[i - 1]) {
@@ -487,65 +468,6 @@ void PTHelpers::extrapFillTableDirection(bool horizontal, PTData& ptData) {
   }
 }
 
-void PTHelpers::extrapolateDiagonalEntries(const std::vector<ptIndex>& emptyIndices, std::pair<std::vector<float>, std::vector<float>> xy, size_t n, PTData& ptData) {
-  if (n == 1) {
-    int singleValue = static_cast<int>(round(xy.second[0]));
-    for (const auto& it : emptyIndices) {
-      ptData.tableRow[it.cadIndex].tableEntry[it.wattIndex].targetPosition = singleValue;
-    }
-    return;
-  }
-  ptIndex index;
-  if (n == 2) {
-    for (const auto& it : emptyIndices) {
-      index = it;
-
-      float extrapolated_value = linearExtrapolate(xy, n, index.cadIndex);
-      int tempValue            = static_cast<int>(round(extrapolated_value));
-
-      if (testNeighbors(index, tempValue, ptData).allNeighborsPassed) {
-        ptData.tableRow[index.cadIndex].tableEntry[index.wattIndex].targetPosition = tempValue;
-      }
-    }
-    return;
-  }
-
-  if (n >= 3) {
-    bool validForSpline = true;
-    for (size_t k = 1; k < n; ++k) {
-      if (xy.first[k] <= xy.first[k - 1]) {
-        validForSpline = false;
-        break;
-      }
-    }
-    if (!validForSpline) {
-      SS2K_LOG(PTDATA_LOG_TAG, "Duplicate or non-increasing x-values detected for diagonal!");
-      return;
-    }
-
-    CubicSpline spline;
-    spline.set_points(xy, n);
-
-    for (const auto& it : emptyIndices) {
-      index = it;
-
-      if (index.cadIndex < 0 || index.cadIndex >= POWERTABLE_CAD_SIZE || index.wattIndex < 0 || index.wattIndex >= POWERTABLE_WATT_SIZE) continue;
-
-      float extrapolated_value = spline.extrapolate(index.cadIndex);
-
-      float minVal       = *std::min_element(xy.second.begin(), xy.second.end());
-      float maxVal       = *std::max_element(xy.second.begin(), xy.second.end());
-      float range        = maxVal - minVal;
-      extrapolated_value = std::max(minVal - 0.1f * range, std::min(extrapolated_value, maxVal + 0.1f * range));
-
-      int tempValue = static_cast<int>(round(extrapolated_value));
-      if (testNeighbors(index, tempValue, ptData).allNeighborsPassed) {
-        ptData.tableRow[index.cadIndex].tableEntry[index.wattIndex].targetPosition = tempValue;
-      }
-    }
-  }
-}
-
 /**
  * @brief Estimates the y-coordinate corresponding to a given x-coordinate `j`
  *        using linear extrapolation or interpolation based on provided data points.
@@ -579,9 +501,31 @@ float PTHelpers::linearExtrapolate(std::pair<std::vector<float>, std::vector<flo
   return y0 + slope * (j - x0);
 }
 
-void PTHelpers::standardFill(PTData& ptData) {
+void PTHelpers::splineFill(PTData& ptData) {
   findTableDirection(true, ptData);   // Horizontal
   findTableDirection(false, ptData);  // Vertical
+}
+
+void PTHelpers::linearFill(PTData& ptData) {
+    for (int i = 0; i < POWERTABLE_CAD_SIZE; i++) {
+    for (int j = 0; j < POWERTABLE_WATT_SIZE; j++) {
+      if (ptData.tableRow[i].tableEntry[j].targetPosition == INT16_MIN) {
+        // lookup resistance for this position using watts and cadence
+        int watts      = j * POWERTABLE_WATT_INCREMENT;
+        int cad        = i * POWERTABLE_CAD_INCREMENT + MINIMUM_TABLE_CAD;
+        int resistance = lookup(watts, cad, ptData) / TABLE_DIVISOR;
+        ptIndex index;
+        index.wattIndex     = j;
+        index.cadIndex      = i;
+        TestResults results = testNeighbors(index, resistance, ptData);
+        if (results.allNeighborsPassed == 1) {
+          ptData.tableRow[i].tableEntry[j].targetPosition = resistance;
+        } else {  // log the failure to in insert the value
+            //Serial.printf("Failed to fill position (%d, %d) with resistance: %d\n", i, j, resistance);
+        }// log failed neighbor resistance values
+      }
+    }
+  }
 }
 
 void PTHelpers::findTableDirection(bool horizontal, PTData& ptData) {
@@ -828,65 +772,6 @@ float CubicSpline::extrapolate(float x_val) const {
     return y[n] + b[n - 1] * dx + c[n - 1] * dx * dx + d[n - 1] * dx * dx * dx;
   }
   return INT16_MIN;  // Out of range
-}
-
-void PTHelpers::extrapolateDiagonal(PTData& ptData) {
-  std::vector<std::pair<float, float>> unique_xy;
-  std::vector<ptIndex> emptyIndices;
-
-  std::vector<float> prevX, prevY;
-  std::vector<ptIndex> prevEmptyIndices;
-  bool prevSplineValid = false;
-
-  int midCAD  = POWERTABLE_CAD_SIZE / 2;
-  int midWATT = POWERTABLE_WATT_SIZE / 2;
-
-  // Iterate over different diagonals (sum of indices is constant)
-  for (int sum = 0; sum < POWERTABLE_CAD_SIZE + POWERTABLE_WATT_SIZE - 1; ++sum) {
-    unique_xy.clear();
-    emptyIndices.clear();
-
-    int rangeStart = std::max(0, sum / 2 - 10);
-    int rangeEnd   = std::min(POWERTABLE_CAD_SIZE, sum / 2 + 10);
-
-    // Collect known values for this diagonal
-    ptIndex tIndex;
-    for (tIndex.cadIndex = rangeStart; tIndex.cadIndex < rangeEnd; ++tIndex.cadIndex) {
-      tIndex.wattIndex = sum - tIndex.cadIndex;
-      if (tIndex.wattIndex >= 0 && tIndex.wattIndex < POWERTABLE_WATT_SIZE) {
-        if (ptData.tableRow[tIndex.cadIndex].tableEntry[tIndex.wattIndex].targetPosition != INT16_MIN) {
-          unique_xy.emplace_back(tIndex.cadIndex, static_cast<float>(ptData.tableRow[tIndex.cadIndex].tableEntry[tIndex.wattIndex].targetPosition));
-        } else {
-          ptIndex newIndex;
-          newIndex.cadIndex  = tIndex.cadIndex;
-          newIndex.wattIndex = tIndex.wattIndex;
-          emptyIndices.push_back(newIndex);
-        }
-      }
-    }
-
-    if (unique_xy.size() < 2) continue;  // Skip if not enough data
-
-    std::sort(unique_xy.begin(), unique_xy.end());
-
-    std::vector<float> x, y;
-    for (const auto& point : unique_xy) {
-      x.push_back(point.first);
-      y.push_back(point.second);
-    }
-
-    if (prevSplineValid && x == prevX && emptyIndices == prevEmptyIndices) {
-      continue;
-    }
-
-    // Store for reuse
-    prevX            = x;
-    prevY            = y;
-    prevEmptyIndices = emptyIndices;
-    prevSplineValid  = true;
-
-    extrapolateDiagonalEntries(emptyIndices, std::make_pair(x, y), x.size(), ptData);
-  }
 }
 
 bool CubicSpline::shouldUseNaturalSpline(std::pair<std::vector<float>, std::vector<float>> xy, size_t n) {

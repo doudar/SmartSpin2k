@@ -126,12 +126,11 @@ class PTHelpers {
   void extrapFillTableDirection(bool horizontal, PTData& ptData);
   float linearExtrapolate(std::pair<std::vector<float>, std::vector<float>> xy, size_t n, float j);
   void findTableDirection(bool horizontal, PTData& ptData);
-  void standardFill(PTData& ptData);
+  void splineFill(PTData& ptData);
+  void linearFill(PTData& ptData);
   int32_t lookupWatts(int cad, int32_t targetPosition, PTData& ptData);
   int32_t extrapolateCadenceWatts(int cad, float targetPosition, PTData& ptData);
   int extrapolateWattsFromCadence(int cad, int32_t targetPosition, PTData& ptData);
-  void extrapolateDiagonalEntries(const std::vector<ptIndex>& emptyIndices, std::pair<std::vector<float>, std::vector<float>> xy, size_t n, PTData& ptData);
-  void extrapolateDiagonal(PTData& ptData);
   ptIndex calculateIndex(int watts, int cad);
   int dataPoints(PTData& ptData);
   std::pair<std::vector<float>, std::vector<float>> getRow(int row, PTData& ptData);

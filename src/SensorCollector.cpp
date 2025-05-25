@@ -84,7 +84,7 @@ void collectAndSet(NimBLEUUID charUUID, NimBLEUUID serviceUUID, NimBLEAddress ad
     }
   }
 
-  //////adding incline so that i can plot it
+  //adding incline so that i can plot it
   logBufLength += snprintf(logBuf + logBufLength, kLogBufMaxLength - logBufLength, " POS(%d)", ss2k->getCurrentPosition());
   strncat(logBuf + logBufLength, " ]", kLogBufMaxLength - logBufLength);
 
