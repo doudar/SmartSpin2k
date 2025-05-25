@@ -298,7 +298,7 @@ void PowerTable::fillTable() {
     } else if (step == 1) {
       this->extrapFillTable();
     } else if (step == 2) {
-      //ptHelpers.extrapolateDiagonal(ptData);
+      // ptHelpers.extrapolateDiagonal(ptData);
     }
     newEntries = getNumEntries();
     SS2K_LOG(POWERTABLE_LOG_TAG, "Fill step %d added %d new entries", step, newEntries - prevEntries);
@@ -392,12 +392,13 @@ float PowerTable::calculatePosition(float watts, float cad, float targetPos, ptI
   float positions[]  = {float(wattPosition + POWERTABLE_WATT_INCREMENT), float(wattPosition - POWERTABLE_WATT_INCREMENT), float(cadPosition + POWERTABLE_CAD_INCREMENT),
                         float(cadPosition - POWERTABLE_CAD_INCREMENT)};
   bool passedTests[] = {testResults.rightNeighbor.passedTest, testResults.leftNeighbor.passedTest, testResults.bottomNeighbor.passedTest, testResults.topNeighbor.passedTest};
+  bool isValid[]       = {testResults.rightNeighbor.found, testResults.leftNeighbor.found, testResults.bottomNeighbor.found, testResults.topNeighbor.found};
 
   float totalValue = 0.0f;
   int count        = 0;
 
-  for (int idx = 0; idx < sizeof(passedTests/passedTests[0]) ; ++idx) {
-    if (passedTests[idx]) {
+  for (int idx = 0; idx < sizeof(passedTests) / sizeof(passedTests[0]); ++idx) {
+    if (passedTests[idx] && isValid[idx]) {
       float delta = deltas[idx] / abs(targetPos - float(this->ptData.tableRow[index.cadIndex].tableEntry[index.wattIndex].targetPosition));
       float x     = abs((idx < 2 ? watts : cad) - positions[idx]);
       totalValue += targetPos - (x / delta);
