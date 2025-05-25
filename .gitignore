@@ -18,3 +18,4 @@ build/CMakeCache.txt
 .aider*
 .env
 C/Users/
+build/CMakeFiles/cmake.check_cache
