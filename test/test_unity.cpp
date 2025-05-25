@@ -91,19 +91,26 @@ int main(int argc, char **argv) {
   // Attempt to create the directory. 
   // On POSIX systems, mkdir requires <sys/stat.h> and <sys/types.h>.
   // Mode 0777 gives read, write, execute permissions for owner, group, and others.
-  int result = mkdir(dir_path, 0777);
-
-  if (result == -1) {
-    // If mkdir failed, check why
-    if (errno != EEXIST) {
-      // EEXIST means the directory already exists, which is not an error for our purpose.
-      // For any other error, print it.
-      perror("Error creating directory test/output");
-      // Depending on requirements, you might want to exit here or let tests proceed/fail.
+  #ifdef _WIN32
+    int result = mkdir(dir_path); // Use _mkdir on Windows
+  #else
+    int result = mkdir(dir_path, 0777); // Use mkdir on POSIX systems
+  #endif
+  
+    if (result == -1) {
+      // If mkdir failed, check why
+  #ifdef _WIN32
+      if (errno != EEXIST) {
+  #else
+      if (errno != EEXIST) {
+  #endif
+        // EEXIST means the directory already exists, which is not an error for our purpose.
+        // For any other error, print it.
+        perror("Error creating directory test/output");
+        // Depending on requirements, you might want to exit here or let tests proceed/fail.
+      }
+      // If errno is EEXIST, directory already exists, which is fine.
     }
-    // If errno is EEXIST, directory already exists, which is fine.
-  }
-  // Note: For Windows, you would typically use _mkdir(dir_path) from <direct.h>.
 
   setup();
   return 0;

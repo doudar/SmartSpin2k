@@ -29,6 +29,7 @@ std::ofstream outFile("test/output/test_PowerTable_Helpers.txt", std::ios::trunc
 #include "SS2KLog.h"
 #endif
 
+// uses testValue in targetPosition/TABLE_DIVISOR
 TestResults PTHelpers::testNeighbors(ptIndex index, int testValue, PTData& ptData) {
   TestResults returnResult;
 
@@ -41,17 +42,27 @@ TestResults PTHelpers::testNeighbors(ptIndex index, int testValue, PTData& ptDat
     int colChange;
     TestResults::Neighbor* neighbor;
     bool (*testPredicate)(int16_t, int);
-  } directions[] = {
-      // Left: decreasing j, same i, lower target position
-      {index.wattIndex > 0 ? index.wattIndex - 1 : -1, -1, -1, 0, 0, &returnResult.leftNeighbor, [](int16_t pos, int test) { return pos <= test || pos == INT16_MIN; }},
-      // Right: increasing j, same i, higher target position
-      {index.wattIndex < POWERTABLE_WATT_SIZE - 1 ? index.wattIndex + 1 : POWERTABLE_WATT_SIZE, POWERTABLE_WATT_SIZE, 1, 0, 0, &returnResult.rightNeighbor,
-       [](int16_t pos, int test) { return pos >= test || pos == INT16_MIN; }},
-      // Top: decreasing i, same j, lower target position
-      {index.cadIndex > 0 ? index.cadIndex - 1 : -1, -1, -1, 1, 0, &returnResult.topNeighbor, [](int16_t pos, int test) { return pos <= test || pos == INT16_MIN; }},
-      // Bottom: increasing i, same j, lower target position
-      {index.cadIndex < POWERTABLE_CAD_SIZE - 1 ? index.cadIndex + 1 : POWERTABLE_CAD_SIZE, POWERTABLE_CAD_SIZE, 1, 1, 0, &returnResult.bottomNeighbor,
-       [](int16_t pos, int test) { return pos >= test || pos == INT16_MIN; }}};
+  } directions[] = {// Left: decreasing j, same i, lower target position
+                    {index.wattIndex > 0 ? index.wattIndex - 1 : -1, -1, -1, 0, 0, &returnResult.leftNeighbor,
+                     [](int16_t pos, int test) {
+                       // SS2K_LOG(PTDATA_LOG_TAG, "Testing left neighbor: pos=%d, test=%d", pos, test);
+                       return pos < test || pos == INT16_MIN;
+                     }},
+                    // Right: increasing j, same i, higher target position
+                    {index.wattIndex < POWERTABLE_WATT_SIZE - 1 ? index.wattIndex + 1 : POWERTABLE_WATT_SIZE, POWERTABLE_WATT_SIZE, 1, 0, 0, &returnResult.rightNeighbor,
+                     [](int16_t pos, int test) {
+                       // SS2K_LOG(PTDATA_LOG_TAG, "Testing right neighbor: pos=%d, test=%d", pos, test);
+                       return pos > test || pos == INT16_MIN;
+                     }},
+                    // Top: decreasing i, same j, lower target position
+                    {index.cadIndex > 0 ? index.cadIndex - 1 : -1, -1, -1, 1, 0, &returnResult.topNeighbor,
+                     [](int16_t pos, int test) {
+                       // SS2K_LOG(PTDATA_LOG_TAG, "Testing top neighbor: pos=%d, test=%d", pos, test);
+                       return pos > test || pos == INT16_MIN;
+                     }},
+                    // Bottom: increasing i, same j, lower target position
+                    {index.cadIndex < POWERTABLE_CAD_SIZE - 1 ? index.cadIndex + 1 : POWERTABLE_CAD_SIZE, POWERTABLE_CAD_SIZE, 1, 1, 0, &returnResult.bottomNeighbor,
+                     [](int16_t pos, int test) { return pos < test || pos == INT16_MIN; }}};
 
   // Process each direction
   for (const auto& dir : directions) {
@@ -80,7 +91,7 @@ TestResults PTHelpers::testNeighbors(ptIndex index, int testValue, PTData& ptDat
         dir.neighbor->index.cadIndex  = row;
         dir.neighbor->index.wattIndex = col;
         dir.neighbor->found           = 1;
-        found = true;
+        found                         = true;
         break;
       }
     }
@@ -440,7 +451,7 @@ void PTHelpers::extrapFillTableDirection(bool horizontal, PTData& ptData) {
     // Collect data points
     for (int innerIndex = rangeStart; innerIndex < rangeEnd; ++innerIndex) {
       index.cadIndex  = horizontal ? outerIndex : innerIndex;
-      index.wattIndex = horizontal ? innerIndex : outerValue;
+      index.wattIndex = horizontal ? innerIndex : outerIndex;
 
       if (ptData.tableRow[index.cadIndex].tableEntry[index.wattIndex].targetPosition != INT16_MIN) {
         unique_xy.emplace_back(innerIndex, static_cast<float>(ptData.tableRow[index.cadIndex].tableEntry[index.wattIndex].targetPosition));
@@ -643,41 +654,39 @@ int32_t PTHelpers::lookupWatts(int cad, int32_t targetPosition, PTData& ptData) 
   }
 
   // Calculate center point value
-  int centerWatts = extrapolateWattsFromCadence(cad, targetPosition / TABLE_DIVISOR, ptData);
-  
+  int centerWatts = extrapolateWattsFromCadence(cad, targetPosition, ptData);
+
   // Sample additional points for Gaussian smoothing
-  int cadLower = cad - POWERTABLE_CAD_INCREMENT;
-  int cadHigher = cad + POWERTABLE_CAD_INCREMENT;
-  int32_t posLower = targetPosition - 500;
+  int cadLower      = cad - POWERTABLE_CAD_INCREMENT;
+  int cadHigher     = cad + POWERTABLE_CAD_INCREMENT;
+  int32_t posLower  = targetPosition - 500;
   int32_t posHigher = targetPosition + 500;
-  
+
   // Calculate watts for the additional points
-  int wattsLowerCad = extrapolateWattsFromCadence(cadLower, targetPosition / TABLE_DIVISOR, ptData);
-  int wattsHigherCad = extrapolateWattsFromCadence(cadHigher, targetPosition / TABLE_DIVISOR, ptData);
-  int wattsLowerPos = extrapolateWattsFromCadence(cad, posLower / TABLE_DIVISOR, ptData);
-  int wattsHigherPos = extrapolateWattsFromCadence(cad, posHigher / TABLE_DIVISOR, ptData);
-  
+  int wattsLowerCad  = extrapolateWattsFromCadence(cadLower, targetPosition, ptData);
+  int wattsHigherCad = extrapolateWattsFromCadence(cadHigher, targetPosition, ptData);
+  int wattsLowerPos  = extrapolateWattsFromCadence(cad, posLower, ptData);
+  int wattsHigherPos = extrapolateWattsFromCadence(cad, posHigher, ptData);
+
   // Apply Gaussian weights (center point has highest weight)
-  const float centerWeight = 0.5f;
-  const float adjacentWeight = 0.125f; // Each adjacent point gets 1/8 weight
-  
+  const float centerWeight   = 0.5f;
+  const float adjacentWeight = 0.125f;  // Each adjacent point gets 1/8 weight
+
   // Calculate weighted average
-  float weightedSum = centerWatts * centerWeight +
-                     wattsLowerCad * adjacentWeight +
-                     wattsHigherCad * adjacentWeight +
-                     wattsLowerPos * adjacentWeight +
-                     wattsHigherPos * adjacentWeight;
-  
+  float weightedSum =
+      centerWatts * centerWeight + wattsLowerCad * adjacentWeight + wattsHigherCad * adjacentWeight + wattsLowerPos * adjacentWeight + wattsHigherPos * adjacentWeight;
+
   int smoothedWatts = static_cast<int>(round(weightedSum));
-  
+
   // Ensure non-negative value
   if (smoothedWatts < 0) smoothedWatts = 0;
-  
+
   return smoothedWatts;
 }
 
 int PTHelpers::extrapolateWattsFromCadence(int cad, int32_t targetPosition, PTData& ptData) {
-  int watts = 0;
+  int watts      = 0;
+  targetPosition = targetPosition / TABLE_DIVISOR;
   if (cad < 1) {
     return 0;
   }
@@ -730,7 +739,7 @@ int PTHelpers::extrapolateWattsFromCadence(int cad, int32_t targetPosition, PTDa
 
   // print everything in xy
   for (int i = 0; i < xy.first.size(); i++) {
-    //Serial.printf("xy[%d]: %f, %f\n", i, xy.first[i], xy.second[i]);
+    // Serial.printf("xy[%d]: %f, %f\n", i, xy.first[i], xy.second[i]);
   }
 
   // because this is a reverse lookup, we need to swap the pair

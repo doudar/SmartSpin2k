@@ -58,7 +58,7 @@ void TestTableFill::test_fill_incomplete_table(void) {
         ptIndex index;
         index.wattIndex     = j;
         index.cadIndex      = i;
-        TestResults results = helpers.testNeighbors(index, resistance * TABLE_DIVISOR, ptData);
+        TestResults results = helpers.testNeighbors(index, resistance, ptData);
         logFile << "All neighbors passed: " << results.allNeighborsPassed << "\n";
         if (results.allNeighborsPassed == 1) {
           ptData.tableRow[i].tableEntry[j].targetPosition = resistance;
