@@ -125,8 +125,8 @@ class PTHelpers {
                                bool naturalSpline, PTData& ptData);
   void extrapFillTableDirection(bool horizontal, PTData& ptData);
   float linearExtrapolate(std::pair<std::vector<float>, std::vector<float>> xy, size_t n, float j);
-  void findTableDirection(bool horizontal, PTData& ptData);
-  void splineFill(PTData& ptData);
+  void findTableDirection(bool horizontal, PTData& ptData, bool firstHalf);
+  void splineFill(PTData& ptData, bool firstHalf = true);
   void linearFill(PTData& ptData);
   int32_t lookupWatts(int cad, int32_t targetPosition, PTData& ptData);
   int32_t extrapolateCadenceWatts(int cad, float targetPosition, PTData& ptData);

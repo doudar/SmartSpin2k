@@ -204,6 +204,7 @@ int32_t PTHelpers::lookup(int watts, int cad, PTData& ptData) {
   const int MAX_CAD_VAL  = MINIMUM_TABLE_CAD + (POWERTABLE_CAD_SIZE - 1) * POWERTABLE_CAD_INCREMENT;
   const int MIN_WATT_VAL = 0;  // Assuming watts index start from 0
   const int MAX_WATT_VAL = (POWERTABLE_WATT_SIZE - 1) * POWERTABLE_WATT_INCREMENT;
+  int32_t resistance = RETURN_ERROR;
   int ptDataSize         = dataPoints(ptData);
   std::pair<std::vector<float>, std::vector<float>> dataPoints;
 
@@ -222,31 +223,30 @@ int32_t PTHelpers::lookup(int watts, int cad, PTData& ptData) {
       if (dataPoints.first.size() >= 2) {
         float extrapolatedVal = linearExtrapolate(dataPoints, dataPoints.first.size(), static_cast<float>(cad));
         if (extrapolatedVal != INT16_MIN && !std::isnan(extrapolatedVal) && !std::isinf(extrapolatedVal)) {
-          return static_cast<int32_t>(round(extrapolatedVal)) * TABLE_DIVISOR;
+          resistance = static_cast<int32_t>(round(extrapolatedVal)) * TABLE_DIVISOR;
         }
       }
     }
-
-    // A.2. Attempt Watt Extrapolation if watts are out of bounds
-    if (isWattOutOfTable && !isCadOutOfTable) {
-      int targetCadIndex = index.cadIndex;
-      dataPoints.first.clear();
-      dataPoints.second.clear();
-      // Clamp targetCadIndex to be within table bounds for selecting the row
-      if (targetCadIndex < 0) targetCadIndex = 0;
-
-      dataPoints = getRow(targetCadIndex, ptData);
-
-      if (dataPoints.first.size() >= 2) {
-        float extrapolatedVal = linearExtrapolate(dataPoints, dataPoints.first.size(), static_cast<float>(watts));
-        if (extrapolatedVal != INT16_MIN && !std::isnan(extrapolatedVal) && !std::isinf(extrapolatedVal)) {
-          return static_cast<int32_t>(round(extrapolatedVal)) * TABLE_DIVISOR;
-        }
-      }
-    }
-    return INT32_MIN;
   }
 
+  // A.2. Attempt Watt Extrapolation if watts are out of bounds
+  if (!isCadOutOfTable) {
+    int targetCadIndex = index.cadIndex;
+    dataPoints.first.clear();
+    dataPoints.second.clear();
+    // Clamp targetCadIndex to be within table bounds for selecting the row
+    if (targetCadIndex < 0) targetCadIndex = 0;
+
+    dataPoints = getRow(targetCadIndex, ptData);
+    if (dataPoints.first.size() >= 2) {
+      float extrapolatedVal = linearExtrapolate(dataPoints, dataPoints.first.size(), static_cast<float>(watts));
+      if (extrapolatedVal != INT16_MIN && !std::isnan(extrapolatedVal) && !std::isinf(extrapolatedVal)) {
+        resistance = static_cast<int32_t>(round(extrapolatedVal)) * TABLE_DIVISOR;
+      }
+    }
+
+  }
+return resistance;  // Return early if we found a valid extrapolated value
   // ---- B. Handle In-Table Lookup (Direct, Interpolation) ----
   // At this point, both 'watts' and 'cad' are considered within the conceptual table boundaries.
   TestResults neighbors = testNeighbors(index, 0, ptData);  // testValue for testNeighbors is not critical here.
@@ -301,10 +301,13 @@ int32_t PTHelpers::lookup(int watts, int cad, PTData& ptData) {
   }
 
   if (count > 0) {
-    return static_cast<int32_t>(round(sum / count)) * TABLE_DIVISOR;
+    resistance = static_cast<int32_t>(round(sum / count)) * TABLE_DIVISOR;
+    SS2K_LOG(PTDATA_LOG_TAG, "Lookup result: watts=%d, cad=%d, resistance=%d", watts, cad, resistance);
+    //LOG R1, R2, R3 values for debugging
+    SS2K_LOG(PTDATA_LOG_TAG, "R1: %f, R2: %f, R3: %f", R1, R2, R3);
   }
 
-  return INT32_MIN;  // All lookup methods failed
+  return resistance;  // All lookup methods failed
 }
 
 void PTHelpers::fillEmptyTable(int outerValue, const std::vector<int>& emptyIndices, std::pair<std::vector<float>, std::vector<float>> xy, size_t n, bool horizontal,
@@ -493,7 +496,10 @@ float PTHelpers::linearExtrapolate(std::pair<std::vector<float>, std::vector<flo
   y0 = xy.second[0], y1 = xy.second[n - 1];
 
   if (x1 - x0 == 0) {
-    SS2K_LOG(PTDATA_LOG_TAG, "Linear Extrapolation failed, x1 - x0 is 0");
+    SS2K_LOG(PTDATA_LOG_TAG, "Linear Extrapolation failed, x1 - x0 is 0. x0=%f, x1=%f, y0=%f, y1=%f, n=%zu", x0, x1, y0, y1, n);
+    for (size_t i = 0; i < n; ++i) {
+      SS2K_LOG(PTDATA_LOG_TAG, "xy[%zu]: x=%f, y=%f", i, xy.first[i], xy.second[i]);
+    }
     return INT16_MIN;
   }
 
@@ -501,34 +507,41 @@ float PTHelpers::linearExtrapolate(std::pair<std::vector<float>, std::vector<flo
   return y0 + slope * (j - x0);
 }
 
-void PTHelpers::splineFill(PTData& ptData) {
-  findTableDirection(true, ptData);   // Horizontal
-  findTableDirection(false, ptData);  // Vertical
+void PTHelpers::splineFill(PTData& ptData, bool firstHalf) {
+  findTableDirection(true, ptData, firstHalf);   // Horizontal
+  findTableDirection(false, ptData, firstHalf);  // Vertical
 }
 
 void PTHelpers::linearFill(PTData& ptData) {
-    for (int i = 0; i < POWERTABLE_CAD_SIZE; i++) {
+  for (int i = 0; i < POWERTABLE_CAD_SIZE; i++) {
     for (int j = 0; j < POWERTABLE_WATT_SIZE; j++) {
       if (ptData.tableRow[i].tableEntry[j].targetPosition == INT16_MIN) {
         // lookup resistance for this position using watts and cadence
         int watts      = j * POWERTABLE_WATT_INCREMENT;
         int cad        = i * POWERTABLE_CAD_INCREMENT + MINIMUM_TABLE_CAD;
-        int resistance = lookup(watts, cad, ptData) / TABLE_DIVISOR;
+        int resistance = lookup(watts, cad, ptData);
+        if (resistance == RETURN_ERROR) {
+          SS2K_LOG(PTDATA_LOG_TAG, "Failed to lookup resistance for watts: %d, cadence: %d", watts, cad);
+          continue;  // Skip if lookup failed
+        } else {
+          resistance = resistance / TABLE_DIVISOR;
+        }
         ptIndex index;
         index.wattIndex     = j;
         index.cadIndex      = i;
         TestResults results = testNeighbors(index, resistance, ptData);
         if (results.allNeighborsPassed == 1) {
           ptData.tableRow[i].tableEntry[j].targetPosition = resistance;
+          SS2K_LOG(PTDATA_LOG_TAG, "Filled position (%d, %d) with resistance: %d", i, j, resistance);
         } else {  // log the failure to in insert the value
-            //Serial.printf("Failed to fill position (%d, %d) with resistance: %d\n", i, j, resistance);
-        }// log failed neighbor resistance values
+                  // Serial.printf("Failed to fill position (%d, %d) with resistance: %d\n", i, j, resistance);
+        }  // log failed neighbor resistance values
       }
     }
   }
 }
 
-void PTHelpers::findTableDirection(bool horizontal, PTData& ptData) {
+void PTHelpers::findTableDirection(bool horizontal, PTData& ptData, bool firstHalf) {
   int outerSize = horizontal ? POWERTABLE_CAD_SIZE : POWERTABLE_WATT_SIZE;
   int innerSize = horizontal ? POWERTABLE_WATT_SIZE : POWERTABLE_CAD_SIZE;
 

@@ -24,7 +24,7 @@ void TestPTLookupResistance::test_pt_lookup_resistance(void) {
   PTData ptData;
 
   // Load the power table data from the .ptab file
-  const std::string filePath = "test/data/power_table.ptab";
+  const std::string filePath = "test/data/final_5_25_25.ptab";
   loadCSVToPTData(filePath, ptData);
 
   // Create helpers object for lookup

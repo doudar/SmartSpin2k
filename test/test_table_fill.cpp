@@ -23,7 +23,7 @@ void TestTableFill::test_fill_incomplete_table(void) {
   PTData ptData;
 
   // Load the incomplete power table data
-  const std::string inputFilePath = "test/data/power_table_incomplete.ptab";
+  const std::string inputFilePath = "test/data/final_5_25_25.ptab";
   loadCSVToPTData(inputFilePath, ptData);
   logFile << "Loaded incomplete power table from: " << inputFilePath << "\n";
 
@@ -48,7 +48,7 @@ void TestTableFill::test_fill_incomplete_table(void) {
   }
 
   // loop through the table and check for INT16_MIN values
-  helpers.linearFill(ptData);
+   helpers.linearFill(ptData);
   // Save the filled power table
   const std::string outputFilePath = "test/output/power_table_filled.ptab";
   savePTDataToCSV(ptData, outputFilePath);
