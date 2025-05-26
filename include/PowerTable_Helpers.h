@@ -119,13 +119,10 @@ class PTHelpers {
  public:
   TestResults testNeighbors(ptIndex index, int value, PTData& ptData);
   int32_t lookup(int watts, int cad, PTData& ptData);
-  void fillEmptyTable(int outerValue, const std::vector<int>& emptyIndices, std::pair<std::vector<float>, std::vector<float>> xy, size_t n, bool horizontal, bool useNaturalSpline,
-                      PTData& ptData);
   void extrapolateEmptyIndices(int outerIndex, const std::vector<int>& emptyIndices, std::pair<std::vector<float>, std::vector<float>> xy, size_t n, bool horizontal,
                                bool naturalSpline, PTData& ptData);
-  void extrapFillTableDirection(bool horizontal, PTData& ptData);
+  void extrapFillTableDirection(bool horizontal, PTData& ptData, bool firtHalf = true);
   float linearExtrapolate(std::pair<std::vector<float>, std::vector<float>> xy, size_t n, float j);
-  void findTableDirection(bool horizontal, PTData& ptData, bool firstHalf);
   void splineFill(PTData& ptData, bool firstHalf = true);
   void linearFill(PTData& ptData);
   int32_t lookupWatts(int cad, int32_t targetPosition, PTData& ptData);

@@ -204,7 +204,7 @@ int32_t PTHelpers::lookup(int watts, int cad, PTData& ptData) {
   const int MAX_CAD_VAL  = MINIMUM_TABLE_CAD + (POWERTABLE_CAD_SIZE - 1) * POWERTABLE_CAD_INCREMENT;
   const int MIN_WATT_VAL = 0;  // Assuming watts index start from 0
   const int MAX_WATT_VAL = (POWERTABLE_WATT_SIZE - 1) * POWERTABLE_WATT_INCREMENT;
-  int32_t resistance = RETURN_ERROR;
+  int32_t resistance     = RETURN_ERROR;
   int ptDataSize         = dataPoints(ptData);
   std::pair<std::vector<float>, std::vector<float>> dataPoints;
 
@@ -244,9 +244,8 @@ int32_t PTHelpers::lookup(int watts, int cad, PTData& ptData) {
         resistance = static_cast<int32_t>(round(extrapolatedVal)) * TABLE_DIVISOR;
       }
     }
-
   }
-return resistance;  // Return early if we found a valid extrapolated value
+  return resistance;  // Return early if we found a valid extrapolated value
   // ---- B. Handle In-Table Lookup (Direct, Interpolation) ----
   // At this point, both 'watts' and 'cad' are considered within the conceptual table boundaries.
   TestResults neighbors = testNeighbors(index, 0, ptData);  // testValue for testNeighbors is not critical here.
@@ -303,72 +302,11 @@ return resistance;  // Return early if we found a valid extrapolated value
   if (count > 0) {
     resistance = static_cast<int32_t>(round(sum / count)) * TABLE_DIVISOR;
     SS2K_LOG(PTDATA_LOG_TAG, "Lookup result: watts=%d, cad=%d, resistance=%d", watts, cad, resistance);
-    //LOG R1, R2, R3 values for debugging
+    // LOG R1, R2, R3 values for debugging
     SS2K_LOG(PTDATA_LOG_TAG, "R1: %f, R2: %f, R3: %f", R1, R2, R3);
   }
 
   return resistance;  // All lookup methods failed
-}
-
-void PTHelpers::fillEmptyTable(int outerValue, const std::vector<int>& emptyIndices, std::pair<std::vector<float>, std::vector<float>> xy, size_t n, bool horizontal,
-                               bool useNaturalSpline, PTData& ptData) {
-  int innerSize = horizontal ? POWERTABLE_WATT_SIZE : POWERTABLE_CAD_SIZE;
-  ptIndex index;
-
-  if (n == 1) {  // If only one point, fill row with the value
-    float singleValue = xy.second[0];
-    for (int innerValue : emptyIndices) {
-      index.cadIndex                                                             = horizontal ? outerValue : innerValue;
-      index.wattIndex                                                            = horizontal ? innerValue : outerValue;
-      ptData.tableRow[index.cadIndex].tableEntry[index.wattIndex].targetPosition = static_cast<int>(round(singleValue));
-    }
-  } else if (n == 2) {  // If two points, do linear interpolation
-    for (int innerValue : emptyIndices) {
-      index.cadIndex  = horizontal ? outerValue : innerValue;
-      index.wattIndex = horizontal ? innerValue : outerValue;
-
-      float interpolated_value = linearExtrapolate(xy, n, innerValue);
-      int tempValue            = static_cast<int>(round(interpolated_value));
-
-      if (testNeighbors(index, tempValue, ptData).allNeighborsPassed) {
-        ptData.tableRow[index.cadIndex].tableEntry[index.wattIndex].targetPosition = tempValue;
-      }
-    }
-  } else if (n >= 3) {  // If three or more points, use cubic spline interpolation
-    bool validForSpline = true;
-    for (size_t i = 1; i < n; ++i) {
-      if (xy.first[i] <= xy.first[i - 1]) {
-        validForSpline = false;
-        break;
-      }
-    }
-    if (!validForSpline) {
-      SS2K_LOG(PTDATA_LOG_TAG, "Duplicate or non-increasing x-values detected!");
-      return;
-    }
-
-    // Create and initialize the spline with the desired type (natural or clamped)
-    CubicSpline spline;
-    spline.set_points(xy, n);
-
-    for (int innerValue : emptyIndices) {
-      index.cadIndex  = horizontal ? outerValue : innerValue;
-      index.wattIndex = horizontal ? innerValue : outerValue;
-
-      float interpolated_value = spline.interpolate(innerValue);
-      float minValue           = *std::min_element(xy.second.begin(), xy.second.end());
-      float maxValue           = *std::max_element(xy.second.begin(), xy.second.end());
-      interpolated_value       = std::max(minValue, std::min(maxValue, interpolated_value));
-
-      int tempValue = static_cast<int>(round(interpolated_value));
-
-      if (this->testNeighbors(index, tempValue, ptData).allNeighborsPassed) {
-        ptData.tableRow[index.cadIndex].tableEntry[index.wattIndex].targetPosition = tempValue;
-      }
-    }
-  } else {
-    SS2K_LOG(PTDATA_LOG_TAG, "Error: No unique points found.");
-  }
 }
 
 void PTHelpers::extrapolateEmptyIndices(int outerIndex, const std::vector<int>& emptyIndices, std::pair<std::vector<float>, std::vector<float>> xy, size_t n, bool horizontal,
@@ -403,25 +341,71 @@ void PTHelpers::extrapolateEmptyIndices(int outerIndex, const std::vector<int>& 
       int tempValue            = static_cast<int>(round(extrapolated_value));
 
       if (testNeighbors(index, tempValue, ptData).allNeighborsPassed) {
-        ptData.tableRow[index.cadIndex].tableEntry[index.wattIndex].targetPosition = tempValue;
+        // Blend with nearby valid neighbors to ensure smoothness
+        float blendedValue = tempValue;
+        float totalWeight = 1.0f;  // Start with original value
+        
+        // Check horizontal and vertical neighbors within 2 steps
+        const int blendRadius = 2;
+        const float distanceDecay = 0.7f;  // Weight decreases with distance
+        
+        for (int di = -blendRadius; di <= blendRadius; di++) {
+          for (int dj = -blendRadius; dj <= blendRadius; dj++) {
+            // Skip self
+            if (di == 0 && dj == 0) continue;
+            
+            int ni = index.cadIndex + (horizontal ? 0 : di);
+            int nj = index.wattIndex + (horizontal ? di : 0);
+            
+            // Check if neighbor is valid
+            if (ni >= 0 && ni < POWERTABLE_CAD_SIZE && nj >= 0 && nj < POWERTABLE_WATT_SIZE) {
+              int16_t neighborVal = ptData.tableRow[ni].tableEntry[nj].targetPosition;
+              
+              if (neighborVal != INT16_MIN) {
+                // Calculate distance-based weight
+                float distance = std::fabs(di) + std::fabs(dj);  // Manhattan distance
+                float weight = std::pow(distanceDecay, distance);
+                
+                // Add to weighted average
+                blendedValue += neighborVal * weight;
+                totalWeight += weight;
+              }
+            }
+          }
+        }
+        
+        // Compute final blended value if we found neighbors
+        if (totalWeight > 1.0f) {
+          // More weight to original spline value (70%) for trend preservation
+          float originalWeight = 0.7f;
+          float neighborWeight = 1.0f - originalWeight;
+          
+          blendedValue = (originalWeight * tempValue + 
+                          neighborWeight * (blendedValue - tempValue) / (totalWeight - 1.0f));
+        }
+        
+        ptData.tableRow[index.cadIndex].tableEntry[index.wattIndex].targetPosition = static_cast<int16_t>(round(blendedValue));
       }
     }
   }
 }
 
-void PTHelpers::extrapFillTableDirection(bool horizontal, PTData& ptData) {
+void PTHelpers::extrapFillTableDirection(bool horizontal, PTData& ptData, bool firstHalf) {
   int outerSize = horizontal ? POWERTABLE_CAD_SIZE : POWERTABLE_WATT_SIZE;
   int innerSize = horizontal ? POWERTABLE_WATT_SIZE : POWERTABLE_CAD_SIZE;
 
   std::vector<std::pair<int, float>> unique_xy;
   std::vector<int> emptyIndices;
   std::vector<float> x, y;
+  int rangeStart, rangeEnd;
 
-  // Store previous data to reuse
-  std::vector<float> prevX, prevY;
-  std::vector<int> prevEmptyIndices;
-  bool prevSplineValid   = false;
-  bool prevNaturalSpline = false;
+  if (firstHalf) {
+    rangeStart = 0;
+    rangeEnd   = (innerSize / 2) + (innerSize / 2 - innerSize / 3);
+  } else {
+    rangeStart = (innerSize / 2) - (innerSize / 2 - innerSize / 3);
+    rangeEnd   = innerSize;
+  }
 
   for (int outerIndex = 0; outerIndex < outerSize; ++outerIndex) {
     unique_xy.clear();
@@ -429,8 +413,6 @@ void PTHelpers::extrapFillTableDirection(bool horizontal, PTData& ptData) {
     x.clear();
     y.clear();
 
-    int rangeStart = std::max(0, innerSize / 2 - 10);
-    int rangeEnd   = std::min(innerSize, innerSize / 2 + 10);
     ptIndex index;
     // Collect data points
     for (int innerIndex = rangeStart; innerIndex < rangeEnd; ++innerIndex) {
@@ -453,18 +435,8 @@ void PTHelpers::extrapFillTableDirection(bool horizontal, PTData& ptData) {
       y.push_back(it.second);
     }
 
-    if (prevSplineValid && x == prevX && y == prevY && emptyIndices == prevEmptyIndices) {
-      continue;
-    }
-
     CubicSpline spline;
     bool useNaturalSpline = spline.shouldUseNaturalSpline(std::make_pair(x, y), x.size());
-
-    prevX             = x;
-    prevY             = y;
-    prevEmptyIndices  = emptyIndices;
-    prevNaturalSpline = useNaturalSpline;
-    prevSplineValid   = true;
 
     // Fill empty table entries using the determined spline type
     extrapolateEmptyIndices(outerIndex, emptyIndices, std::make_pair(x, y), x.size(), horizontal, useNaturalSpline, ptData);
@@ -508,8 +480,8 @@ float PTHelpers::linearExtrapolate(std::pair<std::vector<float>, std::vector<flo
 }
 
 void PTHelpers::splineFill(PTData& ptData, bool firstHalf) {
-  findTableDirection(true, ptData, firstHalf);   // Horizontal
-  findTableDirection(false, ptData, firstHalf);  // Vertical
+  extrapFillTableDirection(true, ptData, true);
+  extrapFillTableDirection(true, ptData, false);  // Fill remaining empty entries in horizontal direction
 }
 
 void PTHelpers::linearFill(PTData& ptData) {
@@ -538,69 +510,6 @@ void PTHelpers::linearFill(PTData& ptData) {
         }  // log failed neighbor resistance values
       }
     }
-  }
-}
-
-void PTHelpers::findTableDirection(bool horizontal, PTData& ptData, bool firstHalf) {
-  int outerSize = horizontal ? POWERTABLE_CAD_SIZE : POWERTABLE_WATT_SIZE;
-  int innerSize = horizontal ? POWERTABLE_WATT_SIZE : POWERTABLE_CAD_SIZE;
-
-  std::vector<std::pair<int, float>> unique_xy;
-  std::vector<int> emptyIndices;
-  std::vector<float> x, y;
-
-  // Get previous x/y values and empty indices to reuse if we can
-  std::vector<float> prevX, prevY;
-  std::vector<int> prevEmptyIndices;
-  bool prevSplineValid   = false;
-  bool prevNaturalSpline = false;
-
-  for (int outerValue = 0; outerValue < outerSize; ++outerValue) {
-    unique_xy.clear();
-    emptyIndices.clear();
-    x.clear();
-    y.clear();
-
-    int rangeStart = std::max(0, innerSize / 2 - 5);
-    int rangeEnd   = std::min(innerSize, innerSize / 2 + 5);
-
-    for (int innerValue = rangeStart; innerValue < rangeEnd; ++innerValue) {
-      int i = horizontal ? outerValue : innerValue;
-      int j = horizontal ? innerValue : outerValue;
-
-      int targetPos = ptData.tableRow[i].tableEntry[j].targetPosition;
-      if (targetPos != INT16_MIN) {
-        unique_xy.emplace_back(innerValue, static_cast<float>(targetPos));
-      } else {
-        emptyIndices.push_back(innerValue);
-      }
-    }
-
-    if (unique_xy.size() < 2) continue;
-
-    std::sort(unique_xy.begin(), unique_xy.end());
-
-    for (const auto& it : unique_xy) {
-      x.push_back(it.first);
-      y.push_back(it.second);
-    }
-
-    // Reuse spline if same values
-    if (prevSplineValid && x == prevX && y == prevY && emptyIndices == prevEmptyIndices) {
-      continue;
-    }
-
-    CubicSpline spline;
-    bool useNaturalSpline = spline.shouldUseNaturalSpline(std::make_pair(x, y), x.size());
-
-    // Store values
-    prevX             = x;
-    prevY             = y;
-    prevEmptyIndices  = emptyIndices;
-    prevNaturalSpline = useNaturalSpline;
-    prevSplineValid   = true;
-
-    fillEmptyTable(outerValue, emptyIndices, std::make_pair(x, y), x.size(), horizontal, useNaturalSpline, ptData);
   }
 }
 
