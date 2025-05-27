@@ -42,11 +42,11 @@ void _staSetup() {
 }
 
 void _APSetup() {
-  //WiFi.eraseAP(); //Needed if we switch back to espressif32 @6.5.0
+  // WiFi.eraseAP(); //Needed if we switch back to espressif32 @6.5.0
   WiFi.mode(WIFI_AP);
-  //WiFi.setHostname("reset");  // Fixes a bug when switching Arduino Core Versions
-  //WiFi.softAPsetHostname("reset");
-  //WiFi.setHostname(userConfig->getDeviceName());
+  // WiFi.setHostname("reset");  // Fixes a bug when switching Arduino Core Versions
+  // WiFi.softAPsetHostname("reset");
+  // WiFi.setHostname(userConfig->getDeviceName());
   WiFi.softAPsetHostname(userConfig->getDeviceName());
   WiFi.enableAP(true);
   delay(500);  // Micro controller requires some time to reset the mode
@@ -110,14 +110,14 @@ void startWifi() {
   MDNS.addServiceTxt("http", "_tcp", "lf", "0");
   SS2K_LOG(HTTP_SERVER_LOG_TAG, "Connected to %s IP address: %s", userConfig->getSsid(), myIP.toString().c_str());
   SS2K_LOG(HTTP_SERVER_LOG_TAG, "Open http://%s.local/", userConfig->getDeviceName());
-  
+
   // Initialize DirCon MDNS service
   if (DirConManager::start()) {
     SS2K_LOG(HTTP_SERVER_LOG_TAG, "DirCon service started successfully");
   } else {
     SS2K_LOG(HTTP_SERVER_LOG_TAG, "Error starting DirCon service");
   }
-  
+
   WiFi.setTxPower(WIFI_POWER_19_5dBm);
 
   if (WiFi.getMode() == WIFI_STA) {
@@ -301,12 +301,6 @@ void HTTP_Server::start() {
     server.send(200, "text/plain", tString);
   });
 
-  server.on("/PWCJSON", []() {
-    String tString;
-    tString = userPWC->returnJSON();
-    server.send(200, "text/plain", tString);
-  });
-
   server.on("/login", HTTP_GET, []() {
     server.sendHeader("Connection", "close");
     server.send(200, "text/html", OTALoginIndex);
@@ -365,7 +359,6 @@ void HTTP_Server::start() {
                                      // current progress
               server.send(200, "text/plain", "Littlefs Uploaded Successfully. Rebooting...");
               userConfig->saveToLittleFS();
-              userPWC->saveToLittleFS();
               ss2k->rebootFlag == true;
             } else {
               Update.printError(Serial);
@@ -408,10 +401,10 @@ void HTTP_Server::webClientUpdate() {
     _webClientTimer                = millis();
     static unsigned long mDnsTimer = millis();  // NOLINT: There is no overload in String for uint64_t
     server.handleClient();
-    //if (WiFi.getMode() != WIFI_MODE_STA) {
-    //  dnsServer.processNextRequest();
-    //}
-    // Keep MDNS alive
+    // if (WiFi.getMode() != WIFI_MODE_STA) {
+    //   dnsServer.processNextRequest();
+    // }
+    //  Keep MDNS alive
     if ((millis() - mDnsTimer) > 30000) {
       MDNS.addServiceTxt("http", "_tcp", "lf", String(mDnsTimer));
       mDnsTimer = millis();
@@ -595,24 +588,7 @@ void HTTP_Server::settingsProcessor() {
       userConfig->setConnectedRemote("any");
     }
   }
-  if (!server.arg("session1HR").isEmpty()) {  // Needs checking for unrealistic numbers.
-    userPWC->session1HR = server.arg("session1HR").toInt();
-  }
-  if (!server.arg("session1Pwr").isEmpty()) {
-    userPWC->session1Pwr = server.arg("session1Pwr").toInt();
-  }
-  if (!server.arg("session2HR").isEmpty()) {
-    userPWC->session2HR = server.arg("session2HR").toInt();
-  }
-  if (!server.arg("session2Pwr").isEmpty()) {
-    userPWC->session2Pwr = server.arg("session2Pwr").toInt();
 
-    if (!server.arg("hr2Pwr").isEmpty()) {
-      userPWC->hr2Pwr = true;
-    } else {
-      userPWC->hr2Pwr = false;
-    }
-  }
   String response = "<!DOCTYPE html><html><body><h2>";
 
   if (wasBTUpdate) {  // Special BT page update response
@@ -704,7 +680,7 @@ void HTTP_Server::FirmwareUpdate() {
         DeserializationError error = deserializeJson(doc, payload);
         if (error) {
           SS2K_LOG(HTTP_SERVER_LOG_TAG, "Failed to read file list");
-          http.end(); // Make sure to end HTTP before returning
+          http.end();  // Make sure to end HTTP before returning
           return;
         }
         httpServer.internetConnection = true;
@@ -714,7 +690,7 @@ void HTTP_Server::FirmwareUpdate() {
       }
       // End HTTP connection after file list download
       http.end();
-      
+
       JsonArray files = doc.as<JsonArray>();
       // iterate through file list and download files individually
       for (JsonVariant v : files) {
@@ -732,7 +708,7 @@ void HTTP_Server::FirmwareUpdate() {
           File file = LittleFS.open(fileName, FILE_WRITE, true);
           if (!file) {
             SS2K_LOG(HTTP_SERVER_LOG_TAG, "Failed to create file, %s", fileName);
-            http.end(); // End HTTP before returning
+            http.end();  // End HTTP before returning
             return;
           }
           file.print(payload);
@@ -769,9 +745,8 @@ void HTTP_Server::FirmwareUpdate() {
     } else {  // don't update
       SS2K_LOG(HTTP_SERVER_LOG_TAG, "  - Current Version: %s", FIRMWARE_VERSION);
     }
-  }else{
+  } else {
     SS2K_LOG(HTTP_SERVER_LOG_TAG, "Could not connect to Github. httpCode: %d", httpCode);
   }
   // localClient will be automatically destroyed when the function exits
 }
-

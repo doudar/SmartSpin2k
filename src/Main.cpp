@@ -45,7 +45,6 @@ PowerTable *powerTable           = new PowerTable;
 SS2K *ss2k                       = new SS2K;
 userParameters *userConfig       = new userParameters;
 RuntimeParameters *rtConfig      = new RuntimeParameters;
-physicalWorkingCapacity *userPWC = new physicalWorkingCapacity;
 
 ///////////// Log Appender /////////////
 UdpAppender udpAppender;
@@ -118,10 +117,6 @@ void setup() {
     spinBLEServer.spinDownFlag = 1;
   }
 
-  // load PWC for HR to Pwr Calculation
-  userPWC->loadFromLittleFS();
-  userPWC->printFile();
-  userPWC->saveToLittleFS();
   // print littleFS free space and all file sizes on partition
   Serial.printf("LittleFS Total Bytes:%lu, Used Bytes:%lu\n", LittleFS.totalBytes(), LittleFS.usedBytes());
 
@@ -301,7 +296,6 @@ void SS2K::maintenanceLoop(void *pvParameters) {
     if (ss2k->saveFlag) {
       ss2k->saveFlag = false;
       userConfig->saveToLittleFS();
-      userPWC->saveToLittleFS();
     }
 
     // Things to do every 6 seconds

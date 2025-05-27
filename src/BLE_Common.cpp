@@ -15,8 +15,6 @@
 #include <sensors/SensorDataFactory.h>
 #include <NimBLEDevice.h>
 
-bool hr2p = false;
-
 const BLEServiceInfo* getDeviceServiceInfo(const NimBLEAdvertisedDevice* advertisedDevice, const String& deviceName) {
   if (!advertisedDevice->haveServiceUUID()) {
     return nullptr;
@@ -85,19 +83,12 @@ void BLECommunications() {
     }
 
     // ***********************************SERVER**************************************
-    if ((spinBLEClient.connectedHRM || rtConfig->hr.getSimulate()) && !spinBLEClient.connectedPM && !rtConfig->watts.getSimulate() && (rtConfig->hr.getValue() > 0) &&
-        userPWC->hr2Pwr) {
-      calculateInstPwrFromHR();
-      hr2p = true;
-    } else {
-      hr2p = false;
-    }
 #ifdef DEBUG_HR_TO_PWR
     calculateInstPwrFromHR();
 #endif  // DEBUG_HR_TO_PWR
 
     // Set outputs to zero if we're not simulating or have connected devices.
-    if (!spinBLEClient.connectedPM && !hr2p && !rtConfig->watts.getSimulate() && !rtConfig->cad.getSimulate() && !userConfig->getPTab4Pwr()) {
+    if (!spinBLEClient.connectedPM && !rtConfig->watts.getSimulate() && !rtConfig->cad.getSimulate() && !userConfig->getPTab4Pwr()) {
       rtConfig->cad.setValue(0);
       rtConfig->watts.setValue(0);
     }

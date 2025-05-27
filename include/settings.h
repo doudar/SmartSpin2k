@@ -35,9 +35,6 @@ const char* const DEFAULT_PASSWORD = "password";
 // name of local file to save configuration in LittleFS
 #define configFILENAME "/config.txt"
 
-// name of local file to save Physical Working Capacity in LittleFS
-#define userPWCFILENAME "/userPWC.txt"
-
 // name of the local file to save the torque table.
 #define POWER_TABLE_FILENAME "/PowerTable.txt"
 

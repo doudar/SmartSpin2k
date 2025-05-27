@@ -99,9 +99,6 @@ class AuxSerialBuffer {
   }
 };
 
-// Users Physical Working Capacity Calculation Parameters (heart rate to Power
-// calculation)
-extern physicalWorkingCapacity *userPWC;
 extern SS2K *ss2k;
 
 // Main program variable that stores most everything

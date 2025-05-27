@@ -176,7 +176,7 @@ void MyCharacteristicCallbacks::onStatus(NimBLECharacteristic* pCharacteristic, 
     logValue += buf;
   }
 
-  //SS2K_LOG(BLE_SERVER_LOG_TAG, "%s -> %s", pCharacteristic->getUUID().toString().c_str(), logValue.c_str());
+  // SS2K_LOG(BLE_SERVER_LOG_TAG, "%s -> %s", pCharacteristic->getUUID().toString().c_str(), logValue.c_str());
 }
 
 void MyCharacteristicCallbacks::onSubscribe(NimBLECharacteristic* pCharacteristic, NimBLEConnInfo& connInfo, uint16_t subValue) {
@@ -206,39 +206,6 @@ int connectedClientCount() {
   } else {
     return 0;
   }
-}
-
-void calculateInstPwrFromHR() {
-  static int oldHR    = rtConfig->hr.getValue();
-  static int newHR    = rtConfig->hr.getValue();
-  static double delta = 0;
-  oldHR               = newHR;  // Copying HR from Last loop
-  newHR               = rtConfig->hr.getValue();
-
-  delta = (newHR - oldHR) / ((BLE_CLIENT_DELAY / 1000) + 1);
-
-  // userConfig->setSimulatedWatts((s1Pwr*s2HR)-(s2Pwr*S1HR))/(S2HR-s1HR)+(userConfig->getSimulatedHr(*((s1Pwr-s2Pwr)/(s1HR-s2HR)));
-  int avgP = ((userPWC->session1Pwr * userPWC->session2HR) - (userPWC->session2Pwr * userPWC->session1HR)) / (userPWC->session2HR - userPWC->session1HR) +
-             (newHR * ((userPWC->session1Pwr - userPWC->session2Pwr) / (userPWC->session1HR - userPWC->session2HR)));
-
-  if (avgP < DEFAULT_MIN_WATTS) {
-    avgP = DEFAULT_MIN_WATTS;
-  }
-
-  if (delta < 0) {
-    // magic math here for inst power
-  }
-
-  if (delta > 0) {
-    // magic math here for inst power
-  }
-
-#ifndef DEBUG_HR_TO_PWR
-  rtConfig->watts.setValue(avgP);
-  rtConfig->cad.setValue(NORMAL_CAD);
-#endif  // DEBUG_HR_TO_PWR
-
-  SS2K_LOG(BLE_SERVER_LOG_TAG, "Power From HR: %d", avgP);
 }
 
 void logCharacteristic(char* buffer, const size_t bufferCapacity, const byte* data, const size_t dataLength, const NimBLEUUID serviceUUID, const NimBLEUUID charUUID,

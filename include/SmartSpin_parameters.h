@@ -221,18 +221,3 @@ class userParameters {
   void loadFromLittleFS();
   void printFile();
 };
-
-class physicalWorkingCapacity {
- public:
-  int session1HR;
-  int session1Pwr;
-  int session2HR;
-  int session2Pwr;
-  bool hr2Pwr;
-
-  void setDefaults();
-  String returnJSON();
-  void saveToLittleFS();
-  void loadFromLittleFS();
-  void printFile();
-};
