@@ -301,9 +301,9 @@ int32_t PTHelpers::lookup(int watts, int cad, PTData& ptData) {
 
   if (count > 0) {
     resistance = static_cast<int32_t>(round(sum / count)) * TABLE_DIVISOR;
-    SS2K_LOG(PTDATA_LOG_TAG, "Lookup result: watts=%d, cad=%d, resistance=%d", watts, cad, resistance);
+    //SS2K_LOG(PTDATA_LOG_TAG, "Lookup result: watts=%d, cad=%d, resistance=%d", watts, cad, resistance);
     // LOG R1, R2, R3 values for debugging
-    SS2K_LOG(PTDATA_LOG_TAG, "R1: %f, R2: %f, R3: %f", R1, R2, R3);
+    //SS2K_LOG(PTDATA_LOG_TAG, "R1: %f, R2: %f, R3: %f", R1, R2, R3);
   }
 
   return resistance;  // All lookup methods failed
@@ -468,9 +468,9 @@ float PTHelpers::linearExtrapolate(std::pair<std::vector<float>, std::vector<flo
   y0 = xy.second[0], y1 = xy.second[n - 1];
 
   if (x1 - x0 == 0) {
-    SS2K_LOG(PTDATA_LOG_TAG, "Linear Extrapolation failed, x1 - x0 is 0. x0=%f, x1=%f, y0=%f, y1=%f, n=%zu", x0, x1, y0, y1, n);
+    //SS2K_LOG(PTDATA_LOG_TAG, "Linear Extrapolation failed, x1 - x0 is 0. x0=%f, x1=%f, y0=%f, y1=%f, n=%zu", x0, x1, y0, y1, n);
     for (size_t i = 0; i < n; ++i) {
-      SS2K_LOG(PTDATA_LOG_TAG, "xy[%zu]: x=%f, y=%f", i, xy.first[i], xy.second[i]);
+      //SS2K_LOG(PTDATA_LOG_TAG, "xy[%zu]: x=%f, y=%f", i, xy.first[i], xy.second[i]);
     }
     return INT16_MIN;
   }
@@ -504,7 +504,7 @@ void PTHelpers::linearFill(PTData& ptData) {
         TestResults results = testNeighbors(index, resistance, ptData);
         if (results.allNeighborsPassed == 1) {
           ptData.tableRow[i].tableEntry[j].targetPosition = resistance;
-          SS2K_LOG(PTDATA_LOG_TAG, "Filled position (%d, %d) with resistance: %d", i, j, resistance);
+          //SS2K_LOG(PTDATA_LOG_TAG, "Filled position (%d, %d) with resistance: %d", i, j, resistance);
         } else {  // log the failure to in insert the value
                   // Serial.printf("Failed to fill position (%d, %d) with resistance: %d\n", i, j, resistance);
         }  // log failed neighbor resistance values
