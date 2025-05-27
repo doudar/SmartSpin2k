@@ -163,7 +163,123 @@ static void createPowerTableHeatmap(const std::string& inputFilePath, const std:
     htmlFile << "    <div>" << maxValue << " (Max)</div>\n";
     htmlFile << "  </div>\n";
     htmlFile << "</div>\n";
+
+    // Add Chart.js library
+    htmlFile << "<script src=\"https://cdn.jsdelivr.net/npm/chart.js\"></script>\n";
+
+    // Add canvas for the chart with increased height
+    htmlFile << "<div style=\"width: 80%; height: 600px; margin: 40px auto;\">\n";
+    htmlFile << "  <canvas id=\"resistanceWattChart\"></canvas>\n";
+    htmlFile << "</div>\n";
+
+    // Add Y-axis range control HTML *before* the script that uses it
+    htmlFile << "<div style=\"width: 80%; margin: 20px auto; display: flex; flex-direction: column; align-items: center;\">\n";
+    htmlFile << "  <label for=\"yAxisRange\" style=\"margin-bottom: 5px;\">Adjust Y-axis maximum value: <span id=\"yAxisRangeValue\">" << maxValue << "</span></label>\n";
+    htmlFile << "  <input type=\"range\" id=\"yAxisRange\" min=\"" << minValue + 50 << "\" max=\"" << maxValue + 100 << "\" step=\"10\" value=\"" << maxValue << "\" style=\"width: 50%;\">\n";
+    htmlFile << "</div>\n";
+
+    // Start script for chart and slider logic
+    htmlFile << "<script>\n";
+    htmlFile << "  const ctx = document.getElementById('resistanceWattChart');\n\n";
+
+    // Prepare datasets (one for each cadence)
+    htmlFile << "  const datasets = [\n";
+
+    // Generate a color for each cadence line
+    for (int row = 0; row < POWERTABLE_CAD_SIZE; row++) {
+        // Create a HSL color with evenly distributed hue
+        int hue = (row * 360 / POWERTABLE_CAD_SIZE) % 360;
+        std::string lineColor = "hsl(" + std::to_string(hue) + ", 70%, 50%)";
+        
+        int cadence = MINIMUM_TABLE_CAD + row * POWERTABLE_CAD_INCREMENT;
+        
+        htmlFile << "    {\n";
+        htmlFile << "      label: '" << cadence << " RPM',\n";
+        htmlFile << "      data: [";
+        
+        // Add data points for this cadence
+        bool firstPoint = true;
+        for (int col = 0; col < POWERTABLE_WATT_SIZE; col++) {
+            int16_t value = ptData.tableRow[row].tableEntry[col].targetPosition;
+            if (value != INT16_MIN) {
+                if (!firstPoint) htmlFile << ", ";
+                htmlFile << "{x: " << col * POWERTABLE_WATT_INCREMENT << ", y: " << value << "}";
+                firstPoint = false;
+            }
+        }
+        
+        htmlFile << "],\n";
+        htmlFile << "      borderColor: '" << lineColor << "',\n";
+        htmlFile << "      backgroundColor: '" << lineColor << "',\n";
+        htmlFile << "      tension: 0.3,\n"; // Slight curve to the lines
+        htmlFile << "      fill: false\n";
+        htmlFile << "    }";
+        
+        if (row < POWERTABLE_CAD_SIZE - 1) {
+            htmlFile << ",";
+        }
+        htmlFile << "\n";
+    }
+
+    htmlFile << "  ];\n\n";    // Create the chart
+    htmlFile << "  let chart = new Chart(ctx, {\n";
+    htmlFile << "    type: 'line',\n";
+    htmlFile << "    data: { datasets },\n";
+    htmlFile << "    options: {\n";
+    htmlFile << "      responsive: true,\n";
+    htmlFile << "      maintainAspectRatio: false,\n";
+    htmlFile << "      plugins: {\n";
+    htmlFile << "        title: {\n";
+    htmlFile << "          display: true,\n";
+    htmlFile << "          text: 'Resistance vs. Watts by Cadence',\n";
+    htmlFile << "          font: { size: 18 }\n";
+    htmlFile << "        },\n";
+    htmlFile << "        legend: {\n";
+    htmlFile << "          position: 'bottom',\n";
+    htmlFile << "          labels: { usePointStyle: true }\n";
+    htmlFile << "        }\n";
+    htmlFile << "      },\n";
+    htmlFile << "      scales: {\n";
+    htmlFile << "        x: {\n";
+    htmlFile << "          type: 'linear',\n";
+    htmlFile << "          title: {\n";
+    htmlFile << "            display: true,\n";
+    htmlFile << "            text: 'Watts'\n";
+    htmlFile << "          },\n";
+    htmlFile << "          min: 0,\n";
+    htmlFile << "          max: " << (POWERTABLE_WATT_SIZE * POWERTABLE_WATT_INCREMENT) << "\n";
+    htmlFile << "        },\n";
+    htmlFile << "        y: {\n";
+    htmlFile << "          title: {\n";
+    htmlFile << "            display: true,\n";
+    htmlFile << "            text: 'Resistance'\n";
+    htmlFile << "          },\n";
+    htmlFile << "          min: " << minValue << ",\n";
+    htmlFile << "          max: " << maxValue << "\n";
+    htmlFile << "        }\n";    htmlFile << "      }\n";
+    htmlFile << "    }\n";
+    htmlFile << "  });\n";
     
+    htmlFile << "  // Add event listener for range input\n";
+    htmlFile << "  const yAxisRange = document.getElementById('yAxisRange');\n";
+    htmlFile << "  const yAxisRangeValue = document.getElementById('yAxisRangeValue');\n";
+      htmlFile << "  function updateYAxisRange() {\n";
+    htmlFile << "    const newMax = parseInt(yAxisRange.value);\n";
+    htmlFile << "    yAxisRangeValue.textContent = newMax;\n";
+    htmlFile << "    \n";
+    htmlFile << "    chart.options.scales.y.max = newMax;\n";
+    htmlFile << "    chart.update('none'); // Use 'none' for immediate update without animation\n";
+    htmlFile << "  }\n\n";
+
+    htmlFile << "  yAxisRange.addEventListener('input', updateYAxisRange);\n";
+    htmlFile << "</script>\n";
+
+    // Add Y-axis range control
+    htmlFile << "<div style=\"width: 80%; margin: 20px auto; display: flex; flex-direction: column; align-items: center;\">\n";
+    htmlFile << "  <label for=\"yAxisRange\" style=\"margin-bottom: 5px;\">Adjust Y-axis maximum value: <span id=\"yAxisRangeValue\">" << maxValue << "</span></label>\n";
+    htmlFile << "  <input type=\"range\" id=\"yAxisRange\" min=\"" << minValue + 50 << "\" max=\"" << maxValue + 100 << "\" step=\"10\" value=\"" << maxValue << "\" style=\"width: 50%;\">\n";
+    htmlFile << "</div>\n";
+
     // HTML footer
     htmlFile << "</body>\n</html>\n";
     

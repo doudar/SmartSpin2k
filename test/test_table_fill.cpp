@@ -23,7 +23,7 @@ void TestTableFill::test_fill_incomplete_table(void) {
   PTData ptData;
 
   // Load the incomplete power table data
-  const std::string inputFilePath = "test/data/final_5_25_25.ptab";
+  const std::string inputFilePath = "test/data/10x5-26-25.ptab";
   loadCSVToPTData(inputFilePath, ptData);
   logFile << "Loaded incomplete power table from: " << inputFilePath << "\n";
 
