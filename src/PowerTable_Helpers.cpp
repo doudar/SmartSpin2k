@@ -399,25 +399,44 @@ void PTHelpers::extrapFillTableDirection(bool horizontal, PTData& ptData, bool f
   std::vector<float> x, y;
   int rangeStart, rangeEnd;
 
+  // Determine the range for inner loop based on firstHalf or secondHalf
+  // This logic for 'rangeStart' and 'rangeEnd' applies to the 'innerIndex' loop
   if (firstHalf) {
     rangeStart = 0;
-    rangeEnd   = (innerSize / 2) + (innerSize / 2 - innerSize / 3);
+    // Ensure overlap: process a bit more than half, e.g., 2/3 or 3/4
+    // The amount of overlap might need tuning. Let's try 2/3 for now.
+    rangeEnd   = (innerSize * 2) / 3; 
+    if (rangeEnd > innerSize) rangeEnd = innerSize; // cap at innerSize
   } else {
-    rangeStart = (innerSize / 2) - (innerSize / 2 - innerSize / 3);
+    // Start from a point that ensures overlap with the first half
+    rangeStart = innerSize / 3;
     rangeEnd   = innerSize;
   }
 
-  for (int outerIndex = 0; outerIndex < outerSize; ++outerIndex) {
+
+  int mid_outer = outerSize / 2;
+  int max_k_outer = 0;
+  if (outerSize > 0) {
+      max_k_outer = std::max(mid_outer, (outerSize - 1) - mid_outer);
+  }
+
+  auto processOuterIndex = 
+    [&](int currentOuterIndex) {
     unique_xy.clear();
     emptyIndices.clear();
     x.clear();
     y.clear();
 
     ptIndex index;
-    // Collect data points
+    // Collect data points for the currentOuterIndex across the specified inner range
     for (int innerIndex = rangeStart; innerIndex < rangeEnd; ++innerIndex) {
-      index.cadIndex  = horizontal ? outerIndex : innerIndex;
-      index.wattIndex = horizontal ? innerIndex : outerIndex;
+      index.cadIndex  = horizontal ? currentOuterIndex : innerIndex;
+      index.wattIndex = horizontal ? innerIndex : currentOuterIndex;
+
+      // Boundary checks for safety, though currentOuterIndex should be valid by loop logic
+      if (index.cadIndex < 0 || index.cadIndex >= POWERTABLE_CAD_SIZE || index.wattIndex < 0 || index.wattIndex >= POWERTABLE_WATT_SIZE) {
+          continue;
+      }
 
       if (ptData.tableRow[index.cadIndex].tableEntry[index.wattIndex].targetPosition != INT16_MIN) {
         unique_xy.emplace_back(innerIndex, static_cast<float>(ptData.tableRow[index.cadIndex].tableEntry[index.wattIndex].targetPosition));
@@ -426,7 +445,7 @@ void PTHelpers::extrapFillTableDirection(bool horizontal, PTData& ptData, bool f
       }
     }
 
-    if (unique_xy.size() < 2) continue;  // Skip if not enough data
+    if (unique_xy.size() < 2) return;  // Skip if not enough data
 
     std::sort(unique_xy.begin(), unique_xy.end());
 
@@ -436,10 +455,26 @@ void PTHelpers::extrapFillTableDirection(bool horizontal, PTData& ptData, bool f
     }
 
     CubicSpline spline;
+    // The decision to use natural spline might be based on the characteristics of x, y
+    // For now, let's assume shouldUseNaturalSpline is available and correctly implemented
     bool useNaturalSpline = spline.shouldUseNaturalSpline(std::make_pair(x, y), x.size());
 
     // Fill empty table entries using the determined spline type
-    extrapolateEmptyIndices(outerIndex, emptyIndices, std::make_pair(x, y), x.size(), horizontal, useNaturalSpline, ptData);
+    extrapolateEmptyIndices(currentOuterIndex, emptyIndices, std::make_pair(x, y), x.size(), horizontal, useNaturalSpline, ptData);
+  };
+
+  for (int k = 0; k <= max_k_outer; ++k) {
+    int outer_upper = mid_outer + k;
+    if (outer_upper < outerSize) {
+      processOuterIndex(outer_upper);
+    }
+
+    if (k > 0) {
+      int outer_lower = mid_outer - k;
+      if (outer_lower >= 0) {
+        processOuterIndex(outer_lower);
+      }
+    }
   }
 }
 
@@ -484,30 +519,60 @@ void PTHelpers::splineFill(PTData& ptData, bool firstHalf) {
   extrapFillTableDirection(true, ptData, false);  // Fill remaining empty entries in horizontal direction
 }
 
+/**
+ * @brief Fills empty entries in the power table using linear interpolation.
+ *
+ * This function iterates through the table rows, starting from the middle row and expanding outward,
+ * and fills empty cells (where targetPosition == INT16_MIN) by estimating resistance using the lookup method.
+ * Only fills a cell if all its neighbors pass validation.
+ *
+ * @param ptData Reference to the PTData object containing the power table.
+ */
 void PTHelpers::linearFill(PTData& ptData) {
-  for (int i = 0; i < POWERTABLE_CAD_SIZE; i++) {
-    for (int j = 0; j < POWERTABLE_WATT_SIZE; j++) {
-      if (ptData.tableRow[i].tableEntry[j].targetPosition == INT16_MIN) {
-        // lookup resistance for this position using watts and cadence
-        int watts      = j * POWERTABLE_WATT_INCREMENT;
-        int cad        = i * POWERTABLE_CAD_INCREMENT + MINIMUM_TABLE_CAD;
-        int resistance = lookup(watts, cad, ptData);
-        if (resistance == RETURN_ERROR) {
-          SS2K_LOG(PTDATA_LOG_TAG, "Failed to lookup resistance for watts: %d, cadence: %d", watts, cad);
-          continue;  // Skip if lookup failed
-        } else {
-          resistance = resistance / TABLE_DIVISOR;
+  int mid = POWERTABLE_CAD_SIZE / 2;
+  int max_k = (POWERTABLE_CAD_SIZE - 1) - mid;
+
+  // Define a lambda for processing a single cell
+  auto processCell = [this, &ptData](int currentRowIndex, int currentColIndex) {
+    if (ptData.tableRow[currentRowIndex].tableEntry[currentColIndex].targetPosition == INT16_MIN) {
+      int watts      = currentColIndex * POWERTABLE_WATT_INCREMENT;
+      int cad        = currentRowIndex * POWERTABLE_CAD_INCREMENT + MINIMUM_TABLE_CAD;
+      int resistance = this->lookup(watts, cad, ptData);
+      if (resistance == RETURN_ERROR) {
+        SS2K_LOG(PTDATA_LOG_TAG, "Failed to lookup resistance for watts: %d, cadence: %d", watts, cad);
+        return; // Skip this cell processing
+      } else {
+        resistance = resistance / TABLE_DIVISOR;
+      }
+      ptIndex current_pt_idx;
+      current_pt_idx.wattIndex     = currentColIndex;
+      current_pt_idx.cadIndex      = currentRowIndex;
+      TestResults results = this->testNeighbors(current_pt_idx, resistance, ptData);
+      if (results.allNeighborsPassed == 1) {
+        ptData.tableRow[currentRowIndex].tableEntry[currentColIndex].targetPosition = resistance;
+        //SS2K_LOG(PTDATA_LOG_TAG, "Filled position (%d, %d) with resistance: %d", currentRowIndex, currentColIndex, resistance);
+      } else {  // log the failure to in insert the value
+                // Serial.printf("Failed to fill position (%d, %d) with resistance: %d\n", currentRowIndex, currentColIndex, resistance);
+      }
+    }
+  };
+
+  for (int k = 0; k <= max_k; ++k) {
+    // Process row from mid upwards: mid, mid+1, mid+2, ...
+    int i_upper = mid + k;
+    if (i_upper < POWERTABLE_CAD_SIZE) { // Ensure i_upper is a valid row index
+      for (int j = 0; j < POWERTABLE_WATT_SIZE; j++) {
+        processCell(i_upper, j);
+      }
+    }
+
+    // Process row from mid downwards: mid-1, mid-2, ..., only if k > 0 to avoid re-processing 'mid'
+    if (k > 0) {
+      int i_lower = mid - k;
+      if (i_lower >= 0) { // Ensure i_lower is a valid row index
+        for (int j = 0; j < POWERTABLE_WATT_SIZE; j++) {
+          processCell(i_lower, j);
         }
-        ptIndex index;
-        index.wattIndex     = j;
-        index.cadIndex      = i;
-        TestResults results = testNeighbors(index, resistance, ptData);
-        if (results.allNeighborsPassed == 1) {
-          ptData.tableRow[i].tableEntry[j].targetPosition = resistance;
-          //SS2K_LOG(PTDATA_LOG_TAG, "Filled position (%d, %d) with resistance: %d", i, j, resistance);
-        } else {  // log the failure to in insert the value
-                  // Serial.printf("Failed to fill position (%d, %d) with resistance: %d\n", i, j, resistance);
-        }  // log failed neighbor resistance values
       }
     }
   }
