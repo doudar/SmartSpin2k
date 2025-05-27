@@ -46,13 +46,13 @@ const char* const DEFAULT_PASSWORD = "password";
 // into actual stepper steps that move the stepper motor. It takes 2,181.76 steps to rotate the knob 1 full revolution. with hardware version 1.
 // Incline_Multiplier may be able to be removed in the future by dividing ShiftSteps by ~200 to get this value but we're not quite ready
 // to make that commitment yet.
-#define INCLINE_MULTIPLIER 5.0
+#define INCLINE_MULTIPLIER 5.0f
 
 // Minumum value for power correction factor user setting
-#define MIN_PCF .5
+#define MIN_PCF .5f
 
 // Maximum value for power correction factor user setting
-#define MAX_PCF 2.5
+#define MAX_PCF 2.5f
 
 // Default Stepper Power.
 // Stepper peak current in ma. This is hardware restricted to a maximum of 2000ma on the TMC2225. RMS current is less.
@@ -71,7 +71,7 @@ const char* const DEFAULT_PASSWORD = "password";
 // I.E. If the difference between ERG target and Current watts were 30, and the Shift step is defined as 600 steps,
 // and ERG_Sensitivity were 1.0, ERG mode would move the stepper motor 600 steps to compensate. With an ERG_Sensitivity of 2.0, the stepper
 // would move 1200 steps to compensate, however ERG_Sensitivity values much different than 1.0 imply shiftStep has been improperly configured.
-#define ERG_SENSITIVITY 5.0
+#define ERG_SENSITIVITY 5.0f
 
 // Number of watts per shift expected by ERG mode for it's calculation. The user should target this number by adjusting Shift Step until WATTS_PER_SHIFT
 // is obtained as closely as possible during each shift.
@@ -303,13 +303,13 @@ const char* const DEFAULT_PASSWORD = "password";
 #define MINIMUM_RELIABLE_POSITIONS 3
 
 // Limit power table size to save memory
-#define TABLE_DIVISOR 100.0
+#define TABLE_DIVISOR 10.0f
 
 //Max distance a failed neighbor can be horizontally from target position
-#define HORIZONTAL_NEIGHBOR_RANGE 0.6
+#define HORIZONTAL_NEIGHBOR_RANGE 0.6f
     
 //Max distance a failed neighbor can be vertically from target position
-#define VERTICAL_NEIGHBOR_RANGE 0.8
+#define VERTICAL_NEIGHBOR_RANGE 0.8f
 
 // Temperature of the ESP32 at which to start reducing the power output of the stepper motor driver.
 #define THROTTLE_TEMP 90
