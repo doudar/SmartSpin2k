@@ -274,12 +274,6 @@ static void createPowerTableHeatmap(const std::string& inputFilePath, const std:
     htmlFile << "  yAxisRange.addEventListener('input', updateYAxisRange);\n";
     htmlFile << "</script>\n";
 
-    // Add Y-axis range control
-    htmlFile << "<div style=\"width: 80%; margin: 20px auto; display: flex; flex-direction: column; align-items: center;\">\n";
-    htmlFile << "  <label for=\"yAxisRange\" style=\"margin-bottom: 5px;\">Adjust Y-axis maximum value: <span id=\"yAxisRangeValue\">" << maxValue << "</span></label>\n";
-    htmlFile << "  <input type=\"range\" id=\"yAxisRange\" min=\"" << minValue + 50 << "\" max=\"" << maxValue + 100 << "\" step=\"10\" value=\"" << maxValue << "\" style=\"width: 50%;\">\n";
-    htmlFile << "</div>\n";
-
     // HTML footer
     htmlFile << "</body>\n</html>\n";
     
