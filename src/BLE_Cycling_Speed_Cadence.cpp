@@ -14,9 +14,9 @@ void BLE_Cycling_Speed_Cadence::setupService(NimBLEServer *pServer, MyCharacteri
   pCyclingSpeedCadenceService = pServer->createService(CSCSERVICE_UUID);
   cscMeasurement              = pCyclingSpeedCadenceService->createCharacteristic(CSCMEASUREMENT_UUID, NIMBLE_PROPERTY::NOTIFY);
   cscFeature                  = pCyclingSpeedCadenceService->createCharacteristic(CSCFEATURE_UUID, NIMBLE_PROPERTY::READ);
-  
-  CyclingSpeedCadenceFeatureFlags::Types cscFeatureFlags = CyclingSpeedCadenceFeatureFlags::WheelRevolutionDataSupported | 
-                                                           CyclingSpeedCadenceFeatureFlags::CrankRevolutionDataSupported;
+
+  CyclingSpeedCadenceFeatureFlags::Types cscFeatureFlags =
+      CyclingSpeedCadenceFeatureFlags::WheelRevolutionDataSupported | CyclingSpeedCadenceFeatureFlags::CrankRevolutionDataSupported;
 
   cscFeatureBytes[0] = static_cast<uint8_t>(cscFeatureFlags & 0xFF);
   cscFeatureBytes[1] = static_cast<uint8_t>((cscFeatureFlags >> 8) & 0xFF);
@@ -24,8 +24,8 @@ void BLE_Cycling_Speed_Cadence::setupService(NimBLEServer *pServer, MyCharacteri
   cscFeature->setValue(cscFeatureBytes, sizeof(cscFeatureBytes));
   cscMeasurement->setCallbacks(chrCallbacks);
   pCyclingSpeedCadenceService->start();
-  //spinBLEServer.pServer->getAdvertising()->addServiceUUID(pCyclingSpeedCadenceService->getUUID());
-  
+  // spinBLEServer.pServer->getAdvertising()->addServiceUUID(pCyclingSpeedCadenceService->getUUID());
+
   // Add service UUID to DirCon MDNS
   DirConManager::addBleServiceUuid(pCyclingSpeedCadenceService->getUUID());
 }
@@ -52,7 +52,10 @@ void BLE_Cycling_Speed_Cadence::update() {
 
   auto byteArray = csc.toByteArray();
 
-  cscMeasurement->notify(&byteArray[0], byteArray.size());
+  // Notify the cycling power measurement characteristic
+  // Need to set the value before notifying so that read works correctly.
+  cscMeasurement->setValue(&byteArray[0], byteArray.size());
+  cscMeasurement->notify();
 
   const int kLogBufCapacity = 150;
   char logBuf[kLogBufCapacity];

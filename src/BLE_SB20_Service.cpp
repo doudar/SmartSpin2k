@@ -19,7 +19,7 @@ void BLE_SB20_Service::begin() {
   pService        = BLEDevice::createServer()->createService(SB20_SERVICE_UUID);
   pCharacteristic = pService->createCharacteristic(SB20_CHARACTERISTIC_UUID, NIMBLE_PROPERTY::READ | NIMBLE_PROPERTY::NOTIFY);
   pService->start();
-  SS2K_LOG(SS2K_LOG_TAG,"SB20 Service started\n");
+  SS2K_LOG(SS2K_LOG_TAG, "SB20 Service started\n");
 }
 
 void BLE_SB20_Service::setData(SB20Data data) { currentData = data; }
@@ -38,6 +38,9 @@ void BLE_SB20_Service::notify() {
   currentData.power     = rtConfig->watts.getValue();
   currentData.heartrate = rtConfig->hr.getValue();
 
-  pCharacteristic->notify((uint8_t *)&currentData, sizeof(currentData));
-  SS2K_LOG(SS2K_LOG_TAG,"SB20 data sent: Gear=%d, Cadence=%d, Power=%d, HR=%d\n", currentData.gear, currentData.cadence, currentData.power, currentData.heartrate);
+  // Notify the cycling power measurement characteristic
+  // Need to set the value before notifying so that read works correctly.
+  pCharacteristic->setValue((uint8_t *)&currentData, sizeof(currentData));
+  pCharacteristic->notify();
+  SS2K_LOG(SS2K_LOG_TAG, "SB20 data sent: Gear=%d, Cadence=%d, Power=%d, HR=%d\n", currentData.gear, currentData.cadence, currentData.power, currentData.heartrate);
 }

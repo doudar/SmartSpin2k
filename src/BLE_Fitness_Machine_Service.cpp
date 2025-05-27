@@ -108,8 +108,10 @@ void BLE_Fitness_Machine_Service::update() {
     ftmsIndoorBikeData.push_back(static_cast<uint8_t>(rtConfig->hr.getValue()));
   }
 
-  fitnessMachineIndoorBikeData->notify(ftmsIndoorBikeData.data(), ftmsIndoorBikeData.size());
-
+  // Notify the cycling power measurement characteristic
+  // Need to set the value before notifying so that read works correctly.
+  fitnessMachineIndoorBikeData->setValue(ftmsIndoorBikeData.data(), ftmsIndoorBikeData.size());
+  fitnessMachineIndoorBikeData->notify();
 
   // Also notify DirCon TCP clients about Indoor Bike Data
   DirConManager::notifyCharacteristic(NimBLEUUID(FITNESSMACHINESERVICE_UUID), fitnessMachineIndoorBikeData->getUUID(), ftmsIndoorBikeData.data(), ftmsIndoorBikeData.size());
@@ -286,7 +288,7 @@ void BLE_Fitness_Machine_Service::processFTMSWrite() {
       ftmsStatus            = {FitnessMachineStatus::StartedOrResumedByUser};
       ftmsTrainingStatus[1] = FitnessMachineTrainingStatus::Other;  // 0x00;
     }
-    //not checking for subscription because a write request would have triggererd this
+    // not checking for subscription because a write request would have triggererd this
     fitnessMachineControlPoint->indicate(returnValue.data(), returnValue.size());
     fitnessMachineTrainingStatus->notify(ftmsTrainingStatus.data(), ftmsTrainingStatus.size());
     fitnessMachineStatusCharacteristic->notify(ftmsStatus.data(), ftmsStatus.size());

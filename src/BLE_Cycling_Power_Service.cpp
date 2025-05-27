@@ -8,17 +8,16 @@
 #include "DirConManager.h"
 #include <Constants.h>
 
-BLE_Cycling_Power_Service::BLE_Cycling_Power_Service() : pPowerMonitor(nullptr), cyclingPowerFeatureCharacteristic(nullptr), sensorLocationCharacteristic(nullptr){}
+BLE_Cycling_Power_Service::BLE_Cycling_Power_Service() : pPowerMonitor(nullptr), cyclingPowerFeatureCharacteristic(nullptr), sensorLocationCharacteristic(nullptr) {}
 void BLE_Cycling_Power_Service::setupService(NimBLEServer *pServer, MyCharacteristicCallbacks *chrCallbacks) {
   // Power Meter service setup
   pPowerMonitor                         = spinBLEServer.pServer->createService(CYCLINGPOWERSERVICE_UUID);
   cyclingPowerMeasurementCharacteristic = pPowerMonitor->createCharacteristic(CYCLINGPOWERMEASUREMENT_UUID, NIMBLE_PROPERTY::READ | NIMBLE_PROPERTY::NOTIFY);
   cyclingPowerFeatureCharacteristic     = pPowerMonitor->createCharacteristic(CYCLINGPOWERFEATURE_UUID, NIMBLE_PROPERTY::READ);
   sensorLocationCharacteristic          = pPowerMonitor->createCharacteristic(SENSORLOCATION_UUID, NIMBLE_PROPERTY::READ);
-  byte cpsLocation[1]                   = {0b0101};    // sensor location 5 == left crank
+  byte cpsLocation[1]                   = {0b0101};  // sensor location 5 == left crank
 
-  CyclingPowerFeatureFlags::Types cpFeatureFlags = CyclingPowerFeatureFlags::WheelRevolutionDataSupported |
-                                                   CyclingPowerFeatureFlags::CrankRevolutionDataSupported;
+  CyclingPowerFeatureFlags::Types cpFeatureFlags = CyclingPowerFeatureFlags::WheelRevolutionDataSupported | CyclingPowerFeatureFlags::CrankRevolutionDataSupported;
 
   cpFeature[0] = static_cast<uint8_t>(cpFeatureFlags & 0xFF);
   cpFeature[1] = static_cast<uint8_t>((cpFeatureFlags >> 8) & 0xFF);
@@ -29,14 +28,13 @@ void BLE_Cycling_Power_Service::setupService(NimBLEServer *pServer, MyCharacteri
   sensorLocationCharacteristic->setValue(cpsLocation, sizeof(cpsLocation));
   cyclingPowerMeasurementCharacteristic->setCallbacks(chrCallbacks);
   pPowerMonitor->start();
-  //spinBLEServer.pServer->getAdvertising()->addServiceUUID(pPowerMonitor->getUUID());
-  
+  // spinBLEServer.pServer->getAdvertising()->addServiceUUID(pPowerMonitor->getUUID());
+
   // Add service UUID to DirCon MDNS
   DirConManager::addBleServiceUuid(pPowerMonitor->getUUID());
 }
 
 void BLE_Cycling_Power_Service::update() {
-
   int power     = rtConfig->watts.getValue();
   float cadence = rtConfig->cad.getValue();
 
@@ -58,20 +56,18 @@ void BLE_Cycling_Power_Service::update() {
 
   auto byteArray = cpm.toByteArray();
 
-  cyclingPowerMeasurementCharacteristic->notify(&byteArray[0], byteArray.size());
-  
+  // Notify the cycling power measurement characteristic
+  // Need to set the value before notifying so that read works correctly.
+  cyclingPowerMeasurementCharacteristic->setValue(&byteArray[0], byteArray.size());
+  cyclingPowerMeasurementCharacteristic->notify();
+
   // Also notify DirCon TCP clients
-  DirConManager::notifyCharacteristic(
-    NimBLEUUID(CYCLINGPOWERSERVICE_UUID),
-    cyclingPowerMeasurementCharacteristic->getUUID(),
-    &byteArray[0],
-    byteArray.size()
-  );
+  DirConManager::notifyCharacteristic(NimBLEUUID(CYCLINGPOWERSERVICE_UUID), cyclingPowerMeasurementCharacteristic->getUUID(), &byteArray[0], byteArray.size());
 
   const int kLogBufCapacity = 150;
   char logBuf[kLogBufCapacity];
   const size_t byteArrayLength = byteArray.size();
 
   logCharacteristic(logBuf, kLogBufCapacity, &byteArray[0], byteArrayLength, CYCLINGPOWERSERVICE_UUID, cyclingPowerMeasurementCharacteristic->getUUID(),
-                   "CPS(CPM)[ CD(%.2f) PW(%d) ]", cadence > 0 ? fmodf(cadence, 1000.0) : 0, power % 10000);
+                    "CPS(CPM)[ CD(%.2f) PW(%d) ]", cadence > 0 ? fmodf(cadence, 1000.0) : 0, power % 10000);
 }

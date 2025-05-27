@@ -28,10 +28,10 @@ void BLE_Wattbike_Service::setupService(NimBLEServer *pServer) {
 }
 
 void BLE_Wattbike_Service::parseNemit() {
-  static int lastGear = -1;  // Track last gear position
-  static unsigned long lastNotifyTime = 0;  // Track last notification time
+  static int lastGear                 = -1;     // Track last gear position
+  static unsigned long lastNotifyTime = 0;      // Track last notification time
   const unsigned long NOTIFY_INTERVAL = 30000;  // 30 seconds in milliseconds
-  
+
   // Get current shifter position
   int currentGear = rtConfig->getShifterPosition();
   if (currentGear < 1) {  // Ensure gear is at least 1
@@ -39,13 +39,13 @@ void BLE_Wattbike_Service::parseNemit() {
   }
 
   unsigned long currentTime = millis();
-  
+
   // Only call update if gear changed or 30 seconds elapsed
   if (currentGear != lastGear || (currentTime - lastNotifyTime) >= NOTIFY_INTERVAL) {
     update();  // Call existing update function to handle notification
-    
+
     // Update tracking variables
-    lastGear = currentGear;
+    lastGear       = currentGear;
     lastNotifyTime = currentTime;
   }
 }
@@ -67,7 +67,8 @@ void BLE_Wattbike_Service::update() {
   gearData[2] = 0xB6;               // Fixed value
   gearData[3] = (byte)currentGear;  // Gear value
 
-  // Update the characteristic
+  // Notify the cycling power measurement characteristic
+  // Need to set the value before notifying so that read works correctly.
   wattbikeReadCharacteristic->setValue(gearData, sizeof(gearData));
   wattbikeReadCharacteristic->notify();
   DirConManager::notifyCharacteristic(NimBLEUUID(WATTBIKE_SERVICE_UUID), wattbikeReadCharacteristic->getUUID(), gearData, sizeof(gearData));
