@@ -37,7 +37,7 @@ void BLE_Fitness_Machine_Service::setupService(NimBLEServer *pServer, MyCharacte
   // Fitness Machine service setup
   pFitnessMachineService             = spinBLEServer.pServer->createService(FITNESSMACHINESERVICE_UUID);
   fitnessMachineFeature              = pFitnessMachineService->createCharacteristic(FITNESSMACHINEFEATURE_UUID, NIMBLE_PROPERTY::READ);
-  fitnessMachineControlPoint         = pFitnessMachineService->createCharacteristic(FITNESSMACHINECONTROLPOINT_UUID, NIMBLE_PROPERTY::WRITE | NIMBLE_PROPERTY::INDICATE);
+  fitnessMachineControlPoint         = pFitnessMachineService->createCharacteristic(FITNESSMACHINECONTROLPOINT_UUID, NIMBLE_PROPERTY::WRITE | NIMBLE_PROPERTY::INDICATE | NIMBLE_PROPERTY::NOTIFY);
   fitnessMachineStatusCharacteristic = pFitnessMachineService->createCharacteristic(FITNESSMACHINESTATUS_UUID, NIMBLE_PROPERTY::NOTIFY);
   fitnessMachineIndoorBikeData       = pFitnessMachineService->createCharacteristic(FITNESSMACHINEINDOORBIKEDATA_UUID, NIMBLE_PROPERTY::NOTIFY);
   fitnessMachineResistanceLevelRange = pFitnessMachineService->createCharacteristic(FITNESSMACHINERESISTANCELEVELRANGE_UUID, NIMBLE_PROPERTY::READ);
@@ -280,7 +280,7 @@ void BLE_Fitness_Machine_Service::processFTMSWrite() {
           logBufLength += snprintf(logBuf + logBufLength, kLogBufCapacity - logBufLength, "-> Unsupported FTMS Request");
         }
       }
-      SS2K_LOG(FMTS_SERVER_LOG_TAG, "%s", logBuf);
+      SS2K_LOG(FMTS_SERVER_LOG_TAG, "%s. Responding: %x%x%x", logBuf, returnValue[0], returnValue[1], returnValue[2]);
     } else {
       SS2K_LOG(FMTS_SERVER_LOG_TAG, "App wrote nothing ");
       SS2K_LOG(FMTS_SERVER_LOG_TAG, "assuming it's a Control request");
@@ -289,9 +289,12 @@ void BLE_Fitness_Machine_Service::processFTMSWrite() {
       ftmsTrainingStatus[1] = FitnessMachineTrainingStatus::Other;  // 0x00;
     }
     // not checking for subscription because a write request would have triggererd this
-    fitnessMachineControlPoint->indicate(returnValue.data(), returnValue.size());
-    fitnessMachineTrainingStatus->notify(ftmsTrainingStatus.data(), ftmsTrainingStatus.size());
-    fitnessMachineStatusCharacteristic->notify(ftmsStatus.data(), ftmsStatus.size());
+    fitnessMachineControlPoint->setValue(returnValue.data(), returnValue.size());
+    fitnessMachineControlPoint->notify();
+    fitnessMachineTrainingStatus->setValue(ftmsTrainingStatus.data(), ftmsTrainingStatus.size());
+    fitnessMachineTrainingStatus->notify();
+    fitnessMachineStatusCharacteristic->setValue(ftmsStatus.data(), ftmsStatus.size());
+    fitnessMachineStatusCharacteristic->notify();
 
     // Also notify DirCon TCP clients
     DirConManager::notifyCharacteristic(NimBLEUUID(FITNESSMACHINESERVICE_UUID), fitnessMachineControlPoint->getUUID(), returnValue.data(), returnValue.size());
