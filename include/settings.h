@@ -214,7 +214,7 @@ const char* const DEFAULT_PASSWORD = "password";
 #define BLE_CLIENT_DELAY 101
 
 // Number of devices that can be connected to the Client (myBLEDevices size)
-#define NUM_BLE_DEVICES 4
+#define NUM_BLE_DEVICES 3
 
 // loop speed for the Webserver
 #define WEBSERVER_DELAY 7
