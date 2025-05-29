@@ -89,6 +89,7 @@ class SpinBLEServer {
   void notifyShift();
   double calculateSpeed();
   void update();
+  int connectedClientCount();
   // Queue to store writes to any of the callbacks to the server
   std::queue<std::string> writeCache;
 };
@@ -108,7 +109,6 @@ void startBLEServer();
 void logCharacteristic(char* buffer, const size_t bufferCapacity, const byte* data, const size_t dataLength, const NimBLEUUID serviceUUID, const NimBLEUUID charUUID,
                        const char* format, ...);
 void calculateInstPwrFromHR();
-int connectedClientCount();
 
 // BLE FIRMWARE UPDATER
 void BLEFirmwareSetup();

@@ -105,7 +105,7 @@ void BLECommunications() {
 #endif
 
       if (BLEDevice::getAdvertising()) {
-        if (!(BLEDevice::getAdvertising()->isAdvertising()) && (BLEDevice::getServer()->getConnectedCount() < CONFIG_BT_NIMBLE_MAX_CONNECTIONS - NUM_BLE_DEVICES)) {
+        if ((!BLEDevice::getAdvertising()->isAdvertising()) && (spinBLEServer.connectedClientCount() < CONFIG_BT_NIMBLE_MAX_CONNECTIONS - NUM_BLE_DEVICES)) {
           SS2K_LOG(BLE_COMMON_LOG_TAG, "Starting Advertising From Communication Loop");
           BLEDevice::startAdvertising();
         }
@@ -113,7 +113,7 @@ void BLECommunications() {
     }
 
     // blink if no client connected
-    if (connectedClientCount() == 0) {
+    if (spinBLEServer.connectedClientCount() == 0) {
       if ((millis() / 500) % 2 == 0) {
         digitalWrite(LED_PIN, LOW);
       } else {

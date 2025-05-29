@@ -200,7 +200,7 @@ void MyCharacteristicCallbacks::onSubscribe(NimBLECharacteristic* pCharacteristi
 }
 
 // Return number of clients connected to our server.
-int connectedClientCount() {
+int SpinBLEServer::connectedClientCount() {
   if (BLEDevice::getServer()) {
     return BLEDevice::getServer()->getConnectedCount();
   } else {
