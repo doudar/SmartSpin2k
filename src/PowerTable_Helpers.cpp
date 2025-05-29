@@ -539,7 +539,7 @@ void PTHelpers::linearFill(PTData& ptData) {
       int cad        = currentRowIndex * POWERTABLE_CAD_INCREMENT + MINIMUM_TABLE_CAD;
       int resistance = this->lookup(watts, cad, ptData);
       if (resistance == RETURN_ERROR) {
-        SS2K_LOG(PTDATA_LOG_TAG, "Failed to lookup resistance for watts: %d, cadence: %d", watts, cad);
+        //SS2K_LOG(PTDATA_LOG_TAG, "Failed to lookup resistance for watts: %d, cadence: %d", watts, cad);
         return; // Skip this cell processing
       } else {
         resistance = resistance / TABLE_DIVISOR;

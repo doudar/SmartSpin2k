@@ -282,7 +282,7 @@ void PowerTable::fillTable() {
   if (this->getNumEntries() > 4) {
     // set flag to stop execution after we can't add any more entries.
     if (esp_get_free_heap_size() < FREE_HEAP_FOR_COMPLEX_MATH) {
-      SS2K_LOG(POWERTABLE_LOG_TAG, "%d Heap too low for step %d.", esp_get_free_heap_size(), step);
+      // SS2K_LOG(POWERTABLE_LOG_TAG, "%d Heap too low for step %d.", esp_get_free_heap_size(), step);
       return;
     }
     entries = getNumEntries();
