@@ -151,7 +151,6 @@ int PowerTable::getNumEntries() {
 
 void PowerTable::clean() {
   SS2K_LOG(POWERTABLE_LOG_TAG, "Clean Power Table");
-  int ret = 0;
   for (int i = 0; i < POWERTABLE_CAD_SIZE; i++) {
     for (int j = 0; j < POWERTABLE_WATT_SIZE; j++) {
       if (this->ptData.tableRow[i].tableEntry[j].readings < 1) {
@@ -166,7 +165,6 @@ void PowerTable::newEntry(PowerBuffer& powerBuffer) {
   float watts          = 0;
   float cad            = 0;
   float targetPosition = 0;
-  int avgPosition      = 0;
 
   // First, take the power buffer and average all of the samples together.
   int validEntries = 0;
@@ -233,6 +231,7 @@ void PowerTable::newEntry(PowerBuffer& powerBuffer) {
   }
 
   this->enterData(index, (int)targetPosition);
+  fillTableFlag = true;  // set flag to fill table
   BLE_ss2kCustomCharacteristic::notify(0x27, index.cadIndex);
 }
 
@@ -263,7 +262,6 @@ void PowerTable::enterData(ptIndex index, int pos) {
     }
   }
   this->ptData.tableRow[index.cadIndex].tableEntry[index.wattIndex].readings++;
-  fillTableFlag = true;  // set flag to fill table
 }
 
 void PowerTable::fillTable() {
@@ -272,6 +270,7 @@ void PowerTable::fillTable() {
   static int8_t step     = 0;
   static int prevEntries = 0;
 
+  //Abort if the fillTableFlag is not set.
   if (!fillTableFlag) {
     entries     = 0;
     newEntries  = 0;
@@ -279,6 +278,7 @@ void PowerTable::fillTable() {
     step        = 0;
     return;
   }
+
   if (this->getNumEntries() > 4) {
     // set flag to stop execution after we can't add any more entries.
     if (esp_get_free_heap_size() < FREE_HEAP_FOR_COMPLEX_MATH) {
@@ -289,11 +289,11 @@ void PowerTable::fillTable() {
     if (step == 0) {
       SS2K_LOG(POWERTABLE_LOG_TAG, "Fill start with %d entries", entries);
       prevEntries = entries;
-      ptHelpers.splineFill(ptData);
+      ptHelpers.splineFill(ptData, true);
     } else if (step == 1) {
-      ptHelpers.linearFill(ptData);
+      ptHelpers.splineFill(ptData, false);
     } else if (step == 2) {
-      // NOT IMPLEMENTED YET
+      ptHelpers.linearFill(ptData);
     }
     newEntries = getNumEntries();
     SS2K_LOG(POWERTABLE_LOG_TAG, "Fill step %d added %d new entries", step, newEntries - prevEntries);
@@ -302,7 +302,8 @@ void PowerTable::fillTable() {
     } else if (step == 2) {
       SS2K_LOG(POWERTABLE_LOG_TAG, "No more entries can be added, stopping fill.");
       fillTableFlag = false;
-      step          = -1;
+      step          = 0;
+      return;
     }
     step = (step + 1) % 3;
   }
@@ -387,7 +388,7 @@ float PowerTable::calculatePosition(float watts, float cad, float targetPos, ptI
   float positions[]  = {float(wattPosition + POWERTABLE_WATT_INCREMENT), float(wattPosition - POWERTABLE_WATT_INCREMENT), float(cadPosition + POWERTABLE_CAD_INCREMENT),
                         float(cadPosition - POWERTABLE_CAD_INCREMENT)};
   bool passedTests[] = {testResults.rightNeighbor.passedTest, testResults.leftNeighbor.passedTest, testResults.bottomNeighbor.passedTest, testResults.topNeighbor.passedTest};
-  bool isValid[]       = {testResults.rightNeighbor.found, testResults.leftNeighbor.found, testResults.bottomNeighbor.found, testResults.topNeighbor.found};
+  bool isValid[]     = {testResults.rightNeighbor.found, testResults.leftNeighbor.found, testResults.bottomNeighbor.found, testResults.topNeighbor.found};
 
   float totalValue = 0.0f;
   int count        = 0;

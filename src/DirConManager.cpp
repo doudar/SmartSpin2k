@@ -536,12 +536,12 @@ void DirConManager::broadcastNotification(const NimBLEUUID& characteristicUuid, 
   }
 
   // Send to all connected clients
-  bool sentDebug = false;
   for (int i = 0; i < DIRCON_MAX_CLIENTS; i++) {
     if (!dirConClients[i].connected() || !hasSubscription(i, characteristicUuid)) {
       continue;
     }
 #ifdef DEBUG_DIRCON_MESSAGES
+    bool sentDebug = false;
     // Print the outgoing raw message bytes to serial
     if (!sentDebug) DirConMessage::printVectorBytesToSerial(*encodedMessage, false);
     sentDebug = true;

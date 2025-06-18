@@ -106,9 +106,9 @@ void SpinBLEServer::updateWheelAndCrankRev() {
   }
 
   // Calculate wheel revolutions per minute
-  float wheelRpm        = (wheelSpeedMps / wheelSize) * 60;
-  double wheelRevPeriod = (60 * 1024) / wheelRpm;
+  float wheelRpm = (wheelSpeedMps / wheelSize) * 60;
   if (wheelRpm > 0) {
+    double wheelRevPeriod = (60 * 1024) / wheelRpm;
     spinBLEClient.cscCumulativeWheelRev++;                // Increment cumulative wheel revolutions
     spinBLEClient.cscLastWheelEvtTime += wheelRevPeriod;  // Convert RPM to time, ensuring no division by zero
   }
@@ -167,7 +167,11 @@ void MyCharacteristicCallbacks::onWrite(NimBLECharacteristic* pCharacteristic, N
 }
 
 void MyCharacteristicCallbacks::onStatus(NimBLECharacteristic* pCharacteristic, int code) {
-  // loop through and accumulate the data into a C++ string
+// loop through and accumulate the data into a C++ string
+// only used for extensive logging.
+#ifndef DEBUG_BLE_TX_RX
+  return;
+#endif
   std::string characteristicValue = pCharacteristic->getValue();
   std::string logValue;
   for (size_t i = 0; i < characteristicValue.length(); ++i) {
@@ -176,7 +180,7 @@ void MyCharacteristicCallbacks::onStatus(NimBLECharacteristic* pCharacteristic, 
     logValue += buf;
   }
 
-  // SS2K_LOG(BLE_SERVER_LOG_TAG, "%s -> %s", pCharacteristic->getUUID().toString().c_str(), logValue.c_str());
+  SS2K_LOG(BLE_SERVER_LOG_TAG, "%s -> %s", pCharacteristic->getUUID().toString().c_str(), logValue.c_str());
 }
 
 void MyCharacteristicCallbacks::onSubscribe(NimBLECharacteristic* pCharacteristic, NimBLEConnInfo& connInfo, uint16_t subValue) {

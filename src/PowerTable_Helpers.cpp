@@ -205,7 +205,6 @@ int32_t PTHelpers::lookup(int watts, int cad, PTData& ptData) {
   const int MIN_WATT_VAL = 0;  // Assuming watts index start from 0
   const int MAX_WATT_VAL = (POWERTABLE_WATT_SIZE - 1) * POWERTABLE_WATT_INCREMENT;
   int32_t resistance     = RETURN_ERROR;
-  int ptDataSize         = dataPoints(ptData);
   std::pair<std::vector<float>, std::vector<float>> dataPoints;
 
   bool isCadOutOfTable = cad < MIN_CAD_VAL || cad > MAX_CAD_VAL;
@@ -214,17 +213,14 @@ int32_t PTHelpers::lookup(int watts, int cad, PTData& ptData) {
 
   // ---- A. Handle Out-of-Table simple Extrapolation ----
   if (isCadOutOfTable && !isWattOutOfTable) {
-    // A.1. Attempt Cadence Extrapolation if cadence is out of bounds
-    if (isCadOutOfTable) {
-      int targetWattIndex = index.wattIndex;
-      // Clamp targetWattIndex to be within table bounds for selecting the column
-      if (targetWattIndex < 0) targetWattIndex = 0;
-      dataPoints = getColumn(targetWattIndex, ptData);
-      if (dataPoints.first.size() >= 2) {
-        float extrapolatedVal = linearExtrapolate(dataPoints, dataPoints.first.size(), static_cast<float>(cad));
-        if (extrapolatedVal != INT16_MIN && !std::isnan(extrapolatedVal) && !std::isinf(extrapolatedVal)) {
-          resistance = static_cast<int32_t>(round(extrapolatedVal)) * TABLE_DIVISOR;
-        }
+    int targetWattIndex = index.wattIndex;
+    // Clamp targetWattIndex to be within table bounds for selecting the column
+    if (targetWattIndex < 0) targetWattIndex = 0;
+    dataPoints = getColumn(targetWattIndex, ptData);
+    if (dataPoints.first.size() >= 2) {
+      float extrapolatedVal = linearExtrapolate(dataPoints, dataPoints.first.size(), static_cast<float>(cad));
+      if (extrapolatedVal != INT16_MIN && !std::isnan(extrapolatedVal) && !std::isinf(extrapolatedVal)) {
+        resistance = static_cast<int32_t>(round(extrapolatedVal)) * TABLE_DIVISOR;
       }
     }
   }
@@ -301,17 +297,33 @@ int32_t PTHelpers::lookup(int watts, int cad, PTData& ptData) {
 
   if (count > 0) {
     resistance = static_cast<int32_t>(round(sum / count)) * TABLE_DIVISOR;
-    //SS2K_LOG(PTDATA_LOG_TAG, "Lookup result: watts=%d, cad=%d, resistance=%d", watts, cad, resistance);
-    // LOG R1, R2, R3 values for debugging
-    //SS2K_LOG(PTDATA_LOG_TAG, "R1: %f, R2: %f, R3: %f", R1, R2, R3);
+    // SS2K_LOG(PTDATA_LOG_TAG, "Lookup result: watts=%d, cad=%d, resistance=%d", watts, cad, resistance);
+    //  LOG R1, R2, R3 values for debugging
+    // SS2K_LOG(PTDATA_LOG_TAG, "R1: %f, R2: %f, R3: %f", R1, R2, R3);
   }
 
   return resistance;  // All lookup methods failed
 }
 
+/**
+ * @brief Extrapolates and fills empty indices in a power table row or column using cubic spline interpolation and neighbor blending.
+ *
+ * This function takes a set of empty indices within a row or column of a power table and attempts to extrapolate their values
+ * based on existing (x, y) data points using cubic spline interpolation. The extrapolated value is then blended with nearby
+ * valid neighbors to ensure smoothness and avoid abrupt transitions. The function also ensures that the extrapolated values
+ * remain within a reasonable range, slightly extended beyond the min/max of the known values. Neighbor blending uses a
+ * distance-based decay to weight closer neighbors more heavily.
+ *
+ * @param outerIndex The index of the row or column being processed, depending on the orientation.
+ * @param emptyIndices The indices within the row or column that are empty and need to be extrapolated.
+ * @param xy A pair of vectors representing the known (x, y) data points for interpolation.
+ * @param n The number of valid (x, y) data points.
+ * @param horizontal If true, extrapolation is performed horizontally (across columns); otherwise, vertically (across rows).
+ * @param naturalSpline If true, use a natural cubic spline for interpolation (currently unused in this function).
+ * @param ptData Reference to the power table data structure to be updated with extrapolated values.
+ */
 void PTHelpers::extrapolateEmptyIndices(int outerIndex, const std::vector<int>& emptyIndices, std::pair<std::vector<float>, std::vector<float>> xy, size_t n, bool horizontal,
                                         bool naturalSpline, PTData& ptData) {
-  int innerSize = horizontal ? POWERTABLE_WATT_SIZE : POWERTABLE_CAD_SIZE;
   ptIndex index;
   if (n >= 3) {
     bool validForSpline = true;
@@ -343,29 +355,29 @@ void PTHelpers::extrapolateEmptyIndices(int outerIndex, const std::vector<int>& 
       if (testNeighbors(index, tempValue, ptData).allNeighborsPassed) {
         // Blend with nearby valid neighbors to ensure smoothness
         float blendedValue = tempValue;
-        float totalWeight = 1.0f;  // Start with original value
-        
+        float totalWeight  = 1.0f;  // Start with original value
+
         // Check horizontal and vertical neighbors within 2 steps
-        const int blendRadius = 2;
+        const int blendRadius     = 2;
         const float distanceDecay = 0.7f;  // Weight decreases with distance
-        
+
         for (int di = -blendRadius; di <= blendRadius; di++) {
           for (int dj = -blendRadius; dj <= blendRadius; dj++) {
             // Skip self
             if (di == 0 && dj == 0) continue;
-            
+
             int ni = index.cadIndex + (horizontal ? 0 : di);
             int nj = index.wattIndex + (horizontal ? di : 0);
-            
+
             // Check if neighbor is valid
             if (ni >= 0 && ni < POWERTABLE_CAD_SIZE && nj >= 0 && nj < POWERTABLE_WATT_SIZE) {
               int16_t neighborVal = ptData.tableRow[ni].tableEntry[nj].targetPosition;
-              
+
               if (neighborVal != INT16_MIN) {
                 // Calculate distance-based weight
                 float distance = std::fabs(di) + std::fabs(dj);  // Manhattan distance
-                float weight = std::pow(distanceDecay, distance);
-                
+                float weight   = std::pow(distanceDecay, distance);
+
                 // Add to weighted average
                 blendedValue += neighborVal * weight;
                 totalWeight += weight;
@@ -373,24 +385,36 @@ void PTHelpers::extrapolateEmptyIndices(int outerIndex, const std::vector<int>& 
             }
           }
         }
-        
+
         // Compute final blended value if we found neighbors
         if (totalWeight > 1.0f) {
           // More weight to original spline value (70%) for trend preservation
           float originalWeight = 0.7f;
           float neighborWeight = 1.0f - originalWeight;
-          
-          blendedValue = (originalWeight * tempValue + 
-                          neighborWeight * (blendedValue - tempValue) / (totalWeight - 1.0f));
+
+          blendedValue = (originalWeight * tempValue + neighborWeight * (blendedValue - tempValue) / (totalWeight - 1.0f));
         }
-        
+
         ptData.tableRow[index.cadIndex].tableEntry[index.wattIndex].targetPosition = static_cast<int16_t>(round(blendedValue));
       }
     }
   }
 }
 
-void PTHelpers::extrapFillTableDirection(bool horizontal, PTData& ptData, bool firstHalf) {
+/**
+ * @brief Fills missing entries in the power table using cubic spline interpolation.
+ *
+ * This function processes either the first or second half of the table rows or columns,
+ * depending on the `firstHalf` parameter, and interpolates missing values (marked by INT16_MIN)
+ * using cubic splines. The interpolation is performed either horizontally (across watt indices)
+ * or vertically (across cadence indices) as determined by the `horizontal` parameter.
+ * The function ensures overlap between the two halves to provide smooth transitions.
+ *
+ * @param ptData      Reference to the power table data structure to be filled.
+ * @param firstHalf   (optional) If true, processes the first half (with overlap); otherwise, processes the second half. Default is true.
+ * @param horizontal  (optional) If true, fills across watt indices (rows); if false, fills across cadence indices (columns). Default is true.
+ */
+void PTHelpers::splineFill(PTData& ptData, bool firstHalf /*= true*/, bool horizontal /*= true*/) {
   int outerSize = horizontal ? POWERTABLE_CAD_SIZE : POWERTABLE_WATT_SIZE;
   int innerSize = horizontal ? POWERTABLE_WATT_SIZE : POWERTABLE_CAD_SIZE;
 
@@ -405,23 +429,21 @@ void PTHelpers::extrapFillTableDirection(bool horizontal, PTData& ptData, bool f
     rangeStart = 0;
     // Ensure overlap: process a bit more than half, e.g., 2/3 or 3/4
     // The amount of overlap might need tuning. Let's try 2/3 for now.
-    rangeEnd   = (innerSize * 2) / 3; 
-    if (rangeEnd > innerSize) rangeEnd = innerSize; // cap at innerSize
+    rangeEnd = (innerSize * 2) / 3;
+    if (rangeEnd > innerSize) rangeEnd = innerSize;  // cap at innerSize
   } else {
     // Start from a point that ensures overlap with the first half
     rangeStart = innerSize / 3;
     rangeEnd   = innerSize;
   }
 
-
-  int mid_outer = outerSize / 2;
+  int mid_outer   = outerSize / 2;
   int max_k_outer = 0;
   if (outerSize > 0) {
-      max_k_outer = std::max(mid_outer, (outerSize - 1) - mid_outer);
+    max_k_outer = std::max(mid_outer, (outerSize - 1) - mid_outer);
   }
 
-  auto processOuterIndex = 
-    [&](int currentOuterIndex) {
+  auto processOuterIndex = [&](int currentOuterIndex) {
     unique_xy.clear();
     emptyIndices.clear();
     x.clear();
@@ -435,7 +457,7 @@ void PTHelpers::extrapFillTableDirection(bool horizontal, PTData& ptData, bool f
 
       // Boundary checks for safety, though currentOuterIndex should be valid by loop logic
       if (index.cadIndex < 0 || index.cadIndex >= POWERTABLE_CAD_SIZE || index.wattIndex < 0 || index.wattIndex >= POWERTABLE_WATT_SIZE) {
-          continue;
+        continue;
       }
 
       if (ptData.tableRow[index.cadIndex].tableEntry[index.wattIndex].targetPosition != INT16_MIN) {
@@ -503,20 +525,15 @@ float PTHelpers::linearExtrapolate(std::pair<std::vector<float>, std::vector<flo
   y0 = xy.second[0], y1 = xy.second[n - 1];
 
   if (x1 - x0 == 0) {
-    //SS2K_LOG(PTDATA_LOG_TAG, "Linear Extrapolation failed, x1 - x0 is 0. x0=%f, x1=%f, y0=%f, y1=%f, n=%zu", x0, x1, y0, y1, n);
+    // SS2K_LOG(PTDATA_LOG_TAG, "Linear Extrapolation failed, x1 - x0 is 0. x0=%f, x1=%f, y0=%f, y1=%f, n=%zu", x0, x1, y0, y1, n);
     for (size_t i = 0; i < n; ++i) {
-      //SS2K_LOG(PTDATA_LOG_TAG, "xy[%zu]: x=%f, y=%f", i, xy.first[i], xy.second[i]);
+      // SS2K_LOG(PTDATA_LOG_TAG, "xy[%zu]: x=%f, y=%f", i, xy.first[i], xy.second[i]);
     }
     return INT16_MIN;
   }
 
   float slope = (y1 - y0) / (x1 - x0);
   return y0 + slope * (j - x0);
-}
-
-void PTHelpers::splineFill(PTData& ptData, bool firstHalf) {
-  extrapFillTableDirection(true, ptData, true);
-  extrapFillTableDirection(true, ptData, false);  // Fill remaining empty entries in horizontal direction
 }
 
 /**
@@ -529,7 +546,7 @@ void PTHelpers::splineFill(PTData& ptData, bool firstHalf) {
  * @param ptData Reference to the PTData object containing the power table.
  */
 void PTHelpers::linearFill(PTData& ptData) {
-  int mid = POWERTABLE_CAD_SIZE / 2;
+  int mid   = POWERTABLE_CAD_SIZE / 2;
   int max_k = (POWERTABLE_CAD_SIZE - 1) - mid;
 
   // Define a lambda for processing a single cell
@@ -539,18 +556,18 @@ void PTHelpers::linearFill(PTData& ptData) {
       int cad        = currentRowIndex * POWERTABLE_CAD_INCREMENT + MINIMUM_TABLE_CAD;
       int resistance = this->lookup(watts, cad, ptData);
       if (resistance == RETURN_ERROR) {
-        //SS2K_LOG(PTDATA_LOG_TAG, "Failed to lookup resistance for watts: %d, cadence: %d", watts, cad);
-        return; // Skip this cell processing
+        // SS2K_LOG(PTDATA_LOG_TAG, "Failed to lookup resistance for watts: %d, cadence: %d", watts, cad);
+        return;  // Skip this cell processing
       } else {
         resistance = resistance / TABLE_DIVISOR;
       }
       ptIndex current_pt_idx;
-      current_pt_idx.wattIndex     = currentColIndex;
-      current_pt_idx.cadIndex      = currentRowIndex;
-      TestResults results = this->testNeighbors(current_pt_idx, resistance, ptData);
+      current_pt_idx.wattIndex = currentColIndex;
+      current_pt_idx.cadIndex  = currentRowIndex;
+      TestResults results      = this->testNeighbors(current_pt_idx, resistance, ptData);
       if (results.allNeighborsPassed == 1) {
         ptData.tableRow[currentRowIndex].tableEntry[currentColIndex].targetPosition = resistance;
-        //SS2K_LOG(PTDATA_LOG_TAG, "Filled position (%d, %d) with resistance: %d", currentRowIndex, currentColIndex, resistance);
+        // SS2K_LOG(PTDATA_LOG_TAG, "Filled position (%d, %d) with resistance: %d", currentRowIndex, currentColIndex, resistance);
       } else {  // log the failure to in insert the value
                 // Serial.printf("Failed to fill position (%d, %d) with resistance: %d\n", currentRowIndex, currentColIndex, resistance);
       }
@@ -560,7 +577,7 @@ void PTHelpers::linearFill(PTData& ptData) {
   for (int k = 0; k <= max_k; ++k) {
     // Process row from mid upwards: mid, mid+1, mid+2, ...
     int i_upper = mid + k;
-    if (i_upper < POWERTABLE_CAD_SIZE) { // Ensure i_upper is a valid row index
+    if (i_upper < POWERTABLE_CAD_SIZE) {  // Ensure i_upper is a valid row index
       for (int j = 0; j < POWERTABLE_WATT_SIZE; j++) {
         processCell(i_upper, j);
       }
@@ -569,7 +586,7 @@ void PTHelpers::linearFill(PTData& ptData) {
     // Process row from mid downwards: mid-1, mid-2, ..., only if k > 0 to avoid re-processing 'mid'
     if (k > 0) {
       int i_lower = mid - k;
-      if (i_lower >= 0) { // Ensure i_lower is a valid row index
+      if (i_lower >= 0) {  // Ensure i_lower is a valid row index
         for (int j = 0; j < POWERTABLE_WATT_SIZE; j++) {
           processCell(i_lower, j);
         }
@@ -623,7 +640,6 @@ int PTHelpers::extrapolateWattsFromCadence(int cad, int32_t targetPosition, PTDa
   }
   ptIndex index       = calculateIndex(0, cad);  // Ensure the index is calculated for the given cadence
   bool inCadenceRange = index.cadIndex >= 0 && index.cadIndex < POWERTABLE_CAD_SIZE;
-  bool inWattRange    = index.wattIndex >= 0 && index.wattIndex < POWERTABLE_WATT_SIZE;
   std::pair<std::vector<float>, std::vector<float>> xyUsed4Offset;
 
   std::pair<std::vector<float>, std::vector<float>> xy;  // Get the row data for the given cadence
@@ -644,11 +660,9 @@ int PTHelpers::extrapolateWattsFromCadence(int cad, int32_t targetPosition, PTDa
       // SS2K_LOG(PTDATA_LOG_TAG, "LookupWatts: index.cadIndex == %d, xy %f, xyused4Offset %f, cadDelta %d", index.cadIndex, xy.second[0], xyUsed4Offset.second[0], cadDelta);
     }
     for (int i = 0; i < xy.second.size(); i++) {
-      bool found = false;
       for (int j = 0; j < xyUsed4Offset.second.size(); j++) {
         if (xy.first[i] == xyUsed4Offset.first[j]) {
           offset     = (((xyUsed4Offset.second[j] - xy.second[i]) * cadDelta) + offset) / 2;
-          bool found = true;
         }
       }
     }

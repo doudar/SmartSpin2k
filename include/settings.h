@@ -320,9 +320,6 @@ const char* const DEFAULT_PASSWORD = "password";
 // If not receiving Peloton Messages, how long to wait before next TX attempt is
 #define TX_CHECK_INTERVAL 20
 
-// If ble devices are both setup, how often to attempt a reconnect.
-#define BLE_RECONNECT_INTERVAL 1
-
 // Interval for polling ble battery updates
 #define BATTERY_UPDATE_INTERVAL_MILLIS 300000
 

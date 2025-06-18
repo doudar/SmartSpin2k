@@ -140,7 +140,6 @@ void BLE_ss2kCustomCharacteristic::process(std::string rxValue) {
   }
   NimBLECharacteristic *pCharacteristic = NimBLEDevice::getServer()->getServiceByUUID(SMARTSPIN2K_SERVICE_UUID)->getCharacteristic(SMARTSPIN2K_CHARACTERISTIC_UUID);
   uint8_t *pData                        = reinterpret_cast<uint8_t *>(&rxValue[0]);
-  int length                            = rxValue.length();
 
 #ifdef CUSTOM_CHAR_DEBUG
 #define LOG_BUF_APPEND(...) logBufLength += snprintf(logBuf + logBufLength, kLogBufCapacity - logBufLength, __VA_ARGS__)

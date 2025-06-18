@@ -117,7 +117,6 @@ void ErgMode::runERG() {
 
 // compute position for resistance control mode
 void ErgMode::computeResistance() {
-  static int stepChangePerResistance = userConfig->getShiftStep();
   static Measurement oldResistance;
 
   if (rtConfig->resistance.getTimestamp() == oldResistance.getTimestamp()) {

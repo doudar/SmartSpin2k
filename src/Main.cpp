@@ -198,7 +198,6 @@ void loop() {  // Delete this task so we can make one that's more memory efficie
 void SS2K::maintenanceLoop(void *pvParameters) {
   static unsigned long intervalTimer2 = millis();
   static unsigned long rebootTimer    = millis();
-  static bool isScanning              = false;
 
   while (true) {
     delay(5);

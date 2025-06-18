@@ -65,7 +65,6 @@ void startWifi() {
       SS2K_LOG(HTTP_SERVER_LOG_TAG, "Waiting for connection to be established...");
       i++;
       if (i > WIFI_CONNECT_TIMEOUT) {
-        i = 0;
         SS2K_LOG(HTTP_SERVER_LOG_TAG, "Couldn't Connect. Switching to AP mode");
         WiFi.disconnect(true, true);
         WiFi.setAutoReconnect(false);
@@ -565,7 +564,6 @@ void HTTP_Server::settingsProcessor() {
   if (!server.arg("bleHRDropdown").isEmpty()) {
     wasBTUpdate = true;
     if (server.arg("bleHRDropdown")) {
-      bool reset = false;
       tString    = server.arg("bleHRDropdown");
       if (tString != userConfig->getConnectedHeartMonitor()) {
         spinBLEClient.reconnectAllDevices();
@@ -578,7 +576,6 @@ void HTTP_Server::settingsProcessor() {
   if (!server.arg("bleRemoteDropdown").isEmpty()) {
     wasBTUpdate = true;
     if (server.arg("bleRemoteDropdown")) {
-      bool reset = false;
       tString    = server.arg("bleRemoteDropdown");
       if (tString != userConfig->getConnectedRemote()) {
         spinBLEClient.reconnectAllDevices();
@@ -673,7 +670,6 @@ void HTTP_Server::FirmwareUpdate() {
       delay(100);
       JsonDocument doc;
       if (httpCode == HTTP_CODE_OK) {  // if version received
-        String payload;
         payload = http.getString();  // save received version
         payload.trim();
         // Deserialize the JSON document
@@ -701,7 +697,6 @@ void HTTP_Server::FirmwareUpdate() {
         httpCode = http.GET();
         delay(100);
         if (httpCode == HTTP_CODE_OK) {
-          String payload;
           payload = http.getString();
           payload.trim();
           LittleFS.remove(fileName);

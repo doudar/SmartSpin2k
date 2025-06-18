@@ -121,9 +121,8 @@ class PTHelpers {
   int32_t lookup(int watts, int cad, PTData& ptData);
   void extrapolateEmptyIndices(int outerIndex, const std::vector<int>& emptyIndices, std::pair<std::vector<float>, std::vector<float>> xy, size_t n, bool horizontal,
                                bool naturalSpline, PTData& ptData);
-  void extrapFillTableDirection(bool horizontal, PTData& ptData, bool firtHalf = true);
+  void splineFill(PTData& ptData, bool firtHalf = true,bool horizontal = true);
   float linearExtrapolate(std::pair<std::vector<float>, std::vector<float>> xy, size_t n, float j);
-  void splineFill(PTData& ptData, bool firstHalf = true);
   void linearFill(PTData& ptData);
   int32_t lookupWatts(int cad, int32_t targetPosition, PTData& ptData);
   int32_t extrapolateCadenceWatts(int cad, float targetPosition, PTData& ptData);

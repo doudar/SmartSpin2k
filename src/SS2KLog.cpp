@@ -75,12 +75,6 @@ void LogHandler::writev(esp_log_level_t level, const char *module, const char *f
     Serial.println(buffer);
   }
 
-  size_t bytesSent = xMessageBufferSend(_messageBufferHandle, buffer, written, 0);
-
-  //if (bytesSent < written) {
-  //  ESP_LOGE(LOG_HANDLER_TAG, "Can not send log message. Not enough free space left in buffer.");
-  //}
-
   xSemaphoreGive(_logBufferMutex);
 }
 

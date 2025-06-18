@@ -200,7 +200,6 @@ bool SpinBLEClient::connectToServer() {
   NimBLEUUID serviceUUID;
   NimBLEUUID charUUID;
 
-  int successful                         = 0;
   const NimBLEAdvertisedDevice *myDevice = nullptr;
   int device_number                      = -1;
 
@@ -420,7 +419,6 @@ void ScanCallbacks::onResult(const NimBLEAdvertisedDevice *advertisedDevice) {
   const char *const STRING_MATCHED_ANY    = " String Matched Any";
   const char *const THIS                  = "This ";
   const char *const NAME                  = "Name ";
-  const char *const ADDRESS               = "Address ";
   const char *const REMOTE                = "Remote";
   const char *const HRM                   = "HRM";
   const char *const PM                    = "PM";
@@ -748,14 +746,14 @@ NotifyData SpinBLEAdvertisedDevice::dequeueData() {
 
 void SpinBLEClient::connectBLE_HID(NimBLEClient *pClient) {
   NimBLERemoteService *pSvc        = nullptr;
-  NimBLERemoteCharacteristic *pChr = nullptr;
   pSvc                             = pClient->getService(HID_SERVICE_UUID);
   if (pSvc) { /** make sure it's not null */
     // This returns the HID report descriptor like this
     // HID_REPORT_MAP 0x2a4b Value: 5,1,9,2,A1,1,9,1,A1,0,5,9,19,1,29,5,15,0,25,1,75,1,
     // Copy and paste the value digits to http://eleccelerator.com/usbdescreqparser/
     // to see the decoded report descriptor.
-    /*pChr = pSvc->getCharacteristic(HID_REPORT_MAP_UUID);
+    /*NimBLERemoteCharacteristic *pChr = nullptr;
+    pChr = pSvc->getCharacteristic(HID_REPORT_MAP_UUID);
     if (pChr) { /** make sure it's not null */
     /*  Serial.print("HID_REPORT_MAP ");
       if (pChr->canRead()) {
