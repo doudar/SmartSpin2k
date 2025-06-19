@@ -75,6 +75,7 @@ void LogHandler::writev(esp_log_level_t level, const char *module, const char *f
     Serial.println(buffer);
   }
 
+  xMessageBufferSend(_messageBufferHandle, buffer, written, 0);
   xSemaphoreGive(_logBufferMutex);
 }
 
