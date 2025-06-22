@@ -269,8 +269,9 @@ void PowerTable::fillTable() {
   static int newEntries  = 0;
   static int8_t step     = 0;
   static int prevEntries = 0;
+  bool completed         = true;
 
-  //Abort if the fillTableFlag is not set.
+  // Abort if the fillTableFlag is not set.
   if (!fillTableFlag) {
     entries     = 0;
     newEntries  = 0;
@@ -289,11 +290,11 @@ void PowerTable::fillTable() {
     if (step == 0) {
       SS2K_LOG(POWERTABLE_LOG_TAG, "Fill start with %d entries", entries);
       prevEntries = entries;
-      ptHelpers.splineFill(ptData, true);
+      completed   = ptHelpers.splineFill(ptData, true);
     } else if (step == 1) {
-      ptHelpers.splineFill(ptData, false);
+      completed = ptHelpers.splineFill(ptData, false);
     } else if (step == 2) {
-      ptHelpers.linearFill(ptData);
+      completed = ptHelpers.linearFill(ptData);
     }
     newEntries = getNumEntries();
     SS2K_LOG(POWERTABLE_LOG_TAG, "Fill step %d added %d new entries", step, newEntries - prevEntries);
@@ -305,7 +306,7 @@ void PowerTable::fillTable() {
       step          = 0;
       return;
     }
-    step = (step + 1) % 3;
+    if (completed) step = (step + 1) % 3;
   }
 }
 

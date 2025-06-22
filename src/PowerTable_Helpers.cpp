@@ -307,6 +307,7 @@ int32_t PTHelpers::lookup(int watts, int cad, PTData& ptData) {
 
 /**
  * @brief Extrapolates and fills empty indices in a power table row or column using cubic spline interpolation and neighbor blending.
+ * returns false if the operation takes too long.
  *
  * This function takes a set of empty indices within a row or column of a power table and attempts to extrapolate their values
  * based on existing (x, y) data points using cubic spline interpolation. The extrapolated value is then blended with nearby
@@ -322,8 +323,10 @@ int32_t PTHelpers::lookup(int watts, int cad, PTData& ptData) {
  * @param naturalSpline If true, use a natural cubic spline for interpolation (currently unused in this function).
  * @param ptData Reference to the power table data structure to be updated with extrapolated values.
  */
-void PTHelpers::extrapolateEmptyIndices(int outerIndex, const std::vector<int>& emptyIndices, std::pair<std::vector<float>, std::vector<float>> xy, size_t n, bool horizontal,
+bool PTHelpers::extrapolateEmptyIndices(int outerIndex, const std::vector<int>& emptyIndices, std::pair<std::vector<float>, std::vector<float>> xy, size_t n, bool horizontal,
                                         bool naturalSpline, PTData& ptData) {
+
+  unsigned long timeout = millis() + COMPUTATION_TIMEOUT_MS;  // Set timeout for computation
   ptIndex index;
   if (n >= 3) {
     bool validForSpline = true;
@@ -335,7 +338,7 @@ void PTHelpers::extrapolateEmptyIndices(int outerIndex, const std::vector<int>& 
     }
     if (!validForSpline) {
       SS2K_LOG(PTDATA_LOG_TAG, "Duplicate or non-increasing x-values detected!");
-      return;
+      return true;
     }
 
     CubicSpline spline;
@@ -396,9 +399,14 @@ void PTHelpers::extrapolateEmptyIndices(int outerIndex, const std::vector<int>& 
         }
 
         ptData.tableRow[index.cadIndex].tableEntry[index.wattIndex].targetPosition = static_cast<int16_t>(round(blendedValue));
+        if( millis() > timeout) {
+          SS2K_LOG(PTDATA_LOG_TAG, "Spline fill operation timed out!");
+          return false;  // Exit if computation takes too long
+        }
       }
     }
   }
+  return true;
 }
 
 /**
@@ -414,7 +422,8 @@ void PTHelpers::extrapolateEmptyIndices(int outerIndex, const std::vector<int>& 
  * @param firstHalf   (optional) If true, processes the first half (with overlap); otherwise, processes the second half. Default is true.
  * @param horizontal  (optional) If true, fills across watt indices (rows); if false, fills across cadence indices (columns). Default is true.
  */
-void PTHelpers::splineFill(PTData& ptData, bool firstHalf /*= true*/, bool horizontal /*= true*/) {
+bool PTHelpers::splineFill(PTData& ptData, bool firstHalf /*= true*/, bool horizontal /*= true*/) {
+  bool completedWithoutTimeout = true;;
   int outerSize = horizontal ? POWERTABLE_CAD_SIZE : POWERTABLE_WATT_SIZE;
   int innerSize = horizontal ? POWERTABLE_WATT_SIZE : POWERTABLE_CAD_SIZE;
 
@@ -482,10 +491,13 @@ void PTHelpers::splineFill(PTData& ptData, bool firstHalf /*= true*/, bool horiz
     bool useNaturalSpline = spline.shouldUseNaturalSpline(std::make_pair(x, y), x.size());
 
     // Fill empty table entries using the determined spline type
-    extrapolateEmptyIndices(currentOuterIndex, emptyIndices, std::make_pair(x, y), x.size(), horizontal, useNaturalSpline, ptData);
+    completedWithoutTimeout = extrapolateEmptyIndices(currentOuterIndex, emptyIndices, std::make_pair(x, y), x.size(), horizontal, useNaturalSpline, ptData);
   };
 
   for (int k = 0; k <= max_k_outer; ++k) {
+    if(!completedWithoutTimeout) {
+      return false;  // Exit if computation takes too long
+    }
     int outer_upper = mid_outer + k;
     if (outer_upper < outerSize) {
       processOuterIndex(outer_upper);
@@ -498,6 +510,7 @@ void PTHelpers::splineFill(PTData& ptData, bool firstHalf /*= true*/, bool horiz
       }
     }
   }
+  return completedWithoutTimeout;  // Return true if all operations completed without timeout
 }
 
 /**
@@ -545,7 +558,7 @@ float PTHelpers::linearExtrapolate(std::pair<std::vector<float>, std::vector<flo
  *
  * @param ptData Reference to the PTData object containing the power table.
  */
-void PTHelpers::linearFill(PTData& ptData) {
+bool PTHelpers::linearFill(PTData& ptData) {
   int mid   = POWERTABLE_CAD_SIZE / 2;
   int max_k = (POWERTABLE_CAD_SIZE - 1) - mid;
 
@@ -593,6 +606,7 @@ void PTHelpers::linearFill(PTData& ptData) {
       }
     }
   }
+  return true;  // Return true if all operations completed without timeout
 }
 
 // Use the powertable to preform a reverse lookup of the target position to find the watts at a given cadence.

@@ -14,6 +14,7 @@
 
 #define RETURN_ERROR               INT32_MIN
 #define FREE_HEAP_FOR_COMPLEX_MATH 30000
+#define COMPUTATION_TIMEOUT_MS 50
 
 class PowerEntry {
  public:
@@ -119,11 +120,11 @@ class PTHelpers {
  public:
   TestResults testNeighbors(ptIndex index, int value, PTData& ptData);
   int32_t lookup(int watts, int cad, PTData& ptData);
-  void extrapolateEmptyIndices(int outerIndex, const std::vector<int>& emptyIndices, std::pair<std::vector<float>, std::vector<float>> xy, size_t n, bool horizontal,
+  bool extrapolateEmptyIndices(int outerIndex, const std::vector<int>& emptyIndices, std::pair<std::vector<float>, std::vector<float>> xy, size_t n, bool horizontal,
                                bool naturalSpline, PTData& ptData);
-  void splineFill(PTData& ptData, bool firtHalf = true,bool horizontal = true);
+  bool splineFill(PTData& ptData, bool firtHalf = true,bool horizontal = true);
   float linearExtrapolate(std::pair<std::vector<float>, std::vector<float>> xy, size_t n, float j);
-  void linearFill(PTData& ptData);
+  bool linearFill(PTData& ptData);
   int32_t lookupWatts(int cad, int32_t targetPosition, PTData& ptData);
   int32_t extrapolateCadenceWatts(int cad, float targetPosition, PTData& ptData);
   int extrapolateWattsFromCadence(int cad, int32_t targetPosition, PTData& ptData);
