@@ -7,6 +7,7 @@
 
 #include "Main.h"
 #include "SS2KLog.h"
+#include "esp_system.h"
 #include <TMCStepper.h>
 #include <Arduino.h>
 #include <LittleFS.h>
@@ -74,7 +75,8 @@ void SS2K::stopTasks() {
   }
 }
 
-void setup() {
+extern "C" void app_main() {
+  initArduino();
   // Serial port for debugging purposes
   Serial.begin(115200);
   SS2K_LOG(MAIN_LOG_TAG, "Compiled %s%s", __DATE__, __TIME__);

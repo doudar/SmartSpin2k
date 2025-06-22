@@ -21,11 +21,7 @@ void LogHandler::addAppender(ILogAppender *appender) { _appenders.push_back(appe
 
 void LogHandler::initialize() {
   for (ILogAppender *appender : _appenders) {
-    try {
-      appender->Initialize();
-    } catch (...) {
-      SS2K_LOG(LOG_HANDLER_TAG, "Fatal error during initialize of log appender.");
-    }
+    appender->Initialize();
   }
 }
 
@@ -41,11 +37,7 @@ void LogHandler::writeLogs() {
     buffer[receivedBytes] = '\0';
 
     for (ILogAppender *appender : _appenders) {
-      try {
         appender->Log(buffer);
-      } catch (...) {
-        SS2K_LOG(LOG_HANDLER_TAG, "Fatal error during writing to log appender.");
-      }
     }
   }
   SS2K_LOG(LOG_HANDLER_TAG, "Exit writeLogs(). Messages remaining in buffer.");

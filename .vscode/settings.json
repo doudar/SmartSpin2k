@@ -119,4 +119,6 @@
         "VERSIONFILE",
         "WEBSERVER"
     ],
+    "idf.pythonInstallPath": "/opt/homebrew/bin/python3",
+    "idf.flashType": "UART",
 }
