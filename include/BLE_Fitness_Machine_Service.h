@@ -21,9 +21,9 @@ class BLE_Fitness_Machine_Service {
  private:
   BLEService *pFitnessMachineService;
   BLECharacteristic *fitnessMachineFeature;
-  BLECharacteristic *fitnessMachineIndoorBikeData;
-  BLECharacteristic *fitnessMachineStatusCharacteristic;
   BLECharacteristic *fitnessMachineControlPoint;
+  BLECharacteristic *fitnessMachineStatusCharacteristic;
+  BLECharacteristic *fitnessMachineIndoorBikeData;
   BLECharacteristic *fitnessMachineResistanceLevelRange;
   BLECharacteristic *fitnessMachinePowerRange;
   BLECharacteristic *fitnessMachineInclinationRange;

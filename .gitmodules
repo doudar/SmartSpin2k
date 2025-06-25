@@ -1,0 +1,6 @@
+[submodule "lib/TMCStepper"]
+	path = lib/TMCStepper
+	url = https://github.com/teemuatlut/TMCStepper.git
+[submodule "lib/ArduinoWebsockets"]
+	path = lib/ArduinoWebsockets
+	url = https://github.com/gilmaimon/ArduinoWebsockets.git

@@ -20,3 +20,4 @@ build/CMakeCache.txt
 C/Users/
 /build
 /managed_components
+dependencies.lock
