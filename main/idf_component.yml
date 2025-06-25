@@ -1,7 +1,0 @@
-## IDF Component Manager Manifest File
-dependencies:
-  espressif/arduino-esp32: ^3.2.0
-  h2zero/esp-nimble-cpp: ^2.3.1
-  bblanchon/arduinojson: 7.3.1
-  doudar/FastAccelStepper:
-    git: https://github.com/doudar/FastAccelStepper
