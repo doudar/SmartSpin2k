@@ -119,6 +119,6 @@
         "VERSIONFILE",
         "WEBSERVER"
     ],
-    "idf.pythonInstallPath": "/opt/homebrew/bin/python3",
+    "idf.pythonInstallPath": "C:\\Users\\anthony\\.espressif\\tools\\idf-python\\3.11.2\\python.exe",
     "idf.flashType": "UART",
 }
