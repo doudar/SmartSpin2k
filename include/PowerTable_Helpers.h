@@ -14,7 +14,7 @@
 
 #define RETURN_ERROR               INT32_MIN
 #define FREE_HEAP_FOR_COMPLEX_MATH 30000
-#define COMPUTATION_TIMEOUT_MS 50
+#define COMPUTATION_TIMEOUT_MS 25
 
 class PowerEntry {
  public:
