@@ -257,7 +257,7 @@ bool SpinBLEClient::connectToServer() {
     pClient = NimBLEDevice::getClientByPeerAddress(myDevice->getAddress());
     if (pClient) {
       pClient->setConnectTimeout(10000);
-      pClient->setConnectionParams(24, 96, 1, 500);
+      pClient->setConnectionParams(connectionParams[0], connectionParams[1], connectionParams[2], connectionParams[3]);
       SS2K_LOG(BLE_CLIENT_LOG_TAG, "Reusing Client");
       if (!pClient->connect(myDevice)) {
         SS2K_LOG(BLE_CLIENT_LOG_TAG, "Reconnect failed ");
@@ -299,7 +299,7 @@ bool SpinBLEClient::connectToServer() {
      *  connections. Timeout should be a multiple of the interval, minimum is 100ms.
      *  Min interval: 12 * 1.25ms = 15, Max interval: 12 * 1.25ms = 15, 0 latency, 51 * 10ms = 510ms timeout
      */
-    pClient->setConnectionParams(24, 96, 1, 500);
+    pClient->setConnectionParams(connectionParams[0], connectionParams[1], connectionParams[2], connectionParams[3]);
     /** Set how long we are willing to wait for the connection to complete (seconds), default is 30. */
     pClient->setConnectTimeout(5000);  // 5 seconds
 

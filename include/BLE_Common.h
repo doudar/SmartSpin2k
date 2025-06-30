@@ -24,6 +24,14 @@
 #define NOTIFY_DATA_QUEUE_SIZE   25
 #define NOTIFY_DATA_QUEUE_LENGTH 10
 
+
+// BLE Connection Parameters:
+// minInterval – [in] The minimum connection interval in 1.25ms units.
+// maxInterval – [in] The maximum connection interval in 1.25ms units.
+// latency – [in] The number of packets allowed to skip (extends max interval).
+// timeout – [in] The timeout time in 10ms units before disconnecting.
+const uint16_t connectionParams[] = {24, 160, 1, 80};
+
 // Vector of supported BLE services and their corresponding characteristic UUIDs
 struct BLEServiceInfo {
   BLEUUID serviceUUID;
