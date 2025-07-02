@@ -15,6 +15,17 @@
 #include <sensors/SensorDataFactory.h>
 #include <NimBLEDevice.h>
 
+/**
+ * @brief Retrieves the BLE service information for a given advertised device and device name.
+ *
+ * This function checks if the advertised device is advertising any of the supported BLE services.
+ * For the Flywheel UART service, it additionally verifies that the device name matches the expected Flywheel BLE name.
+ * If a matching service is found, a pointer to the corresponding BLEServiceInfo is returned.
+ *
+ * @param advertisedDevice Pointer to the NimBLEAdvertisedDevice representing the BLE device being checked.
+ * @param deviceName The name of the BLE device as a String.
+ * @return Pointer to the matching BLEServiceInfo if found; otherwise, nullptr.
+ */
 const BLEServiceInfo* getDeviceServiceInfo(const NimBLEAdvertisedDevice* advertisedDevice, const String& deviceName) {
   if (!advertisedDevice->haveServiceUUID()) {
     return nullptr;
@@ -36,6 +47,15 @@ const BLEServiceInfo* getDeviceServiceInfo(const NimBLEAdvertisedDevice* adverti
   return nullptr;
 }
 
+/**
+ * @brief Checks if a BLE device is supported based on its advertised information and name.
+ *
+ * Determines whether the specified BLE device is supported by attempting to retrieve its service information.
+ *
+ * @param advertisedDevice Pointer to the advertised BLE device to check.
+ * @param deviceName The name of the device to match against.
+ * @return true if the device is supported; false otherwise.
+ */
 bool isDeviceSupported(const NimBLEAdvertisedDevice* advertisedDevice, const String& deviceName) { return getDeviceServiceInfo(advertisedDevice, deviceName) != nullptr; }
 
 void BLECommunications() {

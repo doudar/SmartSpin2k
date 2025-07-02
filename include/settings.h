@@ -219,17 +219,21 @@ const char* const DEFAULT_PASSWORD = "password";
 // loop speed for the Webserver
 #define WEBSERVER_DELAY 7
 
+// BLE Device Generic Names
+constexpr const char* NONE = "none";
+constexpr const char* ANY = "any";
+
 // Name of default Power Meter. any connects to anything, none connects to
 // nothing.
-#define CONNECTED_POWER_METER "none"
+#define CONNECTED_POWER_METER NONE
 
 // Name of default heart monitor. any connects to anything, none connects to
 // nothing.
-#define CONNECTED_HEART_MONITOR "none"
+#define CONNECTED_HEART_MONITOR NONE
 
 // Name of default remote. any connects to anything, none connects to
 // nothing.
-#define CONNECTED_REMOTE "none"
+#define CONNECTED_REMOTE NONE
 
 // number of main loops the shifters need to be held before a BLE scan is
 // initiated.
@@ -329,8 +333,8 @@ const char* const DEFAULT_PASSWORD = "password";
 // Default homing sensitivity value
 #define DEFAULT_HOMING_SENSITIVITY 50
 
-// BLE automatic reconnect duration in milliseconds. Set this low to avoid interruption. 
-#define BLE_RECONNECT_SCAN_DURATION 1000
+// BLE automatic reconnect interval in milliseconds.
+#define BLE_RECONNECT_SCAN_INTERVAL 5000
 
 // Task Stack Sizes
 // In theory you can subtract whatever is left in the report from DEBUG_STACK for each task

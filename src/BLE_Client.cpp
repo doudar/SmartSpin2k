@@ -85,10 +85,11 @@ static void notifyCB(NimBLERemoteCharacteristic *pBLERemoteCharacteristic, uint8
  * @param pClient Pointer to the NimBLEClient object representing the BLE client.
  *                The client must be connected for the function to proceed.
  */
-void subscribeToAllNotifications(NimBLEClient *pClient) {
+bool subscribeToAllNotifications(NimBLEClient *pClient) {
+  bool isSubscribed = false;
   if (!pClient || !pClient->isConnected()) {
     SS2K_LOG(BLE_CLIENT_LOG_TAG, "Client not connected for notifications");
-    return;
+    return false;
   }
   for (const auto &service : BLEServices::SUPPORTED_SERVICES) {
     NimBLERemoteService *pSvc = pClient->getService(service.serviceUUID);
@@ -100,6 +101,7 @@ void subscribeToAllNotifications(NimBLEClient *pClient) {
           if (pChr->canNotify() || pChr->canIndicate()) {
             if (pChr->canNotify() ? pChr->subscribe(true, notifyCB) : pChr->subscribe(false, notifyCB)) {
               SS2K_LOG(BLE_CLIENT_LOG_TAG, "Subscribed to %s %s handle: %d", service.name.c_str(), pChr->getUUID().toString().c_str(), pChr->getHandle());
+              isSubscribed = true;
             } else {
               SS2K_LOG(BLE_CLIENT_LOG_TAG, "Failed to subscribe to %s %s", service.name.c_str(), pChr->getUUID().toString().c_str());
             }
@@ -108,6 +110,7 @@ void subscribeToAllNotifications(NimBLEClient *pClient) {
       }
     }
   }
+  return isSubscribed;
 }
 
 // BLE Client loop task.
@@ -155,24 +158,23 @@ void bleClientTask(void *pvParameters) {
           }
         }
       }
+      while (ss2k->isUpdating) {  // wait until the update is done
+        delay(100);
+      }
     }
 
-    // Scan for BLE devices that we should connect to this client
-    static unsigned long scanDelay = millis();
-    if ((millis() - scanDelay) > BLE_RECONNECT_SCAN_DURATION) {
-      spinBLEClient.checkBLEReconnect();
-      scanDelay = millis();
-    }
-
-    if (spinBLEClient.doScan && (!ss2k->isUpdating)) {
-      spinBLEClient.scanProcess(DEFAULT_SCAN_DURATION);
-    }
-
+    // Post connect previously connected clients. This needs to be before connect, as it takes a while to complete the connection (let it loop once.)
     spinBLEClient.postConnect();
 
     // Connect BLE Servers to this client
     for (int x = 0; x < NUM_BLE_DEVICES; x++) {
       if (spinBLEClient.myBLEDevices[x].doConnect == true && !ss2k->isUpdating) {
+        // stop in process scans
+        NimBLEScan *pBLEScan = NimBLEDevice::getScan();
+        if (pBLEScan->isScanning()) {
+          SS2K_LOG(BLE_CLIENT_LOG_TAG, "Stopping scan before connecting to device on slot %d ...", x);
+          pBLEScan->stop();
+        }
         SS2K_LOG(BLE_CLIENT_LOG_TAG, "Connecting device on slot %d ...", x);
         if (spinBLEClient.connectToServer()) {
           SS2K_LOG(BLE_CLIENT_LOG_TAG, "We are now connected to the BLE Server.");
@@ -180,6 +182,16 @@ void bleClientTask(void *pvParameters) {
           SS2K_LOG(BLE_CLIENT_LOG_TAG, "slot %d connection failed", x);
         }
       }
+    }
+
+    // Scan for BLE devices that we should connect to this client
+    static unsigned long scanDelay = millis();
+    if ((millis() - scanDelay) > BLE_RECONNECT_SCAN_INTERVAL) {
+      spinBLEClient.checkBLEReconnect();
+      if (spinBLEClient.doScan && (!ss2k->isUpdating)) {
+        spinBLEClient.scanProcess(DEFAULT_SCAN_DURATION);
+      }
+      scanDelay = millis();
     }
 
     // Spin Down process for the Server. It's here because it needs to be non-blocking for the maintenance loop.
@@ -246,7 +258,17 @@ bool SpinBLEClient::connectToServer() {
 
   SS2K_LOG(BLE_CLIENT_LOG_TAG, "Forming a connection to: %s", this->adevName2UniqueName(myDevice).c_str());
 
-  NimBLEClient *pClient = nullptr;
+  NimBLEClient *pClient          = nullptr;
+  auto handleFailedClientConnect = [&]() {
+    SS2K_LOG(BLE_CLIENT_LOG_TAG, " - Failed to connect client");
+    /** Created a client but failed to connect, don't need to keep it as it has no data */
+    spinBLEClient.myBLEDevices[device_number].reset();
+    spinBLEClient.resetDevices(pClient);
+    pClient->deleteServices();
+    NimBLEDevice::getScan()->erase(pClient->getPeerAddress());
+    NimBLEDevice::deleteClient(pClient);
+    return false;
+  };
 
   /** Check if we have a client we should reuse first **/
   if (NimBLEDevice::getCreatedClientCount()) {
@@ -257,18 +279,14 @@ bool SpinBLEClient::connectToServer() {
     pClient = NimBLEDevice::getClientByPeerAddress(myDevice->getAddress());
     if (pClient) {
       pClient->setConnectTimeout(10000);
-      pClient->setConnectionParams(connectionParams[0], connectionParams[1], connectionParams[2], connectionParams[3]);
+      pClient->setConnectionParams(connectionParams[0], connectionParams[1], connectionParams[2], connectionParams[3] * 2);
       SS2K_LOG(BLE_CLIENT_LOG_TAG, "Reusing Client");
-      if (!pClient->connect(myDevice)) {
+      if (!pClient->connect(myDevice, false, true, true)) {
         SS2K_LOG(BLE_CLIENT_LOG_TAG, "Reconnect failed ");
         this->reconnectTries--;
         SS2K_LOG(BLE_CLIENT_LOG_TAG, "%d left.", reconnectTries);
         if (reconnectTries < 1) {
-          spinBLEClient.myBLEDevices[device_number].reset();
-          spinBLEClient.resetDevices(pClient);
-          pClient->deleteServices();
-          NimBLEDevice::getScan()->erase(pClient->getPeerAddress());
-          NimBLEDevice::deleteClient(pClient);
+          handleFailedClientConnect();
         }
         return false;
       }
@@ -299,23 +317,16 @@ bool SpinBLEClient::connectToServer() {
      *  connections. Timeout should be a multiple of the interval, minimum is 100ms.
      *  Min interval: 12 * 1.25ms = 15, Max interval: 12 * 1.25ms = 15, 0 latency, 51 * 10ms = 510ms timeout
      */
-    pClient->setConnectionParams(connectionParams[0], connectionParams[1], connectionParams[2], connectionParams[3]);
+    pClient->setConnectionParams(connectionParams[0], connectionParams[1], connectionParams[2], connectionParams[3] * 2);
     /** Set how long we are willing to wait for the connection to complete (seconds), default is 30. */
     pClient->setConnectTimeout(5000);  // 5 seconds
 
     if (!pClient->connect(myDevice)) {
-      SS2K_LOG(BLE_CLIENT_LOG_TAG, " - Failed to connect client");
-      /** Created a client but failed to connect, don't need to keep it as it has no data */
-      spinBLEClient.myBLEDevices[device_number].reset();
-      pClient->deleteServices();
-      NimBLEDevice::getScan()->erase(pClient->getPeerAddress());
-      NimBLEDevice::deleteClient(pClient);
-      return false;
+      return handleFailedClientConnect();
     }
   }
 
   SS2K_LOG(BLE_CLIENT_LOG_TAG, "Connected to: %s - %s RSSI %d", this->adevName2UniqueName(myDevice).c_str(), pClient->getPeerAddress().toString().c_str(), pClient->getRssi());
-
   if (serviceUUID == HID_SERVICE_UUID) {
     connectBLE_HID(pClient);
     this->reconnectTries = MAX_RECONNECT_TRIES;
@@ -345,6 +356,7 @@ bool SpinBLEClient::connectToServer() {
     removeDuplicates(pClient);
   } else {
     SS2K_LOG(BLE_CLIENT_LOG_TAG, "Failed to find service: %s", serviceUUID.toString().c_str());
+    return handleFailedClientConnect();
   }
   SS2K_LOG(BLE_CLIENT_LOG_TAG, "Device Connected");
   return true;
@@ -356,7 +368,7 @@ bool SpinBLEClient::connectToServer() {
 void MyClientCallback::onConnect(NimBLEClient *pClient) { SS2K_LOG(BLE_CLIENT_LOG_TAG, "Connected, %s", pClient->getPeerAddress().toString().c_str()); }
 
 void MyClientCallback::onDisconnect(NimBLEClient *pClient, int reason) {
-  if (!pClient->isConnected()) {
+  if (!pClient->isConnected() && !ss2k->isUpdating) {
     NimBLEAddress addr = pClient->getPeerAddress();
     SS2K_LOG(BLE_CLIENT_LOG_TAG, "Client %s Disconnected, reason = %d", addr.toString().c_str(), reason);
     for (size_t i = 0; i < NUM_BLE_DEVICES; i++) {
@@ -426,16 +438,16 @@ void ScanCallbacks::onResult(const NimBLEAdvertisedDevice *advertisedDevice) {
   const char *aDevAddr                    = advertisedDevice->getAddress().toString().c_str();
 
   if (advertisedDevice->haveServiceUUID() && isDeviceSupported(advertisedDevice, aDevName)) {
-    SS2K_LOG(BLE_CLIENT_LOG_TAG, "Trying to match found device name: %s", aDevName.c_str());
+    SS2K_LOG(BLE_CLIENT_LOG_TAG, "Found Device: %s", aDevName.c_str());
 
     // Handling for BLE connected remotes
     if (advertisedDevice->getServiceUUID() == HID_SERVICE_UUID) {
-      if (strcmp(userConfig->getConnectedRemote(), "any") == 0) {
+      if (strcmp(userConfig->getConnectedRemote(), ANY) == 0) {
         SS2K_LOG(BLE_CLIENT_LOG_TAG, "%s%s", REMOTE, STRING_MATCHED_ANY);
       } else {
         bool nameMatched = (aDevName = userConfig->getConnectedRemote()) ? true : false;
         bool addrMatched = strcmp(aDevAddr, userConfig->getConnectedRemote()) == 0;
-        if (!nameMatched && !addrMatched || strcmp(userConfig->getConnectedRemote(), "none") == 0) {
+        if (!nameMatched && !addrMatched || strcmp(userConfig->getConnectedRemote(), NONE) == 0) {
           SS2K_LOG(BLE_CLIENT_LOG_TAG, "%s%s%s%s", THIS, REMOTE, DIDNT_MATCH_THE_SAVED, userConfig->getConnectedRemote());
           return;  // Ignore this device;
         } else {
@@ -443,12 +455,12 @@ void ScanCallbacks::onResult(const NimBLEAdvertisedDevice *advertisedDevice) {
         }
       }
     } else if (advertisedDevice->getServiceUUID() == HEARTSERVICE_UUID) {
-      if (strcmp(userConfig->getConnectedHeartMonitor(), "any") == 0) {
+      if (strcmp(userConfig->getConnectedHeartMonitor(), ANY) == 0) {
         SS2K_LOG(BLE_CLIENT_LOG_TAG, "%s%s", HRM, STRING_MATCHED_ANY);
       } else {
         bool nameMatched = (aDevName == userConfig->getConnectedHeartMonitor()) ? true : false;
         bool addrMatched = strcmp(aDevAddr, userConfig->getConnectedHeartMonitor()) == 0;
-        if (!nameMatched && !addrMatched || strcmp(userConfig->getConnectedHeartMonitor(), "none") == 0) {
+        if (!nameMatched && !addrMatched || strcmp(userConfig->getConnectedHeartMonitor(), NONE) == 0) {
           SS2K_LOG(BLE_CLIENT_LOG_TAG, "%s%s%s%s", THIS, HRM, DIDNT_MATCH_THE_SAVED, userConfig->getConnectedHeartMonitor());
           return;  // Ignore this device;
         } else {
@@ -457,11 +469,11 @@ void ScanCallbacks::onResult(const NimBLEAdvertisedDevice *advertisedDevice) {
       }
     } else {
       // Power Meter
-      if (strcmp(userConfig->getConnectedPowerMeter(), "any") == 0) {
+      if (strcmp(userConfig->getConnectedPowerMeter(), ANY) == 0) {
         SS2K_LOG(BLE_CLIENT_LOG_TAG, "%s%s", PM, STRING_MATCHED_ANY);
       } else {
         bool nameMatched = (aDevName == userConfig->getConnectedPowerMeter()) ? true : false;
-        if (!nameMatched || strcmp(userConfig->getConnectedPowerMeter(), "none") == 0) {
+        if (!nameMatched || strcmp(userConfig->getConnectedPowerMeter(), NONE) == 0) {
           SS2K_LOG(BLE_CLIENT_LOG_TAG, "%s%s%s%s", THIS, PM, DIDNT_MATCH_THE_SAVED, userConfig->getConnectedPowerMeter());
           return;  // Ignore this device;
         } else {
@@ -485,14 +497,16 @@ void ScanCallbacks::onResult(const NimBLEAdvertisedDevice *advertisedDevice) {
 void SpinBLEClient::scanProcess(int duration) {
   this->doScan = false;  // Confirming we did the scan
 
-  SS2K_LOG(BLE_CLIENT_LOG_TAG, "Scanning for BLE servers and putting them into a list...");
-
   NimBLEScan *pBLEScan = NimBLEDevice::getScan();
   if (pBLEScan->isScanning()) {
     return;
   }
-  pBLEScan->start(duration, false, false);
-  this->dontBlockScan = false;
+
+  SS2K_LOG(BLE_CLIENT_LOG_TAG, "Scanning for BLE servers and putting them into a list...");
+  pBLEScan->start(duration, false, true);
+  while (pBLEScan->isScanning()) {
+    delay(10);  // Wait for the scan to finish
+  }
 }
 
 void ScanCallbacks::onScanEnd(const NimBLEScanResults &results, int reason) {
@@ -626,9 +640,13 @@ void SpinBLEClient::postConnect() {
       SS2K_LOG(BLE_CLIENT_LOG_TAG, "Post connecting: %s , ConnID %d, PrimaryChar %s", _BLEd.peerAddress.toString().c_str(), _BLEd.connectedClientID,
                _BLEd.charUUID.toString().c_str());
       if (NimBLEDevice::getClientByPeerAddress(_BLEd.peerAddress)) {
-        _BLEd.setPostConnected(true);
         NimBLEClient *pClient = NimBLEDevice::getClientByPeerAddress(_BLEd.peerAddress);
-        subscribeToAllNotifications(pClient);
+        BLEDevice::getServer()->updateConnParams(pClient->getConnHandle(), connectionParams[0], connectionParams[1], connectionParams[2], connectionParams[3]);
+        _BLEd.setPostConnected(subscribeToAllNotifications(pClient));
+        if (!_BLEd.getPostConnected()) {
+          SS2K_LOG(BLE_CLIENT_LOG_TAG, "Failed to subscribe to notifications for %s", _BLEd.peerAddress.toString().c_str());
+          return;
+        }
         if (_BLEd.charUUID == ECHELON_DATA_UUID) {
           NimBLERemoteCharacteristic *writeCharacteristic = pClient->getService(ECHELON_SERVICE_UUID)->getCharacteristic(ECHELON_WRITE_UUID);
           if (writeCharacteristic == nullptr) {
@@ -646,7 +664,6 @@ void SpinBLEClient::postConnect() {
 
         if ((_BLEd.charUUID == FITNESSMACHINEINDOORBIKEDATA_UUID)) {
           SS2K_LOG(BLE_CLIENT_LOG_TAG, "Updating Connection Params for: %s", _BLEd.peerAddress.toString().c_str());
-          BLEDevice::getServer()->updateConnParams(pClient->getConnHandle(), 100, 100, 2, 1000);
           spinBLEClient.handleBattInfo(pClient, true);
 
           auto featuresCharacteristic = pClient->getService(FITNESSMACHINESERVICE_UUID)->getCharacteristic(FITNESSMACHINEFEATURE_UUID);
@@ -745,8 +762,8 @@ NotifyData SpinBLEAdvertisedDevice::dequeueData() {
 }
 
 void SpinBLEClient::connectBLE_HID(NimBLEClient *pClient) {
-  NimBLERemoteService *pSvc        = nullptr;
-  pSvc                             = pClient->getService(HID_SERVICE_UUID);
+  NimBLERemoteService *pSvc = nullptr;
+  pSvc                      = pClient->getService(HID_SERVICE_UUID);
   if (pSvc) { /** make sure it's not null */
     // This returns the HID report descriptor like this
     // HID_REPORT_MAP 0x2a4b Value: 5,1,9,2,A1,1,9,1,A1,0,5,9,19,1,29,5,15,0,25,1,75,1,
@@ -817,17 +834,23 @@ void SpinBLEClient::keepAliveBLE_HID(NimBLEClient *pClient) {
 }
 
 void SpinBLEClient::checkBLEReconnect() {
-  if ((String(userConfig->getConnectedHeartMonitor()) != "none") && !spinBLEClient.connectedHRM) {
+  char notConnectedDevices[32] = {0};
+  size_t offset                = 0;
+
+  if ((strcmp(userConfig->getConnectedHeartMonitor(), NONE) != 0) && !spinBLEClient.connectedHRM) {
     this->doScan = true;
-    SS2K_LOG(BLE_CLIENT_LOG_TAG, "No HRM Connected");
+    offset += snprintf(notConnectedDevices + offset, sizeof(notConnectedDevices) - offset, "HRM ");
   }
-  if ((String(userConfig->getConnectedPowerMeter()) != "none") && !(spinBLEClient.connectedPM || spinBLEClient.connectedCD)) {
+  if ((strcmp(userConfig->getConnectedPowerMeter(), NONE) != 0) && !(spinBLEClient.connectedPM || spinBLEClient.connectedCD)) {
     this->doScan = true;
-    SS2K_LOG(BLE_CLIENT_LOG_TAG, "No PM Connected");
+    offset += snprintf(notConnectedDevices + offset, sizeof(notConnectedDevices) - offset, "PM ");
   }
-  if ((String(userConfig->getConnectedRemote()) != "none") && !(spinBLEClient.connectedRemote)) {
+  if ((strcmp(userConfig->getConnectedRemote(), NONE) != 0) && !(spinBLEClient.connectedRemote)) {
     this->doScan = true;
-    SS2K_LOG(BLE_CLIENT_LOG_TAG, "No Rem Connected");
+    offset += snprintf(notConnectedDevices + offset, sizeof(notConnectedDevices) - offset, "Remote ");
+  }
+  if (offset > 0) {
+    SS2K_LOG(BLE_CLIENT_LOG_TAG, "Devices not connected: %s", notConnectedDevices);
   }
 }
 
@@ -939,9 +962,13 @@ void SpinBLEAdvertisedDevice::set(const NimBLEAdvertisedDevice *device, int id, 
           SS2K_LOG(BLE_CLIENT_LOG_TAG, "Registered Remote on Connect");
         }
       }
+    } else {
+      SS2K_LOG(BLE_CLIENT_LOG_TAG, "No pClient in Set()");
     }
+  } else {
+    // During initial discovery, just store the device info without registering services
+    SS2K_LOG(BLE_CLIENT_LOG_TAG, "Set %s with no current connection.", device->getAddress().toString().c_str());
   }
-  // During initial discovery, just store the device info without registering services
 }
 
 /**

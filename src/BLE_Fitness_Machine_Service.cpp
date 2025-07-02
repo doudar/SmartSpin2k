@@ -79,7 +79,7 @@ void BLE_Fitness_Machine_Service::update() {
   FitnessMachineIndoorBikeDataFlags::Types ftmsIBDFlags = FitnessMachineIndoorBikeDataFlags::InstantaneousCadencePresent |
                                                           FitnessMachineIndoorBikeDataFlags::ResistanceLevelPresent | FitnessMachineIndoorBikeDataFlags::InstantaneousPowerPresent;
 
-  if (String(userConfig->getConnectedHeartMonitor()) != "none") {
+  if (strcmp(userConfig->getConnectedHeartMonitor(), NONE) != 0) {
     ftmsIBDFlags = ftmsIBDFlags | FitnessMachineIndoorBikeDataFlags::HeartRatePresent;
   }
 
@@ -104,7 +104,7 @@ void BLE_Fitness_Machine_Service::update() {
   ftmsIndoorBikeData.push_back(static_cast<uint8_t>(rtConfig->watts.getValue() >> 8));
 
   // Add heart rate if HRM is connected
-  if (String(userConfig->getConnectedHeartMonitor()) != "none") {
+  if (strcmp(userConfig->getConnectedHeartMonitor(), NONE) != 0) {
     ftmsIndoorBikeData.push_back(static_cast<uint8_t>(rtConfig->hr.getValue()));
   }
 

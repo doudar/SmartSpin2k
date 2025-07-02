@@ -61,18 +61,7 @@ void SS2K::startTasks() {
 }
 
 void SS2K::stopTasks() {
-  SS2K_LOG(BLE_CLIENT_LOG_TAG, "Shutting Down all BLE services");
-  spinBLEClient.reconnectTries        = 0;
-  spinBLEClient.intentionalDisconnect = NUM_BLE_DEVICES;
-  if (NimBLEDevice::isInitialized()) {
-    NimBLEDevice::deinit();
-    ss2k->stopTasks();
-  }
-  SS2K_LOG(MAIN_LOG_TAG, "Stop BLE + ERG Tasks");
-  if (BLEClientTask != NULL) {
-    vTaskDelete(BLEClientTask);
-    BLEClientTask = NULL;
-  }
+  // In favor of stopping the tasks, BLE communications loop just disconnects all connected devices. 
 }
 
 extern "C" void app_main() {
@@ -332,7 +321,7 @@ void SS2K::maintenanceLoop(void *pvParameters) {
       SS2K_LOG(MAIN_LOG_TAG, "Best Block: %d", heap_caps_get_largest_free_block(MALLOC_CAP_8BIT));
 #endif  // DEBUG_STACK
       // Log userParameters
-      SS2K_LOG(MAIN_LOG_TAG, "PM Con %d, HRM Con %d, W %d, Cad %d, HR %d, Gear %d, Target Position %d", spinBLEClient.connectedPM, spinBLEClient.connectedHRM,
+      SS2K_LOG(MAIN_LOG_TAG, "PM Con %d, CAD con %d, HRM Con %d, W %d, Cad %d, HR %d, Gear %d, Target Position %d", spinBLEClient.connectedPM, spinBLEClient.connectedCD, spinBLEClient.connectedHRM,
                rtConfig->watts.getValue(), rtConfig->cad.getValue(), rtConfig->hr.getValue(), rtConfig->getShifterPosition(), ss2k->targetPosition);
 
       intervalTimer2 = millis();

@@ -110,12 +110,6 @@ void startWifi() {
   SS2K_LOG(HTTP_SERVER_LOG_TAG, "Connected to %s IP address: %s", userConfig->getSsid(), myIP.toString().c_str());
   SS2K_LOG(HTTP_SERVER_LOG_TAG, "Open http://%s.local/", userConfig->getDeviceName());
 
-  // Initialize DirCon MDNS service
-  if (DirConManager::start()) {
-    SS2K_LOG(HTTP_SERVER_LOG_TAG, "DirCon service started successfully");
-  } else {
-    SS2K_LOG(HTTP_SERVER_LOG_TAG, "Error starting DirCon service");
-  }
 
   WiFi.setTxPower(WIFI_POWER_19_5dBm);
 
@@ -170,7 +164,6 @@ void HTTP_Server::start() {
         "15 seconds.</body><script> setTimeout(\"location.href = 'http://" +
         myIP.toString() + "/bluetoothscanner.html';\",15000);</script></html>";
     // spinBLEClient.resetDevices();
-    spinBLEClient.dontBlockScan = true;
     spinBLEClient.doScan        = true;
     server.send(200, "text/html", response);
   });
@@ -321,6 +314,7 @@ void HTTP_Server::start() {
       []() {
         HTTPUpload &upload = server.upload();
         if (upload.filename == String("firmware.bin").c_str()) {
+          ss2k->isUpdating = true;  // Set the updating flag to true
           if (upload.status == UPLOAD_FILE_START) {
             SS2K_LOG(HTTP_SERVER_LOG_TAG, "Update: %s", upload.filename.c_str());
             if (!Update.begin(UPDATE_SIZE_UNKNOWN, U_FLASH)) {  // start with max
@@ -341,6 +335,7 @@ void HTTP_Server::start() {
               Update.printError(Serial);
             }
           }
+          ss2k->isUpdating = false;  // Reset the updating flag
         } else if (upload.filename == String("littlefs.bin").c_str()) {
           if (upload.status == UPLOAD_FILE_START) {
             SS2K_LOG(HTTP_SERVER_LOG_TAG, "Update: %s", upload.filename.c_str());
@@ -558,7 +553,7 @@ void HTTP_Server::settingsProcessor() {
         spinBLEClient.reconnectAllDevices();
       }
     } else {
-      userConfig->setConnectedPowerMeter("any");
+      userConfig->setConnectedPowerMeter(String(ANY));
     }
   }
   if (!server.arg("bleHRDropdown").isEmpty()) {
@@ -570,7 +565,7 @@ void HTTP_Server::settingsProcessor() {
       }
       userConfig->setConnectedHeartMonitor(server.arg("bleHRDropdown"));
     } else {
-      userConfig->setConnectedHeartMonitor("any");
+      userConfig->setConnectedHeartMonitor(String(NONE));
     }
   }
   if (!server.arg("bleRemoteDropdown").isEmpty()) {
@@ -582,7 +577,7 @@ void HTTP_Server::settingsProcessor() {
       }
       userConfig->setConnectedRemote(server.arg("bleRemoteDropdown"));
     } else {
-      userConfig->setConnectedRemote("any");
+      userConfig->setConnectedRemote(String(NONE));
     }
   }
 
@@ -663,8 +658,7 @@ void HTTP_Server::FirmwareUpdate() {
     if (((availableVer > currentVer) && (userConfig->getAutoUpdate())) || (!LittleFS.exists("/index.html"))) {
       //////////////// Update LittleFS//////////////
       SS2K_LOG(HTTP_SERVER_LOG_TAG, "Updating FileSystem");
-      http.begin(DATA_UPDATEURL + String(DATA_FILELIST),
-                 rootCACertificate);  // check version URL
+      http.begin(DATA_UPDATEURL DATA_FILELIST, rootCACertificate);  // check version URL
       delay(100);
       httpCode = http.GET();  // get data from version file
       delay(100);

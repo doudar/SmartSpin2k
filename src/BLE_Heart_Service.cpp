@@ -37,17 +37,6 @@ void BLE_Heart_Service::deinit() {
 }
 
 void BLE_Heart_Service::update() {
-  /* Check if heart rate monitor is connected
-  if (String(userConfig->getConnectedHeartMonitor()) == "none") {
-    deinit();
-    return;
-  }
-
-  if (!pHeartService) {
-    // Re-initialize if needed, most likely after changing HRM from none to a specific device
-    MyCharacteristicCallbacks* chrCallbacks;
-    setupService(spinBLEServer.pServer, chrCallbacks);
-  }*/
 
   byte heartRateMeasurement[2] = {0x00, (byte)rtConfig->hr.getValue()};
   // Notify the cycling power measurement characteristic
