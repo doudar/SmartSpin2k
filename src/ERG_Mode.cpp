@@ -52,7 +52,7 @@ void ErgMode::runERG() {
         simulationRunning = rtConfig->watts.getSimulate();
       }
 
-      if (userConfig->getPTab4Pwr()) {
+      if (!userConfig->getPTab4Pwr()) {
         // add values to Power table
         powerTable->processPowerValue(powerBuffer, rtConfig->cad.getValue(), rtConfig->watts);
       }
