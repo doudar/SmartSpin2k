@@ -26,7 +26,6 @@ void ErgMode::runERG() {
   static bool hasConnectedPowerMeter = false;
   static bool simulationRunning      = false;
   static int loopCounter             = 0;
-  static bool pTabUsed4Pwr           = false;
 
   if ((millis() - ergTimer) > ERG_MODE_DELAY) {
     // reset the timer.
@@ -53,7 +52,7 @@ void ErgMode::runERG() {
         simulationRunning = rtConfig->watts.getSimulate();
       }
 
-      if (!pTabUsed4Pwr) {
+      if (userConfig->getPTab4Pwr()) {
         // add values to Power table
         powerTable->processPowerValue(powerBuffer, rtConfig->cad.getValue(), rtConfig->watts);
       }
@@ -87,19 +86,18 @@ void ErgMode::runERG() {
     loopCounter++;
   }
 
-  if (userConfig->getPTab4Pwr() && rtConfig->getHomed()) {
+  if (userConfig->getPTab4Pwr()) {
     // only do this twice as often as ERG_MODE_DELAY
-    static float previousPower = 0;
+    static float previousPower             = 0;
     static unsigned long int pTab4pwrTimer = millis();
+    int _smoothPWR = 0;
     if (millis() - pTab4pwrTimer > ERG_MODE_DELAY / 2) {
       // reset the timer.
       pTab4pwrTimer = millis();
       // Lookup watts using the Power Table.
-      pTabUsed4Pwr = true;
       if (powerTable->_hasBeenLoadedThisSession) {
-        //Instead of directly outputting this, we should smooth the output by averaging it with the last value.
-        rtConfig->watts.setValue((previousPower + powerTable->lookupWatts(rtConfig->cad.getValue(), ss2k->getCurrentPosition()))/2);
-        previousPower = (rtConfig->watts.getValue() + previousPower) / 2;
+        // Instead of directly outputting this, we should smooth the output by averaging it with the last value.
+        _smoothPWR = ((previousPower + powerTable->lookupWatts(rtConfig->cad.getValue(), ss2k->getCurrentPosition())) / 2);
       } else {
         // only run _manageSaveState every 5 seconds
         static unsigned long int saveStateTimer = millis();
@@ -109,9 +107,11 @@ void ErgMode::runERG() {
           saveStateTimer = millis();
         }
       }
+       // So the user knows pTab4PWR is enabled, provide some cadence feedback even if the value returned by the table is 0. 
+        _smoothPWR     = _smoothPWR < rtConfig->cad.getValue() ? round((rtConfig->cad.getValue() + previousPower) / 2.0f) : _smoothPWR;
+        rtConfig->watts.setValue(_smoothPWR);
+        previousPower = (rtConfig->watts.getValue() + previousPower) / 2;
     }
-  } else {
-    pTabUsed4Pwr = false;
   }
 }
 

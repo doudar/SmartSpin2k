@@ -473,7 +473,7 @@ bool PowerTable::_manageSaveState(bool canSkipReliabilityChecks) {
 
     // If both current and saved tables were created with homing, we can skip position reliability checks
     if (!canSkipReliabilityChecks) {
-      canSkipReliabilityChecks = (savedHomed && rtConfig->getHomed()) || userConfig->getPTab4Pwr();
+      canSkipReliabilityChecks = (savedHomed && rtConfig->getHomed());
     }
 
     if (version != TABLE_VERSION) {
