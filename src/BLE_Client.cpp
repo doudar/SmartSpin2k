@@ -34,7 +34,7 @@ void SpinBLEClient::start() {
                           "BLEClientTask",  /* name of task. */
                           BLE_CLIENT_STACK, /* Stack size of task */
                           NULL,             /* parameter of the task */
-                          1,                /* priority of the task  */
+                          21,                /* priority of the task  */
                           &BLEClientTask,   /* Task handle to keep track of created task */
                           1);               /* pin task to core */
 
@@ -279,9 +279,9 @@ bool SpinBLEClient::connectToServer() {
     pClient = NimBLEDevice::getClientByPeerAddress(myDevice->getAddress());
     if (pClient) {
       pClient->setConnectTimeout(10000);
-      pClient->setConnectionParams(connectionParams[0], connectionParams[1], connectionParams[2], connectionParams[3] * 2);
+      pClient->setConnectionParams(connectionParams[0], connectionParams[1], connectionParams[2], 1000);
       SS2K_LOG(BLE_CLIENT_LOG_TAG, "Reusing Client");
-      if (!pClient->connect(myDevice, false, true, true)) {
+      if (!pClient->connect(myDevice, false, false, true)) {
         SS2K_LOG(BLE_CLIENT_LOG_TAG, "Reconnect failed ");
         this->reconnectTries--;
         SS2K_LOG(BLE_CLIENT_LOG_TAG, "%d left.", reconnectTries);
@@ -317,7 +317,7 @@ bool SpinBLEClient::connectToServer() {
      *  connections. Timeout should be a multiple of the interval, minimum is 100ms.
      *  Min interval: 12 * 1.25ms = 15, Max interval: 12 * 1.25ms = 15, 0 latency, 51 * 10ms = 510ms timeout
      */
-    pClient->setConnectionParams(connectionParams[0], connectionParams[1], connectionParams[2], connectionParams[3] * 2);
+    pClient->setConnectionParams(connectionParams[0], connectionParams[1], connectionParams[2], 1000);
     /** Set how long we are willing to wait for the connection to complete (seconds), default is 30. */
     pClient->setConnectTimeout(5000);  // 5 seconds
 
@@ -504,9 +504,6 @@ void SpinBLEClient::scanProcess(int duration) {
 
   SS2K_LOG(BLE_CLIENT_LOG_TAG, "Scanning for BLE servers and putting them into a list...");
   pBLEScan->start(duration, false, true);
-  while (pBLEScan->isScanning()) {
-    delay(10);  // Wait for the scan to finish
-  }
 }
 
 void ScanCallbacks::onScanEnd(const NimBLEScanResults &results, int reason) {

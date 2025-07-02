@@ -173,9 +173,9 @@ extern "C" void app_main() {
                           "maintenanceLoopFunction", /* name of task. */
                           MAIN_STACK,                /* Stack size of task */
                           NULL,                      /* parameter of the task */
-                          10,                         /* priority of the task */
+                          20,                         /* priority of the task */
                           &maintenanceLoopTask,      /* Task handle to keep track of created task */
-                          0);                        /* pin task to core */
+                          1);                        /* pin task to core */
 }
 
 void loop() {  // Delete this task so we can make one that's more memory efficient.
