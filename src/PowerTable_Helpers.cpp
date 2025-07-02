@@ -126,19 +126,6 @@ ptIndex PTHelpers::calculateIndex(int watts, int cad) {
   return index;
 }
 
-// find the number of data points in the table
-int PTHelpers::dataPoints(PTData& ptData) {
-  int count = 0;
-  for (int i = 0; i < POWERTABLE_CAD_SIZE; ++i) {
-    for (int j = 0; j < POWERTABLE_WATT_SIZE; ++j) {
-      if (ptData.tableRow[i].tableEntry[j].targetPosition != INT16_MIN) {
-        count++;
-      }
-    }
-  }
-  return count;
-}
-
 /**
  * @brief Retrieves the x and y values from a specific row of the power table.
  *
@@ -325,7 +312,6 @@ int32_t PTHelpers::lookup(int watts, int cad, PTData& ptData) {
  */
 bool PTHelpers::extrapolateEmptyIndices(int outerIndex, const std::vector<int>& emptyIndices, std::pair<std::vector<float>, std::vector<float>> xy, size_t n, bool horizontal,
                                         bool naturalSpline, PTData& ptData) {
-
   unsigned long timeout = millis() + COMPUTATION_TIMEOUT_MS;  // Set timeout for computation
   ptIndex index;
   if (n >= 3) {
@@ -353,7 +339,9 @@ bool PTHelpers::extrapolateEmptyIndices(int outerIndex, const std::vector<int>& 
       float maxVal             = *std::max_element(xy.second.begin(), xy.second.end());
       float range              = maxVal - minVal;
       extrapolated_value       = std::max(minVal - 0.1f * range, std::min(extrapolated_value, maxVal + 0.1f * range));
-      int tempValue            = static_cast<int>(round(extrapolated_value));
+      int tempValue            = (ptData.tableRow[index.cadIndex].tableEntry[index.wattIndex].targetPosition == INT16_MIN)
+                                     ? round(extrapolated_value)
+                                     : round((extrapolated_value + ptData.tableRow[index.cadIndex].tableEntry[index.wattIndex].targetPosition) / 2.0f);
 
       if (testNeighbors(index, tempValue, ptData).allNeighborsPassed) {
         // Blend with nearby valid neighbors to ensure smoothness
@@ -397,9 +385,8 @@ bool PTHelpers::extrapolateEmptyIndices(int outerIndex, const std::vector<int>& 
 
           blendedValue = (originalWeight * tempValue + neighborWeight * (blendedValue - tempValue) / (totalWeight - 1.0f));
         }
-
         ptData.tableRow[index.cadIndex].tableEntry[index.wattIndex].targetPosition = static_cast<int16_t>(round(blendedValue));
-        if( millis() > timeout) {
+        if (millis() > timeout) {
           SS2K_LOG(PTDATA_LOG_TAG, "Spline fill operation timed out!");
           return false;  // Exit if computation takes too long
         }
@@ -407,6 +394,154 @@ bool PTHelpers::extrapolateEmptyIndices(int outerIndex, const std::vector<int>& 
     }
   }
   return true;
+}
+
+/**
+ * @brief Fills missing or invalid entries in the power table by estimating values using averages.
+ *
+ * This function processes the provided PTData structure, which represents a power table with
+ * cadence and wattage dimensions. It performs the following steps:
+ * 1. Calculates the average target position for each wattage column across all valid cadence rows.
+ * 2. Computes the average increase in target position per cadence increment for each wattage column.
+ * 3. For each empty or invalid cell, estimates its value based on the center average and the average
+ *    increase per cadence step, filling in the missing data accordingly.
+ *
+ * If a cell was previously filled by another method, the function averages the new estimate with the
+ * existing value to provide a smoother result.
+ *
+ * @param ptData Reference to the PTData structure containing the power table to be filled.
+ */
+void PTHelpers::fillByAverage(PTData& ptData) {
+  std::vector<float> centerAverageRow(POWERTABLE_WATT_SIZE, 0.0f);
+  std::vector<int> validCounts(POWERTABLE_WATT_SIZE, 0);
+  int mid_cad_index = POWERTABLE_CAD_SIZE / 2;
+  float center_cad = static_cast<float>(MINIMUM_TABLE_CAD + mid_cad_index * POWERTABLE_CAD_INCREMENT);
+
+  // 1. Calculate the center average row using improved regression
+  for (int j = 0; j < POWERTABLE_WATT_SIZE; ++j) {
+    std::vector<std::pair<float, float>> points;
+    for (int i = 0; i < POWERTABLE_CAD_SIZE; ++i) {
+      if (ptData.tableRow[i].tableEntry[j].targetPosition != INT16_MIN) {
+        float cad = static_cast<float>(MINIMUM_TABLE_CAD + i * POWERTABLE_CAD_INCREMENT);
+        points.push_back({cad, static_cast<float>(ptData.tableRow[i].tableEntry[j].targetPosition)});
+      }
+    }
+    validCounts[j] = points.size();
+
+    if (points.size() >= 2) {
+      // Check if data is clustered far from center
+      float min_cad = points.front().first;
+      float max_cad = points.back().first;
+      float cad_range = max_cad - min_cad;
+      float distance_from_center = std::min(std::abs(center_cad - min_cad), std::abs(center_cad - max_cad));
+      
+      // If data is too far from center or range is too small, use neighbor interpolation instead
+      if (distance_from_center > 20.0f || cad_range < 10.0f) {
+        // Try to interpolate from neighboring power levels
+        float neighborAvg = 0.0f;
+        int neighborCount = 0;
+        
+        // Check left and right neighbors
+        for (int neighbor_j = std::max(0, j-2); neighbor_j <= std::min(POWERTABLE_WATT_SIZE-1, j+2); neighbor_j++) {
+          if (neighbor_j != j && validCounts[neighbor_j] > 0) {
+            // Get neighbor's data and check if it has data near center
+            std::vector<std::pair<float, float>> neighborPoints;
+            for (int i = 0; i < POWERTABLE_CAD_SIZE; ++i) {
+              if (ptData.tableRow[i].tableEntry[neighbor_j].targetPosition != INT16_MIN) {
+                float cad = static_cast<float>(MINIMUM_TABLE_CAD + i * POWERTABLE_CAD_INCREMENT);
+                neighborPoints.push_back({cad, static_cast<float>(ptData.tableRow[i].tableEntry[neighbor_j].targetPosition)});
+              }
+            }
+            
+            if (neighborPoints.size() >= 2) {
+              // Calculate neighbor's center value
+              float sum_x = 0, sum_y = 0, sum_xy = 0, sum_x2 = 0;
+              for (const auto& p : neighborPoints) {
+                sum_x += p.first;
+                sum_y += p.second;
+                sum_xy += p.first * p.second;
+                sum_x2 += p.first * p.first;
+              }
+              float n = neighborPoints.size();
+              float denom = (n * sum_x2 - sum_x * sum_x);
+              if (denom != 0) {
+                float slope = (n * sum_xy - sum_x * sum_y) / denom;
+                float intercept = (sum_y - slope * sum_x) / n;
+                float neighborCenterValue = slope * center_cad + intercept;
+                
+                // Weight by proximity and data quality
+                float weight = 1.0f / (1.0f + std::abs(neighbor_j - j));
+                neighborAvg += neighborCenterValue * weight;
+                neighborCount += weight;
+              }
+            }
+          }
+        }
+        
+        if (neighborCount > 0) {
+          centerAverageRow[j] = neighborAvg / neighborCount;
+        } else {
+          // Fallback to simple average of available points
+          float sum = 0;
+          for (const auto& p : points) sum += p.second;
+          centerAverageRow[j] = sum / points.size();
+        }
+      } else {
+        // Use normal linear regression for well-distributed data
+        float sum_x = 0, sum_y = 0, sum_xy = 0, sum_x2 = 0;
+        for (const auto& p : points) {
+          sum_x += p.first;
+          sum_y += p.second;
+          sum_xy += p.first * p.second;
+          sum_x2 += p.first * p.first;
+        }
+        float n = points.size();
+        float denom = (n * sum_x2 - sum_x * sum_x);
+        float slope = (denom != 0) ? (n * sum_xy - sum_x * sum_y) / denom : 0;
+        float intercept = (sum_y - slope * sum_x) / n;
+        centerAverageRow[j] = slope * center_cad + intercept;
+      }
+    } else if (points.size() == 1) {
+      centerAverageRow[j] = points[0].second;
+    }
+  }
+  
+  // 2. Calculate the average increase in target position per cadence increment for each column
+  std::vector<float> averageIncreasePerCadence(POWERTABLE_WATT_SIZE, 0.0f);
+  for (int j = 0; j < POWERTABLE_WATT_SIZE; ++j) {
+    float totalIncrease = 0.0f;
+    int increaseCount   = 0;
+    for (int i = 0; i < POWERTABLE_CAD_SIZE - 1; ++i) {
+      if (ptData.tableRow[i].tableEntry[j].targetPosition != INT16_MIN && ptData.tableRow[i + 1].tableEntry[j].targetPosition != INT16_MIN) {
+        totalIncrease += (ptData.tableRow[i + 1].tableEntry[j].targetPosition - ptData.tableRow[i].tableEntry[j].targetPosition);
+        increaseCount++;
+      }
+    }
+    if (increaseCount > 0) {
+      averageIncreasePerCadence[j] = totalIncrease / increaseCount;
+    }
+  }
+
+  // 3. Fill empty cells based on the average row and average increase
+  for (int i = 0; i < POWERTABLE_CAD_SIZE; ++i) {
+    for (int j = 0; j < POWERTABLE_WATT_SIZE; ++j) {
+      // Only fill cells that have not been populated with real data
+      if (ptData.tableRow[i].tableEntry[j].readings < 1) {
+        if (validCounts[j] > 0) {  // Only fill if there was data in this column to create an average
+          int distance      = i - mid_cad_index;
+          float newValue    = centerAverageRow[j] + (averageIncreasePerCadence[j] * distance);
+          int16_t intNewValue = static_cast<int16_t>(round(newValue));
+
+          // If the cell was already filled by another method, average with the new value
+          if (ptData.tableRow[i].tableEntry[j].targetPosition != INT16_MIN) {
+            ptData.tableRow[i].tableEntry[j].targetPosition = round((ptData.tableRow[i].tableEntry[j].targetPosition + intNewValue) / 2.0f);
+          } else {
+            ptData.tableRow[i].tableEntry[j].targetPosition = intNewValue;
+          }
+        }
+      }
+    }
+  }
 }
 
 /**
@@ -423,9 +558,9 @@ bool PTHelpers::extrapolateEmptyIndices(int outerIndex, const std::vector<int>& 
  * @param horizontal  (optional) If true, fills across watt indices (rows); if false, fills across cadence indices (columns). Default is true.
  */
 bool PTHelpers::splineFill(PTData& ptData, bool firstHalf /*= true*/, bool horizontal /*= true*/) {
-  bool completedWithoutTimeout = true;;
-  int outerSize = horizontal ? POWERTABLE_CAD_SIZE : POWERTABLE_WATT_SIZE;
-  int innerSize = horizontal ? POWERTABLE_WATT_SIZE : POWERTABLE_CAD_SIZE;
+  bool completedWithoutTimeout = true;
+  int outerSize                = horizontal ? POWERTABLE_CAD_SIZE : POWERTABLE_WATT_SIZE;
+  int innerSize                = horizontal ? POWERTABLE_WATT_SIZE : POWERTABLE_CAD_SIZE;
 
   std::vector<std::pair<int, float>> unique_xy;
   std::vector<int> emptyIndices;
@@ -469,7 +604,8 @@ bool PTHelpers::splineFill(PTData& ptData, bool firstHalf /*= true*/, bool horiz
         continue;
       }
 
-      if (ptData.tableRow[index.cadIndex].tableEntry[index.wattIndex].targetPosition != INT16_MIN) {
+      // Gather valid data points. Exclude points with 0 readings and a valid targetPosition - those are previously interpolated points.
+      if (ptData.tableRow[index.cadIndex].tableEntry[index.wattIndex].readings > 0 && ptData.tableRow[index.cadIndex].tableEntry[index.wattIndex].targetPosition != INT16_MIN) {
         unique_xy.emplace_back(innerIndex, static_cast<float>(ptData.tableRow[index.cadIndex].tableEntry[index.wattIndex].targetPosition));
       } else {
         emptyIndices.push_back(innerIndex);
@@ -495,7 +631,7 @@ bool PTHelpers::splineFill(PTData& ptData, bool firstHalf /*= true*/, bool horiz
   };
 
   for (int k = 0; k <= max_k_outer; ++k) {
-    if(!completedWithoutTimeout) {
+    if (!completedWithoutTimeout) {
       return false;  // Exit if computation takes too long
     }
     int outer_upper = mid_outer + k;
@@ -564,7 +700,7 @@ bool PTHelpers::linearFill(PTData& ptData) {
 
   // Define a lambda for processing a single cell
   auto processCell = [this, &ptData](int currentRowIndex, int currentColIndex) {
-    if (ptData.tableRow[currentRowIndex].tableEntry[currentColIndex].targetPosition == INT16_MIN) {
+    if (ptData.tableRow[currentRowIndex].tableEntry[currentColIndex].readings == 0) {
       int watts      = currentColIndex * POWERTABLE_WATT_INCREMENT;
       int cad        = currentRowIndex * POWERTABLE_CAD_INCREMENT + MINIMUM_TABLE_CAD;
       int resistance = this->lookup(watts, cad, ptData);
@@ -579,7 +715,10 @@ bool PTHelpers::linearFill(PTData& ptData) {
       current_pt_idx.cadIndex  = currentRowIndex;
       TestResults results      = this->testNeighbors(current_pt_idx, resistance, ptData);
       if (results.allNeighborsPassed == 1) {
-        ptData.tableRow[currentRowIndex].tableEntry[currentColIndex].targetPosition = resistance;
+        ptData.tableRow[currentRowIndex].tableEntry[currentColIndex].targetPosition =
+            (ptData.tableRow[currentRowIndex].tableEntry[currentColIndex].targetPosition == INT16_MIN)
+                ? resistance
+                : round((ptData.tableRow[currentRowIndex].tableEntry[currentColIndex].targetPosition + resistance) / 2.0f);
         // SS2K_LOG(PTDATA_LOG_TAG, "Filled position (%d, %d) with resistance: %d", currentRowIndex, currentColIndex, resistance);
       } else {  // log the failure to in insert the value
                 // Serial.printf("Failed to fill position (%d, %d) with resistance: %d\n", currentRowIndex, currentColIndex, resistance);
@@ -607,6 +746,50 @@ bool PTHelpers::linearFill(PTData& ptData) {
     }
   }
   return true;  // Return true if all operations completed without timeout
+}
+
+/**
+ * @brief Counts the number of valid entries in the power table.
+ *
+ * This function iterates through the power table and counts entries that are considered valid.
+ * If minReadings is 0 (the default), an entry is valid if its targetPosition is not INT16_MIN.
+ * Otherwise, an entry is valid if its readings count is greater than or equal to minReadings.
+ *
+ * @param ptData Reference to the PTData structure containing the power table.
+ * @param minReadings (optional) Minimum number of readings required for an entry to be considered valid. Default is 0.
+ * @return int The number of valid entries in the power table.
+ */
+int PTHelpers::getNumEntries(PTData& ptData, int minReadings /*= 0*/) {
+  int ret = 0;
+  if (minReadings == 0) {
+    for (int i = 0; i < POWERTABLE_CAD_SIZE; i++) {
+      for (int j = 0; j < POWERTABLE_WATT_SIZE; j++) {
+        if (ptData.tableRow[i].tableEntry[j].targetPosition != INT16_MIN) {
+          ret++;
+        }
+      }
+    }
+  } else {
+    for (int i = 0; i < POWERTABLE_CAD_SIZE; i++) {
+      for (int j = 0; j < POWERTABLE_WATT_SIZE; j++) {
+        if (ptData.tableRow[i].tableEntry[j].readings >= minReadings) {
+          ret++;
+        }
+      }
+    }
+  }
+  return ret;
+}
+
+// returns the total number of readings in the power table
+int PTHelpers::getTotalReadings(PTData& ptData) {
+  int totalReadings = 0;
+  for (int i = 0; i < POWERTABLE_CAD_SIZE; i++) {
+    for (int j = 0; j < POWERTABLE_WATT_SIZE; j++) {
+      totalReadings += ptData.tableRow[i].tableEntry[j].readings;
+    }
+  }
+  return totalReadings;
 }
 
 // Use the powertable to preform a reverse lookup of the target position to find the watts at a given cadence.
@@ -676,7 +859,7 @@ int PTHelpers::extrapolateWattsFromCadence(int cad, int32_t targetPosition, PTDa
     for (int i = 0; i < xy.second.size(); i++) {
       for (int j = 0; j < xyUsed4Offset.second.size(); j++) {
         if (xy.first[i] == xyUsed4Offset.first[j]) {
-          offset     = (((xyUsed4Offset.second[j] - xy.second[i]) * cadDelta) + offset) / 2;
+          offset = (((xyUsed4Offset.second[j] - xy.second[i]) * cadDelta) + offset) / 2;
         }
       }
     }

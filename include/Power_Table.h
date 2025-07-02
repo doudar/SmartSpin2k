@@ -57,9 +57,6 @@ class PowerTable {
   // Reset the active power table and delete the saved power table.
   bool reset();
 
-  // return number of readings in the table.
-  int getNumReadings();
-
   // Display power table in log
   void toLog();
 
@@ -73,8 +70,6 @@ class PowerTable {
  private:
   unsigned long lastSaveTime = millis();
   
-  int getNumEntries();
-  // remove entries with < 1 readings
   void clean();
 };
 

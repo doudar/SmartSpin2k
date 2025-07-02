@@ -58,7 +58,7 @@ void PowerTable::processPowerValue(PowerBuffer& powerBuffer, int cadence, Measur
 
     int currentPos = ss2k->getCurrentPosition() / TABLE_DIVISOR;
     int targetPos  = powerBuffer.powerEntry[0].targetPosition;
-    int range      = (userConfig->getShiftStep() / 2) / TABLE_DIVISOR;
+    int range      = (userConfig->getShiftStep() * 2) / TABLE_DIVISOR;
 
     if (currentPos >= (targetPos - range) && currentPos <= (targetPos + range)) {
       for (int i = 1; i < POWER_SAMPLES; i++) {
@@ -137,18 +137,6 @@ void PowerTable::setStepperMinMax() {
   }
 }
 
-int PowerTable::getNumEntries() {
-  int ret = 0;
-  for (int i = 0; i < POWERTABLE_CAD_SIZE; i++) {
-    for (int j = 0; j < POWERTABLE_WATT_SIZE; j++) {
-      if (this->ptData.tableRow[i].tableEntry[j].targetPosition != INT16_MIN) {
-        ret++;
-      }
-    }
-  }
-  return ret;
-}
-
 void PowerTable::clean() {
   SS2K_LOG(POWERTABLE_LOG_TAG, "Clean Power Table");
   for (int i = 0; i < POWERTABLE_CAD_SIZE; i++) {
@@ -192,7 +180,7 @@ void PowerTable::newEntry(PowerBuffer& powerBuffer) {
   }
 
   // clean previously extrapolated data so we don't fill with trash.
-  this->clean();
+  // this->clean();
   // To start working on the PowerTable, we need to calculate position in the table for the new entry
 
   ptIndex index = ptHelpers.calculateIndex(watts, cad);
@@ -280,13 +268,13 @@ void PowerTable::fillTable() {
     return;
   }
 
-  if (this->getNumEntries() > 4) {
+  if (ptHelpers.getNumEntries(ptData) > 4) {
     // set flag to stop execution after we can't add any more entries.
     if (esp_get_free_heap_size() < FREE_HEAP_FOR_COMPLEX_MATH) {
       // SS2K_LOG(POWERTABLE_LOG_TAG, "%d Heap too low for step %d.", esp_get_free_heap_size(), step);
       return;
     }
-    entries = getNumEntries();
+    entries = ptHelpers.getNumEntries(ptData);
     if (step == 0) {
       SS2K_LOG(POWERTABLE_LOG_TAG, "Fill start with %d entries", entries);
       prevEntries = entries;
@@ -295,18 +283,21 @@ void PowerTable::fillTable() {
       completed = ptHelpers.splineFill(ptData, false);
     } else if (step == 2) {
       completed = ptHelpers.linearFill(ptData);
+    }else if (step == 3) {
+      ptHelpers.fillByAverage(ptData);
+      completed = true;  // this step is always completed.
     }
-    newEntries = getNumEntries();
+    newEntries = ptHelpers.getNumEntries(ptData);
     SS2K_LOG(POWERTABLE_LOG_TAG, "Fill step %d added %d new entries", step, newEntries - prevEntries);
     if (newEntries > prevEntries) {
       prevEntries = newEntries;
-    } else if (step == 2) {
+    } else if (step == 3) {
       SS2K_LOG(POWERTABLE_LOG_TAG, "No more entries can be added, stopping fill.");
       fillTableFlag = false;
       step          = 0;
       return;
     }
-    if (completed) step = (step + 1) % 3;
+    if (completed) step = (step + 1) % 4;
   }
 }
 
@@ -493,7 +484,7 @@ bool PowerTable::_manageSaveState(bool canSkipReliabilityChecks) {
     }
 
     // Is the data we are working with better than the saved file?
-    int activeReadings = this->getNumReadings();
+    int activeReadings = ptHelpers.getTotalReadings(ptData);
     if (activeReadings > savedQuality) {
       SS2K_LOG(POWERTABLE_LOG_TAG, "Active table had a reliability of %d, vs %d for the saved file. Overwriting save.", activeReadings, savedQuality);
       file.close();
@@ -618,7 +609,7 @@ bool PowerTable::_save() {
   Serial.printf("LittleFS Total Bytes:%d, Used Bytes:%d", LittleFS.totalBytes(), LittleFS.usedBytes());
 
   // Count valid readings before saving
-  int validReadings = getNumReadings();
+  int validReadings = ptHelpers.getTotalReadings(ptData);
 
   // Only proceed with saving if we have enough data to make the file useful
   if (validReadings < 1) {
@@ -753,16 +744,4 @@ void PowerTable::toLog() {
     SS2K_LOG(POWERTABLE_LOG_TAG, "%s", logString.c_str());
   }
 #endif
-}
-
-int PowerTable::getNumReadings() {
-  int ret = 0;
-  for (int i = 0; i < POWERTABLE_CAD_SIZE; i++) {
-    for (int j = 0; j < POWERTABLE_WATT_SIZE; j++) {
-      if (this->ptData.tableRow[i].tableEntry[j].readings > 0) {
-        ret++;
-      }
-    }
-  }
-  return ret;
 }

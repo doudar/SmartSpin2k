@@ -128,8 +128,11 @@ class PTHelpers {
   int32_t lookupWatts(int cad, int32_t targetPosition, PTData& ptData);
   int32_t extrapolateCadenceWatts(int cad, float targetPosition, PTData& ptData);
   int extrapolateWattsFromCadence(int cad, int32_t targetPosition, PTData& ptData);
+    // return number of readings in the table. If minReadings is set, it will only count entries with at least that many readings.
+  int getNumEntries(PTData& ptData, int minReadings = 0);
+  int getTotalReadings(PTData& ptData);
+  void fillByAverage(PTData& ptData);
   ptIndex calculateIndex(int watts, int cad);
-  int dataPoints(PTData& ptData);
   std::pair<std::vector<float>, std::vector<float>> getRow(int row, PTData& ptData);
   std::pair<std::vector<float>, std::vector<float>> getColumn(int column, PTData& ptData);
 };
