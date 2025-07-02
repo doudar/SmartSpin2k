@@ -137,14 +137,10 @@ extern "C" void app_main() {
   //  moves don't cause problems)
 
   digitalWrite(LED_PIN, HIGH);
-  Serial.println("Starting BLE");
   // Configure and Initialize Logger
   logHandler.addAppender(&webSocketAppender);
-  Serial.println("Starting BLE");
   logHandler.addAppender(&udpAppender);
-  Serial.println("Starting BLE");
   logHandler.initialize();
-  Serial.println("Starting BLE");
   ss2k->startTasks();
   httpServer.start();
 

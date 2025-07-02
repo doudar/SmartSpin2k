@@ -110,6 +110,12 @@ void startWifi() {
   SS2K_LOG(HTTP_SERVER_LOG_TAG, "Connected to %s IP address: %s", userConfig->getSsid(), myIP.toString().c_str());
   SS2K_LOG(HTTP_SERVER_LOG_TAG, "Open http://%s.local/", userConfig->getDeviceName());
 
+  // Initialize DirCon MDNS service
+  if (DirConManager::start()) {
+    SS2K_LOG(HTTP_SERVER_LOG_TAG, "DirCon service started successfully");
+  } else {
+    SS2K_LOG(HTTP_SERVER_LOG_TAG, "Error starting DirCon service");
+  }
 
   WiFi.setTxPower(WIFI_POWER_19_5dBm);
 
@@ -164,7 +170,7 @@ void HTTP_Server::start() {
         "15 seconds.</body><script> setTimeout(\"location.href = 'http://" +
         myIP.toString() + "/bluetoothscanner.html';\",15000);</script></html>";
     // spinBLEClient.resetDevices();
-    spinBLEClient.doScan        = true;
+    spinBLEClient.doScan = true;
     server.send(200, "text/html", response);
   });
 
@@ -559,7 +565,7 @@ void HTTP_Server::settingsProcessor() {
   if (!server.arg("bleHRDropdown").isEmpty()) {
     wasBTUpdate = true;
     if (server.arg("bleHRDropdown")) {
-      tString    = server.arg("bleHRDropdown");
+      tString = server.arg("bleHRDropdown");
       if (tString != userConfig->getConnectedHeartMonitor()) {
         spinBLEClient.reconnectAllDevices();
       }
@@ -571,7 +577,7 @@ void HTTP_Server::settingsProcessor() {
   if (!server.arg("bleRemoteDropdown").isEmpty()) {
     wasBTUpdate = true;
     if (server.arg("bleRemoteDropdown")) {
-      tString    = server.arg("bleRemoteDropdown");
+      tString = server.arg("bleRemoteDropdown");
       if (tString != userConfig->getConnectedRemote()) {
         spinBLEClient.reconnectAllDevices();
       }
@@ -664,7 +670,7 @@ void HTTP_Server::FirmwareUpdate() {
       delay(100);
       JsonDocument doc;
       if (httpCode == HTTP_CODE_OK) {  // if version received
-        payload = http.getString();  // save received version
+        payload = http.getString();    // save received version
         payload.trim();
         // Deserialize the JSON document
         DeserializationError error = deserializeJson(doc, payload);
