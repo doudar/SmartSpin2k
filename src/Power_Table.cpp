@@ -284,7 +284,7 @@ void PowerTable::fillTable() {
     } else if (step == 2) {
       completed = ptHelpers.linearFill(ptData);
     }else if (step == 3) {
-      ptHelpers.fillByAverage(ptData);
+      //ptHelpers.fillByAverage(ptData);
       completed = true;  // this step is always completed.
     }
     newEntries = ptHelpers.getNumEntries(ptData);
