@@ -31,7 +31,7 @@ void TestTableFill::test_fill_incomplete_table(void) {
   PTHelpers helpers;
 
   // Count initial data points
-  int initialPoints = helpers.dataPoints(ptData);
+  int initialPoints = helpers.getNumEntries(ptData);
   logFile << "Initial data points: " << initialPoints << "\n";
   int previousFilledPoints = 0;
   int filledPoints         = 1;
@@ -42,13 +42,13 @@ void TestTableFill::test_fill_incomplete_table(void) {
     logFile << "Applied splineFill to the table\n";
 
     // Count filled data points
-    filledPoints = helpers.dataPoints(ptData);
+    filledPoints = helpers.getNumEntries(ptData);
     logFile << "Filled data points: " << filledPoints << "\n";
     logFile << "Added " << (filledPoints - initialPoints) << " points\n";
   }
 
   // loop through the table and check for INT16_MIN values
-  helpers.linearFill(ptData);
+  helpers.fillByAverage(ptData);
   // Save the filled power table
   const std::string outputFilePath = "test/output/power_table_filled.ptab";
   savePTDataToCSV(ptData, outputFilePath);

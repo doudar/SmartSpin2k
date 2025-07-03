@@ -433,7 +433,7 @@ void PTHelpers::fillByAverage(PTData& ptData) {
       float min_cad = points.front().first;
       float max_cad = points.back().first;
       float cad_range = max_cad - min_cad;
-      float distance_from_center = std::min(std::abs(center_cad - min_cad), std::abs(center_cad - max_cad));
+      float distance_from_center = (std::min)((std::abs)(center_cad - min_cad), (std::abs)(center_cad - max_cad));
       
       // If data is too far from center or range is too small, use neighbor interpolation instead
       if (distance_from_center > 20.0f || cad_range < 10.0f) {
@@ -470,7 +470,7 @@ void PTHelpers::fillByAverage(PTData& ptData) {
                 float neighborCenterValue = slope * center_cad + intercept;
                 
                 // Weight by proximity and data quality
-                float weight = 1.0f / (1.0f + std::abs(neighbor_j - j));
+                float weight = 1.0f / (1.0f + (std::abs)(neighbor_j - j));
                 neighborAvg += neighborCenterValue * weight;
                 neighborCount += weight;
               }
