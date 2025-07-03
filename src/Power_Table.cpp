@@ -284,7 +284,7 @@ void PowerTable::fillTable() {
     } else if (step == 2) {
       completed = ptHelpers.linearFill(ptData);
     }else if (step == 3) {
-      ptHelpers.fillByAverage(ptData);
+      //ptHelpers.fillByAverage(ptData);
       completed = true;  // this step is always completed.
     }
     newEntries = ptHelpers.getNumEntries(ptData);
@@ -403,31 +403,6 @@ float PowerTable::calculatePosition(float watts, float cad, float targetPos, ptI
 }
 
 /**
- * @brief Calculates a penalty value for downvoting a neighbor entry in the power table.
- *
- * This function computes a penalty based on the difference between the target value
- * and the neighbor value. The penalty is scaled by a predefined penalty factor and
- * is used to reduce the reliability of a neighbor entry when it fails validation.
- *
- * @param targetValue The target position value being evaluated.
- * @param neighborValue The neighbor position value being compared.
- * @return The calculated penalty value to be applied to the neighbor entry.
- */
-int weightedDownVote(int targetValue, int neighborValue) {
-  // calculate diff between target and neighbor
-  int delta = abs(targetValue - neighborValue);
-  int penalty;
-  float penaltyFactor = 0.2;
-
-  SS2K_LOG(POWERTABLE_LOG_TAG, "WEIGHTED DOWNVOTING: Target Value: (%d), NeighborValue: (%d)", targetValue, neighborValue);
-
-  penalty = (delta * penaltyFactor);
-
-  SS2K_LOG(POWERTABLE_LOG_TAG, "WEIGHTED DOWNVOTING: Delta: (%d), Penalty: (%d)", delta, penalty);
-  return penalty;
-}
-
-/**
  * @brief Applies a downvote penalty to a specific entry in the power table.
  *
  * This function reduces the number of readings for a specific entry in the power table
@@ -440,10 +415,11 @@ int weightedDownVote(int targetValue, int neighborValue) {
  */
 void PowerTable::downVoteData(ptIndex index, float target, int neighbor) {
   // determine penalty amount before applying to failed neighbor
-  int penalty = weightedDownVote(target, neighbor);
+  int penalty = 1;
 
   if (this->ptData.tableRow[index.cadIndex].tableEntry[index.wattIndex].readings < penalty) {
     this->ptData.tableRow[index.cadIndex].tableEntry[index.wattIndex].readings = 0;
+    this->ptData.tableRow[index.cadIndex].tableEntry[index.wattIndex].targetPosition = INT16_MIN;  // remove target position if readings are zero.
   } else {
     this->ptData.tableRow[index.cadIndex].tableEntry[index.wattIndex].readings -= penalty;
   }
