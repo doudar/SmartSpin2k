@@ -1038,29 +1038,29 @@ bool PTHelpers::completePowerTable(PTData& data) {
         // --- MODIFIED RULE ---
         // Enforce Rule: Neighbor above (row r-1) must be higher.
         // This means the value at [r] must be LESS than the value at [r-1].
-        if (r > 0 && isFilled(data.tableRow[r - 1].tableEntry[c]) &&
-            data.tableRow[r - 1].tableEntry[c].readings < round(((iteration_count / 2.0f) / (float)max_iterations) * MAX_NEIGHBOR_WEIGHT)) {
+        if (r > 0 && isFilled(data.tableRow[r - 1].tableEntry[c])) {
           if (data.tableRow[r].tableEntry[c].targetPosition >= data.tableRow[r - 1].tableEntry[c].targetPosition) {
             if(data.tableRow[r].tableEntry[c].readings >= data.tableRow[r - 1].tableEntry[c].readings) {
-               data.tableRow[r - 1].tableEntry[c].targetPosition = data.tableRow[r].tableEntry[c].targetPosition + 1;
+               data.tableRow[r].tableEntry[c].targetPosition += 1;
             } else {
               data.tableRow[r].tableEntry[c].targetPosition = data.tableRow[r - 1].tableEntry[c].targetPosition - 1;
+              changedInIteration = true;
             }
-            changedInIteration = true;
+            
           }
         }
 
         // Enforce Rule: Neighbor left (column c-1) must be lower.
         // This means the value at [c] must be GREATER than the value at [c-1].
-        if (c > 0 && isFilled(data.tableRow[r].tableEntry[c - 1]) &&
-            data.tableRow[r].tableEntry[c - 1].readings < round(((iteration_count / 2.0f) / (float)max_iterations) * MAX_NEIGHBOR_WEIGHT)) {
+        if (c > 0 && isFilled(data.tableRow[r].tableEntry[c - 1])) {
           if (data.tableRow[r].tableEntry[c].targetPosition <= data.tableRow[r].tableEntry[c - 1].targetPosition) {
             if(data.tableRow[r].tableEntry[c].readings >= data.tableRow[r].tableEntry[c - 1].readings) {
-              data.tableRow[r].tableEntry[c - 1].targetPosition = data.tableRow[r].tableEntry[c].targetPosition - 1;
+              data.tableRow[r].tableEntry[c].targetPosition += 1;
             } else {
               data.tableRow[r].tableEntry[c].targetPosition = data.tableRow[r].tableEntry[c - 1].targetPosition + 1;
+              changedInIteration = true;
             }
-            changedInIteration = true;
+            
           }
         }
       }
