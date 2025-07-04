@@ -1040,7 +1040,7 @@ bool PTHelpers::completePowerTable(PTData& data) {
         // This means the value at [r] must be LESS than the value at [r-1].
         if (r > 0 && isFilled(data.tableRow[r - 1].tableEntry[c])) {
           if (data.tableRow[r].tableEntry[c].targetPosition >= data.tableRow[r - 1].tableEntry[c].targetPosition) {
-            if(data.tableRow[r].tableEntry[c].readings >= data.tableRow[r - 1].tableEntry[c].readings) {
+            if(data.tableRow[r].tableEntry[c].readings > data.tableRow[r - 1].tableEntry[c].readings) {
                data.tableRow[r].tableEntry[c].targetPosition += 1;
             } else {
               data.tableRow[r].tableEntry[c].targetPosition = data.tableRow[r - 1].tableEntry[c].targetPosition - 1;
@@ -1054,7 +1054,7 @@ bool PTHelpers::completePowerTable(PTData& data) {
         // This means the value at [c] must be GREATER than the value at [c-1].
         if (c > 0 && isFilled(data.tableRow[r].tableEntry[c - 1])) {
           if (data.tableRow[r].tableEntry[c].targetPosition <= data.tableRow[r].tableEntry[c - 1].targetPosition) {
-            if(data.tableRow[r].tableEntry[c].readings >= data.tableRow[r].tableEntry[c - 1].readings) {
+            if(data.tableRow[r].tableEntry[c].readings > data.tableRow[r].tableEntry[c - 1].readings) {
               data.tableRow[r].tableEntry[c].targetPosition += 1;
             } else {
               data.tableRow[r].tableEntry[c].targetPosition = data.tableRow[r].tableEntry[c - 1].targetPosition + 1;
