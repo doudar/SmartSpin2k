@@ -48,8 +48,8 @@ void TestTableFill::test_fill_incomplete_table(void) {
   // }
 
   // loop through the table and check for INT16_MIN values
-  //for(int i=1; i<2; i++){
-  helpers.completePowerTable(ptData);//}
+  for(int i=1; i<100; i++){
+  helpers.completePowerTable(ptData);}
   // Save the filled power table
   const std::string outputFilePath = "test/output/power_table_filled.ptab";
   savePTDataToCSV(ptData, outputFilePath);

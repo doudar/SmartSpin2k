@@ -223,6 +223,13 @@ void PowerTable::newEntry(PowerBuffer& powerBuffer) {
   BLE_ss2kCustomCharacteristic::notify(0x27, index.cadIndex);
 }
 
+void fillAllCadenceLines(ptIndex index, PTData& ptData) {
+  for (int i = 0; i < POWERTABLE_CAD_SIZE; i++) {
+    if (ptData.tableRow[i].tableEntry[index.wattIndex].readings == 0) {
+      ptData.tableRow[i].tableEntry[index.wattIndex].targetPosition = ptData.tableRow[index.cadIndex].tableEntry[index.wattIndex].targetPosition + (i - index.cadIndex) * (index.wattIndex + 10);
+    }
+  }
+}
 /**
  * @brief Updates or enters data into the power table for a specific row and entry.
  *
@@ -250,6 +257,7 @@ void PowerTable::enterData(ptIndex index, int pos) {
     }
   }
   this->ptData.tableRow[index.cadIndex].tableEntry[index.wattIndex].readings++;
+  fillAllCadenceLines(index, this->ptData);
 }
 
 void PowerTable::fillTable() {
