@@ -1031,8 +1031,8 @@ bool PTHelpers::completePowerTable(PTData& data) {
     }
 
     // --- PASS 2: Monotonicity Enforcement ---
-    for (int r = 1; r < POWERTABLE_CAD_SIZE; ++r) {
-      for (int c = 1; c < POWERTABLE_WATT_SIZE; ++c) {
+    for (int r = 0; r < POWERTABLE_CAD_SIZE; ++r) {
+      for (int c = 0; c < POWERTABLE_WATT_SIZE; ++c) {
         if (!isFilled(data.tableRow[r].tableEntry[c])) continue;
 
         // --- MODIFIED RULE ---
