@@ -397,457 +397,6 @@ bool PTHelpers::extrapolateEmptyIndices(int outerIndex, const std::vector<int>& 
 }
 
 /**
- * @brief Fills missing or invalid entries in the power table by estimating values using averages.
- *
- * This function processes the provided PTData structure, which represents a power table with
- * cadence and wattage dimensions. It performs the following steps:
- * 1. Calculates the average target position for each wattage column across all valid cadence rows.
- * 2. Computes the average increase in target position per cadence increment for each wattage column.
- * 3. For each empty or invalid cell, estimates its value based on the center average and the average
- *    increase per cadence step, filling in the missing data accordingly.
- * 4. Validates that each filled value maintains proper ordering relative to neighbors.
- * 5. Applies a second pass to correct outlier rows and fix downward trends.
- *
- * If a cell was previously filled by another method, the function averages the new estimate with the
- * existing value to provide a smoother result.
- *
- * @param ptData Reference to the PTData structure containing the power table to be filled.
- */
-void PTHelpers::fillByAverage(PTData& ptData) {
-  std::vector<float> centerAverageRow(POWERTABLE_WATT_SIZE, 0.0f);
-  std::vector<int> validCounts(POWERTABLE_WATT_SIZE, 0);
-  int mid_cad_index = POWERTABLE_CAD_SIZE / 2;
-  float center_cad  = static_cast<float>(MINIMUM_TABLE_CAD + mid_cad_index * POWERTABLE_CAD_INCREMENT);
-
-  // 1. Calculate the center average row using improved regression
-  for (int j = 0; j < POWERTABLE_WATT_SIZE; ++j) {
-    std::vector<std::pair<float, float>> points;
-    for (int i = 0; i < POWERTABLE_CAD_SIZE; ++i) {
-      if (ptData.tableRow[i].tableEntry[j].targetPosition != INT16_MIN) {
-        float cad = static_cast<float>(MINIMUM_TABLE_CAD + i * POWERTABLE_CAD_INCREMENT);
-        points.push_back({cad, static_cast<float>(ptData.tableRow[i].tableEntry[j].targetPosition)});
-      }
-    }
-    validCounts[j] = points.size();
-
-    if (points.size() >= 2) {
-      // Check if data is clustered far from center
-      float min_cad              = points.front().first;
-      float max_cad              = points.back().first;
-      float cad_range            = max_cad - min_cad;
-      float distance_from_center = (std::min)((std::abs)(center_cad - min_cad), (std::abs)(center_cad - max_cad));
-
-      // If data is too far from center or range is too small, use neighbor interpolation instead
-      float centerDistanceThreshold = POWERTABLE_CAD_INCREMENT * 4.0f;  // 4 cadence increments from center
-      float minimumCadenceRange     = POWERTABLE_CAD_INCREMENT * 2.0f;  // At least 2 cadence increments of data
-
-      if (distance_from_center > centerDistanceThreshold || cad_range < minimumCadenceRange) {
-        // Try to interpolate from neighboring power levels
-        float neighborAvg = 0.0f;
-        int neighborCount = 0;
-
-        // Check left and right neighbors
-        for (int neighbor_j = std::max(0, j - 2); neighbor_j <= std::min(POWERTABLE_WATT_SIZE - 1, j + 2); neighbor_j++) {
-          if (neighbor_j != j && validCounts[neighbor_j] > 0) {
-            // Get neighbor's data and check if it has data near center
-            std::vector<std::pair<float, float>> neighborPoints;
-            for (int i = 0; i < POWERTABLE_CAD_SIZE; ++i) {
-              if (ptData.tableRow[i].tableEntry[neighbor_j].targetPosition != INT16_MIN) {
-                float cad = static_cast<float>(MINIMUM_TABLE_CAD + i * POWERTABLE_CAD_INCREMENT);
-                neighborPoints.push_back({cad, static_cast<float>(ptData.tableRow[i].tableEntry[neighbor_j].targetPosition)});
-              }
-            }
-
-            if (neighborPoints.size() >= 2) {
-              // Calculate neighbor's center value
-              float sum_x = 0, sum_y = 0, sum_xy = 0, sum_x2 = 0;
-              for (const auto& p : neighborPoints) {
-                sum_x += p.first;
-                sum_y += p.second;
-                sum_xy += p.first * p.second;
-                sum_x2 += p.first * p.first;
-              }
-              float n     = neighborPoints.size();
-              float denom = (n * sum_x2 - sum_x * sum_x);
-              if (denom != 0) {
-                float slope               = (n * sum_xy - sum_x * sum_y) / denom;
-                float intercept           = (sum_y - slope * sum_x) / n;
-                float neighborCenterValue = slope * center_cad + intercept;
-
-                // Weight by proximity and data quality
-                float weight = 1.0f / (1.0f + (std::abs)(neighbor_j - j));
-                neighborAvg += neighborCenterValue * weight;
-                neighborCount += weight;
-              }
-            }
-          }
-        }
-
-        if (neighborCount > 0) {
-          centerAverageRow[j] = neighborAvg / neighborCount;
-        } else {
-          // Fallback to simple average of available points
-          float sum = 0;
-          for (const auto& p : points) sum += p.second;
-          centerAverageRow[j] = sum / points.size();
-        }
-      } else {
-        // Use normal linear regression for well-distributed data
-        float sum_x = 0, sum_y = 0, sum_xy = 0, sum_x2 = 0;
-        for (const auto& p : points) {
-          sum_x += p.first;
-          sum_y += p.second;
-          sum_xy += p.first * p.second;
-          sum_x2 += p.first * p.first;
-        }
-        float n             = points.size();
-        float denom         = (n * sum_x2 - sum_x * sum_x);
-        float slope         = (denom != 0) ? (n * sum_xy - sum_x * sum_y) / denom : 0;
-        float intercept     = (sum_y - slope * sum_x) / n;
-        centerAverageRow[j] = slope * center_cad + intercept;
-      }
-    } else if (points.size() == 1) {
-      centerAverageRow[j] = points[0].second;
-    }
-  }
-
-  // 2. Calculate the average increase in target position per cadence increment for each column
-  std::vector<float> averageIncreasePerCadence(POWERTABLE_WATT_SIZE, 0.0f);
-  for (int j = 0; j < POWERTABLE_WATT_SIZE; ++j) {
-    float totalIncrease = 0.0f;
-    int increaseCount   = 0;
-    for (int i = 0; i < POWERTABLE_CAD_SIZE - 1; ++i) {
-      if (ptData.tableRow[i].tableEntry[j].targetPosition != INT16_MIN && ptData.tableRow[i + 1].tableEntry[j].targetPosition != INT16_MIN) {
-        totalIncrease += (ptData.tableRow[i + 1].tableEntry[j].targetPosition - ptData.tableRow[i].tableEntry[j].targetPosition);
-        increaseCount++;
-      }
-    }
-    if (increaseCount > 0) {
-      averageIncreasePerCadence[j] = totalIncrease / increaseCount;
-    }
-  }
-
-  // Helper function to get neighbor values
-  auto getNeighborValue = [&](int i, int j, int di, int dj) -> int16_t {
-    int ni = i + di;
-    int nj = j + dj;
-    if (ni >= 0 && ni < POWERTABLE_CAD_SIZE && nj >= 0 && nj < POWERTABLE_WATT_SIZE) {
-      return ptData.tableRow[ni].tableEntry[nj].targetPosition;
-    }
-    return INT16_MIN;
-  };
-
-  // Helper function to count valid neighbors
-  auto countValidNeighbors = [&](int i, int j) -> int {
-    int count = 0;
-    if (getNeighborValue(i, j, 0, -1) != INT16_MIN) count++;  // left
-    if (getNeighborValue(i, j, 0, 1) != INT16_MIN) count++;   // right
-    if (getNeighborValue(i, j, -1, 0) != INT16_MIN) count++;  // top
-    if (getNeighborValue(i, j, 1, 0) != INT16_MIN) count++;   // bottom
-    return count;
-  };
-
-  // Helper function to apply flexible constraints
-  auto applyFlexibleConstraints = [&](int i, int j, float baseValue) -> int16_t {
-    int16_t leftNeighbor   = getNeighborValue(i, j, 0, -1);
-    int16_t rightNeighbor  = getNeighborValue(i, j, 0, 1);
-    int16_t topNeighbor    = getNeighborValue(i, j, -1, 0);
-    int16_t bottomNeighbor = getNeighborValue(i, j, 1, 0);
-
-    int validNeighborCount = countValidNeighbors(i, j);
-    float adjustedValue    = baseValue;
-
-    // If we have very few neighbors, be more lenient with constraints
-    if (validNeighborCount <= 1) {
-      // Only apply minimal constraints - allow more deviation from trend
-      const float tolerance = POWERTABLE_CAD_INCREMENT * 10.0f;  // Allow larger deviations when few neighbors (50 units if CAD_INCREMENT=5)
-
-      if (leftNeighbor != INT16_MIN) {
-        adjustedValue = std::max(adjustedValue, static_cast<float>(leftNeighbor - tolerance));
-      }
-      if (rightNeighbor != INT16_MIN) {
-        adjustedValue = std::min(adjustedValue, static_cast<float>(rightNeighbor + tolerance));
-      }
-      if (topNeighbor != INT16_MIN) {
-        adjustedValue = std::min(adjustedValue, static_cast<float>(topNeighbor + tolerance));
-      }
-      if (bottomNeighbor != INT16_MIN) {
-        adjustedValue = std::max(adjustedValue, static_cast<float>(bottomNeighbor - tolerance));
-      }
-    } else {
-      // Apply normal constraints when we have sufficient neighbor data
-      const float tolerance = POWERTABLE_CAD_INCREMENT * 2.0f;  // Smaller tolerance when we have more data (10 units if CAD_INCREMENT=5)
-
-      // Ensure value follows general trend but with some tolerance
-      if (leftNeighbor != INT16_MIN) {
-        adjustedValue = std::max(adjustedValue, static_cast<float>(leftNeighbor + 1));
-      }
-      if (bottomNeighbor != INT16_MIN) {
-        adjustedValue = std::max(adjustedValue, static_cast<float>(bottomNeighbor + 1));
-      }
-      if (topNeighbor != INT16_MIN) {
-        adjustedValue = std::min(adjustedValue, static_cast<float>(topNeighbor - 1));
-      }
-      if (rightNeighbor != INT16_MIN) {
-        adjustedValue = std::min(adjustedValue, static_cast<float>(rightNeighbor - 1));
-      }
-
-      // Check for impossible constraints and relax if needed
-      float minRequired = -std::numeric_limits<float>::infinity();
-      float maxAllowed  = std::numeric_limits<float>::infinity();
-
-      if (leftNeighbor != INT16_MIN) minRequired = std::max(minRequired, static_cast<float>(leftNeighbor + 1));
-      if (bottomNeighbor != INT16_MIN) minRequired = std::max(minRequired, static_cast<float>(bottomNeighbor + 1));
-      if (topNeighbor != INT16_MIN) maxAllowed = std::min(maxAllowed, static_cast<float>(topNeighbor - 1));
-      if (rightNeighbor != INT16_MIN) maxAllowed = std::min(maxAllowed, static_cast<float>(rightNeighbor - 1));
-
-      if (minRequired > maxAllowed) {
-        // Constraints conflict - use weighted average favoring the trend
-        float trendWeight = 0.7f;
-        adjustedValue     = trendWeight * baseValue + (1.0f - trendWeight) * ((minRequired + maxAllowed) / 2.0f);
-      }
-    }
-
-    return static_cast<int16_t>(round(adjustedValue));
-  };
-
-  // 3. Fill empty cells based on the average row and average increase, with flexible neighbor validation
-  for (int i = 0; i < POWERTABLE_CAD_SIZE; ++i) {
-    for (int j = 0; j < POWERTABLE_WATT_SIZE; ++j) {
-      // Only fill cells that have not been populated with real data
-      if (ptData.tableRow[i].tableEntry[j].readings < 1) {
-        float newValue = 0.0f;
-        bool hasValue  = false;
-
-        if (validCounts[j] > 0) {
-          // Use column-based average if we have data for this column
-          int distance = i - mid_cad_index;
-          newValue     = centerAverageRow[j] + (averageIncreasePerCadence[j] * distance);
-          hasValue     = true;
-        } else {
-          // Column is completely empty - interpolate from neighboring columns
-          float leftValue = 0.0f, rightValue = 0.0f;
-          bool hasLeft = false, hasRight = false;
-
-          // Find nearest left column with data
-          for (int left_j = j - 1; left_j >= 0; --left_j) {
-            if (validCounts[left_j] > 0) {
-              int distance = i - mid_cad_index;
-              leftValue    = centerAverageRow[left_j] + (averageIncreasePerCadence[left_j] * distance);
-              hasLeft      = true;
-              break;
-            }
-          }
-
-          // Find nearest right column with data
-          for (int right_j = j + 1; right_j < POWERTABLE_WATT_SIZE; ++right_j) {
-            if (validCounts[right_j] > 0) {
-              int distance = i - mid_cad_index;
-              rightValue   = centerAverageRow[right_j] + (averageIncreasePerCadence[right_j] * distance);
-              hasRight     = true;
-              break;
-            }
-          }
-
-          // Interpolate between left and right neighbors
-          if (hasLeft && hasRight) {
-            // Linear interpolation between left and right columns
-            float ratio = 0.5f;  // Simple midpoint for now, could be more sophisticated
-            newValue    = leftValue + (rightValue - leftValue) * ratio;
-            hasValue    = true;
-          } else if (hasLeft) {
-            // Extrapolate from left neighbor
-            newValue = leftValue + (leftValue * 0.1f);  // Add 10% increase as reasonable extrapolation
-            hasValue = true;
-          } else if (hasRight) {
-            // Extrapolate from right neighbor
-            newValue = rightValue - (rightValue * 0.1f);  // Subtract 10% as reasonable extrapolation
-            hasValue = true;
-          }
-        }
-
-        if (hasValue) {
-          // Apply flexible constraints based on neighbor availability
-          int16_t constrainedValue = applyFlexibleConstraints(i, j, newValue);
-
-          // If the cell was already filled by another method, average with the new value
-          if (ptData.tableRow[i].tableEntry[j].targetPosition != INT16_MIN) {
-            float existingValue                             = static_cast<float>(ptData.tableRow[i].tableEntry[j].targetPosition);
-            float blendedValue                              = (existingValue + constrainedValue) / 2.0f;
-            int16_t finalValue                              = applyFlexibleConstraints(i, j, blendedValue);
-            ptData.tableRow[i].tableEntry[j].targetPosition = finalValue;
-          } else {
-            ptData.tableRow[i].tableEntry[j].targetPosition = constrainedValue;
-          }
-        }
-      }
-    }
-  }
-
-  // 4. SECOND PASS: Detect and correct outlier rows and downward trends
-
-  // Calculate overall table statistics for outlier detection
-  std::vector<float> rowAverages(POWERTABLE_CAD_SIZE, 0.0f);
-  std::vector<int> rowValidCounts(POWERTABLE_CAD_SIZE, 0);
-
-  for (int i = 0; i < POWERTABLE_CAD_SIZE; ++i) {
-    float sum = 0.0f;
-    int count = 0;
-    for (int j = 0; j < POWERTABLE_WATT_SIZE; ++j) {
-      if (ptData.tableRow[i].tableEntry[j].targetPosition != INT16_MIN) {
-        sum += ptData.tableRow[i].tableEntry[j].targetPosition;
-        count++;
-      }
-    }
-    if (count > 0) {
-      rowAverages[i]    = sum / count;
-      rowValidCounts[i] = count;
-    }
-  }
-
-  // Calculate expected row average based on neighboring rows
-  auto calculateExpectedRowAverage = [&](int rowIndex) -> float {
-    float weightedSum = 0.0f;
-    float totalWeight = 0.0f;
-
-    // Use 3 rows above and below with distance-based weighting
-    for (int offset = -3; offset <= 3; ++offset) {
-      if (offset == 0) continue;  // Skip self
-      int neighborRow = rowIndex + offset;
-      if (neighborRow >= 0 && neighborRow < POWERTABLE_CAD_SIZE && rowValidCounts[neighborRow] > 0) {
-        float weight = 1.0f / (1.0f + (std::abs)(offset));
-        weightedSum += rowAverages[neighborRow] * weight;
-        totalWeight += weight;
-      }
-    }
-
-    return (totalWeight > 0) ? weightedSum / totalWeight : rowAverages[rowIndex];
-  };
-
-  // Check for downward trends in rows (resistance should generally increase with lower cadence)
-  auto hasDownwardTrend = [&](int rowIndex) -> bool {
-    if (rowValidCounts[rowIndex] < 3) return false;  // Need enough data points
-
-    float trend    = 0.0f;
-    int trendCount = 0;
-
-    for (int j = 0; j < POWERTABLE_WATT_SIZE - 1; ++j) {
-      if (ptData.tableRow[rowIndex].tableEntry[j].targetPosition != INT16_MIN && ptData.tableRow[rowIndex].tableEntry[j + 1].targetPosition != INT16_MIN) {
-        trend += (ptData.tableRow[rowIndex].tableEntry[j + 1].targetPosition - ptData.tableRow[rowIndex].tableEntry[j].targetPosition);
-        trendCount++;
-      }
-    }
-
-    // If average trend is significantly negative, it's a downward trend
-    float downwardTrendThreshold = -POWERTABLE_CAD_INCREMENT * 2.0f;  // -10 units if CAD_INCREMENT=5
-    return (trendCount > 0 && (trend / trendCount) < downwardTrendThreshold);
-  };
-
-  // Detect and correct outlier rows
-  for (int i = 0; i < POWERTABLE_CAD_SIZE; ++i) {
-    if (rowValidCounts[i] < 3) continue;  // Skip rows with insufficient data
-
-    float expectedAverage           = calculateExpectedRowAverage(i);
-    float deviation                 = (std::abs)(rowAverages[i] - expectedAverage);
-    float minimumDeviationThreshold = POWERTABLE_CAD_INCREMENT * 10.0f;                              // 50 units if CAD_INCREMENT=5
-    float threshold                 = std::max(minimumDeviationThreshold, expectedAverage * 0.15f);  // 15% or minimum threshold
-
-    bool isOutlier    = deviation > threshold;
-    bool hasDownTrend = hasDownwardTrend(i);
-
-    if (isOutlier || hasDownTrend) {
-      // Correct this row by interpolating from neighbors and enforcing upward trend
-      for (int j = 0; j < POWERTABLE_WATT_SIZE; ++j) {
-        if (ptData.tableRow[i].tableEntry[j].readings < 1) {  // Only correct filled values, not original data
-
-          // Calculate expected value based on neighboring rows
-          float verticalInterpolation = 0.0f;
-          float verticalWeight        = 0.0f;
-
-          for (int offset = -2; offset <= 2; ++offset) {
-            if (offset == 0) continue;
-            int neighborRow = i + offset;
-            if (neighborRow >= 0 && neighborRow < POWERTABLE_CAD_SIZE && ptData.tableRow[neighborRow].tableEntry[j].targetPosition != INT16_MIN) {
-              float weight = 1.0f / (1.0f + (std::abs)(offset));
-              verticalInterpolation += ptData.tableRow[neighborRow].tableEntry[j].targetPosition * weight;
-              verticalWeight += weight;
-            }
-          }
-
-          if (verticalWeight > 0) {
-            float correctedValue = verticalInterpolation / verticalWeight;
-
-            // Ensure the corrected value maintains proper ordering
-            int16_t finalCorrectedValue = applyFlexibleConstraints(i, j, correctedValue);
-
-            // Apply correction with some smoothing to avoid abrupt changes
-            if (ptData.tableRow[i].tableEntry[j].targetPosition != INT16_MIN) {
-              float currentValue                              = static_cast<float>(ptData.tableRow[i].tableEntry[j].targetPosition);
-              float blendFactor                               = (isOutlier && hasDownTrend) ? 0.8f : 0.5f;  // Stronger correction for severe cases
-              float blendedValue                              = (1.0f - blendFactor) * currentValue + blendFactor * finalCorrectedValue;
-              ptData.tableRow[i].tableEntry[j].targetPosition = static_cast<int16_t>(round(blendedValue));
-            } else {
-              ptData.tableRow[i].tableEntry[j].targetPosition = finalCorrectedValue;
-            }
-          }
-        }
-      }
-    }
-  }
-
-  // 5. Final pass to ensure no downward trends remain
-  for (int i = 0; i < POWERTABLE_CAD_SIZE; ++i) {
-    for (int j = 0; j < POWERTABLE_WATT_SIZE - 1; ++j) {
-      if (ptData.tableRow[i].tableEntry[j].targetPosition != INT16_MIN && ptData.tableRow[i].tableEntry[j + 1].targetPosition != INT16_MIN &&
-          ptData.tableRow[i].tableEntry[j].readings < 1 &&  // Only adjust filled values
-          ptData.tableRow[i].tableEntry[j + 1].readings < 1) {
-        // If we have a downward trend, adjust the right value upward
-        if (ptData.tableRow[i].tableEntry[j + 1].targetPosition <= ptData.tableRow[i].tableEntry[j].targetPosition) {
-          int16_t minValue                                    = ptData.tableRow[i].tableEntry[j].targetPosition + 1;
-          ptData.tableRow[i].tableEntry[j + 1].targetPosition = std::max(minValue, ptData.tableRow[i].tableEntry[j + 1].targetPosition);
-        }
-      }
-    }
-  }
-
-  // 6. FINAL LAYER CAKE PASS: Build table from lowest cadence (highest row index) upward, enforcing all constraints
-  for (int i = POWERTABLE_CAD_SIZE - 1; i >= 0; --i) {  // Start from lowest cadence (highest RPM)
-    for (int j = 0; j < POWERTABLE_WATT_SIZE; ++j) {
-      // Only update filled/interpolated cells, not real data
-      if (ptData.tableRow[i].tableEntry[j].readings < 1 && ptData.tableRow[i].tableEntry[j].targetPosition != INT16_MIN) {
-        int16_t base = ptData.tableRow[i].tableEntry[j].targetPosition;
-        // 1. Enforce left neighbor (must be lower)
-        if (j > 0 && ptData.tableRow[i].tableEntry[j - 1].targetPosition != INT16_MIN) {
-          int16_t left = ptData.tableRow[i].tableEntry[j - 1].targetPosition;
-          if (base <= left) base = left + 1;
-        }
-        // 2. Enforce down neighbor (must be lower)
-        if (i < POWERTABLE_CAD_SIZE - 1 && ptData.tableRow[i + 1].tableEntry[j].targetPosition != INT16_MIN) {
-          int16_t down   = ptData.tableRow[i + 1].tableEntry[j].targetPosition;
-          float avgInc   = (j < averageIncreasePerCadence.size()) ? averageIncreasePerCadence[j] : 1.0f;
-          int16_t minVal = static_cast<int16_t>(std::ceil(down + std::max(1.0f, avgInc)));
-          if (base < minVal) base = minVal;
-        }
-        // 3. Enforce right neighbor (must be higher)
-        if (j < POWERTABLE_WATT_SIZE - 1 && ptData.tableRow[i].tableEntry[j + 1].targetPosition != INT16_MIN) {
-          int16_t right = ptData.tableRow[i].tableEntry[j + 1].targetPosition;
-          if (base >= right) base = right - 1;
-        }
-        // 4. Enforce up neighbor (must be higher)
-        if (i > 0 && ptData.tableRow[i - 1].tableEntry[j].targetPosition != INT16_MIN) {
-          int16_t up = ptData.tableRow[i - 1].tableEntry[j].targetPosition;
-          if (base >= up) base = up - 1;
-        }
-        // 5. Clamp to reasonable range if needed (optional)
-        if (base < -2000) base = -2000;
-        if (base > 20000) base = 20000;
-        ptData.tableRow[i].tableEntry[j].targetPosition = base;
-      }
-    }
-  }
-}
-
-/**
  * @brief Fills missing entries in the power table using cubic spline interpolation.
  *
  * This function processes either the first or second half of the table rows or columns,
@@ -1352,7 +901,7 @@ double linear_interpolate(double x, double x0, double y0, double x1, double y1) 
  *
  * @param data A reference to the PTData object to be completed in-place.
  */
-void PTHelpers::completePowerTable(PTData& data) {
+bool PTHelpers::completePowerTable(PTData& data) {
   bool changedInIteration = true;
   int max_iterations      = 100;  // Safety break to prevent infinite loops
   int iteration_count     = 0;
@@ -1482,26 +1031,46 @@ void PTHelpers::completePowerTable(PTData& data) {
     }
 
     // --- PASS 2: Monotonicity Enforcement ---
-    for (int r = 0; r < POWERTABLE_CAD_SIZE; ++r) {
-      for (int c = 0; c < POWERTABLE_WATT_SIZE; ++c) {
+    for (int r = 1; r < POWERTABLE_CAD_SIZE; ++r) {
+      for (int c = 1; c < POWERTABLE_WATT_SIZE; ++c) {
         if (!isFilled(data.tableRow[r].tableEntry[c])) continue;
 
         // --- MODIFIED RULE ---
-        // Enforce Rule 2: Neighbor above (row r-1) must be higher.
+        // Enforce Rule: Neighbor above (row r-1) must be higher.
         // This means the value at [r] must be LESS than the value at [r-1].
-        if (r > 0 && isFilled(data.tableRow[r - 1].tableEntry[c])) {
+        if (r > 0 && isFilled(data.tableRow[r - 1].tableEntry[c]) &&
+            data.tableRow[r - 1].tableEntry[c].readings < round(((iteration_count / 2.0f) / (float)max_iterations) * MAX_NEIGHBOR_WEIGHT)) {
           if (data.tableRow[r].tableEntry[c].targetPosition >= data.tableRow[r - 1].tableEntry[c].targetPosition) {
-            data.tableRow[r].tableEntry[c].targetPosition = data.tableRow[r - 1].tableEntry[c].targetPosition - 1;
-            changedInIteration                            = true;
+            data.tableRow[r - 1].tableEntry[c].targetPosition++;
+            changedInIteration = true;
           }
         }
 
-        // Enforce Rule 1: Neighbor left (column c-1) must be lower.
+        // Enforce Rule: Neighbor left (column c-1) must be lower.
         // This means the value at [c] must be GREATER than the value at [c-1].
-        if (c > 0 && isFilled(data.tableRow[r].tableEntry[c - 1])) {
+        if (c > 0 && isFilled(data.tableRow[r].tableEntry[c - 1]) &&
+            data.tableRow[r].tableEntry[c - 1].readings < round(((iteration_count / 2.0f) / (float)max_iterations) * MAX_NEIGHBOR_WEIGHT)) {
           if (data.tableRow[r].tableEntry[c].targetPosition <= data.tableRow[r].tableEntry[c - 1].targetPosition) {
-            data.tableRow[r].tableEntry[c].targetPosition = data.tableRow[r].tableEntry[c - 1].targetPosition + 1;
-            changedInIteration                            = true;
+            data.tableRow[r].tableEntry[c - 1].targetPosition--;
+            changedInIteration = true;
+          }
+        }
+        // Enforce Rule: Neighbor below (row r+1) must be lower.
+        // This means the value at [c] must be LESS than the value at [r+1].
+        if (r < POWERTABLE_CAD_SIZE - 2 && isFilled(data.tableRow[r + 1].tableEntry[c]) &&
+            data.tableRow[r + 1].tableEntry[c].readings < round(((iteration_count / 2.0f) / (float)max_iterations) * MAX_NEIGHBOR_WEIGHT)) {
+          if (data.tableRow[r].tableEntry[c].targetPosition <= data.tableRow[r + 1].tableEntry[c].targetPosition) {
+            data.tableRow[r + 1].tableEntry[c].targetPosition--;
+            changedInIteration = true;
+          }
+        }
+        // Enforce Rule: Neighbor right (column c+1) must be higher.
+        // This means the value at [c] must be GREATER than the value at [c+1].
+        if (c < POWERTABLE_WATT_SIZE - 2 && isFilled(data.tableRow[r].tableEntry[c + 1]) &&
+            data.tableRow[r].tableEntry[c + 1].readings < round(((iteration_count / 2.0f) / (float)max_iterations) * MAX_NEIGHBOR_WEIGHT)) {
+          if (data.tableRow[r].tableEntry[c].targetPosition <= data.tableRow[r].tableEntry[c + 1].targetPosition) {
+            data.tableRow[r].tableEntry[c + 1].targetPosition++;
+            changedInIteration = true;
           }
         }
       }
@@ -1509,5 +1078,7 @@ void PTHelpers::completePowerTable(PTData& data) {
   }
   if (iteration_count >= max_iterations) {
     SS2K_LOG(PTDATA_LOG_TAG, "Warning: Table completion reached max iterations. Result may be unstable.");
+    return false;  // Indicate that the table may not be fully completed
   }
+  return true;  // Indicate that the table was successfully completed
 }

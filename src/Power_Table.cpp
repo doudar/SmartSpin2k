@@ -245,8 +245,8 @@ void PowerTable::enterData(ptIndex index, int pos) {
         (this->ptData.tableRow[index.cadIndex].tableEntry[index.wattIndex].readings + 1.0f);
     SS2K_LOG(POWERTABLE_LOG_TAG, "Existing entry averaged (%d)(%d)(%d), readings(%d)", index.cadIndex, index.wattIndex,
              this->ptData.tableRow[index.cadIndex].tableEntry[index.wattIndex].targetPosition, this->ptData.tableRow[index.cadIndex].tableEntry[index.wattIndex].readings);
-    if (this->ptData.tableRow[index.cadIndex].tableEntry[index.wattIndex].readings > POWER_SAMPLES * 2) {
-      this->ptData.tableRow[index.cadIndex].tableEntry[index.wattIndex].readings = POWER_SAMPLES * 2;  // keep from diluting recent readings too far.
+    if (this->ptData.tableRow[index.cadIndex].tableEntry[index.wattIndex].readings > MAX_NEIGHBOR_WEIGHT) {
+      this->ptData.tableRow[index.cadIndex].tableEntry[index.wattIndex].readings = MAX_NEIGHBOR_WEIGHT;
     }
   }
   this->ptData.tableRow[index.cadIndex].tableEntry[index.wattIndex].readings++;
@@ -278,14 +278,13 @@ void PowerTable::fillTable() {
     if (step == 0) {
       SS2K_LOG(POWERTABLE_LOG_TAG, "Fill start with %d entries", entries);
       prevEntries = entries;
-      // completed   = ptHelpers.splineFill(ptData, true);
+      completed = ptHelpers.completePowerTable(ptData);
     } else if (step == 1) {
       // completed = ptHelpers.splineFill(ptData, false);
     } else if (step == 2) {
       // completed = ptHelpers.linearFill(ptData);
     } else if (step == 3) {
-      ptHelpers.completePowerTable(ptData);
-      completed = true;  // this step is always completed.
+      
     }
     newEntries = ptHelpers.getNumEntries(ptData);
     SS2K_LOG(POWERTABLE_LOG_TAG, "Fill step %d added %d new entries", step, newEntries - prevEntries);
