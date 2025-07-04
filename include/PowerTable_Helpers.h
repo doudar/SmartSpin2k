@@ -132,6 +132,7 @@ class PTHelpers {
   int getNumEntries(PTData& ptData, int minReadings = 0);
   int getTotalReadings(PTData& ptData);
   void fillByAverage(PTData& ptData);
+  void completePowerTable(PTData& data);
   ptIndex calculateIndex(int watts, int cad);
   std::pair<std::vector<float>, std::vector<float>> getRow(int row, PTData& ptData);
   std::pair<std::vector<float>, std::vector<float>> getColumn(int column, PTData& ptData);

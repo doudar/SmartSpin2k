@@ -35,20 +35,21 @@ void TestTableFill::test_fill_incomplete_table(void) {
   logFile << "Initial data points: " << initialPoints << "\n";
   int previousFilledPoints = 0;
   int filledPoints         = 1;
-  // Fill the incomplete table
-  while (previousFilledPoints < filledPoints) {
-    previousFilledPoints = filledPoints;
-    helpers.splineFill(ptData);
-    logFile << "Applied splineFill to the table\n";
+  //Fill the incomplete table
+  // while (previousFilledPoints < filledPoints) {
+  //   previousFilledPoints = filledPoints;
+  //   helpers.linearFill(ptData);
+  //   logFile << "Applied splineFill to the table\n";
 
-    // Count filled data points
-    filledPoints = helpers.getNumEntries(ptData);
-    logFile << "Filled data points: " << filledPoints << "\n";
-    logFile << "Added " << (filledPoints - initialPoints) << " points\n";
-  }
+  //   // Count filled data points
+  //   filledPoints = helpers.getNumEntries(ptData);
+  //   logFile << "Filled data points: " << filledPoints << "\n";
+  //   logFile << "Added " << (filledPoints - initialPoints) << " points\n";
+  // }
 
   // loop through the table and check for INT16_MIN values
-  helpers.fillByAverage(ptData);
+  //for(int i=1; i<2; i++){
+  helpers.completePowerTable(ptData);//}
   // Save the filled power table
   const std::string outputFilePath = "test/output/power_table_filled.ptab";
   savePTDataToCSV(ptData, outputFilePath);

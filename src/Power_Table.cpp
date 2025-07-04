@@ -196,27 +196,27 @@ void PowerTable::newEntry(PowerBuffer& powerBuffer) {
     return;
   }
 
-  targetPosition = this->calculatePosition(watts, cad, targetPosition, index);
+ // targetPosition = this->calculatePosition(watts, cad, targetPosition, index);
 
-  // Downvote out of position neighbors and discard entry if it doesn't match the logic of the table
-  TestResults testResults = ptHelpers.testNeighbors(index, targetPosition, ptData);
+  // // Downvote out of position neighbors and discard entry if it doesn't match the logic of the table
+  // TestResults testResults = ptHelpers.testNeighbors(index, targetPosition, ptData);
 
-  auto handleNeighborFailure = [&](const char* direction, const TestResults::Neighbor& neighbor, const TestResults::Neighbor& oppositeNeighbor, float rangeFactor) {
-    if (!neighbor.passedTest) {
-      SS2K_LOG(POWERTABLE_LOG_TAG, "%s neighbor position (%d) failed with watts=%f, cad=%f, targetPosition=%f, (%d)(%d)", direction, neighbor.targetPosition, watts, cad,
-               targetPosition, index.cadIndex, index.wattIndex);
-      this->processNeighbor(index, targetPosition, neighbor.index, neighbor.targetPosition, oppositeNeighbor.index, oppositeNeighbor.targetPosition, rangeFactor);
-    }
-  };
+  // auto handleNeighborFailure = [&](const char* direction, const TestResults::Neighbor& neighbor, const TestResults::Neighbor& oppositeNeighbor, float rangeFactor) {
+  //   if (!neighbor.passedTest) {
+  //     SS2K_LOG(POWERTABLE_LOG_TAG, "%s neighbor position (%d) failed with watts=%f, cad=%f, targetPosition=%f, (%d)(%d)", direction, neighbor.targetPosition, watts, cad,
+  //              targetPosition, index.cadIndex, index.wattIndex);
+  //     this->processNeighbor(index, targetPosition, neighbor.index, neighbor.targetPosition, oppositeNeighbor.index, oppositeNeighbor.targetPosition, rangeFactor);
+  //   }
+  // };
 
-  handleNeighborFailure("Left", testResults.leftNeighbor, testResults.rightNeighbor, HORIZONTAL_NEIGHBOR_RANGE);
-  handleNeighborFailure("Right", testResults.rightNeighbor, testResults.leftNeighbor, HORIZONTAL_NEIGHBOR_RANGE);
-  handleNeighborFailure("Top", testResults.topNeighbor, testResults.bottomNeighbor, VERTICAL_NEIGHBOR_RANGE);
-  handleNeighborFailure("Bottom", testResults.bottomNeighbor, testResults.topNeighbor, VERTICAL_NEIGHBOR_RANGE);
+  // handleNeighborFailure("Left", testResults.leftNeighbor, testResults.rightNeighbor, HORIZONTAL_NEIGHBOR_RANGE);
+  // handleNeighborFailure("Right", testResults.rightNeighbor, testResults.leftNeighbor, HORIZONTAL_NEIGHBOR_RANGE);
+  // handleNeighborFailure("Top", testResults.topNeighbor, testResults.bottomNeighbor, VERTICAL_NEIGHBOR_RANGE);
+  // handleNeighborFailure("Bottom", testResults.bottomNeighbor, testResults.topNeighbor, VERTICAL_NEIGHBOR_RANGE);
 
-  if (!(testResults.bottomNeighbor.passedTest && testResults.topNeighbor.passedTest && testResults.rightNeighbor.passedTest && testResults.leftNeighbor.passedTest)) {
-    return;
-  }
+  // if (!(testResults.bottomNeighbor.passedTest && testResults.topNeighbor.passedTest && testResults.rightNeighbor.passedTest && testResults.leftNeighbor.passedTest)) {
+  //   return;
+  // }
 
   this->enterData(index, (int)targetPosition);
   fillTableFlag = true;  // set flag to fill table
@@ -242,7 +242,7 @@ void PowerTable::enterData(ptIndex index, int pos) {
   } else {  // Average and update the readings.
     this->ptData.tableRow[index.cadIndex].tableEntry[index.wattIndex].targetPosition =
         (pos + (this->ptData.tableRow[index.cadIndex].tableEntry[index.wattIndex].targetPosition * this->ptData.tableRow[index.cadIndex].tableEntry[index.wattIndex].readings)) /
-        (this->ptData.tableRow[index.cadIndex].tableEntry[index.wattIndex].readings + 1.0);
+        (this->ptData.tableRow[index.cadIndex].tableEntry[index.wattIndex].readings + 1.0f);
     SS2K_LOG(POWERTABLE_LOG_TAG, "Existing entry averaged (%d)(%d)(%d), readings(%d)", index.cadIndex, index.wattIndex,
              this->ptData.tableRow[index.cadIndex].tableEntry[index.wattIndex].targetPosition, this->ptData.tableRow[index.cadIndex].tableEntry[index.wattIndex].readings);
     if (this->ptData.tableRow[index.cadIndex].tableEntry[index.wattIndex].readings > POWER_SAMPLES * 2) {
@@ -278,13 +278,13 @@ void PowerTable::fillTable() {
     if (step == 0) {
       SS2K_LOG(POWERTABLE_LOG_TAG, "Fill start with %d entries", entries);
       prevEntries = entries;
-      completed   = ptHelpers.splineFill(ptData, true);
+      // completed   = ptHelpers.splineFill(ptData, true);
     } else if (step == 1) {
-      completed = ptHelpers.splineFill(ptData, false);
+      // completed = ptHelpers.splineFill(ptData, false);
     } else if (step == 2) {
-      completed = ptHelpers.linearFill(ptData);
-    }else if (step == 3) {
-      //ptHelpers.fillByAverage(ptData);
+      // completed = ptHelpers.linearFill(ptData);
+    } else if (step == 3) {
+      ptHelpers.completePowerTable(ptData);
       completed = true;  // this step is always completed.
     }
     newEntries = ptHelpers.getNumEntries(ptData);
@@ -418,7 +418,7 @@ void PowerTable::downVoteData(ptIndex index, float target, int neighbor) {
   int penalty = 1;
 
   if (this->ptData.tableRow[index.cadIndex].tableEntry[index.wattIndex].readings < penalty) {
-    this->ptData.tableRow[index.cadIndex].tableEntry[index.wattIndex].readings = 0;
+    this->ptData.tableRow[index.cadIndex].tableEntry[index.wattIndex].readings       = 0;
     this->ptData.tableRow[index.cadIndex].tableEntry[index.wattIndex].targetPosition = INT16_MIN;  // remove target position if readings are zero.
   } else {
     this->ptData.tableRow[index.cadIndex].tableEntry[index.wattIndex].readings -= penalty;
