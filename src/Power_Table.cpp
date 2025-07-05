@@ -225,11 +225,13 @@ void PowerTable::newEntry(PowerBuffer& powerBuffer) {
 
 void fillAllCadenceLines(ptIndex index, PTData& ptData) {
   for (int i = 0; i < POWERTABLE_CAD_SIZE; i++) {
+    // Create positions for all cadence lines if they are not set.
+    // This gives us a monotonic table with a linear progression of target positions.
     if (ptData.tableRow[i].tableEntry[index.wattIndex].readings == 0) {
       ptData.tableRow[i].tableEntry[index.wattIndex].targetPosition =
           ptData.tableRow[index.cadIndex].tableEntry[index.wattIndex].targetPosition - (i - index.cadIndex) * (index.wattIndex + 10);
           // add a reading
-      ptData.tableRow[i].tableEntry[index.wattIndex].readings ++;;  // add a reading
+      ptData.tableRow[i].tableEntry[index.wattIndex].readings ++;  // add a reading
     }
     // Positions with a higher row should have lower targetPosition, so enforce monotonicity
     if (i < index.cadIndex) {
@@ -239,10 +241,33 @@ void fillAllCadenceLines(ptIndex index, PTData& ptData) {
     } else if (i > index.cadIndex) {
       ptData.tableRow[i].tableEntry[index.wattIndex].targetPosition =
           std::min(ptData.tableRow[i].tableEntry[index.wattIndex].targetPosition,
-                   (int16_t)(ptData.tableRow[index.cadIndex].tableEntry[index.wattIndex].targetPosition - (i - index.cadIndex) * (index.wattIndex + 10)));
+                   (int16_t)(ptData.tableRow[index.cadIndex].tableEntry[index.wattIndex].targetPosition - (index.cadIndex - i) * (index.wattIndex + 10)));
     }
   }
 }
+
+void fillAllWattColumns(ptIndex index, PTData& ptData) {
+  for (int i = 0; i < POWERTABLE_WATT_SIZE; i++) {
+    // Create positions for all watt columns if they are not set.
+    // This gives us a monotonic table with a linear progression of target positions.
+    if (ptData.tableRow[index.cadIndex].tableEntry[i].readings == 0) {
+      ptData.tableRow[index.cadIndex].tableEntry[i].targetPosition =
+          ptData.tableRow[index.cadIndex].tableEntry[index.wattIndex].targetPosition - (index.wattIndex - i) * (index.cadIndex + 10);
+      ptData.tableRow[index.cadIndex].tableEntry[i].readings ++;  // add a reading
+    }
+    // Each column to the right should have a higher targetPosition, so enforce monotonicity
+    if (i > index.wattIndex) {
+      ptData.tableRow[index.cadIndex].tableEntry[i].targetPosition =
+          std::max(ptData.tableRow[index.cadIndex].tableEntry[i].targetPosition,
+                   (int16_t)(ptData.tableRow[index.cadIndex].tableEntry[index.wattIndex].targetPosition - (index.wattIndex - i) * (index.cadIndex + 10)));
+    } else if (i < index.wattIndex) {
+      ptData.tableRow[index.cadIndex].tableEntry[i].targetPosition =
+          std::min(ptData.tableRow[index.cadIndex].tableEntry[i].targetPosition,
+                   (int16_t)(ptData.tableRow[index.cadIndex].tableEntry[index.wattIndex].targetPosition - (index.wattIndex - i) * (index.cadIndex + 10)));
+    }
+  }
+}
+
 /**
  * @brief Updates or enters data into the power table for a specific row and entry.
  *
@@ -271,7 +296,9 @@ void PowerTable::enterData(ptIndex index, int pos) {
     }
   }
   this->ptData.tableRow[index.cadIndex].tableEntry[index.wattIndex].readings++;
+  // because of monotonicity, we can make some assumptions in order to fill the table.
   fillAllCadenceLines(index, this->ptData);
+  fillAllWattColumns(index, this->ptData);
 }
 
 void PowerTable::fillTable() {
