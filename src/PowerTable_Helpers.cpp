@@ -859,7 +859,9 @@ bool CubicSpline::shouldUseNaturalSpline(std::pair<std::vector<float>, std::vect
 // --- Helper Functions ---
 
 // Check if a cell is considered "filled" with valid data
-bool isFilled(const TableEntry& entry) { return entry.targetPosition != INT16_MIN; }
+bool isFilled(const TableEntry& entry, int readings = 0) { 
+  return entry.targetPosition != INT16_MIN && entry.readings >= readings; 
+}
 
 // Linearly interpolate or extrapolate a value.
 // Interpolates if x is between x0 and x1.
@@ -913,20 +915,20 @@ bool PTHelpers::completePowerTable(PTData& data) {
     // --- PASS 1: Interpolation and Extrapolation ---
     for (int r = 0; r < POWERTABLE_CAD_SIZE; ++r) {
       for (int c = 0; c < POWERTABLE_WATT_SIZE; ++c) {
-        if (isFilled(data.tableRow[r].tableEntry[c]) && data.tableRow[r].tableEntry[c].readings > 0) {
+        if (isFilled(data.tableRow[r].tableEntry[c], 1)) {
           continue;
         }
 
         // Find horizontal anchors (left and right) for interpolation
         int left_c = -1, right_c = -1;
         for (int i = c - 1; i >= 0; --i) {
-          if (isFilled(data.tableRow[r].tableEntry[i])) {
+          if (isFilled(data.tableRow[r].tableEntry[i], 1)) {
             left_c = i;
             break;
           }
         }
         for (int i = c + 1; i < POWERTABLE_WATT_SIZE; ++i) {
-          if (isFilled(data.tableRow[r].tableEntry[i])) {
+          if (isFilled(data.tableRow[r].tableEntry[i], 1)) {
             right_c = i;
             break;
           }
@@ -935,13 +937,13 @@ bool PTHelpers::completePowerTable(PTData& data) {
         // Find vertical anchors (bottom and top) for interpolation
         int bottom_r = -1, top_r = -1;
         for (int i = r - 1; i >= 0; --i) {
-          if (isFilled(data.tableRow[i].tableEntry[c])) {
+          if (isFilled(data.tableRow[i].tableEntry[c], 1)) {
             bottom_r = i;
             break;
           }
         }
         for (int i = r + 1; i < POWERTABLE_CAD_SIZE; ++i) {
-          if (isFilled(data.tableRow[i].tableEntry[c])) {
+          if (isFilled(data.tableRow[i].tableEntry[c], 1)) {
             top_r = i;
             break;
           }
@@ -957,7 +959,7 @@ bool PTHelpers::completePowerTable(PTData& data) {
         } else if (left_c != -1) {
           int l2 = -1;
           for (int i = left_c - 1; i >= 0; --i)
-            if (isFilled(data.tableRow[r].tableEntry[i])) {
+            if (isFilled(data.tableRow[r].tableEntry[i], 1)) {
               l2 = i;
               break;
             }
@@ -969,7 +971,7 @@ bool PTHelpers::completePowerTable(PTData& data) {
         } else if (right_c != -1) {
           int r2 = -1;
           for (int i = right_c + 1; i < POWERTABLE_WATT_SIZE; ++i)
-            if (isFilled(data.tableRow[r].tableEntry[i])) {
+            if (isFilled(data.tableRow[r].tableEntry[i], 1)) {
               r2 = i;
               break;
             }
@@ -987,7 +989,7 @@ bool PTHelpers::completePowerTable(PTData& data) {
         } else if (bottom_r != -1) {
           int b2 = -1;
           for (int i = bottom_r - 1; i >= 0; --i)
-            if (isFilled(data.tableRow[i].tableEntry[c])) {
+            if (isFilled(data.tableRow[i].tableEntry[c], 1)) {
               b2 = i;
               break;
             }
@@ -999,7 +1001,7 @@ bool PTHelpers::completePowerTable(PTData& data) {
         } else if (top_r != -1) {
           int t2 = -1;
           for (int i = top_r + 1; i < POWERTABLE_CAD_SIZE; ++i)
-            if (isFilled(data.tableRow[i].tableEntry[c])) {
+            if (isFilled(data.tableRow[i].tableEntry[c], 1)) {
               t2 = i;
               break;
             }
@@ -1034,7 +1036,6 @@ bool PTHelpers::completePowerTable(PTData& data) {
     for (int r = 0; r < POWERTABLE_CAD_SIZE; ++r) {
       for (int c = 0; c < POWERTABLE_WATT_SIZE; ++c) {
         if (!isFilled(data.tableRow[r].tableEntry[c])) continue;
-
         // --- MODIFIED RULE ---
         // Enforce Rule: Neighbor above (row r-1) must be higher.
         // This means the value at [r] must be LESS than the value at [r-1].

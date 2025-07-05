@@ -196,7 +196,7 @@ void PowerTable::newEntry(PowerBuffer& powerBuffer) {
     return;
   }
 
- // targetPosition = this->calculatePosition(watts, cad, targetPosition, index);
+  // targetPosition = this->calculatePosition(watts, cad, targetPosition, index);
 
   // // Downvote out of position neighbors and discard entry if it doesn't match the logic of the table
   // TestResults testResults = ptHelpers.testNeighbors(index, targetPosition, ptData);
@@ -226,7 +226,20 @@ void PowerTable::newEntry(PowerBuffer& powerBuffer) {
 void fillAllCadenceLines(ptIndex index, PTData& ptData) {
   for (int i = 0; i < POWERTABLE_CAD_SIZE; i++) {
     if (ptData.tableRow[i].tableEntry[index.wattIndex].readings == 0) {
-      ptData.tableRow[i].tableEntry[index.wattIndex].targetPosition = ptData.tableRow[index.cadIndex].tableEntry[index.wattIndex].targetPosition + (i - index.cadIndex) * (index.wattIndex + 10);
+      ptData.tableRow[i].tableEntry[index.wattIndex].targetPosition =
+          ptData.tableRow[index.cadIndex].tableEntry[index.wattIndex].targetPosition - (i - index.cadIndex) * (index.wattIndex + 10);
+          // add a reading
+      ptData.tableRow[i].tableEntry[index.wattIndex].readings ++;;  // add a reading
+    }
+    // Positions with a higher row should have lower targetPosition, so enforce monotonicity
+    if (i < index.cadIndex) {
+      ptData.tableRow[i].tableEntry[index.wattIndex].targetPosition =
+          std::max(ptData.tableRow[i].tableEntry[index.wattIndex].targetPosition,
+                   (int16_t)(ptData.tableRow[index.cadIndex].tableEntry[index.wattIndex].targetPosition - (index.cadIndex - i) * (index.wattIndex + 10)));
+    } else if (i > index.cadIndex) {
+      ptData.tableRow[i].tableEntry[index.wattIndex].targetPosition =
+          std::min(ptData.tableRow[i].tableEntry[index.wattIndex].targetPosition,
+                   (int16_t)(ptData.tableRow[index.cadIndex].tableEntry[index.wattIndex].targetPosition - (i - index.cadIndex) * (index.wattIndex + 10)));
     }
   }
 }
@@ -246,6 +259,7 @@ void PowerTable::enterData(ptIndex index, int pos) {
     this->ptData.tableRow[index.cadIndex].tableEntry[index.wattIndex].targetPosition = pos;
     SS2K_LOG(POWERTABLE_LOG_TAG, "New entry recorded (%d)(%d)(%d)", index.cadIndex, index.wattIndex,
              this->ptData.tableRow[index.cadIndex].tableEntry[index.wattIndex].targetPosition);
+    this->ptData.tableRow[index.cadIndex].tableEntry[index.wattIndex].readings++; // for initial spot on readings, give 2 (one below as well)
   } else {  // Average and update the readings.
     this->ptData.tableRow[index.cadIndex].tableEntry[index.wattIndex].targetPosition =
         (pos + (this->ptData.tableRow[index.cadIndex].tableEntry[index.wattIndex].targetPosition * this->ptData.tableRow[index.cadIndex].tableEntry[index.wattIndex].readings)) /
@@ -261,6 +275,7 @@ void PowerTable::enterData(ptIndex index, int pos) {
 }
 
 void PowerTable::fillTable() {
+  return ; // testing
   static int entries     = 0;
   static int newEntries  = 0;
   static int8_t step     = 0;
@@ -276,23 +291,24 @@ void PowerTable::fillTable() {
     return;
   }
 
-  if (ptHelpers.getNumEntries(ptData) > 4) {
+  if (ptHelpers.getNumEntries(ptData, 1) > 4) {
     // set flag to stop execution after we can't add any more entries.
     if (esp_get_free_heap_size() < FREE_HEAP_FOR_COMPLEX_MATH) {
       // SS2K_LOG(POWERTABLE_LOG_TAG, "%d Heap too low for step %d.", esp_get_free_heap_size(), step);
       return;
     }
+    // clean();  // clean the table before filling it.
     entries = ptHelpers.getNumEntries(ptData);
     if (step == 0) {
       SS2K_LOG(POWERTABLE_LOG_TAG, "Fill start with %d entries", entries);
       prevEntries = entries;
-      completed = ptHelpers.completePowerTable(ptData);
+      ptHelpers.completePowerTable(ptData);
+      completed = true;
     } else if (step == 1) {
       // completed = ptHelpers.splineFill(ptData, false);
     } else if (step == 2) {
       // completed = ptHelpers.linearFill(ptData);
     } else if (step == 3) {
-      
     }
     newEntries = ptHelpers.getNumEntries(ptData);
     SS2K_LOG(POWERTABLE_LOG_TAG, "Fill step %d added %d new entries", step, newEntries - prevEntries);
