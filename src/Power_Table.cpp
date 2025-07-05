@@ -265,6 +265,8 @@ void fillAllWattColumns(ptIndex index, PTData& ptData) {
           std::min(ptData.tableRow[index.cadIndex].tableEntry[i].targetPosition,
                    (int16_t)(ptData.tableRow[index.cadIndex].tableEntry[index.wattIndex].targetPosition - (index.wattIndex - i) * (index.cadIndex + 10)));
     }
+    ptIndex newIndex = {index.cadIndex, i};
+    fillAllCadenceLines(newIndex, ptData);
   }
 }
 
