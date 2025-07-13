@@ -197,39 +197,29 @@ static void createPowerTableHeatmap(const std::string& inputFilePath, const std:
         htmlFile << "  <label for=\"timeSlider\">Time Index: <span id=\"timeSliderValue\"></span></label>\n";
         htmlFile << "  <input type=\"range\" id=\"timeSlider\" min=\"0\" max=\"" << (ptabFiles.size() - 1) << "\" value=\"0\" step=\"1\">\n";
         htmlFile << "</div>\n";
-        // Add table container for dynamic update
-        htmlFile << "<div id=\"heatmapTableContainer\"></div>\n";
+        // Add dynamic table container above the chart
+        htmlFile << "<div id=\"dynamicTableContainer\"></div>\n";
     } else {
-        // Static table as before
-        htmlFile << "<table>\n";
-        // Table header row with watt values
-        htmlFile << "  <tr>\n    <td class=\"header-cell\">CAD/WATTS</td>\n"; // Corner cell
-        for (int col = 0; col < POWERTABLE_WATT_SIZE; col++) {
-            htmlFile << "    <td class=\"header-cell\">" << col * POWERTABLE_WATT_INCREMENT << "W</td>\n";
-        }
-        htmlFile << "  </tr>\n";
-        // Table data
+        // Static (no slider) case: use the same JS-based rendering as the slider case, but with a single data array and no slider
+        htmlFile << "<div id=\"dynamicTableContainer\"></div>\n";
+        htmlFile << "<script>\n";
+        htmlFile << "const ptabDataArray = [\n  [\n";
+        // Output the ptData as a single 2D array
         for (int row = 0; row < POWERTABLE_CAD_SIZE; row++) {
-            htmlFile << "  <tr>\n";
-            // Row header with cadence
-            htmlFile << "    <td class=\"header-cell\">" << (MINIMUM_TABLE_CAD + row * POWERTABLE_CAD_INCREMENT) << "RPM</td>\n";
-            // Data cells
+            htmlFile << "    [";
             for (int col = 0; col < POWERTABLE_WATT_SIZE; col++) {
+                if (col > 0) htmlFile << ", ";
                 int16_t value = ptData.tableRow[row].tableEntry[col].targetPosition;
-                std::string cellColor = valueToColor(value);
-                htmlFile << "    <td style=\"background-color: " << cellColor << ";\"";
-                if (value == INT16_MIN) {
-                    htmlFile << " class=\"empty-cell\"";
-                }
-                htmlFile << ">";
-                if (value != INT16_MIN) {
-                    htmlFile << value;
-                }
-                htmlFile << "</td>\n";
+                if (value != INT16_MIN) htmlFile << value;
+                else htmlFile << "null";
             }
-            htmlFile << "  </tr>\n";
+            htmlFile << "]";
+            if (row < POWERTABLE_CAD_SIZE - 1) htmlFile << ",";
+            htmlFile << "\n";
         }
-        htmlFile << "</table>\n";
+        htmlFile << "  ]\n];\n";
+        htmlFile << "const ptabTimestamps = ['static'];\n";
+        htmlFile << "</script>\n";
     }
     
     // Add horizontal color legend
@@ -261,10 +251,39 @@ static void createPowerTableHeatmap(const std::string& inputFilePath, const std:
     htmlFile << "<script>\n";
     htmlFile << "  const ctx = document.getElementById('resistanceWattChart');\n\n";
 
-    // If addTimeSlider, add logic to update chart on slider move
+    // If addTimeSlider, add logic to update chart and table on slider move
     if (addTimeSlider && !ptabFiles.empty()) {
         htmlFile << "  const timeSlider = document.getElementById('timeSlider');\n";
         htmlFile << "  const timeSliderValue = document.getElementById('timeSliderValue');\n";
+        htmlFile << "  const dynamicTableContainer = document.getElementById('dynamicTableContainer');\n";
+        // Color mapping function (same as C++ valueToColor)
+        htmlFile << "  function valueToColor(value, minValue, maxValue) {\n";
+        htmlFile << "    if (value === null) return 'white';\n";
+        htmlFile << "    let normalized = (value - minValue) / (maxValue - minValue);\n";
+        htmlFile << "    let r = Math.min(255, Math.round(255 * normalized));\n";
+        htmlFile << "    let b = Math.min(255, Math.round(255 * (1.0 - normalized)));\n";
+        htmlFile << "    let g = 0;\n";
+        htmlFile << "    return `#${r.toString(16).padStart(2,'0').toUpperCase()}${g.toString(16).padStart(2,'0').toUpperCase()}${b.toString(16).padStart(2,'0').toUpperCase()}`;\n";
+        htmlFile << "  }\n";
+        // Render the table for a given index
+        htmlFile << "  function renderTable(idx, minValue, maxValue) {\n";
+        htmlFile << "    const ptab = ptabDataArray[idx];\n";
+        htmlFile << "    let html = '<table><tr><td class=\"header-cell\">CAD/WATTS</td>';\n";
+        htmlFile << "    for (let col = 0; col < ptab[0].length; col++) { html += '<td class=\"header-cell\">' + (col * " << POWERTABLE_WATT_INCREMENT << ") + 'W</td>'; }\n";
+        htmlFile << "    html += '</tr>';\n";
+        htmlFile << "    for (let row = 0; row < ptab.length; row++) {\n";
+        htmlFile << "      html += '<tr><td class=\"header-cell\">' + (" << MINIMUM_TABLE_CAD << " + row * " << POWERTABLE_CAD_INCREMENT << ") + 'RPM</td>';\n";
+        htmlFile << "      for (let col = 0; col < ptab[row].length; col++) {\n";
+        htmlFile << "        let value = ptab[row][col];\n";
+        htmlFile << "        let color = valueToColor(value, minValue, maxValue);\n";
+        htmlFile << "        html += '<td style=\"background-color: ' + color + '\"' + (value === null ? ' class=\"empty-cell\"' : '') + '>' + (value !== null ? value : '') + '</td>';\n";
+        htmlFile << "      }\n";
+        htmlFile << "      html += '</tr>';\n";
+        htmlFile << "    }\n";
+        htmlFile << "    html += '</table>';\n";
+        htmlFile << "    dynamicTableContainer.innerHTML = html;\n";
+        htmlFile << "  }\n";
+        // Chart dataset logic (unchanged)
         htmlFile << "  function getDatasetFromPTab(ptab) {\n";
         htmlFile << "    const datasets = [];\n";
         htmlFile << "    for (let row = 0; row < ptab.length; row++) {\n";
@@ -282,83 +301,98 @@ static void createPowerTableHeatmap(const std::string& inputFilePath, const std:
         htmlFile << "    return datasets;\n";
         htmlFile << "  }\n";
         htmlFile << "  let chart = null;\n";
-        htmlFile << "  function updateChart(idx) {\n";
-        htmlFile << "    const datasets = getDatasetFromPTab(ptabDataArray[idx]);\n";
+        htmlFile << "  function updateChartAndTable(idx) {\n";
+        htmlFile << "    // Find min/max for this table\n";
+        htmlFile << "    let minValue = Infinity, maxValue = -Infinity;\n";
+        htmlFile << "    const ptab = ptabDataArray[idx];\n";
+        htmlFile << "    for (let row = 0; row < ptab.length; row++) {\n";
+        htmlFile << "      for (let col = 0; col < ptab[row].length; col++) {\n";
+        htmlFile << "        let v = ptab[row][col];\n";
+        htmlFile << "        if (v !== null) { minValue = Math.min(minValue, v); maxValue = Math.max(maxValue, v); }\n";
+        htmlFile << "      }\n";
+        htmlFile << "    }\n";
+        htmlFile << "    renderTable(idx, minValue, maxValue);\n";
+        htmlFile << "    const datasets = getDatasetFromPTab(ptab);\n";
         htmlFile << "    if (chart) { chart.data.datasets = datasets; chart.update('none'); }\n";
         htmlFile << "    else {\n";
-        htmlFile << "      chart = new Chart(ctx, { type: 'line', data: { datasets }, options: { responsive: true, maintainAspectRatio: false, plugins: { title: { display: true, text: 'Resistance vs. Watts by Cadence', font: { size: 18 } }, legend: { position: 'bottom', labels: { usePointStyle: true } } }, scales: { x: { type: 'linear', title: { display: true, text: 'Watts' }, min: 0, max: " << (POWERTABLE_WATT_SIZE * POWERTABLE_WATT_INCREMENT) << " }, y: { title: { display: true, text: 'Resistance' }, min: " << minValue << ", max: " << maxValue << " } } } }); }\n";
+        htmlFile << "      chart = new Chart(ctx, { type: 'line', data: { datasets }, options: { responsive: true, maintainAspectRatio: false, plugins: { title: { display: true, text: 'Resistance vs. Watts by Cadence', font: { size: 18 } }, legend: { position: 'bottom', labels: { usePointStyle: true } } }, scales: { x: { type: 'linear', title: { display: true, text: 'Watts' }, min: 0, max: " << (POWERTABLE_WATT_SIZE * POWERTABLE_WATT_INCREMENT) << " }, y: { title: { display: true, text: 'Resistance' }, min: minValue, max: maxValue } } } }); }\n";
         htmlFile << "    timeSliderValue.textContent = ptabTimestamps[idx];\n";
+        htmlFile << "    // Also update yAxisRange slider\n";
+        htmlFile << "    yAxisRange.min = minValue + 50;\n";
+        htmlFile << "    yAxisRange.max = maxValue + 100;\n";
+        htmlFile << "    yAxisRange.value = maxValue;\n";
+        htmlFile << "    yAxisRangeValue.textContent = maxValue;\n";
+        htmlFile << "    if (chart) { chart.options.scales.y.max = maxValue; chart.options.scales.y.min = minValue; chart.update('none'); }\n";
         htmlFile << "  }\n";
-        htmlFile << "  timeSlider.addEventListener('input', function() { updateChart(this.value); });\n";
-        htmlFile << "  updateChart(0);\n";
+        htmlFile << "  timeSlider.addEventListener('input', function() { updateChartAndTable(this.value); });\n";
+        htmlFile << "  updateChartAndTable(0);\n";
     } else {
-        // Prepare datasets (one for each cadence) as before
-        htmlFile << "  const datasets = [\n";
-        for (int row = 0; row < POWERTABLE_CAD_SIZE; row++) {
-            int hue = (row * 360 / POWERTABLE_CAD_SIZE) % 360;
-            std::string lineColor = "hsl(" + std::to_string(hue) + ", 70%, 50%)";
-            int cadence = MINIMUM_TABLE_CAD + row * POWERTABLE_CAD_INCREMENT;
-            htmlFile << "    {\n";
-            htmlFile << "      label: '" << cadence << " RPM',\n";
-            htmlFile << "      data: [";
-            bool firstPoint = true;
-            for (int col = 0; col < POWERTABLE_WATT_SIZE; col++) {
-                int16_t value = ptData.tableRow[row].tableEntry[col].targetPosition;
-                if (value != INT16_MIN) {
-                    if (!firstPoint) htmlFile << ", ";
-                    htmlFile << "{x: " << col * POWERTABLE_WATT_INCREMENT << ", y: " << value << "}";
-                    firstPoint = false;
-                }
-            }
-            htmlFile << "],\n";
-            htmlFile << "      borderColor: '" << lineColor << "',\n";
-            htmlFile << "      backgroundColor: '" << lineColor << "',\n";
-            htmlFile << "      tension: 0.3,\n";
-            htmlFile << "      fill: false\n";
-            htmlFile << "    }";
-            if (row < POWERTABLE_CAD_SIZE - 1) {
-                htmlFile << ",";
-            }
-            htmlFile << "\n";
-        }
-        htmlFile << "  ];\n\n";
-        htmlFile << "  let chart = new Chart(ctx, {\n";
-        htmlFile << "    type: 'line',\n";
-        htmlFile << "    data: { datasets },\n";
-        htmlFile << "    options: {\n";
-        htmlFile << "      responsive: true,\n";
-        htmlFile << "      maintainAspectRatio: false,\n";
-        htmlFile << "      plugins: {\n";
-        htmlFile << "        title: {\n";
-        htmlFile << "          display: true,\n";
-        htmlFile << "          text: 'Resistance vs. Watts by Cadence',\n";
-        htmlFile << "          font: { size: 18 }\n";
-        htmlFile << "        },\n";
-        htmlFile << "        legend: {\n";
-        htmlFile << "          position: 'bottom',\n";
-        htmlFile << "          labels: { usePointStyle: true }\n";
-        htmlFile << "        }\n";
-        htmlFile << "      },\n";
-        htmlFile << "      scales: {\n";
-        htmlFile << "        x: {\n";
-        htmlFile << "          type: 'linear',\n";
-        htmlFile << "          title: {\n";
-        htmlFile << "            display: true,\n";
-        htmlFile << "            text: 'Watts'\n";
-        htmlFile << "          },\n";
-        htmlFile << "          min: 0,\n";
-        htmlFile << "          max: " << (POWERTABLE_WATT_SIZE * POWERTABLE_WATT_INCREMENT) << "\n";
-        htmlFile << "        },\n";
-        htmlFile << "        y: {\n";
-        htmlFile << "          title: {\n";
-        htmlFile << "            display: true,\n";
-        htmlFile << "            text: 'Resistance'\n";
-        htmlFile << "          },\n";
-        htmlFile << "          min: " << minValue << ",\n";
-        htmlFile << "          max: " << maxValue << "\n";
-        htmlFile << "        }\n";    htmlFile << "      }\n";
+        // Static (no slider) case: render table and chart for the single data array
+        htmlFile << "  const dynamicTableContainer = document.getElementById('dynamicTableContainer');\n";
+        htmlFile << "  function valueToColor(value, minValue, maxValue) {\n";
+        htmlFile << "    if (value === null) return 'white';\n";
+        htmlFile << "    let normalized = (value - minValue) / (maxValue - minValue);\n";
+        htmlFile << "    let r = Math.min(255, Math.round(255 * normalized));\n";
+        htmlFile << "    let b = Math.min(255, Math.round(255 * (1.0 - normalized))); let g = 0;\n";
+        htmlFile << "    return `#${r.toString(16).padStart(2,'0').toUpperCase()}${g.toString(16).padStart(2,'0').toUpperCase()}${b.toString(16).padStart(2,'0').toUpperCase()}`;\n";
+        htmlFile << "  }\n";
+        htmlFile << "  function renderTable(idx, minValue, maxValue) {\n";
+        htmlFile << "    const ptab = ptabDataArray[idx];\n";
+        htmlFile << "    let html = '<table><tr><td class=\"header-cell\">CAD/WATTS</td>';\n";
+        htmlFile << "    for (let col = 0; col < ptab[0].length; col++) { html += '<td class=\"header-cell\">' + (col * " << POWERTABLE_WATT_INCREMENT << ") + 'W</td>'; }\n";
+        htmlFile << "    html += '</tr>';\n";
+        htmlFile << "    for (let row = 0; row < ptab.length; row++) {\n";
+        htmlFile << "      html += '<tr><td class=\"header-cell\">' + (" << MINIMUM_TABLE_CAD << " + row * " << POWERTABLE_CAD_INCREMENT << ") + 'RPM</td>';\n";
+        htmlFile << "      for (let col = 0; col < ptab[row].length; col++) {\n";
+        htmlFile << "        let value = ptab[row][col];\n";
+        htmlFile << "        let color = valueToColor(value, minValue, maxValue);\n";
+        htmlFile << "        html += '<td style=\"background-color: ' + color + '\"' + (value === null ? ' class=\"empty-cell\"' : '') + '>' + (value !== null ? value : '') + '</td>';\n";
+        htmlFile << "      }\n";
+        htmlFile << "      html += '</tr>';\n";
         htmlFile << "    }\n";
-        htmlFile << "  });\n";
+        htmlFile << "    html += '</table>';\n";
+        htmlFile << "    dynamicTableContainer.innerHTML = html;\n";
+        htmlFile << "  }\n";
+        htmlFile << "  function getDatasetFromPTab(ptab) {\n";
+        htmlFile << "    const datasets = [];\n";
+        htmlFile << "    for (let row = 0; row < ptab.length; row++) {\n";
+        htmlFile << "      const hue = (row * 360 / ptab.length) % 360;\n";
+        htmlFile << "      const lineColor = `hsl(${hue}, 70%, 50%)`;\n";
+        htmlFile << "      const cadence = " << MINIMUM_TABLE_CAD << " + row * " << POWERTABLE_CAD_INCREMENT << ";\n";
+        htmlFile << "      const data = [];\n";
+        htmlFile << "      for (let col = 0; col < ptab[row].length; col++) {\n";
+        htmlFile << "        if (ptab[row][col] !== null) {\n";
+        htmlFile << "          data.push({x: col * " << POWERTABLE_WATT_INCREMENT << ", y: ptab[row][col]});\n";
+        htmlFile << "        }\n";
+        htmlFile << "      }\n";
+        htmlFile << "      datasets.push({label: `${cadence} RPM`, data, borderColor: lineColor, backgroundColor: lineColor, tension: 0.3, fill: false});\n";
+        htmlFile << "    }\n";
+        htmlFile << "    return datasets;\n";
+        htmlFile << "  }\n";
+        htmlFile << "  let chart = null;\n";
+        htmlFile << "  function updateChartAndTable(idx) {\n";
+        htmlFile << "    // Find min/max for this table\n";
+        htmlFile << "    let minValue = Infinity, maxValue = -Infinity;\n";
+        htmlFile << "    const ptab = ptabDataArray[idx];\n";
+        htmlFile << "    for (let row = 0; row < ptab.length; row++) {\n";
+        htmlFile << "      for (let col = 0; col < ptab[row].length; col++) {\n";
+        htmlFile << "        let v = ptab[row][col];\n";
+        htmlFile << "        if (v !== null) { minValue = Math.min(minValue, v); maxValue = Math.max(maxValue, v); }\n";
+        htmlFile << "      }\n";
+        htmlFile << "    }\n";
+        htmlFile << "    renderTable(idx, minValue, maxValue);\n";
+        htmlFile << "    const datasets = getDatasetFromPTab(ptab);\n";
+        htmlFile << "    if (chart) { chart.data.datasets = datasets; chart.update('none'); }\n";
+        htmlFile << "    else {\n";
+        htmlFile << "      chart = new Chart(ctx, { type: 'line', data: { datasets }, options: { responsive: true, maintainAspectRatio: false, plugins: { title: { display: true, text: 'Resistance vs. Watts by Cadence', font: { size: 18 } }, legend: { position: 'bottom', labels: { usePointStyle: true } } }, scales: { x: { type: 'linear', title: { display: true, text: 'Watts' }, min: 0, max: " << (POWERTABLE_WATT_SIZE * POWERTABLE_WATT_INCREMENT) << " }, y: { title: { display: true, text: 'Resistance' }, min: minValue, max: maxValue } } } }); }\n";
+        htmlFile << "    // Also update yAxisRange slider\n";
+        htmlFile << "    yAxisRange.min = minValue + 50;\n";
+        htmlFile << "    yAxisRange.max = maxValue + 100;\n";
+        htmlFile << "    yAxisRange.value = maxValue;\n";
+        htmlFile << "    yAxisRangeValue.textContent = maxValue;\n";
+        htmlFile << "    if (chart) { chart.options.scales.y.max = maxValue; chart.options.scales.y.min = minValue; chart.update('none'); }\n";
+        htmlFile << "  }\n";
+        htmlFile << "  updateChartAndTable(0);\n";
     }
 
     // Add event listener for range input (y-axis)
