@@ -226,9 +226,9 @@ static void createPowerTableHeatmap(const std::string& inputFilePath, const std:
     htmlFile << "<div class=\"legend-container\">\n";
     htmlFile << "  <div class=\"legend\" style=\"background: linear-gradient(to right, blue, purple, red);\"></div>\n";
     htmlFile << "  <div class=\"legend-labels\">\n";
-    htmlFile << "    <div>" << minValue << " (Min)</div>\n";
+    htmlFile << "    <div id=\"legendMin\">" << minValue << " (Min)</div>\n";
     htmlFile << "    <div>" << "Resistance" << "</div>\n";
-    htmlFile << "    <div>" << maxValue << " (Max)</div>\n";
+    htmlFile << "    <div id=\"legendMax\">" << maxValue << " (Max)</div>\n";
     htmlFile << "  </div>\n";
     htmlFile << "</div>\n";
 
@@ -249,7 +249,9 @@ static void createPowerTableHeatmap(const std::string& inputFilePath, const std:
 
     // Start script for chart and slider logic
     htmlFile << "<script>\n";
-    htmlFile << "  const ctx = document.getElementById('resistanceWattChart');\n\n";
+    htmlFile << "  const ctx = document.getElementById('resistanceWattChart');\n";
+    htmlFile << "  const yAxisRange = document.getElementById('yAxisRange');\n";
+    htmlFile << "  const yAxisRangeValue = document.getElementById('yAxisRangeValue');\n\n";
 
     // If addTimeSlider, add logic to update chart and table on slider move
     if (addTimeSlider && !ptabFiles.empty()) {
@@ -311,6 +313,9 @@ static void createPowerTableHeatmap(const std::string& inputFilePath, const std:
         htmlFile << "        if (v !== null) { minValue = Math.min(minValue, v); maxValue = Math.max(maxValue, v); }\n";
         htmlFile << "      }\n";
         htmlFile << "    }\n";
+        htmlFile << "    // Update legend\n";
+        htmlFile << "    document.getElementById('legendMin').textContent = `${minValue} (Min)`;\n";
+        htmlFile << "    document.getElementById('legendMax').textContent = `${maxValue} (Max)`;\n";
         htmlFile << "    renderTable(idx, minValue, maxValue);\n";
         htmlFile << "    const datasets = getDatasetFromPTab(ptab);\n";
         htmlFile << "    if (chart) { chart.data.datasets = datasets; chart.update('none'); }\n";
@@ -380,6 +385,9 @@ static void createPowerTableHeatmap(const std::string& inputFilePath, const std:
         htmlFile << "        if (v !== null) { minValue = Math.min(minValue, v); maxValue = Math.max(maxValue, v); }\n";
         htmlFile << "      }\n";
         htmlFile << "    }\n";
+        htmlFile << "    // Update legend\n";
+        htmlFile << "    document.getElementById('legendMin').textContent = `${minValue} (Min)`;\n";
+        htmlFile << "    document.getElementById('legendMax').textContent = `${maxValue} (Max)`;\n";
         htmlFile << "    renderTable(idx, minValue, maxValue);\n";
         htmlFile << "    const datasets = getDatasetFromPTab(ptab);\n";
         htmlFile << "    if (chart) { chart.data.datasets = datasets; chart.update('none'); }\n";
@@ -396,8 +404,6 @@ static void createPowerTableHeatmap(const std::string& inputFilePath, const std:
     }
 
     // Add event listener for range input (y-axis)
-    htmlFile << "  const yAxisRange = document.getElementById('yAxisRange');\n";
-    htmlFile << "  const yAxisRangeValue = document.getElementById('yAxisRangeValue');\n";
     htmlFile << "  function updateYAxisRange() {\n";
     htmlFile << "    const newMax = parseInt(yAxisRange.value);\n";
     htmlFile << "    yAxisRangeValue.textContent = newMax;\n";
