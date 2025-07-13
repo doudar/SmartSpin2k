@@ -34,16 +34,8 @@ class PowerTable {
   // Interpolates and extrapolates the power table.
   void fillTable();
 
-  // enters data into power table
-  void enterData(ptIndex index, int pos);
-
-  void downVoteData(ptIndex index, float target, int neighbor);
-
   // returns target position for given cadence and watts. Returns RETURN_ERROR if not found.
   int32_t lookup(int watts, int cad) { return this->ptHelpers.lookup(watts, cad, this->ptData); }
-
-  // returns
-  int32_t splineLookup(int watts, int cad);
 
   // returns watts for given cadence and target position. Returns RETURN_ERROR if not found.
   int32_t lookupWatts(int cad, int32_t targetPosition) { return this->ptHelpers.lookupWatts(cad, targetPosition, this->ptData); }
@@ -59,13 +51,6 @@ class PowerTable {
 
   // Display power table in log
   void toLog();
-
-  void fillEmptyTable(int outerValue, const std::vector<int>& emptyIndices, const float* x, const float* y, size_t n, bool horizontal, bool useNaturalSpline);
-
-  float calculatePosition(float watts, float cad, float targetPos, ptIndex index);
-
-  void processNeighbor(ptIndex index, float targetPosition, ptIndex neighborIndex, int neighbor_targetPosition, ptIndex oppositeNeighborIndex,
-                       int oppositeNeighbor_targetPosition, float rangeFactor);
 
  private:
   unsigned long lastSaveTime = millis();

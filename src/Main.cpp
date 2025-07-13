@@ -204,7 +204,6 @@ void SS2K::maintenanceLoop(void *pvParameters) {
         ss2k->moveStepper();
         ss2k->FTMSModeShiftModifier();
         ergMode->runERG();
-        powerTable->fillTable();
       }
       // wattbikeService.parseNemit();
     }

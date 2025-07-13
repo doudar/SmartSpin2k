@@ -105,34 +105,21 @@ class TestResults {
   }
 };
 
-class CubicSpline {
- public:
-  void set_points(std::pair<std::vector<float>, std::vector<float>> xy, size_t n);
-  float interpolate(float x_val) const;
-  float extrapolate(float x_val) const;
-  bool shouldUseNaturalSpline(std::pair<std::vector<float>, std::vector<float>> xy, size_t n);
-
- private:
-  std::vector<float> x, y, h, alpha, l, mu, z, c, b, d;
-};
-
 class PTHelpers {
  public:
   TestResults testNeighbors(ptIndex index, int value, PTData& ptData);
   int32_t lookup(int watts, int cad, PTData& ptData);
-  bool extrapolateEmptyIndices(int outerIndex, const std::vector<int>& emptyIndices, std::pair<std::vector<float>, std::vector<float>> xy, size_t n, bool horizontal,
-                               bool naturalSpline, PTData& ptData);
-  bool splineFill(PTData& ptData, bool firtHalf = true,bool horizontal = true);
   float linearExtrapolate(std::pair<std::vector<float>, std::vector<float>> xy, size_t n, float j);
-  bool linearFill(PTData& ptData);
   int32_t lookupWatts(int cad, int32_t targetPosition, PTData& ptData);
   int32_t extrapolateCadenceWatts(int cad, float targetPosition, PTData& ptData);
   int extrapolateWattsFromCadence(int cad, int32_t targetPosition, PTData& ptData);
     // return number of readings in the table. If minReadings is set, it will only count entries with at least that many readings.
   int getNumEntries(PTData& ptData, int minReadings = 0);
   int getTotalReadings(PTData& ptData);
-  bool completePowerTable(PTData& data);
   ptIndex calculateIndex(int watts, int cad);
+  void enterData(PTData& ptData,ptIndex index, int pos);
+  void fillAllWattColumns(ptIndex index, PTData& ptData);
+  void fillAllCadenceLines(ptIndex index, PTData& ptData, bool addReading);
   std::pair<std::vector<float>, std::vector<float>> getRow(int row, PTData& ptData);
   std::pair<std::vector<float>, std::vector<float>> getColumn(int column, PTData& ptData);
 };

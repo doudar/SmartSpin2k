@@ -293,215 +293,6 @@ int32_t PTHelpers::lookup(int watts, int cad, PTData& ptData) {
 }
 
 /**
- * @brief Extrapolates and fills empty indices in a power table row or column using cubic spline interpolation and neighbor blending.
- * returns false if the operation takes too long.
- *
- * This function takes a set of empty indices within a row or column of a power table and attempts to extrapolate their values
- * based on existing (x, y) data points using cubic spline interpolation. The extrapolated value is then blended with nearby
- * valid neighbors to ensure smoothness and avoid abrupt transitions. The function also ensures that the extrapolated values
- * remain within a reasonable range, slightly extended beyond the min/max of the known values. Neighbor blending uses a
- * distance-based decay to weight closer neighbors more heavily.
- *
- * @param outerIndex The index of the row or column being processed, depending on the orientation.
- * @param emptyIndices The indices within the row or column that are empty and need to be extrapolated.
- * @param xy A pair of vectors representing the known (x, y) data points for interpolation.
- * @param n The number of valid (x, y) data points.
- * @param horizontal If true, extrapolation is performed horizontally (across columns); otherwise, vertically (across rows).
- * @param naturalSpline If true, use a natural cubic spline for interpolation (currently unused in this function).
- * @param ptData Reference to the power table data structure to be updated with extrapolated values.
- */
-bool PTHelpers::extrapolateEmptyIndices(int outerIndex, const std::vector<int>& emptyIndices, std::pair<std::vector<float>, std::vector<float>> xy, size_t n, bool horizontal,
-                                        bool naturalSpline, PTData& ptData) {
-  unsigned long timeout = millis() + COMPUTATION_TIMEOUT_MS;  // Set timeout for computation
-  ptIndex index;
-  if (n >= 3) {
-    bool validForSpline = true;
-    for (size_t i = 1; i < n; ++i) {
-      if (xy.first[i] <= xy.first[i - 1]) {
-        validForSpline = false;
-        break;
-      }
-    }
-    if (!validForSpline) {
-      SS2K_LOG(PTDATA_LOG_TAG, "Duplicate or non-increasing x-values detected!");
-      return true;
-    }
-
-    CubicSpline spline;
-    spline.set_points(xy, n);  // Pass pointer-based data
-
-    for (int innerIndex : emptyIndices) {
-      index.cadIndex  = horizontal ? outerIndex : innerIndex;
-      index.wattIndex = horizontal ? innerIndex : outerIndex;
-
-      float extrapolated_value = spline.extrapolate(innerIndex);
-      float minVal             = *std::min_element(xy.second.begin(), xy.second.end());
-      float maxVal             = *std::max_element(xy.second.begin(), xy.second.end());
-      float range              = maxVal - minVal;
-      extrapolated_value       = std::max(minVal - 0.1f * range, std::min(extrapolated_value, maxVal + 0.1f * range));
-      int tempValue            = (ptData.tableRow[index.cadIndex].tableEntry[index.wattIndex].targetPosition == INT16_MIN)
-                                     ? round(extrapolated_value)
-                                     : round((extrapolated_value + ptData.tableRow[index.cadIndex].tableEntry[index.wattIndex].targetPosition) / 2.0f);
-
-      if (testNeighbors(index, tempValue, ptData).allNeighborsPassed) {
-        // Blend with nearby valid neighbors to ensure smoothness
-        float blendedValue = tempValue;
-        float totalWeight  = 1.0f;  // Start with original value
-
-        // Check horizontal and vertical neighbors within 2 steps
-        const int blendRadius     = 2;
-        const float distanceDecay = 0.7f;  // Weight decreases with distance
-
-        for (int di = -blendRadius; di <= blendRadius; di++) {
-          for (int dj = -blendRadius; dj <= blendRadius; dj++) {
-            // Skip self
-            if (di == 0 && dj == 0) continue;
-
-            int ni = index.cadIndex + (horizontal ? 0 : di);
-            int nj = index.wattIndex + (horizontal ? di : 0);
-
-            // Check if neighbor is valid
-            if (ni >= 0 && ni < POWERTABLE_CAD_SIZE && nj >= 0 && nj < POWERTABLE_WATT_SIZE) {
-              int16_t neighborVal = ptData.tableRow[ni].tableEntry[nj].targetPosition;
-
-              if (neighborVal != INT16_MIN) {
-                // Calculate distance-based weight
-                float distance = std::fabs(di) + std::fabs(dj);  // Manhattan distance
-                float weight   = std::pow(distanceDecay, distance);
-
-                // Add to weighted average
-                blendedValue += neighborVal * weight;
-                totalWeight += weight;
-              }
-            }
-          }
-        }
-
-        // Compute final blended value if we found neighbors
-        if (totalWeight > 1.0f) {
-          // More weight to original spline value (70%) for trend preservation
-          float originalWeight = 0.7f;
-          float neighborWeight = 1.0f - originalWeight;
-
-          blendedValue = (originalWeight * tempValue + neighborWeight * (blendedValue - tempValue) / (totalWeight - 1.0f));
-        }
-        ptData.tableRow[index.cadIndex].tableEntry[index.wattIndex].targetPosition = static_cast<int16_t>(round(blendedValue));
-        if (millis() > timeout) {
-          SS2K_LOG(PTDATA_LOG_TAG, "Spline fill operation timed out!");
-          return false;  // Exit if computation takes too long
-        }
-      }
-    }
-  }
-  return true;
-}
-
-/**
- * @brief Fills missing entries in the power table using cubic spline interpolation.
- *
- * This function processes either the first or second half of the table rows or columns,
- * depending on the `firstHalf` parameter, and interpolates missing values (marked by INT16_MIN)
- * using cubic splines. The interpolation is performed either horizontally (across watt indices)
- * or vertically (across cadence indices) as determined by the `horizontal` parameter.
- * The function ensures overlap between the two halves to provide smooth transitions.
- *
- * @param ptData      Reference to the power table data structure to be filled.
- * @param firstHalf   (optional) If true, processes the first half (with overlap); otherwise, processes the second half. Default is true.
- * @param horizontal  (optional) If true, fills across watt indices (rows); if false, fills across cadence indices (columns). Default is true.
- */
-bool PTHelpers::splineFill(PTData& ptData, bool firstHalf /*= true*/, bool horizontal /*= true*/) {
-  bool completedWithoutTimeout = true;
-  int outerSize                = horizontal ? POWERTABLE_CAD_SIZE : POWERTABLE_WATT_SIZE;
-  int innerSize                = horizontal ? POWERTABLE_WATT_SIZE : POWERTABLE_CAD_SIZE;
-
-  std::vector<std::pair<int, float>> unique_xy;
-  std::vector<int> emptyIndices;
-  std::vector<float> x, y;
-  int rangeStart, rangeEnd;
-
-  // Determine the range for inner loop based on firstHalf or secondHalf
-  // This logic for 'rangeStart' and 'rangeEnd' applies to the 'innerIndex' loop
-  if (firstHalf) {
-    rangeStart = 0;
-    // Ensure overlap: process a bit more than half, e.g., 2/3 or 3/4
-    // The amount of overlap might need tuning. Let's try 2/3 for now.
-    rangeEnd = (innerSize * 2) / 3;
-    if (rangeEnd > innerSize) rangeEnd = innerSize;  // cap at innerSize
-  } else {
-    // Start from a point that ensures overlap with the first half
-    rangeStart = innerSize / 3;
-    rangeEnd   = innerSize;
-  }
-
-  int mid_outer   = outerSize / 2;
-  int max_k_outer = 0;
-  if (outerSize > 0) {
-    max_k_outer = std::max(mid_outer, (outerSize - 1) - mid_outer);
-  }
-
-  auto processOuterIndex = [&](int currentOuterIndex) {
-    unique_xy.clear();
-    emptyIndices.clear();
-    x.clear();
-    y.clear();
-
-    ptIndex index;
-    // Collect data points for the currentOuterIndex across the specified inner range
-    for (int innerIndex = rangeStart; innerIndex < rangeEnd; ++innerIndex) {
-      index.cadIndex  = horizontal ? currentOuterIndex : innerIndex;
-      index.wattIndex = horizontal ? innerIndex : currentOuterIndex;
-
-      // Boundary checks for safety, though currentOuterIndex should be valid by loop logic
-      if (index.cadIndex < 0 || index.cadIndex >= POWERTABLE_CAD_SIZE || index.wattIndex < 0 || index.wattIndex >= POWERTABLE_WATT_SIZE) {
-        continue;
-      }
-
-      // Gather valid data points. Exclude points with 0 readings and a valid targetPosition - those are previously interpolated points.
-      if (ptData.tableRow[index.cadIndex].tableEntry[index.wattIndex].readings > 0 && ptData.tableRow[index.cadIndex].tableEntry[index.wattIndex].targetPosition != INT16_MIN) {
-        unique_xy.emplace_back(innerIndex, static_cast<float>(ptData.tableRow[index.cadIndex].tableEntry[index.wattIndex].targetPosition));
-      } else {
-        emptyIndices.push_back(innerIndex);
-      }
-    }
-
-    if (unique_xy.size() < 2) return;  // Skip if not enough data
-
-    std::sort(unique_xy.begin(), unique_xy.end());
-
-    for (const auto& it : unique_xy) {
-      x.push_back(it.first);
-      y.push_back(it.second);
-    }
-
-    CubicSpline spline;
-    // The decision to use natural spline might be based on the characteristics of x, y
-    // For now, let's assume shouldUseNaturalSpline is available and correctly implemented
-    bool useNaturalSpline = spline.shouldUseNaturalSpline(std::make_pair(x, y), x.size());
-
-    // Fill empty table entries using the determined spline type
-    completedWithoutTimeout = extrapolateEmptyIndices(currentOuterIndex, emptyIndices, std::make_pair(x, y), x.size(), horizontal, useNaturalSpline, ptData);
-  };
-
-  for (int k = 0; k <= max_k_outer; ++k) {
-    if (!completedWithoutTimeout) {
-      return false;  // Exit if computation takes too long
-    }
-    int outer_upper = mid_outer + k;
-    if (outer_upper < outerSize) {
-      processOuterIndex(outer_upper);
-    }
-
-    if (k > 0) {
-      int outer_lower = mid_outer - k;
-      if (outer_lower >= 0) {
-        processOuterIndex(outer_lower);
-      }
-    }
-  }
-  return completedWithoutTimeout;  // Return true if all operations completed without timeout
-}
-
-/**
  * @brief Estimates the y-coordinate corresponding to a given x-coordinate `j`
  *        using linear extrapolation or interpolation based on provided data points.
  *
@@ -535,69 +326,6 @@ float PTHelpers::linearExtrapolate(std::pair<std::vector<float>, std::vector<flo
 
   float slope = (y1 - y0) / (x1 - x0);
   return y0 + slope * (j - x0);
-}
-
-/**
- * @brief Fills empty entries in the power table using linear interpolation.
- *
- * This function iterates through the table rows, starting from the middle row and expanding outward,
- * and fills empty cells (where targetPosition == INT16_MIN) by estimating resistance using the lookup method.
- * Only fills a cell if all its neighbors pass validation.
- *
- * @param ptData Reference to the PTData object containing the power table.
- */
-bool PTHelpers::linearFill(PTData& ptData) {
-  int mid   = POWERTABLE_CAD_SIZE / 2;
-  int max_k = (POWERTABLE_CAD_SIZE - 1) - mid;
-
-  // Define a lambda for processing a single cell
-  auto processCell = [this, &ptData](int currentRowIndex, int currentColIndex) {
-    if (ptData.tableRow[currentRowIndex].tableEntry[currentColIndex].readings == 0) {
-      int watts      = currentColIndex * POWERTABLE_WATT_INCREMENT;
-      int cad        = currentRowIndex * POWERTABLE_CAD_INCREMENT + MINIMUM_TABLE_CAD;
-      int resistance = this->lookup(watts, cad, ptData);
-      if (resistance == RETURN_ERROR) {
-        // SS2K_LOG(PTDATA_LOG_TAG, "Failed to lookup resistance for watts: %d, cadence: %d", watts, cad);
-        return;  // Skip this cell processing
-      } else {
-        resistance = resistance / TABLE_DIVISOR;
-      }
-      ptIndex current_pt_idx;
-      current_pt_idx.wattIndex = currentColIndex;
-      current_pt_idx.cadIndex  = currentRowIndex;
-      TestResults results      = this->testNeighbors(current_pt_idx, resistance, ptData);
-      if (results.allNeighborsPassed == 1) {
-        ptData.tableRow[currentRowIndex].tableEntry[currentColIndex].targetPosition =
-            (ptData.tableRow[currentRowIndex].tableEntry[currentColIndex].targetPosition == INT16_MIN)
-                ? resistance
-                : round((ptData.tableRow[currentRowIndex].tableEntry[currentColIndex].targetPosition + resistance) / 2.0f);
-        // SS2K_LOG(PTDATA_LOG_TAG, "Filled position (%d, %d) with resistance: %d", currentRowIndex, currentColIndex, resistance);
-      } else {  // log the failure to in insert the value
-                // Serial.printf("Failed to fill position (%d, %d) with resistance: %d\n", currentRowIndex, currentColIndex, resistance);
-      }
-    }
-  };
-
-  for (int k = 0; k <= max_k; ++k) {
-    // Process row from mid upwards: mid, mid+1, mid+2, ...
-    int i_upper = mid + k;
-    if (i_upper < POWERTABLE_CAD_SIZE) {  // Ensure i_upper is a valid row index
-      for (int j = 0; j < POWERTABLE_WATT_SIZE; j++) {
-        processCell(i_upper, j);
-      }
-    }
-
-    // Process row from mid downwards: mid-1, mid-2, ..., only if k > 0 to avoid re-processing 'mid'
-    if (k > 0) {
-      int i_lower = mid - k;
-      if (i_lower >= 0) {  // Ensure i_lower is a valid row index
-        for (int j = 0; j < POWERTABLE_WATT_SIZE; j++) {
-          processCell(i_lower, j);
-        }
-      }
-    }
-  }
-  return true;  // Return true if all operations completed without timeout
 }
 
 /**
@@ -764,312 +492,78 @@ int PTHelpers::extrapolateWattsFromCadence(int cad, int32_t targetPosition, PTDa
   return watts;
 }
 
-void CubicSpline::set_points(std::pair<std::vector<float>, std::vector<float>> xy, size_t n) {
-  if (n < 2) return;  // Ensure sufficient points
-
-  x.assign(xy.first.begin(), xy.first.end());
-  y.assign(xy.second.begin(), xy.second.end());
-
-  std::vector<float> h(n - 1), alpha(n, 0.0f);
-  c.resize(n, 0.0f);
-  b.resize(n - 1, 0.0f);
-  d.resize(n - 1, 0.0f);
-
-  for (size_t i = 0; i < n - 1; ++i) {
-    h[i] = x[i + 1] - x[i];
-    if (h[i] == 0.0f) return;  // Avoid duplicate x values
-  }
-
-  for (size_t i = 1; i < n - 1; ++i) {
-    alpha[i] = (3.0f / h[i]) * (y[i + 1] - y[i]) - (3.0f / h[i - 1]) * (y[i] - y[i - 1]);
-  }
-
-  float l = 1.0f, mu = 0.0f, z = 0.0f, prev_l = 1.0f, prev_z = 0.0f;
-
-  for (size_t i = 1; i < n - 1; ++i) {
-    l      = 2.0f * (x[i + 1] - x[i - 1]) - h[i - 1] * mu;
-    mu     = h[i] / l;
-    z      = (alpha[i] - h[i - 1] * prev_z) / l;
-    prev_z = z;
-    prev_l = l;
-  }
-
-  for (int j = n - 2; j >= 0; --j) {
-    c[j] = z - mu * c[j + 1];
-    b[j] = (y[j + 1] - y[j]) / h[j] - h[j] * (c[j + 1] + 2.0f * c[j]) / 3.0f;
-    d[j] = (c[j + 1] - c[j]) / (3.0f * h[j]);
+void PTHelpers::fillAllCadenceLines(ptIndex index, PTData& ptData, bool addReading = false) {
+  int16_t targetCalculation = 0;
+  for (int i = 0; i < POWERTABLE_CAD_SIZE; i++) {
+    targetCalculation = ptData.tableRow[index.cadIndex].tableEntry[index.wattIndex].targetPosition - (i - index.cadIndex) * (index.wattIndex + 10);
+    // Create positions for all cadence lines if they are not set.
+    // This gives us a monotonic table with a linear progression of target positions.
+    if (ptData.tableRow[i].tableEntry[index.wattIndex].readings <= 1) {
+      ptData.tableRow[i].tableEntry[index.wattIndex].targetPosition = targetCalculation;
+      // add a reading
+      if (addReading) {
+        ptData.tableRow[i].tableEntry[index.wattIndex].readings = 1;
+      }
+    }
+    // Positions with a lower row (lower cadence) should have higher targetPosition, so enforce monotonicity
+    if (i < index.cadIndex) {
+      ptData.tableRow[i].tableEntry[index.wattIndex].targetPosition = std::max(ptData.tableRow[i].tableEntry[index.wattIndex].targetPosition, targetCalculation);
+    } else if (i > index.cadIndex) {
+      ptData.tableRow[i].tableEntry[index.wattIndex].targetPosition = std::min(ptData.tableRow[i].tableEntry[index.wattIndex].targetPosition, targetCalculation);
+    }
   }
 }
 
-float CubicSpline::interpolate(float x_val) const {
-  if (x_val < x.front() || x_val > x.back()) {
-    return INT16_MIN;  // Out of range
+void PTHelpers::fillAllWattColumns(ptIndex index, PTData& ptData) {
+  int16_t targetCalculation = 0;
+  for (int i = 0; i < POWERTABLE_WATT_SIZE; i++) {
+    targetCalculation = ptData.tableRow[index.cadIndex].tableEntry[index.wattIndex].targetPosition - (index.wattIndex - i) * (index.cadIndex + 10);
+    // Create positions for all watt columns if they are not set.
+    // This gives us a monotonic table with a linear progression of target positions.
+    if (ptData.tableRow[index.cadIndex].tableEntry[i].readings <= 1) {
+      ptData.tableRow[index.cadIndex].tableEntry[i].targetPosition = targetCalculation;
+    }
+    // Each column to the right should have a higher targetPosition, so enforce monotonicity
+    if (i > index.wattIndex) {
+      ptData.tableRow[index.cadIndex].tableEntry[i].targetPosition = std::max(ptData.tableRow[index.cadIndex].tableEntry[i].targetPosition, targetCalculation);
+    } else if (i < index.wattIndex) {
+      ptData.tableRow[index.cadIndex].tableEntry[i].targetPosition = std::min(ptData.tableRow[index.cadIndex].tableEntry[i].targetPosition, targetCalculation);
+    }
+    ptIndex newIndex;
+    newIndex.cadIndex  = index.cadIndex;
+    newIndex.wattIndex = i;
+    fillAllCadenceLines(newIndex, ptData, false);
   }
-
-  int i    = std::upper_bound(x.begin(), x.end(), x_val) - x.begin() - 1;
-  float dx = x_val - x[i];
-  return y[i] + b[i] * dx + c[i] * dx * dx + d[i] * dx * dx * dx;
 }
-
-float CubicSpline::extrapolate(float x_val) const {
-  if (x_val < x.front()) {
-    float dx = x_val - x[0];
-    return y[0] + b[0] * dx + c[0] * dx * dx + d[0] * dx * dx * dx;
-  }
-  if (x_val > x.back()) {
-    int n    = x.size() - 1;
-    float dx = x_val - x[n];
-    return y[n] + b[n - 1] * dx + c[n - 1] * dx * dx + d[n - 1] * dx * dx * dx;
-  }
-  return INT16_MIN;  // Out of range
-}
-
-bool CubicSpline::shouldUseNaturalSpline(std::pair<std::vector<float>, std::vector<float>> xy, size_t n) {
-  if (n < 3) return true;  // Default to natural spline for small data sets
-
-  // Compute approximate first derivatives at endpoints
-  float startSlope = (xy.second[1] - xy.second[0]) / (xy.first[1] - xy.first[0]);
-  float endSlope   = (xy.second[n - 1] - xy.second[n - 2]) / (xy.first[n - 1] - xy.first[n - 2]);
-
-  // Adaptive slope threshold
-  float dataRange      = *std::max_element(xy.second.begin(), xy.second.end()) - *std::min_element(xy.second.begin(), xy.second.end());
-  float slopeThreshold = 0.1f * dataRange;
-
-  if (abs(startSlope) > slopeThreshold || abs(endSlope) > slopeThreshold) {
-    return false;  // Use clamped spline
-  }
-
-  if (n < 4) return true;  // Not enough points for second derivative check
-
-  // Compute second derivatives safely
-  float h0 = xy.first[1] - xy.first[0], h1 = xy.first[2] - xy.first[1];
-  if (h0 == 0.0f || h1 == 0.0f) return true;  // Avoid division by zero
-
-  float secondDerivativeStart = (xy.second[2] - 2 * xy.second[1] + xy.second[0]) / (h0 * h1);
-
-  float hn1 = xy.first[n - 2] - xy.first[n - 3], hn2 = xy.first[n - 1] - xy.first[n - 2];
-  if (hn1 == 0.0f || hn2 == 0.0f) return true;  // Avoid division by zero
-
-  float secondDerivativeEnd = (xy.second[n - 1] - 2 * xy.second[n - 2] + xy.second[n - 3]) / (hn1 * hn2);
-
-  float curvatureThreshold = 1.0f;
-  return !(abs(secondDerivativeStart) > curvatureThreshold || abs(secondDerivativeEnd) > curvatureThreshold);
-}
-
-// --- Helper Functions ---
-
-// Check if a cell is considered "filled" with valid data
-bool isFilled(const TableEntry& entry, int readings = 0) { 
-  return entry.targetPosition != INT16_MIN && entry.readings >= readings; 
-}
-
-// Linearly interpolate or extrapolate a value.
-// Interpolates if x is between x0 and x1.
-// Extrapolates if x is outside x0 and x1.
-double linear_interpolate(double x, double x0, double y0, double x1, double y1) {
-  if (x0 == x1) {
-    return y0;  // Avoid division by zero, return one of the points
-  }
-  // Formula: y = y0 + (x - x0) * (y1 - y0) / (x1 - x0)
-  return y0 + (x - x0) * (y1 - y0) / (x1 - x0);
-}
-
-// --- Core Logic ---
 
 /**
- * @brief Completes the power table using an iterative interpolation and enforcement strategy.
+ * @brief Updates or enters data into the power table for a specific row and entry.
  *
- * This function fills in a partially completed PTData table. It operates in a loop until
- * the table is stable (no more changes are made). Each loop consists of two main passes:
- *
- * 1. Interpolation/Extrapolation Pass:
- *    - Iterates through each cell that is modifiable (empty or readings == 0).
- *    - For each cell, it finds the nearest filled neighbors in its row and column.
- *    - It uses this information to perform bilinear interpolation (if possible),
- *      linear interpolation, or linear extrapolation to estimate a value.
- *    - This ensures the filled data follows the trend of the existing measurements.
- *
- * 2. Monotonicity Enforcement Pass:
- *    - After interpolation, this pass guarantees all rules are met.
- *    - It sweeps the grid from bottom-left (0,0) to top-right.
- *    - It enforces rule 1: cell[r][c] > cell[r][c-1]
- *    - It enforces rule 2: cell[r][c] > cell[r-1][c]
- *    - If a rule is violated, the cell's value is minimally adjusted (e.g., incremented by 1)
- *      to satisfy the rule. This also handles "outliers" with actual readings that
- *      violate the monotonic structure, correcting them as a last resort.
- *
- * The loop continues until a full iteration makes no changes, resulting in a complete and
- * rule-compliant table.
- *
- * @param data A reference to the PTData object to be completed in-place.
+ * This function records a new target position or averages the new position with
+ * existing data for a specific table entry. It ensures that the number of readings
+ * does not exceed a defined limit to prevent dilution of recent data. Additionally,
+ * it triggers table filling and extrapolation processes if the number of entries
+ * exceeds a threshold.
+ * @param index The index of the table entry
+ * @param pos The new target position to record or average.
  */
-bool PTHelpers::completePowerTable(PTData& data) {
-  bool changedInIteration = true;
-  int max_iterations      = 100;  // Safety break to prevent infinite loops
-  int iteration_count     = 0;
-
-  while (changedInIteration && iteration_count < max_iterations) {
-    changedInIteration = false;
-    iteration_count++;
-
-    // --- PASS 1: Interpolation and Extrapolation ---
-    for (int r = 0; r < POWERTABLE_CAD_SIZE; ++r) {
-      for (int c = 0; c < POWERTABLE_WATT_SIZE; ++c) {
-        if (isFilled(data.tableRow[r].tableEntry[c], 1)) {
-          continue;
-        }
-
-        // Find horizontal anchors (left and right) for interpolation
-        int left_c = -1, right_c = -1;
-        for (int i = c - 1; i >= 0; --i) {
-          if (isFilled(data.tableRow[r].tableEntry[i], 1)) {
-            left_c = i;
-            break;
-          }
-        }
-        for (int i = c + 1; i < POWERTABLE_WATT_SIZE; ++i) {
-          if (isFilled(data.tableRow[r].tableEntry[i], 1)) {
-            right_c = i;
-            break;
-          }
-        }
-
-        // Find vertical anchors (bottom and top) for interpolation
-        int bottom_r = -1, top_r = -1;
-        for (int i = r - 1; i >= 0; --i) {
-          if (isFilled(data.tableRow[i].tableEntry[c], 1)) {
-            bottom_r = i;
-            break;
-          }
-        }
-        for (int i = r + 1; i < POWERTABLE_CAD_SIZE; ++i) {
-          if (isFilled(data.tableRow[i].tableEntry[c], 1)) {
-            top_r = i;
-            break;
-          }
-        }
-
-        double h_val = 0, v_val = 0;
-        bool h_ok = false, v_ok = false;
-
-        // Horizontal Estimation
-        if (left_c != -1 && right_c != -1) {
-          h_val = linear_interpolate(c, left_c, data.tableRow[r].tableEntry[left_c].targetPosition, right_c, data.tableRow[r].tableEntry[right_c].targetPosition);
-          h_ok  = true;
-        } else if (left_c != -1) {
-          int l2 = -1;
-          for (int i = left_c - 1; i >= 0; --i)
-            if (isFilled(data.tableRow[r].tableEntry[i], 1)) {
-              l2 = i;
-              break;
-            }
-          if (l2 != -1)
-            h_val = linear_interpolate(c, l2, data.tableRow[r].tableEntry[l2].targetPosition, left_c, data.tableRow[r].tableEntry[left_c].targetPosition);
-          else
-            h_val = data.tableRow[r].tableEntry[left_c].targetPosition;
-          h_ok = true;
-        } else if (right_c != -1) {
-          int r2 = -1;
-          for (int i = right_c + 1; i < POWERTABLE_WATT_SIZE; ++i)
-            if (isFilled(data.tableRow[r].tableEntry[i], 1)) {
-              r2 = i;
-              break;
-            }
-          if (r2 != -1)
-            h_val = linear_interpolate(c, right_c, data.tableRow[r].tableEntry[right_c].targetPosition, r2, data.tableRow[r].tableEntry[r2].targetPosition);
-          else
-            h_val = data.tableRow[r].tableEntry[right_c].targetPosition;
-          h_ok = true;
-        }
-
-        // Vertical Estimation
-        if (bottom_r != -1 && top_r != -1) {
-          v_val = linear_interpolate(r, bottom_r, data.tableRow[bottom_r].tableEntry[c].targetPosition, top_r, data.tableRow[top_r].tableEntry[c].targetPosition);
-          v_ok  = true;
-        } else if (bottom_r != -1) {
-          int b2 = -1;
-          for (int i = bottom_r - 1; i >= 0; --i)
-            if (isFilled(data.tableRow[i].tableEntry[c], 1)) {
-              b2 = i;
-              break;
-            }
-          if (b2 != -1)
-            v_val = linear_interpolate(r, b2, data.tableRow[b2].tableEntry[c].targetPosition, bottom_r, data.tableRow[bottom_r].tableEntry[c].targetPosition);
-          else
-            v_val = data.tableRow[bottom_r].tableEntry[c].targetPosition;
-          v_ok = true;
-        } else if (top_r != -1) {
-          int t2 = -1;
-          for (int i = top_r + 1; i < POWERTABLE_CAD_SIZE; ++i)
-            if (isFilled(data.tableRow[i].tableEntry[c], 1)) {
-              t2 = i;
-              break;
-            }
-          if (t2 != -1)
-            v_val = linear_interpolate(r, top_r, data.tableRow[top_r].tableEntry[c].targetPosition, t2, data.tableRow[t2].tableEntry[c].targetPosition);
-          else
-            v_val = data.tableRow[top_r].tableEntry[c].targetPosition;
-          v_ok = true;
-        }
-
-        double final_val = 0;
-        if (h_ok && v_ok) {
-          final_val = (h_val + v_val) / 2.0;
-        } else if (h_ok) {
-          final_val = h_val;
-        } else if (v_ok) {
-          final_val = v_val;
-        } else {
-          continue;
-        }
-
-        int16_t new_pos = static_cast<int16_t>(round(final_val));
-        if (data.tableRow[r].tableEntry[c].targetPosition != new_pos) {
-          data.tableRow[r].tableEntry[c].targetPosition = new_pos;
-          data.tableRow[r].tableEntry[c].readings       = 0;
-          changedInIteration                            = true;
-        }
-      }
-    }
-
-    // --- PASS 2: Monotonicity Enforcement ---
-    for (int r = 0; r < POWERTABLE_CAD_SIZE; ++r) {
-      for (int c = 0; c < POWERTABLE_WATT_SIZE; ++c) {
-        if (!isFilled(data.tableRow[r].tableEntry[c])) continue;
-        // --- MODIFIED RULE ---
-        // Enforce Rule: Neighbor above (row r-1) must be higher.
-        // This means the value at [r] must be LESS than the value at [r-1].
-        if (r > 0 && isFilled(data.tableRow[r - 1].tableEntry[c])) {
-          if (data.tableRow[r].tableEntry[c].targetPosition >= data.tableRow[r - 1].tableEntry[c].targetPosition) {
-            if(data.tableRow[r].tableEntry[c].readings > data.tableRow[r - 1].tableEntry[c].readings) {
-               data.tableRow[r].tableEntry[c].targetPosition += 1;
-            } else {
-              data.tableRow[r].tableEntry[c].targetPosition = data.tableRow[r - 1].tableEntry[c].targetPosition - 1;
-              changedInIteration = true;
-            }
-            
-          }
-        }
-
-        // Enforce Rule: Neighbor left (column c-1) must be lower.
-        // This means the value at [c] must be GREATER than the value at [c-1].
-        if (c > 0 && isFilled(data.tableRow[r].tableEntry[c - 1])) {
-          if (data.tableRow[r].tableEntry[c].targetPosition <= data.tableRow[r].tableEntry[c - 1].targetPosition) {
-            if(data.tableRow[r].tableEntry[c].readings > data.tableRow[r].tableEntry[c - 1].readings) {
-              data.tableRow[r].tableEntry[c].targetPosition += 1;
-            } else {
-              data.tableRow[r].tableEntry[c].targetPosition = data.tableRow[r].tableEntry[c - 1].targetPosition + 1;
-              changedInIteration = true;
-            }
-            
-          }
-        }
-      }
+void PTHelpers::enterData(PTData& ptData, ptIndex index, int pos) {
+  if (ptData.tableRow[index.cadIndex].tableEntry[index.wattIndex].readings == 0) {  // if first reading in this entry
+    ptData.tableRow[index.cadIndex].tableEntry[index.wattIndex].targetPosition = pos;
+    SS2K_LOG(PTDATA_LOG_TAG, "New entry recorded (%d)(%d)(%d)", index.cadIndex, index.wattIndex, ptData.tableRow[index.cadIndex].tableEntry[index.wattIndex].targetPosition);
+    ptData.tableRow[index.cadIndex].tableEntry[index.wattIndex].readings++;  // for initial spot on readings, give 2 (one below as well)
+  } else {                                                                   // Average and update the readings.
+    ptData.tableRow[index.cadIndex].tableEntry[index.wattIndex].targetPosition =
+        (pos + (ptData.tableRow[index.cadIndex].tableEntry[index.wattIndex].targetPosition * ptData.tableRow[index.cadIndex].tableEntry[index.wattIndex].readings)) /
+        (ptData.tableRow[index.cadIndex].tableEntry[index.wattIndex].readings + 1.0f);
+    SS2K_LOG(PTDATA_LOG_TAG, "Existing entry averaged (%d)(%d)(%d), readings(%d)", index.cadIndex, index.wattIndex,
+             ptData.tableRow[index.cadIndex].tableEntry[index.wattIndex].targetPosition, ptData.tableRow[index.cadIndex].tableEntry[index.wattIndex].readings);
+    if (ptData.tableRow[index.cadIndex].tableEntry[index.wattIndex].readings > MAX_NEIGHBOR_WEIGHT) {
+      ptData.tableRow[index.cadIndex].tableEntry[index.wattIndex].readings = MAX_NEIGHBOR_WEIGHT;
     }
   }
-  if (iteration_count >= max_iterations) {
-    SS2K_LOG(PTDATA_LOG_TAG, "Warning: Table completion reached max iterations. Result may be unstable.");
-    return false;  // Indicate that the table may not be fully completed
-  }
-  return true;  // Indicate that the table was successfully completed
+  ptData.tableRow[index.cadIndex].tableEntry[index.wattIndex].readings++;
+  // because of monotonicity, we can make some assumptions in order to fill the table.
+  fillAllCadenceLines(index, ptData, true);
+  fillAllWattColumns(index, ptData);
 }

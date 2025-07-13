@@ -1,9 +1,3 @@
-/*
- * Copyright (C) 2020  Anthony Doud & Joel Baranick
- * All rights reserved
- *
- * SPDX-License-Identifier: GPL-2.0-only
- */
 
 #include <unity.h>
 #include "test.h"
@@ -13,53 +7,98 @@
 #include <sstream>
 #include <string>
 #include <vector>
+#include <regex>
+#include <direct.h> // for _mkdir, _rmdir
+#include <io.h>     // for _findfirst, _findnext, _findclose, _unlink
 #include "data_helpers.cpp"
 
+// Helper to clean and recreate a directory
+
+// Helper to clean and recreate a directory (Windows version)
+static void cleanAndCreateDir(const std::string& dirPath) {
+    // Remove all files in the directory
+    struct _finddata_t fileinfo;
+    std::string pattern = dirPath + "*";
+    intptr_t hFile = _findfirst(pattern.c_str(), &fileinfo);
+    if (hFile != -1) {
+        do {
+            if (!(fileinfo.attrib & _A_SUBDIR)) {
+                std::string filepath = dirPath + fileinfo.name;
+                _unlink(filepath.c_str());
+            }
+        } while (_findnext(hFile, &fileinfo) == 0);
+        _findclose(hFile);
+    }
+    // Remove the directory itself if it exists
+    _rmdir(dirPath.c_str());
+    // Recreate the directory
+    _mkdir(dirPath.c_str());
+}
+
 void TestTableFill::test_fill_incomplete_table(void) {
-  std::ofstream logFile("test/output/test_table_fill.txt", std::ios::trunc);
-  logFile << "Starting incomplete table fill test\n";
+    std::ofstream logFile("test/output/test_table_fill.txt", std::ios::trunc);
+    logFile << "Starting Ride_Log replay test\n";
 
-  // Create a power table
-  PTData ptData;
+    // Clean and recreate output directory
+    const std::string outputDir = "test/output/ridedata/";
+    cleanAndCreateDir(outputDir);
 
-  // Load the incomplete power table data
-  const std::string inputFilePath = "test/data/10x5-26-25.ptab";
-  loadCSVToPTData(inputFilePath, ptData);
-  logFile << "Loaded incomplete power table from: " << inputFilePath << "\n";
+    // Open Ride_Log.txt
+    std::ifstream rideLog("test/data/Ride_Log.txt");
+    TEST_ASSERT_TRUE_MESSAGE(rideLog.good(), "Ride_Log.txt could not be opened");
 
-  // Create helpers object
-  PTHelpers helpers;
+    // Prepare regex for Averaged Entry lines
+    std::regex entryRegex(R"(\[(\d+)\]\[E\]\(PTable\): Averaged Entry: watts=([\d\.\-]+), cad=([\d\.\-]+), targetPosition=([\d\.\-]+), \((\d+)\)\((\d+)\))");
+    std::string line;
+    PTData ptData; // Start with an empty table
+    PTHelpers helpers;
+    int entryCount = 0;
 
-  // Count initial data points
-  int initialPoints = helpers.getNumEntries(ptData);
-  logFile << "Initial data points: " << initialPoints << "\n";
-  int previousFilledPoints = 0;
-  int filledPoints         = 1;
-  //Fill the incomplete table
-  // while (previousFilledPoints < filledPoints) {
-  //   previousFilledPoints = filledPoints;
-  //   helpers.linearFill(ptData);
-  //   logFile << "Applied splineFill to the table\n";
+    while (std::getline(rideLog, line)) {
+        std::smatch match;
+        if (std::regex_search(line, match, entryRegex)) {
+            // Extract values
+            std::string timestamp = match[1];
+            float watts = std::stof(match[2]);
+            float cad = std::stof(match[3]);
+            float targetPosition = std::stof(match[4]);
+            int cadIndex = std::stoi(match[5]);
+            int wattIndex = std::stoi(match[6]);
 
-  //   // Count filled data points
-  //   filledPoints = helpers.getNumEntries(ptData);
-  //   logFile << "Filled data points: " << filledPoints << "\n";
-  //   logFile << "Added " << (filledPoints - initialPoints) << " points\n";
-  // }
+            // Log extraction
+            logFile << "Entry " << entryCount << ": ts=" << timestamp << ", watts=" << watts << ", cad=" << cad << ", targetPosition=" << targetPosition << ", cadIndex=" << cadIndex << ", wattIndex=" << wattIndex << "\n";
 
-  // loop through the table and check for INT16_MIN values
-  for(int i=1; i<100; i++){
-  helpers.completePowerTable(ptData);}
-  // Save the filled power table
-  const std::string outputFilePath = "test/output/power_table_filled.ptab";
-  savePTDataToCSV(ptData, outputFilePath);
-  logFile << "Saved filled power table to: " << outputFilePath << "\n";
+            // Call enterData
+            ptIndex idx;
+            idx.cadIndex = cadIndex;
+            idx.wattIndex = wattIndex;
+            helpers.enterData(ptData, idx, static_cast<int>(targetPosition));
 
-  // Verify the file was created
-  std::ifstream checkFile(outputFilePath);
-  TEST_ASSERT_TRUE_MESSAGE(checkFile.good(), "Output file should be created successfully");
-  checkFile.close();
+            // Save PTData to .ptab file named with timestamp
+            std::string outFile = outputDir + timestamp + ".ptab";
+            savePTDataToCSV(ptData, outFile, true); // true = skipHeatmap
 
-  logFile << "Test completed successfully\n";
-  logFile.close();
+            entryCount++;
+        }
+    }
+
+
+    rideLog.close();
+    createPowerTableHeatmap("test/output/ridedata/3028648.ptab", "test/output/heatmap_slider.html", false, true);
+    logFile << "Processed " << entryCount << " Averaged Entry lines.\n";
+    logFile.close();
+
+    // Check that at least one .ptab file was created
+    // Count .ptab files in outputDir (Windows version)
+    int ptabCount = 0;
+    struct _finddata_t fileinfo;
+    std::string pattern = outputDir + "*.ptab";
+    intptr_t hFile = _findfirst(pattern.c_str(), &fileinfo);
+    if (hFile != -1) {
+        do {
+            ptabCount++;
+        } while (_findnext(hFile, &fileinfo) == 0);
+        _findclose(hFile);
+    }
+    TEST_ASSERT_TRUE_MESSAGE(ptabCount > 0, "No .ptab files were created in output directory");
 }

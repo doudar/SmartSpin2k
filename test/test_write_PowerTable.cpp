@@ -29,7 +29,7 @@ void TestWritePowerTable::test_save_and_load(void) {
 
   // Save the power table to the output file
   const std::string outputFilePath = "test/output/power_table.ptab";
-  savePTDataToCSV(ptData, outputFilePath);
+  savePTDataToCSV(ptData, outputFilePath, false);
   logFile << "Saved power table to: " << outputFilePath << "\n";
   
   // Verify the file was created
