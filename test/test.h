@@ -35,7 +35,6 @@ class TestPTLookupResistance {
 class TestPTLookupWatts {
   public:
    static void test_pt_lookup_watts(void);
-   static void test_debug_neighbors(void);
  };
 
 class TestLinearExtrapolate {

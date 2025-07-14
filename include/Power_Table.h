@@ -31,9 +31,6 @@ class PowerTable {
   // Catalogs a new entry into the power table.
   void newEntry(PowerBuffer& powerBuffer);
 
-  // Interpolates and extrapolates the power table.
-  void fillTable();
-
   // returns target position for given cadence and watts. Returns RETURN_ERROR if not found.
   int32_t lookup(int watts, int cad) { return this->ptHelpers.lookup(watts, cad, this->ptData); }
 

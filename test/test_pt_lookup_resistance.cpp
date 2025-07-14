@@ -24,7 +24,7 @@ void TestPTLookupResistance::test_pt_lookup_resistance(void) {
   PTData ptData;
 
   // Load the power table data from the .ptab file
-  const std::string filePath = "test/data/final_5_25_25.ptab";
+  const std::string filePath = "test/data/9077.ptab";
   loadCSVToPTData(filePath, ptData);
 
   // Create helpers object for lookup
@@ -34,6 +34,7 @@ void TestPTLookupResistance::test_pt_lookup_resistance(void) {
   auto performLookup = [&](int cadValue, int wattValue) {
     outFile << "Calling lookup with cadence: " << cadValue << ", watts: " << wattValue << " ";
     int32_t result = helpers.lookup(wattValue, cadValue, ptData);
+    //int32_t result = helpers.getInterpolatedPosition(ptData, wattValue, cadValue);
     outFile << "Lookup returned: " << result << "\n";
     return result;
   };

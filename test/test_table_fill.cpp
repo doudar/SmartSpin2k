@@ -1,4 +1,3 @@
-
 #include <unity.h>
 #include "test.h"
 #include "PowerTable_Helpers.h"
@@ -53,11 +52,13 @@ void TestTableFill::test_fill_incomplete_table(void) {
     PTData ptData; // Start with an empty table
     PTHelpers helpers;
     int entryCount = 0;
+    int lineNumber = 0;
 
     while (std::getline(rideLog, line)) {
+        lineNumber++;
         std::smatch match;
         if (std::regex_search(line, match, entryRegex)) {
-            // Extract values
+            // Extract values (timestamp still extracted but not used for filename)
             std::string timestamp = match[1];
             float watts = std::stof(match[2]);
             float cad = std::stof(match[3]);
@@ -74,8 +75,8 @@ void TestTableFill::test_fill_incomplete_table(void) {
             idx.wattIndex = wattIndex;
             helpers.enterData(ptData, idx, static_cast<int>(targetPosition));
 
-            // Save PTData to .ptab file named with timestamp
-            std::string outFile = outputDir + timestamp + ".ptab";
+            // Save PTData to .ptab file named with line number
+            std::string outFile = outputDir + std::to_string(lineNumber) + ".ptab";
             savePTDataToCSV(ptData, outFile, true); // true = skipHeatmap
 
             entryCount++;

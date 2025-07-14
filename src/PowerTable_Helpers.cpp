@@ -29,93 +29,6 @@ std::ofstream outFile("test/output/test_PowerTable_Helpers.txt", std::ios::trunc
 #include "SS2KLog.h"
 #endif
 
-// uses testValue in targetPosition/TABLE_DIVISOR
-TestResults PTHelpers::testNeighbors(ptIndex index, int testValue, PTData& ptData) {
-  TestResults returnResult;
-
-  // Define direction parameters (start limit, end limit, step, row change, column change)
-  const struct {
-    int startLimit;
-    int endLimit;
-    int step;
-    int rowChange;
-    int colChange;
-    TestResults::Neighbor* neighbor;
-    bool (*testPredicate)(int16_t, int);
-  } directions[] = {// Left: decreasing j, same i, lower target position
-                    {index.wattIndex > 0 ? index.wattIndex - 1 : -1, -1, -1, 0, 0, &returnResult.leftNeighbor,
-                     [](int16_t pos, int test) {
-                       // SS2K_LOG(PTDATA_LOG_TAG, "Testing left neighbor: pos=%d, test=%d", pos, test);
-                       return pos < test || pos == INT16_MIN;
-                     }},
-                    // Right: increasing j, same i, higher target position
-                    {index.wattIndex < POWERTABLE_WATT_SIZE - 1 ? index.wattIndex + 1 : POWERTABLE_WATT_SIZE, POWERTABLE_WATT_SIZE, 1, 0, 0, &returnResult.rightNeighbor,
-                     [](int16_t pos, int test) {
-                       // SS2K_LOG(PTDATA_LOG_TAG, "Testing right neighbor: pos=%d, test=%d", pos, test);
-                       return pos > test || pos == INT16_MIN;
-                     }},
-                    // Top: decreasing i, same j, lower target position
-                    {index.cadIndex > 0 ? index.cadIndex - 1 : -1, -1, -1, 1, 0, &returnResult.topNeighbor,
-                     [](int16_t pos, int test) {
-                       // SS2K_LOG(PTDATA_LOG_TAG, "Testing top neighbor: pos=%d, test=%d", pos, test);
-                       return pos > test || pos == INT16_MIN;
-                     }},
-                    // Bottom: increasing i, same j, lower target position
-                    {index.cadIndex < POWERTABLE_CAD_SIZE - 1 ? index.cadIndex + 1 : POWERTABLE_CAD_SIZE, POWERTABLE_CAD_SIZE, 1, 1, 0, &returnResult.bottomNeighbor,
-                     [](int16_t pos, int test) { return pos < test || pos == INT16_MIN; }}};
-
-  // Process each direction
-  for (const auto& dir : directions) {
-    bool skipDirection = false;
-    if (dir.rowChange == 0) {
-      skipDirection = (dir.startLimit < 0 || dir.startLimit >= POWERTABLE_WATT_SIZE);
-    } else {
-      skipDirection = (dir.startLimit < 0 || dir.startLimit >= POWERTABLE_CAD_SIZE);
-    }
-
-    if (skipDirection) {
-      // If we are at the edge and can't search, treat as passing the test (neighbor not found)
-      dir.neighbor->passedTest = 1;
-      continue;
-    }
-
-    bool found = false;
-    for (int idx = dir.startLimit; idx != dir.endLimit; idx += dir.step) {
-      int row = dir.rowChange ? idx : index.cadIndex;
-      int col = dir.rowChange ? index.wattIndex : idx;
-      if (row < 0 || row >= POWERTABLE_CAD_SIZE || col < 0 || col >= POWERTABLE_WATT_SIZE) {
-        continue;
-      }
-      if (ptData.tableRow[row].tableEntry[col].targetPosition != INT16_MIN) {
-        dir.neighbor->targetPosition  = ptData.tableRow[row].tableEntry[col].targetPosition;
-        dir.neighbor->index.cadIndex  = row;
-        dir.neighbor->index.wattIndex = col;
-        dir.neighbor->found           = 1;
-        found                         = true;
-        break;
-      }
-    }
-    if (found) {
-      if (dir.testPredicate(dir.neighbor->targetPosition, testValue)) {
-        dir.neighbor->passedTest = 1;
-      }
-    } else {
-      // If we reached the table limit and found no neighbor, pass the test in this direction
-      dir.neighbor->passedTest = 1;
-    }
-  }
-  // Check if all neighbors were found.
-  if (returnResult.bottomNeighbor.found && returnResult.topNeighbor.found && returnResult.rightNeighbor.found && returnResult.leftNeighbor.found) {
-    returnResult.allNeighborsFound = 1;
-  }
-  // Check if all neighbors passed tests.
-  if (returnResult.bottomNeighbor.passedTest && returnResult.topNeighbor.passedTest && returnResult.rightNeighbor.passedTest && returnResult.leftNeighbor.passedTest) {
-    returnResult.allNeighborsPassed = 1;
-  }
-
-  return returnResult;
-}
-
 // Calculate index in the table for the given watts and cadence
 ptIndex PTHelpers::calculateIndex(int watts, int cad) {
   ptIndex index;
@@ -228,65 +141,11 @@ int32_t PTHelpers::lookup(int watts, int cad, PTData& ptData) {
       }
     }
   }
-  return resistance;  // Return early if we found a valid extrapolated value
-  // ---- B. Handle In-Table Lookup (Direct, Interpolation) ----
-  // At this point, both 'watts' and 'cad' are considered within the conceptual table boundaries.
-  TestResults neighbors = testNeighbors(index, 0, ptData);  // testValue for testNeighbors is not critical here.
-
-  float R1 = INT16_MIN, R2 = INT16_MIN, R3 = INT16_MIN;
-
-  // R3: Value at the calculated grid cell (index.cadIndex, index.wattIndex)
-  if (index.cadIndex >= 0 && index.cadIndex < POWERTABLE_CAD_SIZE && index.wattIndex >= 0 && index.wattIndex < POWERTABLE_WATT_SIZE &&
-      ptData.tableRow[index.cadIndex].tableEntry[index.wattIndex].targetPosition != INT16_MIN) {
-    R3 = static_cast<float>(ptData.tableRow[index.cadIndex].tableEntry[index.wattIndex].targetPosition);
-  }
-
-  // R1: Interpolation along WATT axis (horizontal) using neighbors
-  if (neighbors.leftNeighbor.found && neighbors.rightNeighbor.found && neighbors.leftNeighbor.targetPosition != INT16_MIN && neighbors.rightNeighbor.targetPosition != INT16_MIN) {
-    float xWattPts[2] = {static_cast<float>(neighbors.leftNeighbor.index.wattIndex * POWERTABLE_WATT_INCREMENT),
-                         static_cast<float>(neighbors.rightNeighbor.index.wattIndex * POWERTABLE_WATT_INCREMENT)};
-    float yWattPts[2] = {static_cast<float>(neighbors.leftNeighbor.targetPosition), static_cast<float>(neighbors.rightNeighbor.targetPosition)};
-    if (xWattPts[0] != xWattPts[1]) {  // Avoid division by zero
-      R1 = linearExtrapolate(std::make_pair(std::vector<float>(xWattPts, xWattPts + 2), std::vector<float>(yWattPts, yWattPts + 2)), 2, static_cast<float>(watts));
-    } else if (fabs(xWattPts[0] - static_cast<float>(watts)) < 1e-3) {  // If points are same and at target watts
-      R1 = yWattPts[0];
-    }
-  }
-
-  // R2: Interpolation along CADENCE axis (vertical) using neighbors
-  if (neighbors.topNeighbor.found && neighbors.bottomNeighbor.found && neighbors.topNeighbor.targetPosition != INT16_MIN && neighbors.bottomNeighbor.targetPosition != INT16_MIN) {
-    float xCadPts[2] = {static_cast<float>(neighbors.topNeighbor.index.cadIndex * POWERTABLE_CAD_INCREMENT + MINIMUM_TABLE_CAD),
-                        static_cast<float>(neighbors.bottomNeighbor.index.cadIndex * POWERTABLE_CAD_INCREMENT + MINIMUM_TABLE_CAD)};
-    float yCadPts[2] = {static_cast<float>(neighbors.topNeighbor.targetPosition), static_cast<float>(neighbors.bottomNeighbor.targetPosition)};
-    if (xCadPts[0] != xCadPts[1]) {  // Avoid division by zero
-      R2 = linearExtrapolate(std::make_pair(std::vector<float>(xCadPts, xCadPts + 2), std::vector<float>(yCadPts, yCadPts + 2)), 2, static_cast<float>(cad));
-    } else if (fabs(xCadPts[0] - static_cast<float>(cad)) < 1e-3) {  // If points are same and at target cadence
-      R2 = yCadPts[0];
-    }
-  }
-
-  // Combine R1, R2, R3
-  float sum   = 0;
-  float count = 0;
-
-  if (R1 != INT16_MIN && !std::isnan(R1) && !std::isinf(R1)) {
-    sum += R1;
-    count++;
-  }
-  if (R2 != INT16_MIN && !std::isnan(R2) && !std::isinf(R2)) {
-    sum += R2;
-    count++;
-  }
-  if (R3 != INT16_MIN && !std::isnan(R3) && !std::isinf(R3)) {
-    sum += R3;
-    count++;
-  }
-
-  if (count > 0) {
-    resistance = static_cast<int32_t>(round(sum / count)) * TABLE_DIVISOR;
-    // SS2K_LOG(PTDATA_LOG_TAG, "Lookup result: watts=%d, cad=%d, resistance=%d", watts, cad, resistance);
-    //  LOG R1, R2, R3 values for debugging
-    // SS2K_LOG(PTDATA_LOG_TAG, "R1: %f, R2: %f, R3: %f", R1, R2, R3);
+  if (resistance != RETURN_ERROR) {
+    SS2K_LOG(PTDATA_LOG_TAG, "Extrapolated resistance: %d for watts=%d, cad=%d", resistance, watts, cad);
+    // Return early if we found a valid extrapolated value
+  } else {
+    SS2K_LOG(PTDATA_LOG_TAG, "Extrapolation failed for watts=%d, cad=%d", watts, cad);
   }
 
   return resistance;  // All lookup methods failed
@@ -311,6 +170,10 @@ int32_t PTHelpers::lookup(int watts, int cad, PTData& ptData) {
  *         (e.g., due to division by zero), the function returns `INT16_MIN`.
  */
 float PTHelpers::linearExtrapolate(std::pair<std::vector<float>, std::vector<float>> xy, size_t n, float j) {
+  // Prevent all crashes from out-of-bounds access.
+  if (n < 2) {
+    return INT16_MIN;  // Cannot extrapolate/interpolate with fewer than 2 points.
+  }
   float x0, x1, y0, y1;
 
   x0 = xy.first[0], x1 = xy.first[n - 1];
@@ -436,13 +299,20 @@ int PTHelpers::extrapolateWattsFromCadence(int cad, int32_t targetPosition, PTDa
       xyUsed4Offset = getRow(POWERTABLE_CAD_SIZE - 2, ptData);
       // SS2K_LOG(PTDATA_LOG_TAG, "LookupWatts: index.cadIndex == %d, xy %f, xyused4Offset %f, cadDelta %d", index.cadIndex, xy.second[0], xyUsed4Offset.second[0], cadDelta);
     }
-    for (int i = 0; i < xy.second.size(); i++) {
-      for (int j = 0; j < xyUsed4Offset.second.size(); j++) {
+    float totalOffset = 0.0f;
+    int pairsFound    = 0;
+    for (size_t i = 0; i < xy.first.size(); ++i) {
+      for (size_t j = 0; j < xyUsed4Offset.first.size(); ++j) {
         if (xy.first[i] == xyUsed4Offset.first[j]) {
-          offset = (((xyUsed4Offset.second[j] - xy.second[i]) * cadDelta) + offset) / 2;
+          totalOffset += (xyUsed4Offset.second[j] - xy.second[i]);
+          pairsFound++;
+          break;  // Found a match for xy.first[i], move to the next i.
         }
       }
     }
+    float averageOffset = (pairsFound > 0) ? totalOffset / pairsFound : 0.0f;
+    offset              = averageOffset * cadDelta;  // Apply the delta to the average offset.
+    
     for (int i = 0; i < xy.first.size(); i++) {
       newxy.first.push_back(xy.first[i]);
       if (index.cadIndex < 0) {
@@ -469,6 +339,12 @@ int PTHelpers::extrapolateWattsFromCadence(int cad, int32_t targetPosition, PTDa
 
   // Most accurate method if we have data in the table
   // Use lower_bound and upper_bound to find the closest points while keeping them associated in the vector
+  if (xy.first.size() < 2) {
+    // Cannot find two points to interpolate/extrapolate between.
+    // Return a sensible default or an error.
+    return cad;
+  }
+
   auto lower = std::lower_bound(xy.first.begin(), xy.first.end(), static_cast<float>(targetPosition));
   auto upper = std::upper_bound(xy.first.begin(), xy.first.end(), static_cast<float>(targetPosition));
 
@@ -492,78 +368,116 @@ int PTHelpers::extrapolateWattsFromCadence(int cad, int32_t targetPosition, PTDa
   return watts;
 }
 
-void PTHelpers::fillAllCadenceLines(ptIndex index, PTData& ptData, bool addReading = false) {
-  int16_t targetCalculation = 0;
-  for (int i = 0; i < POWERTABLE_CAD_SIZE; i++) {
-    targetCalculation = ptData.tableRow[index.cadIndex].tableEntry[index.wattIndex].targetPosition - (i - index.cadIndex) * (index.wattIndex + 10);
-    // Create positions for all cadence lines if they are not set.
-    // This gives us a monotonic table with a linear progression of target positions.
-    if (ptData.tableRow[i].tableEntry[index.wattIndex].readings <= 1) {
-      ptData.tableRow[i].tableEntry[index.wattIndex].targetPosition = targetCalculation;
-      // add a reading
-      if (addReading) {
-        ptData.tableRow[i].tableEntry[index.wattIndex].readings = 1;
+/**
+ * @brief Enforces monotonicity across all cadence columns using a weighted PAVA.
+ * * This function iterates through each watt column and ensures that for any given
+ * wattage, the targetPosition strictly DECREASES as cadence increases. It uses
+ * the same weighted PAVA logic as fillAllCadenceLines.
+ * * @param ptData The main power table data structure.
+ */
+void PTHelpers::fillAllWattColumns(PTData& ptData) {
+  struct PAVAEntry {
+    float position;
+    float readings;
+  };
+
+  for (int watt_idx = 0; watt_idx < POWERTABLE_WATT_SIZE; ++watt_idx) {
+    // Create a temporary, mutable copy of the column for PAVA processing.
+    PAVAEntry correctedCol[POWERTABLE_CAD_SIZE];
+    for (int i = 0; i < POWERTABLE_CAD_SIZE; ++i) {
+      correctedCol[i] = {(float)ptData.tableRow[i].tableEntry[watt_idx].targetPosition, (float)ptData.tableRow[i].tableEntry[watt_idx].readings};
+    }
+
+    // Apply the PAVA logic to the column.
+    for (int i = 1; i < POWERTABLE_CAD_SIZE; ++i) {
+      if (correctedCol[i].readings == 0) continue;
+
+      for (int j = i; j > 0; --j) {
+        if (correctedCol[j - 1].readings == 0) continue;
+
+        // Check for a violation: current position is GREATER than the previous one (enforcing decreasing trend).
+        if (correctedCol[j].position > correctedCol[j - 1].position) {
+          // Violation found, merge the two adjacent blocks.
+          float weightedSum   = (correctedCol[j].position * correctedCol[j].readings) + (correctedCol[j - 1].position * correctedCol[j - 1].readings);
+          float totalReadings = correctedCol[j].readings + correctedCol[j - 1].readings;
+          float newPosition   = weightedSum / totalReadings;
+
+          // The new merged block replaces both previous blocks.
+          correctedCol[j].position     = newPosition;
+          correctedCol[j].readings     = totalReadings;
+          correctedCol[j - 1].position = newPosition;
+          correctedCol[j - 1].readings = totalReadings;
+        } else {
+          break;
+        }
       }
     }
-    // Positions with a lower row (lower cadence) should have higher targetPosition, so enforce monotonicity
-    if (i < index.cadIndex) {
-      ptData.tableRow[i].tableEntry[index.wattIndex].targetPosition = std::max(ptData.tableRow[i].tableEntry[index.wattIndex].targetPosition, targetCalculation);
-    } else if (i > index.cadIndex) {
-      ptData.tableRow[i].tableEntry[index.wattIndex].targetPosition = std::min(ptData.tableRow[i].tableEntry[index.wattIndex].targetPosition, targetCalculation);
-    }
-  }
-}
 
-void PTHelpers::fillAllWattColumns(ptIndex index, PTData& ptData) {
-  int16_t targetCalculation = 0;
-  for (int i = 0; i < POWERTABLE_WATT_SIZE; i++) {
-    targetCalculation = ptData.tableRow[index.cadIndex].tableEntry[index.wattIndex].targetPosition - (index.wattIndex - i) * (index.cadIndex + 10);
-    // Create positions for all watt columns if they are not set.
-    // This gives us a monotonic table with a linear progression of target positions.
-    if (ptData.tableRow[index.cadIndex].tableEntry[i].readings <= 1) {
-      ptData.tableRow[index.cadIndex].tableEntry[i].targetPosition = targetCalculation;
+    // Copy the corrected, monotonic values back to the original ptData structure.
+    for (int i = 0; i < POWERTABLE_CAD_SIZE; ++i) {
+      if (ptData.tableRow[i].tableEntry[watt_idx].readings > 0) {
+        ptData.tableRow[i].tableEntry[watt_idx].targetPosition = (int16_t)correctedCol[i].position;
+      }
     }
-    // Each column to the right should have a higher targetPosition, so enforce monotonicity
-    if (i > index.wattIndex) {
-      ptData.tableRow[index.cadIndex].tableEntry[i].targetPosition = std::max(ptData.tableRow[index.cadIndex].tableEntry[i].targetPosition, targetCalculation);
-    } else if (i < index.wattIndex) {
-      ptData.tableRow[index.cadIndex].tableEntry[i].targetPosition = std::min(ptData.tableRow[index.cadIndex].tableEntry[i].targetPosition, targetCalculation);
-    }
-    ptIndex newIndex;
-    newIndex.cadIndex  = index.cadIndex;
-    newIndex.wattIndex = i;
-    fillAllCadenceLines(newIndex, ptData, false);
   }
 }
 
 /**
- * @brief Updates or enters data into the power table for a specific row and entry.
- *
- * This function records a new target position or averages the new position with
- * existing data for a specific table entry. It ensures that the number of readings
- * does not exceed a defined limit to prevent dilution of recent data. Additionally,
- * it triggers table filling and extrapolation processes if the number of entries
- * exceeds a threshold.
- * @param index The index of the table entry
- * @param pos The new target position to record or average.
+ * @brief Enters a new data point and then enforces monotonicity on the whole table.
+ * * This function first calculates the running average for the given data point.
+ * Then, it calls the PAVA helper functions to ensure the entire table remains
+ * monotonically increasing across both watts and cadence.
+ * * @param ptData The main power table data structure.
+ * @param index The watt and cadence index for the new data point.
+ * @param pos The measured targetPosition for this data point.
  */
 void PTHelpers::enterData(PTData& ptData, ptIndex index, int pos) {
-  if (ptData.tableRow[index.cadIndex].tableEntry[index.wattIndex].readings == 0) {  // if first reading in this entry
-    ptData.tableRow[index.cadIndex].tableEntry[index.wattIndex].targetPosition = pos;
-    SS2K_LOG(PTDATA_LOG_TAG, "New entry recorded (%d)(%d)(%d)", index.cadIndex, index.wattIndex, ptData.tableRow[index.cadIndex].tableEntry[index.wattIndex].targetPosition);
-    ptData.tableRow[index.cadIndex].tableEntry[index.wattIndex].readings++;  // for initial spot on readings, give 2 (one below as well)
-  } else {                                                                   // Average and update the readings.
-    ptData.tableRow[index.cadIndex].tableEntry[index.wattIndex].targetPosition =
-        (pos + (ptData.tableRow[index.cadIndex].tableEntry[index.wattIndex].targetPosition * ptData.tableRow[index.cadIndex].tableEntry[index.wattIndex].readings)) /
-        (ptData.tableRow[index.cadIndex].tableEntry[index.wattIndex].readings + 1.0f);
-    SS2K_LOG(PTDATA_LOG_TAG, "Existing entry averaged (%d)(%d)(%d), readings(%d)", index.cadIndex, index.wattIndex,
-             ptData.tableRow[index.cadIndex].tableEntry[index.wattIndex].targetPosition, ptData.tableRow[index.cadIndex].tableEntry[index.wattIndex].readings);
-    if (ptData.tableRow[index.cadIndex].tableEntry[index.wattIndex].readings > MAX_NEIGHBOR_WEIGHT) {
-      ptData.tableRow[index.cadIndex].tableEntry[index.wattIndex].readings = MAX_NEIGHBOR_WEIGHT;
-    }
+  // Reference to the specific table entry for cleaner code
+  TableEntry& entry = ptData.tableRow[index.cadIndex].tableEntry[index.wattIndex];
+
+  int left       = INT16_MIN;
+  int down       = INT16_MIN;
+  bool moveTable = false;
+
+  left = ptData.tableRow[index.cadIndex].tableEntry[index.wattIndex - 1].targetPosition;  // Get the leftmost value in the row
+  down = ptData.tableRow[index.cadIndex + 1].tableEntry[index.wattIndex].targetPosition;  // Get the topmost value in the column
+
+  if (entry.readings == 0) {  // if first reading in this entry
+
+    SS2K_LOG(PTDATA_LOG_TAG, "New entry recorded (%d)(%d)(%d)", index.cadIndex, index.wattIndex, pos);
+  } else {  // Average and update the readings.
+    // Use floating point for accuracy in averaging
+    float current_total_pos = (float)entry.targetPosition * entry.readings;
+    float new_avg_pos       = (pos + current_total_pos) / (entry.readings + 1.0f);
+    pos                     = (int16_t)new_avg_pos;
+
+    SS2K_LOG(PTDATA_LOG_TAG, "Existing entry averaged (%d)(%d)(%d), readings(%d)", index.cadIndex, index.wattIndex, pos, entry.readings);
   }
-  ptData.tableRow[index.cadIndex].tableEntry[index.wattIndex].readings++;
-  // because of monotonicity, we can make some assumptions in order to fill the table.
-  fillAllCadenceLines(index, ptData, true);
-  fillAllWattColumns(index, ptData);
+
+  if (left > pos || down > pos) {
+    SS2K_LOG(PTDATA_LOG_TAG, "Moving table to accommodate new entry (%d)(%d)(%d), left(%d), down(%d)", index.cadIndex, index.wattIndex, pos, left, down);
+    moveTable = true;
+  }
+
+  if (moveTable && (left != INT16_MIN || down != INT16_MIN)) {
+    int amount = std::max(int16_t(pos - left), int16_t(pos - down));
+    // Move the table to accommodate the new entry
+    for (int i = 0; i < POWERTABLE_CAD_SIZE; ++i) {
+      for (int j = 0; j < POWERTABLE_WATT_SIZE; ++j) {
+        if (ptData.tableRow[i].tableEntry[j].targetPosition != INT16_MIN) {
+          ptData.tableRow[i].tableEntry[j].targetPosition += amount;
+        }
+      }
+    }
+    return;
+  }
+
+  entry.targetPosition = pos;  // Update the target position with the new average
+  // Increment readings, capping at the max value.
+  if (entry.readings < MAX_NEIGHBOR_WEIGHT && !moveTable) {
+    entry.readings++;
+  }
+
+  // After updating a point, re-process the entire table to enforce global monotonicity.
+  fillAllWattColumns(ptData);
 }

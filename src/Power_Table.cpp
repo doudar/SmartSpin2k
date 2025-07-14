@@ -179,10 +179,6 @@ void PowerTable::newEntry(PowerBuffer& powerBuffer) {
     return;
   }
 
-  // clean previously extrapolated data so we don't fill with trash.
-  // this->clean();
-  // To start working on the PowerTable, we need to calculate position in the table for the new entry
-
   ptIndex index = ptHelpers.calculateIndex(watts, cad);
   SS2K_LOG(POWERTABLE_LOG_TAG, "Averaged Entry: watts=%f, cad=%f, targetPosition=%f, (%d)(%d)", watts, cad, targetPosition, index.cadIndex, index.wattIndex);
 
@@ -196,81 +192,9 @@ void PowerTable::newEntry(PowerBuffer& powerBuffer) {
     return;
   }
 
-  // targetPosition = this->calculatePosition(watts, cad, targetPosition, index);
-
-  // // Downvote out of position neighbors and discard entry if it doesn't match the logic of the table
-  // TestResults testResults = ptHelpers.testNeighbors(index, targetPosition, ptData);
-
-  // auto handleNeighborFailure = [&](const char* direction, const TestResults::Neighbor& neighbor, const TestResults::Neighbor& oppositeNeighbor, float rangeFactor) {
-  //   if (!neighbor.passedTest) {
-  //     SS2K_LOG(POWERTABLE_LOG_TAG, "%s neighbor position (%d) failed with watts=%f, cad=%f, targetPosition=%f, (%d)(%d)", direction, neighbor.targetPosition, watts, cad,
-  //              targetPosition, index.cadIndex, index.wattIndex);
-  //     this->processNeighbor(index, targetPosition, neighbor.index, neighbor.targetPosition, oppositeNeighbor.index, oppositeNeighbor.targetPosition, rangeFactor);
-  //   }
-  // };
-
-  // handleNeighborFailure("Left", testResults.leftNeighbor, testResults.rightNeighbor, HORIZONTAL_NEIGHBOR_RANGE);
-  // handleNeighborFailure("Right", testResults.rightNeighbor, testResults.leftNeighbor, HORIZONTAL_NEIGHBOR_RANGE);
-  // handleNeighborFailure("Top", testResults.topNeighbor, testResults.bottomNeighbor, VERTICAL_NEIGHBOR_RANGE);
-  // handleNeighborFailure("Bottom", testResults.bottomNeighbor, testResults.topNeighbor, VERTICAL_NEIGHBOR_RANGE);
-
-  // if (!(testResults.bottomNeighbor.passedTest && testResults.topNeighbor.passedTest && testResults.rightNeighbor.passedTest && testResults.leftNeighbor.passedTest)) {
-  //   return;
-  // }
-
   ptHelpers.enterData(ptData, index, (int)targetPosition);
   fillTableFlag = true;  // set flag to fill table
   BLE_ss2kCustomCharacteristic::notify(0x27, index.cadIndex);
-}
-
-void PowerTable::fillTable() {
-  return;  // testing  ****************************<<<<<<<<<<<<<<<<*****************<<<<<<<<<<<<<<<<<<
-  static int entries     = 0;
-  static int newEntries  = 0;
-  static int8_t step     = 0;
-  static int prevEntries = 0;
-  bool completed         = true;
-
-  // Abort if the fillTableFlag is not set.
-  if (!fillTableFlag) {
-    entries     = 0;
-    newEntries  = 0;
-    prevEntries = 0;
-    step        = 0;
-    return;
-  }
-
-  if (ptHelpers.getNumEntries(ptData, 1) > 4) {
-    // set flag to stop execution after we can't add any more entries.
-    if (esp_get_free_heap_size() < FREE_HEAP_FOR_COMPLEX_MATH) {
-      // SS2K_LOG(POWERTABLE_LOG_TAG, "%d Heap too low for step %d.", esp_get_free_heap_size(), step);
-      return;
-    }
-    // clean();  // clean the table before filling it.
-    entries = ptHelpers.getNumEntries(ptData);
-    if (step == 0) {
-      SS2K_LOG(POWERTABLE_LOG_TAG, "Fill start with %d entries", entries);
-      prevEntries = entries;
-      //ptHelpers.completePowerTable(ptData);
-      completed = true;
-    } else if (step == 1) {
-      // completed = ptHelpers.splineFill(ptData, false);
-    } else if (step == 2) {
-      // completed = ptHelpers.linearFill(ptData);
-    } else if (step == 3) {
-    }
-    newEntries = ptHelpers.getNumEntries(ptData);
-    SS2K_LOG(POWERTABLE_LOG_TAG, "Fill step %d added %d new entries", step, newEntries - prevEntries);
-    if (newEntries > prevEntries) {
-      prevEntries = newEntries;
-    } else if (step == 3) {
-      SS2K_LOG(POWERTABLE_LOG_TAG, "No more entries can be added, stopping fill.");
-      fillTableFlag = false;
-      step          = 0;
-      return;
-    }
-    if (completed) step = (step + 1) % 4;
-  }
 }
 
 bool PowerTable::_manageSaveState(bool canSkipReliabilityChecks) {
@@ -293,11 +217,6 @@ bool PowerTable::_manageSaveState(bool canSkipReliabilityChecks) {
     bool savedHomed;
     file.read((uint8_t*)&savedHomed, sizeof(savedHomed));
 
-    // If both current and saved tables were created with homing, we can skip position reliability checks
-    if (!canSkipReliabilityChecks) {
-      canSkipReliabilityChecks = (savedHomed && rtConfig->getHomed());
-    }
-
     if (version != TABLE_VERSION) {
       SS2K_LOG(POWERTABLE_LOG_TAG, "Expected power table version %d, found version %d", TABLE_VERSION, version);
       file.close();
@@ -315,31 +234,6 @@ bool PowerTable::_manageSaveState(bool canSkipReliabilityChecks) {
 
     SS2K_LOG(POWERTABLE_LOG_TAG, "Loading power table version %d, Size %d, Homed %d", version, savedQuality, savedHomed);
 
-    if (!canSkipReliabilityChecks) {
-      // Initialize a counter for reliable positions
-      int reliablePositions = 0;
-
-      // Check if we have at least 3 reliable positions in the active table in order to determine a reliable offset to load the saved table
-      for (int i = 0; i < POWERTABLE_CAD_SIZE; i++) {
-        for (int j = 0; j < POWERTABLE_WATT_SIZE; j++) {
-          int16_t savedTargetPosition = INT16_MIN;
-          int8_t savedReadings        = 0;
-          file.read((uint8_t*)&savedTargetPosition, sizeof(savedTargetPosition));
-          file.read((uint8_t*)&savedReadings, sizeof(savedReadings));
-          // Does the saved file have a position that the active session has also recorded?
-          // We start comparing at watt position 3 (j>2) because low resistance positions are notoriously unreliable.
-          if ((j > 2) && (this->ptData.tableRow[i].tableEntry[j].targetPosition != INT16_MIN) && (this->ptData.tableRow[i].tableEntry[j].readings > MINIMUM_RELIABLE_POSITIONS) &&
-              (savedReadings > 0)) {
-            reliablePositions++;
-          }
-        }
-      }
-      if (reliablePositions < MINIMUM_RELIABLE_POSITIONS) {  // Do we have enough active data in order to calculate a (good) offset when we load the new table?
-        SS2K_LOG(POWERTABLE_LOG_TAG, "Not enough matching positions to load the Power Table. %d of %d needed.", reliablePositions, MINIMUM_RELIABLE_POSITIONS);
-        file.close();
-        return false;
-      }
-    }
     file.close();
 
     // We passed our checks to load, lets load the saved table into active memory
@@ -356,36 +250,6 @@ bool PowerTable::_manageSaveState(bool canSkipReliabilityChecks) {
     file.read((uint8_t*)&savedQuality, sizeof(savedQuality));
     file.read((uint8_t*)&savedHomed, sizeof(savedHomed));
 
-    float averageOffset = 0;
-    if (!canSkipReliabilityChecks) {
-      std::vector<float> offsetDifferences;
-      int reliablePositions = 0;
-      // Read table entries and calculate offsets
-      for (int i = 0; i < POWERTABLE_CAD_SIZE; i++) {
-        for (int j = 0; j < POWERTABLE_WATT_SIZE; j++) {
-          int16_t savedTargetPosition = INT16_MIN;
-          int8_t savedReadings        = 0;
-          file.read((uint8_t*)&savedTargetPosition, sizeof(savedTargetPosition));
-          file.read((uint8_t*)&savedReadings, sizeof(savedReadings));
-          if ((this->ptData.tableRow[i].tableEntry[j].targetPosition != INT16_MIN) && (savedTargetPosition != INT16_MIN) && (savedReadings > 0) &&
-              (this->ptData.tableRow[i].tableEntry[j].readings > MINIMUM_RELIABLE_POSITIONS)) {
-            int offset = this->ptData.tableRow[i].tableEntry[j].targetPosition - savedTargetPosition;
-            offsetDifferences.push_back(offset);
-            SS2K_LOG(POWERTABLE_LOG_TAG, "offset %d", offset);
-            reliablePositions++;
-          }
-          this->ptData.tableRow[i].tableEntry[j].targetPosition = savedTargetPosition;
-          this->ptData.tableRow[i].tableEntry[j].readings       = savedReadings;
-        }
-      }
-      if (!offsetDifferences.empty() && offsetDifferences.size() >= MINIMUM_RELIABLE_POSITIONS) {
-        averageOffset = std::accumulate(offsetDifferences.begin(), offsetDifferences.end(), 0.0) / offsetDifferences.size();
-      } else {
-        // Default value or handle empty case
-        averageOffset = 0;
-        SS2K_LOG(POWERTABLE_LOG_TAG, "Warning: No valid offset differences found");
-      }
-    } else {
       // If both tables were created with homing, just load the values directly
       for (int i = 0; i < POWERTABLE_CAD_SIZE; i++) {
         for (int j = 0; j < POWERTABLE_WATT_SIZE; j++) {
@@ -397,23 +261,11 @@ bool PowerTable::_manageSaveState(bool canSkipReliabilityChecks) {
           this->ptData.tableRow[i].tableEntry[j].readings       = savedReadings;
         }
       }
-      SS2K_LOG(POWERTABLE_LOG_TAG, "Both tables were created with homing, loaded values directly");
-    }
+      SS2K_LOG(POWERTABLE_LOG_TAG, "Loaded values directly");
+    //}
 
     file.close();
-
-    // Apply the offset if needed
-    if (!canSkipReliabilityChecks) {
-      for (int i = 0; i < POWERTABLE_CAD_SIZE; i++) {
-        for (int j = 0; j < POWERTABLE_WATT_SIZE; j++) {
-          if (this->ptData.tableRow[i].tableEntry[j].targetPosition != INT16_MIN) {
-            this->ptData.tableRow[i].tableEntry[j].targetPosition += averageOffset;
-          }
-        }
-      }
-      SS2K_LOG(POWERTABLE_LOG_TAG, "Power Table loaded with an offset of %d.", averageOffset);
-    }
-
+    
     // set the flag so it isn't loaded again this session.
     this->_hasBeenLoadedThisSession = true;
   }

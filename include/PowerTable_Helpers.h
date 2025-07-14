@@ -76,38 +76,8 @@ class PTData {
   TableRow tableRow[POWERTABLE_CAD_SIZE];
 };
 
-class TestResults {
- public:
-  struct Neighbor {
-    unsigned int found : 1;
-    unsigned int passedTest : 1;
-    ptIndex index;
-    int16_t targetPosition;
-
-    Neighbor() {
-      found          = false;
-      passedTest     = false;
-      targetPosition = INT16_MIN;
-    }
-  };
-
- public:
-  Neighbor leftNeighbor;
-  Neighbor rightNeighbor;
-  Neighbor topNeighbor;
-  Neighbor bottomNeighbor;
-  unsigned int allNeighborsFound : 1;
-  unsigned int allNeighborsPassed : 1;
-
-  TestResults() {
-    allNeighborsFound  = false;
-    allNeighborsPassed = false;
-  }
-};
-
 class PTHelpers {
  public:
-  TestResults testNeighbors(ptIndex index, int value, PTData& ptData);
   int32_t lookup(int watts, int cad, PTData& ptData);
   float linearExtrapolate(std::pair<std::vector<float>, std::vector<float>> xy, size_t n, float j);
   int32_t lookupWatts(int cad, int32_t targetPosition, PTData& ptData);
@@ -118,8 +88,8 @@ class PTHelpers {
   int getTotalReadings(PTData& ptData);
   ptIndex calculateIndex(int watts, int cad);
   void enterData(PTData& ptData,ptIndex index, int pos);
-  void fillAllWattColumns(ptIndex index, PTData& ptData);
-  void fillAllCadenceLines(ptIndex index, PTData& ptData, bool addReading);
+  void fillAllWattColumns(PTData& ptData);
+  void fillAllCadenceLines(PTData& ptData);
   std::pair<std::vector<float>, std::vector<float>> getRow(int row, PTData& ptData);
   std::pair<std::vector<float>, std::vector<float>> getColumn(int column, PTData& ptData);
 };
