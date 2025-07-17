@@ -169,13 +169,13 @@ extern "C" void app_main() {
   attachInterrupt(digitalPinToInterrupt(currentBoard.shiftDownPin), ss2k->handleShift, CHANGE);
   digitalWrite(LED_PIN, HIGH);
 
-  xTaskCreatePinnedToCore(SS2K::maintenanceLoop,     /* Task function. */
-                          "maintenanceLoopFunction", /* name of task. */
-                          MAIN_STACK,                /* Stack size of task */
-                          NULL,                      /* parameter of the task */
-                          20,                        /* priority of the task */
-                          &maintenanceLoopTask,      /* Task handle to keep track of created task */
-                          1);                        /* pin task to core */
+  xTaskCreate(SS2K::maintenanceLoop,     /* Task function. */
+              "maintenanceLoopFunction", /* name of task. */
+              MAIN_STACK,                /* Stack size of task */
+              NULL,                      /* parameter of the task */
+              10,                        /* priority of the task */
+              &maintenanceLoopTask       /* Task handle to keep track of created task */
+  );                                     /* pin task to core */
 }
 
 void loop() {  // Delete this task so we can make one that's more memory efficient.

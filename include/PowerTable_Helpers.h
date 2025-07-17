@@ -89,8 +89,8 @@ class PTHelpers {
   ptIndex calculateIndex(int watts, int cad);
   void enterData(PTData& ptData,ptIndex index, int pos);
   void clean(PTData& ptData);
-  void fillAllWattColumns(PTData& ptData);
-  void fillAllCadenceLines(PTData& ptData);
+  bool fillAllWattColumns(PTData& ptData);
+  bool fillAllCadenceLines(PTData& ptData);
   std::pair<std::vector<float>, std::vector<float>> getRow(int row, PTData& ptData);
   std::pair<std::vector<float>, std::vector<float>> getColumn(int column, PTData& ptData);
 };
