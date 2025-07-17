@@ -137,17 +137,6 @@ void PowerTable::setStepperMinMax() {
   }
 }
 
-void PowerTable::clean() {
-  SS2K_LOG(POWERTABLE_LOG_TAG, "Clean Power Table");
-  for (int i = 0; i < POWERTABLE_CAD_SIZE; i++) {
-    for (int j = 0; j < POWERTABLE_WATT_SIZE; j++) {
-      if (this->ptData.tableRow[i].tableEntry[j].readings < 1) {
-        this->ptData.tableRow[i].tableEntry[j].targetPosition = INT16_MIN;
-      }
-    }
-  }
-}
-
 void PowerTable::newEntry(PowerBuffer& powerBuffer) {
   // these are floats so that we make sure division works correctly.
   float watts          = 0;

@@ -312,7 +312,7 @@ int PTHelpers::extrapolateWattsFromCadence(int cad, int32_t targetPosition, PTDa
     }
     float averageOffset = (pairsFound > 0) ? totalOffset / pairsFound : 0.0f;
     offset              = averageOffset * cadDelta;  // Apply the delta to the average offset.
-    
+
     for (int i = 0; i < xy.first.size(); i++) {
       newxy.first.push_back(xy.first[i]);
       if (index.cadIndex < 0) {
@@ -439,8 +439,7 @@ void PTHelpers::enterData(PTData& ptData, ptIndex index, int pos) {
   int down       = INT16_MIN;
   bool moveTable = false;
 
-  left = ptData.tableRow[index.cadIndex].tableEntry[index.wattIndex - 1].targetPosition;  // Get the leftmost value in the row
-  down = ptData.tableRow[index.cadIndex + 1].tableEntry[index.wattIndex].targetPosition;  // Get the topmost value in the column
+  // Get the topmost value in the column
 
   if (entry.readings == 0) {  // if first reading in this entry
 
@@ -454,21 +453,53 @@ void PTHelpers::enterData(PTData& ptData, ptIndex index, int pos) {
     SS2K_LOG(PTDATA_LOG_TAG, "Existing entry averaged (%d)(%d)(%d), readings(%d)", index.cadIndex, index.wattIndex, pos, entry.readings);
   }
 
-  if (left > pos || down > pos) {
-    SS2K_LOG(PTDATA_LOG_TAG, "Moving table to accommodate new entry (%d)(%d)(%d), left(%d), down(%d)", index.cadIndex, index.wattIndex, pos, left, down);
-    moveTable = true;
+  // Get the value to the left of the new entry
+  for (int i = index.wattIndex - 1; i > 0; i--) {
+    if (ptData.tableRow[index.cadIndex].tableEntry[i].targetPosition > pos) {
+      left = ptData.tableRow[index.cadIndex].tableEntry[i].targetPosition;
+      SS2K_LOG(PTDATA_LOG_TAG, "Left Found %d, %d, tp%d", index.cadIndex, i, ptData.tableRow[index.cadIndex].tableEntry[i].targetPosition);
+      ptData.tableRow[index.cadIndex].tableEntry[i].readings--;
+      moveTable = true;
+      break;
+    }
   }
 
-  if (moveTable && (left != INT16_MIN || down != INT16_MIN)) {
-    int amount = std::max(int16_t(pos - left), int16_t(pos - down));
+  // get the value below the new entry
+  for (int j = index.cadIndex + 1; j < POWERTABLE_CAD_SIZE - 1; j++) {
+    if (ptData.tableRow[j].tableEntry[index.wattIndex].targetPosition > pos) {
+      SS2K_LOG(PTDATA_LOG_TAG, "Down Found %d, %d, tp%d", j, index.wattIndex, ptData.tableRow[j].tableEntry[index.wattIndex].targetPosition);
+      down = ptData.tableRow[j].tableEntry[index.wattIndex].targetPosition;
+      ptData.tableRow[j].tableEntry[index.wattIndex].readings--;
+      moveTable = true;
+      break;
+    }
+  }
+
+  if (moveTable) {
+    int amount = 0;
+    int lShift = (left != INT16_MIN) ? pos - left : 0;
+    int dShift = (down != INT16_MIN) ? pos - down : 0;
+    SS2K_LOG(PTDATA_LOG_TAG, "%d lShift, %d dShift", lShift, dShift);
+    if (abs(lShift) > abs(dShift)) {
+      SS2K_LOG(PTDATA_LOG_TAG, "lShift was greater, %d lShift, %d dShift", lShift, dShift);
+      amount = lShift;
+    } else if (down != INT16_MIN) {
+      SS2K_LOG(PTDATA_LOG_TAG, "dShift was greater, %d lShift, %d dShift", lShift, dShift);
+      amount = dShift;
+    } else {
+      clean(ptData);
+      return;
+    }
+    SS2K_LOG(PTDATA_LOG_TAG, "Moving table to accommodate new entry (%d)(%d)(%d), left(%d), down(%d), amount(%d)", index.cadIndex, index.wattIndex, pos, left, down, amount);
     // Move the table to accommodate the new entry
     for (int i = 0; i < POWERTABLE_CAD_SIZE; ++i) {
       for (int j = 0; j < POWERTABLE_WATT_SIZE; ++j) {
-        if (ptData.tableRow[i].tableEntry[j].targetPosition != INT16_MIN) {
+        if (ptData.tableRow[i].tableEntry[j].readings > 0) {
           ptData.tableRow[i].tableEntry[j].targetPosition += amount;
         }
       }
     }
+    clean(ptData);
     return;
   }
 
@@ -479,5 +510,22 @@ void PTHelpers::enterData(PTData& ptData, ptIndex index, int pos) {
   }
 
   // After updating a point, re-process the entire table to enforce global monotonicity.
-  fillAllWattColumns(ptData);
+  // fillAllWattColumns(ptData);
+  clean(ptData);
+}
+
+void PTHelpers::clean(PTData& ptData) {
+  int removed = 0;
+  for (int i = 0; i < POWERTABLE_CAD_SIZE; i++) {
+    for (int j = 0; j < POWERTABLE_WATT_SIZE; j++) {
+      if (ptData.tableRow[i].tableEntry[j].readings < 1) {
+        ptData.tableRow[i].tableEntry[j].targetPosition = INT16_MIN;
+        ptData.tableRow[i].tableEntry[j].readings       = 0;
+        removed++;
+      }
+    }
+  }
+  if (removed > 0) {
+    SS2K_LOG(PTDATA_LOG_TAG, "Cleaned %d readings", removed);
+  }
 }

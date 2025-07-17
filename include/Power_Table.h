@@ -51,8 +51,6 @@ class PowerTable {
 
  private:
   unsigned long lastSaveTime = millis();
-  
-  void clean();
 };
 
 extern PowerTable* powerTable;

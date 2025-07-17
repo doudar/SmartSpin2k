@@ -41,11 +41,11 @@ Boards boards;
 Board currentBoard;
 
 ///////////// Initialize the Config /////////////
-ErgMode *ergMode                 = new ErgMode;
-PowerTable *powerTable           = new PowerTable;
-SS2K *ss2k                       = new SS2K;
-userParameters *userConfig       = new userParameters;
-RuntimeParameters *rtConfig      = new RuntimeParameters;
+ErgMode *ergMode            = new ErgMode;
+PowerTable *powerTable      = new PowerTable;
+SS2K *ss2k                  = new SS2K;
+userParameters *userConfig  = new userParameters;
+RuntimeParameters *rtConfig = new RuntimeParameters;
 
 ///////////// Log Appender /////////////
 UdpAppender udpAppender;
@@ -61,7 +61,7 @@ void SS2K::startTasks() {
 }
 
 void SS2K::stopTasks() {
-  // In favor of stopping the tasks, BLE communications loop just disconnects all connected devices. 
+  // In favor of stopping the tasks, BLE communications loop just disconnects all connected devices.
 }
 
 extern "C" void app_main() {
@@ -152,7 +152,7 @@ extern "C" void app_main() {
     SS2K_LOG(MAIN_LOG_TAG, "Failed to start DirCon TCP service");
   }
 
-  #ifdef TEST_PTAB4PWR
+#ifdef TEST_PTAB4PWR
   userConfig->setHMin(0);
   userConfig->setHMax(27000);
   rtConfig->setMaxStep(userConfig->getHMax());
@@ -160,7 +160,7 @@ extern "C" void app_main() {
   rtConfig->setHomed(true);
   userConfig->setPTab4Pwr(true);
   spinBLEServer.spinDownFlag = 0;
-  #endif
+#endif
 
   ss2k->resetIfShiftersHeld();
   SS2K_LOG(MAIN_LOG_TAG, "Creating Shifter Interrupts");
@@ -173,7 +173,7 @@ extern "C" void app_main() {
                           "maintenanceLoopFunction", /* name of task. */
                           MAIN_STACK,                /* Stack size of task */
                           NULL,                      /* parameter of the task */
-                          20,                         /* priority of the task */
+                          20,                        /* priority of the task */
                           &maintenanceLoopTask,      /* Task handle to keep track of created task */
                           1);                        /* pin task to core */
 }
@@ -316,8 +316,8 @@ void SS2K::maintenanceLoop(void *pvParameters) {
       SS2K_LOG(MAIN_LOG_TAG, "Best Block: %d", heap_caps_get_largest_free_block(MALLOC_CAP_8BIT));
 #endif  // DEBUG_STACK
       // Log userParameters
-      SS2K_LOG(MAIN_LOG_TAG, "PM Con %d, CAD con %d, HRM Con %d, W %d, Cad %d, HR %d, Gear %d, Target Position %d", spinBLEClient.connectedPM, spinBLEClient.connectedCD, spinBLEClient.connectedHRM,
-               rtConfig->watts.getValue(), rtConfig->cad.getValue(), rtConfig->hr.getValue(), rtConfig->getShifterPosition(), ss2k->targetPosition);
+      SS2K_LOG(MAIN_LOG_TAG, "PM Con %d, CAD con %d, HRM Con %d, W %d, Cad %d, HR %d, Gear %d, Target Position %d", spinBLEClient.connectedPM, spinBLEClient.connectedCD,
+               spinBLEClient.connectedHRM, rtConfig->watts.getValue(), rtConfig->cad.getValue(), rtConfig->hr.getValue(), rtConfig->getShifterPosition(), ss2k->targetPosition);
 
       intervalTimer2 = millis();
     }
@@ -574,8 +574,10 @@ void SS2K::setupTMCStepperDriver(bool reset) {
   this->setCurrentPosition(stepper->getCurrentPosition());
 }
 
+#define HOME_TIMEOUT 30000
 void SS2K::goHome(bool bothDirections) {
   if (stepper) {
+    unsigned long int timeoutTimer = millis();
     if (currentBoard.name != r2_NAME) {
       SS2K_LOG(MAIN_LOG_TAG, "Board Doesn't support homing");
       fitnessMachineService.spinDown(0x02);
@@ -602,7 +604,7 @@ void SS2K::goHome(bool bothDirections) {
     Serial.printf("%d ", driver.SG_RESULT());
     delay(300);
     fitnessMachineService.spinDown(0x04);
-    while (!stalled) {
+    while (!stalled && ((millis() - timeoutTimer) < HOME_TIMEOUT)) {
       if (abs(rtConfig->getShifterPosition() - ss2k->lastShifterPosition)) {  // let the user abort with the shift button.
         userConfig->setHMin(INT32_MIN);
         userConfig->setHMax(INT32_MIN);
@@ -619,11 +621,12 @@ void SS2K::goHome(bool bothDirections) {
     stepper->setCurrentPosition((int32_t)0);
     ss2k->setTargetPosition(0);
     rtConfig->setMinStep(0);
+    timeoutTimer = millis();
     SS2K_LOG(MAIN_LOG_TAG, "Min Position found: %d.", rtConfig->getMinStep());
     stalled = false;
     fitnessMachineService.spinDown(0x02);
     if (bothDirections) {
-      // Back off limit in case we are alread here.
+      // Back off limit in case we are already here.
       this->updateStepperSpeed(1500);
       delay(500);
       stepper->runForward();
@@ -631,7 +634,7 @@ void SS2K::goHome(bool bothDirections) {
       threshold = driver.SG_RESULT();  // take reading
       Serial.printf("%d ", driver.SG_RESULT());
       delay(250);
-      while (!stalled) {
+      while (!stalled && ((millis() - timeoutTimer) < HOME_TIMEOUT)) {
         if (abs(rtConfig->getShifterPosition() - ss2k->lastShifterPosition)) {  // let the user abort with the shift button.
           userConfig->setHMin(INT32_MIN);
           userConfig->setHMax(INT32_MIN);
