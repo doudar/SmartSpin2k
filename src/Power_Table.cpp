@@ -187,6 +187,10 @@ void PowerTable::newEntry(PowerBuffer& powerBuffer) {
 }
 
 bool PowerTable::_manageSaveState(bool canSkipReliabilityChecks) {
+  // Homing is now a prerequisite for loading and saving the powertable.
+  if (!rtConfig->getHomed()) {
+    return false;
+  }
   // Check if the table has been loaded in this session
   if (!this->_hasBeenLoadedThisSession) {
     SS2K_LOG(POWERTABLE_LOG_TAG, "Loading Power Table....");
@@ -239,22 +243,22 @@ bool PowerTable::_manageSaveState(bool canSkipReliabilityChecks) {
     file.read((uint8_t*)&savedQuality, sizeof(savedQuality));
     file.read((uint8_t*)&savedHomed, sizeof(savedHomed));
 
-      // If both tables were created with homing, just load the values directly
-      for (int i = 0; i < POWERTABLE_CAD_SIZE; i++) {
-        for (int j = 0; j < POWERTABLE_WATT_SIZE; j++) {
-          int16_t savedTargetPosition = INT16_MIN;
-          int8_t savedReadings        = 0;
-          file.read((uint8_t*)&savedTargetPosition, sizeof(savedTargetPosition));
-          file.read((uint8_t*)&savedReadings, sizeof(savedReadings));
-          this->ptData.tableRow[i].tableEntry[j].targetPosition = savedTargetPosition;
-          this->ptData.tableRow[i].tableEntry[j].readings       = savedReadings;
-        }
+    // If both tables were created with homing, just load the values directly
+    for (int i = 0; i < POWERTABLE_CAD_SIZE; i++) {
+      for (int j = 0; j < POWERTABLE_WATT_SIZE; j++) {
+        int16_t savedTargetPosition = INT16_MIN;
+        int8_t savedReadings        = 0;
+        file.read((uint8_t*)&savedTargetPosition, sizeof(savedTargetPosition));
+        file.read((uint8_t*)&savedReadings, sizeof(savedReadings));
+        this->ptData.tableRow[i].tableEntry[j].targetPosition = savedTargetPosition;
+        this->ptData.tableRow[i].tableEntry[j].readings       = savedReadings;
       }
-      SS2K_LOG(POWERTABLE_LOG_TAG, "Loaded values directly");
+    }
+    SS2K_LOG(POWERTABLE_LOG_TAG, "Loaded values directly");
     //}
 
     file.close();
-    
+
     // set the flag so it isn't loaded again this session.
     this->_hasBeenLoadedThisSession = true;
   }
@@ -268,6 +272,10 @@ bool PowerTable::_manageSaveState(bool canSkipReliabilityChecks) {
 }
 
 bool PowerTable::_save() {
+  if (!rtConfig->getHomed()) {
+    SS2K_LOG(POWERTABLE_LOG_TAG, "Power Table not saved because homing was not performed.");
+    return false;  // do not save if homing was not performed.
+  }
   // print littleFS free space and all file sizes on partition
   Serial.printf("LittleFS Total Bytes:%d, Used Bytes:%d", LittleFS.totalBytes(), LittleFS.usedBytes());
 
