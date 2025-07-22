@@ -34,7 +34,7 @@ void SpinBLEClient::start() {
                           "BLEClientTask",  /* name of task. */
                           BLE_CLIENT_STACK, /* Stack size of task */
                           NULL,             /* parameter of the task */
-                          21,                /* priority of the task  */
+                          9,               /* priority of the task  */
                           &BLEClientTask,   /* Task handle to keep track of created task */
                           1);               /* pin task to core */
 
@@ -982,9 +982,11 @@ void SpinBLEAdvertisedDevice::set(const NimBLEAdvertisedDevice *device, int id, 
 void SpinBLEAdvertisedDevice::reset(bool resetAdvertisedDevice) {
   SS2K_LOG(BLE_CLIENT_LOG_TAG, "Resetting Device: %d", this->connectedClientID);
   if (this->isHRM) spinBLEClient.connectedHRM = false;
-  if (this->isPM) spinBLEClient.connectedPM = false;
-  if (this->isCSC) spinBLEClient.connectedCD = false;
-  spinBLEClient.connectedSpeed = false;
+  if (this->isPM || this->isCSC) {
+    spinBLEClient.connectedPM    = false;
+    spinBLEClient.connectedCD    = false;
+    spinBLEClient.connectedSpeed = false;
+  }
   if (resetAdvertisedDevice) advertisedDevice = nullptr;
   // NimBLEAddress peerAddress;
   this->connectedClientID = BLE_HS_CONN_HANDLE_NONE;
