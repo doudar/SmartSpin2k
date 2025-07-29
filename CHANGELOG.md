@@ -8,6 +8,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+
+### Changed
+
+### Hardware
+
+
+## [25.5.31]
+
+### Added
 -Root CA certificates are now updated automatically during every build.
 
 ### Changed
