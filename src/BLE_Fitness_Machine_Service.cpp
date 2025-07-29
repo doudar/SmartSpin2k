@@ -35,9 +35,10 @@ void BLE_Fitness_Machine_Service::setupService(NimBLEServer *pServer, MyCharacte
                                                   FitnessMachineTargetFlags::Types::SpinDownControlSupported};
 
   // Fitness Machine service setup
-  pFitnessMachineService             = spinBLEServer.pServer->createService(FITNESSMACHINESERVICE_UUID);
-  fitnessMachineFeature              = pFitnessMachineService->createCharacteristic(FITNESSMACHINEFEATURE_UUID, NIMBLE_PROPERTY::READ);
-  fitnessMachineControlPoint         = pFitnessMachineService->createCharacteristic(FITNESSMACHINECONTROLPOINT_UUID, NIMBLE_PROPERTY::WRITE | NIMBLE_PROPERTY::INDICATE | NIMBLE_PROPERTY::NOTIFY);
+  pFitnessMachineService = spinBLEServer.pServer->createService(FITNESSMACHINESERVICE_UUID);
+  fitnessMachineFeature  = pFitnessMachineService->createCharacteristic(FITNESSMACHINEFEATURE_UUID, NIMBLE_PROPERTY::READ);
+  fitnessMachineControlPoint =
+      pFitnessMachineService->createCharacteristic(FITNESSMACHINECONTROLPOINT_UUID, NIMBLE_PROPERTY::WRITE | NIMBLE_PROPERTY::INDICATE | NIMBLE_PROPERTY::NOTIFY);
   fitnessMachineStatusCharacteristic = pFitnessMachineService->createCharacteristic(FITNESSMACHINESTATUS_UUID, NIMBLE_PROPERTY::NOTIFY);
   fitnessMachineIndoorBikeData       = pFitnessMachineService->createCharacteristic(FITNESSMACHINEINDOORBIKEDATA_UUID, NIMBLE_PROPERTY::NOTIFY);
   fitnessMachineResistanceLevelRange = pFitnessMachineService->createCharacteristic(FITNESSMACHINERESISTANCELEVELRANGE_UUID, NIMBLE_PROPERTY::READ);
@@ -151,48 +152,48 @@ void BLE_Fitness_Machine_Service::processFTMSWrite() {
           rtConfig->watts.setTarget(0);
           rtConfig->setSimTargetWatts(false);
           logBufLength += snprintf(logBuf + logBufLength, kLogBufCapacity - logBufLength, "-> Control Request");
-          ftmsTrainingStatus[1] = FitnessMachineTrainingStatus::Other;  // 0x01;
-          ftmsStatus            = {FitnessMachineStatus::StartedOrResumedByUser};
           break;
 
         case FitnessMachineControlPointProcedure::Reset: {
-          returnValue[2] = FitnessMachineControlPointResultCode::Success;  // 0x01;
+          returnValue[2] = FitnessMachineControlPointResultCode::Success;
           logBufLength += snprintf(logBuf + logBufLength, kLogBufCapacity - logBufLength, "-> Reset");
-          ftmsTrainingStatus[1] = FitnessMachineTrainingStatus::Other;  // 0x01;
           ftmsStatus            = {FitnessMachineStatus::Reset};
-
+          ftmsTrainingStatus[1] = FitnessMachineTrainingStatus::Idle;
         } break;
 
         case FitnessMachineControlPointProcedure::SetTargetInclination: {
           rtConfig->setFTMSMode((uint8_t)rxValue[0]);
-          returnValue[2] = FitnessMachineControlPointResultCode::Success;  // 0x01;
+          returnValue[2] = FitnessMachineControlPointResultCode::Success;
           port           = (rxValue[2] << 8) + rxValue[1];
           port *= 10;
           rtConfig->setTargetIncline(port);
           logBufLength += snprintf(logBuf + logBufLength, kLogBufCapacity - logBufLength, "-> Incline Mode: %2f", rtConfig->getTargetIncline() / 100);
           ftmsStatus            = {FitnessMachineStatus::TargetInclineChanged, (uint8_t)rxValue[1], (uint8_t)rxValue[2]};
-          ftmsTrainingStatus[1] = FitnessMachineTrainingStatus::Other;  // 0x00;
+          ftmsTrainingStatus[1] = FitnessMachineTrainingStatus::ManualMode;
         } break;
 
         case FitnessMachineControlPointProcedure::SetTargetResistanceLevel: {
           rtConfig->setFTMSMode((uint8_t)rxValue[0]);
-          returnValue[2]        = FitnessMachineControlPointResultCode::Success;  // 0x01;
-          ftmsTrainingStatus[1] = FitnessMachineTrainingStatus::Other;            // 0x00;
-          if ((int)rxValue[1] >= rtConfig->getMinResistance() && (int)rxValue[1] <= rtConfig->getMaxResistance()) {
-            rtConfig->resistance.setTarget((int)rxValue[1]);
+          int16_t requestedResistance = (int16_t)rxValue[1];
+
+          if (requestedResistance >= rtConfig->getMinResistance() && requestedResistance <= rtConfig->getMaxResistance()) {
+            rtConfig->resistance.setTarget(requestedResistance);
             returnValue[2] = FitnessMachineControlPointResultCode::Success;
             logBufLength += snprintf(logBuf + logBufLength, kLogBufCapacity - logBufLength, "-> Resistance Mode: %d", rtConfig->resistance.getTarget());
-          } else if ((int)rxValue[1] > rtConfig->getMinResistance()) {
-            rtConfig->resistance.setTarget(rtConfig->getMaxResistance());
-            returnValue[2] = FitnessMachineControlPointResultCode::InvalidParameter;
-            logBufLength += snprintf(logBuf + logBufLength, kLogBufCapacity - logBufLength, "-> Resistance Request %d beyond limits", (int)rxValue[1]);
           } else {
-            rtConfig->resistance.setTarget(rtConfig->getMinResistance());
+            // Clamp the value if it's out of bounds
+            if (requestedResistance > rtConfig->getMaxResistance()) {
+              rtConfig->resistance.setTarget(rtConfig->getMaxResistance());
+            } else {  // requestedResistance < rtConfig->getMinResistance()
+              rtConfig->resistance.setTarget(rtConfig->getMinResistance());
+            }
             returnValue[2] = FitnessMachineControlPointResultCode::InvalidParameter;
-            logBufLength += snprintf(logBuf + logBufLength, kLogBufCapacity - logBufLength, "-> Resistance Request %d beyond limits", (int)rxValue[1]);
+            logBufLength += snprintf(logBuf + logBufLength, kLogBufCapacity - logBufLength, "-> Resistance Request %d beyond limits", requestedResistance);
           }
-          ftmsStatus = {FitnessMachineStatus::TargetResistanceLevelChanged, (uint8_t)(rtConfig->resistance.getTarget() % 256)};
-          rtConfig->resistance.setTarget(rtConfig->resistance.getTarget());
+
+          int16_t targetRes     = rtConfig->resistance.getTarget();
+          ftmsStatus            = {FitnessMachineStatus::TargetResistanceLevelChanged, (uint8_t)(targetRes & 0xff), (uint8_t)(targetRes >> 8)};
+          ftmsTrainingStatus[1] = FitnessMachineTrainingStatus::ManualMode;
         } break;
 
         case FitnessMachineControlPointProcedure::SetTargetPower: {
@@ -217,17 +218,22 @@ void BLE_Fitness_Machine_Service::processFTMSWrite() {
         case FitnessMachineControlPointProcedure::StartOrResume: {
           returnValue[2] = FitnessMachineControlPointResultCode::Success;  // 0x01;
           logBufLength += snprintf(logBuf + logBufLength, kLogBufCapacity - logBufLength, "-> Start Training");
-          ftmsTrainingStatus[1] = FitnessMachineTrainingStatus::Other;  // 0x00;
+          ftmsTrainingStatus[1] = FitnessMachineTrainingStatus::WarmingUp;
           ftmsStatus            = {FitnessMachineStatus::StartedOrResumedByUser};
         } break;
 
         case FitnessMachineControlPointProcedure::StopOrPause: {
-          returnValue[2] = FitnessMachineControlPointResultCode::Success;  // 0x01;
-          // rxValue[1] == 1 -> Stop, 2 -> Pause
-          // TODO: Move stepper to Min Position
-          logBufLength += snprintf(logBuf + logBufLength, kLogBufCapacity - logBufLength, "-> Stop Training");
-          ftmsStatus            = {FitnessMachineStatus::StoppedOrPausedByUser};
-          ftmsTrainingStatus[1] = FitnessMachineTrainingStatus::Other;  // 0x00;
+          returnValue[2] = FitnessMachineControlPointResultCode::Success;
+
+          uint8_t controlParam = (rxValue.length() > 1) ? rxValue[1] : 0x01; 
+          ftmsStatus = {FitnessMachineStatus::StoppedOrPausedByUser, controlParam};
+          if (controlParam == 0x01) {  // Stop
+            logBufLength += snprintf(logBuf + logBufLength, kLogBufCapacity - logBufLength, "-> Stop Training");
+            ftmsTrainingStatus[1] = FitnessMachineTrainingStatus::Idle;
+          } else if (controlParam == 0x02) {  // Pause
+            logBufLength += snprintf(logBuf + logBufLength, kLogBufCapacity - logBufLength, "-> Pause Training");
+            ftmsTrainingStatus = fitnessMachineTrainingStatus->getValue();
+          }
 
         } break;
 
@@ -251,18 +257,27 @@ void BLE_Fitness_Machine_Service::processFTMSWrite() {
                         (uint8_t)rxValue[5],
                         (uint8_t)rxValue[6]};
 
-          ftmsTrainingStatus[1] = FitnessMachineTrainingStatus::Other;  // 0x00;
+          ftmsTrainingStatus[1] = FitnessMachineTrainingStatus::ManualMode;
           spinBLEClient.FTMSControlPointWrite(pData, length);
         } break;
 
         case FitnessMachineControlPointProcedure::SpinDownControl: {
           rtConfig->setFTMSMode((uint8_t)rxValue[0]);
-          uint8_t controlPoint[6] = {FitnessMachineControlPointProcedure::ResponseCode, 0x01, 0x24, 0x03, 0x96, 0x0e};  // send low and high speed targets
-          returnValue[2]          = FitnessMachineControlPointResultCode::Success;
-          pCharacteristic->setValue(controlPoint, 6);
+
+          // The response parameter for a successful spin down command.
+          // Values are Target Speed Low and Target Speed High in km/h with a resolution of 0.01.
+          // Example: 8.00 km/h (0x0320) and 24.00 km/h (0x0960)
+          uint8_t responseParams[] = {0x20, 0x03, 0x60, 0x09};
+
+          // Build the complete, correct response in a single vector
+          returnValue = {FitnessMachineControlPointProcedure::ResponseCode, (uint8_t)rxValue[0], FitnessMachineControlPointResultCode::Success};
+
+          // Append the mandatory parameters for a successful spindown
+          returnValue.insert(returnValue.end(), std::begin(responseParams), std::end(responseParams));
+
           logBufLength += snprintf(logBuf + logBufLength, kLogBufCapacity - logBufLength, "-> Spin Down Requested");
-          ftmsStatus                 = {FitnessMachineStatus::SpinDownStatus, 0x01};  // send low and high speed targets
-          ftmsTrainingStatus[1]      = FitnessMachineTrainingStatus::Other;           // 0x00;
+          ftmsStatus                 = {FitnessMachineStatus::SpinDownStatus, FitnessMachineStatus::SpinDown_SpinDownRequested};
+          ftmsTrainingStatus[1]      = FitnessMachineTrainingStatus::Other;
           spinBLEServer.spinDownFlag = 2;
         } break;
 
@@ -273,7 +288,7 @@ void BLE_Fitness_Machine_Service::processFTMSWrite() {
           // rtConfig->setTargetCadence(targetCadence);
           logBufLength += snprintf(logBuf + logBufLength, kLogBufCapacity - logBufLength, "-> Target Cadence: %d ", targetCadence);
           ftmsStatus            = {FitnessMachineStatus::TargetedCadenceChanged, (uint8_t)rxValue[1], (uint8_t)rxValue[2]};
-          ftmsTrainingStatus[1] = FitnessMachineTrainingStatus::Other;  // 0x00;
+          ftmsTrainingStatus[1] = FitnessMachineTrainingStatus::ManualMode;  // 0x00;
         } break;
 
         default: {
@@ -288,13 +303,21 @@ void BLE_Fitness_Machine_Service::processFTMSWrite() {
       ftmsStatus            = {FitnessMachineStatus::StartedOrResumedByUser};
       ftmsTrainingStatus[1] = FitnessMachineTrainingStatus::Other;  // 0x00;
     }
-    // not checking for subscription because a write request would have triggererd this
+    // not checking for subscription because a write request would have triggered this
     fitnessMachineControlPoint->setValue(returnValue.data(), returnValue.size());
     fitnessMachineControlPoint->notify();
-    fitnessMachineTrainingStatus->setValue(ftmsTrainingStatus.data(), ftmsTrainingStatus.size());
-    fitnessMachineTrainingStatus->notify();
-    fitnessMachineStatusCharacteristic->setValue(ftmsStatus.data(), ftmsStatus.size());
-    fitnessMachineStatusCharacteristic->notify();
+    if (fitnessMachineTrainingStatus->getValue() != ftmsTrainingStatus) {
+      fitnessMachineTrainingStatus->setValue(ftmsTrainingStatus);
+      fitnessMachineTrainingStatus->notify();
+      // Also notify DirCon TCP clients
+      DirConManager::notifyCharacteristic(NimBLEUUID(FITNESSMACHINESERVICE_UUID), fitnessMachineTrainingStatus->getUUID(), ftmsTrainingStatus.data(), ftmsTrainingStatus.size());
+    }
+    if (fitnessMachineStatusCharacteristic->getValue() != ftmsStatus) {
+      fitnessMachineStatusCharacteristic->setValue(ftmsStatus);
+      fitnessMachineStatusCharacteristic->notify();
+      // Also notify DirCon TCP clients
+      DirConManager::notifyCharacteristic(NimBLEUUID(FITNESSMACHINESERVICE_UUID), fitnessMachineStatusCharacteristic->getUUID(), ftmsStatus.data(), ftmsStatus.size());
+    }
 
     // Also notify DirCon TCP clients
     DirConManager::notifyCharacteristic(NimBLEUUID(FITNESSMACHINESERVICE_UUID), fitnessMachineControlPoint->getUUID(), returnValue.data(), returnValue.size());
@@ -303,43 +326,13 @@ void BLE_Fitness_Machine_Service::processFTMSWrite() {
 
 bool BLE_Fitness_Machine_Service::spinDown(uint8_t response) {
   uint8_t spinStatus[2] = {FitnessMachineStatus::SpinDownStatus, response};
-  fitnessMachineStatusCharacteristic->notify(spinStatus, 2);
-  /*std::string rxValue = fitnessMachineStatusCharacteristic->getValue();
-  if (rxValue[0] != 0x14) {
-   return false;
-  }
-  uint8_t spinStatus[2] = {0x14, 0x01};
-  SS2K_LOG(FMTS_SERVER_LOG_TAG, "Spin Status: %d", rxValue[1]);
-  Serial.printf("Spin Status: %d", rxValue[1]);
-  if (rxValue[1] == 0x01) {
-    SS2K_LOG(FMTS_SERVER_LOG_TAG, "Spin Down Initiated");
-    Serial.printf("Spin Down Initiated");
-    vTaskDelay(500 / portTICK_RATE_MS);
-    spinStatus[1] = 0x01;  // Initiated
-    fitnessMachineStatusCharacteristic->setValue(spinStatus, 2);
-    fitnessMachineStatusCharacteristic->notify();
-    vTaskDelay(500 / portTICK_RATE_MS);
-    spinStatus[1] = 0x04;  // send Stop Pedaling
-    fitnessMachineStatusCharacteristic->setValue(spinStatus, 2);
-    fitnessMachineStatusCharacteristic->notify();
-    SS2K_LOG(FMTS_SERVER_LOG_TAG, "Stop Pedaling");
-    Serial.printf("Stop Pedaling");
-    vTaskDelay(500 / portTICK_RATE_MS);
-    spinStatus[1] = 0x02;  // Success
-    fitnessMachineStatusCharacteristic->setValue(spinStatus, 2);
-    fitnessMachineStatusCharacteristic->notify();
-  }
-  if (rxValue[1] == 0x02) {
-    SS2K_LOG(FMTS_SERVER_LOG_TAG, "Success");
-    Serial.printf("Success");
-    spinStatus[0] = 0x00;
-    spinStatus[1] = 0x00;  // Success
-    fitnessMachineStatusCharacteristic->setValue(spinStatus, 2);
-    uint8_t returnValue[3] = {0x00, 0x00, 0x00};
-    fitnessMachineControlPoint->setValue(returnValue, 3);
-    fitnessMachineControlPoint->indicate();
-    fitnessMachineStatusCharacteristic->notify();
-  }*/
+  // Set the value of the characteristic
+  fitnessMachineStatusCharacteristic->setValue(spinStatus, sizeof(spinStatus));
+  // Notify the connected client
+  fitnessMachineStatusCharacteristic->notify();
+  SS2K_LOG(FMTS_SERVER_LOG_TAG, "Sent SpinDown Status: 0x%02X", response);
+  // Also notify DirCon TCP clients about the status change
+  DirConManager::notifyCharacteristic(NimBLEUUID(FITNESSMACHINESERVICE_UUID), fitnessMachineStatusCharacteristic->getUUID(), spinStatus, sizeof(spinStatus));
 
   return true;
 }

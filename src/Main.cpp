@@ -18,6 +18,7 @@
 #include "UdpAppender.h"
 #include "WebsocketAppender.h"
 #include "BLE_Custom_Characteristic.h"
+#include "BLE_Definitions.h"
 #include <Constants.h>
 #include "settings.h"
 // #include "BLE_Wattbike_Service.h"
@@ -580,12 +581,12 @@ void SS2K::goHome(bool bothDirections) {
     unsigned long int timeoutTimer = millis();
     if (currentBoard.name != r2_NAME) {
       SS2K_LOG(MAIN_LOG_TAG, "Board Doesn't support homing");
-      fitnessMachineService.spinDown(0x02);
+      fitnessMachineService.spinDown(FitnessMachineStatus::SpinDown_Error); 
       return;
     }
     SS2K_LOG(MAIN_LOG_TAG, "Homing...");
     SS2K_LOG(MAIN_LOG_TAG, "Updating driver...");
-    fitnessMachineService.spinDown(0x01);
+    fitnessMachineService.spinDown(FitnessMachineStatus::SpinDown_SpinDownRequested); 
     updateStepperPower(userConfig->getStepperPower() * .2);
     delay(50);
     driver.irun(0x02);  // low power
@@ -594,7 +595,7 @@ void SS2K::goHome(bool bothDirections) {
     delay(50);
     int threshold = 0;
     bool stalled  = false;
-    // Back off limit in case we are alread here.
+    // Back off limit in case we are already here.
     stepper->move(userConfig->getShiftStep(), true);
     this->updateStepperSpeed(1500);
     delay(500);
@@ -603,12 +604,10 @@ void SS2K::goHome(bool bothDirections) {
     threshold = driver.SG_RESULT();
     Serial.printf("%d ", driver.SG_RESULT());
     delay(300);
-    fitnessMachineService.spinDown(0x04);
+    fitnessMachineService.spinDown(FitnessMachineStatus::SpinDown_StopPedaling);
     while (!stalled && ((millis() - timeoutTimer) < HOME_TIMEOUT)) {
       if (abs(rtConfig->getShifterPosition() - ss2k->lastShifterPosition)) {  // let the user abort with the shift button.
-        userConfig->setHMin(INT32_MIN);
-        userConfig->setHMax(INT32_MIN);
-        return;
+        break;
       }
       stalled = (driver.SG_RESULT() < threshold - userConfig->getHomingSensitivity());
     }
@@ -624,7 +623,7 @@ void SS2K::goHome(bool bothDirections) {
     timeoutTimer = millis();
     SS2K_LOG(MAIN_LOG_TAG, "Min Position found: %d.", rtConfig->getMinStep());
     stalled = false;
-    fitnessMachineService.spinDown(0x02);
+    fitnessMachineService.spinDown(FitnessMachineStatus::SpinDown_Success); 
     if (bothDirections) {
       // Back off limit in case we are already here.
       this->updateStepperSpeed(1500);
@@ -636,14 +635,12 @@ void SS2K::goHome(bool bothDirections) {
       delay(250);
       while (!stalled && ((millis() - timeoutTimer) < HOME_TIMEOUT)) {
         if (abs(rtConfig->getShifterPosition() - ss2k->lastShifterPosition)) {  // let the user abort with the shift button.
-          userConfig->setHMin(INT32_MIN);
-          userConfig->setHMax(INT32_MIN);
-          return;
+          break;
         }
         stalled = (driver.SG_RESULT() < threshold - userConfig->getHomingSensitivity());
       }
       stepper->forceStop();
-      fitnessMachineService.spinDown(0x02);
+      fitnessMachineService.spinDown(FitnessMachineStatus::SpinDown_Success);
       delay(500);
       rtConfig->setMaxStep(stepper->getCurrentPosition() - 200);
       SS2K_LOG(MAIN_LOG_TAG, "Max Position found: %d.", rtConfig->getMaxStep());
@@ -651,7 +648,8 @@ void SS2K::goHome(bool bothDirections) {
       stepper->moveTo(0, true);
     }
   }
-  fitnessMachineService.spinDown(0x02);
+  // Use 'Success' status from the spec
+  fitnessMachineService.spinDown(FitnessMachineStatus::SpinDown_Success);
   // Start Saving Settings
   if (bothDirections) {
     userConfig->setHMin(rtConfig->getMinStep());
