@@ -8,9 +8,10 @@
 /*
  * Automatically updated CA certificate for raw.githubusercontent.com
  * Last updated: 2025-05-25 08:35:17
- */
 
-#pragma once
+
+ #pragma once
+
 
 // certificate for https://raw.githubusercontent.com
 // Sectigo Limited Sectigo RSA Domain Validation Secure Server CA, valid until Sat Mar 07 2026, size: 2088 bytes

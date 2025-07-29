@@ -5,6 +5,7 @@ Manufacturer|Model|Year|Arm Length (range)
 ----------: |:---:|:---:|:------:
 BH Fitness||Any|50
 Body Bike|Body Bike|Any|50 (Steep angle)
+BodyCraft|MAG|Any|35
 Bowflex|C6|Any|65
 Bowflex|C7|Any|45
 Bowflex|C6|Any|85
@@ -19,7 +20,9 @@ LeMond|RevMaster|Any|75
 Life Fitness|ICG 8|Any|35-60
 Peloton|Bike|Any|75 (90 for slammed bars)
 PooBoo|?|Any|60-80
+PooBoo|616M2|Any|50
 Schwinn|IC4|Any|85
+Schwinn|AC|Any|20-40 (mount needs to go above SS2k)
 Spinning|L7|Any|20-40 (mount needs to go above SS2k)
 SOLE|SB700|ANY|20-40ra
 Soulcycle|Equinox|Any|155-165

@@ -11,6 +11,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 -Root CA certificates are now updated automatically during every build.
 
 ### Changed
+
 - Added CSC sensor selection in BLE Scanner html.
 - Turned moving neighbors into a function, moved cubicspline class to power_table.h, merged dircon2, and changed added set_points changes
 
@@ -32,13 +33,30 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [25.1.28]
 
+### Hardware
+
+
+## [25.4.8]
+
 ### Added
 
 ### Changed
 - PID loop for ERG mode instead of P loop.
 - Fixed flags in CPS and CSC which were causing issues in GTA Bike. Thanks @matthewsshirley !
+- updated cert.h
 
 ### Hardware
+
+
+## [25.1.28]
+
+### Added
+
+### Changed
+
+### Hardware
+- Updated IC SE Insert to fit better.
+- Added Schwinn AC bike insert and mount.
 
 
 ## [25.1.19]
