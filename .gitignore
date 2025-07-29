@@ -5,6 +5,7 @@
 .vscode/extensions.json
 .idea/
 test/tmp_pio_test_transport.cpp
+test/output/
 data/config.txt
 include/telegram_token.h
 Errors
@@ -17,3 +18,9 @@ build/CMakeCache.txt
 .aider*
 .env
 C/Users/
+/build
+/managed_components
+dependencies.lock
+.vscode/settings.json
+dependencies.lock
+dependencies.lock

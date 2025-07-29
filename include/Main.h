@@ -42,10 +42,9 @@ class SS2K {
   bool resetPowerTableFlag = false;
   bool isUpdating          = false;
 
-  bool IRAM_ATTR deBounce();
-  static void IRAM_ATTR maintenanceLoop(void *pvParameters);
-  static void IRAM_ATTR shiftUp();
-  static void IRAM_ATTR shiftDown();
+  static bool deBounce();
+  static void ARDUINO_ISR_ATTR maintenanceLoop(void *pvParameters);
+  static void ARDUINO_ISR_ATTR handleShift();
   static void moveStepper();
 
   // the position the stepper motor will move to
@@ -64,7 +63,6 @@ class SS2K {
   void updateStepperPower(int pwr = 0);
   void updateStealthChop();
   void updateStepperSpeed(int speed = 0);
-  void checkDriverTemperature();
   void FTMSModeShiftModifier();
   static void rxSerial(void);
   void txSerial();
@@ -101,9 +99,6 @@ class AuxSerialBuffer {
   }
 };
 
-// Users Physical Working Capacity Calculation Parameters (heart rate to Power
-// calculation)
-extern physicalWorkingCapacity *userPWC;
 extern SS2K *ss2k;
 
 // Main program variable that stores most everything

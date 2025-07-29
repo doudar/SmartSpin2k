@@ -16,7 +16,7 @@ String RuntimeParameters::returnJSON() {
   // Allocate a temporary JsonDocument
   // Don't forget to change the capacity to match your requirements.
   // Use arduinojson.org/assistant to compute the capacity.
-  DynamicJsonDocument doc(USERCONFIG_JSON_SIZE);
+JsonDocument doc;
   // Set the values in the document
 
   doc["watts"]            = this->watts.getValue();
@@ -67,6 +67,7 @@ void userParameters::setDefaults() {
   stepperDir            = true;
   shifterDir            = true;
   udpLogEnabled         = false;
+  pTab4Pwr              = false;
   hMin                  = INT32_MIN;
   hMax                  = INT32_MIN;
   homingSensitivity     = DEFAULT_HOMING_SENSITIVITY;
@@ -78,7 +79,7 @@ String userParameters::returnJSON() {
   // Allocate a temporary JsonDocument
   // Don't forget to change the capacity to match your requirements.
   // Use arduinojson.org/assistant to compute the capacity.
-  DynamicJsonDocument doc(USERCONFIG_JSON_SIZE);
+ JsonDocument doc;
   // Set the values in the document
 
   doc["firmwareUpdateURL"]     = firmwareUpdateURL;
@@ -103,6 +104,7 @@ String userParameters::returnJSON() {
   doc["shifterDir"]            = shifterDir;
   doc["stepperDir"]            = stepperDir;
   doc["udpLogEnabled"]         = udpLogEnabled;
+  doc["pTab4Pwr"]              = pTab4Pwr;
   doc["hMin"]                  = hMin;
   doc["hMax"]                  = hMax;
   doc["homingSensitivity"]     = homingSensitivity;
@@ -128,7 +130,7 @@ void userParameters::saveToLittleFS() {
   // Allocate a temporary JsonDocument
   // Don't forget to change the capacity to match your requirements.
   // Use arduinojson.org/assistant to compute the capacity.
-  DynamicJsonDocument doc(USERCONFIG_JSON_SIZE);
+ JsonDocument doc;
 
   // Set the values in the document
   // commented items are not needed in save file
@@ -154,6 +156,7 @@ void userParameters::saveToLittleFS() {
   doc["shifterDir"]    = shifterDir;
   doc["stepperDir"]    = stepperDir;
   doc["udpLogEnabled"] = udpLogEnabled;
+  doc["pTab4Pwr"]      = pTab4Pwr;
   doc["hMin"]          = hMin;
   doc["hMax"]          = hMax;
   doc["homingSensitivity"]     = homingSensitivity;
@@ -181,7 +184,7 @@ void userParameters::loadFromLittleFS() {
   // Allocate a temporary JsonDocument
   // Don't forget to change the capacity to match your requirements.
   // Use arduinojson.org/v6/assistant to compute the capacity.
-  DynamicJsonDocument doc(USERCONFIG_JSON_SIZE);
+JsonDocument doc;
 
   // Deserialize the JSON document
   DeserializationError error = deserializeJson(doc, file);
@@ -226,6 +229,9 @@ void userParameters::loadFromLittleFS() {
   if (!doc["udpLogEnabled"].isNull()) {
     setUdpLogEnabled(doc["udpLogEnabled"]);
   }
+  if (!doc["pTab4Pwr"].isNull()) {
+    setPTab4Pwr(doc["pTab4Pwr"]);
+  }
   if (doc["powerCorrectionFactor"]) {
     setPowerCorrectionFactor(doc["powerCorrectionFactor"]);
     if ((getPowerCorrectionFactor() < MIN_PCF) || (getPowerCorrectionFactor() > MAX_PCF)) {
@@ -263,103 +269,3 @@ void userParameters::printFile() {
   file.close();
 }
 
-/*****************************************USERPWC*****************************************/
-
-void physicalWorkingCapacity::setDefaults() {
-  session1HR  = 129;  // examples from https://www.cyclinganalytics.com/
-  session1Pwr = 100;
-  session2HR  = 154;
-  session2Pwr = 150;
-  hr2Pwr      = false;
-}
-
-//-- return all config as one a single JSON string
-String physicalWorkingCapacity::returnJSON() {
-  StaticJsonDocument<500> doc;
-
-  doc["session1HR"]  = session1HR;
-  doc["session1Pwr"] = session1Pwr;
-  doc["session2HR"]  = session2HR;
-  doc["session2Pwr"] = session2Pwr;
-  doc["hr2Pwr"]      = hr2Pwr;
-
-  String output;
-  serializeJson(doc, output);
-  return output;
-}
-
-//-- Saves all parameters to LittleFS
-void physicalWorkingCapacity::saveToLittleFS() {
-  // Delete existing file, otherwise the configuration is appended to the file
-  LittleFS.remove(userPWCFILENAME);
-  // Open file for writing
-  SS2K_LOG(CONFIG_LOG_TAG, "Writing File: %s", userPWCFILENAME);
-  File file = LittleFS.open(userPWCFILENAME, FILE_WRITE);
-  if (!file) {
-    SS2K_LOG(CONFIG_LOG_TAG, "Failed to create file");
-    return;
-  }
-
-  StaticJsonDocument<500> doc;
-
-  doc["session1HR"]  = session1HR;
-  doc["session1Pwr"] = session1Pwr;
-  doc["session2HR"]  = session2HR;
-  doc["session2Pwr"] = session2Pwr;
-  doc["hr2Pwr"]      = hr2Pwr;
-
-  // Serialize JSON to file
-  if (serializeJson(doc, file) == 0) {
-    SS2K_LOG(CONFIG_LOG_TAG, "Failed to write to file");
-  }
-  // Close the file
-  file.close();
-}
-
-// Loads the JSON configuration from a file
-void physicalWorkingCapacity::loadFromLittleFS() {
-  // Open file for reading
-  SS2K_LOG(CONFIG_LOG_TAG, "Reading File: %s", userPWCFILENAME);
-  File file = LittleFS.open(userPWCFILENAME);
-
-  // load defaults if filename doesn't exist
-  if (!file) {
-    SS2K_LOG(CONFIG_LOG_TAG, "Couldn't find configuration file. Loading Defaults");
-    setDefaults();
-    return;
-  }
-
-  StaticJsonDocument<500> doc;
-
-  // Deserialize the JSON document
-  DeserializationError error = deserializeJson(doc, file);
-  if (error) {
-    SS2K_LOG(CONFIG_LOG_TAG, "Failed to read file, using default configuration");
-    setDefaults();
-    return;
-  }
-
-  // Copy values from the JsonDocument to the Config
-  session1HR  = doc["session1HR"];
-  session1Pwr = doc["session1Pwr"];
-  session2HR  = doc["session2HR"];
-  session2Pwr = doc["session2Pwr"];
-  hr2Pwr      = doc["hr2Pwr"];
-
-  SS2K_LOG(CONFIG_LOG_TAG, "Config File Loaded: %s", userPWCFILENAME);
-  file.close();
-}
-
-// Prints the content of a file to the Serial
-void physicalWorkingCapacity::printFile() {
-  // Open file for reading
-  SS2K_LOG(CONFIG_LOG_TAG, "Contents of file: %s", userPWCFILENAME);
-  File file = LittleFS.open(userPWCFILENAME);
-  if (!file) {
-    SS2K_LOG(CONFIG_LOG_TAG, "Failed to read file");
-    return;
-  }
-
-  // Close the file
-  file.close();
-}

@@ -43,6 +43,12 @@ jobs:
         run: python --version
       - name: Install PlatformIO
         run: python -m pip install platformio
+      - name: Install ESP-IDF
+        run: |
+          git clone --recursive https://github.com/espressif/esp-idf.git
+          cd esp-idf
+          git checkout v5.4
+          ./install.sh
       - name: Check pre-commit hooks
         uses: pre-commit/action@v3.0.1
       - name: Build firmware

@@ -4,7 +4,7 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width,initial-scale=1">
   <title>SmartSpin2k Bluetooth Scanner</title>
-  <style>html{background-color:#03245c}</style>
+  <link rel="stylesheet" href="style.css">
 </head>
 <body>
   <div class="page-container">
@@ -102,23 +102,31 @@
         .then(response => response.json())
         .then(data => {
           clearDropdowns();
-          const devices = JSON.parse(data.foundDevices);
+          
+          // Process found devices if available
+          try {
+            const parsedDevices = JSON.parse(data.foundDevices);
+            
+            if (parsedDevices && typeof parsedDevices === 'object') {
+              // Add found devices to dropdowns
+              Object.values(parsedDevices).forEach(device => {
+                let option = document.createElement('option');
+                option.text = device.name || device.address;
 
-          // Add found devices to dropdowns
-          Object.values(devices).forEach(device => {
-            let option = document.createElement('option');
-            option.text = device.name || device.address;
-
-            if (['0x1818', '0x1826', '6e400001-b5a3-f393-e0a9-e50e24dcca9e', '0bf669f0-45f2-11e7-9598-0800200c9a66'].includes(device.UUID)) {
-              PMDropdown.add(option.cloneNode(true));
+                if (['0x1818', '0x1826', '0x1816', '6e400001-b5a3-f393-e0a9-e50e24dcca9e', '0bf669f0-45f2-11e7-9598-0800200c9a66'].includes(device.UUID)) {
+                  PMDropdown.add(option.cloneNode(true));
+                }
+                if (device.UUID === '0x180d') {
+                  HRDropdown.add(option.cloneNode(true));
+                }
+                if (device.UUID === '0x1812') {
+                  remoteDropdown.add(option.cloneNode(true));
+                }
+              });
             }
-            if (device.UUID === '0x180d') {
-              HRDropdown.add(option.cloneNode(true));
-            }
-            if (device.UUID === '0x1812') {
-              remoteDropdown.add(option.cloneNode(true));
-            }
-          });
+          } catch (e) {
+            console.error('Error processing found devices:', e);
+          }
 
           // Add connected devices
           ['PowerMeter', 'HeartMonitor', 'Remote'].forEach(type => {
@@ -154,15 +162,7 @@
         .catch(error => console.error('Error:', error));
     }
 
-    function loadCss() {
-      const link = document.createElement('link');
-      link.rel = 'stylesheet';
-      link.href = 'style.css';
-      document.head.appendChild(link);
-    }
-
     window.addEventListener('load', () => {
-      setTimeout(loadCss, 100);
       requestConfigValues();
       
       // Retry loading if values are still default

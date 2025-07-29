@@ -61,6 +61,7 @@ const uint8_t BLE_simulateTargetWatts   = 0x29;  // are we sending target watts
 const uint8_t BLE_hMin                  = 0x2A;  // Minimum homing value
 const uint8_t BLE_hMax                  = 0x2B;  // Maximum homing value
 const uint8_t BLE_homingSensitivity     = 0x2C;  // Homing sensitivity value
+const uint8_t BLE_pTab4Pwr              = 0x2D;  // Use power values for power table
 
 class BLE_ss2kCustomCharacteristic {
  public:
@@ -74,12 +75,13 @@ class BLE_ss2kCustomCharacteristic {
   static void parseNemit();
 
  private:
-  BLEService *pSmartSpin2kService;
-  BLECharacteristic *smartSpin2kCharacteristic;
+  NimBLEService *pSmartSpin2kService;
+  NimBLECharacteristic *smartSpin2kCharacteristic;
   uint8_t ss2kCustomCharacteristicValue[3] = {0x00, 0x00, 0x00};
 };
 
-class ss2kCustomCharacteristicCallbacks : public BLECharacteristicCallbacks {
-  void onWrite(BLECharacteristic *);
-  void onSubscribe(NimBLECharacteristic *pCharacteristic, ble_gap_conn_desc *desc, uint16_t subValue);
+class ss2kCustomCharacteristicCallbacks : public NimBLECharacteristicCallbacks {
+  void onWrite(NimBLECharacteristic* pCharacteristic, NimBLEConnInfo& connInfo) override;
+  void onSubscribe(NimBLECharacteristic* pCharacteristic, NimBLEConnInfo& connInfo, uint16_t subValue) override;
+  void onStatus(NimBLECharacteristic* pCharacteristic, int code) override;
 };

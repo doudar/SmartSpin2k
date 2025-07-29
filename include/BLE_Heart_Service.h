@@ -13,10 +13,11 @@
 class BLE_Heart_Service {
  public:
   BLE_Heart_Service();
-  void setupService(NimBLEServer *pServer, MyCallbacks *chrCallbacks);
+  void setupService(NimBLEServer *pServer, MyCharacteristicCallbacks *chrCallbacks);
   void update();
+  void deinit();
 
  private:
-BLEService *pHeartService;
-BLECharacteristic *heartRateMeasurementCharacteristic;
+  NimBLEService *pHeartService;
+  NimBLECharacteristic *heartRateMeasurementCharacteristic;
 };

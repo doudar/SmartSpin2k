@@ -13,7 +13,7 @@
 class BLE_Cycling_Speed_Cadence {
  public:
   BLE_Cycling_Speed_Cadence();
-  void setupService(NimBLEServer *pServer, MyCallbacks *chrCallbacks);
+  void setupService(NimBLEServer *pServer, MyCharacteristicCallbacks *chrCallbacks);
   void update();
 
  private:

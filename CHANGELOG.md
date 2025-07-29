@@ -14,11 +14,43 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Hardware
 
 
+## [25.5.31]
+
+### Added
+-Root CA certificates are now updated automatically during every build.
+
+### Changed
+
+- Added CSC sensor selection in BLE Scanner html.
+- Turned moving neighbors into a function, moved cubicspline class to power_table.h, merged dircon2, and changed added set_points changes
+
+### Fixed
+- Fixed stack smashing protection failure in SpinBLEAdvertisedDevice::enqueueData by adding a buffer size check to prevent overflow when handling BLE notifications larger than the buffer size
+
+### Hardware
+
+
+## [25.3.13]
+
+### Added
+
+### Changed
+- Multiple html and css improvements. 
+- Lookup uses existing interpolate and extrapolate functions. 
+### Hardware
+
+
+## [25.1.28]
+
+### Hardware
+
+
 ## [25.4.8]
 
 ### Added
 
 ### Changed
+- PID loop for ERG mode instead of P loop.
 - Fixed flags in CPS and CSC which were causing issues in GTA Bike. Thanks @matthewsshirley !
 - updated cert.h
 

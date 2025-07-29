@@ -11,6 +11,7 @@
 #include "HTTP_Server_Basic.h"
 #include "cert.h"
 #include "SS2KLog.h"
+#include "DirConManager.h"
 #include <WebServer.h>
 #include <HTTPClient.h>
 #include <HTTPUpdate.h>
@@ -22,7 +23,6 @@
 #include <DNSServer.h>
 #include <ArduinoJson.h>
 #include <BLE_Custom_Characteristic.h>
-#include <WiFiProv.h>
 
 File fsUploadFile;
 
@@ -32,16 +32,7 @@ IPAddress myIP;
 const byte DNS_PORT = 53;
 DNSServer dnsServer;
 HTTP_Server httpServer;
-WiFiClientSecure client;
 WebServer server(80);
-
-#ifdef USE_TELEGRAM
-#include <UniversalTelegramBot.h>
-TaskHandle_t telegramTask;
-bool telegramMessageWaiting = false;
-UniversalTelegramBot bot(TELEGRAM_TOKEN, client);
-String telegramMessage = "";
-#endif  // USE_TELEGRAM
 
 void _staSetup() {
   WiFi.setHostname(userConfig->getDeviceName());
@@ -53,12 +44,12 @@ void _staSetup() {
 void _APSetup() {
   // WiFi.eraseAP(); //Needed if we switch back to espressif32 @6.5.0
   WiFi.mode(WIFI_AP);
-  WiFi.setHostname("reset");  // Fixes a bug when switching Arduino Core Versions
-  WiFi.softAPsetHostname("reset");
-  WiFi.setHostname(userConfig->getDeviceName());
+  // WiFi.setHostname("reset");  // Fixes a bug when switching Arduino Core Versions
+  // WiFi.softAPsetHostname("reset");
+  // WiFi.setHostname(userConfig->getDeviceName());
   WiFi.softAPsetHostname(userConfig->getDeviceName());
   WiFi.enableAP(true);
-  vTaskDelay(500);  // Micro controller requires some time to reset the mode
+  delay(500);  // Micro controller requires some time to reset the mode
 }
 
 // ********************************WIFI Setup*************************
@@ -70,16 +61,15 @@ void startWifi() {
     SS2K_LOG(HTTP_SERVER_LOG_TAG, "Connecting to: %s", userConfig->getSsid());
     _staSetup();
     while (WiFi.status() != WL_CONNECTED) {
-      vTaskDelay(1000 / portTICK_RATE_MS);
+      delay(1000);
       SS2K_LOG(HTTP_SERVER_LOG_TAG, "Waiting for connection to be established...");
       i++;
       if (i > WIFI_CONNECT_TIMEOUT) {
-        i = 0;
         SS2K_LOG(HTTP_SERVER_LOG_TAG, "Couldn't Connect. Switching to AP mode");
         WiFi.disconnect(true, true);
         WiFi.setAutoReconnect(false);
         WiFi.mode(WIFI_MODE_NULL);
-        vTaskDelay(1000 / portTICK_RATE_MS);
+        delay(1000);
         break;
       }
     }
@@ -93,15 +83,18 @@ void startWifi() {
 
   // Couldn't connect to existing network, Create SoftAP
   if (WiFi.status() != WL_CONNECTED) {
+    SS2K_LOG(HTTP_SERVER_LOG_TAG, "Starting AP Mode");
     _APSetup();
     if (strcmp(userConfig->getSsid(), DEVICE_NAME) == 0) {
       // If default SSID is still in use, let the user select a new password.
       // Else fall back to the default password.
       WiFi.softAP(userConfig->getDeviceName(), userConfig->getPassword());
+      SS2K_LOG(HTTP_SERVER_LOG_TAG, "Using Stored Password");
     } else {
+      SS2K_LOG(HTTP_SERVER_LOG_TAG, "Using Default Password");
       WiFi.softAP(userConfig->getDeviceName(), DEFAULT_PASSWORD);
     }
-    vTaskDelay(50);
+    delay(50);
     myIP = WiFi.softAPIP();
     /* Setup the DNS server redirecting all the domains to the apIP */
     dnsServer.setErrorReplyCode(DNSReplyCode::NoError);
@@ -115,18 +108,24 @@ void startWifi() {
   MDNS.addService("http", "_tcp", 80);
   MDNS.addServiceTxt("http", "_tcp", "lf", "0");
   SS2K_LOG(HTTP_SERVER_LOG_TAG, "Connected to %s IP address: %s", userConfig->getSsid(), myIP.toString().c_str());
-#ifdef USE_TELEGRAM
-  SEND_TO_TELEGRAM("Connected to " + String(userConfig->getSsid()) + " IP address: " + myIP.toString());
-#endif
   SS2K_LOG(HTTP_SERVER_LOG_TAG, "Open http://%s.local/", userConfig->getDeviceName());
+
+  // Initialize DirCon MDNS service
+  if (DirConManager::start()) {
+    SS2K_LOG(HTTP_SERVER_LOG_TAG, "DirCon service started successfully");
+  } else {
+    SS2K_LOG(HTTP_SERVER_LOG_TAG, "Error starting DirCon service");
+  }
+
   WiFi.setTxPower(WIFI_POWER_19_5dBm);
 
   if (WiFi.getMode() == WIFI_STA) {
     SS2K_LOG(HTTP_SERVER_LOG_TAG, "Syncing clock...");
     configTime(0, 0, "pool.ntp.org");  // get UTC time via NTP
     time_t now = time(nullptr);
+    SS2K_LOG(HTTP_SERVER_LOG_TAG, "Waiting for clock sync");
     while (now < 10) {  // wait 10 seconds
-      SS2K_LOG(HTTP_SERVER_LOG_TAG, "Waiting for clock sync...");
+      SS2K_LOG(".", ".");
       delay(100);
       now = time(nullptr);
     }
@@ -136,6 +135,8 @@ void startWifi() {
 
 void stopWifi() {
   SS2K_LOG(HTTP_SERVER_LOG_TAG, "Closing connection to: %s", userConfig->getSsid());
+  // Stop DirCon service before disconnecting WiFi
+  DirConManager::stop();
   WiFi.disconnect();
 }
 
@@ -169,8 +170,7 @@ void HTTP_Server::start() {
         "15 seconds.</body><script> setTimeout(\"location.href = 'http://" +
         myIP.toString() + "/bluetoothscanner.html';\",15000);</script></html>";
     // spinBLEClient.resetDevices();
-    spinBLEClient.dontBlockScan = true;
-    spinBLEClient.doScan        = true;
+    spinBLEClient.doScan = true;
     server.send(200, "text/html", response);
   });
 
@@ -299,12 +299,6 @@ void HTTP_Server::start() {
     server.send(200, "text/plain", tString);
   });
 
-  server.on("/PWCJSON", []() {
-    String tString;
-    tString = userPWC->returnJSON();
-    server.send(200, "text/plain", tString);
-  });
-
   server.on("/login", HTTP_GET, []() {
     server.sendHeader("Connection", "close");
     server.send(200, "text/html", OTALoginIndex);
@@ -326,6 +320,7 @@ void HTTP_Server::start() {
       []() {
         HTTPUpload &upload = server.upload();
         if (upload.filename == String("firmware.bin").c_str()) {
+          ss2k->isUpdating = true;  // Set the updating flag to true
           if (upload.status == UPLOAD_FILE_START) {
             SS2K_LOG(HTTP_SERVER_LOG_TAG, "Update: %s", upload.filename.c_str());
             if (!Update.begin(UPDATE_SIZE_UNKNOWN, U_FLASH)) {  // start with max
@@ -346,6 +341,7 @@ void HTTP_Server::start() {
               Update.printError(Serial);
             }
           }
+          ss2k->isUpdating = false;  // Reset the updating flag
         } else if (upload.filename == String("littlefs.bin").c_str()) {
           if (upload.status == UPLOAD_FILE_START) {
             SS2K_LOG(HTTP_SERVER_LOG_TAG, "Update: %s", upload.filename.c_str());
@@ -363,7 +359,6 @@ void HTTP_Server::start() {
                                      // current progress
               server.send(200, "text/plain", "Littlefs Uploaded Successfully. Rebooting...");
               userConfig->saveToLittleFS();
-              userPWC->saveToLittleFS();
               ss2k->rebootFlag == true;
             } else {
               Update.printError(Serial);
@@ -395,16 +390,8 @@ void HTTP_Server::start() {
   /********************************************End Server
    * Handlers*******************************/
 
-#ifdef USE_TELEGRAM
-  xTaskCreatePinnedToCore(telegramUpdate,   /* Task function. */
-                          "telegramUpdate", /* name of task. */
-                          4900,             /* Stack size of task*/
-                          NULL,             /* parameter of the task */
-                          1,                /* priority of the task  - higher number is higher priority*/
-                          &telegramTask,    /* Task handle to keep track of created task */
-                          1);               /* pin task to core 1 */
-#endif                                      // USE_TELEGRAM
   server.begin();
+  server.enableDelay(false);
   SS2K_LOG(HTTP_SERVER_LOG_TAG, "HTTP server started");
 }
 
@@ -414,10 +401,10 @@ void HTTP_Server::webClientUpdate() {
     _webClientTimer                = millis();
     static unsigned long mDnsTimer = millis();  // NOLINT: There is no overload in String for uint64_t
     server.handleClient();
-    if (WiFi.getMode() != WIFI_MODE_STA) {
-      dnsServer.processNextRequest();
-    }
-    // Keep MDNS alive
+    // if (WiFi.getMode() != WIFI_MODE_STA) {
+    //   dnsServer.processNextRequest();
+    // }
+    //  Keep MDNS alive
     if ((millis() - mDnsTimer) > 30000) {
       MDNS.addServiceTxt("http", "_tcp", "lf", String(mDnsTimer));
       mDnsTimer = millis();
@@ -539,6 +526,11 @@ void HTTP_Server::settingsProcessor() {
   } else if (wasSettingsUpdate) {
     userConfig->setUdpLogEnabled(false);
   }
+  if (!server.arg("pTab4Pwr").isEmpty()) {
+    userConfig->setPTab4Pwr(true);
+  } else if (wasSettingsUpdate) {
+    userConfig->setPTab4Pwr(false);
+  }
   if (!server.arg("stealthChop").isEmpty()) {
     userConfig->setStealthChop(true);
     ss2k->updateStealthChop();
@@ -567,53 +559,34 @@ void HTTP_Server::settingsProcessor() {
         spinBLEClient.reconnectAllDevices();
       }
     } else {
-      userConfig->setConnectedPowerMeter("any");
+      userConfig->setConnectedPowerMeter(String(ANY));
     }
   }
   if (!server.arg("bleHRDropdown").isEmpty()) {
     wasBTUpdate = true;
     if (server.arg("bleHRDropdown")) {
-      bool reset = false;
-      tString    = server.arg("bleHRDropdown");
+      tString = server.arg("bleHRDropdown");
       if (tString != userConfig->getConnectedHeartMonitor()) {
         spinBLEClient.reconnectAllDevices();
       }
       userConfig->setConnectedHeartMonitor(server.arg("bleHRDropdown"));
     } else {
-      userConfig->setConnectedHeartMonitor("any");
+      userConfig->setConnectedHeartMonitor(String(NONE));
     }
   }
   if (!server.arg("bleRemoteDropdown").isEmpty()) {
     wasBTUpdate = true;
     if (server.arg("bleRemoteDropdown")) {
-      bool reset = false;
-      tString    = server.arg("bleRemoteDropdown");
+      tString = server.arg("bleRemoteDropdown");
       if (tString != userConfig->getConnectedRemote()) {
         spinBLEClient.reconnectAllDevices();
       }
       userConfig->setConnectedRemote(server.arg("bleRemoteDropdown"));
     } else {
-      userConfig->setConnectedRemote("any");
+      userConfig->setConnectedRemote(String(NONE));
     }
   }
-  if (!server.arg("session1HR").isEmpty()) {  // Needs checking for unrealistic numbers.
-    userPWC->session1HR = server.arg("session1HR").toInt();
-  }
-  if (!server.arg("session1Pwr").isEmpty()) {
-    userPWC->session1Pwr = server.arg("session1Pwr").toInt();
-  }
-  if (!server.arg("session2HR").isEmpty()) {
-    userPWC->session2HR = server.arg("session2HR").toInt();
-  }
-  if (!server.arg("session2Pwr").isEmpty()) {
-    userPWC->session2Pwr = server.arg("session2Pwr").toInt();
 
-    if (!server.arg("hr2Pwr").isEmpty()) {
-      userPWC->hr2Pwr = true;
-    } else {
-      userPWC->hr2Pwr = false;
-    }
-  }
   String response = "<!DOCTYPE html><html><body><h2>";
 
   if (wasBTUpdate) {  // Special BT page update response
@@ -658,8 +631,8 @@ void HTTP_Server::stop() {
 
 void HTTP_Server::FirmwareUpdate() {
   HTTPClient http;
-  // WiFiClientSecure client;
-  client.setCACert(rootCACertificate);
+  WiFiClientSecure localClient;
+  localClient.setCACert(rootCACertificate);
   SS2K_LOG(HTTP_SERVER_LOG_TAG, "Checking for newer firmware:");
   http.begin(userConfig->getFirmwareUpdateURL() + String(FW_VERSIONFILE),
              rootCACertificate);  // check version URL
@@ -681,6 +654,7 @@ void HTTP_Server::FirmwareUpdate() {
   if (httpCode == HTTP_CODE_OK) {  // if version received
     bool updateAnyway = false;
     if (!LittleFS.exists("/index.html")) {
+      // force firmware update if index.html is missing
       // updateAnyway = true;
       SS2K_LOG(HTTP_SERVER_LOG_TAG, "  -index.html not found.");
     }
@@ -690,20 +664,19 @@ void HTTP_Server::FirmwareUpdate() {
     if (((availableVer > currentVer) && (userConfig->getAutoUpdate())) || (!LittleFS.exists("/index.html"))) {
       //////////////// Update LittleFS//////////////
       SS2K_LOG(HTTP_SERVER_LOG_TAG, "Updating FileSystem");
-      http.begin(DATA_UPDATEURL + String(DATA_FILELIST),
-                 rootCACertificate);  // check version URL
-      vTaskDelay(100 / portTICK_PERIOD_MS);
+      http.begin(DATA_UPDATEURL DATA_FILELIST, rootCACertificate);  // check version URL
+      delay(100);
       httpCode = http.GET();  // get data from version file
-      vTaskDelay(100 / portTICK_PERIOD_MS);
-      StaticJsonDocument<500> doc;
+      delay(100);
+      JsonDocument doc;
       if (httpCode == HTTP_CODE_OK) {  // if version received
-        String payload;
-        payload = http.getString();  // save received version
+        payload = http.getString();    // save received version
         payload.trim();
         // Deserialize the JSON document
         DeserializationError error = deserializeJson(doc, payload);
         if (error) {
           SS2K_LOG(HTTP_SERVER_LOG_TAG, "Failed to read file list");
+          http.end();  // Make sure to end HTTP before returning
           return;
         }
         httpServer.internetConnection = true;
@@ -711,23 +684,26 @@ void HTTP_Server::FirmwareUpdate() {
         SS2K_LOG(HTTP_SERVER_LOG_TAG, "error downloading %s %d", DATA_FILELIST, httpCode);
         httpServer.internetConnection = false;
       }
+      // End HTTP connection after file list download
+      http.end();
+
       JsonArray files = doc.as<JsonArray>();
       // iterate through file list and download files individually
       for (JsonVariant v : files) {
         String fileName = "/" + v.as<String>();
         http.begin(DATA_UPDATEURL + fileName,
                    rootCACertificate);  // check version URL
-        vTaskDelay(100 / portTICK_PERIOD_MS);
+        delay(100);
         httpCode = http.GET();
-        vTaskDelay(100 / portTICK_PERIOD_MS);
+        delay(100);
         if (httpCode == HTTP_CODE_OK) {
-          String payload;
           payload = http.getString();
           payload.trim();
           LittleFS.remove(fileName);
           File file = LittleFS.open(fileName, FILE_WRITE, true);
           if (!file) {
             SS2K_LOG(HTTP_SERVER_LOG_TAG, "Failed to create file, %s", fileName);
+            http.end();  // End HTTP before returning
             return;
           }
           file.print(payload);
@@ -738,13 +714,15 @@ void HTTP_Server::FirmwareUpdate() {
           SS2K_LOG(HTTP_SERVER_LOG_TAG, "Error downloading %s %d", fileName, httpCode);
           httpServer.internetConnection = false;
         }
+        // End HTTP connection after each file download
+        http.end();
       }
 
       //////// Update Firmware /////////
       if (((availableVer > currentVer) || updateAnyway) && (userConfig->getAutoUpdate())) {
         SS2K_LOG(HTTP_SERVER_LOG_TAG, "New firmware detected!");
         SS2K_LOG(HTTP_SERVER_LOG_TAG, "Upgrading from %s to %s", FIRMWARE_VERSION, payload.c_str());
-        t_httpUpdate_return ret = httpUpdate.update(client, userConfig->getFirmwareUpdateURL() + String(FW_BINFILE));
+        t_httpUpdate_return ret = httpUpdate.update(localClient, userConfig->getFirmwareUpdateURL() + String(FW_BINFILE));
         switch (ret) {
           case HTTP_UPDATE_FAILED:
             SS2K_LOG(HTTP_SERVER_LOG_TAG, "HTTP_UPDATE_FAILED Error %d : %s", httpUpdate.getLastError(), httpUpdate.getLastErrorString().c_str());
@@ -762,57 +740,8 @@ void HTTP_Server::FirmwareUpdate() {
     } else {  // don't update
       SS2K_LOG(HTTP_SERVER_LOG_TAG, "  - Current Version: %s", FIRMWARE_VERSION);
     }
+  } else {
+    SS2K_LOG(HTTP_SERVER_LOG_TAG, "Could not connect to Github. httpCode: %d", httpCode);
   }
+  // localClient will be automatically destroyed when the function exits
 }
-
-#ifdef USE_TELEGRAM
-// Function to handle sending telegram text to the non blocking task
-void sendTelegram(String textToSend) {
-  static int numberOfMessages = 0;
-  static uint64_t timeout     = 120000;  // reset every two minutes
-  static uint64_t startTime   = millis();
-
-  if (millis() - startTime > timeout) {  // Let one message send every two minutes
-    numberOfMessages = MAX_TELEGRAM_MESSAGES - 1;
-    telegramMessage += " " + String(userConfig->getSsid()) + " ";
-    startTime = millis();
-  }
-
-  if ((numberOfMessages < MAX_TELEGRAM_MESSAGES) && (WiFi.getMode() == WIFI_STA)) {
-    telegramMessage += "\n" + textToSend;
-    telegramMessageWaiting = true;
-    numberOfMessages++;
-  }
-}
-
-// Non blocking task to send telegram message
-void telegramUpdate(void *pvParameters) {
-  // client.setInsecure();
-  client.setCACert(TELEGRAM_CERTIFICATE_ROOT);
-  for (;;) {
-    static int telegramFailures = 0;
-    if (telegramMessageWaiting && internetConnection) {
-      telegramMessageWaiting = false;
-      bool rm                = (bot.sendMessage(TELEGRAM_CHAT_ID, telegramMessage, ""));
-      if (!rm) {
-        telegramFailures++;
-        SS2K_LOG(HTTP_SERVER_LOG_TAG, "Telegram failed to send! %s", TELEGRAM_CHAT_ID);
-        if (telegramFailures > 2) {
-          internetConnection = false;
-        }
-      } else {  // Success - reset Telegram Failures
-        telegramFailures = 0;
-      }
-
-      client.stop();
-      telegramMessage = "";
-    }
-#ifdef DEBUG_STACK
-    Serial.printf("Telegram: %d \n", uxTaskGetStackHighWaterMark(telegramTask));
-    Serial.printf("Web: %d \n", uxTaskGetStackHighWaterMark(webClientTask));
-    Serial.printf("Free: %d \n", ESP.getFreeHeap());
-#endif  // DEBUG_STACK
-    vTaskDelay(4000 / portTICK_RATE_MS);
-  }
-}
-#endif  // USE_TELEGRAM

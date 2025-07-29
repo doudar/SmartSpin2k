@@ -4,7 +4,7 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width,initial-scale=1">
   <title>SmartSpin2k StreamFit</title>
-  <style>html{background-color:#03245c}</style>
+  <link rel="stylesheet" href="style.css">
 </head>
 <body>
   <div class="page-container">
@@ -73,16 +73,7 @@
 
   <script src="https://raw.githack.com/doudar/StreamFit/master/index.js"></script>
   <script>
-    function loadCss() {
-      const link = document.createElement('link');
-      link.rel = 'stylesheet';
-      link.href = 'style.css';
-      document.head.appendChild(link);
-    }
-
     window.addEventListener('load', () => {
-      setTimeout(loadCss, 100);
-      
       // Update file input label with selected filename
       document.getElementById('file-selector').addEventListener('change', function(e) {
         const fileName = e.target.files[0]?.name || 'Choose .fit file';

@@ -4,7 +4,7 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width,initial-scale=1">
   <title>SmartSpin2k</title>
-  <style>html{background-color:#03245c}</style>
+  <link rel="stylesheet" href="style.css">
 </head>
 <body>
   <div class="page-container">
@@ -26,19 +26,6 @@
             <ul class="tool-features">
               <li>Manual gear control</li>
               <li>Real-time shifting</li>
-            </ul>
-          </div>
-          <div class="card-arrow">→</div>
-        </a>
-
-        <a href="hrtowatts.html" class="dev-tool-card">
-          <div class="tool-icon">❤️</div>
-          <div class="tool-content">
-            <h2>Heart Rate to Watts</h2>
-            <p>Configure power estimation from heart rate</p>
-            <ul class="tool-features">
-              <li>Power estimation</li>
-              <li>HR zone configuration</li>
             </ul>
           </div>
           <div class="card-arrow">→</div>
@@ -116,15 +103,7 @@
         .catch(error => console.error('Error:', error));
     }
 
-    function loadCss() {
-      const link = document.createElement('link');
-      link.rel = 'stylesheet';
-      link.href = 'style.css';
-      document.head.appendChild(link);
-    }
-
     window.addEventListener('load', () => {
-      setTimeout(loadCss, 100);
       requestConfigValues();
     });
 

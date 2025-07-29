@@ -35,9 +35,6 @@ const char* const DEFAULT_PASSWORD = "password";
 // name of local file to save configuration in LittleFS
 #define configFILENAME "/config.txt"
 
-// name of local file to save Physical Working Capacity in LittleFS
-#define userPWCFILENAME "/userPWC.txt"
-
 // name of the local file to save the torque table.
 #define POWER_TABLE_FILENAME "/PowerTable.txt"
 
@@ -46,13 +43,13 @@ const char* const DEFAULT_PASSWORD = "password";
 // into actual stepper steps that move the stepper motor. It takes 2,181.76 steps to rotate the knob 1 full revolution. with hardware version 1.
 // Incline_Multiplier may be able to be removed in the future by dividing ShiftSteps by ~200 to get this value but we're not quite ready
 // to make that commitment yet.
-#define INCLINE_MULTIPLIER 5.0
+#define INCLINE_MULTIPLIER 5.0f
 
 // Minumum value for power correction factor user setting
-#define MIN_PCF .5
+#define MIN_PCF .5f
 
 // Maximum value for power correction factor user setting
-#define MAX_PCF 2.5
+#define MAX_PCF 2.5f
 
 // Default Stepper Power.
 // Stepper peak current in ma. This is hardware restricted to a maximum of 2000ma on the TMC2225. RMS current is less.
@@ -71,7 +68,7 @@ const char* const DEFAULT_PASSWORD = "password";
 // I.E. If the difference between ERG target and Current watts were 30, and the Shift step is defined as 600 steps,
 // and ERG_Sensitivity were 1.0, ERG mode would move the stepper motor 600 steps to compensate. With an ERG_Sensitivity of 2.0, the stepper
 // would move 1200 steps to compensate, however ERG_Sensitivity values much different than 1.0 imply shiftStep has been improperly configured.
-#define ERG_SENSITIVITY 5.0
+#define ERG_SENSITIVITY 5.0f
 
 // Number of watts per shift expected by ERG mode for it's calculation. The user should target this number by adjusting Shift Step until WATTS_PER_SHIFT
 // is obtained as closely as possible during each shift.
@@ -109,7 +106,7 @@ const char* const DEFAULT_PASSWORD = "password";
 // This is used to set the lower travel limit for the motor.
 #define MIN_ECHELON_RESISTANCE 5
 
-// Maximum resistance on a Peloton Bike.
+// Maximum resistance on a Echelon Bike.
 // This is used to set the upper travel limit for the motor.
 #define MAX_ECHELON_RESISTANCE 30
 
@@ -208,7 +205,7 @@ const char* const DEFAULT_PASSWORD = "password";
 #define LED_PIN 2
 
 // Max tries that BLE client will perform on reconnect
-#define MAX_RECONNECT_TRIES 3
+#define MAX_RECONNECT_TRIES 1
 
 // loop speed for the SmartSpin2k BLE communications
 #define BLE_NOTIFY_DELAY 503
@@ -217,22 +214,26 @@ const char* const DEFAULT_PASSWORD = "password";
 #define BLE_CLIENT_DELAY 101
 
 // Number of devices that can be connected to the Client (myBLEDevices size)
-#define NUM_BLE_DEVICES 4
+#define NUM_BLE_DEVICES 3
 
 // loop speed for the Webserver
 #define WEBSERVER_DELAY 7
 
+// BLE Device Generic Names
+constexpr const char* NONE = "none";
+constexpr const char* ANY = "any";
+
 // Name of default Power Meter. any connects to anything, none connects to
 // nothing.
-#define CONNECTED_POWER_METER "any"
+#define CONNECTED_POWER_METER NONE
 
 // Name of default heart monitor. any connects to anything, none connects to
 // nothing.
-#define CONNECTED_HEART_MONITOR "any"
+#define CONNECTED_HEART_MONITOR NONE
 
 // Name of default remote. any connects to anything, none connects to
 // nothing.
-#define CONNECTED_REMOTE "none"
+#define CONNECTED_REMOTE NONE
 
 // number of main loops the shifters need to be held before a BLE scan is
 // initiated.
@@ -253,14 +254,23 @@ const char* const DEFAULT_PASSWORD = "password";
 
 #define RUNTIMECONFIG_JSON_SIZE 1000 + DEBUG_LOG_BUFFER_SIZE
 
+// Uncomment to use guardrails for ERG mode in the stepper loop.
+#define ERG_GUARDRAILS
+
+//Uncomment to enable the use of the power table for ERG mode.
+#define ERG_MODE_USE_POWER_TABLE
+
+// Uncomment to use the PID controller for ERG mode.
+#define ERG_MODE_USE_PID
+
 // PowerTable Version
-#define TABLE_VERSION 5
+#define TABLE_VERSION 6
 
 /* Number of entries in the ERG Power Lookup Table
  This is currently maintained as to keep memory usage lower and reduce the print output of the table.
  It can be depreciated in the future should we decide to remove logging of the torque table. Then it should be calculated in ERG_Mode.cpp
  by dividing userConfig->getMaxWatts() by POWERTABLE_INCREMENT.  */
-#define POWERTABLE_WATT_SIZE 40
+#define POWERTABLE_WATT_SIZE 30
 
 // Size of the second dimension of the table. The base (starting point) is calculated off of MINUMUM_TABLE_CAD
 #define POWERTABLE_CAD_SIZE 10
@@ -268,11 +278,20 @@ const char* const DEFAULT_PASSWORD = "password";
 // Size of increments (in watts) for the ERG Lookup Table. This needs to be a decimal for proper calculation.
 #define POWERTABLE_WATT_INCREMENT 30
 
+// Where does the CAD portion of the table start?
+#define MINIMUM_TABLE_CAD 60
+
 // Size of increments (in CAD) for the ERG Lookup Table. This needs to be a decimal for proper calculation.
 #define POWERTABLE_CAD_INCREMENT 5
 
 // Number of similar power samples to take before writing to the Power Table
-#define POWER_SAMPLES 5
+#define POWER_SAMPLES 10
+
+// Max downvotes that a neighbor can have
+#define MAX_NEIGHBOR_WEIGHT 2 * POWER_SAMPLES
+
+// Min downvotes that a neighbor can have
+#define MIN_NEIGHBOR_WEIGHT 0
 
 // How often in ms to save the power table if no new data is added and user is pedaling.
 #define POWER_TABLE_SAVE_INTERVAL 240000
@@ -280,12 +299,18 @@ const char* const DEFAULT_PASSWORD = "password";
 // Normal cadence value (used in power table and other areas)
 #define NORMAL_CAD 90
 
-// Where does the CAD portion of the table start?
-#define MINIMUM_TABLE_CAD 60
-
 // Minimum positions recorded in the active table before attempting to load the saved table.
 // Increase this value if the offset for the loaded table is inaccurate.
 #define MINIMUM_RELIABLE_POSITIONS 3
+
+// Limit power table size to save memory
+#define TABLE_DIVISOR 10.0f
+
+//Max distance a failed neighbor can be horizontally from target position
+#define HORIZONTAL_NEIGHBOR_RANGE 0.6f
+    
+//Max distance a failed neighbor can be vertically from target position
+#define VERTICAL_NEIGHBOR_RANGE 0.8f
 
 // Temperature of the ESP32 at which to start reducing the power output of the stepper motor driver.
 #define THROTTLE_TEMP 90
@@ -299,49 +324,42 @@ const char* const DEFAULT_PASSWORD = "password";
 // If not receiving Peloton Messages, how long to wait before next TX attempt is
 #define TX_CHECK_INTERVAL 20
 
-// If ble devices are both setup, how often to attempt a reconnect.
-#define BLE_RECONNECT_INTERVAL 1
-
 // Interval for polling ble battery updates
 #define BATTERY_UPDATE_INTERVAL_MILLIS 300000
 
-// Initial and web scan duration.
-#define DEFAULT_SCAN_DURATION 5
+// Initial and web scan duration in milliseconds
+#define DEFAULT_SCAN_DURATION 5000
 
 // Default homing sensitivity value
 #define DEFAULT_HOMING_SENSITIVITY 50
 
-// BLE automatic reconnect duration. Set this low to avoid interruption.
-#define BLE_RECONNECT_SCAN_DURATION 5
+// BLE automatic reconnect interval in milliseconds.
+#define BLE_RECONNECT_SCAN_INTERVAL 5000
 
 // Task Stack Sizes
-#define MAIN_STACK       6500
-#define BLE_CLIENT_STACK 6000
+// In theory you can subtract whatever is left in the report from DEBUG_STACK for each task
+#define MAIN_STACK       4500
+#define BLE_CLIENT_STACK 6000 //Scans and connects to BLE devices. Holds the BLE Notify Data. 
 
 // Uncomment to enable stack size debugging info
-// #define DEBUG_STACK
-
-// Uncomment to enable sending Telegram debug messages back to the chat
-// specified in telegram_token.h
-// #define USE_TELEGRAM
+#define DEBUG_STACK
 
 // Uncomment to enable HR->PWR debugging info. Always displays HR->PWR
 // Calculation. Never sets userConfig->setSimulatedPower();
 // #define DEBUG_HR_TO_PWR
 
-// Uncomment to enable HR->PWR enhanced torquetable debugging.
-// #define DEBUG_TORQUETABLE
+// Uncomment to enable power table logging.
+// #define DEBUG_POWERTABLE
 
-#ifdef USE_TELEGRAM
-// Max number of telegram messages to send per session
-#define MAX_TELEGRAM_MESSAGES 1
-// Filler definitions for if telegram_token.h is not included (because it has
-// sensitive information). Do not change these as this file is tracked and
-// therefore public. Enter your own Telegram info into telegram_token.h
-#if __has_include("telegram_token.h")
-#include "telegram_token.h"
-#else
-#define TELEGRAM_TOKEN   "1234567890:ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghi"
-#define TELEGRAM_CHAT_ID "1234567890"
-#endif
-#endif
+// Uncomment to enable BLE_TX_RX Logging
+// #define DEBUG_BLE_TX_RX
+
+// UNcomment to enable Custom Characteristic Logging
+// #define CUSTOM_CHAR_DEBUG
+
+// Uncomment to enable DirCon message logging to serial monitor (not logger)
+// #define DEBUG_DIRCON_MESSAGES
+
+// uncomment to enable bench testing of ptab4pwr
+// #define TEST_PTAB4PWR
+

@@ -7,7 +7,7 @@
 
 #pragma once
 
-#ifndef UNIT_TEST
+#ifndef PLATFORMIO_ENV_NATIVE
 #include <Arduino.h>
 #else
 #include <ArduinoFake.h>
@@ -123,6 +123,7 @@ class userParameters {
   int stepperSpeed;
   bool stepperDir;
   bool shifterDir;
+  bool pTab4Pwr              = false;
   bool udpLogEnabled         = false;
   int32_t hMin               = INT32_MIN;
   int32_t hMax               = INT32_MIN;
@@ -199,6 +200,9 @@ class userParameters {
   void setUdpLogEnabled(bool enabled) { udpLogEnabled = enabled; }
   bool getUdpLogEnabled() { return udpLogEnabled; }
 
+  void setPTab4Pwr(bool pTab) { pTab4Pwr = pTab; }
+  bool getPTab4Pwr() { return pTab4Pwr; }
+
   void setFoundDevices(String fdv) { foundDevices = fdv; }
   const char* getFoundDevices() { return foundDevices.c_str(); }
 
@@ -210,21 +214,6 @@ class userParameters {
 
   void setHomingSensitivity(int sensitivity) { homingSensitivity = sensitivity; }
   int getHomingSensitivity() { return homingSensitivity; }
-
-  void setDefaults();
-  String returnJSON();
-  void saveToLittleFS();
-  void loadFromLittleFS();
-  void printFile();
-};
-
-class physicalWorkingCapacity {
- public:
-  int session1HR;
-  int session1Pwr;
-  int session2HR;
-  int session2Pwr;
-  bool hr2Pwr;
 
   void setDefaults();
   String returnJSON();

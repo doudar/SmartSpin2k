@@ -1,0 +1,35 @@
+{
+    "version": "2.0.0",
+    "tasks": [
+        {
+            "label": "SmartSpin2k: Run Tests",
+            "type": "shell",
+            "command": "python",
+            "args": [
+                "${workspaceFolder}/run_tests.py"
+            ],
+            "group": {
+                "kind": "test",
+                "isDefault": true
+            },
+            "presentation": {
+                "reveal": "always",
+                "panel": "new",
+                "focus": true
+            },
+            "problemMatcher": []
+        },
+        {
+            "label": "SmartSpin2k: Run Tests (Direct)",
+            "type": "shell",
+            "command": "cd ${workspaceFolder}platformio test -e native",
+            "group": "test",
+            "presentation": {
+                "reveal": "always",
+                "panel": "new",
+                "focus": true
+            },
+            "problemMatcher": []
+        }
+    ]
+}

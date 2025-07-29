@@ -26,3 +26,28 @@ class TestPowerBuffer {
  public:
   static void set__should_set_values__expect_values_added_to_correct_index(void);
 };
+
+class TestPTLookupResistance {
+ public:
+  static void test_pt_lookup_resistance(void);
+};
+
+class TestPTLookupWatts {
+  public:
+   static void test_pt_lookup_watts(void);
+ };
+
+class TestLinearExtrapolate {
+  public:
+   static void test_linear_extrapolate(void);
+};
+
+class TestWritePowerTable {
+  public:
+    static void test_save_and_load(void);
+};
+
+class TestTableFill {
+  public:
+    static void test_fill_incomplete_table(void);
+};

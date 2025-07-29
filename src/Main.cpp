@@ -7,19 +7,23 @@
 
 #include "Main.h"
 #include "SS2KLog.h"
+#include "esp_system.h"
 #include <TMCStepper.h>
 #include <Arduino.h>
 #include <LittleFS.h>
 #include <HardwareSerial.h>
 #include "FastAccelStepper.h"
 #include "ERG_Mode.h"
+#include "Power_Table.h"
 #include "UdpAppender.h"
 #include "WebsocketAppender.h"
 #include "BLE_Custom_Characteristic.h"
+#include "BLE_Definitions.h"
 #include <Constants.h>
 #include "settings.h"
-#include "BLE_Wattbike_Service.h"
+// #include "BLE_Wattbike_Service.h"
 #include "BLE_Fitness_Machine_Service.h"
+#include "DirConManager.h"
 
 // Stepper Motor Serial
 HardwareSerial stepperSerial(2);
@@ -38,10 +42,11 @@ Boards boards;
 Board currentBoard;
 
 ///////////// Initialize the Config /////////////
-SS2K *ss2k                       = new SS2K;
-userParameters *userConfig       = new userParameters;
-RuntimeParameters *rtConfig      = new RuntimeParameters;
-physicalWorkingCapacity *userPWC = new physicalWorkingCapacity;
+ErgMode *ergMode            = new ErgMode;
+PowerTable *powerTable      = new PowerTable;
+SS2K *ss2k                  = new SS2K;
+userParameters *userConfig  = new userParameters;
+RuntimeParameters *rtConfig = new RuntimeParameters;
 
 ///////////// Log Appender /////////////
 UdpAppender udpAppender;
@@ -57,21 +62,11 @@ void SS2K::startTasks() {
 }
 
 void SS2K::stopTasks() {
-  SS2K_LOG(BLE_CLIENT_LOG_TAG, "Shutting Down all BLE services");
-  spinBLEClient.reconnectTries        = 0;
-  spinBLEClient.intentionalDisconnect = NUM_BLE_DEVICES;
-  if (NimBLEDevice::getInitialized()) {
-    NimBLEDevice::deinit();
-    ss2k->stopTasks();
-  }
-  SS2K_LOG(MAIN_LOG_TAG, "Stop BLE + ERG Tasks");
-  if (BLEClientTask != NULL) {
-    vTaskDelete(BLEClientTask);
-    BLEClientTask = NULL;
-  }
+  // In favor of stopping the tasks, BLE communications loop just disconnects all connected devices.
 }
 
-void setup() {
+extern "C" void app_main() {
+  initArduino();
   // Serial port for debugging purposes
   Serial.begin(115200);
   SS2K_LOG(MAIN_LOG_TAG, "Compiled %s%s", __DATE__, __TIME__);
@@ -99,8 +94,8 @@ void setup() {
   SS2K_LOG(MAIN_LOG_TAG, "Mounting Filesystem");
   if (!LittleFS.begin(false)) {
     SS2K_LOG(MAIN_LOG_TAG, "An Error has occurred while mounting LittleFS.");
-    LittleFS.format();                     // Format so that the settings can be saved.
-    vTaskDelay(100 / portTICK_PERIOD_MS);  // Provide some time for the format to happen.
+    LittleFS.format();  // Format so that the settings can be saved.
+    delay(100);         // Provide some time for the format to happen.
   }
 
   // Load Config
@@ -110,13 +105,12 @@ void setup() {
 
   // if we have homing data, use that instead.
   if (userConfig->getHMax() != INT32_MIN && userConfig->getHMin() != INT32_MIN) {
+    SS2K_LOG(MAIN_LOG_TAG, "Using homing data from config file.");
     spinBLEServer.spinDownFlag = 1;
   }
 
-  // load PWC for HR to Pwr Calculation
-  userPWC->loadFromLittleFS();
-  userPWC->printFile();
-  userPWC->saveToLittleFS();
+  // print littleFS free space and all file sizes on partition
+  Serial.printf("LittleFS Total Bytes:%lu, Used Bytes:%lu\n", LittleFS.totalBytes(), LittleFS.usedBytes());
 
   // Check for firmware update. It's important that this stays before BLE &
   // HTTP setup because otherwise they use too much traffic and the device
@@ -139,33 +133,50 @@ void setup() {
   ss2k->setupTMCStepperDriver();
 
   SS2K_LOG(MAIN_LOG_TAG, "Setting up cpu Tasks");
-  disableCore0WDT();  // Disable the watchdog timer on core 0 (so long stepper
-                      // moves don't cause problems)
+
+  // disableCore0WDT();  // Disable the watchdog timer on core 0 (so long stepper
+  //  moves don't cause problems)
 
   digitalWrite(LED_PIN, HIGH);
-
   // Configure and Initialize Logger
   logHandler.addAppender(&webSocketAppender);
   logHandler.addAppender(&udpAppender);
   logHandler.initialize();
-
   ss2k->startTasks();
   httpServer.start();
+
+  // Start DirCon TCP server for direct control over the bike trainer
+  SS2K_LOG(MAIN_LOG_TAG, "Starting DirCon TCP service");
+  if (DirConManager::start()) {
+    SS2K_LOG(MAIN_LOG_TAG, "DirCon TCP service started successfully");
+  } else {
+    SS2K_LOG(MAIN_LOG_TAG, "Failed to start DirCon TCP service");
+  }
+
+#ifdef TEST_PTAB4PWR
+  userConfig->setHMin(0);
+  userConfig->setHMax(27000);
+  rtConfig->setMaxStep(userConfig->getHMax());
+  rtConfig->setMinStep(userConfig->getHMin());
+  rtConfig->setHomed(true);
+  userConfig->setPTab4Pwr(true);
+  spinBLEServer.spinDownFlag = 0;
+#endif
 
   ss2k->resetIfShiftersHeld();
   SS2K_LOG(MAIN_LOG_TAG, "Creating Shifter Interrupts");
   // Setup Interrupts so shifters work anytime
-  attachInterrupt(digitalPinToInterrupt(currentBoard.shiftUpPin), ss2k->shiftUp, CHANGE);
-  attachInterrupt(digitalPinToInterrupt(currentBoard.shiftDownPin), ss2k->shiftDown, CHANGE);
+  attachInterrupt(digitalPinToInterrupt(currentBoard.shiftUpPin), ss2k->handleShift, CHANGE);
+  attachInterrupt(digitalPinToInterrupt(currentBoard.shiftDownPin), ss2k->handleShift, CHANGE);
   digitalWrite(LED_PIN, HIGH);
 
-  xTaskCreatePinnedToCore(SS2K::maintenanceLoop,     /* Task function. */
-                          "maintenanceLoopFunction", /* name of task. */
-                          MAIN_STACK,                /* Stack size of task */
-                          NULL,                      /* parameter of the task */
-                          20,                        /* priority of the task */
-                          &maintenanceLoopTask,      /* Task handle to keep track of created task */
-                          1);                        /* pin task to core */
+  xTaskCreate(SS2K::maintenanceLoop,     /* Task function. */
+              "maintenanceLoopFunction", /* name of task. */
+              MAIN_STACK,                /* Stack size of task */
+              NULL,                      /* parameter of the task */
+              10,                        /* priority of the task */
+              &maintenanceLoopTask       /* Task handle to keep track of created task */
+  );                                     /* pin task to core */
 }
 
 void loop() {  // Delete this task so we can make one that's more memory efficient.
@@ -173,28 +184,40 @@ void loop() {  // Delete this task so we can make one that's more memory efficie
 }
 
 void SS2K::maintenanceLoop(void *pvParameters) {
-  static unsigned long intervalTimer  = millis();
   static unsigned long intervalTimer2 = millis();
   static unsigned long rebootTimer    = millis();
-  static bool isScanning              = false;
 
   while (true) {
-    vTaskDelay(5 / portTICK_RATE_MS);
+    delay(5);
 
-    // Run what used to be in the BLECommunications Task.
-    BLECommunications();
+    // be quiet while updating via BLE
+    if (!ss2k->isUpdating) {
+      static unsigned long bleTimer = millis();
+      // 500ms
+      if ((millis() - bleTimer) > BLE_NOTIFY_DELAY) {
+        BLECommunications();
+        logHandler.writeLogs();
+        webSocketAppender.Loop();
+        bleTimer = millis();
+      }
+      // Don't do these if updating and in spindown mode.
+      if (!spinBLEServer.spinDownFlag) {
+        ss2k->moveStepper();
+        ss2k->FTMSModeShiftModifier();
+        ergMode->runERG();
+      }
+      // wattbikeService.parseNemit();
+    }
+
     // send BLE notification for any userConfig values that changed.
     BLE_ss2kCustomCharacteristic::parseNemit();
     // Update Zwift Gear UI if shift happened
-    wattbikeService.parseNemit();
-    // Run What used to be in the Stepper Task.
-    ss2k->moveStepper();
-    // Run what used to be in the ERG Mode Task.
-    powerTable->runERG();
-    // Run what used to be in the WebClient Task.
+
     httpServer.webClientUpdate();
+    // Update DirCon protocol
+    DirConManager::update();
     // If we're in ERG mode, modify shift commands to inc/dec the target watts instead.
-    ss2k->FTMSModeShiftModifier();
+
     // If we have a resistance bike attached, slow down when we're close to the limits.
     if (ss2k->pelotonIsConnected && !rtConfig->getHomed() && !spinBLEServer.spinDownFlag) {
       int speed           = userConfig->getStepperSpeed();
@@ -235,11 +258,11 @@ void SS2K::maintenanceLoop(void *pvParameters) {
     // Handle flag set for rebooting
     if (ss2k->rebootFlag) {
       static bool _loopOnce = false;
-      vTaskDelay(1000 / portTICK_RATE_MS);
+      delay(1000);
       // Let the main task loop complete once before rebooting
       if (_loopOnce) {
         // Important to keep this delay high in order to allow coms to finish.
-        vTaskDelay(1000 / portTICK_RATE_MS);
+        delay(1000);
         ESP.restart();
       }
       _loopOnce = true;
@@ -259,14 +282,6 @@ void SS2K::maintenanceLoop(void *pvParameters) {
     if (ss2k->saveFlag) {
       ss2k->saveFlag = false;
       userConfig->saveToLittleFS();
-      userPWC->saveToLittleFS();
-    }
-
-    // Things to do every one seconds
-    if ((millis() - intervalTimer) > 1003) {
-      logHandler.writeLogs();
-      webSocketAppender.Loop();
-      intervalTimer = millis();
     }
 
     // Things to do every 6 seconds
@@ -280,7 +295,7 @@ void SS2K::maintenanceLoop(void *pvParameters) {
         // Inactivity detected
         if (((millis() - rebootTimer) > 1800000)) {
           // Timer expired
-          SS2K_LOGW(MAIN_LOG_TAG, "Rebooting due to inactivity.");
+          SS2K_LOG(MAIN_LOG_TAG, "Rebooting due to inactivity.");
           ss2k->rebootFlag = true;
           logHandler.writeLogs();
           webSocketAppender.Loop();
@@ -295,10 +310,15 @@ void SS2K::maintenanceLoop(void *pvParameters) {
       }
 
 #ifdef DEBUG_STACK
-      Serial.printf("Main Task: %d \n", uxTaskGetStackHighWaterMark(maintenanceLoopTask));
-      Serial.printf("Free Heap: %d \n", ESP.getFreeHeap());
-      Serial.printf("Best Blok: %d \n", heap_caps_get_largest_free_block(MALLOC_CAP_8BIT));
+      SS2K_LOG(MAIN_LOG_TAG, "Main Task: %d", uxTaskGetStackHighWaterMark(maintenanceLoopTask));
+      SS2K_LOG(MAIN_LOG_TAG, "BLEClient: %d", uxTaskGetStackHighWaterMark(BLEClientTask));
+      SS2K_LOG(MAIN_LOG_TAG, "Min Heap: %d", esp_get_minimum_free_heap_size());
+      SS2K_LOG(MAIN_LOG_TAG, "Free Heap: %d", esp_get_free_heap_size());
+      SS2K_LOG(MAIN_LOG_TAG, "Best Block: %d", heap_caps_get_largest_free_block(MALLOC_CAP_8BIT));
 #endif  // DEBUG_STACK
+      // Log userParameters
+      SS2K_LOG(MAIN_LOG_TAG, "PM Con %d, CAD con %d, HRM Con %d, W %d, Cad %d, HR %d, Gear %d, Target Position %d", spinBLEClient.connectedPM, spinBLEClient.connectedCD,
+               spinBLEClient.connectedHRM, rtConfig->watts.getValue(), rtConfig->cad.getValue(), rtConfig->hr.getValue(), rtConfig->getShifterPosition(), ss2k->targetPosition);
 
       intervalTimer2 = millis();
     }
@@ -308,9 +328,6 @@ void SS2K::maintenanceLoop(void *pvParameters) {
 #endif  // UNIT_TEST
 
 void SS2K::FTMSModeShiftModifier() {
-  if (spinBLEServer.spinDownFlag) {
-    return;
-  }
   int shiftDelta = rtConfig->getShifterPosition() - ss2k->lastShifterPosition;
   if (shiftDelta) {  // Shift detected
     switch (rtConfig->getFTMSMode()) {
@@ -356,9 +373,11 @@ void SS2K::FTMSModeShiftModifier() {
       {
         SS2K_LOG(MAIN_LOG_TAG, "Shift %+d pos %d tgt %d min %d max %d r_min %d r_max %d", shiftDelta, rtConfig->getShifterPosition(), ss2k->targetPosition, rtConfig->getMinStep(),
                  rtConfig->getMaxStep(), rtConfig->getMinResistance(), rtConfig->getMaxResistance());
-
-        if (((ss2k->targetPosition + shiftDelta * userConfig->getShiftStep()) < rtConfig->getMinStep()) ||
-            ((ss2k->targetPosition + shiftDelta * userConfig->getShiftStep()) > rtConfig->getMaxStep())) {
+        // Block Shifts further out of bounds
+        if (((ss2k->targetPosition + shiftDelta * userConfig->getShiftStep()) < rtConfig->getMinStep()) && (shiftDelta < 0)) {
+          SS2K_LOG(MAIN_LOG_TAG, "Shift Blocked by stepper limits.");
+          rtConfig->setShifterPosition(ss2k->lastShifterPosition);
+        } else if ((ss2k->targetPosition + shiftDelta * userConfig->getShiftStep()) > rtConfig->getMaxStep() && (shiftDelta > 0)) {
           SS2K_LOG(MAIN_LOG_TAG, "Shift Blocked by stepper limits.");
           rtConfig->setShifterPosition(ss2k->lastShifterPosition);
         } else if (rtConfig->getHomed()) {
@@ -385,23 +404,21 @@ void SS2K::FTMSModeShiftModifier() {
 
 void SS2K::restartWifi() {
   httpServer.stop();
-  vTaskDelay(100 / portTICK_RATE_MS);
+  delay(100);
   stopWifi();
-  vTaskDelay(100 / portTICK_RATE_MS);
+  delay(100);
   startWifi();
   httpServer.start();
 }
 
 void SS2K::moveStepper() {
-  if (spinBLEServer.spinDownFlag) {
-    return;
-  }
   bool _stepperDir = userConfig->getStepperDir();
   if (stepper) {
     ss2k->stepperIsRunning = stepper->isRunning();
     ss2k->currentPosition  = stepper->getCurrentPosition();
     if (!ss2k->externalControl) {
       if ((rtConfig->getFTMSMode() == FitnessMachineControlPointProcedure::SetTargetPower)) {
+#ifdef ERG_GUARDRAILS
         // don't drive lower out of bounds. This is a final test that should never happen.
         if ((stepper->getCurrentPosition() > rtConfig->getTargetIncline()) && (rtConfig->watts.getValue() < rtConfig->watts.getTarget())) {
           rtConfig->setTargetIncline(stepper->getCurrentPosition() + 1);
@@ -410,6 +427,7 @@ void SS2K::moveStepper() {
         if ((stepper->getCurrentPosition() < rtConfig->getTargetIncline()) && (rtConfig->watts.getValue() > rtConfig->watts.getTarget())) {
           rtConfig->setTargetIncline(stepper->getCurrentPosition() - 1);
         }
+#endif
         ss2k->targetPosition = rtConfig->getTargetIncline();
       } else if (rtConfig->getFTMSMode() == FitnessMachineControlPointProcedure::SetTargetResistanceLevel) {
         rtConfig->setTargetIncline(ss2k->currentPosition + ((rtConfig->resistance.getTarget() - rtConfig->resistance.getValue()) * 20));
@@ -475,39 +493,31 @@ void SS2K::moveStepper() {
     if (_stepperDir != userConfig->getStepperDir()) {  // User changed the config direction of the stepper wires
       _stepperDir = userConfig->getStepperDir();
       while (stepper->isRunning()) {  // Wait until the motor stops running
-        vTaskDelay(100 / portTICK_PERIOD_MS);
+        delay(100);
       }
       stepper->setDirectionPin(currentBoard.dirPin, _stepperDir);
     }
   }
 }
 
-bool IRAM_ATTR SS2K::deBounce() {
-  if ((millis() - lastDebounceTime) > debounceDelay) {  // <----------------This should be assigned it's own task and just switch a global bool whatever the reading is at, it's
-                                                        // been there for longer than the debounce delay, so take it as the actual current state: if the button state has changed:
-    lastDebounceTime = millis();
+bool SS2K::deBounce() {
+  if ((millis() - ss2k->lastDebounceTime) >
+      ss2k->debounceDelay) {  // <----------------This should be assigned it's own task and just switch a global bool whatever the reading is at, it's
+                              // been there for longer than the debounce delay, so take it as the actual current state: if the button state has changed:
+    ss2k->lastDebounceTime = millis();
     return true;
   }
-
   return false;
 }
 
 ///////////// Interrupt Functions /////////////
-void IRAM_ATTR SS2K::shiftUp() {  // Handle the shift up interrupt IRAM_ATTR is to keep the interrupt code in ram always
+void ARDUINO_ISR_ATTR SS2K::handleShift() {  // Handle the shift up interrupt IRAM_ATTR is to keep the interrupt code in ram always
   if (ss2k->deBounce()) {
     if (!digitalRead(currentBoard.shiftUpPin)) {  // double checking to make sure the interrupt wasn't triggered by emf
       rtConfig->setShifterPosition(rtConfig->getShifterPosition() - 1 + userConfig->getShifterDir() * 2);
       // Stop homing initiation
       spinBLEServer.spinDownFlag = 0;
-    } else {
-      ss2k->lastDebounceTime = 0;
-    }  // Probably Triggered by EMF, reset the debounce
-  }
-}
-
-void IRAM_ATTR SS2K::shiftDown() {  // Handle the shift down interrupt
-  if (ss2k->deBounce()) {
-    if (!digitalRead(currentBoard.shiftDownPin)) {  // double checking to make sure the interrupt wasn't triggered by emf
+    } else if (!digitalRead(currentBoard.shiftDownPin)) {  // double checking to make sure the interrupt wasn't triggered by emf
       rtConfig->setShifterPosition(rtConfig->getShifterPosition() + 1 - userConfig->getShifterDir() * 2);
       // Stop homing initiation
       spinBLEServer.spinDownFlag = 0;
@@ -522,15 +532,15 @@ void SS2K::resetIfShiftersHeld() {
     SS2K_LOG(MAIN_LOG_TAG, "Resetting to defaults via shifter buttons.");
     for (int x = 0; x < 10; x++) {  // blink fast to acknowledge
       digitalWrite(LED_PIN, HIGH);
-      vTaskDelay(200 / portTICK_PERIOD_MS);
+      delay(200);
       digitalWrite(LED_PIN, LOW);
     }
     for (int i = 0; i < 20; i++) {
       LittleFS.format();
       userConfig->setDefaults();
-      vTaskDelay(200 / portTICK_PERIOD_MS);
+      delay(200);
       userConfig->saveToLittleFS();
-      vTaskDelay(200 / portTICK_PERIOD_MS);
+      delay(200);
     }
     ESP.restart();
   }
@@ -565,81 +575,81 @@ void SS2K::setupTMCStepperDriver(bool reset) {
   this->setCurrentPosition(stepper->getCurrentPosition());
 }
 
+#define HOME_TIMEOUT 30000
 void SS2K::goHome(bool bothDirections) {
   if (stepper) {
+    unsigned long int timeoutTimer = millis();
     if (currentBoard.name != r2_NAME) {
       SS2K_LOG(MAIN_LOG_TAG, "Board Doesn't support homing");
-      fitnessMachineService.spinDown(0x02);
+      fitnessMachineService.spinDown(FitnessMachineStatus::SpinDown_Error); 
       return;
     }
     SS2K_LOG(MAIN_LOG_TAG, "Homing...");
     SS2K_LOG(MAIN_LOG_TAG, "Updating driver...");
-    fitnessMachineService.spinDown(0x01);
+    fitnessMachineService.spinDown(FitnessMachineStatus::SpinDown_SpinDownRequested); 
     updateStepperPower(userConfig->getStepperPower() * .2);
-    vTaskDelay(50 / portTICK_PERIOD_MS);
+    delay(50);
     driver.irun(0x02);  // low power
-    vTaskDelay(50 / portTICK_PERIOD_MS);
+    delay(50);
     driver.ihold(0x01);
-    vTaskDelay(50 / portTICK_PERIOD_MS);
+    delay(50);
     int threshold = 0;
     bool stalled  = false;
-    // Back off limit in case we are alread here.
+    // Back off limit in case we are already here.
     stepper->move(userConfig->getShiftStep(), true);
     this->updateStepperSpeed(1500);
-    vTaskDelay(500 / portTICK_PERIOD_MS);
+    delay(500);
     stepper->runBackward();
-    vTaskDelay(250 / portTICK_PERIOD_MS);
+    delay(250);
     threshold = driver.SG_RESULT();
     Serial.printf("%d ", driver.SG_RESULT());
-    vTaskDelay(300 / portTICK_PERIOD_MS);
-    fitnessMachineService.spinDown(0x04);
-    while (!stalled) {
+    delay(300);
+    fitnessMachineService.spinDown(FitnessMachineStatus::SpinDown_StopPedaling);
+    while (!stalled && ((millis() - timeoutTimer) < HOME_TIMEOUT)) {
       if (abs(rtConfig->getShifterPosition() - ss2k->lastShifterPosition)) {  // let the user abort with the shift button.
-        userConfig->setHMin(INT32_MIN);
-        userConfig->setHMax(INT32_MIN);
-        return;
+        break;
       }
       stalled = (driver.SG_RESULT() < threshold - userConfig->getHomingSensitivity());
     }
     stepper->forceStop();
-    vTaskDelay(100 / portTICK_PERIOD_MS);
+    delay(100);
     stepper->moveTo(stepper->getCurrentPosition() + userConfig->getShiftStep());
     while (stepper->isRunning()) {
-      vTaskDelay(10 / portTICK_PERIOD_MS);
+      delay(10);
     }
     stepper->setCurrentPosition((int32_t)0);
     ss2k->setTargetPosition(0);
     rtConfig->setMinStep(0);
+    timeoutTimer = millis();
     SS2K_LOG(MAIN_LOG_TAG, "Min Position found: %d.", rtConfig->getMinStep());
     stalled = false;
-    fitnessMachineService.spinDown(0x02);
+    fitnessMachineService.spinDown(FitnessMachineStatus::SpinDown_Success); 
     if (bothDirections) {
-      // Back off limit in case we are alread here.
+      // Back off limit in case we are already here.
       this->updateStepperSpeed(1500);
-      vTaskDelay(500 / portTICK_PERIOD_MS);
+      delay(500);
       stepper->runForward();
-      vTaskDelay(1000 / portTICK_PERIOD_MS);  // wait until stable
-      threshold = driver.SG_RESULT();         // take reading
+      delay(1000);                     // wait until stable
+      threshold = driver.SG_RESULT();  // take reading
       Serial.printf("%d ", driver.SG_RESULT());
-      vTaskDelay(250 / portTICK_PERIOD_MS);
-      while (!stalled) {
+      delay(250);
+      while (!stalled && ((millis() - timeoutTimer) < HOME_TIMEOUT)) {
         if (abs(rtConfig->getShifterPosition() - ss2k->lastShifterPosition)) {  // let the user abort with the shift button.
-          userConfig->setHMin(INT32_MIN);
-          userConfig->setHMax(INT32_MIN);
-          return;
+          break;
         }
         stalled = (driver.SG_RESULT() < threshold - userConfig->getHomingSensitivity());
       }
       stepper->forceStop();
-      fitnessMachineService.spinDown(0x02);
-      vTaskDelay(500 / portTICK_PERIOD_MS);
+      fitnessMachineService.spinDown(FitnessMachineStatus::SpinDown_Success);
+      delay(500);
       rtConfig->setMaxStep(stepper->getCurrentPosition() - 200);
       SS2K_LOG(MAIN_LOG_TAG, "Max Position found: %d.", rtConfig->getMaxStep());
       this->updateStepperSpeed();
       stepper->moveTo(0, true);
     }
   }
-  fitnessMachineService.spinDown(0x02);
+  // Use 'Success' status from the spec
+  fitnessMachineService.spinDown(FitnessMachineStatus::SpinDown_Success);
   // Start Saving Settings
   if (bothDirections) {
     userConfig->setHMin(rtConfig->getMinStep());
@@ -650,6 +660,7 @@ void SS2K::goHome(bool bothDirections) {
   userConfig->saveToLittleFS();
   rtConfig->setHomed(true);
   this->setupTMCStepperDriver(true);
+  rtConfig->setShifterPosition(0);
   ss2k->setTargetPosition(0);
 }
 
@@ -686,31 +697,14 @@ void SS2K::updateStepperSpeed(int speed) {
     speed = userConfig->getStepperSpeed();
   }
   int s = stepper->getSpeedInMilliHz() / 1000;
-  //Because the conversion to/from the TMC driver is not perfect, we need to allow a little bit of slop.
-  //Skip the update if the speed is within 5 of the target.
-  if (abs(s-speed) < 5) {
+  // Because the conversion to/from the TMC driver is not perfect, we need to allow a little bit of slop.
+  // Skip the update if the speed is within 5 of the target.
+  if (abs(s - speed) < 5) {
     return;
   }
   speed = speed;
-  //SS2K_LOG(MAIN_LOG_TAG, "StepperSpeed is now %d, %d", speed, s);
+  // SS2K_LOG(MAIN_LOG_TAG, "StepperSpeed is now %d, %d", speed, s);
   stepper->setSpeedInHz(speed);
-}
-
-// Checks the driver temperature and throttles power if above threshold.
-void SS2K::checkDriverTemperature() {
-  static bool overTemp = false;
-  if (static_cast<int>(temperatureRead()) > THROTTLE_TEMP) {  // Start throttling driver power at 72C on the ESP32
-    uint8_t throttledPower = (THROTTLE_TEMP - static_cast<int>(temperatureRead())) + currentBoard.pwrScaler;
-    driver.irun(throttledPower);
-    SS2K_LOG(MAIN_LOG_TAG, "Over temp! Driver is throttling down! ESP32 @ %f C", temperatureRead());
-    overTemp = true;
-  } else if (static_cast<int>(temperatureRead()) < THROTTLE_TEMP) {
-    if (overTemp) {
-      SS2K_LOG(MAIN_LOG_TAG, "Temperature is now under control. Driver current reset.");
-      driver.irun(currentBoard.pwrScaler);
-    }
-    overTemp = false;
-  }
 }
 
 void SS2K::txSerial() {  // Serial.printf(" Before TX ");

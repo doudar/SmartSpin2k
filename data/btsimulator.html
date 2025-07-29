@@ -1,124 +1,17 @@
 <!DOCTYPE html>
 <html lang="en">
-
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width,initial-scale=1">
   <title>SmartSpin2k BLE Simulator</title>
+  <link rel="stylesheet" href="style.css">
   <style>
-    html {
-      background-color: #03245c
-    }
-    
-    .setting-group .value-display,
-    .setting-group .slider-group {
-      display: none;
-    }
-
-    .setting-group {
-      display: flex;
-      flex-direction: column;
-      align-items: center;
-      text-align: center;
-      background: rgba(3, 37, 76, 0.6);
-      padding: 1rem;
-      border-radius: 12px;
-    }
-
-    .slider-group {
-      background: rgba(0, 0, 0, 0.3);
-      padding: 0.5rem;
-      border-radius: 8px;
-      width: 100%;
-      height: 1rem;
-      max-width: 300px;
-      display: flex;
-      flex-direction: column;
-      gap: 0.25rem;
-    }
-
-    .slider-container {
-      width: 100%;
-      margin: 0;
-      height: 20px;
-      -webkit-appearance: none;
-      appearance: none;
-      background: transparent;
-    }
-
-    .slider-container::-webkit-slider-thumb {
-      -webkit-appearance: none;
-      appearance: none;
-      width: 16px;
-      height: 16px;
-      border-radius: 50%;
-      background: #2196F3;
-      cursor: pointer;
-      margin-top: -6px;
-    }
-
-    .slider-container::-webkit-slider-runnable-track {
-      width: 100%;
-      height: 4px;
-      background: #fff;
-      border-radius: 2px;
-    }
-
-    .slider-container::-moz-range-thumb {
-      width: 16px;
-      height: 16px;
-      border-radius: 50%;
-      background: #2196F3;
-      cursor: pointer;
-      border: none;
-    }
-
-    .slider-container::-moz-range-track {
-      width: 100%;
-      height: 4px;
-      background: #fff;
-      border-radius: 2px;
-    }
-
-    .value-display {
-      display: flex;
-      justify-content: center;
-      align-items: center;
-      width: 100%;
-      gap: 1rem;
-      margin-top: 0.25rem;
-      min-height: 24px;
-      flex-wrap: wrap;
-    }
-
-    .setting-group:last-child .value-display {
-      padding: 0.25rem;
-      box-sizing: border-box;
-    }
-
-    .setting-group:last-child .value-display .switch {
-      margin: 0;
-    }
-
-    .settings-section {
-      display: grid;
-      gap: 2rem;
-      grid-template-columns: 1fr;
-    }
-
-    @media (min-width: 768px) {
-      .settings-section {
-        grid-template-columns: repeat(2, 1fr);
-      }
-    }
-
-    h2 {
-      color: #fff;
-      margin-top: 0;
-    }
+    .sim-control{display:none}
+    .setting-header{display:flex;justify-content:space-between;align-items:center}
+    .disabled{opacity:0.5}
+    .auto-update-label{display:flex;align-items:center;gap:0.5rem}
   </style>
 </head>
-
 <body>
   <div class="page-container">
     <header>
@@ -131,38 +24,56 @@
     <main>
       <div id="loadingWatermark" class="watermark" aria-hidden="true">Loading</div>
       <h1 class="brand">BLE Simulator</h1>
-      <div class="settings-section">
+      
+      <div class="settings-grid">
+        <!-- Heart Rate Simulation -->
         <div class="setting-group">
-          <!-- Heart Rate Simulation -->
-          <h2>Simulate Heart Rate</h2>
-          <label class="switch">
-            <input type="checkbox" id="hrOutput" onchange="toggleHRCheckbox(this,true)">
-            <span class="slider"></span>
-          </label>
-          <div class="slider-group">
-            <input type="range" id="hrSlider" min="40" max="250" value="0" step="1" onchange="updateHrSlider()"
-              class="slider-container">
-            <div class="value-display">
-              <span id="hrValue">-- BPM</span>
+          <div class="setting-header">
+            <h2>Simulate Heart Rate</h2>
+            <label class="switch">
+              <input type="checkbox" id="hrOutput" onchange="toggleHRCheckbox(this,true)">
+              <span class="slider"></span>
+            </label>
+          </div>
+          <div class="sim-control" id="hrControls">
+            <div class="slider-group">
+              <div class="value-display">
+                <span id="hrValue" class="gear-value">40</span><span>BPM</span>
+              </div>
+              <div style="display: flex; align-items: center; gap: 0.25rem; width: 100%; box-sizing: border-box;">
+                <button type="button" class="adjust-button" onclick="incrementSlider('hrSlider', -1)">-</button>
+                <input type="range" id="hrSlider" min="40" max="250" value="40" step="1" onchange="updateSlider('hrSlider')" class="slider-container">
+                <button type="button" class="adjust-button" onclick="incrementSlider('hrSlider', 1)">+</button>
+              </div>
             </div>
           </div>
         </div>
 
         <!-- Power Output Simulation -->
         <div class="setting-group">
-          <h2>Simulate Power Output</h2>
-          <label class="switch">
-            <input type="checkbox" id="wattsOutput" onchange="toggleWattsCheckbox(this,true)">
-            <span class="slider"></span>
-          </label>
-          <div class="slider-group">
-            <input type="range" id="wattsSlider" min="0" max="600" value="0" step="1" onchange="updateWattsSlider()"
-              class="slider-container">
-            <div class="value-display">
-              <span id="wattsValue">-- W</span>
-              <label class="auto-update">
-                <input type="checkbox" id="autoUpdateWatts" onclick="autoUpdateWattsClick()">
-                Auto Update
+          <div class="setting-header">
+            <h2>Simulate Power Output</h2>
+            <label class="switch">
+              <input type="checkbox" id="wattsOutput" onchange="toggleWattsCheckbox(this,true)">
+              <span class="slider"></span>
+            </label>
+          </div>
+          <div class="sim-control" id="wattsControls">
+            <div class="slider-group">
+              <div class="value-display">
+                <span id="wattsValue" class="gear-value">0</span><span>Watts</span>
+              </div>
+              <div style="display: flex; align-items: center; gap: 0.25rem; width: 100%; box-sizing: border-box;">
+                <button type="button" class="adjust-button" onclick="incrementSlider('wattsSlider', -5)">-</button>
+                <input type="range" id="wattsSlider" min="0" max="600" value="0" step="1" onchange="updateSlider('wattsSlider')" class="slider-container">
+                <button type="button" class="adjust-button" onclick="incrementSlider('wattsSlider', 5)">+</button>
+              </div>
+            </div>
+            <div class="toggle-group" style="margin-top: 0.5rem;">
+              <span>Auto Update</span>
+              <label class="switch">
+                <input type="checkbox" id="autoUpdateWatts" onclick="autoUpdateClick('wattsSlider', 5)">
+                <span class="slider"></span>
               </label>
             </div>
           </div>
@@ -170,19 +81,29 @@
 
         <!-- Cadence Simulation -->
         <div class="setting-group">
-          <h2>Simulate Cadence</h2>
-          <label class="switch">
-            <input type="checkbox" id="cadOutput" onchange="toggleCadCheckbox(this,true)">
-            <span class="slider"></span>
-          </label>
-          <div class="slider-group">
-            <input type="range" id="cadSlider" min="0" max="180" value="0" step="1" onchange="updateCadSlider()"
-              class="slider-container">
-            <div class="value-display">
-              <span id="cadValue">-- RPM</span>
-              <label class="auto-update">
-                <input type="checkbox" id="autoUpdateCadence" onclick="autoUpdateCadenceClick()">
-                Auto Update
+          <div class="setting-header">
+            <h2>Simulate Cadence</h2>
+            <label class="switch">
+              <input type="checkbox" id="cadOutput" onchange="toggleCadCheckbox(this,true)">
+              <span class="slider"></span>
+            </label>
+          </div>
+          <div class="sim-control" id="cadControls">
+            <div class="slider-group">
+              <div class="value-display">
+                <span id="cadValue" class="gear-value">0</span><span>RPM</span>
+              </div>
+              <div style="display: flex; align-items: center; gap: 0.25rem; width: 100%; box-sizing: border-box;">
+                <button type="button" class="adjust-button" onclick="incrementSlider('cadSlider', -1)">-</button>
+                <input type="range" id="cadSlider" min="0" max="180" value="0" step="1" onchange="updateSlider('cadSlider')" class="slider-container">
+                <button type="button" class="adjust-button" onclick="incrementSlider('cadSlider', 1)">+</button>
+              </div>
+            </div>
+            <div class="toggle-group" style="margin-top: 0.5rem;">
+              <span>Auto Update</span>
+              <label class="switch">
+                <input type="checkbox" id="autoUpdateCadence" onclick="autoUpdateClick('cadSlider', 3)">
+                <span class="slider"></span>
               </label>
             </div>
           </div>
@@ -190,210 +111,183 @@
 
         <!-- ERG Mode Simulation -->
         <div class="setting-group">
-          <h2>Simulate ERG Mode</h2>
-          <label class="switch">
-            <input type="checkbox" id="enableErgCheckbox" onchange="toggleEnableErgCheckbox(this)">
-            <span class="slider"></span>
-          </label>
-          <div class="slider-group">
-            <input type="range" id="targetWattsSlider" min="0" max="600" value="0" step="1"
-              onchange="updateTargetWattsSlider()" class="slider-container">
-            <div class="value-display">
-              <span id="targetWattsValue">-- W</span>
-              <div class="auto-update">
-                <label class="switch">
-                  <input type="checkbox" id="targetWattsOutput" onchange="toggleTargetWattsCheckbox(this,true)">
-                  <span class="slider"></span>
-                </label>
+          <div class="setting-header">
+            <h2>Simulate ERG Mode</h2>
+            <label class="switch">
+              <input type="checkbox" id="enableErgCheckbox" onchange="toggleEnableErgCheckbox(this)">
+              <span class="slider"></span>
+            </label>
+          </div>
+          <div class="sim-control" id="ergControls">
+            <div class="slider-group">
+              <div class="value-display">
+                <span id="targetWattsValue" class="gear-value">0</span><span>Watts</span>
               </div>
+              <div style="display: flex; align-items: center; gap: 0.25rem; width: 100%; box-sizing: border-box;">
+                <button type="button" class="adjust-button" onclick="incrementSlider('targetWattsSlider', -5)">-</button>
+                <input type="range" id="targetWattsSlider" min="0" max="600" value="0" step="1" onchange="updateSlider('targetWattsSlider')" class="slider-container">
+                <button type="button" class="adjust-button" onclick="incrementSlider('targetWattsSlider', 5)">+</button>
+              </div>
+            </div>
+            <div class="toggle-group" style="margin-top: 0.5rem;">
+              <span>Target Watts Enabled</span>
+              <label class="switch">
+                <input type="checkbox" id="targetWattsOutput" onchange="toggleTargetWattsCheckbox(this,true)">
+                <span class="slider"></span>
+              </label>
             </div>
           </div>
         </div>
       </div>
-    </div>
-  </main>
-</div>
+    </main>
+  </div>
 
-<script>
-  // Update values on specified interval
-  setInterval(requestConfigValues, 2000);
+  <script>
+    // Update values on specified interval
+    setInterval(requestConfigValues, 2000);
 
-  function toggleHRCheckbox(element, updateServer) {
-    const settingGroup = element.closest('.setting-group');
-    const contentToHide = settingGroup.querySelectorAll('.value-display, .slider-group');
-    contentToHide.forEach(el => el.style.display = element.checked ? 'block' : 'none');
+    function toggleHRCheckbox(element, updateServer) {
+      document.getElementById('hrControls').style.display = element.checked ? 'block' : 'none';
 
-    if (updateServer) {
-      fetch('/hrslider?value=' + (element.checked ? 'enable' : 'disable'), { method: 'GET' })
+      if (updateServer) {
+        fetch('/hrslider?value=' + (element.checked ? 'enable' : 'disable'), { method: 'GET' })
+          .catch(error => console.error('Error:', error));
+      }
+    }
+
+    function toggleWattsCheckbox(element, updateServer) {
+      document.getElementById('wattsControls').style.display = element.checked ? 'block' : 'none';
+
+      if (updateServer) {
+        fetch('/wattsslider?value=' + (element.checked ? 'enable' : 'disable'), { method: 'GET' })
+          .catch(error => console.error('Error:', error));
+      }
+    }
+
+    function toggleCadCheckbox(element, updateServer) {
+      document.getElementById('cadControls').style.display = element.checked ? 'block' : 'none';
+
+      if (updateServer) {
+        fetch('/cadslider?value=' + (element.checked ? 'enable' : 'disable'), { method: 'GET' })
+          .catch(error => console.error('Error:', error));
+      }
+    }
+
+    function incrementSlider(sliderId, amount) {
+      const slider = document.getElementById(sliderId);
+      const currentValue = parseInt(slider.value);
+      const newValue = Math.max(parseInt(slider.min), Math.min(parseInt(slider.max), currentValue + amount));
+      slider.value = newValue;
+      updateSlider(sliderId);
+    }
+
+    function updateSlider(sliderId) {
+      const value = document.getElementById(sliderId).value;
+      const valueDisplay = document.getElementById(sliderId.replace('Slider', 'Value'));
+      valueDisplay.innerHTML = value;
+      
+      let endpoint;
+      switch (sliderId) {
+        case 'hrSlider': endpoint = '/hrslider'; break;
+        case 'wattsSlider': endpoint = '/wattsslider'; break;
+        case 'cadSlider': endpoint = '/cadslider'; break;
+        case 'targetWattsSlider': endpoint = '/targetwattsslider'; break;
+      }
+      
+      fetch(endpoint + '?value=' + value, { method: 'GET' })
         .catch(error => console.error('Error:', error));
     }
-  }
 
-  function toggleWattsCheckbox(element, updateServer) {
-    const settingGroup = element.closest('.setting-group');
-    const contentToHide = settingGroup.querySelectorAll('.value-display, .slider-group');
-    contentToHide.forEach(el => el.style.display = element.checked ? 'block' : 'none');
+    // All sliders now directly use updateSlider() with the proper ID
 
-    if (updateServer) {
-      fetch('/wattsslider?value=' + (element.checked ? 'enable' : 'disable'), { method: 'GET' })
+    function toggleTargetWattsCheckbox(element, updateServer) {
+      document.getElementById("targetWattsSlider").disabled = !element.checked;
+      
+      if (!element.checked) {
+        document.getElementById("targetWattsValue").classList.add("disabled");
+      } else {
+        document.getElementById("targetWattsValue").classList.remove("disabled");
+      }
+
+      if (updateServer) {
+        fetch('/targetwattsslider?value=' + (element.checked ? 'enable' : 'disable'), { method: 'GET' })
+          .catch(error => console.error('Error:', error));
+      }
+    }
+
+    function toggleEnableErgCheckbox(element) {
+      document.getElementById('ergControls').style.display = element.checked ? 'block' : 'none';
+
+      fetch('/ergmode?value=' + (element.checked ? 'enable' : 'disable'), { method: 'GET' })
         .catch(error => console.error('Error:', error));
     }
-  }
 
-  function toggleCadCheckbox(element, updateServer) {
-    const settingGroup = element.closest('.setting-group');
-    const contentToHide = settingGroup.querySelectorAll('.value-display, .slider-group');
-    contentToHide.forEach(el => el.style.display = element.checked ? 'block' : 'none');
+    function requestConfigValues() {
+      fetch('/runtimeConfigJSON')
+        .then(response => response.json())
+        .then(data => {
+          // Update watts
+          document.getElementById("wattsValue").innerHTML = data.watts || 0;
+          document.getElementById("wattsSlider").value = data.watts || 0;
+          document.getElementById("wattsOutput").checked = data.simWatts;
+          document.getElementById('wattsControls').style.display = data.simWatts ? 'block' : 'none';
 
-    if (updateServer) {
-      fetch('/cadslider?value=' + (element.checked ? 'enable' : 'disable'), { method: 'GET' })
+          // Update heart rate
+          document.getElementById("hrValue").innerHTML = data.hr || 40;
+          document.getElementById("hrSlider").value = data.hr || 40;
+          document.getElementById("hrOutput").checked = data.simHr;
+          document.getElementById('hrControls').style.display = data.simHr ? 'block' : 'none';
+
+          // Update cadence
+          document.getElementById("cadValue").innerHTML = data.cad || 0;
+          document.getElementById("cadSlider").value = data.cad || 0;
+          document.getElementById("cadOutput").checked = data.simCad;
+          document.getElementById('cadControls').style.display = data.simCad ? 'block' : 'none';
+
+          // Update ERG mode
+          const ergEnabled = data.FTMSMode === 5 || data.FTMSMode === "0x05";
+          document.getElementById("enableErgCheckbox").checked = ergEnabled;
+          document.getElementById('ergControls').style.display = ergEnabled ? 'block' : 'none';
+
+          // Update target watts
+          document.getElementById("targetWattsValue").innerHTML = data.targetWatts || 0;
+          document.getElementById("targetWattsSlider").value = data.targetWatts || 0;
+          document.getElementById("targetWattsOutput").checked = data.simTargetWatts;
+          document.getElementById("targetWattsSlider").disabled = !data.simTargetWatts;
+          
+          if (!data.simTargetWatts) {
+            document.getElementById("targetWattsValue").classList.add("disabled");
+          } else {
+            document.getElementById("targetWattsValue").classList.remove("disabled");
+          }
+
+          // Remove loading watermark
+          document.getElementById("loadingWatermark")?.remove();
+        })
         .catch(error => console.error('Error:', error));
     }
-  }
 
-  function updateHrSlider() {
-    const value = document.getElementById("hrSlider").value;
-    document.getElementById("hrValue").innerHTML = value + " BPM";
-    fetch('/hrslider?value=' + value, { method: 'GET' })
-      .catch(error => console.error('Error:', error));
-  }
-
-  function updateWattsSlider() {
-    const value = document.getElementById("wattsSlider").value;
-    document.getElementById("wattsValue").innerHTML = value + " Watts";
-    fetch('/wattsslider?value=' + value, { method: 'GET' })
-      .catch(error => console.error('Error:', error));
-  }
-
-  function updateCadSlider() {
-    const value = document.getElementById("cadSlider").value;
-    document.getElementById("cadValue").innerHTML = value + " RPM";
-    fetch('/cadslider?value=' + value, { method: 'GET' })
-      .catch(error => console.error('Error:', error));
-  }
-
-  function updateTargetWattsSlider() {
-    const value = document.getElementById("targetWattsSlider").value;
-    document.getElementById("targetWattsValue").innerHTML = value + " Watts";
-    fetch('/targetwattsslider?value=' + value, { method: 'GET' })
-      .catch(error => console.error('Error:', error));
-  }
-
-  function toggleTargetWattsCheckbox(element, updateServer) {
-    document.getElementById("targetWattsSlider").hidden = !element.checked;
-    document.getElementById("targetWattsValue").hidden = !element.checked;
-
-    if (updateServer) {
-      fetch('/targetwattsslider?value=' + (element.checked ? 'enable' : 'disable'), { method: 'GET' })
-        .catch(error => console.error('Error:', error));
+    // Universal auto-update function for sliders
+    const updateTimers = {};
+    
+    function autoUpdateClick(sliderId, maxOffset) {
+      if (updateTimers[sliderId]) {
+        clearInterval(updateTimers[sliderId]);
+        updateTimers[sliderId] = null;
+      } else {
+        updateTimers[sliderId] = setInterval(() => {
+          const slider = document.getElementById(sliderId);
+          const offset = Math.random() * (maxOffset * 2) - maxOffset;
+          const value = parseInt(slider.value, 10);
+          slider.value = Math.max(parseInt(slider.min), Math.min(parseInt(slider.max), value + offset));
+          updateSlider(sliderId);
+        }, 1000);
+      }
     }
-  }
-
-  function toggleEnableErgCheckbox(element) {
-    const settingGroup = element.closest('.setting-group');
-    const contentToHide = settingGroup.querySelectorAll('.value-display, .slider-group');
-    contentToHide.forEach(el => el.style.display = element.checked ? 'block' : 'none');
-
-    fetch('/ergmode?value=' + (element.checked ? 'enable' : 'disable'), { method: 'GET' })
-      .catch(error => console.error('Error:', error));
-  }
-
-  function requestConfigValues() {
-    fetch('/runtimeConfigJSON')
-      .then(response => response.json())
-      .then(data => {
-        // Update watts
-        document.getElementById("wattsValue").innerHTML = data.watts + " Watts";
-        document.getElementById("wattsSlider").value = data.watts;
-        document.getElementById("wattsOutput").checked = data.simWatts;
-        const wattsGroup = document.getElementById("wattsOutput").closest('.setting-group');
-        wattsGroup.querySelectorAll('.value-display, .slider-group').forEach(el => 
-          el.style.display = data.simWatts ? 'block' : 'none'
-        );
-
-        // Update heart rate
-        document.getElementById("hrValue").innerHTML = data.hr + " BPM";
-        document.getElementById("hrSlider").value = data.hr;
-        document.getElementById("hrOutput").checked = data.simHr;
-        const hrGroup = document.getElementById("hrOutput").closest('.setting-group');
-        hrGroup.querySelectorAll('.value-display, .slider-group').forEach(el => 
-          el.style.display = data.simHr ? 'block' : 'none'
-        );
-
-        // Update cadence
-        document.getElementById("cadValue").innerHTML = data.cad + " RPM";
-        document.getElementById("cadSlider").value = data.cad;
-        document.getElementById("cadOutput").checked = data.simCad;
-        const cadGroup = document.getElementById("cadOutput").closest('.setting-group');
-        cadGroup.querySelectorAll('.value-display, .slider-group').forEach(el => 
-          el.style.display = data.simCad ? 'block' : 'none'
-        );
-
-        // Update ERG mode
-        const ergEnabled = data.FTMSMode === 5 || data.FTMSMode === "0x05";
-        document.getElementById("enableErgCheckbox").checked = ergEnabled;
-        const ergGroup = document.getElementById("enableErgCheckbox").closest('.setting-group');
-        ergGroup.querySelectorAll('.value-display, .slider-group').forEach(el => 
-          el.style.display = ergEnabled ? 'block' : 'none'
-        );
-
-        // Update target watts
-        document.getElementById("targetWattsValue").innerHTML = data.targetWatts + " Watts";
-        document.getElementById("targetWattsSlider").value = data.targetWatts ?? 0;
-        document.getElementById("targetWattsOutput").checked = data.simTargetWatts;
-        document.getElementById("targetWattsSlider").hidden = !data.simTargetWatts;
-        document.getElementById("targetWattsValue").hidden = !data.simTargetWatts;
-
-        // Remove loading watermark
-        document.getElementById("loadingWatermark")?.remove();
-      })
-      .catch(error => console.error('Error:', error));
-  }
-
-  let updateWattsTimer = null;
-  function autoUpdateWattsClick() {
-    if (updateWattsTimer) {
-      clearInterval(updateWattsTimer);
-      updateWattsTimer = null;
-    } else {
-      updateWattsTimer = setInterval(() => {
-        const slider = document.getElementById("wattsSlider");
-        const offset = Math.random() * 10 - 5;
-        const value = parseInt(slider.value, 10);
-        slider.value = value + offset;
-        updateWattsSlider();
-      }, 1000);
-    }
-  }
-
-  let updateCadenceTimer = null;
-  function autoUpdateCadenceClick() {
-    if (updateCadenceTimer) {
-      clearInterval(updateCadenceTimer);
-      updateCadenceTimer = null;
-    } else {
-      updateCadenceTimer = setInterval(() => {
-        const slider = document.getElementById("cadSlider");
-        const offset = Math.random() * 6 - 3;
-        const value = parseInt(slider.value, 10);
-        slider.value = value + offset;
-        updateCadSlider();
-      }, 1000);
-    }
-  }
-
-  function loadCss() {
-    const link = document.createElement('link');
-    link.rel = 'stylesheet';
-    link.href = 'style.css';
-    document.head.appendChild(link);
-  }
-
-  window.addEventListener('load', () => {
-    setTimeout(loadCss, 100);
-    setTimeout(requestConfigValues, 500);
-  });
-</script>
+    
+    window.addEventListener('load', () => {
+      setTimeout(requestConfigValues, 500);
+    });
+  </script>
 </body>
-
 </html>

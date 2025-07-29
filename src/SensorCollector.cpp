@@ -27,13 +27,26 @@ void collectAndSet(NimBLEUUID charUUID, NimBLEUUID serviceUUID, NimBLEAddress ad
   logBufLength += snprintf(logBuf + logBufLength, kLogBufMaxLength - logBufLength, " | %s[", sensorData->getId().c_str());
   if (sensorData->hasHeartRate() && !rtConfig->hr.getSimulate()) {
     int heartRate = sensorData->getHeartRate();
-    rtConfig->hr.setValue(heartRate);
-    spinBLEClient.connectedHRM = true;
-    logBufLength += snprintf(logBuf + logBufLength, kLogBufMaxLength - logBufLength, " HR(%d)", heartRate % 1000);
+    static int zeroCount = 0;
+    zeroCount++;
+    if (heartRate > 0) {
+      rtConfig->hr.setValue(heartRate);
+      logBufLength += snprintf(logBuf + logBufLength, kLogBufMaxLength - logBufLength, " HR(%d)", heartRate % 1000);
+      spinBLEClient.connectedHRM = true;
+      zeroCount = 0;
+    }else{
+      //require 10 readings in a row before setting the HR to 0
+      logBufLength += snprintf(logBuf + logBufLength, kLogBufMaxLength - logBufLength, " HR IGNORED");
+      if (zeroCount > 10){
+        rtConfig->hr.setValue(0);
+        spinBLEClient.connectedHRM = false;
+        zeroCount = 0;
+      }
+    }
   }
 
   if (sensorData->hasCadence() && !rtConfig->cad.getSimulate()) {
-    if ((charUUID == PELOTON_DATA_UUID) && !((String(userConfig->getConnectedPowerMeter()) == "none") || (String(userConfig->getConnectedPowerMeter()) == "any"))) {
+    if ((charUUID == PELOTON_DATA_UUID) && !(strcmp(userConfig->getConnectedPowerMeter(), NONE) == 0 || strcmp(userConfig->getConnectedPowerMeter(), ANY) == 0)) {
       // Peloton connected but using BLE Power Meter. So skip cad for Peloton UUID.
     } else {
       float cadence = sensorData->getCadence();
@@ -43,8 +56,8 @@ void collectAndSet(NimBLEUUID charUUID, NimBLEUUID serviceUUID, NimBLEAddress ad
     }
   }
 
-  if (sensorData->hasPower() && !rtConfig->watts.getSimulate()) {
-    if ((charUUID == PELOTON_DATA_UUID) && !((String(userConfig->getConnectedPowerMeter()) == "none") || (String(userConfig->getConnectedPowerMeter()) == "any"))) {
+  if (sensorData->hasPower() && !rtConfig->watts.getSimulate() && !userConfig->getPTab4Pwr()) {
+    if ((charUUID == PELOTON_DATA_UUID) && !((strcmp(userConfig->getConnectedPowerMeter(), NONE) == 0) || (strcmp(userConfig->getConnectedPowerMeter(), ANY) == 0))) {
       // Peloton connected but using BLE Power Meter. So skip power for Peloton UUID.
     } else {
       int power = sensorData->getPower() * userConfig->getPowerCorrectionFactor();
@@ -71,19 +84,18 @@ void collectAndSet(NimBLEUUID charUUID, NimBLEUUID serviceUUID, NimBLEAddress ad
     }
   }
 
-  //////adding incline so that i can plot it
+  //adding incline so that i can plot it
   logBufLength += snprintf(logBuf + logBufLength, kLogBufMaxLength - logBufLength, " POS(%d)", ss2k->getCurrentPosition());
   strncat(logBuf + logBufLength, " ]", kLogBufMaxLength - logBufLength);
 
-  // Peloton data screams, so only log one per second.
+// Peloton data screams, so only log one per second.
+#ifdef DEBUG_BLE_TX_RX
   static long int lastTime = millis();
   if ((charUUID == PELOTON_DATA_UUID) && (millis() - lastTime < 1000)) return;
 
   SS2K_LOG(BLE_COMMON_LOG_TAG, "%s", logBuf);
 
   if (charUUID == PELOTON_DATA_UUID) lastTime = millis();
-
-#ifdef USE_TELEGRAM
-  SEND_TO_TELEGRAM(String(logBuf));
 #endif
+
 }
