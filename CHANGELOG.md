@@ -13,6 +13,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Removed unused file. 
 - Added license to test files.
 - Fixed unterminated comment.
+- Fixed BLE and WiFI updates.
 
 ### Hardware
 
