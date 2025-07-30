@@ -51,7 +51,7 @@ void startBLEServer() {
   deviceInformationService.setupService(spinBLEServer.pServer);
   // wattbikeService.setupService(spinBLEServer.pServer);  // No callback needed
   // sb20Service.begin();
-  BLEFirmwareSetup();
+  BLEFirmwareSetup(spinBLEServer.pServer);
 
   // const std::string fitnessData = {0b00000001, 0b00100000, 0b00000000};
   // pAdvertising->setServiceData(FITNESSMACHINESERVICE_UUID, fitnessData);

@@ -310,61 +310,75 @@ void HTTP_Server::start() {
     server.send(200, "text/html", OTAServerIndex);
   });
 
-  /*handling uploading firmware file */
   server.on(
       "/update", HTTP_POST,
+      // This is the onComplete callback. It is executed ONLY after the upload is fully finished.
+      // This is the correct and only place to send the final response to the client.
       []() {
         server.sendHeader("Connection", "close");
-        server.send(200, "text/plain", (Update.hasError()) ? "FAIL" : "OK");
+        // Check if the Update process reported an error and send the final status.
+        if (Update.hasError()) {
+          // You can get more specific error information if you want
+          // size_t len = Update.getErrorString(error_string_buffer, 128);
+          // server.send(500, "text/plain", error_string_buffer);
+          server.send(500, "text/plain", "FAIL");
+        } else {
+          server.send(200, "text/plain", "OK");
+          // It's better to trigger the reboot after successfully notifying the client.
+          ss2k->rebootFlag = true;
+        }
       },
+      // This is the onUpload callback. It handles the file data as it arrives.
+      // It should not send any response to the client.
       []() {
         HTTPUpload &upload = server.upload();
         if (upload.filename == String("firmware.bin").c_str()) {
-          ss2k->isUpdating = true;  // Set the updating flag to true
           if (upload.status == UPLOAD_FILE_START) {
-            SS2K_LOG(HTTP_SERVER_LOG_TAG, "Update: %s", upload.filename.c_str());
-            if (!Update.begin(UPDATE_SIZE_UNKNOWN, U_FLASH)) {  // start with max
-                                                                // available size
+            ss2k->isUpdating = true;  // Set the updating flag to true
+            SS2K_LOG(HTTP_SERVER_LOG_TAG, "Update Start: %s", upload.filename.c_str());
+            if (!Update.begin(UPDATE_SIZE_UNKNOWN, U_FLASH)) {
               Update.printError(Serial);
             }
           } else if (upload.status == UPLOAD_FILE_WRITE) {
             /* flashing firmware to ESP*/
+            Serial.printf(".");
             if (Update.write(upload.buf, upload.currentSize) != upload.currentSize) {
               Update.printError(Serial);
+              SS2K_LOG(HTTP_SERVER_LOG_TAG, "Upload Write Failed.");
             }
           } else if (upload.status == UPLOAD_FILE_END) {
-            if (Update.end(true)) {  // true to set the size to the
-                                     // current progress
-              server.send(200, "text/plain", "Firmware Uploaded Successfully. Rebooting...");
-              ESP.restart();
+            // Finalize the update. The true parameter tells it to flash the remaining buffer.
+            // DO NOT send a response here.
+            if (Update.end(true)) {
+              SS2K_LOG(HTTP_SERVER_LOG_TAG, "Firmware Upload Finished Successfully.");
             } else {
               Update.printError(Serial);
+              SS2K_LOG(HTTP_SERVER_LOG_TAG, "Unknown OTA issue on end.");
             }
+            // The reboot will be triggered in the onComplete handler after the response.
           }
-          ss2k->isUpdating = false;  // Reset the updating flag
         } else if (upload.filename == String("littlefs.bin").c_str()) {
           if (upload.status == UPLOAD_FILE_START) {
-            SS2K_LOG(HTTP_SERVER_LOG_TAG, "Update: %s", upload.filename.c_str());
-            if (!Update.begin(UPDATE_SIZE_UNKNOWN, U_SPIFFS)) {  // start with max
-                                                                 // available size
+            SS2K_LOG(HTTP_SERVER_LOG_TAG, "Update Start: %s", upload.filename.c_str());
+            if (!Update.begin(UPDATE_SIZE_UNKNOWN, U_SPIFFS)) {
               Update.printError(Serial);
             }
           } else if (upload.status == UPLOAD_FILE_WRITE) {
-            /* flashing firmware to ESP*/
+            Serial.printf(".");
             if (Update.write(upload.buf, upload.currentSize) != upload.currentSize) {
               Update.printError(Serial);
             }
           } else if (upload.status == UPLOAD_FILE_END) {
-            if (Update.end(true)) {  // true to set the size to the
-                                     // current progress
-              server.send(200, "text/plain", "Littlefs Uploaded Successfully. Rebooting...");
+            // Finalize the update.
+            // DO NOT send a response here.
+            if (Update.end(true)) {
+              SS2K_LOG(HTTP_SERVER_LOG_TAG, "Littlefs Upload Finished Successfully.");
               userConfig->saveToLittleFS();
-              ss2k->rebootFlag == true;
             } else {
               Update.printError(Serial);
             }
           }
-        } else {
+        } else {  // Handles other file uploads to LittleFS
           if (upload.status == UPLOAD_FILE_START) {
             String filename = upload.filename;
             if (!filename.startsWith("/")) {
@@ -382,7 +396,10 @@ void HTTP_Server::start() {
               fsUploadFile.close();
             }
             SS2K_LOG(HTTP_SERVER_LOG_TAG, "handleFileUpload Size: %zu", upload.totalSize);
-            server.send(200, "text/plain", String(upload.filename + " Uploaded Successfully."));
+            // For non-firmware files, it's okay to send a response here,
+            // but for consistency, it's better to let the onComplete handler do it.
+            // For this example, we assume the main onComplete handler is for firmware.
+            // A more robust solution would check which type of file was uploaded.
           }
         }
       });

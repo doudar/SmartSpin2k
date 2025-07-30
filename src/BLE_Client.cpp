@@ -146,6 +146,7 @@ void bleClientTask(void *pvParameters) {
 
     // disconnect all connected servers if we're updating via BLE
     if (ss2k->isUpdating) {
+      SS2K_LOG(BLE_CLIENT_LOG_TAG, "Disconnecting all connected servers due to update.");
       for (auto &_BLEd : spinBLEClient.myBLEDevices) {  // loop through discovered devices
         if (_BLEd.connectedClientID != BLE_HS_CONN_HANDLE_NONE) {
           if (_BLEd.advertisedDevice) {                                                                // is device registered?
@@ -160,7 +161,11 @@ void bleClientTask(void *pvParameters) {
       }
       while (ss2k->isUpdating) {  // wait until the update is done
         delay(100);
+        if(NimBLEDevice::getScan()->isScanning()) {  // if we're scanning, stop it
+          NimBLEDevice::getScan()->stop();  // stop scanning if we're updating
+        }
       }
+      SS2K_LOG(BLE_CLIENT_LOG_TAG, "Update complete, re-enabling BLE scanning.");
     }
 
     // Post connect previously connected clients. This needs to be before connect, as it takes a while to complete the connection (let it loop once.)
@@ -168,7 +173,7 @@ void bleClientTask(void *pvParameters) {
 
     // Connect BLE Servers to this client
     for (int x = 0; x < NUM_BLE_DEVICES; x++) {
-      if (spinBLEClient.myBLEDevices[x].doConnect == true && !ss2k->isUpdating) {
+      if (spinBLEClient.myBLEDevices[x].doConnect == true) {
         // stop in process scans
         NimBLEScan *pBLEScan = NimBLEDevice::getScan();
         if (pBLEScan->isScanning()) {
@@ -186,9 +191,9 @@ void bleClientTask(void *pvParameters) {
 
     // Scan for BLE devices that we should connect to this client
     static unsigned long scanDelay = millis();
-    if ((millis() - scanDelay) > BLE_RECONNECT_SCAN_INTERVAL) {
+    if (((millis() - scanDelay) > BLE_RECONNECT_SCAN_INTERVAL)) {
       spinBLEClient.checkBLEReconnect();
-      if (spinBLEClient.doScan && (!ss2k->isUpdating)) {
+      if (spinBLEClient.doScan) {
         spinBLEClient.scanProcess(DEFAULT_SCAN_DURATION);
       }
       scanDelay = millis();
