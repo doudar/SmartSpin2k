@@ -143,6 +143,7 @@ void BLE_ss2kCustomCharacteristic::process(std::string rxValue) {
 
 #ifdef CUSTOM_CHAR_DEBUG
 #define LOG_BUF_APPEND(...) logBufLength += snprintf(logBuf + logBufLength, kLogBufCapacity - logBufLength, __VA_ARGS__)
+  int length                = rxValue.length();
   const int kLogBufCapacity = (rxValue.length() * 2) + 60;  // needs to be bigger than the largest message.
   char logBuf[kLogBufCapacity];
   int logBufLength = ss2k_log_hex_to_buffer(pData, length, logBuf, 0, kLogBufCapacity);
@@ -758,8 +759,10 @@ void BLE_ss2kCustomCharacteristic::process(std::string rxValue) {
       }
       if (rxValue[0] == cc_write) {
         returnValue[0] = cc_success;
-        userConfig->setHMin(int32_t((uint8_t)(rxValue[2]) << 0 | (uint8_t)(rxValue[3]) << 8 | (uint8_t)(rxValue[4]) << 16 | (uint8_t)(rxValue[5]) << 24));
-        LOG_BUF_APPEND(" (%f)", userConfig->getHMin());
+        int32_t hMin = int32_t((uint8_t)(rxValue[2]) << 0 | (uint8_t)(rxValue[3]) << 8 | (uint8_t)(rxValue[4]) << 16 | (uint8_t)(rxValue[5]) << 24);
+        userConfig->setHMin(hMin);
+        rtConfig->setMinStep(hMin);
+        LOG_BUF_APPEND(" (%d)", hMin);
       }
       break;
 
@@ -775,8 +778,11 @@ void BLE_ss2kCustomCharacteristic::process(std::string rxValue) {
       }
       if (rxValue[0] == cc_write) {
         returnValue[0] = cc_success;
-        userConfig->setHMax(int32_t((uint8_t)(rxValue[2]) << 0 | (uint8_t)(rxValue[3]) << 8 | (uint8_t)(rxValue[4]) << 16 | (uint8_t)(rxValue[5]) << 24));
-        LOG_BUF_APPEND(" (%f)", userConfig->getHMax());
+        int32_t hMax   = int32_t((uint8_t)(rxValue[2]) << 0 | (uint8_t)(rxValue[3]) << 8 | (uint8_t)(rxValue[4]) << 16 | (uint8_t)(rxValue[5]) << 24);
+        Serial.printf("hMax: %d\n <--------------------------------------------", hMax);
+        userConfig->setHMax(hMax);
+        rtConfig->setMaxStep(hMax);
+        LOG_BUF_APPEND(" (%d)", userConfig->getHMax());
       }
       break;
 
@@ -968,11 +974,13 @@ void BLE_ss2kCustomCharacteristic::parseNemit() {
   if (userConfig->getHMin() != _oldParams.getHMin()) {
     _oldParams.setHMin(userConfig->getHMin());
     BLE_ss2kCustomCharacteristic::notify(BLE_hMin);
+    userConfig->saveToLittleFS();
     return;
   }
   if (userConfig->getHMax() != _oldParams.getHMax()) {
     _oldParams.setHMax(userConfig->getHMax());
     BLE_ss2kCustomCharacteristic::notify(BLE_hMax);
+    userConfig->saveToLittleFS();
     return;
   }
   if (userConfig->getHomingSensitivity() != _oldParams.getHomingSensitivity()) {
