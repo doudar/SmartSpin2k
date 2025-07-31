@@ -524,7 +524,7 @@ void BLE_ss2kCustomCharacteristic::process(std::string rxValue) {
       if (rxValue[0] == cc_write) {
         returnValue[0] = cc_success;
         ss2k->setTargetPosition(int32_t((uint8_t)(rxValue[2]) << 0 | (uint8_t)(rxValue[3]) << 8 | (uint8_t)(rxValue[4]) << 16 | (uint8_t)(rxValue[5]) << 24));
-        LOG_BUF_APPEND( " (%f)", ss2k->getTargetPosition());
+        LOG_BUF_APPEND(" (%f)", ss2k->getTargetPosition());
       }
       break;
 
@@ -711,6 +711,8 @@ void BLE_ss2kCustomCharacteristic::process(std::string rxValue) {
           // Save with explicit version management
           powerTable->_hasBeenLoadedThisSession = true;  // Prevent reload attempts
           powerTable->saveFlag                  = true;
+          // Saved tables all use hMin of Zero and this is not set by the app.
+          userConfig->setHMin(0);
         } else {
           // SS2K_LOG(CUSTOM_CHAR_LOG_TAG, "Table row invalid");
           //  Logging causes crashes in ISR
@@ -981,6 +983,10 @@ void BLE_ss2kCustomCharacteristic::parseNemit() {
   if (userConfig->getPTab4Pwr() != _oldParams.getPTab4Pwr()) {
     _oldParams.setPTab4Pwr(userConfig->getPTab4Pwr());
     BLE_ss2kCustomCharacteristic::notify(BLE_pTab4Pwr);
+    // Home whenever this value is flipped true
+    if (userConfig->getPTab4Pwr()) {
+      spinBLEServer.spinDownFlag = 1;
+    }
     return;
   }
 }
