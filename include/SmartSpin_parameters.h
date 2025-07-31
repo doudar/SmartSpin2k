@@ -89,11 +89,11 @@ class RuntimeParameters {
   void setHomed(bool hmd) { homed = hmd; }
   int getHomed() { return homed; }
 
-  void setMinStep(int ms) { minStep = ms; }
-  int getMinStep() { return minStep; }
+  void setMinStep(int32_t ms) { ms != INT32_MIN ? minStep = ms : minStep = -DEFAULT_STEPPER_TRAVEL; }
+  int32_t getMinStep() { return minStep; }
 
-  void setMaxStep(int ms) { maxStep = ms; }
-  int getMaxStep() { return maxStep; }
+  void setMaxStep(int32_t ms) { ms != INT32_MIN ? maxStep = ms : maxStep = DEFAULT_STEPPER_TRAVEL; }
+  int32_t getMaxStep() { return maxStep; }
 
   void setSimTargetWatts(int tgt) { simTargetWatts = tgt; }
   bool getSimTargetWatts() { return simTargetWatts; }

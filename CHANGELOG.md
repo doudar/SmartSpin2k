@@ -14,6 +14,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Hardware
 
 
+## [25.7.30]
+
+### Added
+
+### Changed
+
+### Hardware
+
+
 ## [25.7.29]
 
 ### Added
@@ -23,6 +32,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Added license to test files.
 - Fixed unterminated comment.
 - Fixed BLE and WiFI updates.
+- Improving use of pTab4Pwr.
+- Fixed edge cases of pTab4Pwr causing runaways.
 
 ### Hardware
 
