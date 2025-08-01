@@ -19,6 +19,7 @@
 #include "BLE_Fitness_Machine_Service.h"
 #include "BLE_Custom_Characteristic.h"
 #include "BLE_Device_Information_Service.h"
+#include "BLE_ZRide.h"
 
 // BLE Server Settings
 SpinBLEServer spinBLEServer;
@@ -31,6 +32,7 @@ BLE_Heart_Service heartService;
 BLE_Fitness_Machine_Service fitnessMachineService;
 BLE_ss2kCustomCharacteristic ss2kCustomCharacteristic;
 BLE_Device_Information_Service deviceInformationService;
+BLE_Zwift_Ride_Service zwiftRideService;
 // BLE_Wattbike_Service wattbikeService;
 // BLE_SB20_Service sb20Service;
 
@@ -49,6 +51,8 @@ void startBLEServer() {
   fitnessMachineService.setupService(spinBLEServer.pServer, &chrCallbacks);
   ss2kCustomCharacteristic.setupService(spinBLEServer.pServer);
   deviceInformationService.setupService(spinBLEServer.pServer);
+  zwiftRideService.setupService(spinBLEServer.pServer);
+
   // wattbikeService.setupService(spinBLEServer.pServer);  // No callback needed
   // sb20Service.begin();
   BLEFirmwareSetup(spinBLEServer.pServer);
@@ -72,6 +76,7 @@ void SpinBLEServer::update() {
   cyclingPowerService.update();
   cyclingSpeedCadenceService.update();
   fitnessMachineService.update();
+  zwiftRideService.update();
   // wattbikeService.parseNemit();  // Changed from update() to parseNemit()
   // sb20Service.notify();
 }

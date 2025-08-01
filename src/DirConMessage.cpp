@@ -15,19 +15,18 @@
 #ifdef DEBUG_DIRCON_MESSAGES
 void printRawBytesToSerial(const uint8_t* data, size_t length, bool isIncoming) {
   String direction = isIncoming ? "RECEIVED" : "SENDING";
-  Serial.print("[DIRCON ");
-  Serial.print(direction);
-  Serial.print("] Raw bytes[");
-  Serial.print(length);
-  Serial.print("]: ");
 
+  // Build the hex string for both Serial and SS2K_LOG
+  String hexString = "";
   for (size_t i = 0; i < length; i++) {
     char hexByte[4];
     snprintf(hexByte, sizeof(hexByte), "%02X ", data[i]);
-    Serial.print(hexByte);
+    hexString += hexByte;
   }
-
-  Serial.println();
+  
+  // Log to SS2K_LOG as well
+  SS2K_LOG(DIRCON_LOG_TAG, "[DIRCON %s] Raw bytes[%d]: %s", 
+           direction.c_str(), length, hexString.c_str());
 }
 
 void DirConMessage::printVectorBytesToSerial(const std::vector<uint8_t>& data, bool isIncoming) {

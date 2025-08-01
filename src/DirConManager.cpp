@@ -9,6 +9,7 @@
 #include "SS2KLog.h"
 #include <algorithm>
 #include <BLE_Fitness_Machine_Service.h>
+#include <BLE_ZRide.h>
 
 #define DIRCON_LOG_TAG "DirConManager"
 
@@ -411,6 +412,13 @@ bool DirConManager::processDirConMessage(DirConMessage* message, size_t clientIn
         fitnessMachineService.processFTMSWrite();
         response.AdditionalData = characteristic->getValue();
       }
+      // handle Zwift Ride Writes
+      else if (characteristic->getUUID().equals(ZWIFT_SYNC_RX_CHARACTERISTIC_UUID)) {
+        // We can handle this in the BLE_ZRide class
+        SS2K_LOG(DIRCON_LOG_TAG, "Received write on Zwift Sync RX characteristic %s", characteristic->getValue().c_str());
+        zwiftRideService.processZwiftSyncWrite(characteristic->getValue().data(), characteristic->getValue().size());
+        response.AdditionalData = characteristic->getValue();
+      }
 
       sendResponse(&response, clientIndex);
       break;
@@ -572,6 +580,9 @@ std::vector<NimBLEUUID> DirConManager::getAvailableServices() {
     NimBLEUUID ftmsUuid = NimBLEUUID(FITNESSMACHINESERVICE_UUID);
     cachedServices.push_back(ftmsUuid);
 
+    NimBLEUUID ZwiftRideUuid = NimBLEUUID(ZWIFT_RIDE_SERVICE_UUID);
+    cachedServices.push_back(ZwiftRideUuid);
+
     // Log summary
     SS2K_LOG(DIRCON_LOG_TAG, "Initialized service discovery with %d services", cachedServices.size());
     servicesInitialized = true;
@@ -646,6 +657,10 @@ uint8_t DirConManager::getDirConProperties(uint32_t characteristicProperties) {
   }
 
   if (characteristicProperties & NIMBLE_PROPERTY::NOTIFY) {
+    properties |= DIRCON_CHAR_PROP_FLAG_NOTIFY;
+  }
+
+  if (characteristicProperties & NIMBLE_PROPERTY::INDICATE) {
     properties |= DIRCON_CHAR_PROP_FLAG_NOTIFY;
   }
 
