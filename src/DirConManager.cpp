@@ -112,20 +112,20 @@ void DirConManager::updateStatusMessage() {
 void DirConManager::setupMDNS() {
   // Static buffers for strings to avoid repeated allocations
   static char macAddress[18];    // MAC format: 11:22:33:44:55:66\0
-  static char serialNumber[24];  // SS2K-112233445566\0
+  static char serialNumber[12];  // SS2K-112233445566\0
 
   // Get device MAC address using existing buffer
   strcpy(macAddress, WiFi.macAddress().c_str());
-
-  // Create a unique serial number (using MAC address)
-  strcpy(serialNumber, "SS2K-");
-  char* dest = serialNumber + 5;
-  for (char* src = macAddress; *src; src++) {
-    if (*src != ':') {
-      *dest++ = *src;
+  //replace colons with dashes for mac address
+  for (char* p = macAddress; *p; p++) {
+    if (*p == ':') {
+      *p = '-';
     }
   }
-  *dest = '\0';
+
+  // Create a unique serial number (using MAC address), and remove the dashes and change the letters to decimal numbers.
+  snprintf(serialNumber, sizeof(serialNumber), "%02X%02X%02X%02X%02X%02X",
+           macAddress[0], macAddress[1], macAddress[3], macAddress[4], macAddress[6], macAddress[7]);
 
   // Add DirCon service to MDNS
   SS2K_LOG(DIRCON_LOG_TAG, "Adding DirCon MDNS service: %s.%s on port %d", DIRCON_MDNS_SERVICE_NAME, DIRCON_MDNS_SERVICE_PROTOCOL, DIRCON_TCP_PORT);
@@ -588,9 +588,13 @@ std::vector<NimBLECharacteristic*> DirConManager::getCharacteristics(const NimBL
   if (service == nullptr) {
     return characteristics;
   }
-
+  for(const NimBLECharacteristic* characteristic : service->getCharacteristics()) {
+    if (characteristic != nullptr) {
+      characteristics.push_back(const_cast<NimBLECharacteristic*>(characteristic));
+    }
+  }
   // Find service-specific characteristics based on known UUIDs
-  if (serviceUuid.equals(CYCLINGPOWERSERVICE_UUID)) {
+  /*if (serviceUuid.equals(CYCLINGPOWERSERVICE_UUID)) {
     characteristics.push_back(service->getCharacteristic(CYCLINGPOWERMEASUREMENT_UUID));
     characteristics.push_back(service->getCharacteristic(CYCLINGPOWERFEATURE_UUID));
     characteristics.push_back(service->getCharacteristic(SENSORLOCATION_UUID));
@@ -608,7 +612,7 @@ std::vector<NimBLECharacteristic*> DirConManager::getCharacteristics(const NimBL
   } else if (serviceUuid.equals(WATTBIKE_SERVICE_UUID)) {
     // Add wattbike service characteristics
   }
-
+*/
   // Filter out null characteristics
   auto it = std::remove_if(characteristics.begin(), characteristics.end(), [](NimBLECharacteristic* c) { return c == nullptr; });
   characteristics.erase(it, characteristics.end());
