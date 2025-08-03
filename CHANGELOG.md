@@ -35,6 +35,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Improving use of pTab4Pwr.
 - Fixed edge cases of pTab4Pwr causing runaways.
 - Reduced the power output when no power table.
+- Fixed Dircon with Mywoosh.
 
 ### Hardware
 
