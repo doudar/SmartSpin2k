@@ -14,6 +14,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Hardware
 
 
+## [25.8.3]
+
+### Added
+
+### Changed
+
+### Hardware
+
+
 ## [25.7.30]
 
 ### Added
