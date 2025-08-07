@@ -166,8 +166,8 @@ extern "C" void app_main() {
   ss2k->resetIfShiftersHeld();
   SS2K_LOG(MAIN_LOG_TAG, "Creating Shifter Interrupts");
   // Setup Interrupts so shifters work anytime
-  attachInterrupt(digitalPinToInterrupt(currentBoard.shiftUpPin), ss2k->handleShift, CHANGE);
-  attachInterrupt(digitalPinToInterrupt(currentBoard.shiftDownPin), ss2k->handleShift, CHANGE);
+  attachInterrupt(digitalPinToInterrupt(currentBoard.shiftUpPin), ss2k->handleShift, FALLING);
+  attachInterrupt(digitalPinToInterrupt(currentBoard.shiftDownPin), ss2k->handleShift, FALLING);
   digitalWrite(LED_PIN, HIGH);
 
   xTaskCreate(SS2K::maintenanceLoop,     /* Task function. */
@@ -500,30 +500,16 @@ void SS2K::moveStepper() {
   }
 }
 
-bool SS2K::deBounce() {
-  if ((millis() - ss2k->lastDebounceTime) >
-      ss2k->debounceDelay) {  // <----------------This should be assigned it's own task and just switch a global bool whatever the reading is at, it's
-                              // been there for longer than the debounce delay, so take it as the actual current state: if the button state has changed:
-    ss2k->lastDebounceTime = millis();
-    return true;
-  }
-  return false;
-}
-
 ///////////// Interrupt Functions /////////////
 void ARDUINO_ISR_ATTR SS2K::handleShift() {  // Handle the shift up interrupt IRAM_ATTR is to keep the interrupt code in ram always
-  if (ss2k->deBounce()) {
-    if (!digitalRead(currentBoard.shiftUpPin)) {  // double checking to make sure the interrupt wasn't triggered by emf
+  if ((millis() - ss2k->lastDebounceTime) > ss2k->debounceDelay) {
+    if (!digitalRead(currentBoard.shiftUpPin)) {
       rtConfig->setShifterPosition(rtConfig->getShifterPosition() - 1 + userConfig->getShifterDir() * 2);
-      // Stop homing initiation
-      spinBLEServer.spinDownFlag = 0;
-    } else if (!digitalRead(currentBoard.shiftDownPin)) {  // double checking to make sure the interrupt wasn't triggered by emf
+      ss2k->lastDebounceTime = millis();
+    } else if (!digitalRead(currentBoard.shiftDownPin)) {
       rtConfig->setShifterPosition(rtConfig->getShifterPosition() + 1 - userConfig->getShifterDir() * 2);
-      // Stop homing initiation
-      spinBLEServer.spinDownFlag = 0;
-    } else {
-      ss2k->lastDebounceTime = 0;
-    }  // Probably Triggered by EMF, reset the debounce
+      ss2k->lastDebounceTime = millis();
+    }
   }
 }
 

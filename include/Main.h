@@ -21,12 +21,12 @@
 
 class SS2K {
  private:
-  uint64_t lastDebounceTime;
-  uint16_t debounceDelay;
+  volatile long int lastDebounceTime;
+  int debounceDelay;
   int lastShifterPosition;
   int shiftersHoldForScan;
-  uint64_t scanDelayTime;
-  uint64_t scanDelayStart;
+  unsigned long int scanDelayTime;
+  unsigned long int scanDelayStart;
   int32_t targetPosition;
   int32_t currentPosition;
 
@@ -42,7 +42,6 @@ class SS2K {
   bool resetPowerTableFlag = false;
   bool isUpdating          = false;
 
-  static bool deBounce();
   static void ARDUINO_ISR_ATTR maintenanceLoop(void *pvParameters);
   static void ARDUINO_ISR_ATTR handleShift();
   static void moveStepper();
