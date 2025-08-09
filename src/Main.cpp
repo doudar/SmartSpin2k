@@ -166,8 +166,8 @@ extern "C" void app_main() {
   ss2k->resetIfShiftersHeld();
   SS2K_LOG(MAIN_LOG_TAG, "Creating Shifter Interrupts");
   // Setup Interrupts so shifters work anytime
-  attachInterrupt(digitalPinToInterrupt(currentBoard.shiftUpPin), ss2k->handleShift, FALLING);
-  attachInterrupt(digitalPinToInterrupt(currentBoard.shiftDownPin), ss2k->handleShift, FALLING);
+  attachInterrupt(digitalPinToInterrupt(currentBoard.shiftUpPin), ss2k->handleUpShift, FALLING);
+  attachInterrupt(digitalPinToInterrupt(currentBoard.shiftDownPin), ss2k->handleDownShift, FALLING);
   digitalWrite(LED_PIN, HIGH);
 
   xTaskCreate(SS2K::maintenanceLoop,     /* Task function. */
@@ -208,6 +208,9 @@ void SS2K::maintenanceLoop(void *pvParameters) {
       }
       // wattbikeService.parseNemit();
     }
+
+    // Handle the shifters
+    ss2k->handleShiftButtons();
 
     // send BLE notification for any userConfig values that changed.
     BLE_ss2kCustomCharacteristic::parseNemit();
@@ -500,17 +503,36 @@ void SS2K::moveStepper() {
   }
 }
 
-///////////// Interrupt Functions /////////////
-void ARDUINO_ISR_ATTR SS2K::handleShift() {  // Handle the shift up interrupt IRAM_ATTR is to keep the interrupt code in ram always
-  if ((millis() - ss2k->lastDebounceTime) > ss2k->debounceDelay) {
-    if (!digitalRead(currentBoard.shiftUpPin)) {
-      rtConfig->setShifterPosition(rtConfig->getShifterPosition() - 1 + userConfig->getShifterDir() * 2);
-      ss2k->lastDebounceTime = millis();
-    } else if (!digitalRead(currentBoard.shiftDownPin)) {
-      rtConfig->setShifterPosition(rtConfig->getShifterPosition() + 1 - userConfig->getShifterDir() * 2);
-      ss2k->lastDebounceTime = millis();
+void SS2K::handleShiftButtons() {
+int upButtonIsPressed = !digitalRead(currentBoard.shiftUpPin);
+int downButtonIsPressed = !digitalRead(currentBoard.shiftDownPin);
+
+// --- UP Button State Machine ---
+if (upButtonIsPressed && ss2k->upButtonState == RELEASED) {
+    if (millis() - ss2k->lastDebounceTime > DEBOUNCE_DELAY) {
+        // It's a valid press, take action!
+        rtConfig->setShifterPosition(rtConfig->getShifterPosition() - 1 + userConfig->getShifterDir() * 2);
+        ss2k->lastDebounceTime = millis();
     }
-  }
+    ss2k->upButtonState = PRESSED;
+
+} else if (!upButtonIsPressed && ss2k->upButtonState == PRESSED) {
+    // The button was pressed, but now it's not. Update the state.
+    ss2k->upButtonState = RELEASED;
+}
+
+
+// --- DOWN Button State Machine ---
+if (downButtonIsPressed && ss2k->downButtonState == RELEASED) {
+    if (millis() - ss2k->lastDebounceTime > DEBOUNCE_DELAY) {
+        rtConfig->setShifterPosition(rtConfig->getShifterPosition() + 1 - userConfig->getShifterDir() * 2);
+        ss2k->lastDebounceTime = millis();
+    }
+    ss2k->downButtonState = PRESSED;
+
+} else if (!downButtonIsPressed && ss2k->downButtonState == PRESSED) {
+    ss2k->downButtonState = RELEASED;
+}
 }
 
 void SS2K::resetIfShiftersHeld() {
@@ -567,12 +589,12 @@ void SS2K::goHome(bool bothDirections) {
     unsigned long int timeoutTimer = millis();
     if (currentBoard.name != r2_NAME) {
       SS2K_LOG(MAIN_LOG_TAG, "Board Doesn't support homing");
-      fitnessMachineService.spinDown(FitnessMachineStatus::SpinDown_Error); 
+      fitnessMachineService.spinDown(FitnessMachineStatus::SpinDown_Error);
       return;
     }
     SS2K_LOG(MAIN_LOG_TAG, "Homing...");
     SS2K_LOG(MAIN_LOG_TAG, "Updating driver...");
-    fitnessMachineService.spinDown(FitnessMachineStatus::SpinDown_SpinDownRequested); 
+    fitnessMachineService.spinDown(FitnessMachineStatus::SpinDown_SpinDownRequested);
     updateStepperPower(userConfig->getStepperPower() * .2);
     delay(50);
     driver.irun(0x02);  // low power
@@ -609,7 +631,7 @@ void SS2K::goHome(bool bothDirections) {
     timeoutTimer = millis();
     SS2K_LOG(MAIN_LOG_TAG, "Min Position found: %d.", rtConfig->getMinStep());
     stalled = false;
-    fitnessMachineService.spinDown(FitnessMachineStatus::SpinDown_Success); 
+    fitnessMachineService.spinDown(FitnessMachineStatus::SpinDown_Success);
     if (bothDirections) {
       // Back off limit in case we are already here.
       this->updateStepperSpeed(1500);

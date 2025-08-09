@@ -19,16 +19,23 @@
 
 // Function Prototypes
 
+enum ButtonState {
+  RELEASED,
+  PRESSED
+};
+
 class SS2K {
  private:
-  volatile long int lastDebounceTime;
-  int debounceDelay;
+  unsigned long int lastDebounceTime = 0;
+  ButtonState upButtonState;
+  ButtonState downButtonState;
   int lastShifterPosition;
   int shiftersHoldForScan;
   unsigned long int scanDelayTime;
   unsigned long int scanDelayStart;
   int32_t targetPosition;
   int32_t currentPosition;
+  void handleShiftButtons();
 
  public:
   bool stepperIsRunning;
@@ -43,7 +50,8 @@ class SS2K {
   bool isUpdating          = false;
 
   static void ARDUINO_ISR_ATTR maintenanceLoop(void *pvParameters);
-  static void ARDUINO_ISR_ATTR handleShift();
+  static void ARDUINO_ISR_ATTR handleUpShift();
+  static void ARDUINO_ISR_ATTR handleDownShift();
   static void moveStepper();
 
   // the position the stepper motor will move to
@@ -69,13 +77,13 @@ class SS2K {
   void goHome(bool bothDirections = false);
 
   SS2K() {
+    upButtonState        = RELEASED;
+    downButtonState      = RELEASED;
     targetPosition      = 0;
     currentPosition     = 0;
     stepperIsRunning    = false;
     externalControl     = false;
     syncMode            = false;
-    lastDebounceTime    = 0;
-    debounceDelay       = DEBOUNCE_DELAY;
     lastShifterPosition = 0;
     shiftersHoldForScan = SHIFTERS_HOLD_FOR_SCAN;
     scanDelayTime       = 10000;
