@@ -118,7 +118,7 @@ const char* const DEFAULT_PASSWORD = "password";
 #define DEFAULT_STEPPER_TRAVEL 200000000
 
 // Default debounce delay for shifters. Increase if you have false shifts. Decrease if shifting takes too long.
-#define DEBOUNCE_DELAY 100
+#define DEBOUNCE_DELAY 200
 
 // Hardware Revision check pin
 #define REV_PIN 34
