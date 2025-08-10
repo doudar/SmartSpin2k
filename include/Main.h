@@ -53,6 +53,7 @@ class SS2K {
   static void ARDUINO_ISR_ATTR handleUpShift();
   static void ARDUINO_ISR_ATTR handleDownShift();
   static void moveStepper();
+  void _findEndStop(bool moveForward);
 
   // the position the stepper motor will move to
   int32_t getTargetPosition() { return targetPosition; }
