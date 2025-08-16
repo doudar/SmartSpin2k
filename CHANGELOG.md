@@ -26,6 +26,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [25.7.29]
 
 ### Added
+- Added state machine for shifters allowing faster and more reliable shifting. 
 
 ### Changed
 - Removed unused file. 
@@ -39,6 +40,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Fixed Bug with Peloton data being requested too often. 
 - Fixed Bug with Dircon data being sent too often. 
 - Fixed Bug with BLE TX/RX being overwhelmed by the above two. 
+- Homing now takes multiple samples at the start of the run. 
 
 ### Hardware
 
