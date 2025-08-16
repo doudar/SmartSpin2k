@@ -627,7 +627,7 @@ void SS2K::_findEndStop(bool moveForward) {
 
     // Periodically log the status for tuning
     if (millis() - lastLogTime > LOG_INTERVAL) {
-      Serial.printf("Homing... Current SG: %d, Threshold: %d, Target: < %d\n", currentSgResult, threshold, threshold + userConfig->getHomingSensitivity());
+      Serial.printf("Homing... Current SG: %d, Baseline: %d, Target: < %d\n", currentSgResult, threshold, threshold - userConfig->getHomingSensitivity());
       lastLogTime = millis();
     }
 
