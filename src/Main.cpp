@@ -88,7 +88,7 @@ extern "C" void app_main() {
     if (!auxSerial) {
       SS2K_LOG(MAIN_LOG_TAG, "Invalid Serial Pin Configuration");
     }
-    auxSerial.onReceive(SS2K::rxSerial, false);  // setup callback
+    auxSerial.onReceive(SS2K::rxSerial, true);  // setup callback
   }
   // Initialize LittleFS
   SS2K_LOG(MAIN_LOG_TAG, "Mounting Filesystem");
@@ -166,13 +166,13 @@ extern "C" void app_main() {
   ss2k->resetIfShiftersHeld();
   digitalWrite(LED_PIN, HIGH);
 
-  xTaskCreate(SS2K::maintenanceLoop,     /* Task function. */
-              "maintenanceLoopFunction", /* name of task. */
-              MAIN_STACK,                /* Stack size of task */
-              NULL,                      /* parameter of the task */
-              10,                        /* priority of the task */
-              &maintenanceLoopTask       /* Task handle to keep track of created task */
-  );                                     /* pin task to core */
+  xTaskCreatePinnedToCore(SS2K::maintenanceLoop,     /* Task function. */
+                          "maintenanceLoopFunction", /* name of task. */
+                          MAIN_STACK,                /* Stack size of task */
+                          NULL,                      /* parameter of the task */
+                          10,                        /* priority of the task */
+                          &maintenanceLoopTask,      /* Task handle to keep track of created task */
+                          1);                        /* pin task to core */
 }
 
 void loop() {  // Delete this task so we can make one that's more memory efficient.
@@ -203,6 +203,16 @@ void SS2K::maintenanceLoop(void *pvParameters) {
         ergMode->runERG();
       }
       // wattbikeService.parseNemit();
+
+      // if this hardware version has serial pins, check and process their data.
+      // only do this every AUX_SERIAL_DELAY
+      static unsigned long auxSerialTimer = millis();
+      if ((millis() - auxSerialTimer) > AUX_SERIAL_DELAY) {
+        if (currentBoard.auxSerialTxPin) {
+          ss2k->txSerial();
+        }
+        auxSerialTimer = millis();
+      }
     }
 
     // Handle the shifters
@@ -247,11 +257,6 @@ void SS2K::maintenanceLoop(void *pvParameters) {
         }
       }
       ss2k->updateStepperSpeed(speed);
-    }
-
-    // if this hardware version has serial pins, check and process their data.
-    if (currentBoard.auxSerialTxPin) {
-      ss2k->txSerial();
     }
 
     // Handle flag set for rebooting
@@ -587,8 +592,8 @@ void SS2K::_findEndStop(bool moveForward) {
   unsigned long timeoutTimer   = millis();
   int threshold                = 0;
   long totalSgResult           = 0;
-  const int SAMPLES_TO_AVERAGE = 16;  // Take 16 samples for a stable average
-  const int LOG_INTERVAL = 250;  // Log every 250ms
+  const int SAMPLES_TO_AVERAGE = 16;   // Take 16 samples for a stable average
+  const int LOG_INTERVAL       = 250;  // Log every 250ms
 
   // Start the motor moving in the specified direction
   if (moveForward) {
@@ -668,7 +673,7 @@ void SS2K::goHome(bool bothDirections) {
 
   // --- FIND MAX END STOP (Optional) ---
   if (bothDirections) {
-    ss2k->_findEndStop(true);                              
+    ss2k->_findEndStop(true);
     rtConfig->setMaxStep(stepper->getCurrentPosition() - userConfig->getShiftStep());  // Set max with a safety margin
     userConfig->setHMax(rtConfig->getMaxStep());
     SS2K_LOG(MAIN_LOG_TAG, "Max Position found: %d", rtConfig->getMaxStep());
