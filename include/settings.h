@@ -118,7 +118,7 @@ const char* const DEFAULT_PASSWORD = "password";
 #define DEFAULT_STEPPER_TRAVEL 200000000
 
 // Default debounce delay for shifters. Increase if you have false shifts. Decrease if shifting takes too long.
-#define DEBOUNCE_DELAY 400
+#define DEBOUNCE_DELAY 200
 
 // Hardware Revision check pin
 #define REV_PIN 34
@@ -212,6 +212,12 @@ const char* const DEFAULT_PASSWORD = "password";
 
 // loop speed for the SmartSpin2k BLE Client reconnect
 #define BLE_CLIENT_DELAY 101
+
+// loop speed of the Dircon Manager
+#define DIRCON_MANAGER_DELAY 20
+
+// loop speed of the aux serial timer
+#define AUX_SERIAL_DELAY 100
 
 // Number of devices that can be connected to the Client (myBLEDevices size)
 #define NUM_BLE_DEVICES 3
