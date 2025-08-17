@@ -19,6 +19,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Added
 
 ### Changed
+- Fixed rare crash due to calling new scan before the previous onScanEnd callback was complete. 
 
 ### Hardware
 
