@@ -161,9 +161,6 @@ void bleClientTask(void *pvParameters) {
       }
       while (ss2k->isUpdating) {  // wait until the update is done
         delay(100);
-        if(NimBLEDevice::getScan()->isScanning()) {  // if we're scanning, stop it
-          NimBLEDevice::getScan()->stop();  // stop scanning if we're updating
-        }
       }
       SS2K_LOG(BLE_CLIENT_LOG_TAG, "Update complete, re-enabling BLE scanning.");
     }
@@ -178,7 +175,9 @@ void bleClientTask(void *pvParameters) {
         NimBLEScan *pBLEScan = NimBLEDevice::getScan();
         if (pBLEScan->isScanning()) {
           SS2K_LOG(BLE_CLIENT_LOG_TAG, "Stopping scan before connecting to device on slot %d ...", x);
-          pBLEScan->stop();
+          while(pBLEScan->isScanning()) {
+            delay(100);
+          }
         }
         SS2K_LOG(BLE_CLIENT_LOG_TAG, "Connecting device on slot %d ...", x);
         if (spinBLEClient.connectToServer()) {
@@ -499,11 +498,33 @@ void ScanCallbacks::onResult(const NimBLEAdvertisedDevice *advertisedDevice) {
   }
 }
 
+/**
+ * @brief Scan for BLE servers and add them to a list.
+ * 
+ * This function initiates a Bluetooth Low Energy scan process to discover
+ * available devices. It ensures that scans are not overlapping by checking
+ * if a scan is already in progress and implementing a waiting mechanism.
+ * 
+ * @details The function uses a static boolean 'waitForScanToComplete' to add a delay
+ * of one program loop cycle (BLE_CLIENT_DELAY) after a scan ends before starting
+ * a new one. This delay is crucial because starting a new scan clears the vector
+ * of previously found devices, which might still be getting processed in the
+ * onScanEnd callback. Without this delay, data could be getting read as it is deleted, causing a crash.
+ * 
+ * @param duration The duration in seconds for which the scan should run
+ */
 void SpinBLEClient::scanProcess(int duration) {
   this->doScan = false;  // Confirming we did the scan
 
   NimBLEScan *pBLEScan = NimBLEDevice::getScan();
+
+  static bool waitForOnScanEndToComplete = false;
   if (pBLEScan->isScanning()) {
+    waitForOnScanEndToComplete = true;
+    return;
+  }
+  if (waitForOnScanEndToComplete) {
+    waitForOnScanEndToComplete = false;
     return;
   }
 

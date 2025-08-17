@@ -333,14 +333,14 @@ constexpr const char* ANY = "any";
 // Interval for polling ble battery updates
 #define BATTERY_UPDATE_INTERVAL_MILLIS 300000
 
-// Initial and web scan duration in milliseconds
-#define DEFAULT_SCAN_DURATION 5000
-
 // Default homing sensitivity value
 #define DEFAULT_HOMING_SENSITIVITY 50
 
 // BLE automatic reconnect interval in milliseconds.
-#define BLE_RECONNECT_SCAN_INTERVAL 5000
+#define BLE_RECONNECT_SCAN_INTERVAL 6000
+
+// Initial and web scan duration in milliseconds
+#define DEFAULT_SCAN_DURATION 4000
 
 // Task Stack Sizes
 // In theory you can subtract whatever is left in the report from DEBUG_STACK for each task
