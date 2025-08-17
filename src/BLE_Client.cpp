@@ -160,6 +160,9 @@ void bleClientTask(void *pvParameters) {
         }
       }
       while (ss2k->isUpdating) {  // wait until the update is done
+        if (NimBLEDevice::getScan()->isScanning()) {
+          NimBLEDevice::getScan()->stop();  // IMPORTANT! Stop scanning to allow the update to complete
+        }
         delay(100);
       }
       SS2K_LOG(BLE_CLIENT_LOG_TAG, "Update complete, re-enabling BLE scanning.");
@@ -176,6 +179,7 @@ void bleClientTask(void *pvParameters) {
         if (pBLEScan->isScanning()) {
           SS2K_LOG(BLE_CLIENT_LOG_TAG, "Stopping scan before connecting to device on slot %d ...", x);
           while(pBLEScan->isScanning()) {
+            pBLEScan->stop();
             delay(100);
           }
         }

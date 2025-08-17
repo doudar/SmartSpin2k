@@ -341,7 +341,6 @@ void HTTP_Server::start() {
             }
           } else if (upload.status == UPLOAD_FILE_WRITE) {
             /* flashing firmware to ESP*/
-            Serial.printf(".");
             if (Update.write(upload.buf, upload.currentSize) != upload.currentSize) {
               Update.printError(Serial);
               SS2K_LOG(HTTP_SERVER_LOG_TAG, "Upload Write Failed.");
@@ -356,6 +355,8 @@ void HTTP_Server::start() {
               SS2K_LOG(HTTP_SERVER_LOG_TAG, "Unknown OTA issue on end.");
             }
             // The reboot will be triggered in the onComplete handler after the response.
+            // Setting this to reboot, even if upload fails. 
+            ss2k->rebootFlag = true;
           }
         } else if (upload.filename == String("littlefs.bin").c_str()) {
           if (upload.status == UPLOAD_FILE_START) {
@@ -364,7 +365,6 @@ void HTTP_Server::start() {
               Update.printError(Serial);
             }
           } else if (upload.status == UPLOAD_FILE_WRITE) {
-            Serial.printf(".");
             if (Update.write(upload.buf, upload.currentSize) != upload.currentSize) {
               Update.printError(Serial);
             }
