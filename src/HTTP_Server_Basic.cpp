@@ -355,7 +355,7 @@ void HTTP_Server::start() {
               SS2K_LOG(HTTP_SERVER_LOG_TAG, "Unknown OTA issue on end.");
             }
             // The reboot will be triggered in the onComplete handler after the response.
-            // Setting this to reboot, even if upload fails. 
+            // Setting this to reboot, even if upload fails.
             ss2k->rebootFlag = true;
           }
         } else if (upload.filename == String("littlefs.bin").c_str()) {
