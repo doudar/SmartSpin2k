@@ -14,12 +14,22 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Hardware
 
 
+## [25.8.16]
+
+### Added
+
+### Changed
+
+### Hardware
+
+
 ## [25.8.3]
 
 ### Added
 
 ### Changed
 - Fixed rare crash due to calling new scan before the previous onScanEnd callback was complete. 
+- Removed serial printf's during updates as it was causing occasional update issues.
 
 ### Hardware
 

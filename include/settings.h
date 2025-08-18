@@ -223,7 +223,7 @@ const char* const DEFAULT_PASSWORD = "password";
 #define NUM_BLE_DEVICES 3
 
 // loop speed for the Webserver
-#define WEBSERVER_DELAY 7
+#define WEBSERVER_DELAY 12
 
 // BLE Device Generic Names
 constexpr const char* NONE = "none";
