@@ -34,7 +34,7 @@ void SpinBLEClient::start() {
                           "BLEClientTask",  /* name of task. */
                           BLE_CLIENT_STACK, /* Stack size of task */
                           NULL,             /* parameter of the task */
-                          9,               /* priority of the task  */
+                          9,                /* priority of the task  */
                           &BLEClientTask,   /* Task handle to keep track of created task */
                           1);               /* pin task to core */
 
@@ -90,7 +90,7 @@ bool subscribeToAllNotifications(NimBLEClient *pClient) {
   if (!pClient || !pClient->isConnected()) {
     SS2K_LOG(BLE_CLIENT_LOG_TAG, "Client not connected for notifications");
     return false;
-  }
+  } //The Issue with Echelon is that there are multiple services
   for (const auto &service : BLEServices::SUPPORTED_SERVICES) {
     NimBLERemoteService *pSvc = pClient->getService(service.serviceUUID);
     if (pSvc) {
@@ -178,7 +178,7 @@ void bleClientTask(void *pvParameters) {
         NimBLEScan *pBLEScan = NimBLEDevice::getScan();
         if (pBLEScan->isScanning()) {
           SS2K_LOG(BLE_CLIENT_LOG_TAG, "Stopping scan before connecting to device on slot %d ...", x);
-          while(pBLEScan->isScanning()) {
+          while (pBLEScan->isScanning()) {
             pBLEScan->stop();
             delay(100);
           }
@@ -432,7 +432,6 @@ void ScanCallbacks::onResult(const NimBLEAdvertisedDevice *advertisedDevice) {
     return;
   }
 
-  
   // Define granular constants for maximal reuse during logging
   const char *const MATCHED               = "Matched ";
   const char *const DIDNT_MATCH_THE_SAVED = " didn't match the saved: ";
@@ -516,17 +515,17 @@ void ScanCallbacks::onResult(const NimBLEAdvertisedDevice *advertisedDevice) {
 
 /**
  * @brief Scan for BLE servers and add them to a list.
- * 
+ *
  * This function initiates a Bluetooth Low Energy scan process to discover
  * available devices. It ensures that scans are not overlapping by checking
  * if a scan is already in progress and implementing a waiting mechanism.
- * 
+ *
  * @details The function uses a static boolean 'waitForScanToComplete' to add a delay
  * of one program loop cycle (BLE_CLIENT_DELAY) after a scan ends before starting
  * a new one. This delay is crucial because starting a new scan clears the vector
  * of previously found devices, which might still be getting processed in the
  * onScanEnd callback. Without this delay, data could be getting read as it is deleted, causing a crash.
- * 
+ *
  * @param duration The duration in seconds for which the scan should run
  */
 void SpinBLEClient::scanProcess(int duration) {
@@ -676,17 +675,17 @@ void SpinBLEClient::postConnect() {
   for (auto &_BLEd : spinBLEClient.myBLEDevices) {
     // Check that the device has been assigned and it hasn't been post connected.
     if ((_BLEd.connectedClientID != BLE_HS_CONN_HANDLE_NONE) && !_BLEd.getPostConnected()) {
-      SS2K_LOG(BLE_CLIENT_LOG_TAG, "Post connecting: %s , ConnID %d, PrimaryChar %s", _BLEd.peerAddress.toString().c_str(), _BLEd.connectedClientID,
-               _BLEd.charUUID.toString().c_str());
-      if (NimBLEDevice::getClientByPeerAddress(_BLEd.peerAddress)) {
-        NimBLEClient *pClient = NimBLEDevice::getClientByPeerAddress(_BLEd.peerAddress);
+      String adevName = this->adevName2UniqueName(_BLEd.advertisedDevice);
+      SS2K_LOG(BLE_CLIENT_LOG_TAG, "Post connecting: %s , ConnID %d, PrimaryChar %s", adevName.c_str(), _BLEd.connectedClientID, _BLEd.charUUID.toString().c_str());
+      NimBLEClient *pClient = NimBLEDevice::getClientByPeerAddress(_BLEd.peerAddress);
+      if (pClient) {
         BLEDevice::getServer()->updateConnParams(pClient->getConnHandle(), connectionParams[0], connectionParams[1], connectionParams[2], connectionParams[3]);
         _BLEd.setPostConnected(subscribeToAllNotifications(pClient));
         if (!_BLEd.getPostConnected()) {
-          SS2K_LOG(BLE_CLIENT_LOG_TAG, "Failed to subscribe to notifications for %s", _BLEd.peerAddress.toString().c_str());
+          SS2K_LOG(BLE_CLIENT_LOG_TAG, "Failed to subscribe to notifications for %s", adevName.c_str());
           return;
         }
-        if (_BLEd.charUUID == ECHELON_DATA_UUID) {
+        if (_BLEd.charUUID == ECHELON_SERVICE_UUID) {
           NimBLERemoteCharacteristic *writeCharacteristic = pClient->getService(ECHELON_SERVICE_UUID)->getCharacteristic(ECHELON_WRITE_UUID);
           if (writeCharacteristic == nullptr) {
             SS2K_LOG(BLE_CLIENT_LOG_TAG, "Failed to find Echelon write characteristic UUID: %s", ECHELON_WRITE_UUID.toString().c_str());
@@ -940,6 +939,9 @@ void SpinBLEClient::handleBattInfo(NimBLEClient *pClient, bool updateNow = false
 }
 // Returns a device name with the las two of the peer address attached. This lets us distinguish between multiple devices with the same device name.
 String SpinBLEClient::adevName2UniqueName(const NimBLEAdvertisedDevice *inDev) {
+  if (!inDev) {
+    return "null"; /* code */
+  }
   if (inDev->haveName()) {
     String _outDevName = String(inDev->getName().c_str());
     // add the last two of the string
@@ -957,8 +959,8 @@ void SpinBLEAdvertisedDevice::set(const NimBLEAdvertisedDevice *device, int id, 
     SS2K_LOGE(BLE_CLIENT_LOG_TAG, "ERROR: Attempt to set null device!");
     return;
   }
-
-  SS2K_LOG(BLE_CLIENT_LOG_TAG, "Setting Device %s", device->getAddress().toString().c_str());
+  String adevName = spinBLEClient.adevName2UniqueName(device);
+  SS2K_LOG(BLE_CLIENT_LOG_TAG, "Setting Device %s", adevName.c_str());
   this->advertisedDevice  = const_cast<const NimBLEAdvertisedDevice *>(device);
   this->peerAddress       = device->getAddress();
   this->connectedClientID = id;
@@ -991,7 +993,7 @@ void SpinBLEAdvertisedDevice::set(const NimBLEAdvertisedDevice *device, int id, 
           spinBLEClient.connectedCD = true;
           SS2K_LOG(BLE_CLIENT_LOG_TAG, "Registered CSC on Connect");
         } else if (serviceUUID == CYCLINGPOWERSERVICE_UUID || serviceUUID == FITNESSMACHINESERVICE_UUID || serviceUUID == FLYWHEEL_UART_SERVICE_UUID ||
-                   serviceUUID == ECHELON_SERVICE_UUID || serviceUUID == PELOTON_DATA_UUID) {
+                   serviceUUID == ECHELON_DEVICE_UUID || serviceUUID == PELOTON_DATA_UUID) {
           this->isPM                = true;
           spinBLEClient.connectedPM = true;
           SS2K_LOG(BLE_CLIENT_LOG_TAG, "Registered PM on Connect");
@@ -1006,7 +1008,7 @@ void SpinBLEAdvertisedDevice::set(const NimBLEAdvertisedDevice *device, int id, 
     }
   } else {
     // During initial discovery, just store the device info without registering services
-    SS2K_LOG(BLE_CLIENT_LOG_TAG, "Set %s with no current connection.", device->getAddress().toString().c_str());
+    SS2K_LOG(BLE_CLIENT_LOG_TAG, "Set %s with no current connection.", adevName.c_str());
   }
 }
 
