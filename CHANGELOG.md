@@ -10,6 +10,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Added
 
 ### Changed
+
+### Hardware
+
+
+## [25.8.18]
+
+### Added
+
+### Changed
 - Added better BLE device logging, even when a connection isn't made.
 - Fixed Echelon connections. 
 
