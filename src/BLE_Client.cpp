@@ -940,7 +940,7 @@ void SpinBLEClient::handleBattInfo(NimBLEClient *pClient, bool updateNow = false
 // Returns a device name with the las two of the peer address attached. This lets us distinguish between multiple devices with the same device name.
 String SpinBLEClient::adevName2UniqueName(const NimBLEAdvertisedDevice *inDev) {
   if (!inDev) {
-    return "null"; /* code */
+    return "null";
   }
   if (inDev->haveName()) {
     String _outDevName = String(inDev->getName().c_str());
