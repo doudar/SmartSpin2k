@@ -937,6 +937,33 @@ void SpinBLEClient::handleBattInfo(NimBLEClient *pClient, bool updateNow = false
     }
   }
 }
+// Helper function to detect if a BLE address is randomized (typically Android devices)
+bool SpinBLEClient::isRandomizedAddress(const NimBLEAdvertisedDevice *inDev) {
+  if (!inDev) {
+    return false;
+  }
+  
+  // Get the raw address bytes
+  NimBLEAddress addr = inDev->getAddress();
+  std::string addrStr = addr.toString();
+  
+  // Parse the first byte to check the random address bit pattern
+  // Random addresses have the 2nd bit (0x02) set in the most significant byte
+  if (addrStr.length() >= 2) {
+    // Extract first byte from string format "xx:xx:xx:xx:xx:xx"
+    char firstByteStr[3] = {addrStr[0], addrStr[1], '\0'};
+    int firstByte = strtol(firstByteStr, nullptr, 16);
+    
+    // Check if the local administration bit (bit 1) is set
+    // This indicates a locally administered (random) address
+    if ((firstByte & 0x02) != 0) {
+      return true;
+    }
+  }
+  
+  return false;
+}
+
 // Returns a device name with the las two of the peer address attached. This lets us distinguish between multiple devices with the same device name.
 String SpinBLEClient::adevName2UniqueName(const NimBLEAdvertisedDevice *inDev) {
   if (!inDev) {
@@ -944,7 +971,15 @@ String SpinBLEClient::adevName2UniqueName(const NimBLEAdvertisedDevice *inDev) {
   }
   if (inDev->haveName()) {
     String _outDevName = String(inDev->getName().c_str());
-    // add the last two of the string
+    
+    // For devices with randomized addresses (typically Android), use just the device name
+    // to avoid changing unique names when the MAC address changes
+    if (isRandomizedAddress(inDev)) {
+      return _outDevName;
+    }
+    
+    // For traditional devices with stable addresses, maintain backward compatibility
+    // by adding the last two characters of the address
     _outDevName += +" " + String(inDev->getAddress().toString().c_str()).substring(inDev->getAddress().toString().length() - 2);
     return _outDevName;
   } else {
