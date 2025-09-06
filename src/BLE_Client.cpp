@@ -973,7 +973,9 @@ String SpinBLEClient::adevName2UniqueName(const NimBLEAdvertisedDevice *inDev) {
     String _outDevName = String(inDev->getName().c_str());
     
     // For devices with randomized addresses (typically Android), use just the device name
-    // to avoid changing unique names when the MAC address changes
+    // to avoid changing unique names when the MAC address changes.
+    // Note: If multiple Android devices have identical names, users should rename them
+    // to ensure uniqueness (e.g., "John's Phone" vs "Mary's Phone").
     if (isRandomizedAddress(inDev)) {
       return _outDevName;
     }
