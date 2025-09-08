@@ -938,55 +938,73 @@ void SpinBLEClient::handleBattInfo(NimBLEClient *pClient, bool updateNow = false
   }
 }
 // Helper function to detect if a BLE address is randomized (typically Android devices)
+// Updated: only treat as randomized if it's a private random address (dynamic), not static random.
 bool SpinBLEClient::isRandomizedAddress(const NimBLEAdvertisedDevice *inDev) {
   if (!inDev) {
     return false;
   }
-  
-  // Get the raw address bytes
-  NimBLEAddress addr = inDev->getAddress();
-  std::string addrStr = addr.toString();
-  
-  // Parse the first byte to check the random address bit pattern
-  // Random addresses have the 2nd bit (0x02) set in the most significant byte
-  if (addrStr.length() >= 2) {
-    // Extract first byte from string format "xx:xx:xx:xx:xx:xx"
-    char firstByteStr[3] = {addrStr[0], addrStr[1], '\0'};
-    int firstByte = strtol(firstByteStr, nullptr, 16);
-    
-    // Check if the local administration bit (bit 1) is set
-    // This indicates a locally administered (random) address
-    if ((firstByte & 0x02) != 0) {
-      return true;
-    }
+
+  // Address string format "xx:xx:xx:xx:xx:xx"; take the first byte ("xx")
+  const std::string addrStr = inDev->getAddress().toString();
+  if (addrStr.size() < 2) {
+    return false;
   }
-  
-  return false;
+
+  char firstByteStr[3] = { addrStr[0], addrStr[1], '\0' };
+  int msb = strtol(firstByteStr, nullptr, 16);
+  if (msb < 0) {
+    return false;
+  }
+
+  // For Random Device Addresses, the two MSBs of the most significant byte define subtype:
+  // 0b11 (0xC0): Static Random (stable)        -> NOT randomized for our purposes
+  // 0b01 (0x40): Resolvable Private (dynamic)  -> randomized
+  // 0b00 (0x00): Non-Resolvable Private        -> randomized
+  // 0b10        Reserved
+  uint8_t topBits = static_cast<uint8_t>(msb) & 0xC0;
+  return (topBits == 0x40) || (topBits == 0x00);
 }
 
-// Returns a device name with the las two of the peer address attached. This lets us distinguish between multiple devices with the same device name.
+// Returns a device name with a stable suffix when possible.
+// - Public or static-random addresses: preserve old behavior (append last 2 hex of address)
+// - Private random addresses: try manufacturer data last byte as suffix; else just the base name
 String SpinBLEClient::adevName2UniqueName(const NimBLEAdvertisedDevice *inDev) {
   if (!inDev) {
     return "null";
   }
+
   if (inDev->haveName()) {
-    String _outDevName = String(inDev->getName().c_str());
-    
-    // For devices with randomized addresses (typically Android), use just the device name
-    // to avoid changing unique names when the MAC address changes.
-    // Note: If multiple Android devices have identical names, users should rename them
-    // to ensure uniqueness (e.g., "John's Phone" vs "Mary's Phone").
+    String outName = String(inDev->getName().c_str());
+
+    // Private random address (dynamic) path
     if (isRandomizedAddress(inDev)) {
-      return _outDevName;
+      // Prefer last byte of manufacturer data as a stable-ish suffix if present
+      if (inDev->haveManufacturerData()) {
+        const std::string &mfg = inDev->getManufacturerData();
+        if (!mfg.empty()) {
+          uint8_t last = static_cast<uint8_t>(mfg.back());
+          char buf[3];
+          // lower-case hex to match address style
+          snprintf(buf, sizeof(buf), "%02x", last);
+          outName += " " + String(buf);
+          return outName;
+        }
+      }
+      // Fallback: just the base name (no changing MAC-based suffix)
+      return outName;
     }
-    
-    // For traditional devices with stable addresses, maintain backward compatibility
-    // by adding the last two characters of the address
-    _outDevName += +" " + String(inDev->getAddress().toString().c_str()).substring(inDev->getAddress().toString().length() - 2);
-    return _outDevName;
+
+    // Backward-compatible path for public or static-random addresses
+    const std::string addrStrStd = inDev->getAddress().toString();
+    if (addrStrStd.size() >= 2) {
+      String addrStr = String(addrStrStd.c_str());
+      outName += " " + addrStr.substring(addrStr.length() - 2);
+    }
+    return outName;
   } else {
-    String _outDevName = inDev->getAddress().toString().c_str();
-    return _outDevName;
+    // No name; keep using the address as the identifier
+    String outName = inDev->getAddress().toString().c_str();
+    return outName;
   }
 }
 
