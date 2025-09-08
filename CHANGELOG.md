@@ -14,6 +14,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Hardware
 
 
+## [25.8.26]
+
+### Added
+
+### Changed
+- Unique (static) name generation for Android devices to prevent re-pairing issues.
+
+### Hardware
+
+
 ## [25.8.18]
 
 ### Added
