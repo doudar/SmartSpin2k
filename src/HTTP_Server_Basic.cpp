@@ -34,6 +34,29 @@ DNSServer dnsServer;
 HTTP_Server httpServer;
 WebServer server(80);
 
+// Helper functions for build version management
+String readStoredBuildVersion() {
+  File file = LittleFS.open(BUILD_VERSION_FILENAME, "r");
+  if (!file) {
+    return "";  // File doesn't exist
+  }
+  String version = file.readString();
+  file.close();
+  version.trim();  // Remove any trailing whitespace/newlines
+  return version;
+}
+
+void writeStoredBuildVersion(const String& version) {
+  File file = LittleFS.open(BUILD_VERSION_FILENAME, "w");
+  if (file) {
+    file.print(version);
+    file.close();
+    SS2K_LOG(HTTP_SERVER_LOG_TAG, "Build version saved: %s", version.c_str());
+  } else {
+    SS2K_LOG(HTTP_SERVER_LOG_TAG, "Failed to save build version");
+  }
+}
+
 void _staSetup() {
   WiFi.setHostname(userConfig->getDeviceName());
   WiFi.mode(WIFI_STA);
@@ -55,6 +78,31 @@ void _APSetup() {
 // ********************************WIFI Setup*************************
 void startWifi() {
   int i = 0;
+  
+  // Check build version for OTA WiFi issue handling
+  String storedVersion = readStoredBuildVersion();
+  String currentVersion = FIRMWARE_VERSION;
+  bool versionMismatch = (storedVersion != currentVersion || storedVersion.length() == 0);
+  
+  if (versionMismatch) {
+    SS2K_LOG(HTTP_SERVER_LOG_TAG, "Build version mismatch detected. Stored: '%s', Current: '%s'", 
+             storedVersion.c_str(), currentVersion.c_str());
+    
+    // Temporarily set hostname to "reset" to handle WiFi issues after OTA
+    WiFi.setHostname("reset");
+    SS2K_LOG(HTTP_SERVER_LOG_TAG, "Temporarily set hostname to 'reset' for OTA WiFi recovery");
+    
+    // Update stored version
+    writeStoredBuildVersion(currentVersion);
+    
+    // Restore original hostname
+    WiFi.setHostname(userConfig->getDeviceName());
+    SS2K_LOG(HTTP_SERVER_LOG_TAG, "Restored hostname to: %s", userConfig->getDeviceName());
+    
+    // Set reboot flag to restart after this WiFi setup completes
+    ss2k->rebootFlag = true;
+    SS2K_LOG(HTTP_SERVER_LOG_TAG, "Reboot flag set due to build version mismatch");
+  }
 
   // Trying Station mode first:
   if (strcmp(userConfig->getSsid(), DEVICE_NAME) != 0) {
