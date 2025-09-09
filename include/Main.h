@@ -19,16 +19,23 @@
 
 // Function Prototypes
 
+enum ButtonState {
+  RELEASED,
+  PRESSED
+};
+
 class SS2K {
  private:
-  uint64_t lastDebounceTime;
-  uint16_t debounceDelay;
+  unsigned long int lastDebounceTime = 0;
+  ButtonState upButtonState;
+  ButtonState downButtonState;
   int lastShifterPosition;
   int shiftersHoldForScan;
-  uint64_t scanDelayTime;
-  uint64_t scanDelayStart;
+  unsigned long int scanDelayTime;
+  unsigned long int scanDelayStart;
   int32_t targetPosition;
   int32_t currentPosition;
+  void handleShiftButtons();
 
  public:
   bool stepperIsRunning;
@@ -42,10 +49,11 @@ class SS2K {
   bool resetPowerTableFlag = false;
   bool isUpdating          = false;
 
-  static bool deBounce();
   static void ARDUINO_ISR_ATTR maintenanceLoop(void *pvParameters);
-  static void ARDUINO_ISR_ATTR handleShift();
+  static void ARDUINO_ISR_ATTR handleUpShift();
+  static void ARDUINO_ISR_ATTR handleDownShift();
   static void moveStepper();
+  void _findEndStop(bool moveForward);
 
   // the position the stepper motor will move to
   int32_t getTargetPosition() { return targetPosition; }
@@ -70,13 +78,13 @@ class SS2K {
   void goHome(bool bothDirections = false);
 
   SS2K() {
+    upButtonState        = RELEASED;
+    downButtonState      = RELEASED;
     targetPosition      = 0;
     currentPosition     = 0;
     stepperIsRunning    = false;
     externalControl     = false;
     syncMode            = false;
-    lastDebounceTime    = 0;
-    debounceDelay       = DEBOUNCE_DELAY;
     lastShifterPosition = 0;
     shiftersHoldForScan = SHIFTERS_HOLD_FOR_SCAN;
     scanDelayTime       = 10000;

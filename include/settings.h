@@ -118,7 +118,7 @@ const char* const DEFAULT_PASSWORD = "password";
 #define DEFAULT_STEPPER_TRAVEL 200000000
 
 // Default debounce delay for shifters. Increase if you have false shifts. Decrease if shifting takes too long.
-#define DEBOUNCE_DELAY 400
+#define DEBOUNCE_DELAY 200
 
 // Hardware Revision check pin
 #define REV_PIN 34
@@ -213,11 +213,17 @@ const char* const DEFAULT_PASSWORD = "password";
 // loop speed for the SmartSpin2k BLE Client reconnect
 #define BLE_CLIENT_DELAY 101
 
+// loop speed of the Dircon Manager
+#define DIRCON_MANAGER_DELAY 20
+
+// loop speed of the aux serial timer
+#define AUX_SERIAL_DELAY 100
+
 // Number of devices that can be connected to the Client (myBLEDevices size)
 #define NUM_BLE_DEVICES 3
 
 // loop speed for the Webserver
-#define WEBSERVER_DELAY 7
+#define WEBSERVER_DELAY 12
 
 // BLE Device Generic Names
 constexpr const char* NONE = "none";
@@ -327,14 +333,14 @@ constexpr const char* ANY = "any";
 // Interval for polling ble battery updates
 #define BATTERY_UPDATE_INTERVAL_MILLIS 300000
 
-// Initial and web scan duration in milliseconds
-#define DEFAULT_SCAN_DURATION 5000
-
 // Default homing sensitivity value
 #define DEFAULT_HOMING_SENSITIVITY 50
 
 // BLE automatic reconnect interval in milliseconds.
-#define BLE_RECONNECT_SCAN_INTERVAL 5000
+#define BLE_RECONNECT_SCAN_INTERVAL 6000
+
+// Initial and web scan duration in milliseconds
+#define DEFAULT_SCAN_DURATION 4000
 
 // Task Stack Sizes
 // In theory you can subtract whatever is left in the report from DEBUG_STACK for each task

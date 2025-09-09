@@ -42,9 +42,10 @@ namespace BLEServices {
 const std::vector<BLEServiceInfo> SUPPORTED_SERVICES = {{CYCLINGPOWERSERVICE_UUID, CYCLINGPOWERMEASUREMENT_UUID, "Cycling Power Service"},
                                                         {CSCSERVICE_UUID, CSCMEASUREMENT_UUID, "Cycling Speed And Cadence Service"},
                                                         {HEARTSERVICE_UUID, HEARTCHARACTERISTIC_UUID, "Heart Rate Service"},
+                                                        {ECHELON_DEVICE_UUID, ECHELON_SERVICE_UUID, "Echelon Device"}, // Two lines for Echelon
+                                                        {ECHELON_SERVICE_UUID, ECHELON_DATA_UUID, "Echelon Service"}, // Because one is for search, the other for data
                                                         {FITNESSMACHINESERVICE_UUID, FITNESSMACHINEINDOORBIKEDATA_UUID, "Fitness Machine Service"},
                                                         {HID_SERVICE_UUID, HID_REPORT_DATA_UUID, "HID Service"},
-                                                        {ECHELON_SERVICE_UUID, ECHELON_DATA_UUID, "Echelon Service"},
                                                         {FLYWHEEL_UART_SERVICE_UUID, FLYWHEEL_UART_TX_UUID, "Flywheel UART Service"}};
 }
 
@@ -218,6 +219,7 @@ class SpinBLEClient {
   // Disconnects all devices. They will then be reconnected if scanned and preferred again.
   void reconnectAllDevices();
 
+  bool isRandomizedAddress(const NimBLEAdvertisedDevice* inDev);
   String adevName2UniqueName(const NimBLEAdvertisedDevice* inDev);
 };
 

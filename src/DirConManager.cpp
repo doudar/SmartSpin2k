@@ -80,6 +80,13 @@ void DirConManager::stop() {
 }
 
 void DirConManager::update() {
+  // Return immediately unless DIRCON_MANAGER_DELAY has passed.
+  static unsigned long lastUpdate = 0;
+  if (millis() - lastUpdate < DIRCON_MANAGER_DELAY) {
+    return;
+  }
+  lastUpdate = millis();
+
   if (!started) {
     return;
   }
@@ -116,7 +123,7 @@ void DirConManager::setupMDNS() {
 
   // Get device MAC address using existing buffer
   strcpy(macAddress, WiFi.macAddress().c_str());
-  //replace colons with dashes for mac address
+  // replace colons with dashes for mac address
   for (char* p = macAddress; *p; p++) {
     if (*p == ':') {
       *p = '-';
@@ -124,8 +131,7 @@ void DirConManager::setupMDNS() {
   }
 
   // Create a unique serial number (using MAC address), and remove the dashes and change the letters to decimal numbers.
-  snprintf(serialNumber, sizeof(serialNumber), "%02X%02X%02X%02X%02X%02X",
-           macAddress[0], macAddress[1], macAddress[3], macAddress[4], macAddress[6], macAddress[7]);
+  snprintf(serialNumber, sizeof(serialNumber), "%02X%02X%02X%02X%02X%02X", macAddress[0], macAddress[1], macAddress[3], macAddress[4], macAddress[6], macAddress[7]);
 
   // Add DirCon service to MDNS
   SS2K_LOG(DIRCON_LOG_TAG, "Adding DirCon MDNS service: %s.%s on port %d", DIRCON_MDNS_SERVICE_NAME, DIRCON_MDNS_SERVICE_PROTOCOL, DIRCON_TCP_PORT);
@@ -588,7 +594,7 @@ std::vector<NimBLECharacteristic*> DirConManager::getCharacteristics(const NimBL
   if (service == nullptr) {
     return characteristics;
   }
-  for(const NimBLECharacteristic* characteristic : service->getCharacteristics()) {
+  for (const NimBLECharacteristic* characteristic : service->getCharacteristics()) {
     if (characteristic != nullptr) {
       characteristics.push_back(const_cast<NimBLECharacteristic*>(characteristic));
     }

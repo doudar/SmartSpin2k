@@ -51,3 +51,13 @@ class TestTableFill {
   public:
     static void test_fill_incomplete_table(void);
 };
+
+class TestAdevName2UniqueName {
+public:
+    static void test_traditional_device_keeps_address_suffix(void);
+    static void test_android_device_no_address_suffix(void);
+    static void test_random_address_pattern_detection(void);
+    static void test_null_device_handling(void);
+    static void test_device_without_name(void);
+    static void test_backward_compatibility(void);
+};

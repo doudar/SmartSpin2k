@@ -120,8 +120,8 @@ class otaCallback : public BLECharacteristicCallbacks {
       } else {
         bufferCount = 1;
         // Serial.printf("%d bytes", rxData.length());
-        //  Notify the iOS app so next batch can be sent
-        Serial.printf(".");
+        // Notify the iOS app so next batch can be sent
+        // Serial.printf(".");
         pTxCharacteristic->notify(0x02, sizeof(uint8_t));
       }
 
