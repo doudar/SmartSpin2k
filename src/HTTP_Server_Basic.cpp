@@ -23,6 +23,7 @@
 #include <DNSServer.h>
 #include <ArduinoJson.h>
 #include <BLE_Custom_Characteristic.h>
+#include <Preferences.h>
 
 File fsUploadFile;
 
@@ -57,6 +58,34 @@ void writeStoredBuildVersion(const String& version) {
   }
 }
 
+// NVS guard helpers (one-time recovery per firmware version)
+namespace {
+const char* OTA_REC_NS  = "ota_recover";  // namespace
+const char* OTA_REC_KEY = "ver";          // key storing last recovered firmware version
+
+String getNVSRecoveryVersion() {
+  Preferences p;
+  if (!p.begin(OTA_REC_NS, true)) {
+    SS2K_LOG(HTTP_SERVER_LOG_TAG, "NVS (ro) open failed");
+    return "";
+  }
+  String v = p.getString(OTA_REC_KEY, "");
+  p.end();
+  return v;
+}
+
+bool setNVSRecoveryVersion(const String& v) {
+  Preferences p;
+  if (!p.begin(OTA_REC_NS, false)) {
+    SS2K_LOG(HTTP_SERVER_LOG_TAG, "NVS (rw) open failed");
+    return false;
+  }
+  size_t n = p.putString(OTA_REC_KEY, v);
+  p.end();
+  return n > 0;
+}
+}  // namespace
+
 void _staSetup() {
   WiFi.setHostname(userConfig->getDeviceName());
   WiFi.mode(WIFI_STA);
@@ -83,25 +112,37 @@ void startWifi() {
   String storedVersion = readStoredBuildVersion();
   String currentVersion = FIRMWARE_VERSION;
   bool versionMismatch = (storedVersion != currentVersion || storedVersion.length() == 0);
-  
   if (versionMismatch) {
-    SS2K_LOG(HTTP_SERVER_LOG_TAG, "Build version mismatch detected. Stored: '%s', Current: '%s'", 
-             storedVersion.c_str(), currentVersion.c_str());
-    
-    // Temporarily set hostname to "reset" to handle WiFi issues after OTA
-    WiFi.setHostname("reset");
-    SS2K_LOG(HTTP_SERVER_LOG_TAG, "Temporarily set hostname to 'reset' for OTA WiFi recovery");
-    
-    // Update stored version
-    writeStoredBuildVersion(currentVersion);
-    
-    // Restore original hostname
-    WiFi.setHostname(userConfig->getDeviceName());
-    SS2K_LOG(HTTP_SERVER_LOG_TAG, "Restored hostname to: %s", userConfig->getDeviceName());
-    
-    // Set reboot flag to restart after this WiFi setup completes
-    ss2k->rebootFlag = true;
-    SS2K_LOG(HTTP_SERVER_LOG_TAG, "Reboot flag set due to build version mismatch");
+    String nvsVer          = getNVSRecoveryVersion();
+    bool recoveryCompleted = (nvsVer == currentVersion);
+    SS2K_LOG(HTTP_SERVER_LOG_TAG, "Build version mismatch. FS:'%s' NVS:'%s' CUR:'%s'", storedVersion.c_str(), nvsVer.c_str(), currentVersion.c_str());
+
+    if (!recoveryCompleted) {
+      // Perform one-time recovery sequence
+      WiFi.setHostname("reset");
+      SS2K_LOG(HTTP_SERVER_LOG_TAG, "Hostname temporarily set to 'reset' (OTA recovery)");
+
+      writeStoredBuildVersion(currentVersion);
+      bool fsOk  = (readStoredBuildVersion() == currentVersion);
+      bool nvsOk = setNVSRecoveryVersion(currentVersion);
+
+      // Restore original hostname
+      WiFi.setHostname(userConfig->getDeviceName());
+      SS2K_LOG(HTTP_SERVER_LOG_TAG, "Hostname restored: %s", userConfig->getDeviceName());
+
+      if (fsOk && nvsOk) {
+        ss2k->rebootFlag = true;
+        SS2K_LOG(HTTP_SERVER_LOG_TAG, "Recovery persisted (fsOk=%d nvsOk=%d). Reboot flagged.", fsOk, nvsOk);
+      } else {
+        SS2K_LOG(HTTP_SERVER_LOG_TAG, "Recovery persistence failed (fsOk=%d nvsOk=%d). Skipping reboot to avoid loop.", fsOk, nvsOk);
+      }
+    } else {
+      // Already recovered for this firmware version. Ensure file is updated if missing/different.
+      if (storedVersion != currentVersion) {
+        writeStoredBuildVersion(currentVersion);
+        SS2K_LOG(HTTP_SERVER_LOG_TAG, "Re-synced build version file without reboot (already recovered)");
+      }
+    }
   }
 
   // Trying Station mode first:
