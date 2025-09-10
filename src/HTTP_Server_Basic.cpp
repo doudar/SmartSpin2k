@@ -112,6 +112,7 @@ void startWifi() {
   String storedVersion = readStoredBuildVersion();
   String currentVersion = FIRMWARE_VERSION;
   bool versionMismatch = (storedVersion != currentVersion || storedVersion.length() == 0);
+  SS2K_LOG(HTTP_SERVER_LOG_TAG, "Build version check. FS:'%s' CUR:'%s'", storedVersion.c_str(), currentVersion.c_str());
   if (versionMismatch) {
     String nvsVer          = getNVSRecoveryVersion();
     bool recoveryCompleted = (nvsVer == currentVersion);
