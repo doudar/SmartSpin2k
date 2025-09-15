@@ -75,6 +75,17 @@ void setup() {
    RUN_TEST(test5.test_fill_incomplete_table);
   }
 
+  // BLE Device Unique Name Tests
+  {
+    TestAdevName2UniqueName test;
+    RUN_TEST(test.test_traditional_device_keeps_address_suffix);
+    RUN_TEST(test.test_android_device_no_address_suffix);
+    RUN_TEST(test.test_random_address_pattern_detection);
+    RUN_TEST(test.test_null_device_handling);
+    RUN_TEST(test.test_device_without_name);
+    RUN_TEST(test.test_backward_compatibility);
+  }
+
   UNITY_END();
 }
 

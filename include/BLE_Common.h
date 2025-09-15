@@ -219,6 +219,7 @@ class SpinBLEClient {
   // Disconnects all devices. They will then be reconnected if scanned and preferred again.
   void reconnectAllDevices();
 
+  bool isRandomizedAddress(const NimBLEAdvertisedDevice* inDev);
   String adevName2UniqueName(const NimBLEAdvertisedDevice* inDev);
 };
 
