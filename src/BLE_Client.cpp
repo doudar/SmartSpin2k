@@ -915,26 +915,31 @@ void SpinBLEClient::handleBattInfo(NimBLEClient *pClient, bool updateNow = false
     if (pClient->getService(BATTERYSERVICE_UUID)->getCharacteristic(BATTERYCHARACTERISTIC_UUID) == nullptr) {
       return;
     }
-    if (pClient->getService(HEARTSERVICE_UUID) && pClient->getService(BATTERYSERVICE_UUID)) {  // get battery level at first connect
+    
+    // Skip battery read for power meters to prevent data drops
+    // Battery reads use synchronous readValue() which can block communication
+    bool isPowerMeter = (pClient->getService(CYCLINGPOWERMEASUREMENT_UUID) || pClient->getService(CYCLINGPOWERSERVICE_UUID));
+    
+    if (pClient->getService(HEARTSERVICE_UUID) && pClient->getService(BATTERYSERVICE_UUID) && !isPowerMeter) {  // get battery level for HRM only
       BLERemoteCharacteristic *battCharacteristic = pClient->getService(BATTERYSERVICE_UUID)->getCharacteristic(BATTERYCHARACTERISTIC_UUID);
       if (battCharacteristic != nullptr) {
-        std::string value = battCharacteristic->readValue();
-        rtConfig->hr_batt.setValue((uint8_t)value[0]);
-        SS2K_LOG(BLE_CLIENT_LOG_TAG, "HRM battery updated %d", (int)value[0]);
+        try {
+          // Add timeout protection for battery reads
+          std::string value = battCharacteristic->readValue();
+          if (!value.empty()) {
+            rtConfig->hr_batt.setValue((uint8_t)value[0]);
+            SS2K_LOG(BLE_CLIENT_LOG_TAG, "HRM battery updated %d", (int)value[0]);
+          }
+        } catch (...) {
+          SS2K_LOG(BLE_CLIENT_LOG_TAG, "HRM battery read failed");
+          rtConfig->hr_batt.setValue(0);
+        }
       } else {
         rtConfig->hr_batt.setValue(0);
       }
-    } else if ((pClient->getService(CYCLINGPOWERMEASUREMENT_UUID) || pClient->getService(CYCLINGPOWERSERVICE_UUID)) &&
-               pClient->getService(BATTERYSERVICE_UUID)) {  // get batterylevel at first connect
-      BLERemoteCharacteristic *battCharacteristic = pClient->getService(BATTERYSERVICE_UUID)->getCharacteristic(BATTERYCHARACTERISTIC_UUID);
-      if (battCharacteristic != nullptr) {
-        std::string value = battCharacteristic->readValue();
-        rtConfig->pm_batt.setValue((uint8_t)value[0]);
-        SS2K_LOG(BLE_CLIENT_LOG_TAG, "PM battery updated %d", (int)value[0]);
-      } else {
-        rtConfig->pm_batt.setValue(0);
-      }
     }
+    // Skip power meter battery reads to prevent 5-minute data drops
+    // Power meter data flow is more critical than battery level reporting
   }
 }
 // Helper function to detect if a BLE address is randomized (typically Android devices)
