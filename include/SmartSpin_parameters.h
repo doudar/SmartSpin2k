@@ -14,8 +14,34 @@
 #endif
 
 #include "settings.h"
+#include <type_traits>
 
 #define CONFIG_LOG_TAG "Config"
+
+// Generic parameter class for simple set/get operations
+template<typename T>
+class Parameter {
+ private:
+  T value;
+
+ public:
+  void set(const T& val) { value = val; }
+  T get() const { return value; }
+  
+  // Overload for String types to return const char*
+  template<typename U = T>
+  typename std::enable_if<std::is_same<U, String>::value, const char*>::type
+  getCStr() const { return value.c_str(); }
+
+  Parameter() : value{} {}
+  Parameter(const T& defaultValue) : value(defaultValue) {}
+  
+  // Assignment operator for convenience
+  Parameter& operator=(const T& val) { value = val; return *this; }
+  
+  // Conversion operator for convenience  
+  operator T() const { return value; }
+};
 
 class Measurement {
  private:
@@ -111,8 +137,8 @@ class userParameters {
  private:
   String firmwareUpdateURL;
   String deviceName;
-  int shiftStep;
-  bool stealthChop;
+  Parameter<int> shiftStep;
+  Parameter<bool> stealthChop;
   float inclineMultiplier;
   float powerCorrectionFactor;
   float ERGSensitivity;
@@ -127,7 +153,7 @@ class userParameters {
   bool udpLogEnabled         = false;
   int32_t hMin               = INT32_MIN;
   int32_t hMax               = INT32_MIN;
-  bool FTMSControlPointWrite = false;
+  Parameter<bool> FTMSControlPointWrite;
   int homingSensitivity      = DEFAULT_HOMING_SENSITIVITY;  // Use default from settings.h
   String ssid;
   String password;
@@ -143,14 +169,14 @@ class userParameters {
   void setDeviceName(String dvn) { deviceName = dvn; }
   const char* getDeviceName() { return deviceName.c_str(); }
 
-  void setShiftStep(int ss) { shiftStep = ss; }
-  int getShiftStep() { return shiftStep; }
+  void setShiftStep(int ss) { shiftStep.set(ss); }
+  int getShiftStep() { return shiftStep.get(); }
 
-  void setStealthChop(bool sc) { stealthChop = sc; }
-  bool getStealthChop() { return stealthChop; }
+  void setStealthChop(bool sc) { stealthChop.set(sc); }
+  bool getStealthChop() { return stealthChop.get(); }
 
-  void setFTMSControlPointWrite(bool cpw) { FTMSControlPointWrite = cpw; }
-  bool getFTMSControlPointWrite() { return FTMSControlPointWrite; }
+  void setFTMSControlPointWrite(bool cpw) { FTMSControlPointWrite.set(cpw); }
+  bool getFTMSControlPointWrite() { return FTMSControlPointWrite.get(); }
 
   void setInclineMultiplier(float im) { inclineMultiplier = im; }
   float getInclineMultiplier() { return inclineMultiplier; }

@@ -48,8 +48,8 @@ JsonDocument doc;
 void userParameters::setDefaults() {
   firmwareUpdateURL     = FW_UPDATEURL;
   deviceName            = DEVICE_NAME;
-  shiftStep             = DEFAULT_SHIFT_STEP;
-  stealthChop           = STEALTHCHOP;
+  shiftStep.set(DEFAULT_SHIFT_STEP);
+  stealthChop.set(STEALTHCHOP);
   stepperPower          = DEFAULT_STEPPER_POWER;
   stepperSpeed          = DEFAULT_STEPPER_SPEED;
   inclineMultiplier     = INCLINE_MULTIPLIER;
@@ -85,10 +85,10 @@ String userParameters::returnJSON() {
   doc["firmwareUpdateURL"]     = firmwareUpdateURL;
   doc["firmwareVersion"]       = FIRMWARE_VERSION;
   doc["deviceName"]            = deviceName;
-  doc["shiftStep"]             = shiftStep;
+  doc["shiftStep"]             = shiftStep.get();
   doc["stepperPower"]          = stepperPower;
   doc["stepperSpeed"]          = stepperSpeed;
-  doc["stealthChop"]           = stealthChop;
+  doc["stealthChop"]           = stealthChop.get();
   doc["inclineMultiplier"]     = inclineMultiplier;
   doc["powerCorrectionFactor"] = powerCorrectionFactor;
   doc["ERGSensitivity"]        = ERGSensitivity;
@@ -137,10 +137,10 @@ void userParameters::saveToLittleFS() {
 
   doc["firmwareUpdateURL"]     = firmwareUpdateURL;
   doc["deviceName"]            = deviceName;
-  doc["shiftStep"]             = shiftStep;
+  doc["shiftStep"]             = shiftStep.get();
   doc["stepperPower"]          = stepperPower;
   doc["stepperSpeed"]          = stepperSpeed;
-  doc["stealthChop"]           = stealthChop;
+  doc["stealthChop"]           = stealthChop.get();
   doc["inclineMultiplier"]     = inclineMultiplier;
   doc["powerCorrectionFactor"] = powerCorrectionFactor;
   doc["ERGSensitivity"]        = ERGSensitivity;
