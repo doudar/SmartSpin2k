@@ -455,7 +455,7 @@ void ScanCallbacks::onResult(const NimBLEAdvertisedDevice *advertisedDevice) {
         if (strcmp(userConfig->getConnectedRemote(), ANY) == 0) {
           SS2K_LOG(BLE_CLIENT_LOG_TAG, "%s%s", REMOTE, STRING_MATCHED_ANY);
         } else {
-          bool nameMatched = (aDevName = userConfig->getConnectedRemote()) ? true : false;
+          bool nameMatched = (aDevName == userConfig->getConnectedRemote()) ? true : false;
           bool addrMatched = strcmp(aDevAddr, userConfig->getConnectedRemote()) == 0;
           if (!nameMatched && !addrMatched || strcmp(userConfig->getConnectedRemote(), NONE) == 0) {
             SS2K_LOG(BLE_CLIENT_LOG_TAG, "%s%s%s%s", THIS, REMOTE, DIDNT_MATCH_THE_SAVED, userConfig->getConnectedRemote());

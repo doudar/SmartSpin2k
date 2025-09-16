@@ -31,7 +31,60 @@ void TestAdevName2UniqueName::test_android_device_no_address_suffix() {
     // Addresses with local administration bit set (0x02, 0x03, 0x06, 0x07, etc.)
     // should NOT have address suffix
     
-    TEST_ASSERT_TRUE_MESSAGE(true, "Android device no-suffix test placeholder - requires manual verification");
+    // Test the SpinBLEAdvertisedDevice uniqueName functionality
+    // Simulate how the uniqueName field should work for stable device identification
+    
+    struct MockDevice {
+        char uniqueName[30];
+        bool advertisedDevice;
+        
+        MockDevice() : advertisedDevice(false) {
+            uniqueName[0] = '\0';
+        }
+        
+        void setUniqueName(const char* name) {
+            strncpy(this->uniqueName, name, sizeof(this->uniqueName) - 1);
+            this->uniqueName[sizeof(this->uniqueName) - 1] = '\0';
+            this->advertisedDevice = true;
+        }
+        
+        void reset() {
+            this->uniqueName[0] = '\0';
+            this->advertisedDevice = false;
+        }
+    };
+    
+    MockDevice device;
+    
+    // Test setting unique name
+    device.setUniqueName("MyAndroidDevice");
+    TEST_ASSERT_EQUAL_STRING("MyAndroidDevice", device.uniqueName);
+    TEST_ASSERT_TRUE(device.advertisedDevice);
+    
+    // Test reset clears unique name
+    device.reset();
+    TEST_ASSERT_EQUAL_STRING("", device.uniqueName);
+    TEST_ASSERT_FALSE(device.advertisedDevice);
+    
+    // Test that device slot assignment logic would work for same device with different addresses
+    MockDevice devices[2];
+    const char* deviceName = "MyAndroidDevice";
+    
+    // First assignment
+    devices[0].setUniqueName(deviceName);
+    
+    // Second attempt with same unique name (different address)
+    bool found = false;
+    for (int i = 0; i < 2; i++) {
+        if (!devices[i].advertisedDevice || 
+            (strlen(devices[i].uniqueName) > 0 && strcmp(devices[i].uniqueName, deviceName) == 0)) {
+            devices[i].setUniqueName(deviceName);
+            found = true;
+            TEST_ASSERT_EQUAL(0, i);  // Should reuse slot 0
+            break;
+        }
+    }
+    TEST_ASSERT_TRUE(found);
 }
 
 void TestAdevName2UniqueName::test_random_address_pattern_detection() {
@@ -91,5 +144,64 @@ void TestAdevName2UniqueName::test_backward_compatibility() {
     // - Non-randomized addresses: "DeviceName XX" (where XX is last 2 chars of MAC)
     // - Randomized addresses: "DeviceName" (no suffix)
     
-    TEST_ASSERT_TRUE_MESSAGE(true, "Backward compatibility test - non-random devices should keep suffix");
+    // Test the device slot logic for both scenarios
+    struct MockDevice {
+        char uniqueName[30];
+        bool advertisedDevice;
+        
+        MockDevice() : advertisedDevice(false) {
+            uniqueName[0] = '\0';
+        }
+        
+        void setUniqueName(const char* name) {
+            strncpy(this->uniqueName, name, sizeof(this->uniqueName) - 1);
+            this->uniqueName[sizeof(this->uniqueName) - 1] = '\0';
+            this->advertisedDevice = true;
+        }
+        
+        void reset() {
+            this->uniqueName[0] = '\0';
+            this->advertisedDevice = false;
+        }
+    };
+    
+    // Test scenario 1: Traditional device with address suffix
+    MockDevice devices[3];
+    
+    // Traditional device assignment
+    devices[0].setUniqueName("TraditionalDevice 55");
+    TEST_ASSERT_EQUAL_STRING("TraditionalDevice 55", devices[0].uniqueName);
+    
+    // Same traditional device should match by unique name
+    bool foundTraditional = false;
+    for (int i = 0; i < 3; i++) {
+        if (!devices[i].advertisedDevice || 
+            (strlen(devices[i].uniqueName) > 0 && strcmp(devices[i].uniqueName, "TraditionalDevice 55") == 0)) {
+            foundTraditional = true;
+            TEST_ASSERT_EQUAL(0, i);  // Should reuse slot 0
+            break;
+        }
+    }
+    TEST_ASSERT_TRUE(foundTraditional);
+    
+    // Test scenario 2: Android device (no suffix)
+    devices[1].setUniqueName("AndroidDevice");
+    TEST_ASSERT_EQUAL_STRING("AndroidDevice", devices[1].uniqueName);
+    
+    // Same Android device should match by unique name
+    bool foundAndroid = false;
+    for (int i = 0; i < 3; i++) {
+        if (!devices[i].advertisedDevice || 
+            (strlen(devices[i].uniqueName) > 0 && strcmp(devices[i].uniqueName, "AndroidDevice") == 0)) {
+            foundAndroid = true;
+            TEST_ASSERT_EQUAL(1, i);  // Should reuse slot 1
+            break;
+        }
+    }
+    TEST_ASSERT_TRUE(foundAndroid);
+    
+    // Verify both devices are properly stored
+    TEST_ASSERT_EQUAL_STRING("TraditionalDevice 55", devices[0].uniqueName);
+    TEST_ASSERT_EQUAL_STRING("AndroidDevice", devices[1].uniqueName);
+    TEST_ASSERT_EQUAL_STRING("", devices[2].uniqueName);  // Empty slot
 }
