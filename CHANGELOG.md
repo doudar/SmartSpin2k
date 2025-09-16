@@ -10,6 +10,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Added
 
 ### Changed
+
+### Hardware
+
+
+## [25.9.8]
+
+### Added
+
+### Changed
 - Only check battery level on initial connection. This is to fix Tempo power meter drops. 
 
 ### Hardware
