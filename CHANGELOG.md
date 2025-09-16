@@ -20,6 +20,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 - Only check battery level on initial connection. This is to fix Tempo power meter drops. 
+- Moved battery information to the SpinBLEAdvertisedDevice class. 
 
 ### Hardware
 

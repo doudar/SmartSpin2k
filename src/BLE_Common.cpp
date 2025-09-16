@@ -59,97 +59,88 @@ const BLEServiceInfo* getDeviceServiceInfo(const NimBLEAdvertisedDevice* adverti
 bool isDeviceSupported(const NimBLEAdvertisedDevice* advertisedDevice, const String& deviceName) { return getDeviceServiceInfo(advertisedDevice, deviceName) != nullptr; }
 
 void BLECommunications() {
-    // **********************************Client***************************************
-    for (auto& _BLEd : spinBLEClient.myBLEDevices) {  // loop through discovered devices
-      if (_BLEd.connectedClientID != BLE_HS_CONN_HANDLE_NONE) {
-        if (_BLEd.advertisedDevice) {                                                                // is device registered?
-          if ((_BLEd.connectedClientID != BLE_HS_CONN_HANDLE_NONE) && (_BLEd.doConnect == false)) {  // client must not be in connection process
-            if (BLEDevice::getClientByPeerAddress(_BLEd.peerAddress)) {                              // nullptr check
-              BLEClient* pClient = NimBLEDevice::getClientByPeerAddress(_BLEd.peerAddress);
-              // Client connected with a valid UUID registered
-              if ((_BLEd.serviceUUID != BLEUUID((uint16_t)0x0000)) && (pClient->isConnected())) {
-                // Handle BLE HID Remotes
-                if (_BLEd.serviceUUID == HID_SERVICE_UUID) {
-                  spinBLEClient.keepAliveBLE_HID(pClient);  // keep alive doesn't seem to help :(
-                  continue;                                 // There is not data that needs to be dequeued for the remote, so got to the next device.
-                }
-                // Dequeue sensor data we stored during notifications
-                while (pdTRUE) {
-                  NotifyData incomingNotifyData = _BLEd.dequeueData();
-                  if (incomingNotifyData.length == 0) {
-                    break;
-                  }
-                  size_t length = incomingNotifyData.length;
-                  uint8_t pData[length];
-
-                  for (size_t i = 0; i < length; i++) {
-                    pData[i] = incomingNotifyData.data[i];
-                  }
-                  collectAndSet(incomingNotifyData.charUUID, incomingNotifyData.serviceUUID, _BLEd.peerAddress, pData, length);
-                }
-                if (_BLEd.getPostConnected()) {
-                  // only do this once after connection. Checking every 5 minutes was causing Tempo Power Meter Drops. 
-                  static bool battInfoChecked = false;
-                  if (!battInfoChecked) {
-                    battInfoChecked = true;
-                    spinBLEClient.handleBattInfo(pClient, false);
-                  }
-                }
-
-              } else if (!pClient->isConnected()) {  // This is a workaround for a bug in NimBLE where onDisconnect() is not called automatically.
-                MyClientCallback workaroundCallback;
-                workaroundCallback.onDisconnect(pClient, 0);
-                SS2K_LOG(BLE_COMMON_LOG_TAG, "Client %s not connected in communications loop", _BLEd.peerAddress.toString().c_str());
+  // **********************************Client***************************************
+  for (auto& _BLEd : spinBLEClient.myBLEDevices) {  // loop through discovered devices
+    if (_BLEd.connectedClientID != BLE_HS_CONN_HANDLE_NONE) {
+      if (_BLEd.advertisedDevice) {                                                                // is device registered?
+        if ((_BLEd.connectedClientID != BLE_HS_CONN_HANDLE_NONE) && (_BLEd.doConnect == false)) {  // client must not be in connection process
+          if (BLEDevice::getClientByPeerAddress(_BLEd.peerAddress)) {                              // nullptr check
+            BLEClient* pClient = NimBLEDevice::getClientByPeerAddress(_BLEd.peerAddress);
+            // Client connected with a valid UUID registered
+            if ((_BLEd.serviceUUID != BLEUUID((uint16_t)0x0000)) && (pClient->isConnected())) {
+              // Handle BLE HID Remotes
+              if (_BLEd.serviceUUID == HID_SERVICE_UUID) {
+                spinBLEClient.keepAliveBLE_HID(pClient);  // keep alive doesn't seem to help :(
+                continue;                                 // There is not data that needs to be dequeued for the remote, so got to the next device.
               }
+              // Dequeue sensor data we stored during notifications
+              while (pdTRUE) {
+                NotifyData incomingNotifyData = _BLEd.dequeueData();
+                if (incomingNotifyData.length == 0) {
+                  break;
+                }
+                size_t length = incomingNotifyData.length;
+                uint8_t pData[length];
+
+                for (size_t i = 0; i < length; i++) {
+                  pData[i] = incomingNotifyData.data[i];
+                }
+                collectAndSet(incomingNotifyData.charUUID, incomingNotifyData.serviceUUID, _BLEd.peerAddress, pData, length);
+              }
+            } else if (!pClient->isConnected()) {  // This is a workaround for a bug in NimBLE where onDisconnect() is not called automatically.
+              MyClientCallback workaroundCallback;
+              workaroundCallback.onDisconnect(pClient, 0);
+              SS2K_LOG(BLE_COMMON_LOG_TAG, "Client %s not connected in communications loop", _BLEd.peerAddress.toString().c_str());
             }
           }
         }
       }
     }
+  }
 
-    // ***********************************SERVER**************************************
+  // ***********************************SERVER**************************************
 #ifdef DEBUG_HR_TO_PWR
-    calculateInstPwrFromHR();
+  calculateInstPwrFromHR();
 #endif  // DEBUG_HR_TO_PWR
 
-    // Set outputs to zero if we're not simulating or have connected devices.
-    if (!spinBLEClient.connectedPM && !rtConfig->watts.getSimulate() && !rtConfig->cad.getSimulate() && !userConfig->getPTab4Pwr()) {
-      rtConfig->cad.setValue(0);
-      rtConfig->watts.setValue(0);
-    }
-    if (!spinBLEClient.connectedHRM && !rtConfig->hr.getSimulate()) {
-      rtConfig->hr.setValue(0);
-    }
+  // Set outputs to zero if we're not simulating or have connected devices.
+  if (!spinBLEClient.connectedPM && !rtConfig->watts.getSimulate() && !rtConfig->cad.getSimulate() && !userConfig->getPTab4Pwr()) {
+    rtConfig->cad.setValue(0);
+    rtConfig->watts.setValue(0);
+  }
+  if (!spinBLEClient.connectedHRM && !rtConfig->hr.getSimulate()) {
+    rtConfig->hr.setValue(0);
+  }
 
-    if (!ss2k->isUpdating) {
-      spinBLEServer.update();
+  if (!ss2k->isUpdating) {
+    spinBLEServer.update();
 
 #ifdef INTERNAL_ERG_4EXT_FTMS
-      uint8_t test[] = {FitnessMachineControlPointProcedure::SetIndoorBikeSimulationParameters, 0x00, 0x00, 0x00, 0x00, 0x28, 0x33};
-      spinBLEClient.FTMSControlPointWrite(test, 7);
+    uint8_t test[] = {FitnessMachineControlPointProcedure::SetIndoorBikeSimulationParameters, 0x00, 0x00, 0x00, 0x00, 0x28, 0x33};
+    spinBLEClient.FTMSControlPointWrite(test, 7);
 #endif
 
-      if (BLEDevice::getAdvertising()) {
-        if ((!BLEDevice::getAdvertising()->isAdvertising()) && (spinBLEServer.connectedClientCount() < (CONFIG_BT_NIMBLE_MAX_CONNECTIONS - NUM_BLE_DEVICES))) {
-          SS2K_LOG(BLE_COMMON_LOG_TAG, "Starting Advertising From Communication Loop. Connected Clients: %d", spinBLEServer.connectedClientCount());
-          auto clients = BLEDevice::getConnectedClients();
-          //loop through clients and log their addresses
-          for (const auto& client : clients) {
-            SS2K_LOG(BLE_COMMON_LOG_TAG, "Connected Client: %s", client->getPeerAddress().toString().c_str());
-          }
-          BLEDevice::startAdvertising();
+    if (BLEDevice::getAdvertising()) {
+      if ((!BLEDevice::getAdvertising()->isAdvertising()) && (spinBLEServer.connectedClientCount() < (CONFIG_BT_NIMBLE_MAX_CONNECTIONS - NUM_BLE_DEVICES))) {
+        SS2K_LOG(BLE_COMMON_LOG_TAG, "Starting Advertising From Communication Loop. Connected Clients: %d", spinBLEServer.connectedClientCount());
+        auto clients = BLEDevice::getConnectedClients();
+        // loop through clients and log their addresses
+        for (const auto& client : clients) {
+          SS2K_LOG(BLE_COMMON_LOG_TAG, "Connected Client: %s", client->getPeerAddress().toString().c_str());
         }
+        BLEDevice::startAdvertising();
       }
     }
+  }
 
-    // blink if no client connected
-    if (spinBLEServer.connectedClientCount() == 0) {
-      if ((millis() / 500) % 2 == 0) {
-        digitalWrite(LED_PIN, LOW);
-      } else {
-        digitalWrite(LED_PIN, HIGH);
-      }
+  // blink if no client connected
+  if (spinBLEServer.connectedClientCount() == 0) {
+    if ((millis() / 500) % 2 == 0) {
+      digitalWrite(LED_PIN, LOW);
     } else {
       digitalWrite(LED_PIN, HIGH);
     }
+  } else {
+    digitalWrite(LED_PIN, HIGH);
+  }
 }
