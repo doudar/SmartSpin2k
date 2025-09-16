@@ -63,6 +63,10 @@ void collectAndSet(NimBLEUUID charUUID, NimBLEUUID serviceUUID, NimBLEAddress ad
       int power = sensorData->getPower() * userConfig->getPowerCorrectionFactor();
       rtConfig->watts.setValue(power);
       spinBLEClient.connectedPM = true;
+      // Set default battery level for power meters since we skip battery reads to prevent data drops
+      if (rtConfig->pm_batt.getValue() == 0) {
+        rtConfig->pm_batt.setValue(100); // Set reasonable default
+      }
       logBufLength += snprintf(logBuf + logBufLength, kLogBufMaxLength - logBufLength, " PW(%d)", power % 10000);
     }
   }
