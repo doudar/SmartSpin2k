@@ -99,8 +99,13 @@ void BLE_Fitness_Machine_Service::update() {
 
   // Add resistance
   int resistanceValue;
-  // If the bike reports resistance, use that value
-  if (rtConfig->resistance.getValue() > 0) {
+  // Check if bike has resistance reporting capability or resistance simulation enabled
+  bool hasResistanceReporting = (rtConfig->resistance.getSimulate() || 
+                                (rtConfig->resistance.getTimestamp() > 0 && 
+                                 (millis() - rtConfig->resistance.getTimestamp()) < 5000));
+  
+  if (hasResistanceReporting) {
+    // Use reported resistance value
     resistanceValue = rtConfig->resistance.getValue();
   } else {
     // Calculate resistance from stepper position for bikes that don't report resistance
@@ -189,7 +194,11 @@ void BLE_Fitness_Machine_Service::processFTMSWrite() {
             rtConfig->resistance.setTarget(requestedResistance);
             
             // For bikes that don't report resistance, calculate stepper position from resistance level (0-100)
-            if (rtConfig->resistance.getValue() == 0) {
+            bool hasResistanceReporting = (rtConfig->resistance.getSimulate() || 
+                                          (rtConfig->resistance.getTimestamp() > 0 && 
+                                           (millis() - rtConfig->resistance.getTimestamp()) < 5000));
+            
+            if (!hasResistanceReporting) {
               int32_t minPos, maxPos;
               
               // Use homing values if available, otherwise use stepper min/max
