@@ -135,39 +135,39 @@ class RuntimeParameters {
 
 class userParameters {
  private:
-  String firmwareUpdateURL;
-  String deviceName;
+  Parameter<String> firmwareUpdateURL;
+  Parameter<String> deviceName;
   Parameter<int> shiftStep;
   Parameter<bool> stealthChop;
-  float inclineMultiplier;
-  float powerCorrectionFactor;
-  float ERGSensitivity;
-  bool autoUpdate;
-  int stepperPower;
-  int maxWatts;
-  int minWatts;
-  int stepperSpeed;
-  bool stepperDir;
-  bool shifterDir;
-  bool pTab4Pwr              = false;
-  bool udpLogEnabled         = false;
-  int32_t hMin               = INT32_MIN;
-  int32_t hMax               = INT32_MIN;
+  Parameter<float> inclineMultiplier;
+  Parameter<float> powerCorrectionFactor;
+  Parameter<float> ERGSensitivity;
+  Parameter<bool> autoUpdate;
+  Parameter<int> stepperPower;
+  Parameter<int> maxWatts;
+  Parameter<int> minWatts;
+  Parameter<int> stepperSpeed;
+  Parameter<bool> stepperDir;
+  Parameter<bool> shifterDir;
+  Parameter<bool> pTab4Pwr;
+  Parameter<bool> udpLogEnabled;
+  Parameter<int32_t> hMin;
+  Parameter<int32_t> hMax;
   Parameter<bool> FTMSControlPointWrite;
-  int homingSensitivity      = DEFAULT_HOMING_SENSITIVITY;  // Use default from settings.h
-  String ssid;
-  String password;
-  String connectedPowerMeter   = CONNECTED_POWER_METER;
-  String connectedHeartMonitor = CONNECTED_HEART_MONITOR;
-  String connectedRemote       = CONNECTED_REMOTE;
-  String foundDevices          = "";
+  Parameter<int> homingSensitivity;
+  Parameter<String> ssid;
+  Parameter<String> password;
+  Parameter<String> connectedPowerMeter;
+  Parameter<String> connectedHeartMonitor;
+  Parameter<String> connectedRemote;
+  Parameter<String> foundDevices;
 
  public:
-  void setFirmwareUpdateURL(String fURL) { firmwareUpdateURL = fURL; }
-  const char* getFirmwareUpdateURL() { return firmwareUpdateURL.c_str(); }
+  void setFirmwareUpdateURL(String fURL) { firmwareUpdateURL.set(fURL); }
+  const char* getFirmwareUpdateURL() { return firmwareUpdateURL.getCStr(); }
 
-  void setDeviceName(String dvn) { deviceName = dvn; }
-  const char* getDeviceName() { return deviceName.c_str(); }
+  void setDeviceName(String dvn) { deviceName.set(dvn); }
+  const char* getDeviceName() { return deviceName.getCStr(); }
 
   void setShiftStep(int ss) { shiftStep.set(ss); }
   int getShiftStep() { return shiftStep.get(); }
@@ -178,68 +178,68 @@ class userParameters {
   void setFTMSControlPointWrite(bool cpw) { FTMSControlPointWrite.set(cpw); }
   bool getFTMSControlPointWrite() { return FTMSControlPointWrite.get(); }
 
-  void setInclineMultiplier(float im) { inclineMultiplier = im; }
-  float getInclineMultiplier() { return inclineMultiplier; }
+  void setInclineMultiplier(float im) { inclineMultiplier.set(im); }
+  float getInclineMultiplier() { return inclineMultiplier.get(); }
 
-  void setPowerCorrectionFactor(float pcf) { powerCorrectionFactor = pcf; }
-  float getPowerCorrectionFactor() { return powerCorrectionFactor; }
+  void setPowerCorrectionFactor(float pcf) { powerCorrectionFactor.set(pcf); }
+  float getPowerCorrectionFactor() { return powerCorrectionFactor.get(); }
 
-  float getERGSensitivity() { return ERGSensitivity; }
-  void setERGSensitivity(float ergS) { ERGSensitivity = ergS; }
+  float getERGSensitivity() { return ERGSensitivity.get(); }
+  void setERGSensitivity(float ergS) { ERGSensitivity.set(ergS); }
 
-  void setAutoUpdate(bool atd) { autoUpdate = atd; }
-  bool getAutoUpdate() { return autoUpdate; }
+  void setAutoUpdate(bool atd) { autoUpdate.set(atd); }
+  bool getAutoUpdate() { return autoUpdate.get(); }
 
-  void setSsid(String sid) { ssid = sid; }
-  const char* getSsid() { return ssid.c_str(); }
+  void setSsid(String sid) { ssid.set(sid); }
+  const char* getSsid() { return ssid.getCStr(); }
 
-  void setPassword(String pwd) { password = pwd; }
-  const char* getPassword() { return password.c_str(); }
+  void setPassword(String pwd) { password.set(pwd); }
+  const char* getPassword() { return password.getCStr(); }
 
-  void setConnectedPowerMeter(String cpm) { connectedPowerMeter = cpm; }
-  const char* getConnectedPowerMeter() { return connectedPowerMeter.c_str(); }
+  void setConnectedPowerMeter(String cpm) { connectedPowerMeter.set(cpm); }
+  const char* getConnectedPowerMeter() { return connectedPowerMeter.getCStr(); }
 
-  void setConnectedHeartMonitor(String cHr) { connectedHeartMonitor = cHr; }
-  const char* getConnectedHeartMonitor() { return connectedHeartMonitor.c_str(); }
+  void setConnectedHeartMonitor(String cHr) { connectedHeartMonitor.set(cHr); }
+  const char* getConnectedHeartMonitor() { return connectedHeartMonitor.getCStr(); }
 
-  void setConnectedRemote(String cRemote) { connectedRemote = cRemote; }
-  const char* getConnectedRemote() { return connectedRemote.c_str(); }
+  void setConnectedRemote(String cRemote) { connectedRemote.set(cRemote); }
+  const char* getConnectedRemote() { return connectedRemote.getCStr(); }
 
-  void setStepperPower(int sp) { stepperPower = sp; }
-  int getStepperPower() { return stepperPower; }
+  void setStepperPower(int sp) { stepperPower.set(sp); }
+  int getStepperPower() { return stepperPower.get(); }
 
-  void setStepperSpeed(int sp) { stepperSpeed = sp; }
-  int getStepperSpeed() { return stepperSpeed; }
+  void setStepperSpeed(int sp) { stepperSpeed.set(sp); }
+  int getStepperSpeed() { return stepperSpeed.get(); }
 
-  void setMaxWatts(int maxW) { maxWatts = maxW; }
-  int getMaxWatts() { return maxWatts; }
+  void setMaxWatts(int maxW) { maxWatts.set(maxW); }
+  int getMaxWatts() { return maxWatts.get(); }
 
-  void setMinWatts(int minW) { minWatts = minW; }
-  int getMinWatts() { return minWatts; }
+  void setMinWatts(int minW) { minWatts.set(minW); }
+  int getMinWatts() { return minWatts.get(); }
 
-  void setStepperDir(bool sd) { stepperDir = sd; }
-  bool getStepperDir() { return stepperDir; }
+  void setStepperDir(bool sd) { stepperDir.set(sd); }
+  bool getStepperDir() { return stepperDir.get(); }
 
-  void setShifterDir(bool shd) { shifterDir = shd; }
-  bool getShifterDir() { return shifterDir; }
+  void setShifterDir(bool shd) { shifterDir.set(shd); }
+  bool getShifterDir() { return shifterDir.get(); }
 
-  void setUdpLogEnabled(bool enabled) { udpLogEnabled = enabled; }
-  bool getUdpLogEnabled() { return udpLogEnabled; }
+  void setUdpLogEnabled(bool enabled) { udpLogEnabled.set(enabled); }
+  bool getUdpLogEnabled() { return udpLogEnabled.get(); }
 
-  void setPTab4Pwr(bool pTab) { pTab4Pwr = pTab; }
-  bool getPTab4Pwr() { return pTab4Pwr; }
+  void setPTab4Pwr(bool pTab) { pTab4Pwr.set(pTab); }
+  bool getPTab4Pwr() { return pTab4Pwr.get(); }
 
-  void setFoundDevices(String fdv) { foundDevices = fdv; }
-  const char* getFoundDevices() { return foundDevices.c_str(); }
+  void setFoundDevices(String fdv) { foundDevices.set(fdv); }
+  const char* getFoundDevices() { return foundDevices.getCStr(); }
 
-  void setHMin(int32_t min) { hMin = min; }
-  int32_t getHMin() { return hMin; }
+  void setHMin(int32_t min) { hMin.set(min); }
+  int32_t getHMin() { return hMin.get(); }
 
-  void setHMax(int32_t max) { hMax = max; }
-  int32_t getHMax() { return hMax; }
+  void setHMax(int32_t max) { hMax.set(max); }
+  int32_t getHMax() { return hMax.get(); }
 
-  void setHomingSensitivity(int sensitivity) { homingSensitivity = sensitivity; }
-  int getHomingSensitivity() { return homingSensitivity; }
+  void setHomingSensitivity(int sensitivity) { homingSensitivity.set(sensitivity); }
+  int getHomingSensitivity() { return homingSensitivity.get(); }
 
   void setDefaults();
   String returnJSON();

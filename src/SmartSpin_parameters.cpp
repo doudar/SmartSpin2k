@@ -46,31 +46,31 @@ JsonDocument doc;
 
 // Default Values
 void userParameters::setDefaults() {
-  firmwareUpdateURL     = FW_UPDATEURL;
-  deviceName            = DEVICE_NAME;
+  firmwareUpdateURL.set(FW_UPDATEURL);
+  deviceName.set(DEVICE_NAME);
   shiftStep.set(DEFAULT_SHIFT_STEP);
   stealthChop.set(STEALTHCHOP);
-  stepperPower          = DEFAULT_STEPPER_POWER;
-  stepperSpeed          = DEFAULT_STEPPER_SPEED;
-  inclineMultiplier     = INCLINE_MULTIPLIER;
-  powerCorrectionFactor = 1.0;
-  ERGSensitivity        = ERG_SENSITIVITY;
-  autoUpdate            = AUTO_FIRMWARE_UPDATE;
-  ssid                  = DEVICE_NAME;
-  password              = DEFAULT_PASSWORD;
-  connectedPowerMeter   = CONNECTED_POWER_METER;
-  connectedHeartMonitor = CONNECTED_HEART_MONITOR;
-  connectedRemote       = CONNECTED_REMOTE;
-  foundDevices          = " ";
-  maxWatts              = DEFAULT_MAX_WATTS;
-  minWatts              = DEFAULT_MIN_WATTS;
-  stepperDir            = true;
-  shifterDir            = true;
-  udpLogEnabled         = false;
-  pTab4Pwr              = false;
-  hMin                  = INT32_MIN;
-  hMax                  = INT32_MIN;
-  homingSensitivity     = DEFAULT_HOMING_SENSITIVITY;
+  stepperPower.set(DEFAULT_STEPPER_POWER);
+  stepperSpeed.set(DEFAULT_STEPPER_SPEED);
+  inclineMultiplier.set(INCLINE_MULTIPLIER);
+  powerCorrectionFactor.set(1.0);
+  ERGSensitivity.set(ERG_SENSITIVITY);
+  autoUpdate.set(AUTO_FIRMWARE_UPDATE);
+  ssid.set(DEVICE_NAME);
+  password.set(DEFAULT_PASSWORD);
+  connectedPowerMeter.set(CONNECTED_POWER_METER);
+  connectedHeartMonitor.set(CONNECTED_HEART_MONITOR);
+  connectedRemote.set(CONNECTED_REMOTE);
+  foundDevices.set(" ");
+  maxWatts.set(DEFAULT_MAX_WATTS);
+  minWatts.set(DEFAULT_MIN_WATTS);
+  stepperDir.set(true);
+  shifterDir.set(true);
+  udpLogEnabled.set(false);
+  pTab4Pwr.set(false);
+  hMin.set(INT32_MIN);
+  hMax.set(INT32_MIN);
+  homingSensitivity.set(DEFAULT_HOMING_SENSITIVITY);
 }
 
 //---------------------------------------------------------------------------------
@@ -82,32 +82,32 @@ String userParameters::returnJSON() {
  JsonDocument doc;
   // Set the values in the document
 
-  doc["firmwareUpdateURL"]     = firmwareUpdateURL;
+  doc["firmwareUpdateURL"]     = firmwareUpdateURL.get();
   doc["firmwareVersion"]       = FIRMWARE_VERSION;
-  doc["deviceName"]            = deviceName;
+  doc["deviceName"]            = deviceName.get();
   doc["shiftStep"]             = shiftStep.get();
-  doc["stepperPower"]          = stepperPower;
-  doc["stepperSpeed"]          = stepperSpeed;
+  doc["stepperPower"]          = stepperPower.get();
+  doc["stepperSpeed"]          = stepperSpeed.get();
   doc["stealthChop"]           = stealthChop.get();
-  doc["inclineMultiplier"]     = inclineMultiplier;
-  doc["powerCorrectionFactor"] = powerCorrectionFactor;
-  doc["ERGSensitivity"]        = ERGSensitivity;
-  doc["autoUpdate"]            = autoUpdate;
-  doc["ssid"]                  = ssid;
-  doc["password"]              = password;
-  doc["connectedPowerMeter"]   = connectedPowerMeter;
-  doc["connectedHeartMonitor"] = connectedHeartMonitor;
-  doc["connectedRemote"]       = connectedRemote;
-  doc["foundDevices"]          = foundDevices;
-  doc["maxWatts"]              = maxWatts;
-  doc["minWatts"]              = minWatts;
-  doc["shifterDir"]            = shifterDir;
-  doc["stepperDir"]            = stepperDir;
-  doc["udpLogEnabled"]         = udpLogEnabled;
-  doc["pTab4Pwr"]              = pTab4Pwr;
-  doc["hMin"]                  = hMin;
-  doc["hMax"]                  = hMax;
-  doc["homingSensitivity"]     = homingSensitivity;
+  doc["inclineMultiplier"]     = inclineMultiplier.get();
+  doc["powerCorrectionFactor"] = powerCorrectionFactor.get();
+  doc["ERGSensitivity"]        = ERGSensitivity.get();
+  doc["autoUpdate"]            = autoUpdate.get();
+  doc["ssid"]                  = ssid.get();
+  doc["password"]              = password.get();
+  doc["connectedPowerMeter"]   = connectedPowerMeter.get();
+  doc["connectedHeartMonitor"] = connectedHeartMonitor.get();
+  doc["connectedRemote"]       = connectedRemote.get();
+  doc["foundDevices"]          = foundDevices.get();
+  doc["maxWatts"]              = maxWatts.get();
+  doc["minWatts"]              = minWatts.get();
+  doc["shifterDir"]            = shifterDir.get();
+  doc["stepperDir"]            = stepperDir.get();
+  doc["udpLogEnabled"]         = udpLogEnabled.get();
+  doc["pTab4Pwr"]              = pTab4Pwr.get();
+  doc["hMin"]                  = hMin.get();
+  doc["hMax"]                  = hMax.get();
+  doc["homingSensitivity"]     = homingSensitivity.get();
 
   String output;
   serializeJson(doc, output);
@@ -135,31 +135,31 @@ void userParameters::saveToLittleFS() {
   // Set the values in the document
   // commented items are not needed in save file
 
-  doc["firmwareUpdateURL"]     = firmwareUpdateURL;
-  doc["deviceName"]            = deviceName;
+  doc["firmwareUpdateURL"]     = firmwareUpdateURL.get();
+  doc["deviceName"]            = deviceName.get();
   doc["shiftStep"]             = shiftStep.get();
-  doc["stepperPower"]          = stepperPower;
-  doc["stepperSpeed"]          = stepperSpeed;
+  doc["stepperPower"]          = stepperPower.get();
+  doc["stepperSpeed"]          = stepperSpeed.get();
   doc["stealthChop"]           = stealthChop.get();
-  doc["inclineMultiplier"]     = inclineMultiplier;
-  doc["powerCorrectionFactor"] = powerCorrectionFactor;
-  doc["ERGSensitivity"]        = ERGSensitivity;
-  doc["autoUpdate"]            = autoUpdate;
-  doc["ssid"]                  = ssid;
-  doc["password"]              = password;
-  doc["connectedPowerMeter"]   = connectedPowerMeter;
-  doc["connectedHeartMonitor"] = connectedHeartMonitor;
-  doc["connectedRemote"]       = connectedRemote;
-  // doc["foundDevices"]          = foundDevices;
-  doc["maxWatts"]      = maxWatts;
-  doc["minWatts"]      = minWatts;
-  doc["shifterDir"]    = shifterDir;
-  doc["stepperDir"]    = stepperDir;
-  doc["udpLogEnabled"] = udpLogEnabled;
-  doc["pTab4Pwr"]      = pTab4Pwr;
-  doc["hMin"]          = hMin;
-  doc["hMax"]          = hMax;
-  doc["homingSensitivity"]     = homingSensitivity;
+  doc["inclineMultiplier"]     = inclineMultiplier.get();
+  doc["powerCorrectionFactor"] = powerCorrectionFactor.get();
+  doc["ERGSensitivity"]        = ERGSensitivity.get();
+  doc["autoUpdate"]            = autoUpdate.get();
+  doc["ssid"]                  = ssid.get();
+  doc["password"]              = password.get();
+  doc["connectedPowerMeter"]   = connectedPowerMeter.get();
+  doc["connectedHeartMonitor"] = connectedHeartMonitor.get();
+  doc["connectedRemote"]       = connectedRemote.get();
+  // doc["foundDevices"]          = foundDevices.get();
+  doc["maxWatts"]      = maxWatts.get();
+  doc["minWatts"]      = minWatts.get();
+  doc["shifterDir"]    = shifterDir.get();
+  doc["stepperDir"]    = stepperDir.get();
+  doc["udpLogEnabled"] = udpLogEnabled.get();
+  doc["pTab4Pwr"]      = pTab4Pwr.get();
+  doc["hMin"]          = hMin.get();
+  doc["hMax"]          = hMax.get();
+  doc["homingSensitivity"]     = homingSensitivity.get();
 
   // Serialize JSON to file
   if (serializeJson(doc, file) == 0) {
