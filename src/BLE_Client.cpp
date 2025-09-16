@@ -493,7 +493,24 @@ void ScanCallbacks::onResult(const NimBLEAdvertisedDevice *advertisedDevice) {
       }
 
       for (size_t i = 0; i < NUM_BLE_DEVICES; i++) {
-        if ((spinBLEClient.myBLEDevices[i].advertisedDevice == nullptr) || (advertisedDevice->getAddress() == spinBLEClient.myBLEDevices[i].peerAddress)) {
+        // Check if slot is available or if this device is already assigned to this slot
+        // For randomized addresses (Android devices), use uniqueName for comparison
+        // For traditional devices, fall back to address comparison for backward compatibility
+        bool slotAvailable = (spinBLEClient.myBLEDevices[i].advertisedDevice == nullptr);
+        bool deviceMatches = false;
+        
+        if (!slotAvailable) {
+          // Check if this is the same device using stable identifier
+          if (strlen(spinBLEClient.myBLEDevices[i].uniqueName) > 0) {
+            // Use unique name comparison for stable identification
+            deviceMatches = (aDevName == String(spinBLEClient.myBLEDevices[i].uniqueName));
+          } else {
+            // Fall back to address comparison for backward compatibility
+            deviceMatches = (advertisedDevice->getAddress() == spinBLEClient.myBLEDevices[i].peerAddress);
+          }
+        }
+        
+        if (slotAvailable || deviceMatches) {
           spinBLEClient.myBLEDevices[i].set(advertisedDevice, BLE_HS_CONN_HANDLE_NONE, primaryServiceUUID);
           spinBLEClient.myBLEDevices[i].doConnect = true;
           SS2K_LOG(BLE_CLIENT_LOG_TAG, "doConnect set on device: %d", i);
@@ -1018,6 +1035,9 @@ void SpinBLEAdvertisedDevice::set(const NimBLEAdvertisedDevice *device, int id, 
   SS2K_LOG(BLE_CLIENT_LOG_TAG, "Setting Device %s", adevName.c_str());
   this->advertisedDevice  = const_cast<const NimBLEAdvertisedDevice *>(device);
   this->peerAddress       = device->getAddress();
+  // Set the unique name for stable device identification
+  strncpy(this->uniqueName, adevName.c_str(), sizeof(this->uniqueName) - 1);
+  this->uniqueName[sizeof(this->uniqueName) - 1] = '\0';  // Ensure null termination
   this->connectedClientID = id;
   this->serviceUUID       = BLEUUID(inServiceUUID);
   this->charUUID          = BLEUUID(inCharUUID);
@@ -1088,6 +1108,7 @@ void SpinBLEAdvertisedDevice::reset(bool resetAdvertisedDevice) {
   }
   if (resetAdvertisedDevice) advertisedDevice = nullptr;
   // NimBLEAddress peerAddress;
+  this->uniqueName[0]     = '\0';  // Clear the unique name
   this->connectedClientID = BLE_HS_CONN_HANDLE_NONE;
   this->serviceUUID       = (uint16_t)0x0000;
   this->charUUID          = (uint16_t)0x0000;
