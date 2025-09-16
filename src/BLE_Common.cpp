@@ -88,7 +88,12 @@ void BLECommunications() {
                   collectAndSet(incomingNotifyData.charUUID, incomingNotifyData.serviceUUID, _BLEd.peerAddress, pData, length);
                 }
                 if (_BLEd.getPostConnected()) {
-                  spinBLEClient.handleBattInfo(pClient, false);
+                  // only do this once after connection. Checking every 5 minutes was causing Tempo Power Meter Drops. 
+                  static bool battInfoChecked = false;
+                  if (!battInfoChecked) {
+                    battInfoChecked = true;
+                    spinBLEClient.handleBattInfo(pClient, false);
+                  }
                 }
 
               } else if (!pClient->isConnected()) {  // This is a workaround for a bug in NimBLE where onDisconnect() is not called automatically.
