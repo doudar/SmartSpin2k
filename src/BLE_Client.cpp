@@ -90,7 +90,7 @@ bool subscribeToAllNotifications(NimBLEClient *pClient) {
   if (!pClient || !pClient->isConnected()) {
     SS2K_LOG(BLE_CLIENT_LOG_TAG, "Client not connected for notifications");
     return false;
-  } //The Issue with Echelon is that there are multiple services
+  }  // The Issue with Echelon is that there are multiple services
   for (const auto &service : BLEServices::SUPPORTED_SERVICES) {
     NimBLERemoteService *pSvc = pClient->getService(service.serviceUUID);
     if (pSvc) {
@@ -386,11 +386,9 @@ void MyClientCallback::onDisconnect(NimBLEClient *pClient, int reason) {
             (spinBLEClient.myBLEDevices[i].charUUID == FLYWHEEL_UART_RX_UUID) || (spinBLEClient.myBLEDevices[i].charUUID == ECHELON_SERVICE_UUID) ||
             (spinBLEClient.myBLEDevices[i].charUUID == CYCLINGPOWERSERVICE_UUID) || (spinBLEClient.myBLEDevices[i].charUUID == CSCSERVICE_UUID)) {
           SS2K_LOG(BLE_CLIENT_LOG_TAG, "Deregistered PM on Disconnect");
-          rtConfig->pm_batt.setValue(0);
         }
         if ((spinBLEClient.myBLEDevices[i].charUUID == HEARTCHARACTERISTIC_UUID)) {
           SS2K_LOG(BLE_CLIENT_LOG_TAG, "Deregistered HR on Disconnect");
-          rtConfig->hr_batt.setValue(0);
         }
         if ((spinBLEClient.myBLEDevices[i].charUUID == HID_REPORT_DATA_UUID)) {
           SS2K_LOG(BLE_CLIENT_LOG_TAG, "Deregistered Remote on Disconnect");
@@ -657,7 +655,7 @@ void SpinBLEClient::FTMSControlPointWrite(const uint8_t *pData, int length) {
       modData[i] = pData[i];
     }
     for (int i = 0; i < NUM_BLE_DEVICES; i++) {
-      if (myBLEDevices[i].getPostConnected() && (myBLEDevices[i].serviceUUID == FITNESSMACHINESERVICE_UUID)) {
+      if (myBLEDevices[i].isPostConnected && (myBLEDevices[i].serviceUUID == FITNESSMACHINESERVICE_UUID)) {
         if (NimBLEDevice::getClientByPeerAddress(myBLEDevices[i].peerAddress)->getService(FITNESSMACHINESERVICE_UUID)) {
           pClient = NimBLEDevice::getClientByPeerAddress(myBLEDevices[i].peerAddress);
           break;
@@ -691,17 +689,18 @@ void SpinBLEClient::FTMSControlPointWrite(const uint8_t *pData, int length) {
 void SpinBLEClient::postConnect() {
   for (auto &_BLEd : spinBLEClient.myBLEDevices) {
     // Check that the device has been assigned and it hasn't been post connected.
-    if ((_BLEd.connectedClientID != BLE_HS_CONN_HANDLE_NONE) && !_BLEd.getPostConnected()) {
+    if ((_BLEd.connectedClientID != BLE_HS_CONN_HANDLE_NONE) && !_BLEd.isPostConnected) {
       String adevName = this->adevName2UniqueName(_BLEd.advertisedDevice);
       SS2K_LOG(BLE_CLIENT_LOG_TAG, "Post connecting: %s , ConnID %d, PrimaryChar %s", adevName.c_str(), _BLEd.connectedClientID, _BLEd.charUUID.toString().c_str());
       NimBLEClient *pClient = NimBLEDevice::getClientByPeerAddress(_BLEd.peerAddress);
       if (pClient) {
         BLEDevice::getServer()->updateConnParams(pClient->getConnHandle(), connectionParams[0], connectionParams[1], connectionParams[2], connectionParams[3]);
-        _BLEd.setPostConnected(subscribeToAllNotifications(pClient));
-        if (!_BLEd.getPostConnected()) {
+        _BLEd.isPostConnected = subscribeToAllNotifications(pClient);
+        if (!_BLEd.isPostConnected) {
           SS2K_LOG(BLE_CLIENT_LOG_TAG, "Failed to subscribe to notifications for %s", adevName.c_str());
           return;
         }
+        spinBLEClient.handleBattInfo(pClient, false);
         if (_BLEd.charUUID == ECHELON_SERVICE_UUID) {
           NimBLERemoteCharacteristic *writeCharacteristic = pClient->getService(ECHELON_SERVICE_UUID)->getCharacteristic(ECHELON_WRITE_UUID);
           if (writeCharacteristic == nullptr) {
@@ -924,36 +923,20 @@ void SpinBLEClient::reconnectAllDevices() {
 // Poll BLE devices for battCharacteristic if available and read value.
 void SpinBLEClient::handleBattInfo(NimBLEClient *pClient, bool updateNow = false) {
   static unsigned long last_battery_update = 0;
-  if ((millis() - last_battery_update >= BATTERY_UPDATE_INTERVAL_MILLIS) || (last_battery_update == 0) || updateNow) {
-    last_battery_update = millis();
-    if (pClient->getService(BATTERYSERVICE_UUID) == nullptr) {
-      return;
-    }
-    if (pClient->getService(BATTERYSERVICE_UUID)->getCharacteristic(BATTERYCHARACTERISTIC_UUID) == nullptr) {
-      return;
-    }
-    if (pClient->getService(HEARTSERVICE_UUID) && pClient->getService(BATTERYSERVICE_UUID)) {  // get battery level at first connect
-      BLERemoteCharacteristic *battCharacteristic = pClient->getService(BATTERYSERVICE_UUID)->getCharacteristic(BATTERYCHARACTERISTIC_UUID);
-      if (battCharacteristic != nullptr) {
-        std::string value = battCharacteristic->readValue();
-        rtConfig->hr_batt.setValue((uint8_t)value[0]);
-        SS2K_LOG(BLE_CLIENT_LOG_TAG, "HRM battery updated %d", (int)value[0]);
-      } else {
-        rtConfig->hr_batt.setValue(0);
-      }
-    } else if ((pClient->getService(CYCLINGPOWERMEASUREMENT_UUID) || pClient->getService(CYCLINGPOWERSERVICE_UUID)) &&
-               pClient->getService(BATTERYSERVICE_UUID)) {  // get batterylevel at first connect
-      BLERemoteCharacteristic *battCharacteristic = pClient->getService(BATTERYSERVICE_UUID)->getCharacteristic(BATTERYCHARACTERISTIC_UUID);
-      if (battCharacteristic != nullptr) {
-        std::string value = battCharacteristic->readValue();
-        rtConfig->pm_batt.setValue((uint8_t)value[0]);
-        SS2K_LOG(BLE_CLIENT_LOG_TAG, "PM battery updated %d", (int)value[0]);
-      } else {
-        rtConfig->pm_batt.setValue(0);
-      }
-    }
+  if (pClient->getService(BATTERYSERVICE_UUID) == nullptr) {
+    return;
+  }
+  if (pClient->getService(BATTERYSERVICE_UUID)->getCharacteristic(BATTERYCHARACTERISTIC_UUID) == nullptr) {
+    return;
+  }
+  BLERemoteCharacteristic *battCharacteristic = pClient->getService(BATTERYSERVICE_UUID)->getCharacteristic(BATTERYCHARACTERISTIC_UUID);
+  if (battCharacteristic != nullptr) {
+    std::string value = battCharacteristic->readValue();
+    rtConfig->batt.setValue((uint8_t)value[0]);
+    SS2K_LOG(BLE_CLIENT_LOG_TAG, "%s Battery updated %d", pClient->getPeerAddress().toString().c_str(), (int)value[0]);
   }
 }
+
 // Helper function to detect if a BLE address is randomized (typically Android devices)
 // Updated: only treat as randomized if it's a private random address (dynamic), not static random.
 bool SpinBLEClient::isRandomizedAddress(const NimBLEAdvertisedDevice *inDev) {
@@ -967,8 +950,8 @@ bool SpinBLEClient::isRandomizedAddress(const NimBLEAdvertisedDevice *inDev) {
     return false;
   }
 
-  char firstByteStr[3] = { addrStr[0], addrStr[1], '\0' };
-  int msb = strtol(firstByteStr, nullptr, 16);
+  char firstByteStr[3] = {addrStr[0], addrStr[1], '\0'};
+  int msb              = strtol(firstByteStr, nullptr, 16);
   if (msb < 0) {
     return false;
   }
@@ -1098,29 +1081,38 @@ void SpinBLEAdvertisedDevice::set(const NimBLEAdvertisedDevice *device, int id, 
  * @param resetAdvertisedDevice If true, the advertised device reference will
  *                              be set to nullptr.
  */
+void SpinBLEAdvertisedDevice::clearState(bool resetAdvertisedDevice) {
+  if (resetAdvertisedDevice) {
+    advertisedDevice = nullptr;
+    peerAddress = NimBLEAddress(); // zero / cleared
+    this->uniqueName[0]     = '\0';  // Clear the unique name
+  }
+  connectedClientID = BLE_HS_CONN_HANDLE_NONE;
+  serviceUUID       = (uint16_t)0x0000;
+  charUUID          = (uint16_t)0x0000;
+  isHRM             = false;
+  isPM              = false;
+  isCSC             = false;
+  isCT              = false;
+  isRemote          = false;
+  doConnect         = false;
+  isPostConnected   = false;
+  batt              = Measurement();
+  if (dataBufferQueue) {
+    xQueueReset(dataBufferQueue);  // safe to centralize
+  }
+}
+
 void SpinBLEAdvertisedDevice::reset(bool resetAdvertisedDevice) {
   SS2K_LOG(BLE_CLIENT_LOG_TAG, "Resetting Device: %d", this->connectedClientID);
-  if (this->isHRM) spinBLEClient.connectedHRM = false;
-  if (this->isPM || this->isCSC) {
+
+  // Adjust global flags BEFORE clearing local flags.
+  if (isHRM) spinBLEClient.connectedHRM = false;
+  if (isPM || isCSC) {
     spinBLEClient.connectedPM    = false;
     spinBLEClient.connectedCD    = false;
     spinBLEClient.connectedSpeed = false;
   }
-  if (resetAdvertisedDevice) advertisedDevice = nullptr;
-  // NimBLEAddress peerAddress;
-  this->uniqueName[0]     = '\0';  // Clear the unique name
-  this->connectedClientID = BLE_HS_CONN_HANDLE_NONE;
-  this->serviceUUID       = (uint16_t)0x0000;
-  this->charUUID          = (uint16_t)0x0000;
-  this->isHRM             = false;  // Heart Rate Monitor
-  this->isPM              = false;  // Power Meter
-  this->isCSC             = false;  // Cycling Speed/Cadence
-  this->isCT              = false;  // Controllable Trainer
-  this->isRemote          = false;  // BLE Remote
-  this->doConnect         = false;  // Initiate connection flag
-  this->isPostConnected   = false;  // Has Post Connect Been Run?
-  if (this->dataBufferQueue != nullptr) {
-    // Serial.println("Resetting queue");
-    xQueueReset(this->dataBufferQueue);
-  }
+
+  clearState(resetAdvertisedDevice);
 }

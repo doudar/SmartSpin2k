@@ -1,0 +1,92 @@
+name: "Copilot Setup Steps"
+
+on:
+  workflow_dispatch:
+  push:
+    paths:
+      - .github/workflows/copilot-setup-steps.yml
+  pull_request:
+    paths:
+      - .github/workflows/copilot-setup-steps.yml
+
+jobs:
+  # IMPORTANT: Job name must be exactly this.
+  copilot-setup-steps:
+    # You can upgrade to a larger Ubuntu runner label later if needed (e.g. ubuntu-4-core)
+    runs-on: ubuntu-latest
+    timeout-minutes: 40
+
+    # Minimize permissions; Copilot will get its own token later.
+    permissions:
+      contents: read
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v5
+        with:
+          # fetch-depth overridden internally for Copilot anyway; keep explicit for normal runs
+          fetch-depth: 0
+
+      - name: Set up Python
+        uses: actions/setup-python@v6
+        with:
+          python-version: '3.x'
+
+      - name: Cache PlatformIO core and packages
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.platformio
+          key: pio-${{ runner.os }}-${{ hashFiles('platformio.ini', 'dependencies.lock') }}
+          restore-keys: |
+            pio-${{ runner.os }}-
+
+      - name: Install PlatformIO Core
+        run: |
+          python -m pip install --upgrade pip
+            pip install --upgrade platformio
+
+      - name: Show PlatformIO info
+        run: |
+          platformio --version
+          platformio system info
+
+      - name: Pre-download native test dependencies
+        run: |
+          platformio pkg install -e native || echo "Native env install attempted"
+
+      - name: Pre-download ESP32 toolchains and libraries (release env)
+        run: |
+          # Only install packages (faster + ensures offline availability later)
+          platformio pkg install -e release
+
+      - name: Warm build cache (lightweight compile) for release env
+        run: |
+          # A full build ensures toolchains, frameworks, and libs are all present
+          # If this becomes too slow, you can remove this step and rely on pkg install only.
+          platformio run -e release || exit 0
+
+      - name: Warm build cache for native env (tests)
+        run: |
+          platformio run -e native || exit 0
+
+      - name: Validate native tests (non-blocking)
+        run: |
+          set +e
+          platformio test -e native
+          # Do not fail setup if tests fail; Copilot will handle fixes.
+          exit 0
+
+      - name: Summarize cached packages
+        run: |
+          du -sh ~/.platformio/packages/* || true
+          du -sh ~/.platformio/platforms/* || true
+
+      - name: Guidance for future adjustments
+        shell: bash
+        run: |
+          echo "Setup steps completed. You can:"
+          echo " - Upgrade runner: change runs-on to ubuntu-4-core if builds are slow." \
+               "\n - Enable LFS: add 'with: lfs: true' to checkout step if using Git LFS." \
+               "\n - Trim steps: remove warm build steps if time exceeds limits." \
+               "\n - Add more pkg installs for other environments if created later."
