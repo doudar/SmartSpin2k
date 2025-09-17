@@ -152,6 +152,9 @@ class SpinBLEAdvertisedDevice {
 
   const NimBLEAdvertisedDevice* advertisedDevice = nullptr;
   NimBLEAddress peerAddress;
+
+  char uniqueName[30] = "";  // Stable identifier using adevName2UniqueName()
+
   int connectedClientID = BLE_HS_CONN_HANDLE_NONE;
   BLEUUID serviceUUID   = (uint16_t)0x0000;
   BLEUUID charUUID      = (uint16_t)0x0000;
@@ -186,7 +189,7 @@ class SpinBLEClient {
   double cscLastCrankEvtTime     = 0.0;
   long int cscCumulativeWheelRev = 0;
   double cscLastWheelEvtTime     = 0.0;
-  int reconnectTries             = MAX_RECONNECT_TRIES;
+  // reconnectTries removed: we now always create a fresh NimBLEClient per connection attempt
 
   BLERemoteCharacteristic* pRemoteCharacteristic = nullptr;
 
