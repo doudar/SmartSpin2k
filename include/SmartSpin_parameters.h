@@ -81,16 +81,16 @@ class Measurement {
 
 class RuntimeParameters {
  private:
-  double targetIncline = 0.0;
-  float simulatedSpeed = 0.0;
-  uint8_t FTMSMode     = 0x00;
-  int shifterPosition  = 0;
-  bool homed           = false;
-  int32_t minStep      = -DEFAULT_STEPPER_TRAVEL;
-  int32_t maxStep      = DEFAULT_STEPPER_TRAVEL;
-  int minResistance    = -DEFAULT_RESISTANCE_RANGE;
-  int maxResistance    = DEFAULT_RESISTANCE_RANGE;
-  bool simTargetWatts  = false;
+  Parameter<float> targetIncline;
+  Parameter<float> simulatedSpeed;
+  Parameter<uint8_t> FTMSMode;
+  Parameter<int> shifterPosition;
+  Parameter<bool> homed;
+  Parameter<int32_t> minStep;
+  Parameter<int32_t> maxStep;
+  Parameter<int> minResistance;
+  Parameter<int> maxResistance;
+  Parameter<bool> simTargetWatts;
 
  public:
   Measurement watts;
@@ -100,35 +100,49 @@ class RuntimeParameters {
   Measurement cad;
   Measurement resistance;
 
-  void setTargetIncline(float inc) { targetIncline = inc; }
-  float getTargetIncline() { return targetIncline; }
+  // Constructor to set default values
+  RuntimeParameters() {
+    targetIncline.set(0.0);
+    simulatedSpeed.set(0.0);
+    FTMSMode.set(0x00);
+    shifterPosition.set(0);
+    homed.set(false);
+    minStep.set(-DEFAULT_STEPPER_TRAVEL);
+    maxStep.set(DEFAULT_STEPPER_TRAVEL);
+    minResistance.set(-DEFAULT_RESISTANCE_RANGE);
+    maxResistance.set(DEFAULT_RESISTANCE_RANGE);
+    simTargetWatts.set(false);
+  }
 
-  void setSimulatedSpeed(float spd) { simulatedSpeed = spd; }
-  float getSimulatedSpeed() { return simulatedSpeed; }
+  void setTargetIncline(float inc) { targetIncline.set(inc); }
+  float getTargetIncline() { return targetIncline.get(); }
 
-  void setFTMSMode(uint8_t mde) { FTMSMode = mde; }
-  uint8_t getFTMSMode() { return FTMSMode; }
+  void setSimulatedSpeed(float spd) { simulatedSpeed.set(spd); }
+  float getSimulatedSpeed() { return simulatedSpeed.get(); }
 
-  void setShifterPosition(int sp) { shifterPosition = sp; }
-  int getShifterPosition() { return shifterPosition; }
+  void setFTMSMode(uint8_t mde) { FTMSMode.set(mde); }
+  uint8_t getFTMSMode() { return FTMSMode.get(); }
 
-  void setHomed(bool hmd) { homed = hmd; }
-  int getHomed() { return homed; }
+  void setShifterPosition(int sp) { shifterPosition.set(sp); }
+  int getShifterPosition() { return shifterPosition.get(); }
 
-  void setMinStep(int32_t ms) { ms != INT32_MIN ? minStep = ms : minStep = -DEFAULT_STEPPER_TRAVEL; }
-  int32_t getMinStep() { return minStep; }
+  void setHomed(bool hmd) { homed.set(hmd); }
+  bool getHomed() { return homed.get(); }
 
-  void setMaxStep(int32_t ms) { ms != INT32_MIN ? maxStep = ms : maxStep = DEFAULT_STEPPER_TRAVEL; }
-  int32_t getMaxStep() { return maxStep; }
+  void setMinStep(int32_t ms) { ms != INT32_MIN ? minStep.set(ms) : minStep.set(-DEFAULT_STEPPER_TRAVEL); }
+  int32_t getMinStep() { return minStep.get(); }
 
-  void setSimTargetWatts(int tgt) { simTargetWatts = tgt; }
-  bool getSimTargetWatts() { return simTargetWatts; }
+  void setMaxStep(int32_t ms) { ms != INT32_MIN ? maxStep.set(ms) : maxStep.set(DEFAULT_STEPPER_TRAVEL); }
+  int32_t getMaxStep() { return maxStep.get(); }
 
-  void setMinResistance(int min) { minResistance = min; }
-  int getMinResistance() { return minResistance; }
+  void setSimTargetWatts(int tgt) { simTargetWatts.set(tgt); }
+  bool getSimTargetWatts() { return simTargetWatts.get(); }
 
-  void setMaxResistance(int max) { maxResistance = max; }
-  int getMaxResistance() { return maxResistance; }
+  void setMinResistance(int min) { minResistance.set(min); }
+  int getMinResistance() { return minResistance.get(); }
+
+  void setMaxResistance(int max) { maxResistance.set(max); }
+  int getMaxResistance() { return maxResistance.get(); }
 
   String returnJSON();
 };
