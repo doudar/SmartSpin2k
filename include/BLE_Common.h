@@ -189,7 +189,7 @@ class SpinBLEClient {
   double cscLastCrankEvtTime     = 0.0;
   long int cscCumulativeWheelRev = 0;
   double cscLastWheelEvtTime     = 0.0;
-  int reconnectTries             = MAX_RECONNECT_TRIES;
+  // reconnectTries removed: we now always create a fresh NimBLEClient per connection attempt
 
   BLERemoteCharacteristic* pRemoteCharacteristic = nullptr;
 

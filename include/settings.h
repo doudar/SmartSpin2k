@@ -204,8 +204,7 @@ const char* const DEFAULT_PASSWORD = "password";
 // 2
 #define LED_PIN 2
 
-// Max tries that BLE client will perform on reconnect
-#define MAX_RECONNECT_TRIES 1
+// Reconnect tries removed: connections now always instantiate a new NimBLEClient
 
 // loop speed for the SmartSpin2k BLE communications
 #define BLE_NOTIFY_DELAY 503

@@ -277,70 +277,27 @@ bool SpinBLEClient::connectToServer() {
     NimBLEDevice::deleteClient(pClient);
     return false;
   };
-
-  /** Check if we have a client we should reuse first **/
-  if (NimBLEDevice::getCreatedClientCount()) {
-    /** Special case when we already know this device, we send false as the
-     *  second argument in connect() to prevent refreshing the service database.
-     *  This saves considerable time and power.
-     */
-    pClient = NimBLEDevice::getClientByPeerAddress(myDevice->getAddress());
-    if (pClient) {
-      pClient->setConnectTimeout(10000);
-      pClient->setConnectionParams(connectionParams[0], connectionParams[1], connectionParams[2], 1000);
-      SS2K_LOG(BLE_CLIENT_LOG_TAG, "Reusing Client");
-      if (!pClient->connect(myDevice, false, false, true)) {
-        SS2K_LOG(BLE_CLIENT_LOG_TAG, "Reconnect failed ");
-        this->reconnectTries--;
-        SS2K_LOG(BLE_CLIENT_LOG_TAG, "%d left.", reconnectTries);
-        if (reconnectTries < 1) {
-          handleFailedClientConnect();
-        }
-        return false;
-      }
-      SS2K_LOG(BLE_CLIENT_LOG_TAG, "Reconnected client");
-    }
-    /** We don't already have a client that knows this device,
-     *  we will check for a client that is disconnected that we can use.
-     */
-    else {
-      pClient = NimBLEDevice::getDisconnectedClient();
-    }
+  // Always create a brand-new client for each connection attempt.
+  if (NimBLEDevice::getCreatedClientCount() >= NIMBLE_MAX_CONNECTIONS) {
+    Serial.println("Max clients reached - no more connections available");
+    return false;
   }
 
-  /** No client to reuse? Create a new one. */
-  if (!pClient) {
-    if (NimBLEDevice::getCreatedClientCount() >= NIMBLE_MAX_CONNECTIONS) {
-      Serial.println("Max clients reached - no more connections available");
-      return false;
-    }
-
-    pClient = NimBLEDevice::createClient();
-
-    SS2K_LOG(BLE_CLIENT_LOG_TAG, " - Created client");
-
-    pClient->setClientCallbacks(&myClientCallback, false);
-    /** Set initial connection parameters: These settings are 15ms interval, 0 latency, 120ms timout.
-     *  These settings are safe for 3 clients to connect reliably, can go faster if you have less
-     *  connections. Timeout should be a multiple of the interval, minimum is 100ms.
-     *  Min interval: 12 * 1.25ms = 15, Max interval: 12 * 1.25ms = 15, 0 latency, 51 * 10ms = 510ms timeout
-     */
-    pClient->setConnectionParams(connectionParams[0], connectionParams[1], connectionParams[2], 1000);
-    /** Set how long we are willing to wait for the connection to complete (seconds), default is 30. */
-    pClient->setConnectTimeout(5000);  // 5 seconds
-
-    if (!pClient->connect(myDevice)) {
-      return handleFailedClientConnect();
-    }
+  pClient = NimBLEDevice::createClient();
+  SS2K_LOG(BLE_CLIENT_LOG_TAG, " - Created new client");
+  pClient->setClientCallbacks(&myClientCallback, false);
+  // Initial connection parameters: 15ms interval, 0 latency, 1000ms timeout (kept from previous logic)
+  pClient->setConnectionParams(connectionParams[0], connectionParams[1], connectionParams[2], 1000);
+  pClient->setConnectTimeout(5000);  // 5 seconds
+  if (!pClient->connect(myDevice)) {
+    return handleFailedClientConnect();
   }
 
   SS2K_LOG(BLE_CLIENT_LOG_TAG, "Connected to: %s - %s RSSI %d", this->adevName2UniqueName(myDevice).c_str(), pClient->getPeerAddress().toString().c_str(), pClient->getRssi());
   if (serviceUUID == HID_SERVICE_UUID) {
     connectBLE_HID(pClient);
-    this->reconnectTries = MAX_RECONNECT_TRIES;
     SS2K_LOG(BLE_CLIENT_LOG_TAG, "Successful remote subscription.");
     spinBLEClient.myBLEDevices[device_number].doConnect = false;
-    this->reconnectTries                                = MAX_RECONNECT_TRIES;
     spinBLEClient.myBLEDevices[device_number].set(myDevice, pClient->getConnHandle(), serviceUUID, charUUID);
     spinBLEClient.myBLEDevices[device_number].peerAddress = pClient->getPeerAddress();
     removeDuplicates(pClient);
@@ -356,9 +313,7 @@ bool SpinBLEClient::connectToServer() {
     pSvc = pClient->getService(serviceUUID);
   }
   if (pSvc) { /** make sure it's not null */
-    this->reconnectTries                                = MAX_RECONNECT_TRIES;
     spinBLEClient.myBLEDevices[device_number].doConnect = false;
-    this->reconnectTries                                = MAX_RECONNECT_TRIES;
     spinBLEClient.myBLEDevices[device_number].set(myDevice, pClient->getConnHandle(), serviceUUID, charUUID);
     spinBLEClient.myBLEDevices[device_number].peerAddress = pClient->getPeerAddress();
     removeDuplicates(pClient);
@@ -403,6 +358,11 @@ void MyClientCallback::onDisconnect(NimBLEClient *pClient, int reason) {
         }
       }
     }
+    // Always fully delete the underlying NimBLE client to force a clean reconnect path
+    // (fresh client will be created on next connect attempt.)
+    pClient->deleteServices();
+    NimBLEDevice::getScan()->erase(addr); // remove cached advertisement data for this address
+    NimBLEDevice::deleteClient(pClient);
     return;
   }
 }
