@@ -246,11 +246,11 @@ void HTTP_Server::start() {
   server.on("/ergmode", []() {
     String value = server.arg("value");
     if (value == "enable") {
-      rtConfig->setFTMSMode(FitnessMachineControlPointProcedure::SetTargetPower);
+      rtConfig->FTMSMode.set(FitnessMachineControlPointProcedure::SetTargetPower);
       server.send(200, "text/plain", "OK");
       SS2K_LOG(HTTP_SERVER_LOG_TAG, "ERG Mode turned on");
     } else {
-      rtConfig->setFTMSMode(FitnessMachineControlPointProcedure::RequestControl);
+      rtConfig->FTMSMode.set(FitnessMachineControlPointProcedure::RequestControl);
       server.send(200, "text/plain", "OK");
       SS2K_LOG(HTTP_SERVER_LOG_TAG, "ERG Mode turned off");
     }
@@ -259,11 +259,11 @@ void HTTP_Server::start() {
   server.on("/targetwattsslider", []() {
     String value = server.arg("value");
     if (value == "enable") {
-      rtConfig->setSimTargetWatts(true);
+      rtConfig->simTargetWatts.set(true);
       server.send(200, "text/plain", "OK");
       SS2K_LOG(HTTP_SERVER_LOG_TAG, "Target Watts Simulator turned on");
     } else if (value == "disable") {
-      rtConfig->setSimTargetWatts(false);
+      rtConfig->simTargetWatts.set(false);
       server.send(200, "text/plain", "OK");
       SS2K_LOG(HTTP_SERVER_LOG_TAG, "Target Watts Simulator turned off");
     } else {
@@ -276,11 +276,11 @@ void HTTP_Server::start() {
   server.on("/shift", []() {
     int value = server.arg("value").toInt();
     if ((value > -10) && (value < 10)) {
-      rtConfig->setShifterPosition(rtConfig->getShifterPosition() + value);
+      rtConfig->shifterPosition.set(rtConfig->shifterPosition.get() + value);
       server.send(200, "text/plain", "OK");
       SS2K_LOG(HTTP_SERVER_LOG_TAG, "Shift From HTML");
     } else {
-      rtConfig->setShifterPosition(value);
+      rtConfig->shifterPosition.set(value);
       SS2K_LOG(HTTP_SERVER_LOG_TAG, "Invalid HTML Shift");
       server.send(200, "text/plain", "OK");
     }
@@ -477,94 +477,94 @@ void HTTP_Server::settingsProcessor() {
   if (!server.arg("ssid").isEmpty()) {
     tString = server.arg("ssid");
     tString.trim();
-    userConfig->setSsid(tString);
+    userConfig->ssid.set(tString);
   }
   if (!server.arg("password").isEmpty()) {
     tString = server.arg("password");
     tString.trim();
-    userConfig->setPassword(tString);
+    userConfig->password.set(tString);
   }
   if (!server.arg("deviceName").isEmpty()) {
     tString = server.arg("deviceName");
     tString.trim();
-    userConfig->setDeviceName(tString);
+    userConfig->deviceName.set(tString);
   }
   if (!server.arg("shiftStep").isEmpty()) {
     uint64_t shiftStep = server.arg("shiftStep").toInt();
     if (shiftStep >= 10 && shiftStep <= 6000) {
-      userConfig->setShiftStep(shiftStep);
+      userConfig->shiftStep.set(shiftStep);
     }
     wasSettingsUpdate = true;
   }
   if (!server.arg("stepperPower").isEmpty()) {
     uint64_t stepperPower = server.arg("stepperPower").toInt();
     if (stepperPower >= 100 && stepperPower <= 2000) {
-      userConfig->setStepperPower(stepperPower);
+      userConfig->stepperPower.set(stepperPower);
       ss2k->updateStepperPower();
     }
   }
   if (!server.arg("maxWatts").isEmpty()) {
     uint64_t maxWatts = server.arg("maxWatts").toInt();
     if (maxWatts >= 0 && maxWatts <= 2000) {
-      userConfig->setMaxWatts(maxWatts);
+      userConfig->maxWatts.set(maxWatts);
     }
   }
   if (!server.arg("minWatts").isEmpty()) {
     uint64_t minWatts = server.arg("minWatts").toInt();
     if (minWatts >= 0 && minWatts <= 200) {
-      userConfig->setMinWatts(minWatts);
+      userConfig->minWatts.set(minWatts);
     }
   }
   if (!server.arg("ERGSensitivity").isEmpty()) {
     float ERGSensitivity = server.arg("ERGSensitivity").toFloat();
     if (ERGSensitivity >= .1 && ERGSensitivity <= 20) {
-      userConfig->setERGSensitivity(ERGSensitivity);
+      userConfig->ERGSensitivity.set(ERGSensitivity);
     }
   }
   // checkboxes don't report off, so need to check using another parameter
   // that's always present on that page
   if (!server.arg("autoUpdate").isEmpty()) {
-    userConfig->setAutoUpdate(true);
+    userConfig->autoUpdate.set(true);
   } else if (wasSettingsUpdate) {
-    userConfig->setAutoUpdate(false);
+    userConfig->autoUpdate.set(false);
   }
   if (!server.arg("stepperDir").isEmpty()) {
-    userConfig->setStepperDir(true);
+    userConfig->stepperDir.set(true);
   } else if (wasSettingsUpdate) {
-    userConfig->setStepperDir(false);
+    userConfig->stepperDir.set(false);
   }
   if (!server.arg("shifterDir").isEmpty()) {
-    userConfig->setShifterDir(true);
+    userConfig->shifterDir.set(true);
   } else if (wasSettingsUpdate) {
-    userConfig->setShifterDir(false);
+    userConfig->shifterDir.set(false);
   }
   if (!server.arg("udpLogEnabled").isEmpty()) {
-    userConfig->setUdpLogEnabled(true);
+    userConfig->udpLogEnabled.set(true);
   } else if (wasSettingsUpdate) {
-    userConfig->setUdpLogEnabled(false);
+    userConfig->udpLogEnabled.set(false);
   }
   if (!server.arg("pTab4Pwr").isEmpty()) {
-    userConfig->setPTab4Pwr(true);
+    userConfig->pTab4Pwr.set(true);
   } else if (wasSettingsUpdate) {
-    userConfig->setPTab4Pwr(false);
+    userConfig->pTab4Pwr.set(false);
   }
   if (!server.arg("stealthChop").isEmpty()) {
-    userConfig->setStealthChop(true);
+    userConfig->stealthChop.set(true);
     ss2k->updateStealthChop();
   } else if (wasSettingsUpdate) {
-    userConfig->setStealthChop(false);
+    userConfig->stealthChop.set(false);
     ss2k->updateStealthChop();
   }
   if (!server.arg("inclineMultiplier").isEmpty()) {
     float inclineMultiplier = server.arg("inclineMultiplier").toFloat();
     if (inclineMultiplier >= 0 && inclineMultiplier <= 10) {
-      userConfig->setInclineMultiplier(inclineMultiplier);
+      userConfig->inclineMultiplier.set(inclineMultiplier);
     }
   }
   if (!server.arg("powerCorrectionFactor").isEmpty()) {
     float powerCorrectionFactor = server.arg("powerCorrectionFactor").toFloat();
     if (powerCorrectionFactor >= MIN_PCF && powerCorrectionFactor <= MAX_PCF) {
-      userConfig->setPowerCorrectionFactor(powerCorrectionFactor);
+      userConfig->powerCorrectionFactor.set(powerCorrectionFactor);
     }
   }
   if (!server.arg("blePMDropdown").isEmpty()) {
@@ -572,11 +572,11 @@ void HTTP_Server::settingsProcessor() {
     if (server.arg("blePMDropdown")) {
       tString = server.arg("blePMDropdown");
       if (tString != userConfig->getConnectedPowerMeter()) {
-        userConfig->setConnectedPowerMeter(tString);
+        userConfig->connectedPowerMeter.set(tString);
         spinBLEClient.reconnectAllDevices();
       }
     } else {
-      userConfig->setConnectedPowerMeter(String(ANY));
+      userConfig->connectedPowerMeter.set(String(ANY));
     }
   }
   if (!server.arg("bleHRDropdown").isEmpty()) {
@@ -586,9 +586,9 @@ void HTTP_Server::settingsProcessor() {
       if (tString != userConfig->getConnectedHeartMonitor()) {
         spinBLEClient.reconnectAllDevices();
       }
-      userConfig->setConnectedHeartMonitor(server.arg("bleHRDropdown"));
+      userConfig->connectedHeartMonitor.set(server.arg("bleHRDropdown"));
     } else {
-      userConfig->setConnectedHeartMonitor(String(NONE));
+      userConfig->connectedHeartMonitor.set(String(NONE));
     }
   }
   if (!server.arg("bleRemoteDropdown").isEmpty()) {
@@ -598,9 +598,9 @@ void HTTP_Server::settingsProcessor() {
       if (tString != userConfig->getConnectedRemote()) {
         spinBLEClient.reconnectAllDevices();
       }
-      userConfig->setConnectedRemote(server.arg("bleRemoteDropdown"));
+      userConfig->connectedRemote.set(server.arg("bleRemoteDropdown"));
     } else {
-      userConfig->setConnectedRemote(String(NONE));
+      userConfig->connectedRemote.set(String(NONE));
     }
   }
 
@@ -678,7 +678,7 @@ void HTTP_Server::FirmwareUpdate() {
     Version availableVer(payload.c_str());
     Version currentVer(FIRMWARE_VERSION);
 
-    if (((availableVer > currentVer) && (userConfig->getAutoUpdate())) || (!LittleFS.exists("/index.html"))) {
+    if (((availableVer > currentVer) && (userConfig->autoUpdate.get())) || (!LittleFS.exists("/index.html"))) {
       //////////////// Update LittleFS//////////////
       SS2K_LOG(HTTP_SERVER_LOG_TAG, "Updating FileSystem");
       http.begin(DATA_UPDATEURL DATA_FILELIST, rootCACertificate);  // check version URL
@@ -736,7 +736,7 @@ void HTTP_Server::FirmwareUpdate() {
       }
 
       //////// Update Firmware /////////
-      if (((availableVer > currentVer) || updateAnyway) && (userConfig->getAutoUpdate())) {
+      if (((availableVer > currentVer) || updateAnyway) && (userConfig->autoUpdate.get())) {
         SS2K_LOG(HTTP_SERVER_LOG_TAG, "New firmware detected!");
         SS2K_LOG(HTTP_SERVER_LOG_TAG, "Upgrading from %s to %s", FIRMWARE_VERSION, payload.c_str());
         t_httpUpdate_return ret = httpUpdate.update(localClient, userConfig->getFirmwareUpdateURL() + String(FW_BINFILE));

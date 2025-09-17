@@ -14,8 +14,34 @@
 #endif
 
 #include "settings.h"
+#include <type_traits>
 
 #define CONFIG_LOG_TAG "Config"
+
+// Generic parameter class for simple set/get operations
+template<typename T>
+class Parameter {
+ private:
+  T value;
+
+ public:
+  void set(const T& val) { value = val; }
+  T get() const { return value; }
+  
+  // Overload for String types to return const char*
+  template<typename U = T>
+  typename std::enable_if<std::is_same<U, String>::value, const char*>::type
+  getCStr() const { return value.c_str(); }
+
+  Parameter() : value{} {}
+  Parameter(const T& defaultValue) : value(defaultValue) {}
+  
+  // Assignment operator for convenience
+  Parameter& operator=(const T& val) { value = val; return *this; }
+  
+  // Conversion operator for convenience  
+  operator T() const { return value; }
+};
 
 class Measurement {
  private:
@@ -54,18 +80,6 @@ class Measurement {
 };
 
 class RuntimeParameters {
- private:
-  double targetIncline = 0.0;
-  float simulatedSpeed = 0.0;
-  uint8_t FTMSMode     = 0x00;
-  int shifterPosition  = 0;
-  bool homed           = false;
-  int32_t minStep      = -DEFAULT_STEPPER_TRAVEL;
-  int32_t maxStep      = DEFAULT_STEPPER_TRAVEL;
-  int minResistance    = -DEFAULT_RESISTANCE_RANGE;
-  int maxResistance    = DEFAULT_RESISTANCE_RANGE;
-  bool simTargetWatts  = false;
-
  public:
   Measurement watts;
   Measurement pm_batt;
@@ -74,146 +88,78 @@ class RuntimeParameters {
   Measurement cad;
   Measurement resistance;
 
-  void setTargetIncline(float inc) { targetIncline = inc; }
-  float getTargetIncline() { return targetIncline; }
+  // Parameter template members - made public for direct access
+  Parameter<float> targetIncline;
+  Parameter<float> simulatedSpeed;
+  Parameter<uint8_t> FTMSMode;
+  Parameter<int> shifterPosition;
+  Parameter<bool> homed;
+  Parameter<int32_t> minStep;
+  Parameter<int32_t> maxStep;
+  Parameter<int> minResistance;
+  Parameter<int> maxResistance;
+  Parameter<bool> simTargetWatts;
 
-  void setSimulatedSpeed(float spd) { simulatedSpeed = spd; }
-  float getSimulatedSpeed() { return simulatedSpeed; }
+  // Constructor to set default values
+  RuntimeParameters() {
+    targetIncline.set(0.0);
+    simulatedSpeed.set(0.0);
+    FTMSMode.set(0x00);
+    shifterPosition.set(0);
+    homed.set(false);
+    minStep.set(-DEFAULT_STEPPER_TRAVEL);
+    maxStep.set(DEFAULT_STEPPER_TRAVEL);
+    minResistance.set(-DEFAULT_RESISTANCE_RANGE);
+    maxResistance.set(DEFAULT_RESISTANCE_RANGE);
+    simTargetWatts.set(false);
+  }
 
-  void setFTMSMode(uint8_t mde) { FTMSMode = mde; }
-  uint8_t getFTMSMode() { return FTMSMode; }
-
-  void setShifterPosition(int sp) { shifterPosition = sp; }
-  int getShifterPosition() { return shifterPosition; }
-
-  void setHomed(bool hmd) { homed = hmd; }
-  int getHomed() { return homed; }
-
-  void setMinStep(int32_t ms) { ms != INT32_MIN ? minStep = ms : minStep = -DEFAULT_STEPPER_TRAVEL; }
-  int32_t getMinStep() { return minStep; }
-
-  void setMaxStep(int32_t ms) { ms != INT32_MIN ? maxStep = ms : maxStep = DEFAULT_STEPPER_TRAVEL; }
-  int32_t getMaxStep() { return maxStep; }
-
-  void setSimTargetWatts(int tgt) { simTargetWatts = tgt; }
-  bool getSimTargetWatts() { return simTargetWatts; }
-
-  void setMinResistance(int min) { minResistance = min; }
-  int getMinResistance() { return minResistance; }
-
-  void setMaxResistance(int max) { maxResistance = max; }
-  int getMaxResistance() { return maxResistance; }
+  // Special setter for MinStep and MaxStep with validation logic
+  void setMinStep(int32_t ms) { ms != INT32_MIN ? minStep.set(ms) : minStep.set(-DEFAULT_STEPPER_TRAVEL); }
+  void setMaxStep(int32_t ms) { ms != INT32_MIN ? maxStep.set(ms) : maxStep.set(DEFAULT_STEPPER_TRAVEL); }
 
   String returnJSON();
 };
 
 class userParameters {
- private:
-  String firmwareUpdateURL;
-  String deviceName;
-  int shiftStep;
-  bool stealthChop;
-  float inclineMultiplier;
-  float powerCorrectionFactor;
-  float ERGSensitivity;
-  bool autoUpdate;
-  int stepperPower;
-  int maxWatts;
-  int minWatts;
-  int stepperSpeed;
-  bool stepperDir;
-  bool shifterDir;
-  bool pTab4Pwr              = false;
-  bool udpLogEnabled         = false;
-  int32_t hMin               = INT32_MIN;
-  int32_t hMax               = INT32_MIN;
-  bool FTMSControlPointWrite = false;
-  int homingSensitivity      = DEFAULT_HOMING_SENSITIVITY;  // Use default from settings.h
-  String ssid;
-  String password;
-  String connectedPowerMeter   = CONNECTED_POWER_METER;
-  String connectedHeartMonitor = CONNECTED_HEART_MONITOR;
-  String connectedRemote       = CONNECTED_REMOTE;
-  String foundDevices          = "";
-
  public:
-  void setFirmwareUpdateURL(String fURL) { firmwareUpdateURL = fURL; }
-  const char* getFirmwareUpdateURL() { return firmwareUpdateURL.c_str(); }
+  // Parameter template members - made public for direct access
+  Parameter<String> firmwareUpdateURL;
+  Parameter<String> deviceName;
+  Parameter<int> shiftStep;
+  Parameter<bool> stealthChop;
+  Parameter<float> inclineMultiplier;
+  Parameter<float> powerCorrectionFactor;
+  Parameter<float> ERGSensitivity;
+  Parameter<bool> autoUpdate;
+  Parameter<int> stepperPower;
+  Parameter<int> maxWatts;
+  Parameter<int> minWatts;
+  Parameter<int> stepperSpeed;
+  Parameter<bool> stepperDir;
+  Parameter<bool> shifterDir;
+  Parameter<bool> pTab4Pwr;
+  Parameter<bool> udpLogEnabled;
+  Parameter<int32_t> hMin;
+  Parameter<int32_t> hMax;
+  Parameter<bool> FTMSControlPointWrite;
+  Parameter<int> homingSensitivity;
+  Parameter<String> ssid;
+  Parameter<String> password;
+  Parameter<String> connectedPowerMeter;
+  Parameter<String> connectedHeartMonitor;
+  Parameter<String> connectedRemote;
+  Parameter<String> foundDevices;
 
-  void setDeviceName(String dvn) { deviceName = dvn; }
-  const char* getDeviceName() { return deviceName.c_str(); }
-
-  void setShiftStep(int ss) { shiftStep = ss; }
-  int getShiftStep() { return shiftStep; }
-
-  void setStealthChop(bool sc) { stealthChop = sc; }
-  bool getStealthChop() { return stealthChop; }
-
-  void setFTMSControlPointWrite(bool cpw) { FTMSControlPointWrite = cpw; }
-  bool getFTMSControlPointWrite() { return FTMSControlPointWrite; }
-
-  void setInclineMultiplier(float im) { inclineMultiplier = im; }
-  float getInclineMultiplier() { return inclineMultiplier; }
-
-  void setPowerCorrectionFactor(float pcf) { powerCorrectionFactor = pcf; }
-  float getPowerCorrectionFactor() { return powerCorrectionFactor; }
-
-  float getERGSensitivity() { return ERGSensitivity; }
-  void setERGSensitivity(float ergS) { ERGSensitivity = ergS; }
-
-  void setAutoUpdate(bool atd) { autoUpdate = atd; }
-  bool getAutoUpdate() { return autoUpdate; }
-
-  void setSsid(String sid) { ssid = sid; }
-  const char* getSsid() { return ssid.c_str(); }
-
-  void setPassword(String pwd) { password = pwd; }
-  const char* getPassword() { return password.c_str(); }
-
-  void setConnectedPowerMeter(String cpm) { connectedPowerMeter = cpm; }
-  const char* getConnectedPowerMeter() { return connectedPowerMeter.c_str(); }
-
-  void setConnectedHeartMonitor(String cHr) { connectedHeartMonitor = cHr; }
-  const char* getConnectedHeartMonitor() { return connectedHeartMonitor.c_str(); }
-
-  void setConnectedRemote(String cRemote) { connectedRemote = cRemote; }
-  const char* getConnectedRemote() { return connectedRemote.c_str(); }
-
-  void setStepperPower(int sp) { stepperPower = sp; }
-  int getStepperPower() { return stepperPower; }
-
-  void setStepperSpeed(int sp) { stepperSpeed = sp; }
-  int getStepperSpeed() { return stepperSpeed; }
-
-  void setMaxWatts(int maxW) { maxWatts = maxW; }
-  int getMaxWatts() { return maxWatts; }
-
-  void setMinWatts(int minW) { minWatts = minW; }
-  int getMinWatts() { return minWatts; }
-
-  void setStepperDir(bool sd) { stepperDir = sd; }
-  bool getStepperDir() { return stepperDir; }
-
-  void setShifterDir(bool shd) { shifterDir = shd; }
-  bool getShifterDir() { return shifterDir; }
-
-  void setUdpLogEnabled(bool enabled) { udpLogEnabled = enabled; }
-  bool getUdpLogEnabled() { return udpLogEnabled; }
-
-  void setPTab4Pwr(bool pTab) { pTab4Pwr = pTab; }
-  bool getPTab4Pwr() { return pTab4Pwr; }
-
-  void setFoundDevices(String fdv) { foundDevices = fdv; }
-  const char* getFoundDevices() { return foundDevices.c_str(); }
-
-  void setHMin(int32_t min) { hMin = min; }
-  int32_t getHMin() { return hMin; }
-
-  void setHMax(int32_t max) { hMax = max; }
-  int32_t getHMax() { return hMax; }
-
-  void setHomingSensitivity(int sensitivity) { homingSensitivity = sensitivity; }
-  int getHomingSensitivity() { return homingSensitivity; }
+  // String parameter getters that provide const char* interface for compatibility
+  const char* getFirmwareUpdateURL() { return firmwareUpdateURL.getCStr(); }
+  const char* getDeviceName() { return deviceName.getCStr(); }
+  const char* getSsid() { return ssid.getCStr(); }
+  const char* getPassword() { return password.getCStr(); }
+  const char* getConnectedPowerMeter() { return connectedPowerMeter.getCStr(); }
+  const char* getConnectedHeartMonitor() { return connectedHeartMonitor.getCStr(); }
+  const char* getConnectedRemote() { return connectedRemote.getCStr(); }
+  const char* getFoundDevices() { return foundDevices.getCStr(); }
 
   void setDefaults();
   String returnJSON();

@@ -58,7 +58,7 @@ void PowerTable::processPowerValue(PowerBuffer& powerBuffer, int cadence, Measur
 
     int currentPos = ss2k->getCurrentPosition() / TABLE_DIVISOR;
     int targetPos  = powerBuffer.powerEntry[0].targetPosition;
-    int range      = (userConfig->getShiftStep() * 2) / TABLE_DIVISOR;
+    int range      = (userConfig->shiftStep.get() * 2) / TABLE_DIVISOR;
 
     if (currentPos >= (targetPos - range) && currentPos <= (targetPos + range)) {
       for (int i = 1; i < POWER_SAMPLES; i++) {
@@ -85,12 +85,12 @@ void PowerTable::setStepperMinMax() {
   int32_t _return = RETURN_ERROR;
 
   // if Homing was preformed, skip estimating min_max
-  if (rtConfig->getHomed() && (userConfig->getHMin() != INT32_MIN) || (userConfig->getHMax() != INT32_MIN)) {
+  if (rtConfig->homed.get() && (userConfig->hMin.get() != INT32_MIN) || (userConfig->hMax.get() != INT32_MIN)) {
     SS2K_LOG(POWERTABLE_LOG_TAG, "Using detected travel limits during homing");
-    rtConfig->setMinStep(userConfig->getHMin());
-    rtConfig->setMaxStep(userConfig->getHMax());
+    rtConfig->setMinStep(userConfig->hMin.get());
+    rtConfig->setMaxStep(userConfig->hMax.get());
     return;
-  } else if (rtConfig->getHomed()){
+  } else if (rtConfig->homed.get()){
     SS2K_LOG(POWERTABLE_LOG_TAG, "HOMING VALUES NOT FOUND");
   }
 
@@ -102,18 +102,18 @@ void PowerTable::setStepperMinMax() {
     return;
   }
 
-  int minBreakWatts = userConfig->getMinWatts();
+  int minBreakWatts = userConfig->minWatts.get();
   if (minBreakWatts > 1) {
     _return = this->lookup(minBreakWatts, NORMAL_CAD);
     if (_return != RETURN_ERROR) {
       // never set less than one shift below current incline.
-      if ((_return >= ss2k->getCurrentPosition()) && (rtConfig->watts.getValue() > userConfig->getMinWatts())) {
-        _return = ss2k->getCurrentPosition() - userConfig->getShiftStep();
+      if ((_return >= ss2k->getCurrentPosition()) && (rtConfig->watts.getValue() > userConfig->minWatts.get())) {
+        _return = ss2k->getCurrentPosition() - userConfig->shiftStep.get();
         SS2K_LOG(POWERTABLE_LOG_TAG, "Min Position too close to current incline: %d", _return);
       }
       // never set above max step.
-      if (_return >= rtConfig->getMaxStep()) {
-        _return = ss2k->getCurrentPosition() - userConfig->getShiftStep() * 2;
+      if (_return >= rtConfig->maxStep.get()) {
+        _return = ss2k->getCurrentPosition() - userConfig->shiftStep.get() * 2;
         SS2K_LOG(POWERTABLE_LOG_TAG, "Min Position above max!: %d", _return);
       }
       rtConfig->setMinStep(_return);
@@ -121,18 +121,18 @@ void PowerTable::setStepperMinMax() {
     }
   }
 
-  int maxBreakWatts = userConfig->getMaxWatts();
+  int maxBreakWatts = userConfig->maxWatts.get();
   if (maxBreakWatts > 1) {
     _return = this->lookup(maxBreakWatts, NORMAL_CAD);
     if (_return != RETURN_ERROR) {
       // never set less than one shift above current incline.
-      if ((_return <= ss2k->getCurrentPosition()) && (rtConfig->watts.getValue() < userConfig->getMaxWatts())) {
-        _return = ss2k->getCurrentPosition() + userConfig->getShiftStep();
+      if ((_return <= ss2k->getCurrentPosition()) && (rtConfig->watts.getValue() < userConfig->maxWatts.get())) {
+        _return = ss2k->getCurrentPosition() + userConfig->shiftStep.get();
         SS2K_LOG(POWERTABLE_LOG_TAG, "Max Position too close to current incline: %d", _return);
       }
       // never set below min step.
-      if (_return <= rtConfig->getMinStep()) {
-        _return = ss2k->getCurrentPosition() + userConfig->getShiftStep() * 2;
+      if (_return <= rtConfig->minStep.get()) {
+        _return = ss2k->getCurrentPosition() + userConfig->shiftStep.get() * 2;
         SS2K_LOG(POWERTABLE_LOG_TAG, "Max Position below min!: %d", _return);
       }
       rtConfig->setMaxStep(_return);
@@ -192,7 +192,7 @@ void PowerTable::newEntry(PowerBuffer& powerBuffer) {
 
 bool PowerTable::_manageSaveState(bool canSkipReliabilityChecks) {
   // Homing is now a prerequisite for loading and saving the powertable.
-  if (!rtConfig->getHomed()) {
+  if (!rtConfig->homed.get()) {
     return false;
   }
   // Check if the table has been loaded in this session
@@ -276,7 +276,7 @@ bool PowerTable::_manageSaveState(bool canSkipReliabilityChecks) {
 }
 
 bool PowerTable::_save() {
-  if (!rtConfig->getHomed()) {
+  if (!rtConfig->homed.get()) {
     SS2K_LOG(POWERTABLE_LOG_TAG, "Power Table not saved because homing was not performed.");
     return false;  // do not save if homing was not performed.
   }
@@ -319,7 +319,7 @@ bool PowerTable::_save() {
   }
 
   // Write homing state
-  bool isHomed = rtConfig->getHomed();
+  bool isHomed = rtConfig->homed.get();
   if (file.write((uint8_t*)&isHomed, sizeof(isHomed)) != sizeof(isHomed)) {
     SS2K_LOG(POWERTABLE_LOG_TAG, "Failed to write homing state");
     file.close();
