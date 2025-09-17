@@ -194,61 +194,61 @@ JsonDocument doc;
   }
 
   // Copy values from the JsonDocument to the Config
-  setFirmwareUpdateURL(doc["firmwareUpdateURL"]);
-  setDeviceName(doc["deviceName"]);
-  setShiftStep(doc["shiftStep"]);
-  setStepperPower(doc["stepperPower"]);
-  setStealthChop(doc["stealthChop"]);
-  setInclineMultiplier(doc["inclineMultiplier"]);
-  setAutoUpdate(doc["autoUpdate"]);
-  setSsid(doc["ssid"]);
-  setPassword(doc["password"]);
-  setConnectedPowerMeter(doc["connectedPowerMeter"]);
-  setConnectedHeartMonitor(doc["connectedHeartMonitor"]);
+  firmwareUpdateURL.set(doc["firmwareUpdateURL"]);
+  deviceName.set(doc["deviceName"]);
+  shiftStep.set(doc["shiftStep"]);
+  stepperPower.set(doc["stepperPower"]);
+  stealthChop.set(doc["stealthChop"]);
+  inclineMultiplier.set(doc["inclineMultiplier"]);
+  autoUpdate.set(doc["autoUpdate"]);
+  ssid.set(doc["ssid"]);
+  password.set(doc["password"]);
+  connectedPowerMeter.set(doc["connectedPowerMeter"]);
+  connectedHeartMonitor.set(doc["connectedHeartMonitor"]);
   // setFoundDevices(doc["foundDevices"]);
 
   // If statements to upgrade old versions of config.txt that didn't include these
   if (doc["ERGSensitivity"]) {
-    setERGSensitivity(doc["ERGSensitivity"]);
+    ERGSensitivity.set(doc["ERGSensitivity"]);
   }
   if (doc["maxWatts"]) {
-    setMaxWatts(doc["maxWatts"]);
+    maxWatts.set(doc["maxWatts"]);
   }
   if (doc["stepperSpeed"]) {
-    setStepperSpeed(doc["stepperSpeed"]);
+    stepperSpeed.set(doc["stepperSpeed"]);
   }
   if (doc["minWatts"]) {
-    setMinWatts(doc["minWatts"]);
+    minWatts.set(doc["minWatts"]);
   }
   if (!doc["stepperDir"].isNull()) {
-    setStepperDir(doc["stepperDir"]);
+    stepperDir.set(doc["stepperDir"]);
   }
   if (!doc["shifterDir"].isNull()) {
-    setShifterDir(doc["shifterDir"]);
+    shifterDir.set(doc["shifterDir"]);
   }
   if (!doc["udpLogEnabled"].isNull()) {
-    setUdpLogEnabled(doc["udpLogEnabled"]);
+    udpLogEnabled.set(doc["udpLogEnabled"]);
   }
   if (!doc["pTab4Pwr"].isNull()) {
-    setPTab4Pwr(doc["pTab4Pwr"]);
+    pTab4Pwr.set(doc["pTab4Pwr"]);
   }
   if (doc["powerCorrectionFactor"]) {
-    setPowerCorrectionFactor(doc["powerCorrectionFactor"]);
-    if ((getPowerCorrectionFactor() < MIN_PCF) || (getPowerCorrectionFactor() > MAX_PCF)) {
-      setPowerCorrectionFactor(1);
+    powerCorrectionFactor.set(doc["powerCorrectionFactor"]);
+    if ((powerCorrectionFactor.get() < MIN_PCF) || (powerCorrectionFactor.get() > MAX_PCF)) {
+      powerCorrectionFactor.set(1);
     }
   }
   if (doc["connectedRemote"]) {
-    setConnectedRemote(doc["connectedRemote"]);
+    connectedRemote.set(doc["connectedRemote"]);
   }
   if (!doc["hMin"].isNull()) {
-    setHMin(doc["hMin"]);
+    hMin.set(doc["hMin"]);
   }
   if (!doc["hMax"].isNull()) {
-    setHMax(doc["hMax"]);
+    hMax.set(doc["hMax"]);
   }
   if (!doc["homingSensitivity"].isNull()) {
-    setHomingSensitivity(doc["homingSensitivity"]);
+    homingSensitivity.set(doc["homingSensitivity"]);
   }
 
   SS2K_LOG(CONFIG_LOG_TAG, "Config File Loaded: %s", configFILENAME);

@@ -52,18 +52,18 @@ void ErgMode::runERG() {
         simulationRunning = rtConfig->watts.getSimulate();
       }
 
-      if (!userConfig->getPTab4Pwr()) {
+      if (!userConfig->pTab4Pwr.get()) {
         // add values to Power table
         powerTable->processPowerValue(powerBuffer, rtConfig->cad.getValue(), rtConfig->watts);
       }
 
       // compute ERG
-      if ((rtConfig->getFTMSMode() == FitnessMachineControlPointProcedure::SetTargetPower) && (hasConnectedPowerMeter || simulationRunning)) {
+      if ((rtConfig->FTMSMode.get() == FitnessMachineControlPointProcedure::SetTargetPower) && (hasConnectedPowerMeter || simulationRunning)) {
         ergMode.computeErg();
       }
 
       // resistance mode
-      if ((rtConfig->getFTMSMode() == FitnessMachineControlPointProcedure::SetTargetResistanceLevel) && (rtConfig->getMaxResistance() != DEFAULT_RESISTANCE_RANGE)) {
+      if ((rtConfig->FTMSMode.get() == FitnessMachineControlPointProcedure::SetTargetResistanceLevel) && (rtConfig->maxResistance.get() != DEFAULT_RESISTANCE_RANGE)) {
         ergMode.computeResistance();
       }
 
@@ -77,16 +77,16 @@ void ErgMode::runERG() {
     if (ss2k->resetPowerTableFlag) {
       LittleFS.remove(POWER_TABLE_FILENAME);
       powerTable->reset();
-      userConfig->setHMin(INT32_MIN);
-      userConfig->setHMax(INT32_MIN);
+      userConfig->hMin.set(INT32_MIN);
+      userConfig->hMax.set(INT32_MIN);
       spinBLEServer.spinDownFlag = 0;
-      rtConfig->setHomed(false);
+      rtConfig->homed.set(false);
       userConfig->saveToLittleFS();
     }
     loopCounter++;
   }
 
-  if (userConfig->getPTab4Pwr()) {
+  if (userConfig->pTab4Pwr.get()) {
     // only do this twice as often as ERG_MODE_DELAY
     static float previousPower             = 0;
     static unsigned long int pTab4pwrTimer = millis();
@@ -127,9 +127,9 @@ void ErgMode::computeResistance() {
 
   int actualDelta = rtConfig->resistance.getTarget() - rtConfig->resistance.getValue();
   if (actualDelta != 0) {
-    rtConfig->setTargetIncline(rtConfig->getTargetIncline() + (TABLE_DIVISOR * actualDelta));
+    rtConfig->targetIncline.set(rtConfig->targetIncline.get() + (TABLE_DIVISOR * actualDelta));
   } else {
-    rtConfig->setTargetIncline(ss2k->getCurrentPosition());
+    rtConfig->targetIncline.set(ss2k->getCurrentPosition());
   }
   oldResistance = rtConfig->resistance;
 }
@@ -146,9 +146,9 @@ void ErgMode::computeErg() {
   }
 
   // set minimum set point to minimum bike watts if app sends set point lower than minimum bike watts.
-  if (newWatts.getTarget() < userConfig->getMinWatts()) {
+  if (newWatts.getTarget() < userConfig->minWatts.get()) {
     SS2K_LOG(ERG_MODE_LOG_TAG, "ERG Target Below Minumum Value.");
-    newWatts.setTarget(userConfig->getMinWatts());
+    newWatts.setTarget(userConfig->minWatts.get());
   }
 
   bool isUserSpinning = this->_userIsSpinning(newCadence, ss2k->getCurrentPosition());
@@ -200,8 +200,8 @@ void ErgMode::_setPointChangeState(int newCadence, Measurement& newWatts) {
   SS2K_LOG(ERG_MODE_LOG_TAG, "SetPoint changed:%dw PowerTable Result: %d", newWatts.getTarget(), tableResult);
   _updateValues(newCadence, newWatts, tableResult);
 
-  if (rtConfig->getTargetIncline() != ss2k->getCurrentPosition()) {  // add some time to wait while the knob moves to target position.
-    int timeToAdd = abs(ss2k->getCurrentPosition() - rtConfig->getTargetIncline());
+  if (rtConfig->targetIncline.get() != ss2k->getCurrentPosition()) {  // add some time to wait while the knob moves to target position.
+    int timeToAdd = abs(ss2k->getCurrentPosition() - rtConfig->targetIncline.get());
     if (timeToAdd > 4000) {  // 4 seconds
       SS2K_LOG(ERG_MODE_LOG_TAG, "Capping ERG seek time to 5 seconds");
       timeToAdd = 4000;
@@ -221,7 +221,7 @@ void ErgMode::_setPointChangeState(int newCadence, Measurement& newWatts) {
 // PrevError
 void ErgMode::_inSetpointState(int newCadence, Measurement& newWatts) {
   // Setting Gains For PID Loop
-  float Kp = userConfig->getERGSensitivity();
+  float Kp = userConfig->ERGSensitivity.get();
   float Ki = 0.1;
   float Kd = 0.1;
 
@@ -276,7 +276,7 @@ void ErgMode::_inSetpointState(int newCadence, Measurement& newWatts) {
 }
 
 void ErgMode::_updateValues(int newCadence, Measurement& newWatts, float newIncline) {
-  rtConfig->setTargetIncline(newIncline);
+  rtConfig->targetIncline.set(newIncline);
   _writeLog(ss2k->getCurrentPosition(), newIncline, this->setPoint, newWatts.getTarget(), this->watts.getValue(), newWatts.getValue(), this->cadence, newCadence);
 
   this->watts    = newWatts;
@@ -287,7 +287,7 @@ void ErgMode::_updateValues(int newCadence, Measurement& newWatts, float newIncl
 bool ErgMode::_userIsSpinning(int cadence, float incline) {
   if (cadence <= MIN_ERG_CADENCE) {
     if (!this->engineStopped) {       // Test so motor stop command only happens once.                                    // release tension
-      rtConfig->setTargetIncline(0);  // release incline
+      rtConfig->targetIncline.set(0);  // release incline
       this->engineStopped = true;
     }
     return false;  // Cadence too low, nothing to do here

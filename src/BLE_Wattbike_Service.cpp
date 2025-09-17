@@ -33,7 +33,7 @@ void BLE_Wattbike_Service::parseNemit() {
   const unsigned long NOTIFY_INTERVAL = 30000;  // 30 seconds in milliseconds
 
   // Get current shifter position
-  int currentGear = rtConfig->getShifterPosition();
+  int currentGear = rtConfig->shifterPosition.get();
   if (currentGear < 1) {  // Ensure gear is at least 1
     currentGear = 1;
   }
@@ -52,7 +52,7 @@ void BLE_Wattbike_Service::parseNemit() {
 
 void BLE_Wattbike_Service::update() {
   // Get current shifter position
-  int currentGear = rtConfig->getShifterPosition();
+  int currentGear = rtConfig->shifterPosition.get();
   if (currentGear < 1) {  // Ensure gear is at least 1
     currentGear = 1;
   }

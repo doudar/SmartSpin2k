@@ -67,8 +67,8 @@ void BLE_Fitness_Machine_Service::update() {
 
   // Calculate Speed for FTMS
   int speedFtmsUnit = 0;
-  if (rtConfig->getSimulatedSpeed() > 5) {
-    speedFtmsUnit = rtConfig->getSimulatedSpeed() * 100;
+  if (rtConfig->simulatedSpeed.get() > 5) {
+    speedFtmsUnit = rtConfig->simulatedSpeed.get() * 100;
   } else {
     speedFtmsUnit = spinBLEServer.calculateSpeed() * 100;
   }
@@ -150,7 +150,7 @@ void BLE_Fitness_Machine_Service::processFTMSWrite() {
         case FitnessMachineControlPointProcedure::RequestControl:
           returnValue[2] = FitnessMachineControlPointResultCode::Success;
           rtConfig->watts.setTarget(0);
-          rtConfig->setSimTargetWatts(false);
+          rtConfig->simTargetWatts.set(false);
           logBufLength += snprintf(logBuf + logBufLength, kLogBufCapacity - logBufLength, "-> Control Request");
           break;
 
@@ -162,30 +162,30 @@ void BLE_Fitness_Machine_Service::processFTMSWrite() {
         } break;
 
         case FitnessMachineControlPointProcedure::SetTargetInclination: {
-          rtConfig->setFTMSMode((uint8_t)rxValue[0]);
+          rtConfig->FTMSMode.set((uint8_t)rxValue[0]);
           returnValue[2] = FitnessMachineControlPointResultCode::Success;
           port           = (rxValue[2] << 8) + rxValue[1];
           port *= 10;
-          rtConfig->setTargetIncline(port);
-          logBufLength += snprintf(logBuf + logBufLength, kLogBufCapacity - logBufLength, "-> Incline Mode: %2f", rtConfig->getTargetIncline() / 100);
+          rtConfig->targetIncline.set(port);
+          logBufLength += snprintf(logBuf + logBufLength, kLogBufCapacity - logBufLength, "-> Incline Mode: %2f", rtConfig->targetIncline.get() / 100);
           ftmsStatus            = {FitnessMachineStatus::TargetInclineChanged, (uint8_t)rxValue[1], (uint8_t)rxValue[2]};
           ftmsTrainingStatus[1] = FitnessMachineTrainingStatus::ManualMode;
         } break;
 
         case FitnessMachineControlPointProcedure::SetTargetResistanceLevel: {
-          rtConfig->setFTMSMode((uint8_t)rxValue[0]);
+          rtConfig->FTMSMode.set((uint8_t)rxValue[0]);
           int16_t requestedResistance = (int16_t)rxValue[1];
 
-          if (requestedResistance >= rtConfig->getMinResistance() && requestedResistance <= rtConfig->getMaxResistance()) {
+          if (requestedResistance >= rtConfig->minResistance.get() && requestedResistance <= rtConfig->maxResistance.get()) {
             rtConfig->resistance.setTarget(requestedResistance);
             returnValue[2] = FitnessMachineControlPointResultCode::Success;
             logBufLength += snprintf(logBuf + logBufLength, kLogBufCapacity - logBufLength, "-> Resistance Mode: %d", rtConfig->resistance.getTarget());
           } else {
             // Clamp the value if it's out of bounds
-            if (requestedResistance > rtConfig->getMaxResistance()) {
-              rtConfig->resistance.setTarget(rtConfig->getMaxResistance());
-            } else {  // requestedResistance < rtConfig->getMinResistance()
-              rtConfig->resistance.setTarget(rtConfig->getMinResistance());
+            if (requestedResistance > rtConfig->maxResistance.get()) {
+              rtConfig->resistance.setTarget(rtConfig->maxResistance.get());
+            } else {  // requestedResistance < rtConfig->minResistance.get()
+              rtConfig->resistance.setTarget(rtConfig->minResistance.get());
             }
             returnValue[2] = FitnessMachineControlPointResultCode::InvalidParameter;
             logBufLength += snprintf(logBuf + logBufLength, kLogBufCapacity - logBufLength, "-> Resistance Request %d beyond limits", requestedResistance);
@@ -197,16 +197,16 @@ void BLE_Fitness_Machine_Service::processFTMSWrite() {
         } break;
 
         case FitnessMachineControlPointProcedure::SetTargetPower: {
-          rtConfig->setFTMSMode((uint8_t)rxValue[0]);
+          rtConfig->FTMSMode.set((uint8_t)rxValue[0]);
           if (spinBLEClient.connectedPM || rtConfig->watts.getSimulate() || spinBLEClient.connectedCD) {
             returnValue[2] = FitnessMachineControlPointResultCode::Success;  // 0x01;
             rtConfig->watts.setTarget(bytes_to_u16(rxValue[2], rxValue[1]));
             logBufLength += snprintf(logBuf + logBufLength, kLogBufCapacity - logBufLength, "-> ERG Mode Target: %d Current: %d Incline: %2f", rtConfig->watts.getTarget(),
-                                     rtConfig->watts.getValue(), rtConfig->getTargetIncline() / 100);
+                                     rtConfig->watts.getValue(), rtConfig->targetIncline.get() / 100);
             ftmsStatus            = {FitnessMachineStatus::TargetPowerChanged, (uint8_t)rxValue[1], (uint8_t)rxValue[2]};
             ftmsTrainingStatus[1] = FitnessMachineTrainingStatus::WattControl;  // 0x0C;
             // Adjust set point for powerCorrectionFactor and send to FTMS server (if connected)
-            int adjustedTarget         = rtConfig->watts.getTarget() / userConfig->getPowerCorrectionFactor();
+            int adjustedTarget         = rtConfig->watts.getTarget() / userConfig->powerCorrectionFactor.get();
             const uint8_t translated[] = {FitnessMachineControlPointProcedure::SetTargetPower, (uint8_t)(adjustedTarget % 256), (uint8_t)(adjustedTarget / 256)};
             spinBLEClient.FTMSControlPointWrite(translated, 3);
           } else {
@@ -238,7 +238,7 @@ void BLE_Fitness_Machine_Service::processFTMSWrite() {
         } break;
 
         case FitnessMachineControlPointProcedure::SetIndoorBikeSimulationParameters: {  // sim mode
-          rtConfig->setFTMSMode((uint8_t)rxValue[0]);
+          rtConfig->FTMSMode.set((uint8_t)rxValue[0]);
           returnValue[2] = FitnessMachineControlPointResultCode::Success;  // 0x01;
           signed char buf[2];
           // int16_t windSpeed        = (rxValue[2] << 8) + rxValue[1];
@@ -247,8 +247,8 @@ void BLE_Fitness_Machine_Service::processFTMSWrite() {
           // int8_t rollingResistance = rxValue[5];
           // int8_t windResistance    = rxValue[6];
           port = bytes_to_u16(buf[1], buf[0]);
-          rtConfig->setTargetIncline(port);
-          logBufLength += snprintf(logBuf + logBufLength, kLogBufCapacity - logBufLength, "-> Sim Mode Incline %2f", rtConfig->getTargetIncline() / 100);
+          rtConfig->targetIncline.set(port);
+          logBufLength += snprintf(logBuf + logBufLength, kLogBufCapacity - logBufLength, "-> Sim Mode Incline %2f", rtConfig->targetIncline.get() / 100);
           ftmsStatus = {FitnessMachineStatus::IndoorBikeSimulationParametersChanged,
                         (uint8_t)rxValue[1],
                         (uint8_t)rxValue[2],
@@ -262,7 +262,7 @@ void BLE_Fitness_Machine_Service::processFTMSWrite() {
         } break;
 
         case FitnessMachineControlPointProcedure::SpinDownControl: {
-          rtConfig->setFTMSMode((uint8_t)rxValue[0]);
+          rtConfig->FTMSMode.set((uint8_t)rxValue[0]);
 
           // The response parameter for a successful spin down command.
           // Values are Target Speed Low and Target Speed High in km/h with a resolution of 0.01.
@@ -282,7 +282,7 @@ void BLE_Fitness_Machine_Service::processFTMSWrite() {
         } break;
 
         case FitnessMachineControlPointProcedure::SetTargetedCadence: {
-          rtConfig->setFTMSMode((uint8_t)rxValue[0]);
+          rtConfig->FTMSMode.set((uint8_t)rxValue[0]);
           returnValue[2]    = FitnessMachineControlPointResultCode::Success;  // 0x01;
           int targetCadence = bytes_to_u16(rxValue[2], rxValue[1]);
           // rtConfig->setTargetCadence(targetCadence);

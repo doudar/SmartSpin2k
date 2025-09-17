@@ -62,10 +62,10 @@ static void notifyCB(NimBLERemoteCharacteristic *pBLERemoteCharacteristic, uint8
   if (pBLERemoteCharacteristic->getRemoteService()->getUUID() == HID_SERVICE_UUID) {
     Serial.print(pData[0], HEX);
     if (pData[0] == 0x04) {
-      rtConfig->setShifterPosition(rtConfig->getShifterPosition() + 1);
+      rtConfig->shifterPosition.set(rtConfig->shifterPosition.get() + 1);
     }
     if (pData[0] == 0x08) {
-      rtConfig->setShifterPosition(rtConfig->getShifterPosition() - 1);
+      rtConfig->shifterPosition.set(rtConfig->shifterPosition.get() - 1);
     }
   }
   // Enqueue sensor data
@@ -589,7 +589,7 @@ void ScanCallbacks::onScanEnd(const NimBLEScanResults &results, int reason) {
   String output;
   serializeJson(devices, output);
   SS2K_LOG(BLE_CLIENT_LOG_TAG, "Found Devices: %s", output.c_str());
-  userConfig->setFoundDevices(output);  // Save the updated JSON document
+  userConfig->foundDevices.set(output);  // Save the updated JSON document
 }
 
 // remove the last connected BLE Power Meter
@@ -633,7 +633,7 @@ void SpinBLEClient::resetDevices(NimBLEClient *pClient) {
 
 // Control a connected FTMS trainer. If no args are passed, treat it like an external stepper motor.
 void SpinBLEClient::FTMSControlPointWrite(const uint8_t *pData, int length) {
-  if (userConfig->getFTMSControlPointWrite()) {
+  if (userConfig->FTMSControlPointWrite.get()) {
     NimBLEClient *pClient = nullptr;
     uint8_t modData[7];
     for (int i = 0; i < length; i++) {
@@ -654,16 +654,16 @@ void SpinBLEClient::FTMSControlPointWrite(const uint8_t *pData, int length) {
         const int kLogBufCapacity = length + 40;
         char logBuf[kLogBufCapacity];
         if (modData[0] == FitnessMachineControlPointProcedure::SetIndoorBikeSimulationParameters) {  // use virtual Shifting
-          int incline = ss2k->getTargetPosition() / userConfig->getInclineMultiplier();
+          int incline = ss2k->getTargetPosition() / userConfig->inclineMultiplier.get();
           modData[3]  = (uint8_t)(incline & 0xff);
           modData[4]  = (uint8_t)(incline >> 8);
           writeCharacteristic->writeValue(modData, length);
           logBufLength = ss2k_log_hex_to_buffer(modData, length, logBuf, 0, kLogBufCapacity);
-          logBufLength += snprintf(logBuf + logBufLength, kLogBufCapacity - logBufLength, "-> Shifted Sim Data: %d", rtConfig->getShifterPosition());
+          logBufLength += snprintf(logBuf + logBufLength, kLogBufCapacity - logBufLength, "-> Shifted Sim Data: %d", rtConfig->shifterPosition.get());
         } else {
           writeCharacteristic->writeValue(modData, length);
           logBufLength = ss2k_log_hex_to_buffer(modData, length, logBuf, 0, kLogBufCapacity);
-          logBufLength += snprintf(logBuf + logBufLength, kLogBufCapacity - logBufLength, "-> Shifted ERG Data: %d", rtConfig->getShifterPosition());
+          logBufLength += snprintf(logBuf + logBufLength, kLogBufCapacity - logBufLength, "-> Shifted ERG Data: %d", rtConfig->shifterPosition.get());
         }
         SS2K_LOG(BLE_CLIENT_LOG_TAG, "%s", logBuf);
       }
@@ -696,8 +696,8 @@ void SpinBLEClient::postConnect() {
           byte message[] = {0xF0, 0xB0, 0x01, 0x01, 0xA2};
           writeCharacteristic->writeValue(message, 5);
           SS2K_LOG(BLE_CLIENT_LOG_TAG, "Activated Echelon callbacks.");
-          rtConfig->setMinResistance(MIN_ECHELON_RESISTANCE);
-          rtConfig->setMaxResistance(MAX_ECHELON_RESISTANCE);
+          rtConfig->minResistance.set(MIN_ECHELON_RESISTANCE);
+          rtConfig->maxResistance.set(MAX_ECHELON_RESISTANCE);
         }
 
         if ((_BLEd.charUUID == FITNESSMACHINEINDOORBIKEDATA_UUID)) {
@@ -733,7 +733,7 @@ void SpinBLEClient::postConnect() {
 
           // If we would like to control an external FTMS trainer. With most spin bikes we would want this off, but it's useful if you want to use the SmartSpin2k as an
           // appliance.
-          if (userConfig->getFTMSControlPointWrite()) {
+          if (userConfig->FTMSControlPointWrite.get()) {
             writeCharacteristic->writeValue(FitnessMachineControlPointProcedure::RequestControl, 1);
             delay(BLE_NOTIFY_DELAY);
             SS2K_LOG(BLE_CLIENT_LOG_TAG, "Activated FTMS Training.");

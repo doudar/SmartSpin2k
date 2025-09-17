@@ -30,7 +30,7 @@ void BLE_SB20_Service::notify() {
   }
 
   // Get current values and populate data struct
-  int shifterPosition = rtConfig->getShifterPosition();
+  int shifterPosition = rtConfig->shifterPosition.get();
   shifterPosition     = constrain(shifterPosition, 1, 22);  // Clamp to 1-22
 
   currentData.gear      = shifterPosition;

@@ -99,8 +99,8 @@ double SpinBLEServer::calculateSpeed() {
 void SpinBLEServer::updateWheelAndCrankRev() {
   float wheelSize     = 2.127;  // 700cX28 circumference, typical in meters
   float wheelSpeedMps = 0.0;
-  if (rtConfig->getSimulatedSpeed() > 5) {
-    wheelSpeedMps = rtConfig->getSimulatedSpeed() / 3.6;
+  if (rtConfig->simulatedSpeed.get() > 5) {
+    wheelSpeedMps = rtConfig->simulatedSpeed.get() / 3.6;
   } else {
     wheelSpeedMps = this->calculateSpeed() / 3.6;  // covert km/h to m/s
   }
