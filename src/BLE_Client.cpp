@@ -496,7 +496,7 @@ void ScanCallbacks::onResult(const NimBLEAdvertisedDevice *advertisedDevice) {
         if ((spinBLEClient.myBLEDevices[i].advertisedDevice == nullptr) || (advertisedDevice->getAddress() == spinBLEClient.myBLEDevices[i].peerAddress)) {
           spinBLEClient.myBLEDevices[i].set(advertisedDevice, BLE_HS_CONN_HANDLE_NONE, primaryServiceUUID);
           spinBLEClient.myBLEDevices[i].doConnect = true;
-          SS2K_LOG(BLE_CLIENT_LOG_TAG, "doConnect set on device: %d", i);
+          SS2K_LOG(BLE_CLIENT_LOG_TAG, "%s assigned slot: %d", aDevName.c_str(), i);
           return;
         }
         SS2K_LOG(BLE_CLIENT_LOG_TAG, "Checking Slot %d", i);
