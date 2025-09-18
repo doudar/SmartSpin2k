@@ -19,6 +19,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Added
 
 ### Changed
+- Only check battery level on initial connection. This is to fix Tempo power meter drops. 
+- Moved battery information to the SpinBLEAdvertisedDevice class.
+- When adding to SpinBLEAdvertisedDevice, check adevname as well as address to prevent duplicates.
+- Stopped reusing BLE clients for better connection reliability.  
 
 ### Hardware
 
