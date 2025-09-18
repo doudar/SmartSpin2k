@@ -800,7 +800,8 @@ void SS2K::rxSerial(void) {
         for (int j = i; j < auxSerialBuffer.len; j++) {
           newBuf[j - i] = auxSerialBuffer.data[j];
         }
-        collectAndSet(PELOTON_DATA_UUID, PELOTON_DATA_UUID, PELOTON_ADDRESS, newBuf, newLen);
+        std::string uniqueName = "Peloton";
+        collectAndSet(PELOTON_DATA_UUID, PELOTON_DATA_UUID, uniqueName, newBuf, newLen);
       }
     }
   }

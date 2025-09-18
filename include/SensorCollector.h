@@ -11,4 +11,4 @@
 #pragma once
 
 
-void collectAndSet(NimBLEUUID charUUID, NimBLEUUID serviceUUID, NimBLEAddress address, uint8_t *pData, size_t length);
+void collectAndSet(NimBLEUUID charUUID, NimBLEUUID serviceUUID, std::string& uniqueName, uint8_t *pData, size_t length);

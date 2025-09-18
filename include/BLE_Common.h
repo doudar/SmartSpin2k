@@ -153,7 +153,7 @@ class SpinBLEAdvertisedDevice {
   const NimBLEAdvertisedDevice* advertisedDevice = nullptr;
   NimBLEAddress peerAddress;
 
-  char uniqueName[30] = "";  // Stable identifier using adevName2UniqueName()
+  std::string uniqueName = "";  // Stable identifier using adevName2UniqueName()
 
   int connectedClientID = BLE_HS_CONN_HANDLE_NONE;
   BLEUUID serviceUUID   = (uint16_t)0x0000;

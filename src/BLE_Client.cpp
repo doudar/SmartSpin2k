@@ -177,17 +177,17 @@ void bleClientTask(void *pvParameters) {
         // stop in process scans
         NimBLEScan *pBLEScan = NimBLEDevice::getScan();
         if (pBLEScan->isScanning()) {
-          SS2K_LOG(BLE_CLIENT_LOG_TAG, "Stopping scan before connecting to device on slot %d ...", x);
+          SS2K_LOG(BLE_CLIENT_LOG_TAG, "Stopping scan before connecting %s on slot %d ...", spinBLEClient.myBLEDevices[x].uniqueName.c_str(), x);
           while (pBLEScan->isScanning()) {
             pBLEScan->stop();
             delay(100);
           }
         }
-        SS2K_LOG(BLE_CLIENT_LOG_TAG, "Connecting device on slot %d ...", x);
+        SS2K_LOG(BLE_CLIENT_LOG_TAG, "Connecting %s on slot %d ...", spinBLEClient.myBLEDevices[x].uniqueName.c_str(), x);
         if (spinBLEClient.connectToServer()) {
-          SS2K_LOG(BLE_CLIENT_LOG_TAG, "We are now connected to the BLE Server.");
+          SS2K_LOG(BLE_CLIENT_LOG_TAG, "We are now connected to %s", spinBLEClient.myBLEDevices[x].uniqueName.c_str());
         } else {
-          SS2K_LOG(BLE_CLIENT_LOG_TAG, "slot %d connection failed", x);
+          SS2K_LOG(BLE_CLIENT_LOG_TAG, "%s connection failed", spinBLEClient.myBLEDevices[x].uniqueName.c_str());
         }
       }
     }
@@ -272,9 +272,12 @@ bool SpinBLEClient::connectToServer() {
     /** Created a client but failed to connect, don't need to keep it as it has no data */
     spinBLEClient.myBLEDevices[device_number].reset();
     spinBLEClient.resetDevices(pClient);
-    pClient->deleteServices();
-    NimBLEDevice::getScan()->erase(pClient->getPeerAddress());
-    NimBLEDevice::deleteClient(pClient);
+    // loop through all clients and delete any stale clients
+    auto connectedClients = NimBLEDevice::getConnectedClients();
+    for (auto client : connectedClients) {
+      SS2K_LOG(BLE_CLIENT_LOG_TAG, " - Deleting stale client %s", client->getPeerAddress().toString().c_str());
+      client->disconnect();
+    }
     return false;
   };
   // Always create a brand-new client for each connection attempt.
@@ -286,6 +289,7 @@ bool SpinBLEClient::connectToServer() {
   pClient = NimBLEDevice::createClient();
   SS2K_LOG(BLE_CLIENT_LOG_TAG, " - Created new client");
   pClient->setClientCallbacks(&myClientCallback, false);
+  pClient->setSelfDelete(true, true);
   // Initial connection parameters: 15ms interval, 0 latency, 1000ms timeout (kept from previous logic)
   pClient->setConnectionParams(connectionParams[0], connectionParams[1], connectionParams[2], 1000);
   pClient->setConnectTimeout(5000);  // 5 seconds
@@ -352,17 +356,15 @@ void MyClientCallback::onDisconnect(NimBLEClient *pClient, int reason) {
         if (!spinBLEClient.intentionalDisconnect) {
           spinBLEClient.myBLEDevices[i].doConnect = true;
           spinBLEClient.myBLEDevices[i].reset(false);
+          SS2K_LOG(BLE_CLIENT_LOG_TAG, "Reconnecting %s", spinBLEClient.myBLEDevices[i].uniqueName.c_str());
         } else {
           spinBLEClient.intentionalDisconnect--;
           spinBLEClient.myBLEDevices[i].reset();
+          SS2K_LOG(BLE_CLIENT_LOG_TAG, "Not Reconnecting %s", spinBLEClient.myBLEDevices[i].uniqueName.c_str());
         }
       }
     }
-    // Always fully delete the underlying NimBLE client to force a clean reconnect path
-    // (fresh client will be created on next connect attempt.)
-    pClient->deleteServices();
     NimBLEDevice::getScan()->erase(addr); // remove cached advertisement data for this address
-    NimBLEDevice::deleteClient(pClient);
     return;
   }
 }
@@ -459,9 +461,9 @@ void ScanCallbacks::onResult(const NimBLEAdvertisedDevice *advertisedDevice) {
         
         if (!slotAvailable) {
           // Check if this is the same device using stable identifier
-          if (strlen(spinBLEClient.myBLEDevices[i].uniqueName) > 0) {
+          if (!spinBLEClient.myBLEDevices[i].uniqueName.empty()) {
             // Use unique name comparison for stable identification
-            deviceMatches = (aDevName == String(spinBLEClient.myBLEDevices[i].uniqueName));
+            deviceMatches = (aDevName == String(spinBLEClient.myBLEDevices[i].uniqueName.c_str()));
           } else {
             // Fall back to address comparison for backward compatibility
             deviceMatches = (advertisedDevice->getAddress() == spinBLEClient.myBLEDevices[i].peerAddress);
@@ -474,7 +476,7 @@ void ScanCallbacks::onResult(const NimBLEAdvertisedDevice *advertisedDevice) {
           SS2K_LOG(BLE_CLIENT_LOG_TAG, "%s assigned slot: %d", aDevName.c_str(), i);
           return;
         }
-        SS2K_LOG(BLE_CLIENT_LOG_TAG, "Checking Slot %d", i);
+        SS2K_LOG(BLE_CLIENT_LOG_TAG, "Slot %d contains %s", i, spinBLEClient.myBLEDevices[i].uniqueName.c_str());
       }
     } else {
       String servicesStr = "unsupported services: ";
@@ -870,9 +872,9 @@ void SpinBLEClient::checkBLEReconnect() {
 
 void SpinBLEClient::reconnectAllDevices() {
   for (auto i : spinBLEClient.myBLEDevices) {
-    if (NimBLEDevice::getClientByPeerAddress(i.peerAddress)) {
-      if (NimBLEDevice::getClientByPeerAddress(i.peerAddress)->isConnected()) {
-        NimBLEDevice::getClientByPeerAddress(i.peerAddress)->disconnect();
+    if (NimBLEDevice::getClientByHandle(i.connectedClientID)) {
+      if (NimBLEDevice::getClientByHandle(i.connectedClientID)->isConnected()) {
+        NimBLEDevice::getClientByHandle(i.connectedClientID)->disconnect();
         i.reset();
         spinBLEClient.intentionalDisconnect++;
       }
@@ -979,8 +981,7 @@ void SpinBLEAdvertisedDevice::set(const NimBLEAdvertisedDevice *device, int id, 
   this->advertisedDevice  = const_cast<const NimBLEAdvertisedDevice *>(device);
   this->peerAddress       = device->getAddress();
   // Set the unique name for stable device identification
-  strncpy(this->uniqueName, adevName.c_str(), sizeof(this->uniqueName) - 1);
-  this->uniqueName[sizeof(this->uniqueName) - 1] = '\0';  // Ensure null termination
+  this->uniqueName = adevName.c_str();
   this->connectedClientID = id;
   this->serviceUUID       = BLEUUID(inServiceUUID);
   this->charUUID          = BLEUUID(inCharUUID);
@@ -1045,7 +1046,7 @@ void SpinBLEAdvertisedDevice::clearState(bool resetAdvertisedDevice) {
   if (resetAdvertisedDevice) {
     advertisedDevice = nullptr;
     peerAddress = NimBLEAddress(); // zero / cleared
-    this->uniqueName[0]     = '\0';  // Clear the unique name
+    this->uniqueName.clear();  // Clear the unique name
   }
   connectedClientID = BLE_HS_CONN_HANDLE_NONE;
   serviceUUID       = (uint16_t)0x0000;
@@ -1064,7 +1065,7 @@ void SpinBLEAdvertisedDevice::clearState(bool resetAdvertisedDevice) {
 }
 
 void SpinBLEAdvertisedDevice::reset(bool resetAdvertisedDevice) {
-  SS2K_LOG(BLE_CLIENT_LOG_TAG, "Resetting Device: %d", this->connectedClientID);
+  SS2K_LOG(BLE_CLIENT_LOG_TAG, "Resetting Device: %s", this->uniqueName.c_str());
 
   // Adjust global flags BEFORE clearing local flags.
   if (isHRM) spinBLEClient.connectedHRM = false;

@@ -14,7 +14,7 @@
 
 SensorDataFactory sensorDataFactory;
 
-void collectAndSet(NimBLEUUID charUUID, NimBLEUUID serviceUUID, NimBLEAddress address, uint8_t *pData, size_t length) {
+void collectAndSet(NimBLEUUID charUUID, NimBLEUUID serviceUUID, std::string& uniqueName, uint8_t *pData, size_t length) {
   const int kLogBufMaxLength = 250;
   char logBuf[kLogBufMaxLength];
   SS2K_LOGD(BLE_COMMON_LOG_TAG, "Data length: %d", length);
@@ -22,7 +22,7 @@ void collectAndSet(NimBLEUUID charUUID, NimBLEUUID serviceUUID, NimBLEAddress ad
 
   logBufLength += snprintf(logBuf + logBufLength, kLogBufMaxLength - logBufLength, "<- %.8s | %.8s", serviceUUID.toString().c_str(), charUUID.toString().c_str());
 
-  std::shared_ptr<SensorData> sensorData = sensorDataFactory.getSensorData(charUUID, (uint64_t)address, pData, length);
+  std::shared_ptr<SensorData> sensorData = sensorDataFactory.getSensorData(charUUID, uniqueName, pData, length);
 
   logBufLength += snprintf(logBuf + logBufLength, kLogBufMaxLength - logBufLength, " | %s[", sensorData->getId().c_str());
   if (sensorData->hasHeartRate() && !rtConfig->hr.getSimulate()) {
