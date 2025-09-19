@@ -335,7 +335,6 @@ bool SpinBLEClient::connectToServer() {
 void MyClientCallback::onConnect(NimBLEClient *pClient) { SS2K_LOG(BLE_CLIENT_LOG_TAG, "Connected, %s", pClient->getPeerAddress().toString().c_str()); }
 
 void MyClientCallback::onDisconnect(NimBLEClient *pClient, int reason) {
-  if (!pClient->isConnected() && !ss2k->isUpdating) {
     NimBLEAddress addr = pClient->getPeerAddress();
     SS2K_LOG(BLE_CLIENT_LOG_TAG, "Client %s Disconnected, reason = %d", addr.toString().c_str(), reason);
     for (size_t i = 0; i < NUM_BLE_DEVICES; i++) {
@@ -366,7 +365,6 @@ void MyClientCallback::onDisconnect(NimBLEClient *pClient, int reason) {
     }
     NimBLEDevice::getScan()->erase(addr); // remove cached advertisement data for this address
     return;
-  }
 }
 
 /**
