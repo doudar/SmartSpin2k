@@ -8,6 +8,7 @@
 #include "Main.h"
 #include "SS2KLog.h"
 #include "Constants.h"
+#include "BLE_Common.h"
 
 #include <sensors/SensorData.h>
 #include <sensors/SensorDataFactory.h>
@@ -15,6 +16,14 @@
 SensorDataFactory sensorDataFactory;
 
 void collectAndSet(NimBLEUUID charUUID, NimBLEUUID serviceUUID, std::string& uniqueName, uint8_t *pData, size_t length) {
+  // Update the timestamp for disconnect detection
+  for (size_t i = 0; i < NUM_BLE_DEVICES; i++) {
+    if (spinBLEClient.myBLEDevices[i].uniqueName == uniqueName) {
+      spinBLEClient.myBLEDevices[i].lastDataUpdateTime = millis();
+      break;
+    }
+  }
+  
   const int kLogBufMaxLength = 250;
   char logBuf[kLogBufMaxLength];
   SS2K_LOGD(BLE_COMMON_LOG_TAG, "Data length: %d", length);

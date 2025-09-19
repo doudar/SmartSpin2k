@@ -212,6 +212,11 @@ const char* const DEFAULT_PASSWORD = "password";
 // loop speed for the SmartSpin2k BLE Client reconnect
 #define BLE_CLIENT_DELAY 101
 
+// BLE Client disconnect detection timeout in milliseconds
+// If no data is received from a connected device for this duration, 
+// onDisconnect will be invoked automatically
+#define BLE_CLIENT_DISCONNECT_TIMEOUT 2000
+
 // loop speed of the Dircon Manager
 #define DIRCON_MANAGER_DELAY 20
 
