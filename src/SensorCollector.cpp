@@ -84,7 +84,7 @@ void collectAndSet(NimBLEUUID charUUID, NimBLEUUID serviceUUID, std::string& uni
   }
 
   if (sensorData->hasResistance()) {
-    if ((rtConfig->getMaxResistance() == MAX_PELOTON_RESISTANCE) && (charUUID != PELOTON_DATA_UUID)) {
+    if ((ss2k->pelotonIsConnected) && (charUUID != PELOTON_DATA_UUID)) {
       // Peloton connected but using BLE Power Meter. So skip resistance for UUID's that aren't Peloton.
     } else {
       int resistance = sensorData->getResistance();

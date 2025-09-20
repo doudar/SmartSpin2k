@@ -776,15 +776,16 @@ void SS2K::txSerial() {  // Serial.printf(" Before TX ");
     txCheck++;
   }
 }
-
-void SS2K::pelotonConnected() {
+bool SS2K::pelotonConnected() {
   txCheck = TX_CHECK_INTERVAL;
   if (rtConfig->resistance.getValue() > 0) {
     rtConfig->setMinResistance(MIN_PELOTON_RESISTANCE);
     rtConfig->setMaxResistance(MAX_PELOTON_RESISTANCE);
+    return true;
   } else {
     rtConfig->setMinResistance(-DEFAULT_RESISTANCE_RANGE);
     rtConfig->setMaxResistance(DEFAULT_RESISTANCE_RANGE);
+    return false;
   }
 }
 
