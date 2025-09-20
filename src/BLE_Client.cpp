@@ -1050,7 +1050,6 @@ void SpinBLEAdvertisedDevice::clearState(bool resetAdvertisedDevice) {
   doConnect         = false;
   isPostConnected   = false;
   batt              = Measurement();
-  lastDataUpdateTime = 0;  // Reset disconnect detection timestamp
   if (dataBufferQueue) {
     xQueueReset(dataBufferQueue);  // safe to centralize
   }

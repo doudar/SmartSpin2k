@@ -166,9 +166,6 @@ class SpinBLEAdvertisedDevice {
   bool isRemote        = false;
   bool doConnect       = false;
   bool isPostConnected = false;
-  
-  // Timestamp tracking for disconnect detection
-  unsigned long lastDataUpdateTime = 0;
 
   void set(const NimBLEAdvertisedDevice* device, int id = BLE_HS_CONN_HANDLE_NONE, BLEUUID inServiceUUID = (uint16_t)0x0000, BLEUUID inCharUUID = (uint16_t)0x0000);
   void reset(bool resetAdvertisedDevice = true);

@@ -62,11 +62,6 @@ void ErgMode::runERG() {
         ergMode.computeErg();
       }
 
-      // resistance mode
-      if ((rtConfig->getFTMSMode() == FitnessMachineControlPointProcedure::SetTargetResistanceLevel) && (rtConfig->getMaxResistance() != DEFAULT_RESISTANCE_RANGE)) {
-        ergMode.computeResistance();
-      }
-
       // Set Min and Max Stepper positions
       if (loopCounter > 50) {
         loopCounter = 0;
@@ -114,24 +109,6 @@ void ErgMode::runERG() {
         previousPower = (rtConfig->watts.getValue() + previousPower) / 2;
     }
   }
-}
-
-// compute position for resistance control mode
-void ErgMode::computeResistance() {
-  static Measurement oldResistance;
-
-  if (rtConfig->resistance.getTimestamp() == oldResistance.getTimestamp()) {
-    SS2K_LOG(ERG_MODE_LOG_TAG, "Resistance previously processed.");
-    return;
-  }
-
-  int actualDelta = rtConfig->resistance.getTarget() - rtConfig->resistance.getValue();
-  if (actualDelta != 0) {
-    rtConfig->setTargetIncline(rtConfig->getTargetIncline() + (TABLE_DIVISOR * actualDelta));
-  } else {
-    rtConfig->setTargetIncline(ss2k->getCurrentPosition());
-  }
-  oldResistance = rtConfig->resistance;
 }
 
 // as a note, Trainer Road sends 50w target whenever the app is connected.

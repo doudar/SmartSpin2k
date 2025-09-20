@@ -436,7 +436,8 @@ void SS2K::moveStepper() {
 #endif
         ss2k->targetPosition = rtConfig->getTargetIncline();
       } else if (rtConfig->getFTMSMode() == FitnessMachineControlPointProcedure::SetTargetResistanceLevel) {
-        rtConfig->setTargetIncline(ss2k->currentPosition + ((rtConfig->resistance.getTarget() - rtConfig->resistance.getValue()) * 20));
+        int actualDelta = rtConfig->resistance.getTarget() - rtConfig->resistance.getValue();
+        rtConfig->setTargetIncline(ss2k->getCurrentPosition() + ((userConfig->getERGSensitivity() * 3) * actualDelta));
         ss2k->targetPosition = rtConfig->getTargetIncline();
       } else {
         // Simulation Mode
