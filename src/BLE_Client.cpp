@@ -271,13 +271,6 @@ bool SpinBLEClient::connectToServer() {
     SS2K_LOG(BLE_CLIENT_LOG_TAG, " - Failed to connect client");
     /** Created a client but failed to connect, don't need to keep it as it has no data */
     spinBLEClient.myBLEDevices[device_number].reset();
-    spinBLEClient.resetDevices(pClient);
-    // loop through all clients and delete any stale clients
-    auto connectedClients = NimBLEDevice::getConnectedClients();
-    for (auto client : connectedClients) {
-      SS2K_LOG(BLE_CLIENT_LOG_TAG, " - Deleting stale client %s", client->getPeerAddress().toString().c_str());
-      client->disconnect();
-    }
     return false;
   };
   // Always create a brand-new client for each connection attempt.
@@ -292,8 +285,8 @@ bool SpinBLEClient::connectToServer() {
   pClient->setSelfDelete(true, true);
   // Initial connection parameters: 15ms interval, 0 latency, 1000ms timeout (kept from previous logic)
   pClient->setConnectionParams(connectionParams[0], connectionParams[1], connectionParams[2], 1000);
-  pClient->setConnectTimeout(5000);  // 5 seconds
-  if (!pClient->connect(myDevice)) {
+  pClient->setConnectTimeout(10000);  // 10 seconds
+  if (!pClient->connect(myDevice, true, false, false)) {
     return handleFailedClientConnect();
   }
 
