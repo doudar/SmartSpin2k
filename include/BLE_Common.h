@@ -29,7 +29,7 @@
 // maxInterval – [in] The maximum connection interval in 1.25ms units.
 // latency – [in] The number of packets allowed to skip (extends max interval).
 // timeout – [in] The timeout time in 10ms units before disconnecting.
-const uint16_t connectionParams[] = {24, 168, 1, 200};
+const uint16_t connectionParams[] = {24, 48, 0, 200};
 
 // Vector of supported BLE services and their corresponding characteristic UUIDs
 struct BLEServiceInfo {
@@ -183,8 +183,7 @@ class SpinBLEClient {
   boolean connectedCT            = false;
   boolean connectedSpeed         = false;
   boolean connectedRemote        = false;
-  boolean doScan                 = false;
-  int intentionalDisconnect      = 0;
+  boolean doScan                 = true; //Set to true so there's an initial scan on startup
   long int cscCumulativeCrankRev = 0;
   double cscLastCrankEvtTime     = 0.0;
   long int cscCumulativeWheelRev = 0;
@@ -197,7 +196,6 @@ class SpinBLEClient {
   SpinBLEAdvertisedDevice myBLEDevices[NUM_BLE_DEVICES];
 
   void start();
-  // void serverScan(bool connectRequest);
   bool connectToServer();
   // Check for duplicate services of BLEClient and remove the previously
   // connected one.

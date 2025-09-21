@@ -57,7 +57,6 @@ WebSocketAppender webSocketAppender;
 
 void SS2K::startTasks() {
   SS2K_LOG(MAIN_LOG_TAG, "Start BLE + ERG Tasks");
-  spinBLEClient.intentionalDisconnect = 0;
   setupBLE();
 }
 

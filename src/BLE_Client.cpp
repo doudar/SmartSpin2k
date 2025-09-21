@@ -92,19 +92,39 @@ bool subscribeToAllNotifications(NimBLEClient *pClient) {
     return false;
   }  // The Issue with Echelon is that there are multiple services
   for (const auto &service : BLEServices::SUPPORTED_SERVICES) {
+    // Re-check connection health before each service to prevent racing with a disconnect
+    if (!pClient->isConnected()) {
+      SS2K_LOGW(BLE_CLIENT_LOG_TAG, "Aborting subscription loop: client disconnected mid-iteration");
+      break;
+    }
     NimBLERemoteService *pSvc = pClient->getService(service.serviceUUID);
     if (pSvc) {
       SS2K_LOG(BLE_CLIENT_LOG_TAG, "Found %s", service.name.c_str());
-      for (const auto &pChr : pSvc->getCharacteristics(true)) {
-        if (pChr) {
-          SS2K_LOG(BLE_CLIENT_LOG_TAG, "Found %s, %s", service.serviceUUID.toString().c_str(), pChr->getUUID().toString().c_str());
-          if (pChr->canNotify() || pChr->canIndicate()) {
-            if (pChr->canNotify() ? pChr->subscribe(true, notifyCB) : pChr->subscribe(false, notifyCB)) {
-              SS2K_LOG(BLE_CLIENT_LOG_TAG, "Subscribed to %s %s handle: %d", service.name.c_str(), pChr->getUUID().toString().c_str(), pChr->getHandle());
-              isSubscribed = true;
-            } else {
-              SS2K_LOG(BLE_CLIENT_LOG_TAG, "Failed to subscribe to %s %s", service.name.c_str(), pChr->getUUID().toString().c_str());
-            }
+      auto chars = pSvc->getCharacteristics(true);
+      for (auto *pChr : chars) {
+        if (!pChr) {
+          continue;
+        }
+        // Defensive: Ensure characteristic still belongs to this service (avoid stale pointer after service refresh)
+        if (pChr->getRemoteService() != pSvc) {
+          SS2K_LOGW(BLE_CLIENT_LOG_TAG, "Characteristic parent mismatch while subscribing %s", pChr->getUUID().toString().c_str());
+          continue;
+        }
+        if (!pClient->isConnected()) {
+          SS2K_LOGW(BLE_CLIENT_LOG_TAG, "Stopping subscription: client disconnected before subscribing to %s", pChr->getUUID().toString().c_str());
+          break;
+        }
+        SS2K_LOG(BLE_CLIENT_LOG_TAG, "Found %s, %s", service.serviceUUID.toString().c_str(), pChr->getUUID().toString().c_str());
+        if (pChr->canNotify() || pChr->canIndicate()) {
+          bool wantNotify = pChr->canNotify();
+          // Wrap subscribe in a try/catch-equivalent pattern: NimBLE doesn't throw, but we guard return status
+          if (wantNotify ? pChr->subscribe(true, notifyCB) : pChr->subscribe(false, notifyCB)) {
+            SS2K_LOG(BLE_CLIENT_LOG_TAG, "Subscribed to %s %s handle: %d", service.name.c_str(), pChr->getUUID().toString().c_str(), pChr->getHandle());
+            isSubscribed = true;
+          } else {
+            // Additional debug: check CCCD descriptor presence which subscribe() internally uses
+            NimBLERemoteDescriptor *cccd = pChr->getDescriptor(NimBLEUUID((uint16_t)0x2902));
+            SS2K_LOGW(BLE_CLIENT_LOG_TAG, "Failed to subscribe to %s %s (handle %d, hasCCCD=%s)", service.name.c_str(), pChr->getUUID().toString().c_str(), pChr->getHandle(), cccd ? "Y" : "N");
           }
         }
       }
@@ -260,7 +280,6 @@ bool SpinBLEClient::connectToServer() {
   } else {
     SS2K_LOG(BLE_CLIENT_LOG_TAG, "Device has no Service UUID");
     spinBLEClient.myBLEDevices[device_number].reset();
-    // spinBLEClient.serverScan(true);
     return false;
   }
 
@@ -344,19 +363,9 @@ void MyClientCallback::onDisconnect(NimBLEClient *pClient, int reason) {
         if ((spinBLEClient.myBLEDevices[i].charUUID == HID_REPORT_DATA_UUID)) {
           SS2K_LOG(BLE_CLIENT_LOG_TAG, "Deregistered Remote on Disconnect");
         }
-        // did another task disconnect this device?
-        if (!spinBLEClient.intentionalDisconnect) {
-          spinBLEClient.myBLEDevices[i].doConnect = true;
-          spinBLEClient.myBLEDevices[i].reset(false);
-          SS2K_LOG(BLE_CLIENT_LOG_TAG, "Reconnecting %s", spinBLEClient.myBLEDevices[i].uniqueName.c_str());
-        } else {
-          spinBLEClient.intentionalDisconnect--;
-          spinBLEClient.myBLEDevices[i].reset();
-          SS2K_LOG(BLE_CLIENT_LOG_TAG, "Not Reconnecting %s", spinBLEClient.myBLEDevices[i].uniqueName.c_str());
-        }
+        spinBLEClient.myBLEDevices[i].reset(true); // fully clear
       }
     }
-    NimBLEDevice::getScan()->erase(addr); // remove cached advertisement data for this address
     return;
 }
 
@@ -580,8 +589,7 @@ void SpinBLEClient::removeDuplicates(NimBLEClient *pClient) {
           if (BLEDevice::getClientByPeerAddress(oldBLEd.peerAddress)->isConnected()) {
             SS2K_LOG(BLE_CLIENT_LOG_TAG, "%s Detected as a duplicate.  Disconnecting: %s", tBLEd.peerAddress.toString().c_str(), oldBLEd.peerAddress.toString().c_str());
             NimBLEDevice::deleteClient(BLEDevice::getClientByPeerAddress(oldBLEd.peerAddress));
-            oldBLEd.reset();
-            spinBLEClient.intentionalDisconnect++;
+            oldBLEd.reset(true);
             return;
           }
         }
@@ -643,7 +651,14 @@ void SpinBLEClient::postConnect() {
   for (auto &_BLEd : spinBLEClient.myBLEDevices) {
     // Check that the device has been assigned and it hasn't been post connected.
     if ((_BLEd.connectedClientID != BLE_HS_CONN_HANDLE_NONE) && !_BLEd.isPostConnected) {
-      String adevName = this->adevName2UniqueName(_BLEd.advertisedDevice);
+      // Guard against stale / cleared advertisedDevice pointers (can happen after disconnect + erase())
+      if (_BLEd.advertisedDevice == nullptr) {
+        SS2K_LOGW(BLE_CLIENT_LOG_TAG, "Skipping postConnect: null advertisedDevice (ConnID %d)", _BLEd.connectedClientID);
+        continue;
+      }
+      // Prefer the stored uniqueName (captured at discovery) to avoid dereferencing the NimBLEAdvertisedDevice
+      // unnecessarily (haveName()->findAdvField() has caused crashes when backing storage was freed).
+      String adevName = _BLEd.uniqueName.empty() ? this->adevName2UniqueName(_BLEd.advertisedDevice) : String(_BLEd.uniqueName.c_str());
       SS2K_LOG(BLE_CLIENT_LOG_TAG, "Post connecting: %s , ConnID %d, PrimaryChar %s", adevName.c_str(), _BLEd.connectedClientID, _BLEd.charUUID.toString().c_str());
       NimBLEClient *pClient = NimBLEDevice::getClientByPeerAddress(_BLEd.peerAddress);
       if (pClient) {
@@ -866,8 +881,7 @@ void SpinBLEClient::reconnectAllDevices() {
     if (NimBLEDevice::getClientByHandle(i.connectedClientID)) {
       if (NimBLEDevice::getClientByHandle(i.connectedClientID)->isConnected()) {
         NimBLEDevice::getClientByHandle(i.connectedClientID)->disconnect();
-        i.reset();
-        spinBLEClient.intentionalDisconnect++;
+        i.reset(true);
       }
     }
   }
@@ -922,8 +936,19 @@ bool SpinBLEClient::isRandomizedAddress(const NimBLEAdvertisedDevice *inDev) {
 // - Public or static-random addresses: preserve old behavior (append last 2 hex of address)
 // - Private random addresses: try manufacturer data last byte as suffix; else just the base name
 String SpinBLEClient::adevName2UniqueName(const NimBLEAdvertisedDevice *inDev) {
-  if (!inDev) {
+  if (!inDev || !inDev->getAddress()) {
     return "null";
+  }
+  
+
+  // Defensive: Some crashes have been traced to NimBLEAdvertisedDevice::haveName()
+  // calling findAdvField() after the underlying advertisement data has been
+  // invalidated (e.g. after a disconnect + erase()). We attempt to detect an
+  // obviously invalid state: zeroed address and no services.
+  // (Address string of all zeros can indicate cleared object.)
+  const std::string addrCheck = inDev->getAddress().toString();
+  if (addrCheck == "00:00:00:00:00:00") {
+    return String("unknown 00");
   }
 
   if (inDev->haveName()) {
@@ -1002,7 +1027,7 @@ void SpinBLEAdvertisedDevice::set(const NimBLEAdvertisedDevice *device, int id, 
           this->isCSC               = true;
           spinBLEClient.connectedCD = true;
           SS2K_LOG(BLE_CLIENT_LOG_TAG, "Registered CSC on Connect");
-        } else if (serviceUUID == CYCLINGPOWERSERVICE_UUID || serviceUUID == FITNESSMACHINESERVICE_UUID || serviceUUID == FLYWHEEL_UART_SERVICE_UUID ||
+        } else if (serviceUUID == CYCLINGPOWERSERVICE_UUID || serviceUUID == FITNESSMACHINESERVICE_UUID || (serviceUUID == FLYWHEEL_UART_SERVICE_UUID && this->uniqueName.contains("Flywheel")) ||
                    serviceUUID == ECHELON_DEVICE_UUID || serviceUUID == PELOTON_DATA_UUID) {
           this->isPM                = true;
           spinBLEClient.connectedPM = true;
