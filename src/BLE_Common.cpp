@@ -94,7 +94,7 @@ void BLECommunications() {
                 for (size_t i = 0; i < length; i++) {
                   pData[i] = incomingNotifyData.data[i];
                 }
-                collectAndSet(incomingNotifyData.charUUID, _BLEd.uniqueName, _BLEd.uniqueName, pData, length);
+                collectAndSet(incomingNotifyData.charUUID, incomingNotifyData.serviceUUID, _BLEd.uniqueName, pData, length);
               }
             } else if (!pClient->isConnected()) {  // This is a workaround for a bug in NimBLE where onDisconnect() is not called automatically.
               MyClientCallback workaroundCallback;
