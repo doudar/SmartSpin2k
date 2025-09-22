@@ -210,11 +210,7 @@ void BLE_Fitness_Machine_Service::processFTMSWrite() {
                 maxPos = rtConfig->getMaxStep();
               }
               
-              // // Calculate target position from resistance percentage
-              // if (maxPos > minPos) {
-              //   int32_t targetPosition = minPos + ((requestedResistance * (maxPos - minPos)) / 100);
-              //   ss2k->setTargetPosition(targetPosition);
-              // }
+              // TODO: Implement calculation of target position from resistance percentage if resistance reporting is unavailable.
             }
             
             returnValue[2] = FitnessMachineControlPointResultCode::Success;
