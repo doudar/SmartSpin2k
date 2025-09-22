@@ -57,7 +57,6 @@ WebSocketAppender webSocketAppender;
 
 void SS2K::startTasks() {
   SS2K_LOG(MAIN_LOG_TAG, "Start BLE + ERG Tasks");
-  spinBLEClient.intentionalDisconnect = 0;
   setupBLE();
 }
 
@@ -291,11 +290,10 @@ void SS2K::maintenanceLoop(void *pvParameters) {
     // Things to do every 6 seconds
     if ((millis() - intervalTimer2) > 6007) {
       // reboot every half hour if not in use.
-      static int _oldHR               = 0;
-      static int _oldWatts            = 0;
-      static double _oldTargetIncline = 0;
-      if (_oldHR == rtConfig->hr.getValue() && _oldWatts == rtConfig->watts.getValue() && _oldTargetIncline == rtConfig->getTargetIncline() &&
-          NimBLEDevice::getServer()->getConnectedCount() == 0) {
+      static int _oldHR              = 0;
+      static int _oldWatts           = 0;
+      static float _oldTargetIncline = 0.0f;
+      if (_oldHR == rtConfig->hr.getValue() && _oldWatts == rtConfig->watts.getValue() && _oldTargetIncline == rtConfig->getTargetIncline()) {
         // Inactivity detected
         if (((millis() - rebootTimer) > 1800000)) {
           // Timer expired
@@ -436,7 +434,8 @@ void SS2K::moveStepper() {
 #endif
         ss2k->targetPosition = rtConfig->getTargetIncline();
       } else if (rtConfig->getFTMSMode() == FitnessMachineControlPointProcedure::SetTargetResistanceLevel) {
-        rtConfig->setTargetIncline(ss2k->currentPosition + ((rtConfig->resistance.getTarget() - rtConfig->resistance.getValue()) * 20));
+        int actualDelta = rtConfig->resistance.getTarget() - rtConfig->resistance.getValue();
+        rtConfig->setTargetIncline(ss2k->getCurrentPosition() + ((userConfig->getERGSensitivity() * 3) * actualDelta));
         ss2k->targetPosition = rtConfig->getTargetIncline();
       } else {
         // Simulation Mode
@@ -776,15 +775,16 @@ void SS2K::txSerial() {  // Serial.printf(" Before TX ");
     txCheck++;
   }
 }
-
-void SS2K::pelotonConnected() {
+bool SS2K::pelotonConnected() {
   txCheck = TX_CHECK_INTERVAL;
   if (rtConfig->resistance.getValue() > 0) {
     rtConfig->setMinResistance(MIN_PELOTON_RESISTANCE);
     rtConfig->setMaxResistance(MAX_PELOTON_RESISTANCE);
+    return true;
   } else {
     rtConfig->setMinResistance(-DEFAULT_RESISTANCE_RANGE);
     rtConfig->setMaxResistance(DEFAULT_RESISTANCE_RANGE);
+    return false;
   }
 }
 
@@ -800,7 +800,8 @@ void SS2K::rxSerial(void) {
         for (int j = i; j < auxSerialBuffer.len; j++) {
           newBuf[j - i] = auxSerialBuffer.data[j];
         }
-        collectAndSet(PELOTON_DATA_UUID, PELOTON_DATA_UUID, PELOTON_ADDRESS, newBuf, newLen);
+        std::string uniqueName = "Peloton";
+        collectAndSet(PELOTON_DATA_UUID, PELOTON_DATA_UUID, uniqueName, newBuf, newLen);
       }
     }
   }

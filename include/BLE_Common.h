@@ -29,7 +29,7 @@
 // maxInterval – [in] The maximum connection interval in 1.25ms units.
 // latency – [in] The number of packets allowed to skip (extends max interval).
 // timeout – [in] The timeout time in 10ms units before disconnecting.
-const uint16_t connectionParams[] = {24, 168, 1, 200};
+const uint16_t connectionParams[] = {24, 48, 0, 200};
 
 // Vector of supported BLE services and their corresponding characteristic UUIDs
 struct BLEServiceInfo {
@@ -153,7 +153,7 @@ class SpinBLEAdvertisedDevice {
   const NimBLEAdvertisedDevice* advertisedDevice = nullptr;
   NimBLEAddress peerAddress;
 
-  char uniqueName[30] = "";  // Stable identifier using adevName2UniqueName()
+  std::string uniqueName = "";  // Stable identifier using adevName2UniqueName()
 
   int connectedClientID = BLE_HS_CONN_HANDLE_NONE;
   BLEUUID serviceUUID   = (uint16_t)0x0000;
@@ -166,6 +166,7 @@ class SpinBLEAdvertisedDevice {
   bool isRemote        = false;
   bool doConnect       = false;
   bool isPostConnected = false;
+  unsigned long lastDataUpdateTime = 0;  // Reset disconnect detection timestamp
 
   void set(const NimBLEAdvertisedDevice* device, int id = BLE_HS_CONN_HANDLE_NONE, BLEUUID inServiceUUID = (uint16_t)0x0000, BLEUUID inCharUUID = (uint16_t)0x0000);
   void reset(bool resetAdvertisedDevice = true);
@@ -183,13 +184,11 @@ class SpinBLEClient {
   boolean connectedCT            = false;
   boolean connectedSpeed         = false;
   boolean connectedRemote        = false;
-  boolean doScan                 = false;
-  int intentionalDisconnect      = 0;
+  boolean doScan                 = true; //Set to true so there's an initial scan on startup
   long int cscCumulativeCrankRev = 0;
   double cscLastCrankEvtTime     = 0.0;
   long int cscCumulativeWheelRev = 0;
   double cscLastWheelEvtTime     = 0.0;
-  // reconnectTries removed: we now always create a fresh NimBLEClient per connection attempt
 
   BLERemoteCharacteristic* pRemoteCharacteristic = nullptr;
 
@@ -197,7 +196,6 @@ class SpinBLEClient {
   SpinBLEAdvertisedDevice myBLEDevices[NUM_BLE_DEVICES];
 
   void start();
-  // void serverScan(bool connectRequest);
   bool connectToServer();
   // Check for duplicate services of BLEClient and remove the previously
   // connected one.

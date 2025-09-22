@@ -8,6 +8,8 @@
 #include <unity.h>
 #include <Arduino.h>
 #include "test.h"
+#include "settings.h"
+#include <string>
 
 // Test helper function to create a mock address string and test the randomization detection
 // Since we can't easily mock NimBLEAdvertisedDevice, we'll test the logic indirectly
@@ -35,21 +37,20 @@ void TestAdevName2UniqueName::test_android_device_no_address_suffix() {
     // Simulate how the uniqueName field should work for stable device identification
     
     struct MockDevice {
-        char uniqueName[30];
+        std::string uniqueName;
         bool advertisedDevice;
         
         MockDevice() : advertisedDevice(false) {
-            uniqueName[0] = '\0';
+            uniqueName.clear();
         }
         
         void setUniqueName(const char* name) {
-            strncpy(this->uniqueName, name, sizeof(this->uniqueName) - 1);
-            this->uniqueName[sizeof(this->uniqueName) - 1] = '\0';
+            uniqueName = std::string(name);
             this->advertisedDevice = true;
         }
         
         void reset() {
-            this->uniqueName[0] = '\0';
+            uniqueName.clear();
             this->advertisedDevice = false;
         }
     };
@@ -58,12 +59,12 @@ void TestAdevName2UniqueName::test_android_device_no_address_suffix() {
     
     // Test setting unique name
     device.setUniqueName("MyAndroidDevice");
-    TEST_ASSERT_EQUAL_STRING("MyAndroidDevice", device.uniqueName);
+    TEST_ASSERT_EQUAL_STRING("MyAndroidDevice", device.uniqueName.c_str());
     TEST_ASSERT_TRUE(device.advertisedDevice);
     
     // Test reset clears unique name
     device.reset();
-    TEST_ASSERT_EQUAL_STRING("", device.uniqueName);
+    TEST_ASSERT_EQUAL_STRING("", device.uniqueName.c_str());
     TEST_ASSERT_FALSE(device.advertisedDevice);
     
     // Test that device slot assignment logic would work for same device with different addresses
@@ -76,8 +77,8 @@ void TestAdevName2UniqueName::test_android_device_no_address_suffix() {
     // Second attempt with same unique name (different address)
     bool found = false;
     for (int i = 0; i < 2; i++) {
-        if (!devices[i].advertisedDevice || 
-            (strlen(devices[i].uniqueName) > 0 && strcmp(devices[i].uniqueName, deviceName) == 0)) {
+        if (!devices[i].advertisedDevice ||
+            (!devices[i].uniqueName.empty() && devices[i].uniqueName == deviceName)) {
             devices[i].setUniqueName(deviceName);
             found = true;
             TEST_ASSERT_EQUAL(0, i);  // Should reuse slot 0
@@ -146,21 +147,20 @@ void TestAdevName2UniqueName::test_backward_compatibility() {
     
     // Test the device slot logic for both scenarios
     struct MockDevice {
-        char uniqueName[30];
+        std::string uniqueName;
         bool advertisedDevice;
         
         MockDevice() : advertisedDevice(false) {
-            uniqueName[0] = '\0';
+            uniqueName.clear();
         }
         
         void setUniqueName(const char* name) {
-            strncpy(this->uniqueName, name, sizeof(this->uniqueName) - 1);
-            this->uniqueName[sizeof(this->uniqueName) - 1] = '\0';
+            uniqueName = std::string(name);
             this->advertisedDevice = true;
         }
         
         void reset() {
-            this->uniqueName[0] = '\0';
+            uniqueName.clear();
             this->advertisedDevice = false;
         }
     };
@@ -170,13 +170,13 @@ void TestAdevName2UniqueName::test_backward_compatibility() {
     
     // Traditional device assignment
     devices[0].setUniqueName("TraditionalDevice 55");
-    TEST_ASSERT_EQUAL_STRING("TraditionalDevice 55", devices[0].uniqueName);
+    TEST_ASSERT_EQUAL_STRING("TraditionalDevice 55", devices[0].uniqueName.c_str());
     
     // Same traditional device should match by unique name
     bool foundTraditional = false;
     for (int i = 0; i < 3; i++) {
-        if (!devices[i].advertisedDevice || 
-            (strlen(devices[i].uniqueName) > 0 && strcmp(devices[i].uniqueName, "TraditionalDevice 55") == 0)) {
+        if (!devices[i].advertisedDevice ||
+            (!devices[i].uniqueName.empty() && devices[i].uniqueName == "TraditionalDevice 55")) {
             foundTraditional = true;
             TEST_ASSERT_EQUAL(0, i);  // Should reuse slot 0
             break;
@@ -186,13 +186,13 @@ void TestAdevName2UniqueName::test_backward_compatibility() {
     
     // Test scenario 2: Android device (no suffix)
     devices[1].setUniqueName("AndroidDevice");
-    TEST_ASSERT_EQUAL_STRING("AndroidDevice", devices[1].uniqueName);
+    TEST_ASSERT_EQUAL_STRING("AndroidDevice", devices[1].uniqueName.c_str());
     
     // Same Android device should match by unique name
     bool foundAndroid = false;
     for (int i = 0; i < 3; i++) {
-        if (!devices[i].advertisedDevice || 
-            (strlen(devices[i].uniqueName) > 0 && strcmp(devices[i].uniqueName, "AndroidDevice") == 0)) {
+        if (!devices[i].advertisedDevice ||
+            (!devices[i].uniqueName.empty() && devices[i].uniqueName == "AndroidDevice")) {
             foundAndroid = true;
             TEST_ASSERT_EQUAL(1, i);  // Should reuse slot 1
             break;
@@ -201,7 +201,7 @@ void TestAdevName2UniqueName::test_backward_compatibility() {
     TEST_ASSERT_TRUE(foundAndroid);
     
     // Verify both devices are properly stored
-    TEST_ASSERT_EQUAL_STRING("TraditionalDevice 55", devices[0].uniqueName);
-    TEST_ASSERT_EQUAL_STRING("AndroidDevice", devices[1].uniqueName);
-    TEST_ASSERT_EQUAL_STRING("", devices[2].uniqueName);  // Empty slot
+    TEST_ASSERT_EQUAL_STRING("TraditionalDevice 55", devices[0].uniqueName.c_str());
+    TEST_ASSERT_EQUAL_STRING("AndroidDevice", devices[1].uniqueName.c_str());
+    TEST_ASSERT_EQUAL_STRING("", devices[2].uniqueName.c_str());  // Empty slot
 }

@@ -11,24 +11,25 @@
 #include <NimBLEUUID.h>
 #include <vector>
 #include "sensors/SensorData.h"
+#include "settings.h"
 
 class SensorDataFactory {
  public:
   SensorDataFactory() {}
 
-  std::shared_ptr<SensorData> getSensorData(NimBLEUUID characteristicUUID, const uint64_t peerAddress, uint8_t *data, size_t length);
+  std::shared_ptr<SensorData> getSensorData(NimBLEUUID characteristicUUID, std::string& uniqueName, uint8_t *data, size_t length);
 
  private:
   class KnownDevice {
    public:
-    KnownDevice(const NimBLEUUID characteristicUUID, const uint64_t peerAddress, std::shared_ptr<SensorData> sensorData)
-        : characteristicId(characteristicUUID), peerAddress(peerAddress), sensorData(sensorData) {}
+    KnownDevice(const NimBLEUUID characteristicUUID, const std::string& uniqueName, std::shared_ptr<SensorData> sensorData)
+        : characteristicId(characteristicUUID), uniqueName(uniqueName), sensorData(sensorData) {}
     std::shared_ptr<SensorData> decode(uint8_t *data, size_t length);
-    bool isSameDeviceCharacteristic(const NimBLEUUID characteristicUUID, const uint64_t peerAddress);
+    bool isSameDeviceCharacteristic(const NimBLEUUID characteristicUUID, const std::string& uniqueName);
 
    private:
     NimBLEUUID characteristicId;
-    uint64_t peerAddress;
+    std::string uniqueName;
     std::shared_ptr<SensorData> sensorData;
   };
 

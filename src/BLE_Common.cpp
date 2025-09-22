@@ -64,13 +64,22 @@ void BLECommunications() {
     if (_BLEd.connectedClientID != BLE_HS_CONN_HANDLE_NONE) {
       if (_BLEd.advertisedDevice) {                                                                // is device registered?
         if ((_BLEd.connectedClientID != BLE_HS_CONN_HANDLE_NONE) && (_BLEd.doConnect == false)) {  // client must not be in connection process
-          if (BLEDevice::getClientByPeerAddress(_BLEd.peerAddress)) {                              // nullptr check
-            BLEClient* pClient = NimBLEDevice::getClientByPeerAddress(_BLEd.peerAddress);
+          if (BLEDevice::getClientByHandle(_BLEd.connectedClientID)) {                             // nullptr check
+            BLEClient* pClient = NimBLEDevice::getClientByHandle(_BLEd.connectedClientID);
             // Client connected with a valid UUID registered
             if ((_BLEd.serviceUUID != BLEUUID((uint16_t)0x0000)) && (pClient->isConnected())) {
+              // Check for data timeout and trigger disconnect if needed
+              if (_BLEd.lastDataUpdateTime > 0) {  // Only check if we've received data before
+                unsigned long timeSinceLastData = millis() - _BLEd.lastDataUpdateTime;
+                if (timeSinceLastData > BLE_CLIENT_DISCONNECT_TIMEOUT) {
+                  SS2K_LOG(BLE_COMMON_LOG_TAG, "%s data timeout (%lu ms), triggering disconnect", _BLEd.uniqueName.c_str(), timeSinceLastData);
+                  pClient->disconnect();
+                  continue;                                   // Skip further processing for this device
+                }
+              }
               // Handle BLE HID Remotes
               if (_BLEd.serviceUUID == HID_SERVICE_UUID) {
-                spinBLEClient.keepAliveBLE_HID(pClient);  // keep alive doesn't seem to help :(
+                spinBLEClient.keepAliveBLE_HID(pClient);  // keep alive doesn't seem to help
                 continue;                                 // There is not data that needs to be dequeued for the remote, so got to the next device.
               }
               // Dequeue sensor data we stored during notifications
@@ -85,12 +94,12 @@ void BLECommunications() {
                 for (size_t i = 0; i < length; i++) {
                   pData[i] = incomingNotifyData.data[i];
                 }
-                collectAndSet(incomingNotifyData.charUUID, incomingNotifyData.serviceUUID, _BLEd.peerAddress, pData, length);
+                collectAndSet(incomingNotifyData.charUUID, incomingNotifyData.serviceUUID, _BLEd.uniqueName, pData, length);
               }
             } else if (!pClient->isConnected()) {  // This is a workaround for a bug in NimBLE where onDisconnect() is not called automatically.
               MyClientCallback workaroundCallback;
               workaroundCallback.onDisconnect(pClient, 0);
-              SS2K_LOG(BLE_COMMON_LOG_TAG, "Client %s not connected in communications loop", _BLEd.peerAddress.toString().c_str());
+              SS2K_LOG(BLE_COMMON_LOG_TAG, "%s not connected in communications loop", _BLEd.uniqueName.c_str());
             }
           }
         }
