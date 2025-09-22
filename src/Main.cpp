@@ -290,9 +290,9 @@ void SS2K::maintenanceLoop(void *pvParameters) {
     // Things to do every 6 seconds
     if ((millis() - intervalTimer2) > 6007) {
       // reboot every half hour if not in use.
-      static int _oldHR               = 0;
-      static int _oldWatts            = 0;
-      static double _oldTargetIncline = 0;
+      static int _oldHR              = 0;
+      static int _oldWatts           = 0;
+      static float _oldTargetIncline = 0.0f;
       if (_oldHR == rtConfig->hr.getValue() && _oldWatts == rtConfig->watts.getValue() && _oldTargetIncline == rtConfig->getTargetIncline()) {
         // Inactivity detected
         if (((millis() - rebootTimer) > 1800000)) {
