@@ -19,6 +19,7 @@ void collectAndSet(NimBLEUUID charUUID, NimBLEUUID serviceUUID, std::string& uni
   // Update the timestamp for disconnect detection
   for (size_t i = 0; i < NUM_BLE_DEVICES; i++) {
     if (spinBLEClient.myBLEDevices[i].uniqueName == uniqueName) {
+      spinBLEClient.myBLEDevices[i].lastDataUpdateTime = millis();
       break;
     }
   }

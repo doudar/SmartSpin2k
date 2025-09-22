@@ -255,6 +255,11 @@ constexpr const char* ANY = "any";
 // how long to try STA mode before falling back to AP mode
 #define WIFI_CONNECT_TIMEOUT 10
 
+// Sometimes nimble doesn't detect that a device has disconnected.
+// If no data is received from a connected device after this duration,
+// The client will be disconnected.
+#define BLE_CLIENT_DISCONNECT_TIMEOUT 5000
+
 #ifndef DEBUG_LOG_BUFFER_SIZE
 #define DEBUG_LOG_BUFFER_SIZE 600
 #endif

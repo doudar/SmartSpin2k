@@ -166,6 +166,7 @@ class SpinBLEAdvertisedDevice {
   bool isRemote        = false;
   bool doConnect       = false;
   bool isPostConnected = false;
+  unsigned long lastDataUpdateTime = 0;  // Reset disconnect detection timestamp
 
   void set(const NimBLEAdvertisedDevice* device, int id = BLE_HS_CONN_HANDLE_NONE, BLEUUID inServiceUUID = (uint16_t)0x0000, BLEUUID inCharUUID = (uint16_t)0x0000);
   void reset(bool resetAdvertisedDevice = true);
@@ -188,7 +189,6 @@ class SpinBLEClient {
   double cscLastCrankEvtTime     = 0.0;
   long int cscCumulativeWheelRev = 0;
   double cscLastWheelEvtTime     = 0.0;
-  // reconnectTries removed: we now always create a fresh NimBLEClient per connection attempt
 
   BLERemoteCharacteristic* pRemoteCharacteristic = nullptr;
 
