@@ -178,10 +178,13 @@ void BLE_Fitness_Machine_Service::processFTMSWrite() {
         case FitnessMachineControlPointProcedure::SetTargetInclination: {
           rtConfig->setFTMSMode((uint8_t)rxValue[0]);
           returnValue[2] = FitnessMachineControlPointResultCode::Success;
-          port           = (rxValue[2] << 8) + rxValue[1];
-          port *= 10;
+          int16_t rawInclineTenthsPercent = (int16_t)((rxValue[2] << 8) | rxValue[1]); // signed 0.1% units
+          port                            = static_cast<int>(rawInclineTenthsPercent) * 10; // convert to 0.01% units
           rtConfig->setTargetIncline(port);
-          logBufLength += snprintf(logBuf + logBufLength, kLogBufCapacity - logBufLength, "-> Incline Mode: %2f", rtConfig->getTargetIncline() / 100);
+          logBufLength += snprintf(logBuf + logBufLength,
+                                   kLogBufCapacity - logBufLength,
+                                   "-> Incline Mode: %2f",
+                                   rtConfig->getTargetIncline() / 100);
           ftmsStatus            = {FitnessMachineStatus::TargetInclineChanged, (uint8_t)rxValue[1], (uint8_t)rxValue[2]};
           ftmsTrainingStatus[1] = FitnessMachineTrainingStatus::ManualMode;
         } break;
