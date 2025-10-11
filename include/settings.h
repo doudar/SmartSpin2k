@@ -207,8 +207,7 @@ const char* const DEFAULT_PASSWORD = "password";
 // 2
 #define LED_PIN 2
 
-// Max tries that BLE client will perform on reconnect
-#define MAX_RECONNECT_TRIES 1
+// Reconnect tries removed: connections now always instantiate a new NimBLEClient
 
 // loop speed for the SmartSpin2k BLE communications
 #define BLE_NOTIFY_DELAY 503
@@ -253,6 +252,11 @@ constexpr const char* ANY = "any";
 
 // how long to try STA mode before falling back to AP mode
 #define WIFI_CONNECT_TIMEOUT 10
+
+// Sometimes nimble doesn't detect that a device has disconnected.
+// If no data is received from a connected device after this duration,
+// The client will be disconnected.
+#define BLE_CLIENT_DISCONNECT_TIMEOUT 5000
 
 #ifndef DEBUG_LOG_BUFFER_SIZE
 #define DEBUG_LOG_BUFFER_SIZE 600

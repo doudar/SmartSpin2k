@@ -74,7 +74,7 @@ class SS2K {
   void FTMSModeShiftModifier();
   static void rxSerial(void);
   void txSerial();
-  void pelotonConnected();
+  bool pelotonConnected();
   void goHome(bool bothDirections = false);
 
   SS2K() {

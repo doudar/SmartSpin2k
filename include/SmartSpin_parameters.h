@@ -68,10 +68,9 @@ class RuntimeParameters {
 
  public:
   Measurement watts;
-  Measurement pm_batt;
   Measurement hr;
-  Measurement hr_batt;
   Measurement cad;
+  Measurement batt;
   Measurement resistance;
 
   void setTargetIncline(float inc) { targetIncline = inc; }

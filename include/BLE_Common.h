@@ -29,7 +29,7 @@
 // maxInterval – [in] The maximum connection interval in 1.25ms units.
 // latency – [in] The number of packets allowed to skip (extends max interval).
 // timeout – [in] The timeout time in 10ms units before disconnecting.
-const uint16_t connectionParams[] = {24, 168, 1, 200};
+const uint16_t connectionParams[] = {24, 48, 0, 200};
 
 // Vector of supported BLE services and their corresponding characteristic UUIDs
 struct BLEServiceInfo {
@@ -42,8 +42,8 @@ namespace BLEServices {
 const std::vector<BLEServiceInfo> SUPPORTED_SERVICES = {{CYCLINGPOWERSERVICE_UUID, CYCLINGPOWERMEASUREMENT_UUID, "Cycling Power Service"},
                                                         {CSCSERVICE_UUID, CSCMEASUREMENT_UUID, "Cycling Speed And Cadence Service"},
                                                         {HEARTSERVICE_UUID, HEARTCHARACTERISTIC_UUID, "Heart Rate Service"},
-                                                        {ECHELON_DEVICE_UUID, ECHELON_SERVICE_UUID, "Echelon Device"}, // Two lines for Echelon
-                                                        {ECHELON_SERVICE_UUID, ECHELON_DATA_UUID, "Echelon Service"}, // Because one is for search, the other for data
+                                                        {ECHELON_DEVICE_UUID, ECHELON_SERVICE_UUID, "Echelon Device"},  // Two lines for Echelon
+                                                        {ECHELON_SERVICE_UUID, ECHELON_DATA_UUID, "Echelon Service"},   // Because one is for search, the other for data
                                                         {FITNESSMACHINESERVICE_UUID, FITNESSMACHINEINDOORBIKEDATA_UUID, "Fitness Machine Service"},
                                                         {HID_SERVICE_UUID, HID_REPORT_DATA_UUID, "HID Service"},
                                                         {FLYWHEEL_UART_SERVICE_UUID, FLYWHEEL_UART_TX_UUID, "Flywheel UART Service"}};
@@ -145,33 +145,29 @@ class SpinBLEAdvertisedDevice {
  private:
   QueueHandle_t dataBufferQueue = nullptr;
 
-  bool isPostConnected = false;
+  void clearState(bool resetAdvertisedDevice);  // NEW
 
- public:  // eventually these should be made private
-  // // TODO: Do we dispose of this object?  Is so, we need to de-allocate the queue.
-  // //       This destructor was called too early and the queue was deleted out from
-  // //       under us.
-  // ~SpinBLEAdvertisedDevice() {
-  //   if (dataBuffer != nullptr) {
-  //     Serial.println("Deleting queue");
-  //     vQueueDelete(dataBuffer);
-  //   }
-  // }
+ public:
+  SpinBLEAdvertisedDevice() { clearState(true); }  // NEW
 
   const NimBLEAdvertisedDevice* advertisedDevice = nullptr;
   NimBLEAddress peerAddress;
 
+  std::string uniqueName = "";  // Stable identifier using adevName2UniqueName()
+
   int connectedClientID = BLE_HS_CONN_HANDLE_NONE;
   BLEUUID serviceUUID   = (uint16_t)0x0000;
   BLEUUID charUUID      = (uint16_t)0x0000;
-  bool isHRM            = false;
-  bool isPM             = false;
-  bool isCSC            = false;
-  bool isCT             = false;
-  bool isRemote         = false;
-  bool doConnect        = false;
-  void setPostConnected(bool pc) { isPostConnected = pc; }
-  bool getPostConnected() { return isPostConnected; }
+  Measurement batt;
+  bool isHRM           = false;
+  bool isPM            = false;
+  bool isCSC           = false;
+  bool isCT            = false;
+  bool isRemote        = false;
+  bool doConnect       = false;
+  bool isPostConnected = false;
+  unsigned long lastDataUpdateTime = 0;  // Reset disconnect detection timestamp
+
   void set(const NimBLEAdvertisedDevice* device, int id = BLE_HS_CONN_HANDLE_NONE, BLEUUID inServiceUUID = (uint16_t)0x0000, BLEUUID inCharUUID = (uint16_t)0x0000);
   void reset(bool resetAdvertisedDevice = true);
   bool enqueueData(uint8_t* data, size_t length, NimBLEUUID serviceUUID, NimBLEUUID charUUID);
@@ -188,13 +184,11 @@ class SpinBLEClient {
   boolean connectedCT            = false;
   boolean connectedSpeed         = false;
   boolean connectedRemote        = false;
-  boolean doScan                 = false;
-  int intentionalDisconnect      = 0;
+  boolean doScan                 = true; //Set to true so there's an initial scan on startup
   long int cscCumulativeCrankRev = 0;
   double cscLastCrankEvtTime     = 0.0;
   long int cscCumulativeWheelRev = 0;
   double cscLastWheelEvtTime     = 0.0;
-  int reconnectTries             = MAX_RECONNECT_TRIES;
 
   BLERemoteCharacteristic* pRemoteCharacteristic = nullptr;
 
@@ -202,7 +196,6 @@ class SpinBLEClient {
   SpinBLEAdvertisedDevice myBLEDevices[NUM_BLE_DEVICES];
 
   void start();
-  // void serverScan(bool connectRequest);
   bool connectToServer();
   // Check for duplicate services of BLEClient and remove the previously
   // connected one.

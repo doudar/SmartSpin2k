@@ -6,6 +6,7 @@
  */
 #include "BLE_Fitness_Machine_Service.h"
 #include "DirConManager.h"
+#include "Main.h"
 #include <Constants.h>
 #include <vector>
 
@@ -97,8 +98,21 @@ void BLE_Fitness_Machine_Service::update() {
   ftmsIndoorBikeData.push_back(static_cast<uint8_t>(static_cast<int>(rtConfig->cad.getValue() * 2) >> 8));
 
   // Add resistance
-  ftmsIndoorBikeData.push_back(static_cast<uint8_t>(rtConfig->resistance.getValue() & 0xff));
-  ftmsIndoorBikeData.push_back(static_cast<uint8_t>(rtConfig->resistance.getValue() >> 8));
+  int resistanceValue;
+  // Check if bike has resistance reporting capability or resistance simulation enabled
+  bool hasResistanceReporting = (rtConfig->resistance.getSimulate() || 
+                                (rtConfig->resistance.getTimestamp() > 0 && 
+                                 (millis() - rtConfig->resistance.getTimestamp()) < 5000));
+  
+  if (hasResistanceReporting) {
+    // Use reported resistance value
+    resistanceValue = rtConfig->resistance.getValue();
+  } else {
+    // Calculate resistance from stepper position for bikes that don't report resistance
+    resistanceValue = this->calculateResistanceFromPosition();
+  }
+  ftmsIndoorBikeData.push_back(static_cast<uint8_t>(resistanceValue & 0xff));
+  ftmsIndoorBikeData.push_back(static_cast<uint8_t>(resistanceValue >> 8));
 
   // Add power
   ftmsIndoorBikeData.push_back(static_cast<uint8_t>(rtConfig->watts.getValue() & 0xff));
@@ -164,10 +178,13 @@ void BLE_Fitness_Machine_Service::processFTMSWrite() {
         case FitnessMachineControlPointProcedure::SetTargetInclination: {
           rtConfig->setFTMSMode((uint8_t)rxValue[0]);
           returnValue[2] = FitnessMachineControlPointResultCode::Success;
-          port           = (rxValue[2] << 8) + rxValue[1];
-          port *= 10;
+          int16_t rawInclineTenthsPercent = (int16_t)((rxValue[2] << 8) | rxValue[1]); // signed 0.1% units
+          port                            = static_cast<int>(rawInclineTenthsPercent) * 10; // convert to 0.01% units
           rtConfig->setTargetIncline(port);
-          logBufLength += snprintf(logBuf + logBufLength, kLogBufCapacity - logBufLength, "-> Incline Mode: %2f", rtConfig->getTargetIncline() / 100);
+          logBufLength += snprintf(logBuf + logBufLength,
+                                   kLogBufCapacity - logBufLength,
+                                   "-> Incline Mode: %2f",
+                                   rtConfig->getTargetIncline() / 100);
           ftmsStatus            = {FitnessMachineStatus::TargetInclineChanged, (uint8_t)rxValue[1], (uint8_t)rxValue[2]};
           ftmsTrainingStatus[1] = FitnessMachineTrainingStatus::ManualMode;
         } break;
@@ -178,6 +195,27 @@ void BLE_Fitness_Machine_Service::processFTMSWrite() {
 
           if (requestedResistance >= rtConfig->getMinResistance() && requestedResistance <= rtConfig->getMaxResistance()) {
             rtConfig->resistance.setTarget(requestedResistance);
+            
+            // For bikes that don't report resistance, calculate stepper position from resistance level (0-100)
+            bool hasResistanceReporting = (rtConfig->resistance.getSimulate() || 
+                                          (rtConfig->resistance.getTimestamp() > 0 && 
+                                           (millis() - rtConfig->resistance.getTimestamp()) < 5000));
+            
+            if (!hasResistanceReporting) {
+              int32_t minPos, maxPos;
+              
+              // Use homing values if available, otherwise use stepper min/max
+              if (userConfig->getHMin() != INT32_MIN && userConfig->getHMax() != INT32_MIN) {
+                minPos = userConfig->getHMin();
+                maxPos = userConfig->getHMax();
+              } else {
+                minPos = rtConfig->getMinStep();
+                maxPos = rtConfig->getMaxStep();
+              }
+              
+              // TODO: Implement calculation of target position from resistance percentage if resistance reporting is unavailable.
+            }
+            
             returnValue[2] = FitnessMachineControlPointResultCode::Success;
             logBufLength += snprintf(logBuf + logBufLength, kLogBufCapacity - logBufLength, "-> Resistance Mode: %d", rtConfig->resistance.getTarget());
           } else {
@@ -335,4 +373,33 @@ bool BLE_Fitness_Machine_Service::spinDown(uint8_t response) {
   DirConManager::notifyCharacteristic(NimBLEUUID(FITNESSMACHINESERVICE_UUID), fitnessMachineStatusCharacteristic->getUUID(), spinStatus, sizeof(spinStatus));
 
   return true;
+}
+
+// Calculate resistance from stepper position for bikes that don't natively report resistance
+int BLE_Fitness_Machine_Service::calculateResistanceFromPosition() {
+  int32_t currentPosition = ss2k->getCurrentPosition();
+  int32_t minPos, maxPos;
+  
+  // Use homing values if available, otherwise use stepper min/max
+  if (userConfig->getHMin() != INT32_MIN && userConfig->getHMax() != INT32_MIN) {
+    minPos = userConfig->getHMin();
+    maxPos = userConfig->getHMax();
+  } else {
+    minPos = rtConfig->getMinStep();
+    maxPos = rtConfig->getMaxStep();
+  }
+  
+  // Ensure we have valid range
+  if (maxPos <= minPos) {
+    return 50; // Default to mid-point resistance if range is invalid
+  }
+  
+  // Calculate resistance as percentage (0-100) based on position
+  int resistance = ((currentPosition - minPos) * 100) / (maxPos - minPos);
+  
+  // Clamp to valid range
+  if (resistance < 0) resistance = 0;
+  if (resistance > 100) resistance = 100;
+  
+  return resistance;
 }

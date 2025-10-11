@@ -16,9 +16,9 @@
 #include "sensors/PelotonData.h"
 #include "sensors/CscSensorData.h"
 
-std::shared_ptr<SensorData> SensorDataFactory::getSensorData(const NimBLEUUID characteristicUUID, const uint64_t peerAddress, uint8_t *data, size_t length) {
+std::shared_ptr<SensorData> SensorDataFactory::getSensorData(const NimBLEUUID characteristicUUID, std::string& uniqueName, uint8_t *data, size_t length) {
   for (auto &it : SensorDataFactory::knownDevices) {
-    if (it->isSameDeviceCharacteristic(characteristicUUID, peerAddress)) {
+    if (it->isSameDeviceCharacteristic(characteristicUUID, uniqueName)) {
       return it->decode(data, length);
     }
   }
@@ -42,7 +42,7 @@ std::shared_ptr<SensorData> SensorDataFactory::getSensorData(const NimBLEUUID ch
     return NULL_SENSOR_DATA;
   }
 
-  KnownDevice *knownDevice = new KnownDevice(characteristicUUID, peerAddress, sensorData);
+  KnownDevice *knownDevice = new KnownDevice(characteristicUUID, uniqueName, sensorData);
   SensorDataFactory::knownDevices.push_back(knownDevice);
   return knownDevice->decode(data, length);
 }
@@ -52,8 +52,8 @@ std::shared_ptr<SensorData> SensorDataFactory::KnownDevice::decode(uint8_t *data
   return this->sensorData;
 }
 
-bool SensorDataFactory::KnownDevice::isSameDeviceCharacteristic(const NimBLEUUID characteristicUUID, const uint64_t peerAddress) {
-  return this->characteristicId == characteristicUUID && this->peerAddress == peerAddress;
+bool SensorDataFactory::KnownDevice::isSameDeviceCharacteristic(const NimBLEUUID characteristicUUID, const std::string& uniqueName) {
+  return this->characteristicId == characteristicUUID && this->uniqueName == uniqueName;
 }
 
 bool SensorDataFactory::NullData::hasHeartRate() { return false; }
