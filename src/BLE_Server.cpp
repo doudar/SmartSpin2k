@@ -52,7 +52,7 @@ void startBLEServer() {
   cyclingPowerService.setupService(spinBLEServer.pServer, &chrCallbacks);
   heartService.setupService(spinBLEServer.pServer, &chrCallbacks);
   fitnessMachineService.setupService(spinBLEServer.pServer, &chrCallbacks);
-  ss2kCustomCharacteristic.setupService(spinBLEServer.pServer, oScanResponseData);
+  ss2kCustomCharacteristic.setupService(spinBLEServer.pServer);
   deviceInformationService.setupService(spinBLEServer.pServer);
   //add all service UUIDs to advertisement vector
   oServiceUUIDs.push_back(CSCSERVICE_UUID);
