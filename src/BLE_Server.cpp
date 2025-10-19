@@ -42,12 +42,12 @@ void startBLEServer() {
 
   // start services
   BLEAdvertising* pAdvertising = BLEDevice::getAdvertising();
+  pAdvertising->enableScanResponse(true);
   NimBLEAdvertisementData oScanResponseData;
   NimBLEAdvertisementData oAdvertisementData;
   std::vector<NimBLEUUID> oServiceUUIDs;
   oScanResponseData.setFlags(0x06);  // General Discoverable, BR/EDR Not Supported
   oScanResponseData.setCompleteServices(SMARTSPIN2K_SERVICE_UUID);
-  cyclingSpeedCadenceService.setupService(spinBLEServer.pServer, &chrCallbacks);
   cyclingSpeedCadenceService.setupService(spinBLEServer.pServer, &chrCallbacks);
   cyclingPowerService.setupService(spinBLEServer.pServer, &chrCallbacks);
   heartService.setupService(spinBLEServer.pServer, &chrCallbacks);
