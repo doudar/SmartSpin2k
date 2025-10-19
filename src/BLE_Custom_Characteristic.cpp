@@ -95,7 +95,6 @@ void BLE_ss2kCustomCharacteristic::setupService(NimBLEServer *pServer) {
   smartSpin2kCharacteristic->setValue(ss2kCustomCharacteristicValue, sizeof(ss2kCustomCharacteristicValue));
   smartSpin2kCharacteristic->setCallbacks(new ss2kCustomCharacteristicCallbacks());
   pSmartSpin2kService->start();
-  spinBLEServer.pServer->getAdvertising()->addServiceUUID(pSmartSpin2kService->getUUID());
 }
 
 void BLE_ss2kCustomCharacteristic::update() {}
