@@ -38,6 +38,9 @@ const char* const DEFAULT_PASSWORD = "password";
 // name of the local file to save the torque table.
 #define POWER_TABLE_FILENAME "/PowerTable.txt"
 
+// name of the local file to save build version for OTA WiFi issue handling
+#define BUILD_VERSION_FILENAME "/build_version.txt"
+
 // Default Incline Multiplier.
 // Incline multiplier is the multiple required to convert incline received from the remote client (percent grade*100)
 // into actual stepper steps that move the stepper motor. It takes 2,181.76 steps to rotate the knob 1 full revolution. with hardware version 1.
