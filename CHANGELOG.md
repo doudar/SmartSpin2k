@@ -30,7 +30,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Changed
 - WiFi will automatically switch/reset if needed after firmware update. 
 - BLE advertisement data reworked and optimized. 
-- Fixed Typo.
 
 ### Hardware
 

@@ -42,13 +42,27 @@ void startBLEServer() {
 
   // start services
   BLEAdvertising* pAdvertising = BLEDevice::getAdvertising();
-  pAdvertising->enableScanResponse(true);
+  NimBLEAdvertisementData oScanResponseData;
+  NimBLEAdvertisementData oAdvertisementData;
+  std::vector<NimBLEUUID> oServiceUUIDs;
+  oScanResponseData.setFlags(0x06);  // General Discoverable, BR/EDR Not Supported
+  oScanResponseData.setCompleteServices(SMARTSPIN2K_SERVICE_UUID);
+  cyclingSpeedCadenceService.setupService(spinBLEServer.pServer, &chrCallbacks);
   cyclingSpeedCadenceService.setupService(spinBLEServer.pServer, &chrCallbacks);
   cyclingPowerService.setupService(spinBLEServer.pServer, &chrCallbacks);
   heartService.setupService(spinBLEServer.pServer, &chrCallbacks);
   fitnessMachineService.setupService(spinBLEServer.pServer, &chrCallbacks);
-  ss2kCustomCharacteristic.setupService(spinBLEServer.pServer);
+  ss2kCustomCharacteristic.setupService(spinBLEServer.pServer, oScanResponseData);
   deviceInformationService.setupService(spinBLEServer.pServer);
+  //add all service UUIDs to advertisement vector
+  oServiceUUIDs.push_back(CSCSERVICE_UUID);
+  oServiceUUIDs.push_back(CYCLINGPOWERSERVICE_UUID);
+  oServiceUUIDs.push_back(HEARTSERVICE_UUID);
+  oServiceUUIDs.push_back(FITNESSMACHINESERVICE_UUID);
+  oAdvertisementData.setFlags(0x06);  // General Discoverable, BR/EDR Not Supported
+  oAdvertisementData.setCompleteServices16(oServiceUUIDs);
+  pAdvertising->setAdvertisementData(oAdvertisementData);
+  pAdvertising->setScanResponseData(oScanResponseData);
   // wattbikeService.setupService(spinBLEServer.pServer);  // No callback needed
   // sb20Service.begin();
   BLEFirmwareSetup(spinBLEServer.pServer);
@@ -58,7 +72,6 @@ void startBLEServer() {
   pAdvertising->setName(userConfig->getDeviceName());
   pAdvertising->setMaxInterval(250);
   pAdvertising->setMinInterval(160);
-
   pAdvertising->start();
 
   SS2K_LOG(BLE_SERVER_LOG_TAG, "Bluetooth Characteristics defined!");

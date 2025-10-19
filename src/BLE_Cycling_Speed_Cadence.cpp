@@ -24,7 +24,6 @@ void BLE_Cycling_Speed_Cadence::setupService(NimBLEServer *pServer, MyCharacteri
   cscFeature->setValue(cscFeatureBytes, sizeof(cscFeatureBytes));
   cscMeasurement->setCallbacks(chrCallbacks);
   pCyclingSpeedCadenceService->start();
-  // spinBLEServer.pServer->getAdvertising()->addServiceUUID(pCyclingSpeedCadenceService->getUUID());
 
   // Add service UUID to DirCon MDNS
   DirConManager::addBleServiceUuid(pCyclingSpeedCadenceService->getUUID());

@@ -28,7 +28,6 @@ void BLE_Cycling_Power_Service::setupService(NimBLEServer *pServer, MyCharacteri
   sensorLocationCharacteristic->setValue(cpsLocation, sizeof(cpsLocation));
   cyclingPowerMeasurementCharacteristic->setCallbacks(chrCallbacks);
   pPowerMonitor->start();
-  // spinBLEServer.pServer->getAdvertising()->addServiceUUID(pPowerMonitor->getUUID());
 
   // Add service UUID to DirCon MDNS
   DirConManager::addBleServiceUuid(pPowerMonitor->getUUID());
