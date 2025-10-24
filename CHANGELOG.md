@@ -10,6 +10,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Added
 
 ### Changed
+
+### Hardware
+
+
+## [25.10.19]
+
+### Added
+
+### Changed
 - Fixed Rouvy Connection 25-10-18 caused.
 
 ### Hardware
