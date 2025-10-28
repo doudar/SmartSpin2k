@@ -39,13 +39,9 @@ void DirConMessage::printVectorBytesToSerial(const std::vector<uint8_t>& data, b
 
 // Helper functions for UUID conversion - matching the expected DirCon protocol format
 void uuidToBytes(NimBLEUUID& uuid, std::vector<uint8_t>& message) {
-  // Log the UUID being processed for debugging
-  //SS2K_LOG(DIRCON_LOG_TAG, "Processing UUID: %s", uuid.toString().c_str());
-
-  uint8_t *uuidBytes = (uint8_t*)uuid.to128().getBase();
-
-  // Add the bytes to the message
-  for(size_t i = 16; i > 0; i--) {
+  uint8_t* uuidBytes = (uint8_t*)uuid.to128().getBase();
+  // Push 16 bytes in reverse order (15..0)
+  for (int i = 15; i >= 0; --i) {
     message.push_back(uuidBytes[i]);
   }
 }
@@ -273,18 +269,28 @@ size_t DirConMessage::parse(uint8_t* data, size_t len, uint8_t sequenceNumber) {
       break;
 
     case DIRCON_MSGID_ENABLE_CHARACTERISTIC_NOTIFICATIONS:
-      if ((this->Length == 16) || (this->Length == 17)) {
-        // Update ENABLE_CHARACTERISTIC_NOTIFICATIONS UUID parsing
+      if (this->Length >= 16) {
         this->UUID = bytesToUuid(data + DIRCON_MESSAGE_HEADER_LENGTH, 0);
         parsedBytes += 16;
-        if (this->Length == 17) {
+
+        size_t payloadLen = this->Length - 16;
+        this->AdditionalData.clear();
+
+        if (payloadLen > 0) {
+          // Request carries a value (e.g., CCCD 1–2 bytes)
           this->Request = true;
-          this->AdditionalData.clear();
-          this->AdditionalData.push_back((uint8_t)data[DIRCON_MESSAGE_HEADER_LENGTH + 16]);
-          parsedBytes += 1;
+          for (size_t i = 0; i < payloadLen; ++i) {
+            this->AdditionalData.push_back(
+              (uint8_t)data[DIRCON_MESSAGE_HEADER_LENGTH + 16 + i]
+            );
+            parsedBytes += 1;
+          }
+        } else {
+          // No value => likely a response/ack
+          this->Request = this->isRequest(sequenceNumber);
         }
       } else {
-        SS2K_LOG(DIRCON_LOG_TAG, "Error parsing DirCon message: Length %d isn't 16 or 17", this->Length);
+        SS2K_LOG(DIRCON_LOG_TAG, "Error parsing DirCon message: Length %d < 16", this->Length);
         this->Identifier = DIRCON_MSGID_ERROR;
         return 0;
       }
