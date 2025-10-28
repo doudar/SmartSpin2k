@@ -116,16 +116,16 @@ std::vector<uint8_t>* DirConMessage::encode(uint8_t sequenceNumber) {
     }
     // Handle discover characteristics response
     else if (this->Identifier == DIRCON_MSGID_DISCOVER_CHARACTERISTICS && !this->Request) {
-      this->Length = 16 + this->AdditionalUUIDs.size() * 17;
+      // Ensure we don't overrun AdditionalData if sizes differ
+      size_t count = std::min(this->AdditionalUUIDs.size(), this->AdditionalData.size());
+      this->Length = 16 + count * 17;
       this->encodedMessage.push_back((uint8_t)(this->Length >> 8));
       this->encodedMessage.push_back((uint8_t)(this->Length));
       uuidToBytes(this->UUID, this->encodedMessage);
 
-      size_t dataIndex = 0;
-      for (size_t counter = 0; counter < this->AdditionalUUIDs.size(); counter++) {
-        uuidToBytes(this->AdditionalUUIDs[counter], this->encodedMessage);
-        this->encodedMessage.push_back(this->AdditionalData[dataIndex]);
-        dataIndex++;
+      for (size_t i = 0; i < count; ++i) {
+        uuidToBytes(this->AdditionalUUIDs[i], this->encodedMessage);
+        this->encodedMessage.push_back(this->AdditionalData[i]); // properties byte
       }
     }
     // Handle read characteristic request or discover characteristics request or notification response
@@ -201,32 +201,40 @@ size_t DirConMessage::parse(uint8_t* data, size_t len, uint8_t sequenceNumber) {
 
     case DIRCON_MSGID_DISCOVER_CHARACTERISTICS:
       if (this->Length >= 16) {
-        // Parse the UUID in the same reversed byte format
+        // Parse the service UUID
         this->UUID = bytesToUuid(data + DIRCON_MESSAGE_HEADER_LENGTH, 0);
         parsedBytes += 16;
+
         if (this->Length == 16) {
+          // This is a request (no payload beyond the service UUID)
           this->Request = this->isRequest(sequenceNumber);
         } else if ((this->Length - 16) % 17 == 0) {
+          // Response: list of (CharacteristicUUID[16] + Properties[1]) tuples
+          this->Request = false;
           this->AdditionalUUIDs.clear();
           this->AdditionalData.clear();
+
           size_t index = 16;
-          while (this->Length >= index + 17) {
-            // Ensure consistent byte order for characteristic UUIDs
-            NimBLEService* pService                                   = spinBLEServer.pServer->getServiceByUUID(this->UUID);
-            const std::vector<NimBLECharacteristic*> pCharacteristics = pService->getCharacteristics();
-            for (NimBLECharacteristic* pCharacteristic : pCharacteristics) {
-              this->AdditionalUUIDs.push_back(pCharacteristic->getUUID());
-              index += pCharacteristic->getUUID().toString().length();
-              parsedBytes += pCharacteristic->getUUID().toString().length();
-            }
+          while (index + 17 <= this->Length) {
+            NimBLEUUID charUuid = bytesToUuid(data + DIRCON_MESSAGE_HEADER_LENGTH, index);
+            this->AdditionalUUIDs.push_back(charUuid);
+
+            uint8_t props = data[DIRCON_MESSAGE_HEADER_LENGTH + index + 16];
+            this->AdditionalData.push_back(props);
+
+            index += 17;
+            parsedBytes += 17;
           }
+        } else {
+          SS2K_LOG(DIRCON_LOG_TAG, "Error parsing DirCon message: (Length - 16) % 17 != 0 (len=%d)", this->Length);
+          this->Identifier = DIRCON_MSGID_ERROR;
+          return 0;
         }
       } else {
-        SS2K_LOG(DIRCON_LOG_TAG, "Error parsing additional UUIDs and data: Length %d isn't a multiple of 17", (this->Length - 16));
+        SS2K_LOG(DIRCON_LOG_TAG, "Error parsing DirCon message: Length %d < 16", this->Length);
         this->Identifier = DIRCON_MSGID_ERROR;
         return 0;
       }
-
       break;
 
     case DIRCON_MSGID_READ_CHARACTERISTIC:
