@@ -13,6 +13,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Fixed Rouvy Connection 25-10-18 caused.
 
 ### Hardware
+- Added Merach.
 
 
 ## [25.9.30]
