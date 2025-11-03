@@ -164,7 +164,7 @@ size_t DirConMessage::parse(uint8_t* data, size_t len, uint8_t sequenceNumber) {
   }
 
   #ifdef DEBUG_DIRCON_MESSAGES
- printVectorBytesToSerial(std::vector<uint8_t>(data, data + len), true);
+  printVectorBytesToSerial(std::vector<uint8_t>(data, data + len), true);
 #endif
 
   // Parse header
