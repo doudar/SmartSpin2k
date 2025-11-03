@@ -21,6 +21,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 - Fixed Rouvy Connection 25-10-18 caused.
+- Updated build scripts. 
 
 ### Hardware
 
