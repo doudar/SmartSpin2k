@@ -8,7 +8,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
-- Added Rouvy Dircon.
+
+### Changed
+
+### Hardware
+
+
+## [25.10.19]
+
+### Added
+- Added Rouvy Dircon. Working! 
 
 ### Changed
 - Fixed Rouvy Connection 25-10-18 caused.
