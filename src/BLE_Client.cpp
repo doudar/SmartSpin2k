@@ -268,7 +268,7 @@ bool SpinBLEClient::connectToServer() {
     String deviceName = myDevice->haveName() ? String(myDevice->getName().c_str()) : "Unknown";
     SS2K_LOG(BLE_CLIENT_LOG_TAG, "Getting service info for device: %s with %d services", deviceName.c_str(), myDevice->getServiceUUIDCount());
 
-    const BLEServiceInfo* serviceInfo = getDeviceServiceInfo(myDevice, deviceName.c_str());
+    const BLEServiceInfo* serviceInfo = getDeviceServiceInfo(myDevice, deviceName);
     if (!serviceInfo) {
       SS2K_LOG(BLE_CLIENT_LOG_TAG, "No supported service UUID found for device: %s", deviceName.c_str());
       spinBLEClient.myBLEDevices[device_number].reset();
