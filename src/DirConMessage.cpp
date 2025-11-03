@@ -163,6 +163,10 @@ size_t DirConMessage::parse(uint8_t* data, size_t len, uint8_t sequenceNumber) {
     return 0;
   }
 
+  #ifdef DEBUG_DIRCON_MESSAGES
+ printVectorBytesToSerial(std::vector<uint8_t>(data, data + len), true);
+#endif
+
   // Parse header
   this->MessageVersion = data[0];
   this->Identifier     = data[1];
@@ -273,11 +277,11 @@ size_t DirConMessage::parse(uint8_t* data, size_t len, uint8_t sequenceNumber) {
       break;
 
     case DIRCON_MSGID_ENABLE_CHARACTERISTIC_NOTIFICATIONS:
-      if ((this->Length == 16) || (this->Length == 17)) {
+      if ((this->Length >= 16)) {
         // Update ENABLE_CHARACTERISTIC_NOTIFICATIONS UUID parsing
         this->UUID = bytesToUuid(data + DIRCON_MESSAGE_HEADER_LENGTH, 0);
         parsedBytes += 16;
-        if (this->Length == 17) {
+        if (this->Length >= 17) {
           this->Request = true;
           this->AdditionalData.clear();
           this->AdditionalData.push_back((uint8_t)data[DIRCON_MESSAGE_HEADER_LENGTH + 16]);
@@ -313,16 +317,6 @@ size_t DirConMessage::parse(uint8_t* data, size_t len, uint8_t sequenceNumber) {
       return 0;
       break;
   }
-
-#ifdef DEBUG_DIRCON_MESSAGES
-  // Print the incoming raw message bytes to serial if parsing was successful
-  if (parsedBytes > 0 && this->Identifier != DIRCON_MSGID_ERROR) {
-    // Create a buffer with the parsed data
-    uint8_t buffer[DIRCON_MESSAGE_HEADER_LENGTH + this->Length];
-    memcpy(buffer, data, parsedBytes);
-    printRawBytesToSerial(buffer, parsedBytes, true);
-  }
-#endif
 
   return parsedBytes;
 }

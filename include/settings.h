@@ -371,7 +371,7 @@ constexpr const char* ANY = "any";
 // #define CUSTOM_CHAR_DEBUG
 
 // Uncomment to enable DirCon message logging to serial monitor (not logger)
-// #define DEBUG_DIRCON_MESSAGES
+#define DEBUG_DIRCON_MESSAGES
 
 // uncomment to enable bench testing of ptab4pwr
 // #define TEST_PTAB4PWR
