@@ -399,12 +399,15 @@ bool DirConManager::processDirConMessage(DirConMessage* message, size_t clientIn
 
       if (characteristic == nullptr) {
         sendErrorResponse(DIRCON_MSGID_WRITE_CHARACTERISTIC, message->SequenceNumber, DIRCON_RESPCODE_CHARACTERISTIC_NOT_FOUND, clientIndex);
+        SS2K_LOG(DIRCON_LOG_TAG, "Write characteristic failed: characteristic %s not found", message->UUID.toString().c_str());
         return false;
       }
 
       // Check if write is allowed based on properties
       if (!(characteristic->getProperties() & NIMBLE_PROPERTY::WRITE)) {
         sendErrorResponse(DIRCON_MSGID_WRITE_CHARACTERISTIC, message->SequenceNumber, DIRCON_RESPCODE_CHARACTERISTIC_OPERATION_NOT_SUPPORTED, clientIndex);
+        // log which characteristic failed
+        SS2K_LOG(DIRCON_LOG_TAG, "Write operation not supported for characteristic %s", characteristic->getUUID().toString().c_str());
         return false;
       }
 
@@ -433,12 +436,14 @@ bool DirConManager::processDirConMessage(DirConMessage* message, size_t clientIn
 
       if (characteristic == nullptr) {
         sendErrorResponse(DIRCON_MSGID_ENABLE_CHARACTERISTIC_NOTIFICATIONS, message->SequenceNumber, DIRCON_RESPCODE_CHARACTERISTIC_NOT_FOUND, clientIndex);
+        SS2K_LOG(DIRCON_LOG_TAG, "Enable notifications failed: characteristic %s not found", message->UUID.toString().c_str());
         return false;
       }
 
       // Check if notifications are allowed based on properties
       if (!(characteristic->getProperties() & NIMBLE_PROPERTY::NOTIFY)) {
         sendErrorResponse(DIRCON_MSGID_ENABLE_CHARACTERISTIC_NOTIFICATIONS, message->SequenceNumber, DIRCON_RESPCODE_CHARACTERISTIC_OPERATION_NOT_SUPPORTED, clientIndex);
+        SS2K_LOG(DIRCON_LOG_TAG, "Notifications not supported for characteristic %s", characteristic->getUUID().toString().c_str());
         return false;
       }
 
