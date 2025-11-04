@@ -9,7 +9,6 @@
 #include "Version_Converter.h"
 #include "Builtin_Pages.h"
 #include "HTTP_Server_Basic.h"
-#include "cert.h"
 #include "SS2KLog.h"
 #include "DirConManager.h"
 #include <WebServer.h>
@@ -24,6 +23,7 @@
 #include <ArduinoJson.h>
 #include <BLE_Custom_Characteristic.h>
 #include <Preferences.h>
+#include <esp_crt_bundle.h>
 
 File fsUploadFile;
 
@@ -733,16 +733,24 @@ void HTTP_Server::stop() {
   server.close();
 }
 
+// Helper function to setup secure WiFi client with certificate bundle
+// This uses ESP-IDF's built-in certificate bundle instead of hardcoded certificates
+// The certificate bundle is maintained by Espressif and includes all major root CAs
+void setupSecureClient(WiFiClientSecure& client) {
+  // Attach the ESP-IDF certificate bundle which contains trusted root CAs
+  // This replaces the need for hardcoded certificates in cert.h
+  client.setCACertBundle(esp_crt_bundle_attach);
+}
+
 // github fingerprint
 // 70:94:DE:DD:E6:C4:69:48:3A:92:70:A1:48:56:78:2D:18:64:E0:B7
 
 void HTTP_Server::FirmwareUpdate() {
   HTTPClient http;
   WiFiClientSecure localClient;
-  localClient.setCACert(rootCACertificate);
+  setupSecureClient(localClient);
   SS2K_LOG(HTTP_SERVER_LOG_TAG, "Checking for newer firmware:");
-  http.begin(userConfig->getFirmwareUpdateURL() + String(FW_VERSIONFILE),
-             rootCACertificate);  // check version URL
+  http.begin(localClient, userConfig->getFirmwareUpdateURL() + String(FW_VERSIONFILE));  // check version URL
   delay(100);
   int httpCode = http.GET();  // get data from version file
   delay(100);
@@ -771,7 +779,7 @@ void HTTP_Server::FirmwareUpdate() {
     if (((availableVer > currentVer) && (userConfig->getAutoUpdate())) || (!LittleFS.exists("/index.html"))) {
       //////////////// Update LittleFS//////////////
       SS2K_LOG(HTTP_SERVER_LOG_TAG, "Updating FileSystem");
-      http.begin(DATA_UPDATEURL DATA_FILELIST, rootCACertificate);  // check version URL
+      http.begin(localClient, DATA_UPDATEURL DATA_FILELIST);  // check version URL
       delay(100);
       httpCode = http.GET();  // get data from version file
       delay(100);
@@ -798,8 +806,7 @@ void HTTP_Server::FirmwareUpdate() {
       // iterate through file list and download files individually
       for (JsonVariant v : files) {
         String fileName = "/" + v.as<String>();
-        http.begin(DATA_UPDATEURL + fileName,
-                   rootCACertificate);  // check version URL
+        http.begin(localClient, DATA_UPDATEURL + fileName);  // check version URL
         delay(100);
         httpCode = http.GET();
         delay(100);

@@ -29,8 +29,7 @@ Install required tools and dependencies:
 - `pio check -e debug` -- runs cppcheck static analysis on debug environment. Takes 2-5 minutes. **Network Issues**: May fail with HTTPClientError due to platform download restrictions.
 - Python build scripts (always work):
   - `python git_tag_macro.py` -- generates firmware version from git tags
-  - `python build_date_macro.py` -- generates build timestamp  
-  - `python cert_updater.py` -- updates SSL certificates (may fail with network issues)
+  - `python build_date_macro.py` -- generates build timestamp
 
 ### Run the Application
 - **Build First**: Always complete the bootstrap and build steps before attempting to run.
@@ -99,7 +98,6 @@ External libraries loaded automatically by PlatformIO:
 
 ### Known Issues and Limitations
 - **Network Connectivity**: Platform and toolchain downloads may fail due to firewall restrictions. All build commands (`pio run`, `pio test`, `pio check`) require internet access on first run.
-- **SSL Certificates**: cert_updater.py may fail to fetch current certificates due to network restrictions
 - **Hardware Testing**: Cannot test actual motor control or BLE communication without physical hardware
 - **Build Times**: Initial builds require internet access and take 15-45 minutes due to large platform downloads
 
@@ -107,7 +105,6 @@ External libraries loaded automatically by PlatformIO:
 - **HTTPClientError during build**: This indicates network/firewall restrictions preventing platform downloads. No workaround available in restricted environments.
 - **Platform not found**: Run `pio platform install espressif32` to manually install the ESP32 platform (requires internet).
 - **Test failures**: Ensure you're running tests in native environment: `pio test -e native`
-- **SSL certificate warnings**: Update certificates with `python cert_updater.py` or manually update `include/cert.h`
 - **Build flag errors**: The Python scripts in build_flags must execute successfully. Test them individually if build fails.
 
 ### Environment Verification
@@ -123,7 +120,7 @@ python git_tag_macro.py && python build_date_macro.py
 
 ### Debugging Tips
 - Use `pio device monitor` to view serial output when connected to ESP32 hardware
-- Check `include/cert.h` if experiencing SSL errors during firmware updates
+- HTTPS connections use ESP-IDF's built-in certificate bundle (no manual certificate management needed)
 - Monitor memory usage with DEBUG_STACK enabled in settings.h
 - BLE debugging available through web interface at `/develop.html`
 
