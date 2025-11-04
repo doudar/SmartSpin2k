@@ -855,8 +855,6 @@ bool HTTP_Server::installGitHubRelease() {
         }
       }
       
-      http.end();
-      
       if (assetUrl.length() > 0) {
         SS2K_LOG(HTTP_SERVER_LOG_TAG, "Downloading firmware from: %s", assetUrl.c_str());
         ss2k->stopTasks();
@@ -887,17 +885,15 @@ bool HTTP_Server::installGitHubRelease() {
         }
       } else {
         SS2K_LOG(HTTP_SERVER_LOG_TAG, "No firmware.bin asset found in release");
-        http.end();
       }
     } else {
       SS2K_LOG(HTTP_SERVER_LOG_TAG, "Failed to parse GitHub API response");
-      http.end();
     }
   } else {
     SS2K_LOG(HTTP_SERVER_LOG_TAG, "GitHub API request failed with code: %d", httpCode);
-    http.end();
   }
   
+  http.end();
   return success;
 }
 
