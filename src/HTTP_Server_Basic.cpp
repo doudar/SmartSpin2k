@@ -282,7 +282,7 @@ void HTTP_Server::start() {
     ss2k->rebootFlag = true;
   });
 
-  server.on("/downloadFirmware", []() {
+  server.on("/downloadFirmware", HTTP_ANY, []() {
     if (!server.hasArg("url")) {
       server.send(400, "text/plain", "Missing url parameter");
       return;
@@ -292,12 +292,25 @@ void HTTP_Server::start() {
     
     HTTPClient http;
     WiFiClientSecure client;
-    client.setCACert(rootCACertificate);
     
+    // Try with bundled certificate first
+    client.setCACert(rootCACertificate);
     http.begin(client, firmwareUrl);
     http.addHeader("User-Agent", "SmartSpin2k");
     
     int httpCode = http.GET();
+    
+    // If certificate validation fails, retry without validation
+    // This ensures updates work even if bundled cert expires
+    if (httpCode == HTTPC_ERROR_CONNECTION_REFUSED || httpCode < 0) {
+      SS2K_LOG(HTTP_SERVER_LOG_TAG, "Certificate validation failed, retrying without validation");
+      http.end();
+      client.setInsecure(); // Skip certificate validation
+      http.begin(client, firmwareUrl);
+      http.addHeader("User-Agent", "SmartSpin2k");
+      httpCode = http.GET();
+    }
+    
     if (httpCode == HTTP_CODE_OK) {
       int len = http.getSize();
       WiFiClient * stream = http.getStreamPtr();
