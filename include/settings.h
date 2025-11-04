@@ -17,8 +17,8 @@ const char* const DEVICE_NAME = "SmartSpin2k";
 const char* const DEFAULT_PASSWORD = "password";
 
 // default URL To get Updates From.
-// Uses ESP-IDF's built-in certificate bundle for HTTPS connections.
-// No need to manually update certificates - they're maintained by Espressif.
+// HTTPS connections use setInsecure() to avoid certificate expiration issues.
+// No manual certificate management needed.
 #define FW_UPDATEURL "https://raw.githubusercontent.com/doudar/OTAUpdates/main/"
 
 // File that contains Version info
