@@ -28,7 +28,6 @@ class HTTP_Server {
   static void webClientUpdate();
   
   String checkGitHubRelease();
-  bool installGitHubRelease();
 
   HTTP_Server() { internetConnection = false; }
 };

@@ -292,17 +292,6 @@ void HTTP_Server::start() {
     }
   });
 
-  server.on("/installGitHubRelease", []() {
-    SS2K_LOG(HTTP_SERVER_LOG_TAG, "Installing latest GitHub release");
-    bool success = httpServer.installGitHubRelease();
-    if (success) {
-      String response = "<!DOCTYPE html><html><body><h1>Firmware Update Started</h1><p>The device will reboot after the update completes. This may take a few minutes.</p></body></html>";
-      server.send(200, "text/html", response);
-    } else {
-      server.send(500, "text/plain", "Failed to start firmware update");
-    }
-  });
-
   server.on("/hrslider", []() {
     String value = server.arg("value");
     if (value == "enable") {
@@ -821,81 +810,7 @@ String HTTP_Server::checkGitHubRelease() {
   return result;
 }
 
-bool HTTP_Server::installGitHubRelease() {
-  HTTPClient http;
-  WiFiClientSecure client;
-  client.setCACert(rootCACertificate);
-  
-  String apiUrl = "https://api.github.com/repos/doudar/SmartSpin2k/releases/latest";
-  SS2K_LOG(HTTP_SERVER_LOG_TAG, "Fetching release info for installation");
-  
-  http.begin(client, apiUrl);
-  http.addHeader("Accept", "application/vnd.github.v3+json");
-  http.addHeader("User-Agent", "SmartSpin2k");
-  
-  int httpCode = http.GET();
-  bool success = false;
-  
-  if (httpCode == HTTP_CODE_OK) {
-    String payload = http.getString();
-    JsonDocument doc;
-    DeserializationError error = deserializeJson(doc, payload);
-    
-    if (!error) {
-      String tagName = doc["tag_name"].as<String>();
-      String assetUrl = "";
-      
-      // Find firmware.bin asset
-      JsonArray assets = doc["assets"].as<JsonArray>();
-      for (JsonVariant asset : assets) {
-        String assetName = asset["name"].as<String>();
-        if (assetName == "firmware.bin") {
-          assetUrl = asset["browser_download_url"].as<String>();
-          break;
-        }
-      }
-      
-      if (assetUrl.length() > 0) {
-        SS2K_LOG(HTTP_SERVER_LOG_TAG, "Downloading firmware from: %s", assetUrl.c_str());
-        ss2k->stopTasks();
-        ss2k->isUpdating = true;
-        
-        WiFiClientSecure updateClient;
-        updateClient.setCACert(rootCACertificate);
-        
-        t_httpUpdate_return ret = httpUpdate.update(updateClient, assetUrl);
-        
-        switch (ret) {
-          case HTTP_UPDATE_FAILED:
-            SS2K_LOG(HTTP_SERVER_LOG_TAG, "HTTP_UPDATE_FAILED Error %d : %s", 
-                     httpUpdate.getLastError(), httpUpdate.getLastErrorString().c_str());
-            ss2k->isUpdating = false;
-            break;
-            
-          case HTTP_UPDATE_NO_UPDATES:
-            SS2K_LOG(HTTP_SERVER_LOG_TAG, "HTTP_UPDATE_NO_UPDATES");
-            ss2k->isUpdating = false;
-            break;
-            
-          case HTTP_UPDATE_OK:
-            SS2K_LOG(HTTP_SERVER_LOG_TAG, "HTTP_UPDATE_OK - Rebooting");
-            success = true;
-            ss2k->rebootFlag = true;
-            break;
-        }
-      } else {
-        SS2K_LOG(HTTP_SERVER_LOG_TAG, "No firmware.bin asset found in release");
-      }
-    } else {
-      SS2K_LOG(HTTP_SERVER_LOG_TAG, "Failed to parse GitHub API response");
-    }
-  } else {
-    SS2K_LOG(HTTP_SERVER_LOG_TAG, "GitHub API request failed with code: %d", httpCode);
-  }
-  
-  http.end();
-  return success;
-}
+
 
 // github fingerprint
 // 70:94:DE:DD:E6:C4:69:48:3A:92:70:A1:48:56:78:2D:18:64:E0:B7
