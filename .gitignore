@@ -23,3 +23,4 @@ C/Users/
 dependencies.lock
 .vscode/settings.json
 *.map
+_codeql_detected_source_root
