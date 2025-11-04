@@ -404,7 +404,7 @@ void ScanCallbacks::onResult(const NimBLEAdvertisedDevice* advertisedDevice) {
       //check to see if we're already connected to this device
       for (size_t i = 0; i < NUM_BLE_DEVICES; i++) {
         if (spinBLEClient.myBLEDevices[i].advertisedDevice != nullptr) {
-          if (aDevName.c_str() == spinBLEClient.myBLEDevices[i].uniqueName.c_str()) {
+          if (aDevName == spinBLEClient.myBLEDevices[i].uniqueName) {
             SS2K_LOG(BLE_CLIENT_LOG_TAG, "%s already connected on slot %d", aDevName.c_str(), i);
             return;  // Already connected to this device
           }
