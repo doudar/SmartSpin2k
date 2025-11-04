@@ -236,7 +236,7 @@ String OTAServerIndex =
     "dlPrg.style.width = '0%';"
     "dlPrg.innerHTML = '0%';"
     "var xhr = new XMLHttpRequest();"
-    "xhr.open('GET', currentReleaseData.assetUrl, true);"
+    "xhr.open('GET', '/downloadFirmware?url=' + encodeURIComponent(currentReleaseData.assetUrl), true);"
     "xhr.responseType = 'blob';"
     "xhr.onprogress = function(e) {"
     "if (e.lengthComputable) {"

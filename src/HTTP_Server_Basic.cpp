@@ -282,6 +282,49 @@ void HTTP_Server::start() {
     ss2k->rebootFlag = true;
   });
 
+  server.on("/downloadFirmware", []() {
+    if (!server.hasArg("url")) {
+      server.send(400, "text/plain", "Missing url parameter");
+      return;
+    }
+    String firmwareUrl = server.arg("url");
+    SS2K_LOG(HTTP_SERVER_LOG_TAG, "Proxying firmware download from: %s", firmwareUrl.c_str());
+    
+    HTTPClient http;
+    WiFiClientSecure client;
+    client.setCACert(rootCACertificate);
+    
+    http.begin(client, firmwareUrl);
+    http.addHeader("User-Agent", "SmartSpin2k");
+    
+    int httpCode = http.GET();
+    if (httpCode == HTTP_CODE_OK) {
+      int len = http.getSize();
+      WiFiClient * stream = http.getStreamPtr();
+      
+      server.setContentLength(len);
+      server.send(200, "application/octet-stream", "");
+      
+      uint8_t buff[512];
+      while (http.connected() && (len > 0 || len == -1)) {
+        size_t size = stream->available();
+        if (size) {
+          int c = stream->readBytes(buff, ((size > sizeof(buff)) ? sizeof(buff) : size));
+          server.client().write(buff, c);
+          if (len > 0) {
+            len -= c;
+          }
+        }
+        delay(1);
+      }
+      SS2K_LOG(HTTP_SERVER_LOG_TAG, "Firmware proxy download complete");
+    } else {
+      SS2K_LOG(HTTP_SERVER_LOG_TAG, "Firmware proxy download failed: %d", httpCode);
+      server.send(httpCode, "text/plain", "Failed to download firmware");
+    }
+    http.end();
+  });
+
   server.on("/hrslider", []() {
     String value = server.arg("value");
     if (value == "enable") {
