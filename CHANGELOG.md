@@ -10,6 +10,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Added
 
 ### Changed
+- **Certificate Management**: Switched from hardcoded certificates to ESP-IDF's built-in certificate bundle for HTTPS connections. This eliminates the need to manually update certificates and prevents connection failures due to expired certificates. The certificate bundle is maintained by Espressif and automatically includes all major root CAs.
+- Removed `include/cert.h` and `cert_updater.py` as they are no longer needed.
 
 ### Hardware
 
