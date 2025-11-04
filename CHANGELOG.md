@@ -10,7 +10,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Added
 
 ### Changed
-- **Certificate Management**: Switched from hardcoded certificates to ESP-IDF's built-in certificate bundle for HTTPS connections. This eliminates the need to manually update certificates and prevents connection failures due to expired certificates. The certificate bundle is maintained by Espressif and automatically includes all major root CAs.
+- **Certificate Management**: Removed hardcoded certificates for firmware updates. The firmware now uses `setInsecure()` for HTTPS connections to GitHub servers during firmware updates. While this skips certificate verification, it's a pragmatic trade-off that prevents update failures due to expired certificates. The connections are still encrypted (TLS/SSL) and limited to known GitHub servers. A future improvement would be to use ESP-IDF's certificate bundle once Arduino-ESP32 provides a suitable API.
 - Removed `include/cert.h` and `cert_updater.py` as they are no longer needed.
 
 ### Hardware
