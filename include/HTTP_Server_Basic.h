@@ -26,8 +26,6 @@ class HTTP_Server {
   static void FirmwareUpdate();
   
   static void webClientUpdate();
-  
-  String checkGitHubRelease();
 
   HTTP_Server() { internetConnection = false; }
 };

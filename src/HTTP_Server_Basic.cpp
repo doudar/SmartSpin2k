@@ -282,16 +282,6 @@ void HTTP_Server::start() {
     ss2k->rebootFlag = true;
   });
 
-  server.on("/checkGitHubRelease", []() {
-    SS2K_LOG(HTTP_SERVER_LOG_TAG, "Checking GitHub for latest release");
-    String releaseInfo = httpServer.checkGitHubRelease();
-    if (releaseInfo.length() > 0) {
-      server.send(200, "application/json", releaseInfo);
-    } else {
-      server.send(500, "text/plain", "Failed to check for updates");
-    }
-  });
-
   server.on("/hrslider", []() {
     String value = server.arg("value");
     if (value == "enable") {
@@ -741,73 +731,6 @@ void HTTP_Server::stop() {
   SS2K_LOG(HTTP_SERVER_LOG_TAG, "Stopping Http Server");
   server.stop();
   server.close();
-}
-
-String HTTP_Server::checkGitHubRelease() {
-  HTTPClient http;
-  WiFiClientSecure client;
-  client.setCACert(rootCACertificate);
-  
-  String apiUrl = "https://api.github.com/repos/doudar/SmartSpin2k/releases/latest";
-  SS2K_LOG(HTTP_SERVER_LOG_TAG, "Querying GitHub API: %s", apiUrl.c_str());
-  
-  http.begin(client, apiUrl);
-  http.addHeader("Accept", "application/vnd.github.v3+json");
-  http.addHeader("User-Agent", "SmartSpin2k");
-  
-  int httpCode = http.GET();
-  String result = "";
-  
-  if (httpCode == HTTP_CODE_OK) {
-    String payload = http.getString();
-    JsonDocument doc;
-    DeserializationError error = deserializeJson(doc, payload);
-    
-    if (!error) {
-      String tagName = doc["tag_name"].as<String>();
-      String releaseName = doc["name"].as<String>();
-      String releaseBody = doc["body"].as<String>();
-      String publishedAt = doc["published_at"].as<String>();
-      
-      // Find firmware.bin asset
-      String assetUrl = "";
-      JsonArray assets = doc["assets"].as<JsonArray>();
-      for (JsonVariant asset : assets) {
-        String assetName = asset["name"].as<String>();
-        if (assetName == "firmware.bin") {
-          assetUrl = asset["browser_download_url"].as<String>();
-          break;
-        }
-      }
-      
-      // Compare versions
-      Version currentVer(FIRMWARE_VERSION);
-      Version releaseVer(tagName.c_str());
-      bool isNewer = releaseVer > currentVer;
-      
-      // Build JSON response
-      JsonDocument responseDoc;
-      responseDoc["currentVersion"] = FIRMWARE_VERSION;
-      responseDoc["latestVersion"] = tagName;
-      responseDoc["releaseName"] = releaseName;
-      responseDoc["releaseNotes"] = releaseBody;
-      responseDoc["publishedAt"] = publishedAt;
-      responseDoc["isNewer"] = isNewer;
-      responseDoc["assetUrl"] = assetUrl;
-      responseDoc["hasAsset"] = (assetUrl.length() > 0);
-      
-      serializeJson(responseDoc, result);
-      SS2K_LOG(HTTP_SERVER_LOG_TAG, "Latest release: %s (current: %s, newer: %s)", 
-               tagName.c_str(), FIRMWARE_VERSION, isNewer ? "yes" : "no");
-    } else {
-      SS2K_LOG(HTTP_SERVER_LOG_TAG, "Failed to parse GitHub API response");
-    }
-  } else {
-    SS2K_LOG(HTTP_SERVER_LOG_TAG, "GitHub API request failed with code: %d", httpCode);
-  }
-  
-  http.end();
-  return result;
 }
 
 
