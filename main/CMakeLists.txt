@@ -10,6 +10,7 @@ idf_component_register(
     REQUIRES
         arduino
         SS2K
+        ArduinoCompat
         esp_http_server
         esp_https_server
         esp_http_client

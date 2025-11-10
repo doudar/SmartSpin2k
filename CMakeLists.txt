@@ -26,3 +26,6 @@ include($ENV{IDF_PATH}/tools/cmake/project.cmake)
 
 # Define the project
 project(SmartSpin2k)
+
+# Create LittleFS partition image from data directory
+littlefs_create_partition_image(littlefs ${CMAKE_SOURCE_DIR}/data FLASH_IN_PROJECT)
