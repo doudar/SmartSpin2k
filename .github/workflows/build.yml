@@ -12,35 +12,25 @@ jobs:
       - uses: actions/checkout@v5
         with:
           fetch-depth: 0
-      - name: Cache PlatformIO
-        uses: actions/cache@v4
-        with:
-          path: ~/.platformio
-          key: ${{ runner.os }}-platformio-${{ hashFiles('platformio.ini') }}
-          restore-keys: |
-            ${{ runner.os }}-platformio-
+      
       - name: Ensure changelog is updated
         uses: dangoslen/changelog-enforcer@v3.6.1
-      - name: Set up python
-        uses: actions/setup-python@v6
-        with:
-          python-version: '3.11'
-          architecture: 'x64'
-      - name: Upgrade pip tooling
-        run: |
-          python -m pip install --upgrade pip setuptools wheel
+      
       - name: Get current date
         id: date
         run: echo "date=$(date +'%y.%-m.%-d')" >> $GITHUB_OUTPUT
+      
       - name: Test with environment variables
         run: echo $TAG_NAME - $RELEASE_NAME
         env:
           TAG_NAME: ${{ steps.date.outputs.date }}
           RELEASE_NAME: ${{ steps.date.outputs.date }}- 
+      
       - uses: rickstaa/action-create-tag@v1
         with:
           tag: ${{ steps.date.outputs.date }}
           message: "Automatic release ${{ steps.date.outputs.date }}"
+      
       - uses: dorny/paths-filter@v3
         id: changes
         with:
@@ -49,39 +39,43 @@ jobs:
               - '!(Hardware/**)'
             hardware:
               - 'Hardware/**'
-      - name: Show python version
-        run: python --version
-      - name: Install PlatformIO
-        run: python -m pip install platformio
-      - name: Pre-install PlatformIO packages (release env)
-        run: platformio pkg install -e release
-      - name: Ensure ESP-IDF component manager is available
-        shell: bash
+      
+      - name: Install ESP-IDF
+        uses: espressif/esp-idf-ci-action@v1
+        with:
+          esp_idf_version: v5.4
+          target: esp32
+      
+      - name: Setup external dependencies
         run: |
-          set -euo pipefail
-          PIO_HOME="$HOME/.platformio"
-          # Try to locate PlatformIO-managed ESP-IDF virtualenv
-          ESPIDF_VENV=$(ls -d "$PIO_HOME/penv/.espidf-"* 2>/dev/null | head -n 1 || true)
-          if [ -z "$ESPIDF_VENV" ]; then
-            # Trigger framework fetch which usually creates the venv
-            platformio platform show espressif32 || true
-            ESPIDF_VENV=$(ls -d "$PIO_HOME/penv/.espidf-"* 2>/dev/null | head -n 1 || true)
-          fi
-          if [ -n "$ESPIDF_VENV" ] && [ -x "$ESPIDF_VENV/bin/python" ]; then
-            "$ESPIDF_VENV/bin/python" -m pip install --upgrade pip setuptools wheel
-            "$ESPIDF_VENV/bin/python" -m pip install --upgrade idf-component-manager
-          else
-            echo "ESP-IDF venv not found yet; proceeding. PlatformIO should install deps during build."
-          fi
+          chmod +x setup_dependencies.sh
+          ./setup_dependencies.sh
+      
       - name: Check pre-commit hooks
         uses: pre-commit/action@v3.0.1
+      
       - name: Build firmware
-        run: platformio run -e release
-      - name: Build filesystem
-        run: platformio run -e release --target buildfs
+        run: |
+          . $IDF_PATH/export.sh
+          idf.py set-target esp32
+          idf.py build
+      
+      - name: Build filesystem (LittleFS)
+        run: |
+          . $IDF_PATH/export.sh
+          idf.py littlefs-create-partition-image littlefs data
+      
       - name: Create artifacts
         run: |
-          7z a SmartSpin2kFirmware-${{ steps.date.outputs.date }}.bin.zip ./.pio/build/release/*.bin
+          mkdir -p artifacts
+          cp build/SmartSpin2k.bin artifacts/
+          cp build/bootloader/bootloader.bin artifacts/
+          cp build/partition_table/partition-table.bin artifacts/
+          cp build/littlefs.bin artifacts/ || echo "LittleFS image not found, skipping"
+          cd artifacts
+          7z a ../SmartSpin2kFirmware-${{ steps.date.outputs.date }}.bin.zip *.bin
+          cd ..
+      
       - name: Archive
         uses: actions/upload-artifact@v4
         with:

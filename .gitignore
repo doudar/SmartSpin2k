@@ -1,25 +1,38 @@
+# PlatformIO (legacy - can be removed after full migration)
 .pio/
+
+# VSCode
 .vscode/c_cpp_properties.json
 .vscode/launch.json
 .vscode/ipch
 .vscode/extensions.json
+.vscode/settings.json
+
+# IDEs
 .idea/
+
+# ESP-IDF Build artifacts
+/build/
+/managed_components/
+/dependencies.lock
+sdkconfig
+sdkconfig.old
+
+# Test artifacts
 test/tmp_pio_test_transport.cpp
 test/output/
+
+# User config and logs
 data/config.txt
 include/telegram_token.h
 Errors
 SmartSpin_logfile.txt
 *.err
-.DS_Store
-build/CMakeCache.txt
 *.log
+*.map
+
+# System files
 .DS_Store
 .aider*
 .env
-C/Users/
-/build
-/managed_components
-dependencies.lock
-.vscode/settings.json
-*.map
+C/Users/

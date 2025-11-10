@@ -52,14 +52,49 @@ SmartSpin2k is a great way to turn any spin bike into a smart trainer. With its 
 ### Documentation
 Everything you need to know is in the [SS2K Wiki](https://github.com/doudar/SmartSpin2k/wiki)
 
-## Contributing
-1. Install Microsoft Visual Code. https://code.visualstudio.com/
-2. Install PlatformIO into Visual Code. https://platformio.org/platformio-ide
+## Building from Source
+
+SmartSpin2k now uses ESP-IDF (Espressif IoT Development Framework) with Arduino as a component.
+
+### Quick Start
+
+1. **Install ESP-IDF v5.4+**
+   - Follow the [ESP-IDF installation guide](https://docs.espressif.com/projects/esp-idf/en/latest/esp32/get-started/index.html)
+   - Install for ESP32: `./install.sh esp32`
+   - Source the environment: `. $HOME/esp/esp-idf/export.sh`
+
+2. **Clone this repository**
+   ```bash
+   git clone https://github.com/doudar/SmartSpin2k.git
+   cd SmartSpin2k
+   ```
+
+3. **Setup dependencies**
+   ```bash
+   ./setup_dependencies.sh
+   ```
+
+4. **Build and flash**
+   ```bash
+   idf.py set-target esp32
+   idf.py build
+   idf.py flash
+   ```
+
+For detailed build instructions, see [BUILDING.md](BUILDING.md).
+
+### VSCode Development
+
+1. Install [Microsoft Visual Studio Code](https://code.visualstudio.com/)
+2. Install the [ESP-IDF extension](https://marketplace.visualstudio.com/items?itemName=espressif.esp-idf-extension)
 3. Install Python https://www.python.org/downloads/
-4. Install Pre-commit. https://pre-commit.com `py -m pip install pre-commit`
-5. Follow any install warnings to add pre-commit to your path. 
-6. Install pre-push git hooks: `pre-commit install --hook-type pre-push`
-7. Open this project in PlatformIO.
+4. Install Pre-commit: `pip install pre-commit`
+5. Install pre-push git hooks: `pre-commit install --hook-type pre-push`
+6. Open this project in VSCode
+
+### Contributing
+
+See [BUILDING.md](BUILDING.md) for comprehensive build and development instructions.
 
 ## Important announcement for existing users
 If you experience an issue after upgrading firmware, please follow these instructions in the Wiki. Flashing instructions are available [HERE.](https://github.com/doudar/SmartSpin2k/wiki/Loading-Software)
