@@ -101,7 +101,7 @@ jobs:
           body: ${{ github.event.head_commit.message }}
           files: |
             SmartSpin2kFirmware-${{ steps.date.outputs.date }}.bin.zip
-              update-changelog:
+      
       - name: Update changelog
         uses: thomaseizinger/keep-a-changelog-new-release@v3
         with:
