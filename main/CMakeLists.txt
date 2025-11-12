@@ -8,7 +8,7 @@ idf_component_register(
     SRCS ${SRCS}
     INCLUDE_DIRS "." "../include"
     REQUIRES
-        arduino
+        arduino-esp32
         SS2K
         ArduinoCompat
         esp_http_server

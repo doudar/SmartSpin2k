@@ -10,7 +10,7 @@ file(GLOB_RECURSE COMPONENT_SRCS
 idf_component_register(
     SRCS ${COMPONENT_SRCS}
     INCLUDE_DIRS "include"
-    REQUIRES arduino bt
+    REQUIRES arduino-esp32 bt
 )
 
 # Add build flags
