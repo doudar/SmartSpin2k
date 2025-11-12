@@ -7,7 +7,7 @@
 
 #pragma once
 
-#include <NimBLEUUID.h>
+#include <NimBLEDevice.h>
 
 // SmartSpin2k custom UUID's
 #define SMARTSPIN2K_SERVICE_UUID        NimBLEUUID("77776277-7877-7774-4466-896665500000")

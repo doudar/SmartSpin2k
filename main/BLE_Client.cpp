@@ -989,7 +989,7 @@ String SpinBLEClient::adevName2UniqueName(const NimBLEAdvertisedDevice* inDev) {
   }
 }
 
-void SpinBLEAdvertisedDevice::set(const NimBLEAdvertisedDevice* device, int id, BLEUUID inServiceUUID, BLEUUID inCharUUID) {
+void SpinBLEAdvertisedDevice::set(const NimBLEAdvertisedDevice* device, int id,NimBLEUUID inServiceUUID,NimBLEUUID inCharUUID) {
   // Defensive null check to prevent crashes
   if (!device) {
     SS2K_LOGE(BLE_CLIENT_LOG_TAG, "ERROR: Attempt to set null device!");
@@ -1002,8 +1002,8 @@ void SpinBLEAdvertisedDevice::set(const NimBLEAdvertisedDevice* device, int id, 
   // Set the unique name for stable device identification
   this->uniqueName        = adevName.c_str();
   this->connectedClientID = id;
-  this->serviceUUID       = BLEUUID(inServiceUUID);
-  this->charUUID          = BLEUUID(inCharUUID);
+  this->serviceUUID       =NimBLEUUID(inServiceUUID);
+  this->charUUID          =NimBLEUUID(inCharUUID);
 
   // Create the queue if it doesn't exist
   if (this->dataBufferQueue == nullptr) {
@@ -1020,7 +1020,7 @@ void SpinBLEAdvertisedDevice::set(const NimBLEAdvertisedDevice* device, int id, 
       // Get all services
       const std::vector<NimBLERemoteService*>& services = pClient->getServices(true);
       for (auto& pService : services) {
-        BLEUUID serviceUUID = pService->getUUID();
+       NimBLEUUID serviceUUID = pService->getUUID();
 
         if (serviceUUID == HEARTSERVICE_UUID) {
           this->isHRM                = true;

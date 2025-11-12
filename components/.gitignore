@@ -1,0 +1,6 @@
+# External dependencies to be cloned manually or as submodules
+esp-nimble-cpp/
+TMCStepper/
+ArduinoJson/
+FastAccelStepper/
+ArduinoWebsockets/
