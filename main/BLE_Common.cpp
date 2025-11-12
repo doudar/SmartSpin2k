@@ -67,7 +67,7 @@ void BLECommunications() {
           if (BLEDevice::getClientByHandle(_BLEd.connectedClientID)) {                             // nullptr check
             BLEClient* pClient = NimBLEDevice::getClientByHandle(_BLEd.connectedClientID);
             // Client connected with a valid UUID registered
-            if ((_BLEd.serviceUUID != BLEUUID((uint16_t)0x0000)) && (pClient->isConnected())) {
+            if ((_BLEd.serviceUUID !=NimBLEUUID((uint16_t)0x0000)) && (pClient->isConnected())) {
               // Check for data timeout and trigger disconnect if needed
               if (_BLEd.lastDataUpdateTime > 0) {  // Only check if we've received data before
                 unsigned long timeSinceLastData = millis() - _BLEd.lastDataUpdateTime;

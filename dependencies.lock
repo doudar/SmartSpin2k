@@ -9,6 +9,12 @@ dependencies:
       registry_url: https://components.espressif.com
       type: service
     version: 1.0.3
+  esp-nimble-cpp:
+    dependencies: []
+    source:
+      path: C:\Users\Anthony\Documents\GitHub\SmartSpin2k\components\esp-nimble-cpp
+      type: local
+    version: 2.3.1
   espressif/arduino-esp32:
     component_hash: b08668a01eaf1ecd61340a59bf965f03dd966c18b1aa7c8ae98d74cfe2a40258
     dependencies:
@@ -460,7 +466,8 @@ dependencies:
       type: service
     version: 1.20.2
 direct_dependencies:
+- esp-nimble-cpp
 - espressif/arduino-esp32
-manifest_hash: 65c92faccb5ae74ef3727960023c841428c03be80a560ead060883482de02d70
+manifest_hash: c7917fcbf8240c0ef3688f9ca700330b4a42a3b1483a8081d340d7ceb0cc1c5b
 target: esp32
 version: 2.0.0

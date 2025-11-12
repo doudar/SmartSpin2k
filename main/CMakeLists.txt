@@ -10,7 +10,6 @@ idf_component_register(
     REQUIRES
         arduino-esp32
         SS2K
-        ArduinoCompat
         esp_http_server
         esp_https_server
         esp_http_client
@@ -27,9 +26,9 @@ idf_component_register(
         esp_netif
         esp_eth
         app_update
+        esp-nimble-cpp
 )
 
 # Add build flags
-target_compile_options(${COMPONENT_LIB} PRIVATE
-    -std=gnu++17
-)
+# Use C++17 for C++ sources only
+target_compile_features(${COMPONENT_LIB} PRIVATE cxx_std_17)

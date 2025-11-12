@@ -1,6 +1,12 @@
 ## IDF Component Manager Manifest File
 dependencies:
   espressif/arduino-esp32: "^3.1.0"
-  # Note: External Arduino libraries (esp-nimble-cpp, TMCStepper, ArduinoJson, 
-  # FastAccelStepper, ArduinoWebsockets) will be downloaded and managed by 
-  # the CMakeLists.txt using FetchContent during the build process
+  # Use NimBLE C++ wrapper via Git so local builds don't need manual cloning
+  esp-nimble-cpp:
+    git: https://github.com/doudar/esp-nimble-cpp.git
+    # Optionally pin to a tag or commit for reproducibility
+    # version: "v1.4.0"
+  
+  # Note: Other Arduino-style libraries (TMCStepper, ArduinoJson, FastAccelStepper,
+  # ArduinoWebsockets) are typically vendored under components/ via setup_dependencies.sh
+  # because many don't ship IDF manifests. If needed, we can add wrappers later.

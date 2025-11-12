@@ -33,8 +33,8 @@ const uint16_t connectionParams[] = {24, 48, 0, 200};
 
 // Vector of supported BLE services and their corresponding characteristic UUIDs
 struct BLEServiceInfo {
-  BLEUUID serviceUUID;
-  BLEUUID characteristicUUID;
+ NimBLEUUID serviceUUID;
+ NimBLEUUID characteristicUUID;
   String name;
 };
 
@@ -128,9 +128,9 @@ void BLEFirmwareSetup(NimBLEServer* pServer);
 void bleClientTask(void* pvParameters);
 
 // UUID's the client has methods for
-// BLEUUID serviceUUIDs[4] = {FITNESSMACHINESERVICE_UUID,
+//NimBLEUUID serviceUUIDs[4] = {FITNESSMACHINESERVICE_UUID,
 // CYCLINGPOWERSERVICE_UUID, HEARTSERVICE_UUID, FLYWHEEL_UART_SERVICE_UUID};
-// BLEUUID charUUIDs[4] = {FITNESSMACHINEINDOORBIKEDATA_UUID,
+//NimBLEUUID charUUIDs[4] = {FITNESSMACHINEINDOORBIKEDATA_UUID,
 // CYCLINGPOWERMEASUREMENT_UUID, HEARTCHARACTERISTIC_UUID,
 // FLYWHEEL_UART_TX_UUID};
 
@@ -156,8 +156,8 @@ class SpinBLEAdvertisedDevice {
   std::string uniqueName = "";  // Stable identifier using adevName2UniqueName()
 
   int connectedClientID = BLE_HS_CONN_HANDLE_NONE;
-  BLEUUID serviceUUID   = (uint16_t)0x0000;
-  BLEUUID charUUID      = (uint16_t)0x0000;
+ NimBLEUUID serviceUUID   = (uint16_t)0x0000;
+ NimBLEUUID charUUID      = (uint16_t)0x0000;
   Measurement batt;
   bool isHRM           = false;
   bool isPM            = false;
@@ -168,7 +168,7 @@ class SpinBLEAdvertisedDevice {
   bool isPostConnected = false;
   unsigned long lastDataUpdateTime = 0;  // Reset disconnect detection timestamp
 
-  void set(const NimBLEAdvertisedDevice* device, int id = BLE_HS_CONN_HANDLE_NONE, BLEUUID inServiceUUID = (uint16_t)0x0000, BLEUUID inCharUUID = (uint16_t)0x0000);
+  void set(const NimBLEAdvertisedDevice* device, int id = BLE_HS_CONN_HANDLE_NONE,NimBLEUUID inServiceUUID = (uint16_t)0x0000,NimBLEUUID inCharUUID = (uint16_t)0x0000);
   void reset(bool resetAdvertisedDevice = true);
   bool enqueueData(uint8_t* data, size_t length, NimBLEUUID serviceUUID, NimBLEUUID charUUID);
   NotifyData dequeueData();

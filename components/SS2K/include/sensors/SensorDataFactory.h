@@ -8,9 +8,9 @@
 #pragma once
 
 #include <memory>
-#include <NimBLEUUID.h>
+#include <NimBLEDevice.h>
 #include <vector>
-#include "sensors/SensorData.h"
+#include "./SensorData.h"
 #include "settings.h"
 
 class SensorDataFactory {
