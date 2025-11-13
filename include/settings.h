@@ -355,7 +355,7 @@ constexpr const char* ANY = "any";
 #define BLE_CLIENT_STACK 6000 //Scans and connects to BLE devices. Holds the BLE Notify Data. 
 
 // Uncomment to enable stack size debugging info
-#define DEBUG_STACK
+// #define DEBUG_STACK
 
 // Uncomment to enable HR->PWR debugging info. Always displays HR->PWR
 // Calculation. Never sets userConfig->setSimulatedPower();
