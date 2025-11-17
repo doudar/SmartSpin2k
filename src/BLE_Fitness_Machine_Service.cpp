@@ -99,7 +99,7 @@ void BLE_Fitness_Machine_Service::update() {
   // Add resistance
   int resistanceValue;
   // Check if bike has resistance reporting capability or resistance simulation enabled
-  bool hasResistanceReporting = (rtConfig->resistance.getSimulate() || 
+  bool hasResistanceReporting = (!rtConfig->resistance.getSimulate() && 
                                 (rtConfig->resistance.getTimestamp() > 0 && 
                                  (millis() - rtConfig->resistance.getTimestamp()) < 5000));
   
@@ -109,6 +109,8 @@ void BLE_Fitness_Machine_Service::update() {
   } else {
     // Calculate resistance from stepper position for bikes that don't report resistance
     resistanceValue = this->calculateResistanceFromPosition();
+    rtConfig->resistance.setValue(resistanceValue);
+    rtConfig->resistance.setSimulate(true); // Mark as simulated
   }
   ftmsIndoorBikeData.push_back(static_cast<uint8_t>(resistanceValue & 0xff));
   ftmsIndoorBikeData.push_back(static_cast<uint8_t>(resistanceValue >> 8));
@@ -196,7 +198,7 @@ void BLE_Fitness_Machine_Service::processFTMSWrite() {
             rtConfig->resistance.setTarget(requestedResistance);
             
             // For bikes that don't report resistance, calculate stepper position from resistance level (0-100)
-            bool hasResistanceReporting = (rtConfig->resistance.getSimulate() || 
+            bool hasResistanceReporting = (!rtConfig->resistance.getSimulate() && 
                                           (rtConfig->resistance.getTimestamp() > 0 && 
                                            (millis() - rtConfig->resistance.getTimestamp()) < 5000));
             

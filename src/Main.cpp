@@ -34,7 +34,7 @@ HardwareSerial auxSerial(1);
 AuxSerialBuffer auxSerialBuffer;
 
 FastAccelStepperEngine engine = FastAccelStepperEngine();
-FastAccelStepper *stepper     = NULL;
+FastAccelStepper* stepper     = NULL;
 
 TaskHandle_t maintenanceLoopTask;
 
@@ -42,11 +42,11 @@ Boards boards;
 Board currentBoard;
 
 ///////////// Initialize the Config /////////////
-ErgMode *ergMode            = new ErgMode;
-PowerTable *powerTable      = new PowerTable;
-SS2K *ss2k                  = new SS2K;
-userParameters *userConfig  = new userParameters;
-RuntimeParameters *rtConfig = new RuntimeParameters;
+ErgMode* ergMode            = new ErgMode;
+PowerTable* powerTable      = new PowerTable;
+SS2K* ss2k                  = new SS2K;
+userParameters* userConfig  = new userParameters;
+RuntimeParameters* rtConfig = new RuntimeParameters;
 
 ///////////// Log Appender /////////////
 UdpAppender udpAppender;
@@ -178,12 +178,12 @@ void loop() {  // Delete this task so we can make one that's more memory efficie
   vTaskDelete(NULL);
 }
 
-void SS2K::maintenanceLoop(void *pvParameters) {
+void SS2K::maintenanceLoop(void* pvParameters) {
   static unsigned long intervalTimer2 = millis();
   static unsigned long rebootTimer    = millis();
 
   while (true) {
-    delay(5);
+    delay(10);
 
     // be quiet while updating via BLE
     if (!ss2k->isUpdating) {
@@ -322,7 +322,8 @@ void SS2K::maintenanceLoop(void *pvParameters) {
 #endif  // DEBUG_STACK
       // Log userParameters
       SS2K_LOG(MAIN_LOG_TAG, "PM Con %d, CAD con %d, HRM Con %d, W %d, Cad %d, HR %d, Gear %d, Res %d, Target Position %d", spinBLEClient.connectedPM, spinBLEClient.connectedCD,
-               spinBLEClient.connectedHRM, rtConfig->watts.getValue(), rtConfig->cad.getValue(), rtConfig->hr.getValue(), rtConfig->getShifterPosition(), rtConfig->resistance.getValue(), ss2k->targetPosition);
+               spinBLEClient.connectedHRM, rtConfig->watts.getValue(), rtConfig->cad.getValue(), rtConfig->hr.getValue(), rtConfig->getShifterPosition(),
+               rtConfig->resistance.getValue(), ss2k->targetPosition);
 
       intervalTimer2 = millis();
     }
@@ -434,8 +435,36 @@ void SS2K::moveStepper() {
 #endif
         ss2k->targetPosition = rtConfig->getTargetIncline();
       } else if (rtConfig->getFTMSMode() == FitnessMachineControlPointProcedure::SetTargetResistanceLevel) {
-        int actualDelta = rtConfig->resistance.getTarget() - rtConfig->resistance.getValue();
-        rtConfig->setTargetIncline(ss2k->getCurrentPosition() + ((userConfig->getERGSensitivity() * 3) * actualDelta));
+        // Get absolute position for a given resistance percent (0-100)
+        if (rtConfig->resistance.getSimulate()) {
+          int32_t minPos, maxPos;
+          if (userConfig->getHMin() != INT32_MIN && userConfig->getHMax() != INT32_MIN) {
+            minPos = userConfig->getHMin();
+            maxPos = userConfig->getHMax();
+          } else {
+            minPos = rtConfig->getMinStep();
+            maxPos = rtConfig->getMaxStep();
+          }
+          int resistancePercent = rtConfig->resistance.getTarget();
+          if (resistancePercent < 0) resistancePercent = 0;
+          if (resistancePercent > 100) resistancePercent = 100;
+          int64_t span = (int64_t)maxPos - (int64_t)minPos;
+          // Round to nearest step (+50 assumes span up to ~2e9; safe for typical values)
+          int32_t pos = minPos + (int32_t)((span * resistancePercent + 50) / 100);
+          rtConfig->setTargetIncline(pos);
+        } else {
+          int actualDelta = rtConfig->resistance.getTarget() - rtConfig->resistance.getValue();
+          int direction   = (actualDelta > 0) ? 1 : -1;
+          if (abs(actualDelta) > 25) {
+            rtConfig->setTargetIncline(ss2k->getCurrentPosition() + userConfig->getShiftStep() * direction);
+          } else if (abs(actualDelta) > 12) {
+            rtConfig->setTargetIncline(ss2k->getCurrentPosition() + (userConfig->getERGSensitivity() * actualDelta));
+          } else if (abs(actualDelta) > 3) {
+            rtConfig->setTargetIncline(ss2k->getCurrentPosition() + actualDelta + (userConfig->getERGSensitivity() * direction));
+          } else {
+            rtConfig->setTargetIncline(ss2k->getCurrentPosition() + actualDelta);
+          }
+        }
         ss2k->targetPosition = rtConfig->getTargetIncline();
       } else {
         // Simulation Mode
