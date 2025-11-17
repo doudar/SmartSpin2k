@@ -321,8 +321,8 @@ void SS2K::maintenanceLoop(void *pvParameters) {
       }
 #endif  // DEBUG_STACK
       // Log userParameters
-      SS2K_LOG(MAIN_LOG_TAG, "PM Con %d, CAD con %d, HRM Con %d, W %d, Cad %d, HR %d, Gear %d, Target Position %d", spinBLEClient.connectedPM, spinBLEClient.connectedCD,
-               spinBLEClient.connectedHRM, rtConfig->watts.getValue(), rtConfig->cad.getValue(), rtConfig->hr.getValue(), rtConfig->getShifterPosition(), ss2k->targetPosition);
+      SS2K_LOG(MAIN_LOG_TAG, "PM Con %d, CAD con %d, HRM Con %d, W %d, Cad %d, HR %d, Gear %d, Res %d, Target Position %d", spinBLEClient.connectedPM, spinBLEClient.connectedCD,
+               spinBLEClient.connectedHRM, rtConfig->watts.getValue(), rtConfig->cad.getValue(), rtConfig->hr.getValue(), rtConfig->getShifterPosition(), rtConfig->resistance.getValue(), ss2k->targetPosition);
 
       intervalTimer2 = millis();
     }

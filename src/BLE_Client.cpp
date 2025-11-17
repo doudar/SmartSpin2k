@@ -401,7 +401,7 @@ void ScanCallbacks::onResult(const NimBLEAdvertisedDevice* advertisedDevice) {
     if (serviceInfo) {
       SS2K_LOG(BLE_CLIENT_LOG_TAG, "Supported Device: %s with service %s", aDevName.c_str(), serviceInfo->name.c_str());
       const NimBLEUUID& primaryServiceUUID = serviceInfo->serviceUUID;
-      //check to see if we're already connected to this device
+      // check to see if we're already connected to this device
       for (size_t i = 0; i < NUM_BLE_DEVICES; i++) {
         if (spinBLEClient.myBLEDevices[i].advertisedDevice != nullptr) {
           if (aDevName == String(spinBLEClient.myBLEDevices[i].uniqueName.c_str())) {
@@ -671,50 +671,80 @@ void SpinBLEClient::postConnect() {
           // Enable device notifications
           byte message[] = {0xF0, 0xB0, 0x01, 0x01, 0xA2};
           writeCharacteristic->writeValue(message, 5);
-          SS2K_LOG(BLE_CLIENT_LOG_TAG, "Activated Echelon callbacks.");
+          SS2K_LOG(BLE_CLIENT_LOG_TAG, "Activated Echelon callbacks on device: %s", _BLEd.uniqueName.c_str());
           rtConfig->setMinResistance(MIN_ECHELON_RESISTANCE);
           rtConfig->setMaxResistance(MAX_ECHELON_RESISTANCE);
         }
 
-        if ((_BLEd.charUUID == FITNESSMACHINEINDOORBIKEDATA_UUID)) {
-          SS2K_LOG(BLE_CLIENT_LOG_TAG, "Updating Connection Params for: %s", _BLEd.peerAddress.toString().c_str());
-          spinBLEClient.handleBattInfo(pClient, true);
+        if (pClient->getService(FITNESSMACHINESERVICE_UUID)) {
+          SS2K_LOG(BLE_CLIENT_LOG_TAG, "Initializing FTMS on device: %s", _BLEd.uniqueName.c_str());
 
           auto featuresCharacteristic = pClient->getService(FITNESSMACHINESERVICE_UUID)->getCharacteristic(FITNESSMACHINEFEATURE_UUID);
           if (featuresCharacteristic == nullptr) {
             SS2K_LOG(BLE_CLIENT_LOG_TAG, "Failed to find FTMS features characteristic UUID: %s", FITNESSMACHINEFEATURE_UUID.toString().c_str());
-            return;
-          }
+          } else {
+            if (featuresCharacteristic->canRead()) {
+              auto value = featuresCharacteristic->readValue();
+              if (value.size() < sizeof(uint64_t)) {
+                SS2K_LOG(BLE_CLIENT_LOG_TAG, "Failed to read FTMS features characteristic for: %s", _BLEd.uniqueName.c_str());
+              } else {
+                // We're only interested in the machine fitness features, not the target setting features.
+                auto features = *reinterpret_cast<const uint32_t*>(value.data());
+                if (!(features & FitnessMachineFeatureFlags::Types::ElapsedTimeSupported) || !(features & FitnessMachineFeatureFlags::Types::RemainingTimeSupported)) {
+                  SS2K_LOG(BLE_CLIENT_LOG_TAG, "FTMS Control Point StartOrResume not supported on: %s", _BLEd.uniqueName.c_str());
+                }
 
-          if (featuresCharacteristic->canRead()) {
-            auto value = featuresCharacteristic->readValue();
-            if (value.size() < sizeof(uint64_t)) {
-              SS2K_LOG(BLE_CLIENT_LOG_TAG, "Failed to read FTMS features characteristic");
-              return;
+                NimBLERemoteCharacteristic* writeCharacteristic = pClient->getService(FITNESSMACHINESERVICE_UUID)->getCharacteristic(FITNESSMACHINECONTROLPOINT_UUID);
+                if (writeCharacteristic == nullptr) {
+                  SS2K_LOG(BLE_CLIENT_LOG_TAG, "Failed to find FTMS control characteristic UUID: %s, on %s", FITNESSMACHINECONTROLPOINT_UUID.toString().c_str(),
+                           _BLEd.uniqueName.c_str());
+                } else {
+                  // If we would like to control an external FTMS trainer. With most spin bikes we would want this off, but it's useful if you want to use the SmartSpin2k as an
+                  // appliance.
+                  if (userConfig->getFTMSControlPointWrite()) {
+                    writeCharacteristic->writeValue(FitnessMachineControlPointProcedure::RequestControl, 1);
+                    delay(BLE_NOTIFY_DELAY);
+                    SS2K_LOG(BLE_CLIENT_LOG_TAG, "Activated FTMS Training on device: %s", _BLEd.uniqueName.c_str());
+                  }
+                  writeCharacteristic->writeValue(FitnessMachineControlPointProcedure::StartOrResume, 1);
+                }
+              }
             }
+          }
+          // update resistance range if supported:
+          auto resistanceRangeCharacteristic = pClient->getService(FITNESSMACHINESERVICE_UUID)->getCharacteristic(FITNESSMACHINERESISTANCELEVELRANGE_UUID);
+          if (resistanceRangeCharacteristic && resistanceRangeCharacteristic->canRead()) {
+            auto rr = resistanceRangeCharacteristic->readValue();
+            if (rr.size() >= 6) {
+              const uint8_t* b = reinterpret_cast<const uint8_t*>(rr.data());
+              int16_t minRaw   = static_cast<int16_t>(b[0] | (static_cast<uint16_t>(b[1]) << 8));
+              int16_t maxRaw   = static_cast<int16_t>(b[2] | (static_cast<uint16_t>(b[3]) << 8));
+              uint16_t incRaw  = static_cast<uint16_t>(b[4] | (static_cast<uint16_t>(b[5]) << 8));
 
-            // We're only interested in the machine fitness features, not the target setting features.
-            auto features = *reinterpret_cast<const uint32_t*>(value.data());
-            if (!(features & FitnessMachineFeatureFlags::Types::ElapsedTimeSupported) || !(features & FitnessMachineFeatureFlags::Types::RemainingTimeSupported)) {
-              SS2K_LOG(BLE_CLIENT_LOG_TAG, "FTMS Control Point StartOrResume not supported");
-              return;
+              float incF = static_cast<float>(incRaw) / 10.0f;  // resolution 0.1
+              float minF = (static_cast<float>(minRaw) / 10.0f)/incF;  // resolution 0.1
+              float maxF = (static_cast<float>(maxRaw) / 10.0f)/incF;  // resolution 0.1
+
+              // Internal resistance is integer-based; round to nearest
+              int minRes = static_cast<int>(minF >= 0.0f ? (minF + 0.5f) : (minF - 0.5f));
+              int maxRes = static_cast<int>(maxF >= 0.0f ? (maxF + 0.5f) : (maxF - 0.5f));
+
+              if (minRes > maxRes) {
+                // Defensive: swap if device reports reversed
+                int tmp = minRes;
+                minRes  = maxRes;
+                maxRes  = tmp;
+              }
+
+              rtConfig->resistance.setMin(minRes);
+              rtConfig->resistance.setMax(maxRes);
+              SS2K_LOG(BLE_CLIENT_LOG_TAG, "FTMS Resistance Range: raw min=%.1f raw max=%.1f inc=%.1f -> set %d->%d", minF, maxF, incF, minRes, maxRes);
+            } else {
+              SS2K_LOG(BLE_CLIENT_LOG_TAG, "FTMS Resistance Range characteristic too short (%d bytes)", rr.size());
             }
+          } else {
+            SS2K_LOG(BLE_CLIENT_LOG_TAG, "FTMS Resistance Range characteristic unavailable or unreadable");
           }
-
-          NimBLERemoteCharacteristic* writeCharacteristic = pClient->getService(FITNESSMACHINESERVICE_UUID)->getCharacteristic(FITNESSMACHINECONTROLPOINT_UUID);
-          if (writeCharacteristic == nullptr) {
-            SS2K_LOG(BLE_CLIENT_LOG_TAG, "Failed to find FTMS control characteristic UUID: %s", FITNESSMACHINECONTROLPOINT_UUID.toString().c_str());
-            return;
-          }
-
-          // If we would like to control an external FTMS trainer. With most spin bikes we would want this off, but it's useful if you want to use the SmartSpin2k as an
-          // appliance.
-          if (userConfig->getFTMSControlPointWrite()) {
-            writeCharacteristic->writeValue(FitnessMachineControlPointProcedure::RequestControl, 1);
-            delay(BLE_NOTIFY_DELAY);
-            SS2K_LOG(BLE_CLIENT_LOG_TAG, "Activated FTMS Training.");
-          }
-          writeCharacteristic->writeValue(FitnessMachineControlPointProcedure::StartOrResume, 1);
         }
       }
     }
