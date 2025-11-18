@@ -464,10 +464,8 @@ void SS2K::moveStepper() {
         } else {
           int actualDelta = rtConfig->resistance.getTarget() - rtConfig->resistance.getValue();
           int direction   = (actualDelta > 0) ? 1 : -1;
-          if (abs(actualDelta) > 25) {
+          if (abs(actualDelta) > 20 - userConfig->getERGSensitivity()) {
             rtConfig->setTargetIncline(ss2k->getCurrentPosition() + userConfig->getShiftStep() * direction);
-          } else if (abs(actualDelta) > 12) {
-            rtConfig->setTargetIncline(ss2k->getCurrentPosition() + (userConfig->getERGSensitivity() * actualDelta));
           } else if (abs(actualDelta) > 3) {
             rtConfig->setTargetIncline(ss2k->getCurrentPosition() + actualDelta + (userConfig->getERGSensitivity() * direction));
           } else {
