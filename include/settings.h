@@ -95,7 +95,7 @@ const char* const DEFAULT_PASSWORD = "password";
 
 // Default Max Watts that the brake on the spin bike can absorb from the user.
 // This is used to set the upper travel limit for the motor.
-#define DEFAULT_MAX_WATTS 1400
+#define DEFAULT_MAX_WATTS 1000
 
 // Minimum resistance on a Peloton Bike.
 // This is used to set the lower travel limit for the motor.

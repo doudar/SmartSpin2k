@@ -19,7 +19,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Added
 
 ### Changed
-- Supported resistance level updated. 
+- Added support for reading resistance range from connected FTMS devices
+- Improved resistance mode control logic for bikes with and without native resistance reporting
+- Fixed resistance value parsing to correctly handle 16-bit values
+- Reduced default max brake watts from 1400w to 1000w. 
 
 ### Hardware
 
