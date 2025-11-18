@@ -10,6 +10,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Added
 
 ### Changed
+
+### Hardware
+
+
+## [25.11.4]
+
+### Added
+
+### Changed
 - Supported resistance level updated. 
 
 ### Hardware
