@@ -95,7 +95,7 @@ void PowerTable::setStepperMinMax() {
   }
 
   // if the FTMS device reports resistance feedback, skip estimating min_max
-  if (rtConfig->resistance.getValue() > 0) {
+  if (rtConfig->resistance.getValue() > 0 && !rtConfig->resistance.getSimulate()) {
     rtConfig->setMinStep(-DEFAULT_STEPPER_TRAVEL);
     rtConfig->setMaxStep(DEFAULT_STEPPER_TRAVEL);
     SS2K_LOG(POWERTABLE_LOG_TAG, "Using Resistance Travel Limits");

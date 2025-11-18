@@ -434,23 +434,32 @@ void SS2K::moveStepper() {
         }
 #endif
         ss2k->targetPosition = rtConfig->getTargetIncline();
-      } else if (rtConfig->getFTMSMode() == FitnessMachineControlPointProcedure::SetTargetResistanceLevel) {
+      } else if ((rtConfig->getFTMSMode() == FitnessMachineControlPointProcedure::SetTargetResistanceLevel)) {
         // Get absolute position for a given resistance percent (0-100)
         if (rtConfig->resistance.getSimulate()) {
           int32_t minPos, maxPos;
+          bool usePwr = false;
           if (userConfig->getHMin() != INT32_MIN && userConfig->getHMax() != INT32_MIN) {
             minPos = userConfig->getHMin();
             maxPos = userConfig->getHMax();
-          } else {
+          } else if(rtConfig->getMinStep() != -DEFAULT_STEPPER_TRAVEL && rtConfig->getMaxStep() != DEFAULT_STEPPER_TRAVEL) {
             minPos = rtConfig->getMinStep();
             maxPos = rtConfig->getMaxStep();
+          } else{ //No good position information. Fallback to using ERG
+            minPos = userConfig->getMinWatts();
+            maxPos = userConfig->getMaxWatts();
+            usePwr = true;
           }
           int resistancePercent = rtConfig->resistance.getTarget();
           if (resistancePercent < 0) resistancePercent = 0;
           if (resistancePercent > 100) resistancePercent = 100;
           int64_t span = (int64_t)maxPos - (int64_t)minPos;
-          // Round to nearest step (+50 assumes span up to ~2e9; safe for typical values)
-          int32_t pos = minPos + (int32_t)((span * resistancePercent + 50) / 100);
+          int32_t pos = minPos + (int32_t)((span * resistancePercent) / 100);
+          if (usePwr) { //fallback to using ERG
+            rtConfig->watts.setTarget(pos); 
+            rtConfig->setFTMSMode(FitnessMachineControlPointProcedure::SetTargetPower);
+            return;
+          }
           rtConfig->setTargetIncline(pos);
         } else {
           int actualDelta = rtConfig->resistance.getTarget() - rtConfig->resistance.getValue();
@@ -806,7 +815,7 @@ void SS2K::txSerial() {  // Serial.printf(" Before TX ");
 }
 bool SS2K::pelotonConnected() {
   txCheck = TX_CHECK_INTERVAL;
-  if (rtConfig->resistance.getValue() > 0) {
+  if (millis() - rtConfig->resistance.getTimestamp() < 5000 && !rtConfig->resistance.getSimulate()) {
     rtConfig->setMinResistance(MIN_PELOTON_RESISTANCE);
     rtConfig->setMaxResistance(MAX_PELOTON_RESISTANCE);
     return true;
