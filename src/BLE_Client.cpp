@@ -721,9 +721,9 @@ void SpinBLEClient::postConnect() {
               int16_t maxRaw   = static_cast<int16_t>(b[2] | (static_cast<uint16_t>(b[3]) << 8));
               uint16_t incRaw  = static_cast<uint16_t>(b[4] | (static_cast<uint16_t>(b[5]) << 8));
 
-              float incF = static_cast<float>(incRaw) / 10.0f;  // resolution 0.1
-              float minF = (static_cast<float>(minRaw) / 10.0f)/incF;  // resolution 0.1
-              float maxF = (static_cast<float>(maxRaw) / 10.0f)/incF;  // resolution 0.1
+              float incF = static_cast<float>(incRaw) / 10.0f;  // FTMS resolution 0.1, convert to actual increment value
+              float minF = (static_cast<float>(minRaw) / 10.0f)/incF;  // Convert FTMS 0.1 units to normalized scale
+              float maxF = (static_cast<float>(maxRaw) / 10.0f)/incF;  // Convert FTMS 0.1 units to normalized scale
 
               // Internal resistance is integer-based; round to nearest
               int minRes = static_cast<int>(minF >= 0.0f ? (minF + 0.5f) : (minF - 0.5f));
