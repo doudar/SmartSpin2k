@@ -23,7 +23,7 @@ BLE_Fitness_Machine_Service::BLE_Fitness_Machine_Service()
 
 void BLE_Fitness_Machine_Service::setupService(NimBLEServer *pServer, MyCharacteristicCallbacks *chrCallbacks) {
   // Resistance, IPower, HeartRate
-  uint8_t ftmsResistanceLevelRange[6] = {0x01, 0x00, 0x64, 0x00, 0x01, 0x00};  // 1:100 increment 1
+  uint8_t ftmsResistanceLevelRange[6] = {0x01, 0x00, 0x64, 0x00, 0x0A, 0x00};  // .1:10 increment .1
   uint8_t ftmsPowerRange[6]           = {0x01, 0x00, 0xA0, 0x0F, 0x01, 0x00};  // 1:4000 watts increment 1
   uint8_t ftmsInclinationRange[6]     = {0x38, 0xff, 0xc8, 0x00, 0x01, 0x00};  // -20.0:20.0 increment .1
   // Fitness Machine Feature Flags Setup
@@ -99,7 +99,7 @@ void BLE_Fitness_Machine_Service::update() {
   // Add resistance
   int resistanceValue;
   // Check if bike has resistance reporting capability or resistance simulation enabled
-  bool hasResistanceReporting = (rtConfig->resistance.getSimulate() || 
+  bool hasResistanceReporting = (!rtConfig->resistance.getSimulate() && 
                                 (rtConfig->resistance.getTimestamp() > 0 && 
                                  (millis() - rtConfig->resistance.getTimestamp()) < 5000));
   
@@ -109,6 +109,8 @@ void BLE_Fitness_Machine_Service::update() {
   } else {
     // Calculate resistance from stepper position for bikes that don't report resistance
     resistanceValue = this->calculateResistanceFromPosition();
+    rtConfig->resistance.setValue(resistanceValue);
+    rtConfig->resistance.setSimulate(true); // Mark as simulated
   }
   ftmsIndoorBikeData.push_back(static_cast<uint8_t>(resistanceValue & 0xff));
   ftmsIndoorBikeData.push_back(static_cast<uint8_t>(resistanceValue >> 8));
@@ -190,13 +192,13 @@ void BLE_Fitness_Machine_Service::processFTMSWrite() {
 
         case FitnessMachineControlPointProcedure::SetTargetResistanceLevel: {
           rtConfig->setFTMSMode((uint8_t)rxValue[0]);
-          int16_t requestedResistance = (int16_t)rxValue[1];
+          int16_t requestedResistance = (int16_t)((rxValue[2] << 8) | rxValue[1]);
 
           if (requestedResistance >= rtConfig->getMinResistance() && requestedResistance <= rtConfig->getMaxResistance()) {
             rtConfig->resistance.setTarget(requestedResistance);
             
             // For bikes that don't report resistance, calculate stepper position from resistance level (0-100)
-            bool hasResistanceReporting = (rtConfig->resistance.getSimulate() || 
+            bool hasResistanceReporting = (!rtConfig->resistance.getSimulate() && 
                                           (rtConfig->resistance.getTimestamp() > 0 && 
                                            (millis() - rtConfig->resistance.getTimestamp()) < 5000));
             
