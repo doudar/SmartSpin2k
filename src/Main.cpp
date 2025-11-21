@@ -442,10 +442,10 @@ void SS2K::moveStepper() {
           if (userConfig->getHMin() != INT32_MIN && userConfig->getHMax() != INT32_MIN) {
             minPos = userConfig->getHMin();
             maxPos = userConfig->getHMax();
-          } else if(rtConfig->getMinStep() != -DEFAULT_STEPPER_TRAVEL && rtConfig->getMaxStep() != DEFAULT_STEPPER_TRAVEL) {
+          } else if (rtConfig->getMinStep() != -DEFAULT_STEPPER_TRAVEL && rtConfig->getMaxStep() != DEFAULT_STEPPER_TRAVEL) {
             minPos = rtConfig->getMinStep();
             maxPos = rtConfig->getMaxStep();
-          } else{ //No good position information. Fallback to using ERG
+          } else {  // No good position information. Fallback to using ERG
             minPos = userConfig->getMinWatts();
             maxPos = userConfig->getMaxWatts();
             usePwr = true;
@@ -454,9 +454,9 @@ void SS2K::moveStepper() {
           if (resistancePercent < 0) resistancePercent = 0;
           if (resistancePercent > 100) resistancePercent = 100;
           int64_t span = (int64_t)maxPos - (int64_t)minPos;
-          int32_t pos = minPos + (int32_t)((span * resistancePercent) / 100);
-          if (usePwr) { //fallback to using ERG
-            rtConfig->watts.setTarget(pos); 
+          int32_t pos  = minPos + (int32_t)((span * resistancePercent) / 100);
+          if (usePwr) {  // fallback to using ERG
+            rtConfig->watts.setTarget(pos);
             rtConfig->setFTMSMode(FitnessMachineControlPointProcedure::SetTargetPower);
             return;
           }
@@ -630,7 +630,7 @@ void SS2K::_findEndStop(bool moveForward) {
   int threshold                = 0;
   long totalSgResult           = 0;
   const int SAMPLES_TO_AVERAGE = 16;   // Take 16 samples for a stable average
-  const int LOG_INTERVAL       = 250;  // Log every 250ms
+  const int LOG_INTERVAL       = 1000;  // Log every 1000ms
 
   // Start the motor moving in the specified direction
   if (moveForward) {
@@ -664,8 +664,9 @@ void SS2K::_findEndStop(bool moveForward) {
 
     // Periodically log the status for tuning
     if (millis() - lastLogTime > LOG_INTERVAL) {
-      Serial.printf("Homing... Current SG: %d, Baseline: %d, Target: < %d\n", currentSgResult, threshold, threshold - userConfig->getHomingSensitivity());
+      SS2K_LOG(MAIN_LOG_TAG, "Homing... Current SG: %d, Baseline: %d, Target: < %d\n", currentSgResult, threshold, threshold - userConfig->getHomingSensitivity());
       lastLogTime = millis();
+      if (moveForward)fitnessMachineService.spinDown(FitnessMachineStatus::SpinDown_StopPedaling);
     }
 
     // Check for the stall condition
@@ -689,7 +690,7 @@ void SS2K::goHome(bool bothDirections) {
   }
 
   SS2K_LOG(MAIN_LOG_TAG, "Starting homing procedure...");
-  fitnessMachineService.spinDown(FitnessMachineStatus::SpinDown_SpinDownRequested);
+  if (bothDirections) fitnessMachineService.spinDown(FitnessMachineStatus::SpinDown_SpinDownRequested);
 
   // --- SETUP DRIVER FOR SENSORLESS HOMING ---
   // Use very low power for sensitive stall detection
@@ -710,6 +711,7 @@ void SS2K::goHome(bool bothDirections) {
 
   // --- FIND MAX END STOP (Optional) ---
   if (bothDirections) {
+    fitnessMachineService.spinDown(FitnessMachineStatus::SpinDown_StopPedaling);
     ss2k->_findEndStop(true);
     rtConfig->setMaxStep(stepper->getCurrentPosition() - userConfig->getShiftStep());  // Set max with a safety margin
     userConfig->setHMax(rtConfig->getMaxStep());
@@ -729,7 +731,7 @@ void SS2K::goHome(bool bothDirections) {
   rtConfig->setShifterPosition(0);
   ss2k->setTargetPosition(0);
   stepper->moveTo(0);
-  fitnessMachineService.spinDown(FitnessMachineStatus::SpinDown_Success);
+  if (bothDirections) fitnessMachineService.spinDown(FitnessMachineStatus::SpinDown_Success);
   SS2K_LOG(MAIN_LOG_TAG, "Homing procedure complete.");
 }
 
