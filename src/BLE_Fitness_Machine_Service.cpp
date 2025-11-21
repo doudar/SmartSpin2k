@@ -344,7 +344,7 @@ void BLE_Fitness_Machine_Service::processFTMSWrite() {
     }
     // not checking for subscription because a write request would have triggered this
     fitnessMachineControlPoint->setValue(returnValue.data(), returnValue.size());
-    fitnessMachineControlPoint->notify();
+    fitnessMachineControlPoint->indicate();
     if (fitnessMachineTrainingStatus->getValue() != ftmsTrainingStatus) {
       fitnessMachineTrainingStatus->setValue(ftmsTrainingStatus);
       fitnessMachineTrainingStatus->notify();
