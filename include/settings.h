@@ -67,6 +67,12 @@ const char* const DEFAULT_PASSWORD = "password";
 // Stepper Max Speed in steps/s
 #define DEFAULT_STEPPER_SPEED 3500
 
+// Stepper Hold Power Scaler. Divides the RMS current to get hold current.
+#define HOLD_PWR_SCALER .3f
+
+// Power Scaler for Homing. Reduces the power during homing to improve stall detection.
+#define PWR_SCALER_FOR_HOMING 0.8f
+
 // Default ERG Sensitivity. Predicated on # of Shifts (further defined by shift steps) per 30 watts of resistance change.
 // I.E. If the difference between ERG target and Current watts were 30, and the Shift step is defined as 600 steps,
 // and ERG_Sensitivity were 1.0, ERG mode would move the stepper motor 600 steps to compensate. With an ERG_Sensitivity of 2.0, the stepper
