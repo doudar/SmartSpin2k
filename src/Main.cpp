@@ -716,6 +716,12 @@ void SS2K::_findFTMSHome(bool bothDirections) {
         setupTMCStepperDriver(true);  // Restore normal driver settings
         return;
       }
+      if (rtConfig->getShifterPosition() != ss2k->lastShifterPosition) {
+        SS2K_LOG(MAIN_LOG_TAG, "FTMS Homing aborted by user.");
+        stepper->forceStop();
+        setupTMCStepperDriver(true);  // Restore normal driver settings
+        return;
+      }
       ss2k->setCurrentPosition(stepper->getCurrentPosition());
       rtConfig->resistance.setTarget(targetResistance);
       rtConfig->setTargetIncline(ss2k->getCurrentPosition());
