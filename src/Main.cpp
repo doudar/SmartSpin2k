@@ -746,7 +746,7 @@ void SS2K::_findFTMSHome(bool bothDirections) {
   ss2k->updateStepperSpeed(1500);  // Use a slow-medium speed for homing
 
   // first back off of the stop if we're already there
-  int midTarget = (rtConfig->resistance.getMax() - rtConfig->resistance.getMin()) / 3;
+  int midTarget = (rtConfig->resistance.getMax() - rtConfig->resistance.getMin()) / 4;
   rtConfig->resistance.setTarget(midTarget);
   runHomingSweep(midTarget, nullptr, false);
   runHomingSweep(rtConfig->resistance.getMin(), "Homing to Min Resistance... Current: %d, Target: %d", false);
