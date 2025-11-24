@@ -679,7 +679,7 @@ void SS2K::_findEndStop(bool moveForward) {
 
     // Periodically log the status for tuning
     if (millis() - lastLogTime > LOG_INTERVAL) {
-      SS2K_LOG(MAIN_LOG_TAG, "Homing... Current SG: %d, Baseline: %d, Target: < %d\n", currentSgResult, threshold, threshold - userConfig->getHomingSensitivity());
+      SS2K_LOG(MAIN_LOG_TAG, "Homing... Current SG: %d, Baseline: %d, Target: < %d", currentSgResult, threshold, threshold - userConfig->getHomingSensitivity());
       lastLogTime = millis();
       if (moveForward) fitnessMachineService.spinDown(FitnessMachineStatus::SpinDown_StopPedaling);
     }
@@ -771,7 +771,7 @@ void SS2K::_findFTMSHome(bool bothDirections) {
   ss2k->setTargetPosition(0);
   rtConfig->setTargetIncline(0);
   stepper->moveTo(0);
-  rtConfig->setMaxStep(userConfig->getHMax());  // Ensure It's set from config if not found
+  rtConfig->setMaxStep(userConfig->getHMax());  // Ensure it's set from config if not found
   rtConfig->setHomed(true);
   userConfig->saveToLittleFS();
 }
