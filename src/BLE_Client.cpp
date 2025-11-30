@@ -225,13 +225,23 @@ void bleClientTask(void* pvParameters) {
 
     // Spin Down process for the Server. It's here because it needs to be non-blocking for the maintenance loop.
     // Checking for cadence also so that we don't home when nobody is around.
-    if (spinBLEServer.spinDownFlag && rtConfig->cad.getValue() > 5) {
-      if (spinBLEServer.spinDownFlag >= 2) {  // Home Both Directions
-        ss2k->goHome(true);
-      } else {  // Startup Homing
-        ss2k->goHome(false);
+    static int cadenceCount = 0;
+    if (spinBLEServer.spinDownFlag) {
+      if (rtConfig->cad.getValue() > 5) {
+        cadenceCount++;  // We need to check multiple times to ensure it's not a blip
+      } else {
+        cadenceCount = 0;  // reset counter if cadence drops
       }
-      spinBLEServer.spinDownFlag = 0;
+      if (cadenceCount >= 3) {
+        SS2K_LOG(BLE_CLIENT_LOG_TAG, "Spin Down initiated via BLE Client task.");
+        cadenceCount = 0;
+        if (spinBLEServer.spinDownFlag >= 2) {  // Home Both Directions
+          ss2k->goHome(true);
+        } else {  // Startup Homing
+          ss2k->goHome(false);
+        }
+        spinBLEServer.spinDownFlag = 0;
+      }
     }
   }
 }
