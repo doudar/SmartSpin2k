@@ -614,8 +614,8 @@ void SS2K::setupTMCStepperDriver(bool reset) {
   driver.pdn_disable(true);       // Use PDN pin to enable UART communication instead of grounding signal
   driver.mstep_reg_select(true);  // Use register instead of ms1&ms2 pins for microstep selection
   driver.microsteps(4);           // Set microsteps to 1/8th
-  driver.iholddelay(10);          // Controls the number of clock cycles for motor power down after standstill is detected
-  driver.TPOWERDOWN(128);         // delay until hold current
+  driver.iholddelay(5);          // Controls the number of clock cycles for motor power down after standstill is detected
+  driver.TPOWERDOWN(16);         // delay until hold current (0-255). 255 = 5.6s, 2 is minimum for StealthChop.
   driver.toff(5);                 // needs >0 for driver enable. 1-15 controls duration of slow decay phase of pwm.
   this->updateStealthChop();
   this->updateStepperSpeed();
