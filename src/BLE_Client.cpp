@@ -232,7 +232,7 @@ void bleClientTask(void* pvParameters) {
       } else {
         cadenceCount = 0;  // reset counter if cadence drops
       }
-      if (cadenceCount >= 3) {
+      if (cadenceCount >= 2000/BLE_CLIENT_DELAY) {  // Approx 2 seconds of cadence
         SS2K_LOG(BLE_CLIENT_LOG_TAG, "Spin Down initiated via BLE Client task.");
         cadenceCount = 0;
         if (spinBLEServer.spinDownFlag >= 2) {  // Home Both Directions
