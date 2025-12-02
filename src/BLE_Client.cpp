@@ -225,13 +225,23 @@ void bleClientTask(void* pvParameters) {
 
     // Spin Down process for the Server. It's here because it needs to be non-blocking for the maintenance loop.
     // Checking for cadence also so that we don't home when nobody is around.
-    if (spinBLEServer.spinDownFlag && rtConfig->cad.getValue()) {
-      if (spinBLEServer.spinDownFlag >= 2) {  // Home Both Directions
-        ss2k->goHome(true);
-      } else {  // Startup Homing
-        ss2k->goHome(false);
+    static int cadenceCount = 0;
+    if (spinBLEServer.spinDownFlag) {
+      if (rtConfig->cad.getValue() > 10 && rtConfig->cad.getValue() < 200) {  // Cadence above 10 RPM
+        cadenceCount++;                                                       // We need to check multiple times to ensure it's not a blip
+      } else {
+        cadenceCount = 0;  // reset counter if cadence drops
       }
-      spinBLEServer.spinDownFlag = 0;
+      if (cadenceCount >= 2000 / BLE_CLIENT_DELAY) {  // Approx 2 seconds of cadence
+        SS2K_LOG(BLE_CLIENT_LOG_TAG, "Spin Down initiated via BLE Client task.");
+        cadenceCount = 0;
+        if (spinBLEServer.spinDownFlag >= 2) {  // Home Both Directions
+          ss2k->goHome(true);
+        } else {  // Startup Homing
+          ss2k->goHome(false);
+        }
+        spinBLEServer.spinDownFlag = 0;
+      }
     }
   }
 }
@@ -721,9 +731,9 @@ void SpinBLEClient::postConnect() {
               int16_t maxRaw   = static_cast<int16_t>(b[2] | (static_cast<uint16_t>(b[3]) << 8));
               uint16_t incRaw  = static_cast<uint16_t>(b[4] | (static_cast<uint16_t>(b[5]) << 8));
 
-              float incF = static_cast<float>(incRaw) / 10.0f;  // FTMS resolution 0.1, convert to actual increment value
-              float minF = (static_cast<float>(minRaw) / 10.0f)/incF;  // Convert FTMS 0.1 units to normalized scale
-              float maxF = (static_cast<float>(maxRaw) / 10.0f)/incF;  // Convert FTMS 0.1 units to normalized scale
+              float incF = static_cast<float>(incRaw) / 10.0f;           // FTMS resolution 0.1, convert to actual increment value
+              float minF = (static_cast<float>(minRaw) / 10.0f) / incF;  // Convert FTMS 0.1 units to normalized scale
+              float maxF = (static_cast<float>(maxRaw) / 10.0f) / incF;  // Convert FTMS 0.1 units to normalized scale
 
               // Internal resistance is integer-based; round to nearest
               int minRes = static_cast<int>(minF >= 0.0f ? (minF + 0.5f) : (minF - 0.5f));

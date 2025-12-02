@@ -10,7 +10,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Added
 
 ### Changed
-- Make Zwift happy during spin down by sending "stop pedaling" every 1 second. 
+
+### Hardware
+
+
+## [25.11.21]
+
+### Added
+
+### Changed
+- Make Zwift happy during spin down by sending "stop pedaling" every 1 second.
+- Added power scalers for stepper hold and homing.
+- Updated driver settings for improved stall detection.
+- FTMS bikes will now home using reported resistance if available.  
 
 ### Hardware
 
