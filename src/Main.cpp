@@ -614,8 +614,8 @@ void SS2K::setupTMCStepperDriver(bool reset) {
   driver.pdn_disable(true);       // Use PDN pin to enable UART communication instead of grounding signal
   driver.mstep_reg_select(true);  // Use register instead of ms1&ms2 pins for microstep selection
   driver.microsteps(4);           // Set microsteps to 1/8th
-  driver.iholddelay(5);          // Controls the number of clock cycles for motor power down after standstill is detected
-  driver.TPOWERDOWN(16);         // delay until hold current (0-255). 255 = 5.6s, 2 is minimum for StealthChop.
+  driver.iholddelay(5);           // Controls the number of clock cycles for motor power down after standstill is detected
+  driver.TPOWERDOWN(16);          // delay until hold current (0-255). 255 = 5.6s, 2 is minimum for StealthChop.
   driver.toff(5);                 // needs >0 for driver enable. 1-15 controls duration of slow decay phase of pwm.
   this->updateStealthChop();
   this->updateStepperSpeed();
@@ -708,9 +708,11 @@ void SS2K::_findFTMSHome(bool bothDirections) {
   const int iMax            = 600;
 
   auto runHomingSweep = [&](int targetResistance, const char* logTemplate, bool notifySpinDown) {
-    timer = millis();
-    i     = 0;
-    while ((rtConfig->resistance.getValue() != targetResistance) && (i < iMax)) {
+    timer                   = millis();
+    i                       = 0;
+    int32_t lastPosition    = ss2k->getCurrentPosition();
+    const int32_t minTravel = userConfig->getShiftStep();
+    while ((rtConfig->resistance.getValue() != targetResistance) && ((i < iMax) || (abs(ss2k->getCurrentPosition() - lastPosition) < minTravel))) {
       if (millis() - timer > HOME_TIMEOUT) {
         SS2K_LOG(MAIN_LOG_TAG, "FTMS Homing timed out!");
         setupTMCStepperDriver(true);  // Restore normal driver settings
@@ -730,6 +732,7 @@ void SS2K::_findFTMSHome(bool bothDirections) {
       delay(5);
       if (lastResistance != rtConfig->resistance.getValue()) {
         lastResistance = rtConfig->resistance.getValue();
+        lastPosition   = ss2k->getCurrentPosition();
         i              = 0;
       }
       if (logTemplate && (millis() - lastLogTime > LOG_INTERVAL)) {
@@ -741,6 +744,21 @@ void SS2K::_findFTMSHome(bool bothDirections) {
       }
       i++;
     }
+
+    bool reachedTarget  = (rtConfig->resistance.getValue() == targetResistance);
+    int32_t travelDelta  = abs(ss2k->getCurrentPosition() - lastPosition);
+    bool iterExceeded    = (i >= iMax);
+    bool travelSatisfied = (travelDelta >= minTravel);
+    SS2K_LOG(MAIN_LOG_TAG,
+             "FTMS Homing sweep exit: target=%d current=%d reached=%s iter=%d/%d travelΔ=%d minTravel=%d travelMet=%s",
+             targetResistance,
+             rtConfig->resistance.getValue(),
+             reachedTarget ? "true" : "false",
+             i,
+             iMax,
+             travelDelta,
+             minTravel,
+             travelSatisfied ? "true" : "false");
   };
 
   ss2k->updateStepperSpeed(1500);  // Use a slow-medium speed for homing

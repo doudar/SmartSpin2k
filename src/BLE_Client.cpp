@@ -227,12 +227,12 @@ void bleClientTask(void* pvParameters) {
     // Checking for cadence also so that we don't home when nobody is around.
     static int cadenceCount = 0;
     if (spinBLEServer.spinDownFlag) {
-      if (rtConfig->cad.getValue() > 5) {
-        cadenceCount++;  // We need to check multiple times to ensure it's not a blip
+      if (rtConfig->cad.getValue() > 10 && rtConfig->cad.getValue() < 200) {  // Cadence above 10 RPM
+        cadenceCount++;                                                       // We need to check multiple times to ensure it's not a blip
       } else {
         cadenceCount = 0;  // reset counter if cadence drops
       }
-      if (cadenceCount >= 2000/BLE_CLIENT_DELAY) {  // Approx 2 seconds of cadence
+      if (cadenceCount >= 2000 / BLE_CLIENT_DELAY) {  // Approx 2 seconds of cadence
         SS2K_LOG(BLE_CLIENT_LOG_TAG, "Spin Down initiated via BLE Client task.");
         cadenceCount = 0;
         if (spinBLEServer.spinDownFlag >= 2) {  // Home Both Directions
