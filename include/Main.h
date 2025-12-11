@@ -114,3 +114,7 @@ extern SS2K *ss2k;
 // Main program variable that stores most everything
 extern userParameters *userConfig;
 extern RuntimeParameters *rtConfig;
+
+// WebSocket appender for logging and custom characteristic commands
+class WebSocketAppender;
+extern WebSocketAppender webSocketAppender;

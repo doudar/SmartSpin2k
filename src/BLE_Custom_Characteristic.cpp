@@ -87,6 +87,8 @@ This characteristic allows for reading and writing various user configuration pa
 #include <Power_Table.h>
 #include <BLE_Custom_Characteristic.h>
 #include <Constants.h>
+#include <Main.h>
+#include <WebsocketAppender.h>
 
 void BLE_ss2kCustomCharacteristic::setupService(NimBLEServer *pServer) {
   pSmartSpin2kService = spinBLEServer.pServer->createService(SMARTSPIN2K_SERVICE_UUID);
@@ -825,6 +827,8 @@ void BLE_ss2kCustomCharacteristic::process(std::string rxValue) {
 #endif
   if (returnString == "") {
     pCharacteristic->setValue(returnValue, returnLength);
+    // Send response to WebSocket clients that have sent commands
+    webSocketAppender.SendResponse(returnValue, returnLength);
   } else {  // Need to send a string instead
     uint8_t returnChar[returnString.length() + 2];
     returnChar[0] = cc_success;
@@ -833,6 +837,8 @@ void BLE_ss2kCustomCharacteristic::process(std::string rxValue) {
       returnChar[i + 2] = returnString[i];
     }
     pCharacteristic->setValue(returnChar, returnString.length() + 2);
+    // Send response to WebSocket clients that have sent commands
+    webSocketAppender.SendResponse(returnChar, returnString.length() + 2);
   }
 
   pCharacteristic->indicate();

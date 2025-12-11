@@ -17,6 +17,7 @@ class WebSocketAppender : public ILogAppender {
   WebSocketAppender();
   void Log(const char* message);
   void Loop();
+  void SendResponse(const uint8_t* data, size_t length);
 
  private:
   static const uint16_t port      = 8080;
@@ -26,7 +27,10 @@ class WebSocketAppender : public ILogAppender {
   uint8_t GetClientsCount();
   void AddClient(WebsocketsClient* client);
   void CheckConnectedClients();
+  void HandleIncomingMessages();
+  void OnMessageReceived(WebsocketsClient& client, WebsocketsMessage message);
 
   WebsocketsServer _webSocketsServer;
   WebsocketsClient* _clients[maxClients];
+  bool _clientSentCommand[maxClients];
 };

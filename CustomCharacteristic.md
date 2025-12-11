@@ -1,9 +1,20 @@
 Please use and refer to the following notes for use of the custom characteristic:
 
-Custom Characteristic for userConfig Variable manipulation via BLE
+Custom Characteristic for userConfig Variable manipulation via BLE and WebSocket
 
 SMARTSPIN2K_SERVICE_UUID        "77776277-7877-7774-4466-896665500000"
 SMARTSPIN2K_CHARACTERISTIC_UUID "77776277-7877-7774-4466-896665500001"
+
+## Access Methods
+
+Custom characteristic commands can be sent through multiple channels:
+
+1. **BLE (Bluetooth Low Energy)**: Using the SmartSpin2k custom characteristic UUID
+2. **DirCon Protocol**: Via TCP on port 8081 (see DirCon documentation)
+3. **WebSocket**: Via WebSocket connection on port 8080 (NEW)
+
+The WebSocket server accepts the same binary command format as BLE. This allows web applications
+and other WebSocket clients to control SmartSpin2k settings using the same command structure.
 
 An example follows to read/write 26.3kph to simulatedSpeed:
 
@@ -79,7 +90,41 @@ From BLE_common.h
 
 *syncMode will disable the movement of the stepper motor by forcing stepperPosition = targetPosition prior to the motor control. While this mode is enabled, it allows the client to set parameters like incline and shifterPosition without moving the motor from it's current position. Once the parameters are set, this mode should be turned back off and SS2K will resume normal operation.
 
+## Using WebSocket for Custom Characteristic Commands
+
+The WebSocket server (port 8080) provides full bidirectional communication for custom characteristic 
+commands in the same format as BLE. To send a command and receive responses via WebSocket:
+
+1. Connect to `ws://<device-ip>:8080`
+2. Send a binary WebSocket message with the command bytes
+3. Receive the response as a binary message back through the same WebSocket connection
+
+Example JavaScript code:
+```javascript
+const ws = new WebSocket('ws://192.168.1.100:8080');
+ws.binaryType = 'arraybuffer';
+
+ws.onopen = () => {
+  // Write 263 to simulatedSpeed (0x06)
+  const command = new Uint8Array([0x02, 0x06, 0x07, 0x01]);
+  ws.send(command.buffer);
+};
+
+ws.onmessage = (event) => {
+  if (event.data instanceof ArrayBuffer) {
+    // Binary response from custom characteristic command
+    const response = new Uint8Array(event.data);
+    console.log('Response:', Array.from(response).map(b => '0x' + b.toString(16).padStart(2, '0')).join(', '));
+  } else {
+    // Text message (logging output)
+    console.log('Log:', event.data);
+  }
+};
+```
+
+Note: Only WebSocket clients that have sent at least one command will receive command responses.
+Clients that only listen for logs will not receive custom characteristic responses.
 
 This characteristic also notifies when a shift is preformed or the button is pressed. 
 
-See code for more references/info in BLE_Server.cpp starting on line 534
+See code for more references/info in BLE_Custom_Characteristic.cpp
