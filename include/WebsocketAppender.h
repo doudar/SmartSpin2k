@@ -26,6 +26,8 @@ class WebSocketAppender : public ILogAppender {
   uint8_t GetClientsCount();
   void AddClient(WebsocketsClient* client);
   void CheckConnectedClients();
+  void HandleIncomingMessages();
+  void OnMessageReceived(WebsocketsClient& client, WebsocketsMessage message);
 
   WebsocketsServer _webSocketsServer;
   WebsocketsClient* _clients[maxClients];

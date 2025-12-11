@@ -7,6 +7,7 @@
 
 // see: https://github.com/gilmaimon/ArduinoWebsockets
 #include "WebsocketAppender.h"
+#include "BLE_Custom_Characteristic.h"
 
 WebSocketAppender::WebSocketAppender() {
   for (uint8_t index = 0; index < maxClients; index++) {
@@ -15,6 +16,7 @@ WebSocketAppender::WebSocketAppender() {
 }
 
 void WebSocketAppender::Initialize() { _webSocketsServer.listen(WebSocketAppender::port); }
+
 void WebSocketAppender::Loop() {
   // CheckConnectedClients();
   if (WiFi.status() == WL_CONNECTED && GetClientsCount() < maxClients) {
@@ -26,6 +28,9 @@ void WebSocketAppender::Loop() {
     WebsocketsClient client = _webSocketsServer.accept();
     AddClient(new WebsocketsClient(client));
   }
+
+  // Handle incoming messages from connected clients
+  HandleIncomingMessages();
 }
 
 void WebSocketAppender::Log(const char* message) {
@@ -62,6 +67,10 @@ void WebSocketAppender::AddClient(WebsocketsClient* client) {
   for (uint8_t index = 0; index < maxClients; index++) {
     if (_clients[index] == NULL) {
       _clients[index] = client;
+      // Set up message callback for this client
+      client->onMessage([this](WebsocketsClient& client, WebsocketsMessage message) {
+        this->OnMessageReceived(client, message);
+      });
       return;
     }
   }
@@ -81,4 +90,38 @@ void WebSocketAppender::CheckConnectedClients() {
       delete client;
     }
   }
+}
+
+void WebSocketAppender::HandleIncomingMessages() {
+  for (uint8_t index = 0; index < maxClients; index++) {
+    WebsocketsClient* client = _clients[index];
+    if (client == NULL) {
+      continue;
+    }
+
+    if (client->available()) {
+      // Poll for messages - the onMessage callback will be triggered
+      client->poll();
+    }
+  }
+}
+
+void WebSocketAppender::OnMessageReceived(WebsocketsClient& client, WebsocketsMessage message) {
+  // Only process binary or text messages
+  if (!message.isBinary() && !message.isText()) {
+    return;
+  }
+
+  // Convert message data to std::string for processing
+  std::string rxValue;
+  if (message.isBinary()) {
+    // Binary data - directly use the raw data
+    rxValue = std::string(message.c_str(), message.length());
+  } else {
+    // Text data - also use as-is (could be hex-encoded or similar)
+    rxValue = std::string(message.c_str(), message.length());
+  }
+
+  // Process the custom characteristic command using the existing BLE processing logic
+  BLE_ss2kCustomCharacteristic::process(rxValue);
 }
