@@ -88,6 +88,7 @@ This characteristic allows for reading and writing various user configuration pa
 #include <BLE_Custom_Characteristic.h>
 #include <Constants.h>
 #include <Main.h>
+#include <WebsocketAppender.h>
 
 void BLE_ss2kCustomCharacteristic::setupService(NimBLEServer *pServer) {
   pSmartSpin2kService = spinBLEServer.pServer->createService(SMARTSPIN2K_SERVICE_UUID);
