@@ -92,12 +92,12 @@ From BLE_common.h
 
 ## Using WebSocket for Custom Characteristic Commands
 
-The WebSocket server (port 8080) accepts binary messages containing custom characteristic commands 
-in the same format as BLE. To send a command via WebSocket:
+The WebSocket server (port 8080) provides full bidirectional communication for custom characteristic 
+commands in the same format as BLE. To send a command and receive responses via WebSocket:
 
 1. Connect to `ws://<device-ip>:8080`
 2. Send a binary WebSocket message with the command bytes
-3. The response will be sent via BLE notification (if subscribed via BLE)
+3. Receive the response as a binary message back through the same WebSocket connection
 
 Example JavaScript code:
 ```javascript
@@ -109,11 +109,21 @@ ws.onopen = () => {
   const command = new Uint8Array([0x02, 0x06, 0x07, 0x01]);
   ws.send(command.buffer);
 };
+
+ws.onmessage = (event) => {
+  if (event.data instanceof ArrayBuffer) {
+    // Binary response from custom characteristic command
+    const response = new Uint8Array(event.data);
+    console.log('Response:', Array.from(response).map(b => '0x' + b.toString(16).padStart(2, '0')).join(', '));
+  } else {
+    // Text message (logging output)
+    console.log('Log:', event.data);
+  }
+};
 ```
 
-Note: WebSocket responses are currently sent via BLE notification, not back through the WebSocket.
-The WebSocket primarily provides logging output. For bidirectional communication with responses,
-use the DirCon protocol (port 8081) instead.
+Note: Only WebSocket clients that have sent at least one command will receive command responses.
+Clients that only listen for logs will not receive custom characteristic responses.
 
 This characteristic also notifies when a shift is preformed or the button is pressed. 
 
