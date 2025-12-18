@@ -10,6 +10,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Added
 
 ### Changed
+
+### Hardware
+
+
+## [25.12.17]
+
+### Added
+
+### Changed
  - Links card update.
  - Removed indications from Control Point Characteristic to make Zwift on Android happy. 
  - IC4 reported HR won't override other HRM.
