@@ -46,7 +46,7 @@ const char* const DEFAULT_PASSWORD = "password";
 // into actual stepper steps that move the stepper motor. It takes 2,181.76 steps to rotate the knob 1 full revolution. with hardware version 1.
 // Incline_Multiplier may be able to be removed in the future by dividing ShiftSteps by ~200 to get this value but we're not quite ready
 // to make that commitment yet.
-#define INCLINE_MULTIPLIER 5.0f
+#define INCLINE_MULTIPLIER 7.0f
 
 // Minumum value for power correction factor user setting
 #define MIN_PCF .5f
@@ -77,7 +77,7 @@ const char* const DEFAULT_PASSWORD = "password";
 // I.E. If the difference between ERG target and Current watts were 30, and the Shift step is defined as 600 steps,
 // and ERG_Sensitivity were 1.0, ERG mode would move the stepper motor 600 steps to compensate. With an ERG_Sensitivity of 2.0, the stepper
 // would move 1200 steps to compensate, however ERG_Sensitivity values much different than 1.0 imply shiftStep has been improperly configured.
-#define ERG_SENSITIVITY 5.0f
+#define ERG_SENSITIVITY 2.0f
 
 // Number of watts per shift expected by ERG mode for it's calculation. The user should target this number by adjusting Shift Step until WATTS_PER_SHIFT
 // is obtained as closely as possible during each shift.
