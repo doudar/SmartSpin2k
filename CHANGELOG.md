@@ -13,6 +13,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
  - Links card update.
  - Removed indications from Control Point Characteristic to make Zwift on Android happy. 
  - IC4 reported HR won't override other HRM.
+ - Improved ERG response for homed tables.
+ - Slightly faster Peloton bike + homing.
 
 ### Hardware
 

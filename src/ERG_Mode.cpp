@@ -19,6 +19,7 @@
 #include <unordered_map>
 
 static unsigned long ergTimer = millis();
+static bool isDelayed              = false;
 
 void ErgMode::runERG() {
   static ErgMode ergMode;
@@ -27,9 +28,15 @@ void ErgMode::runERG() {
   static bool simulationRunning      = false;
   static int loopCounter             = 0;
 
-  if ((millis() - ergTimer) > ERG_MODE_DELAY) {
+  if ((millis() > ergTimer)) {
+
+    if(isDelayed) {
+      SS2K_LOG(ERG_MODE_LOG_TAG, "ERG wait expired");
+      isDelayed = false;
+    }
+
     // reset the timer.
-    ergTimer = millis();
+    ergTimer = millis() + ERG_MODE_DELAY;
 
     static unsigned long int saveFlagCooldown = 0;
     // save powertable if saveFlag has been set for 10 seconds using a saveFlagCooldown timer
@@ -85,7 +92,7 @@ void ErgMode::runERG() {
     // only do this twice as often as ERG_MODE_DELAY
     static float previousPower             = 0;
     static unsigned long int pTab4pwrTimer = millis();
-    int _smoothPWR = 0;
+    int _smoothPWR                         = 0;
     if (millis() - pTab4pwrTimer > ERG_MODE_DELAY / 2) {
       // reset the timer.
       pTab4pwrTimer = millis();
@@ -102,11 +109,11 @@ void ErgMode::runERG() {
           saveStateTimer = millis();
         }
       }
-       // So the user knows pTab4PWR is enabled, provide some cadence feedback even if the value returned by the table is 0. 
-       int minimumPower = rtConfig->cad.getValue()/2; // 50% of the cadence value
-        _smoothPWR     = _smoothPWR < minimumPower ? round((minimumPower + previousPower) / 2.0f) : _smoothPWR;
-        rtConfig->watts.setValue(_smoothPWR);
-        previousPower = (rtConfig->watts.getValue() + previousPower) / 2;
+      // So the user knows pTab4PWR is enabled, provide some cadence feedback even if the value returned by the table is 0.
+      int minimumPower = rtConfig->cad.getValue() / 2;  // 50% of the cadence value
+      _smoothPWR       = _smoothPWR < minimumPower ? round((minimumPower + previousPower) / 2.0f) : _smoothPWR;
+      rtConfig->watts.setValue(_smoothPWR);
+      previousPower = (rtConfig->watts.getValue() + previousPower) / 2;
     }
   }
 }
@@ -137,7 +144,7 @@ void ErgMode::computeErg() {
 #ifdef ERG_MODE_USE_POWER_TABLE
 // SetPoint changed
 #ifdef ERG_MODE_USE_PID
-  if (abs(this->setPoint - newWatts.getTarget()) > 20) {
+  if (abs(this->setPoint - newWatts.getTarget()) > ERG_MODE_PID_WINDOW && rtConfig->getHomed()) {
 #endif
     _setPointChangeState(newCadence, newWatts);
     return;
@@ -153,15 +160,18 @@ void ErgMode::computeErg() {
 }
 
 void ErgMode::_setPointChangeState(int newCadence, Measurement& newWatts) {
-  int32_t tableResult = powerTable->lookup(newWatts.getTarget(), newCadence);
+  // It's better to undershoot increasing watts and overshoot decreasing watts, so lets set the lookup target to the nearest side of ERG_MODE_PID_WINDOW
+  int adjustedTarget = newWatts.getTarget() >= newWatts.getValue() ? newWatts.getTarget() - ERG_MODE_PID_WINDOW : newWatts.getTarget() + ERG_MODE_PID_WINDOW;
+
+  int32_t tableResult = powerTable->lookup(adjustedTarget, newCadence);
 
   // Test current watts against the table result. If We're already lower or higher than target, flag the result as a return error.
   if (tableResult != RETURN_ERROR) {
-    if (rtConfig->watts.getValue() > newWatts.getTarget() && tableResult > ss2k->getCurrentPosition()) {
+    if (rtConfig->watts.getValue() > adjustedTarget && tableResult > ss2k->getCurrentPosition()) {
       SS2K_LOG(ERG_MODE_LOG_TAG, "Table Result Failed High Test: %d", tableResult);
       tableResult = RETURN_ERROR;
     }
-    if (rtConfig->watts.getValue() < newWatts.getTarget() && tableResult < ss2k->getCurrentPosition()) {
+    if (rtConfig->watts.getValue() < adjustedTarget && tableResult < ss2k->getCurrentPosition()) {
       SS2K_LOG(ERG_MODE_LOG_TAG, "Table Result Failed Low Test: %d", tableResult);
       tableResult = RETURN_ERROR;
     }
@@ -174,14 +184,15 @@ void ErgMode::_setPointChangeState(int newCadence, Measurement& newWatts) {
     return;
   }
 
-  SS2K_LOG(ERG_MODE_LOG_TAG, "SetPoint changed:%dw PowerTable Result: %d", newWatts.getTarget(), tableResult);
+  SS2K_LOG(ERG_MODE_LOG_TAG, "SetPoint changed:%dw PowerTable Result: %d", adjustedTarget, tableResult);
   _updateValues(newCadence, newWatts, tableResult);
 
   if (rtConfig->getTargetIncline() != ss2k->getCurrentPosition()) {  // add some time to wait while the knob moves to target position.
+    isDelayed = true;
     int timeToAdd = abs(ss2k->getCurrentPosition() - rtConfig->getTargetIncline());
-    if (timeToAdd > 4000) {  // 4 seconds
-      SS2K_LOG(ERG_MODE_LOG_TAG, "Capping ERG seek time to 5 seconds");
-      timeToAdd = 4000;
+    if (timeToAdd > 3000) {  // 3 seconds
+      SS2K_LOG(ERG_MODE_LOG_TAG, "Capping ERG seek time to 3 seconds");
+      timeToAdd = 3000;
     }
     ergTimer += timeToAdd;
   }

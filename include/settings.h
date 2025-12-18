@@ -282,6 +282,9 @@ constexpr const char* ANY = "any";
 // Uncomment to use the PID controller for ERG mode.
 #define ERG_MODE_USE_PID
 
+// Window where ERG mode will use PID instead of Power Table for initial changes.
+#define ERG_MODE_PID_WINDOW 20
+
 // PowerTable Version
 #define TABLE_VERSION 6
 
