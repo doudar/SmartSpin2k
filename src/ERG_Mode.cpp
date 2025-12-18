@@ -18,7 +18,7 @@
 #include <numeric>
 #include <unordered_map>
 
-static unsigned long ergTimer = millis();
+static unsigned long ergTimer = millis() + ERG_MODE_DELAY;
 static bool isDelayed              = false;
 
 void ErgMode::runERG() {
@@ -30,7 +30,7 @@ void ErgMode::runERG() {
 
   if ((millis() > ergTimer)) {
 
-    if(isDelayed) {
+    if (isDelayed) {
       SS2K_LOG(ERG_MODE_LOG_TAG, "ERG wait expired");
       isDelayed = false;
     }
