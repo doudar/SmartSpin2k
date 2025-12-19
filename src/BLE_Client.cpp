@@ -1057,15 +1057,25 @@ void SpinBLEAdvertisedDevice::set(const NimBLEAdvertisedDevice* device, int id, 
   if (id != BLE_HS_CONN_HANDLE_NONE) {
     NimBLEClient* pClient = NimBLEDevice::getClientByPeerAddress(device->getAddress());
     if (pClient) {
+      const char* cfgHRM        = userConfig->getConnectedHeartMonitor();
+      const bool cfgHrmIsNone   = (strcmp(cfgHRM, NONE) == 0);
+      const bool cfgHrmIsAny    = (strcmp(cfgHRM, ANY) == 0);
+      const std::string addrStr = device->getAddress().toString();
+      const bool hrmNameMatch   = (adevName == cfgHRM);
+      const bool hrmAddrMatch   = (addrStr == cfgHRM);
+
       // Get all services
       const std::vector<NimBLERemoteService*>& services = pClient->getServices(true);
       for (auto& pService : services) {
         BLEUUID serviceUUID = pService->getUUID();
-
         if (serviceUUID == HEARTSERVICE_UUID) {
           this->isHRM                = true;
-          spinBLEClient.connectedHRM = true;
-          SS2K_LOG(BLE_CLIENT_LOG_TAG, "Registered HRM on Connect");
+          if (cfgHrmIsNone || cfgHrmIsAny || hrmNameMatch || hrmAddrMatch) {
+            spinBLEClient.connectedHRM = true;
+            SS2K_LOG(BLE_CLIENT_LOG_TAG, "Registered HRM on Connect");
+          } else {
+            SS2K_LOG(BLE_CLIENT_LOG_TAG, "Heart service on %s ignored (cfgHRM='%s')", this->uniqueName.c_str(), cfgHRM);
+          }
         } else if (serviceUUID == CSCSERVICE_UUID) {
           this->isCSC               = true;
           spinBLEClient.connectedCD = true;

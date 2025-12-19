@@ -537,8 +537,8 @@ void SS2K::_resistanceMove() {
     int direction   = (actualDelta > 0) ? 1 : -1;
     if (abs(actualDelta) > 20 - userConfig->getERGSensitivity()) {
       rtConfig->setTargetIncline(ss2k->getCurrentPosition() + userConfig->getShiftStep() * direction);
-    } else if (abs(actualDelta) > 3) {
-      rtConfig->setTargetIncline(ss2k->getCurrentPosition() + actualDelta * 2 + (userConfig->getERGSensitivity() * direction));
+    } else if (abs(actualDelta) > 1) {
+      rtConfig->setTargetIncline(ss2k->getCurrentPosition() + actualDelta * 3 + (userConfig->getERGSensitivity() * direction));
     } else {
       rtConfig->setTargetIncline(ss2k->getCurrentPosition() + actualDelta + (userConfig->getERGSensitivity() * direction));
     }
