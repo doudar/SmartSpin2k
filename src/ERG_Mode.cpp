@@ -19,7 +19,7 @@
 #include <unordered_map>
 
 static unsigned long ergTimer = millis() + ERG_MODE_DELAY;
-static bool isDelayed              = false;
+static bool isDelayed         = false;
 
 void ErgMode::runERG() {
   static ErgMode ergMode;
@@ -29,7 +29,6 @@ void ErgMode::runERG() {
   static int loopCounter             = 0;
 
   if ((millis() > ergTimer)) {
-
     if (isDelayed) {
       SS2K_LOG(ERG_MODE_LOG_TAG, "ERG wait expired");
       isDelayed = false;
@@ -52,7 +51,7 @@ void ErgMode::runERG() {
       }
     }
 
-    if (rtConfig->cad.getValue() > 0 && rtConfig->watts.getValue() > 0) {
+    if (rtConfig->cad.getValue()) {
       hasConnectedPowerMeter = spinBLEClient.connectedPM;
       simulationRunning      = rtConfig->watts.getTarget();
       if (!simulationRunning) {
@@ -123,9 +122,9 @@ void ErgMode::computeErg() {
   Measurement newWatts = rtConfig->watts;
   int newCadence       = rtConfig->cad.getValue();
 
-  // check for new torque value or new set point, if watts < 10 treat as faulty
-  if ((this->watts.getTimestamp() == newWatts.getTimestamp() && this->setPoint == newWatts.getTarget()) || newWatts.getValue() < 10) {
-    SS2K_LOGW(ERG_MODE_LOG_TAG, "Watts previously processed.");
+  bool isUserSpinning = this->_userIsSpinning(newCadence, ss2k->getCurrentPosition());
+  if (!isUserSpinning) {
+    SS2K_LOG(ERG_MODE_LOG_TAG, "ERG Mode but no User Spin");
     return;
   }
 
@@ -135,9 +134,9 @@ void ErgMode::computeErg() {
     newWatts.setTarget(userConfig->getMinWatts());
   }
 
-  bool isUserSpinning = this->_userIsSpinning(newCadence, ss2k->getCurrentPosition());
-  if (!isUserSpinning) {
-    SS2K_LOG(ERG_MODE_LOG_TAG, "ERG Mode but no User Spin");
+  // check for new torque value or new set point, if watts < 0 treat as faulty
+  if ((this->watts.getTimestamp() == newWatts.getTimestamp() && this->setPoint == newWatts.getTarget()) || newWatts.getValue() < 0) {
+    SS2K_LOG(ERG_MODE_LOG_TAG, "Watts previously processed.");
     return;
   }
 
@@ -188,7 +187,7 @@ void ErgMode::_setPointChangeState(int newCadence, Measurement& newWatts) {
   _updateValues(newCadence, newWatts, tableResult);
 
   if (rtConfig->getTargetIncline() != ss2k->getCurrentPosition()) {  // add some time to wait while the knob moves to target position.
-    isDelayed = true;
+    isDelayed     = true;
     int timeToAdd = abs(ss2k->getCurrentPosition() - rtConfig->getTargetIncline());
     if (timeToAdd > 3000) {  // 3 seconds
       SS2K_LOG(ERG_MODE_LOG_TAG, "Capping ERG seek time to 3 seconds");
@@ -210,7 +209,7 @@ void ErgMode::_setPointChangeState(int newCadence, Measurement& newWatts) {
 void ErgMode::_inSetpointState(int newCadence, Measurement& newWatts) {
   // Setting Gains For PID Loop
   float Kp = userConfig->getERGSensitivity();
-  float Ki = 0.1;
+  float Ki = 0.5;
   float Kd = 0.1;
 
   static float integral  = 0.0;
@@ -225,14 +224,17 @@ void ErgMode::_inSetpointState(int newCadence, Measurement& newWatts) {
 
   // Defining proportional term
   float proportional = Kp * error;
+  if (newWatts.getValue() < userConfig->getMinWatts()) {
+    proportional = proportional * userConfig->getERGSensitivity();  // increase proportional term when at very low watts. Prevents Zwift from timeout on initial interval.
+  }
 
   // Defining integral term
   integral += error;
   float integralFinal = Ki * integral;
 
   // Clamping down integral term
-  float integralMax = 60;
-  float integralMin = -60;
+  float integralMax = 60 * userConfig->getERGSensitivity();
+  float integralMin = -60 * userConfig->getERGSensitivity();
 
   if (integral > integralMax) {
     integral = integralMax;
