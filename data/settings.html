@@ -179,6 +179,15 @@
         tooltip: 'Use cadence to calculate power output',
         tooltipText: 'Use the PowerTable for Power instead of PM',
         defaultValue: false
+      },
+      inactivityTimeout: {
+        type: 'slider',
+        title: 'Inactivity Reboot Timeout',
+        tooltip: 'Auto-reboot when idle',
+        tooltipText: 'Automatically reboot if device is inactive (no power, HR, or cadence changes) for this duration. Minimum 1 minute, maximum 48 hours.',
+        min: 1, max: 2880, step: 1,
+        defaultValue: 30,
+        unit: 'min'
       }
     };
 
@@ -325,11 +334,21 @@
               if (el.type === 'checkbox') {
                 el.checked = !!obj[key];
               } else {
-                el.value = obj[key];
+                // Convert milliseconds to minutes for inactivityTimeout display
+                let value = obj[key];
+                if (key === 'inactivityTimeout') {
+                  value = Math.round(value / 60000);  // Convert ms to minutes
+                }
+                el.value = value;
               }
               const valueEl = document.getElementById(key + 'Value');
               if (valueEl) {
-                updateSlider(obj[key], valueEl);
+                // Show the actual value in UI (minutes for inactivityTimeout)
+                let displayValue = obj[key];
+                if (key === 'inactivityTimeout') {
+                  displayValue = Math.round(obj[key] / 60000);  // Convert ms to minutes
+                }
+                updateSlider(displayValue, valueEl);
               }
             }
           }
@@ -375,7 +394,12 @@
         if (element.type === 'checkbox') {
           if (element.checked) params.append(element.name, 'true');
         } else {
-          params.append(element.name, element.value);
+          // Convert minutes to milliseconds for inactivityTimeout
+          let value = element.value;
+          if (element.name === 'inactivityTimeout') {
+            value = parseInt(element.value) * 60000;  // Convert minutes to ms
+          }
+          params.append(element.name, value);
         }
         
         const toggleIds = Object.entries(settingsConfig)

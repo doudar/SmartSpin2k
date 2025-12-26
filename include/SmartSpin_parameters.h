@@ -139,6 +139,7 @@ class userParameters {
   int32_t hMax               = INT32_MIN;
   bool FTMSControlPointWrite = false;
   int homingSensitivity      = DEFAULT_HOMING_SENSITIVITY;  // Use default from settings.h
+  unsigned long inactivityTimeout = DEFAULT_INACTIVITY_TIMEOUT;
   String ssid;
   String password;
   String connectedPowerMeter   = CONNECTED_POWER_METER;
@@ -224,6 +225,18 @@ class userParameters {
 
   void setHomingSensitivity(int sensitivity) { homingSensitivity = sensitivity; }
   int getHomingSensitivity() { return homingSensitivity; }
+
+  void setInactivityTimeout(unsigned long timeout) {
+    // Clamp value between min and max
+    if (timeout < MIN_INACTIVITY_TIMEOUT) {
+      inactivityTimeout = MIN_INACTIVITY_TIMEOUT;
+    } else if (timeout > MAX_INACTIVITY_TIMEOUT) {
+      inactivityTimeout = MAX_INACTIVITY_TIMEOUT;
+    } else {
+      inactivityTimeout = timeout;
+    }
+  }
+  unsigned long getInactivityTimeout() { return inactivityTimeout; }
 
   void setDefaults();
   String returnJSON();

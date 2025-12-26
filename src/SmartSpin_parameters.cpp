@@ -71,6 +71,7 @@ void userParameters::setDefaults() {
   hMin                  = INT32_MIN;
   hMax                  = INT32_MIN;
   homingSensitivity     = DEFAULT_HOMING_SENSITIVITY;
+  inactivityTimeout     = DEFAULT_INACTIVITY_TIMEOUT;
 }
 
 //---------------------------------------------------------------------------------
@@ -108,6 +109,7 @@ String userParameters::returnJSON() {
   doc["hMin"]                  = hMin;
   doc["hMax"]                  = hMax;
   doc["homingSensitivity"]     = homingSensitivity;
+  doc["inactivityTimeout"]     = inactivityTimeout;
 
   String output;
   serializeJson(doc, output);
@@ -160,6 +162,7 @@ void userParameters::saveToLittleFS() {
   doc["hMin"]          = hMin;
   doc["hMax"]          = hMax;
   doc["homingSensitivity"]     = homingSensitivity;
+  doc["inactivityTimeout"]     = inactivityTimeout;
 
   // Serialize JSON to file
   if (serializeJson(doc, file) == 0) {
@@ -249,6 +252,9 @@ JsonDocument doc;
   }
   if (!doc["homingSensitivity"].isNull()) {
     setHomingSensitivity(doc["homingSensitivity"]);
+  }
+  if (!doc["inactivityTimeout"].isNull()) {
+    setInactivityTimeout(doc["inactivityTimeout"]);
   }
 
   SS2K_LOG(CONFIG_LOG_TAG, "Config File Loaded: %s", configFILENAME);
