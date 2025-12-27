@@ -19,6 +19,7 @@
 #include "BLE_Fitness_Machine_Service.h"
 #include "BLE_Custom_Characteristic.h"
 #include "BLE_Device_Information_Service.h"
+#include "BLE_KickrBikeService.h"
 
 // BLE Server Settings
 SpinBLEServer spinBLEServer;
@@ -31,6 +32,7 @@ BLE_Heart_Service heartService;
 BLE_Fitness_Machine_Service fitnessMachineService;
 BLE_ss2kCustomCharacteristic ss2kCustomCharacteristic;
 BLE_Device_Information_Service deviceInformationService;
+BLE_KickrBikeService kickrBikeService;
 // BLE_Wattbike_Service wattbikeService;
 // BLE_SB20_Service sb20Service;
 
@@ -52,13 +54,15 @@ void startBLEServer() {
   cyclingPowerService.setupService(spinBLEServer.pServer, &chrCallbacks);
   heartService.setupService(spinBLEServer.pServer, &chrCallbacks);
   fitnessMachineService.setupService(spinBLEServer.pServer, &chrCallbacks);
+  kickrBikeService.setupService(spinBLEServer.pServer, &chrCallbacks);
   ss2kCustomCharacteristic.setupService(spinBLEServer.pServer);
   deviceInformationService.setupService(spinBLEServer.pServer);
   //add all service UUIDs to advertisement vector
   oServiceUUIDs.push_back(CSCSERVICE_UUID);
   oServiceUUIDs.push_back(CYCLINGPOWERSERVICE_UUID);
   oServiceUUIDs.push_back(HEARTSERVICE_UUID);
-  oServiceUUIDs.push_back(FITNESSMACHINESERVICE_UUID);
+  //oServiceUUIDs.push_back(FITNESSMACHINESERVICE_UUID);
+  oServiceUUIDs.push_back(ZWIFT_RIDE_CUSTOM_SERVICE_UUID_SHORT);
   oAdvertisementData.setFlags(0x06);  // General Discoverable, BR/EDR Not Supported
   oAdvertisementData.setCompleteServices16(oServiceUUIDs);
   pAdvertising->setAdvertisementData(oAdvertisementData);
@@ -85,6 +89,7 @@ void SpinBLEServer::update() {
   cyclingPowerService.update();
   cyclingSpeedCadenceService.update();
   fitnessMachineService.update();
+  kickrBikeService.update();
   // wattbikeService.parseNemit();  // Changed from update() to parseNemit()
   // sb20Service.notify();
 }

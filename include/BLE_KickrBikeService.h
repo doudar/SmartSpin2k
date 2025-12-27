@@ -1,0 +1,104 @@
+/*
+ * Copyright (C) 2020  Anthony Doud & Joel Baranick
+ * All rights reserved
+ *
+ * SPDX-License-Identifier: GPL-2.0-only
+ */
+
+#pragma once
+
+#include <NimBLEDevice.h>
+#include "BLE_Common.h"
+
+// Forward declaration for custom callback
+class KickrBikeCharacteristicCallbacks;
+
+// Gear system configuration for virtual shifting
+#define KICKR_BIKE_NUM_GEARS 24
+#define KICKR_BIKE_DEFAULT_GEAR 11  // Middle gear (0-indexed, so gear 12 in 1-indexed)
+
+class BLE_KickrBikeService {
+ public:
+  BLE_KickrBikeService();
+  void setupService(NimBLEServer *pServer, MyCharacteristicCallbacks *chrCallbacks);
+  void update();
+  
+  // Gear management
+  void shiftUp();
+  void shiftDown();
+  int getCurrentGear() const { return currentGear; }
+  double getCurrentGearRatio() const;
+  
+  // Function to check shifter position and modify incline accordingly
+  void updateGearFromShifterPosition();
+  
+  // RideOn handshake handling
+  void processWrite(const std::string& value);
+  void sendRideOnResponse();
+  void sendKeepAlive();
+  void sendRideData();
+  
+  // Opcode message handlers
+  void handleGetRequest(const uint8_t* data, size_t length);
+  void handleSetRequest(const uint8_t* data, size_t length);
+  void handleReset();
+  void handleSetLogLevel(const uint8_t* data, size_t length);
+  void handleVendorMessage(const uint8_t* data, size_t length);
+  void sendGetResponse(uint16_t objectId, const uint8_t* data, size_t length);
+  void sendStatusResponse(uint8_t status);
+  
+  // Gradient/resistance control (independent of FTMS)
+  void setBaseGradient(double gradientPercent);
+  double getBaseGradient() const { return baseGradient; }
+  double getEffectiveGradient() const;
+  void applyGradientToTrainer();
+  
+  // Power control for ERG mode
+  void setTargetPower(int watts);
+  int getTargetPower() const { return targetPower; }
+  
+  // Enable/disable the service
+  void enable() { isEnabled = true; }
+  void disable() { isEnabled = false; }
+  bool isServiceEnabled() const { return isEnabled; }
+  
+ private:
+  BLEService *pKickrBikeService;
+  BLECharacteristic *syncRxCharacteristic;   // Write characteristic for commands
+  BLECharacteristic *asyncTxCharacteristic;  // Notify characteristic for events
+  BLECharacteristic *syncTxCharacteristic;   // Notify characteristic for responses
+  BLECharacteristic *debugCharacteristic; // Optional debug characteristic
+  BLECharacteristic *unknown6Characteristic; // Optional unknown characteristic
+  
+  // Gear system state
+  int currentGear;
+  int lastShifterPosition;
+  
+  // Gradient and resistance state (independent of FTMS)
+  double baseGradient;        // Base gradient set by Zwift (%)
+  double effectiveGradient;   // Gradient after gear ratio applied (%)
+  int targetPower;            // Target power for ERG mode (watts)
+  
+  // Service state
+  bool isHandshakeComplete;
+  bool isEnabled;  // Whether this service should control the trainer
+  unsigned long lastKeepAliveTime;
+  unsigned long lastGradientUpdateTime;
+  unsigned long lastRideDataTime;
+  
+  // Gear ratio table (24 gears)
+  static const double gearRatios[KICKR_BIKE_NUM_GEARS];
+  
+  // Helper methods
+  void applyGearChange();
+  double calculateEffectiveGrade(double baseGrade, double gearRatio);
+  bool isRideOnMessage(const std::string& data);
+  void updateTrainerPosition();
+};
+
+// Custom callback class for KickrBike Sync RX characteristic
+class KickrBikeCharacteristicCallbacks : public NimBLECharacteristicCallbacks {
+  void onWrite(NimBLECharacteristic* pCharacteristic, NimBLEConnInfo& connInfo) override;
+};
+
+extern BLE_KickrBikeService kickrBikeService;
