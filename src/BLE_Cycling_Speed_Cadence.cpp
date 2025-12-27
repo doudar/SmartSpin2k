@@ -10,7 +10,7 @@
 
 BLE_Cycling_Speed_Cadence::BLE_Cycling_Speed_Cadence() : pCyclingSpeedCadenceService(nullptr), cscMeasurement(nullptr), cscFeature(nullptr) {}
 
-void BLE_Cycling_Speed_Cadence::setupService(NimBLEServer *pServer, MyCharacteristicCallbacks *chrCallbacks) {
+void BLE_Cycling_Speed_Cadence::setupService(NimBLEServer* pServer, MyCharacteristicCallbacks* chrCallbacks) {
   pCyclingSpeedCadenceService = pServer->createService(CSCSERVICE_UUID);
   cscMeasurement              = pCyclingSpeedCadenceService->createCharacteristic(CSCMEASUREMENT_UUID, NIMBLE_PROPERTY::NOTIFY);
   cscFeature                  = pCyclingSpeedCadenceService->createCharacteristic(CSCFEATURE_UUID, NIMBLE_PROPERTY::READ);
@@ -37,7 +37,7 @@ void BLE_Cycling_Speed_Cadence::update() {
   CscMeasurement csc;
 
   // Clear all flags initially
-  *(reinterpret_cast<uint8_t *>(&(csc.flags))) = 0;
+  *(reinterpret_cast<uint8_t*>(&(csc.flags))) = 0;
 
   // Set flags based on data presence
   csc.flags.wheelRevolutionDataPresent = 1;  // Wheel Revolution Data Present
@@ -52,9 +52,7 @@ void BLE_Cycling_Speed_Cadence::update() {
   auto byteArray = csc.toByteArray();
 
   // Notify the cycling power measurement characteristic
-  // Need to set the value before notifying so that read works correctly.
-  cscMeasurement->setValue(&byteArray[0], byteArray.size());
-  cscMeasurement->notify();
+  spinBLEServer.notifyBleAndDircon(cscMeasurement, &byteArray[0], byteArray.size());
 
   const int kLogBufCapacity = 150;
   char logBuf[kLogBufCapacity];

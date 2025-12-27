@@ -13,6 +13,7 @@
 #include <NimBLEDevice.h>
 #include <cmath>
 #include <limits>
+#include "DirConManager.h"
 #include "BLE_Cycling_Speed_Cadence.h"
 #include "BLE_Cycling_Power_Service.h"
 #include "BLE_Heart_Service.h"
@@ -61,7 +62,7 @@ void startBLEServer() {
   oServiceUUIDs.push_back(CSCSERVICE_UUID);
   oServiceUUIDs.push_back(CYCLINGPOWERSERVICE_UUID);
   oServiceUUIDs.push_back(HEARTSERVICE_UUID);
-  //oServiceUUIDs.push_back(FITNESSMACHINESERVICE_UUID);
+  oServiceUUIDs.push_back(FITNESSMACHINESERVICE_UUID);
   oServiceUUIDs.push_back(ZWIFT_RIDE_CUSTOM_SERVICE_UUID_SHORT);
   oAdvertisementData.setFlags(0x06);  // General Discoverable, BR/EDR Not Supported
   oAdvertisementData.setCompleteServices16(oServiceUUIDs);
@@ -92,6 +93,15 @@ void SpinBLEServer::update() {
   kickrBikeService.update();
   // wattbikeService.parseNemit();  // Changed from update() to parseNemit()
   // sb20Service.notify();
+}
+
+void SpinBLEServer::notifyBleAndDircon(NimBLECharacteristic* pCharacteristic, const uint8_t* pData, int length) {
+  // Notify connected BLE clients
+  pCharacteristic->setValue(pData, length);
+  pCharacteristic->notify();
+
+  // Also notify DirCon clients if applicable
+  DirConManager::notifyCharacteristic(pCharacteristic->getService()->getUUID(), pCharacteristic->getUUID(), const_cast<uint8_t*>(pData), length);
 }
 
 double SpinBLEServer::calculateSpeed() {

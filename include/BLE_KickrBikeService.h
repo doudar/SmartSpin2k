@@ -41,6 +41,7 @@ class BLE_KickrBikeService {
   // Opcode message handlers
   void handleGetRequest(const uint8_t* data, size_t length);
   void handleSetRequest(const uint8_t* data, size_t length);
+  void handleInfoRequest(const uint8_t* data, size_t length);
   void handleReset();
   void handleSetLogLevel(const uint8_t* data, size_t length);
   void handleVendorMessage(const uint8_t* data, size_t length);

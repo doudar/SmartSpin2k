@@ -56,12 +56,7 @@ void BLE_Cycling_Power_Service::update() {
   auto byteArray = cpm.toByteArray();
 
   // Notify the cycling power measurement characteristic
-  // Need to set the value before notifying so that read works correctly.
-  cyclingPowerMeasurementCharacteristic->setValue(&byteArray[0], byteArray.size());
-  cyclingPowerMeasurementCharacteristic->notify();
-
-  // Also notify DirCon TCP clients
-  DirConManager::notifyCharacteristic(NimBLEUUID(CYCLINGPOWERSERVICE_UUID), cyclingPowerMeasurementCharacteristic->getUUID(), &byteArray[0], byteArray.size());
+  spinBLEServer.notifyBleAndDircon(cyclingPowerMeasurementCharacteristic, &byteArray[0], byteArray.size());
 
   const int kLogBufCapacity = 150;
   char logBuf[kLogBufCapacity];

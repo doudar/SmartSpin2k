@@ -94,7 +94,7 @@ class SpinBLEServer {
  public:
   int spinDownFlag      = 0;
   NimBLEServer* pServer = nullptr;
-  void notifyShift();
+  void notifyBleAndDircon(NimBLECharacteristic* pCharacteristic,const uint8_t* pData, int length);
   double calculateSpeed();
   void update();
   int connectedClientCount();

@@ -8,6 +8,7 @@
 #include "BLE_KickrBikeService.h"
 #include "DirConManager.h"
 #include "Main.h"
+#include "BLE_Common.h"
 #include <Constants.h>
 #include <algorithm>
 #include <vector>
@@ -102,6 +103,8 @@ void BLE_KickrBikeService::setupService(NimBLEServer *pServer, MyCharacteristicC
 }
 
 void BLE_KickrBikeService::update() {
+  updateGearFromShifterPosition();
+
   // Send periodic keep-alive messages if handshake is complete
   if (isHandshakeComplete) {
     unsigned long currentTime = millis();
@@ -162,9 +165,10 @@ void BLE_KickrBikeService::applyGearChange() {
     static_cast<uint8_t>(currentGear + 1),  // 1-indexed gear number
     static_cast<uint8_t>((getCurrentGearRatio() * 100))  // Ratio as percentage
   };
+  // log the full TX of our gear status
+  SS2K_LOG(BLE_SERVER_LOG_TAG, "KICKR BIKE: Gear status sent: Gear %d, Ratio %.2f", currentGear + 1, getCurrentGearRatio());
   
-  asyncTxCharacteristic->setValue(gearStatus, sizeof(gearStatus));
-  asyncTxCharacteristic->notify();
+  spinBLEServer.notifyBleAndDircon(asyncTxCharacteristic, gearStatus, sizeof(gearStatus));
 }
 
 void BLE_KickrBikeService::setBaseGradient(double gradientPercent) {
@@ -316,6 +320,10 @@ void BLE_KickrBikeService::processWrite(const std::string& value) {
   size_t messageLength = value.length() - 1;
   
   switch (opcode) {
+    case 0x00:  // INFO_REQUEST - device information query
+      handleInfoRequest(messageData, messageLength);
+      break;
+      
     case 0x04:  // SET - Update trainer state
       handleSetRequest(messageData, messageLength);
       break;
@@ -364,8 +372,7 @@ void BLE_KickrBikeService::sendRideOnResponse() {
     0x01, 0x03                            // Signature
   };
   
-  syncTxCharacteristic->setValue(response, sizeof(response));
-  syncTxCharacteristic->notify();
+  spinBLEServer.notifyBleAndDircon(syncTxCharacteristic, response, sizeof(response));
   
   SS2K_LOG(BLE_SERVER_LOG_TAG, "KICKR BIKE: Sent RideOn response");
 }
@@ -382,8 +389,7 @@ void BLE_KickrBikeService::sendKeepAlive() {
     0x9E, 0x49, 0x26, 0xFB, 0xE1
   };
   
-  syncTxCharacteristic->setValue(keepAliveData, sizeof(keepAliveData));
-  syncTxCharacteristic->notify();
+  spinBLEServer.notifyBleAndDircon(syncTxCharacteristic, keepAliveData, sizeof(keepAliveData));
   
   SS2K_LOG(BLE_SERVER_LOG_TAG, "KICKR BIKE: Sent keep-alive");
 }
@@ -412,8 +418,8 @@ void BLE_KickrBikeService::sendRideData() {
   appendVarintField(payload, 5, 0);
   appendVarintField(payload, 6, 0);
 
-  asyncTxCharacteristic->setValue(payload.data(), payload.size());
-  asyncTxCharacteristic->notify();
+  spinBLEServer.notifyBleAndDircon(asyncTxCharacteristic, payload.data(), payload.size());
+
 }
 
 // Opcode message handlers
@@ -493,6 +499,51 @@ void BLE_KickrBikeService::handleSetRequest(const uint8_t* data, size_t length) 
   sendStatusResponse(0x00);
 }
 
+void BLE_KickrBikeService::handleInfoRequest(const uint8_t* data, size_t length) {
+  if (length == 0) {
+    SS2K_LOG(BLE_SERVER_LOG_TAG, "KICKR BIKE: INFO request with no data");
+    sendStatusResponse(0x02);
+    return;
+  }
+
+  uint32_t requestId = 0;
+  bool parsed = false;
+
+  if (data[0] == 0x08 && length >= 2) {
+    size_t index = 1;
+    uint8_t shift = 0;
+    while (index < length) {
+      uint8_t byte = data[index++];
+      requestId |= (static_cast<uint32_t>(byte & 0x7F) << shift);
+      if ((byte & 0x80) == 0) {
+        parsed = true;
+        break;
+      }
+      shift += 7;
+      if (shift > 28) {
+        break;
+      }
+    }
+  }
+
+  if (!parsed) {
+    String hexDump;
+    for (size_t i = 0; i < length; ++i) {
+      char buf[4];
+      snprintf(buf, sizeof(buf), "%02X ", data[i]);
+      hexDump += buf;
+    }
+    SS2K_LOG(BLE_SERVER_LOG_TAG, "KICKR BIKE: INFO request unparsed payload: %s", hexDump.c_str());
+    sendStatusResponse(0x02);
+    return;
+  }
+
+  SS2K_LOG(BLE_SERVER_LOG_TAG, "KICKR BIKE: INFO request for id %lu", static_cast<unsigned long>(requestId));
+
+  // We don't yet build the protobuf reply for these queries, but acknowledging keeps the protocol flowing.
+  sendStatusResponse(0x00);
+}
+
 void BLE_KickrBikeService::handleReset() {
   // RESET command - Reset the device to default state
   SS2K_LOG(BLE_SERVER_LOG_TAG, "KICKR BIKE: RESET command received");
@@ -553,8 +604,7 @@ void BLE_KickrBikeService::sendGetResponse(uint16_t objectId, const uint8_t* dat
     response.insert(response.end(), data, data + length);
   }
   
-  syncTxCharacteristic->setValue(response.data(), response.size());
-  syncTxCharacteristic->notify();
+  spinBLEServer.notifyBleAndDircon(syncTxCharacteristic, response.data(), response.size());
   
   SS2K_LOG(BLE_SERVER_LOG_TAG, "KICKR BIKE: Sent GET_RESPONSE for object 0x%04X", objectId);
 }
@@ -566,8 +616,7 @@ void BLE_KickrBikeService::sendStatusResponse(uint8_t status) {
     status  // Status code (0x00 = success, others = error)
   };
   
-  syncTxCharacteristic->setValue(response, sizeof(response));
-  syncTxCharacteristic->notify();
+  spinBLEServer.notifyBleAndDircon(syncTxCharacteristic, response, sizeof(response));
   
   SS2K_LOG(BLE_SERVER_LOG_TAG, "KICKR BIKE: Sent STATUS_RESPONSE (status: 0x%02X)", status);
 }

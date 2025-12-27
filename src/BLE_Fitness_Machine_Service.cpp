@@ -125,12 +125,7 @@ void BLE_Fitness_Machine_Service::update() {
   }
 
   // Notify the cycling power measurement characteristic
-  // Need to set the value before notifying so that read works correctly.
-  fitnessMachineIndoorBikeData->setValue(ftmsIndoorBikeData.data(), ftmsIndoorBikeData.size());
-  fitnessMachineIndoorBikeData->notify();
-
-  // Also notify DirCon TCP clients about Indoor Bike Data
-  DirConManager::notifyCharacteristic(NimBLEUUID(FITNESSMACHINESERVICE_UUID), fitnessMachineIndoorBikeData->getUUID(), ftmsIndoorBikeData.data(), ftmsIndoorBikeData.size());
+  spinBLEServer.notifyBleAndDircon(fitnessMachineIndoorBikeData, ftmsIndoorBikeData.data(), ftmsIndoorBikeData.size());
 
   const int kLogBufCapacity = 200;  // Data(30), Sep(data/2), Arrow(3), CharId(37), Sep(3), CharId(37), Sep(3), Name(10), Prefix(2), HR(7), SEP(1), CD(10), SEP(1), PW(8),
                                     // SEP(1), SD(7), Suffix(2), Nul(1), rounded up
@@ -343,36 +338,20 @@ void BLE_Fitness_Machine_Service::processFTMSWrite() {
       ftmsTrainingStatus[1] = FitnessMachineTrainingStatus::Other;  // 0x00;
     }
     // not checking for subscription because a write request would have triggered this
-    fitnessMachineControlPoint->setValue(returnValue.data(), returnValue.size());
-    fitnessMachineControlPoint->notify();
+    spinBLEServer.notifyBleAndDircon(fitnessMachineControlPoint, returnValue.data(), returnValue.size());
     if (fitnessMachineTrainingStatus->getValue() != ftmsTrainingStatus) {
-      fitnessMachineTrainingStatus->setValue(ftmsTrainingStatus);
-      fitnessMachineTrainingStatus->notify();
-      // Also notify DirCon TCP clients
-      DirConManager::notifyCharacteristic(NimBLEUUID(FITNESSMACHINESERVICE_UUID), fitnessMachineTrainingStatus->getUUID(), ftmsTrainingStatus.data(), ftmsTrainingStatus.size());
-    }
+      spinBLEServer.notifyBleAndDircon(fitnessMachineTrainingStatus, ftmsTrainingStatus.data(), ftmsTrainingStatus.size());
+  }
     if (fitnessMachineStatusCharacteristic->getValue() != ftmsStatus) {
-      fitnessMachineStatusCharacteristic->setValue(ftmsStatus);
-      fitnessMachineStatusCharacteristic->notify();
-      // Also notify DirCon TCP clients
-      DirConManager::notifyCharacteristic(NimBLEUUID(FITNESSMACHINESERVICE_UUID), fitnessMachineStatusCharacteristic->getUUID(), ftmsStatus.data(), ftmsStatus.size());
-    }
-
-    // Also notify DirCon TCP clients
-    DirConManager::notifyCharacteristic(NimBLEUUID(FITNESSMACHINESERVICE_UUID), fitnessMachineControlPoint->getUUID(), returnValue.data(), returnValue.size());
+      spinBLEServer.notifyBleAndDircon(fitnessMachineStatusCharacteristic, ftmsStatus.data(), ftmsStatus.size());
+   }
   }
 }
 
 bool BLE_Fitness_Machine_Service::spinDown(uint8_t response) {
   uint8_t spinStatus[2] = {FitnessMachineStatus::SpinDownStatus, response};
-  // Set the value of the characteristic
-  fitnessMachineStatusCharacteristic->setValue(spinStatus, sizeof(spinStatus));
-  // Notify the connected client
-  fitnessMachineStatusCharacteristic->notify();
+  spinBLEServer.notifyBleAndDircon(fitnessMachineStatusCharacteristic, spinStatus, sizeof(spinStatus));
   SS2K_LOG(FMTS_SERVER_LOG_TAG, "Sent SpinDown Status: 0x%02X", response);
-  // Also notify DirCon TCP clients about the status change
-  DirConManager::notifyCharacteristic(NimBLEUUID(FITNESSMACHINESERVICE_UUID), fitnessMachineStatusCharacteristic->getUUID(), spinStatus, sizeof(spinStatus));
-
   return true;
 }
 
