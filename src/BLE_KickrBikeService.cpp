@@ -258,9 +258,10 @@ void BLE_KickrBikeService::applyGearChange(bool fromZwift) {
 
   const GearProtoFields gearFields = buildGearProtoFields(currentGear);
   if (gearFields.token != 0) {
-    // Only send gear event notification if we initiated the change (not Zwift)
+    // Only send gear response notification if we initiated the change (not Zwift)
+    // Use GEAR_RESPONSE opcode (0x3C) like real KICKR BIKE, not GEAR_EVENT (0x03)
     if (!fromZwift) {
-      emitGearFrame(asyncTxCharacteristic, gearFields, ZWIFT_OPCODE_GEAR_EVENT);
+      emitGearFrame(syncTxCharacteristic, gearFields, ZWIFT_OPCODE_GEAR_RESPONSE);
     }
     lastReportedGearToken = gearFields.token;
     const double ratio = getCurrentGearRatio();
@@ -418,7 +419,7 @@ void BLE_KickrBikeService::processWrite(const std::string& value) {
     // Send initial gear state to the app
     const GearProtoFields gearFields = buildGearProtoFields(currentGear);
     if (gearFields.token != 0) {
-      emitGearFrame(asyncTxCharacteristic, gearFields, ZWIFT_OPCODE_GEAR_EVENT);
+      emitGearFrame(syncTxCharacteristic, gearFields, ZWIFT_OPCODE_GEAR_EVENT);
       SS2K_LOG(BLE_SERVER_LOG_TAG, "KICKR BIKE: Sent initial gear state: gear %d", currentGear + 1);
     }
     
