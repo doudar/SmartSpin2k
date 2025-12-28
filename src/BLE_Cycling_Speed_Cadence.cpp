@@ -26,7 +26,7 @@ void BLE_Cycling_Speed_Cadence::setupService(NimBLEServer* pServer, MyCharacteri
   pCyclingSpeedCadenceService->start();
 
   // Add service UUID to DirCon MDNS
-  //DirConManager::addBleServiceUuid(pCyclingSpeedCadenceService->getUUID());
+  DirConManager::addBleServiceUuid(pCyclingSpeedCadenceService->getUUID());
 }
 
 void BLE_Cycling_Speed_Cadence::update() {

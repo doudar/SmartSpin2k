@@ -30,7 +30,7 @@ void BLE_Cycling_Power_Service::setupService(NimBLEServer *pServer, MyCharacteri
   pPowerMonitor->start();
 
   // Add service UUID to DirCon MDNS
-  //DirConManager::addBleServiceUuid(pPowerMonitor->getUUID());
+  DirConManager::addBleServiceUuid(pPowerMonitor->getUUID());
 }
 
 void BLE_Cycling_Power_Service::update() {

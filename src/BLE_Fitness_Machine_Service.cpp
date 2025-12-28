@@ -57,7 +57,7 @@ void BLE_Fitness_Machine_Service::setupService(NimBLEServer *pServer, MyCharacte
   pFitnessMachineService->start();
 
   // Add service UUID to DirCon MDNS
-  DirConManager::addBleServiceUuid(pFitnessMachineService->getUUID());
+  // DirConManager::addBleServiceUuid(pFitnessMachineService->getUUID());
 }
 
 void BLE_Fitness_Machine_Service::update() {

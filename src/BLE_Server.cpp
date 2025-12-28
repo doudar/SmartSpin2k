@@ -54,8 +54,9 @@ void startBLEServer() {
   cyclingSpeedCadenceService.setupService(spinBLEServer.pServer, &chrCallbacks);
   cyclingPowerService.setupService(spinBLEServer.pServer, &chrCallbacks);
   heartService.setupService(spinBLEServer.pServer, &chrCallbacks);
-  fitnessMachineService.setupService(spinBLEServer.pServer, &chrCallbacks);
+  // Initialize KICKR BIKE before FTMS so it gets priority in DirCon discovery
   kickrBikeService.setupService(spinBLEServer.pServer, &chrCallbacks);
+  fitnessMachineService.setupService(spinBLEServer.pServer, &chrCallbacks);
   ss2kCustomCharacteristic.setupService(spinBLEServer.pServer);
   deviceInformationService.setupService(spinBLEServer.pServer);
   //add all service UUIDs to advertisement vector

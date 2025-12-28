@@ -570,18 +570,11 @@ std::vector<NimBLEUUID> DirConManager::getAvailableServices() {
   if (!servicesInitialized) {
     cachedServices.clear();
 
-    // Add each service with descriptive name for better debugging
-    NimBLEUUID cyclingPowerUuid = NimBLEUUID(CYCLINGPOWERSERVICE_UUID);
-    cachedServices.push_back(cyclingPowerUuid);
-
-    NimBLEUUID cscUuid = NimBLEUUID(CSCSERVICE_UUID);
-    cachedServices.push_back(cscUuid);
-
-    NimBLEUUID heartUuid = NimBLEUUID(HEARTSERVICE_UUID);
-    cachedServices.push_back(heartUuid);
-
-    NimBLEUUID ftmsUuid = NimBLEUUID(FITNESSMACHINESERVICE_UUID);
-    cachedServices.push_back(ftmsUuid);
+    cachedServices.push_back(NimBLEUUID(ZWIFT_RIDE_SERVICE_UUID));
+    cachedServices.push_back(NimBLEUUID(CYCLINGPOWERSERVICE_UUID));
+    cachedServices.push_back(NimBLEUUID(CSCSERVICE_UUID));
+    cachedServices.push_back(NimBLEUUID(HEARTSERVICE_UUID));
+    //cachedServices.push_back(NimBLEUUID(FITNESSMACHINESERVICE_UUID));
 
     // Log summary
     SS2K_LOG(DIRCON_LOG_TAG, "Initialized service discovery with %d services", cachedServices.size());
@@ -604,26 +597,7 @@ std::vector<NimBLECharacteristic*> DirConManager::getCharacteristics(const NimBL
       characteristics.push_back(const_cast<NimBLECharacteristic*>(characteristic));
     }
   }
-  // Find service-specific characteristics based on known UUIDs
-  /*if (serviceUuid.equals(CYCLINGPOWERSERVICE_UUID)) {
-    characteristics.push_back(service->getCharacteristic(CYCLINGPOWERMEASUREMENT_UUID));
-    characteristics.push_back(service->getCharacteristic(CYCLINGPOWERFEATURE_UUID));
-    characteristics.push_back(service->getCharacteristic(SENSORLOCATION_UUID));
-  } else if (serviceUuid.equals(CSCSERVICE_UUID)) {
-    characteristics.push_back(service->getCharacteristic(CSCMEASUREMENT_UUID));
-  } else if (serviceUuid.equals(HEARTSERVICE_UUID)) {
-    characteristics.push_back(service->getCharacteristic(HEARTCHARACTERISTIC_UUID));
-  } else if (serviceUuid.equals(FITNESSMACHINESERVICE_UUID)) {
-    characteristics.push_back(service->getCharacteristic(FITNESSMACHINEINDOORBIKEDATA_UUID));
-    characteristics.push_back(service->getCharacteristic(FITNESSMACHINEFEATURE_UUID));
-    characteristics.push_back(service->getCharacteristic(FITNESSMACHINECONTROLPOINT_UUID));
-    characteristics.push_back(service->getCharacteristic(FITNESSMACHINESTATUS_UUID));
-  } else if (serviceUuid.equals(DEVICE_INFORMATION_SERVICE_UUID)) {
-    // Add device info characteristics if needed
-  } else if (serviceUuid.equals(WATTBIKE_SERVICE_UUID)) {
-    // Add wattbike service characteristics
-  }
-*/
+
   // Filter out null characteristics
   auto it = std::remove_if(characteristics.begin(), characteristics.end(), [](NimBLECharacteristic* c) { return c == nullptr; });
   characteristics.erase(it, characteristics.end());

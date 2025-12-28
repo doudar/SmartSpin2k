@@ -190,7 +190,7 @@ void BLE_KickrBikeService::setupService(NimBLEServer *pServer, MyCharacteristicC
   pKickrBikeService->start();
   
   // Add service UUID to DirCon MDNS (for discovery)
-  // DirConManager::addBleServiceUuid(pKickrBikeService->getUUID());
+  DirConManager::addBleServiceUuid(ZWIFT_RIDE_CUSTOM_SERVICE_UUID_SHORT);
   
   SS2K_LOG(BLE_SERVER_LOG_TAG, "KICKR BIKE Service initialized with %d gears", KICKR_BIKE_NUM_GEARS);
 }
@@ -414,6 +414,14 @@ void BLE_KickrBikeService::processWrite(const std::string& value) {
     sendRideOnResponse();
     isHandshakeComplete = true;
     lastKeepAliveTime = millis();
+    
+    // Send initial gear state to the app
+    const GearProtoFields gearFields = buildGearProtoFields(currentGear);
+    if (gearFields.token != 0) {
+      emitGearFrame(asyncTxCharacteristic, gearFields, ZWIFT_OPCODE_GEAR_EVENT);
+      SS2K_LOG(BLE_SERVER_LOG_TAG, "KICKR BIKE: Sent initial gear state: gear %d", currentGear + 1);
+    }
+    
     return;
   }
   
@@ -513,16 +521,15 @@ void BLE_KickrBikeService::sendRideData() {
 
   std::vector<uint8_t> payload;
   payload.reserve(20);
-  payload.push_back(0x03);
+  payload.push_back(0x03);  // Opcode for HubRidingData
   appendVarintField(payload, 1, static_cast<uint32_t>(power));
   appendVarintField(payload, 2, static_cast<uint32_t>(cadence));
   appendVarintField(payload, 3, speedX100);
   appendVarintField(payload, 4, static_cast<uint32_t>(heartRate));
-  appendVarintField(payload, 5, 0);
-  appendVarintField(payload, 6, 0);
+  appendVarintField(payload, 5, 0);  // Unknown field (possibly flags or state)
+  appendVarintField(payload, 6, static_cast<uint32_t>(currentGear + 1));  // Current gear (1-based)
 
   spinBLEServer.notifyBleAndDircon(asyncTxCharacteristic, payload.data(), payload.size());
-
 }
 
 // Opcode message handlers
@@ -595,27 +602,87 @@ void BLE_KickrBikeService::handleSetRequest(const uint8_t* data, size_t length) 
     }
   }
 
-  // Zwift sends gradient updates as: 0x22 <len> 0x10 <varint gradient*100 (zigzag)>
+  // Zwift/Rouvy send simulation parameters as:
+  // 0x22 <len> [0x08 <power>] [0x10 <grade>] [0x18 <wind>] [0x20 <rolling_resistance>]
   if (data[0] == 0x22 && data[1] >= 2) {
     uint8_t payloadLen = data[1];
     size_t payloadEnd = 2 + payloadLen;
-    if (payloadEnd <= length && data[2] == 0x10) {
-      size_t index = 3;
-      uint32_t rawValue = 0;
-
-      if (!decodeVarint32(data, payloadEnd, index, rawValue)) {
-        SS2K_LOG(BLE_SERVER_LOG_TAG, "KICKR BIKE: SET gradient varint overflow");
-        sendStatusResponse(0x02);
-        return;
-      }
-
-      int32_t signedValue = decodeZigZag32(rawValue);
-      double gradientPercent = static_cast<double>(signedValue) / 100.0;
-      SS2K_LOG(BLE_SERVER_LOG_TAG, "KICKR BIKE: SET gradient to %.2f%% (raw %ld)", gradientPercent, static_cast<long>(signedValue));
-      setBaseGradient(gradientPercent);
-      sendStatusResponse(0x00);
+    if (payloadEnd > length) {
+      SS2K_LOG(BLE_SERVER_LOG_TAG, "KICKR BIKE: SET simulation params payload truncated");
+      sendStatusResponse(0x02);
       return;
     }
+
+    size_t index = 2;
+    uint32_t powerTarget = 0;
+    uint32_t gradeRaw = 0;
+    uint32_t windSpeed = 0;
+    uint32_t rollingResistance = 0;
+    bool hasPower = false;
+    bool hasGrade = false;
+
+    // Parse all fields in the simulation message
+    while (index < payloadEnd) {
+      uint8_t fieldTag = data[index++];
+      
+      switch (fieldTag) {
+        case 0x08:  // Field 1: Power target (watts)
+          if (!decodeVarint32(data, payloadEnd, index, powerTarget)) {
+            SS2K_LOG(BLE_SERVER_LOG_TAG, "KICKR BIKE: SET power varint overflow");
+            sendStatusResponse(0x02);
+            return;
+          }
+          hasPower = true;
+          break;
+          
+        case 0x10:  // Field 2: Grade (zigzag encoded, value * 100)
+          if (!decodeVarint32(data, payloadEnd, index, gradeRaw)) {
+            SS2K_LOG(BLE_SERVER_LOG_TAG, "KICKR BIKE: SET grade varint overflow");
+            sendStatusResponse(0x02);
+            return;
+          }
+          hasGrade = true;
+          break;
+          
+        case 0x18:  // Field 3: Wind speed (m/s * 100, zigzag?)
+          if (!decodeVarint32(data, payloadEnd, index, windSpeed)) {
+            SS2K_LOG(BLE_SERVER_LOG_TAG, "KICKR BIKE: SET wind varint overflow");
+            sendStatusResponse(0x02);
+            return;
+          }
+          break;
+          
+        case 0x20:  // Field 4: Rolling resistance coefficient
+          if (!decodeVarint32(data, payloadEnd, index, rollingResistance)) {
+            SS2K_LOG(BLE_SERVER_LOG_TAG, "KICKR BIKE: SET rolling resistance varint overflow");
+            sendStatusResponse(0x02);
+            return;
+          }
+          break;
+          
+        default:
+          // Unknown field, skip it
+          SS2K_LOG(BLE_SERVER_LOG_TAG, "KICKR BIKE: SET unknown simulation field tag 0x%02X", fieldTag);
+          break;
+      }
+    }
+
+    // Apply grade if present
+    if (hasGrade) {
+      int32_t signedGrade = decodeZigZag32(gradeRaw);
+      double gradientPercent = static_cast<double>(signedGrade) / 100.0;
+      SS2K_LOG(BLE_SERVER_LOG_TAG, "KICKR BIKE: SET gradient to %.2f%%", gradientPercent);
+      setBaseGradient(gradientPercent);
+    }
+    
+    // Log other parameters for debugging
+    if (hasPower) {
+      SS2K_LOG(BLE_SERVER_LOG_TAG, "KICKR BIKE: SET power target %lu W (ignored in SIM mode)", 
+               static_cast<unsigned long>(powerTarget));
+    }
+
+    sendStatusResponse(0x00);
+    return;
   }
 
   // Unknown SET payload; acknowledge to keep protocol flowing but log for future decoding.
