@@ -891,32 +891,48 @@ void SpinBLEClient::checkBLEReconnect() {
   char notConnectedDevices[32] = {0};
   size_t offset                = 0;
 
-  // Diagnostic: capture current config strings and states
   const char* cfgHRM    = userConfig->getConnectedHeartMonitor();
   const char* cfgPM     = userConfig->getConnectedPowerMeter();
   const char* cfgRemote = userConfig->getConnectedRemote();
-  bool wantHRM          = (strcmp(cfgHRM, NONE) != 0);
-  bool wantPM           = (strcmp(cfgPM, NONE) != 0);
-  bool wantRemote       = (strcmp(cfgRemote, NONE) != 0);
 
-  if (wantHRM && !spinBLEClient.connectedHRM) {
-    offset += snprintf(notConnectedDevices + offset, sizeof(notConnectedDevices) - offset, "HRM ");
+  // Helper lambda to check if a device with the given name is currently connected
+  auto isDeviceConnected = [&](const char* configName) -> bool {
+    for (auto& _BLEd : spinBLEClient.myBLEDevices) {
+      if (_BLEd.isPostConnected && _BLEd.uniqueName == configName) {
+        return true;
+      }
+    }
+    return false;
+  };
+
+  // Check HRM: skip if "NONE", use flag if "ANY", otherwise check by name
+  if (strcmp(cfgHRM, NONE) != 0) {
+    bool hrmConnected = (strcmp(cfgHRM, ANY) == 0) ? spinBLEClient.connectedHRM : isDeviceConnected(cfgHRM);
+    if (!hrmConnected) {
+      offset += snprintf(notConnectedDevices + offset, sizeof(notConnectedDevices) - offset, "HRM ");
+    }
   }
-  if (wantPM && !(spinBLEClient.connectedPM || spinBLEClient.connectedCD)) {
-    offset += snprintf(notConnectedDevices + offset, sizeof(notConnectedDevices) - offset, "PM ");
+
+  // Check PM: skip if "NONE", use flag if "ANY", otherwise check by name
+  if (strcmp(cfgPM, NONE) != 0) {
+    bool pmConnected = (strcmp(cfgPM, ANY) == 0) ? (spinBLEClient.connectedPM || spinBLEClient.connectedCD) : isDeviceConnected(cfgPM);
+    if (!pmConnected) {
+      offset += snprintf(notConnectedDevices + offset, sizeof(notConnectedDevices) - offset, "PM ");
+    }
   }
-  if (wantRemote && !(spinBLEClient.connectedRemote)) {
-    offset += snprintf(notConnectedDevices + offset, sizeof(notConnectedDevices) - offset, "Remote ");
+
+  // Check Remote: skip if "NONE", use flag if "ANY", otherwise check by name
+  if (strcmp(cfgRemote, NONE) != 0) {
+    bool remoteConnected = (strcmp(cfgRemote, ANY) == 0) ? spinBLEClient.connectedRemote : isDeviceConnected(cfgRemote);
+    if (!remoteConnected) {
+      offset += snprintf(notConnectedDevices + offset, sizeof(notConnectedDevices) - offset, "Remote ");
+    }
   }
+
   if (offset > 0) {
-    SS2K_LOG(BLE_CLIENT_LOG_TAG,
-             "Devices not connected: %s (cfgHRM='%s' needHRM=%d hrmState=%d cfgPM='%s' needPM=%d pmState=%d cadState=%d cfgRemote='%s' needRemote=%d remoteState=%d)",
-             notConnectedDevices, cfgHRM, wantHRM, spinBLEClient.connectedHRM, cfgPM, wantPM, spinBLEClient.connectedPM, spinBLEClient.connectedCD, cfgRemote, wantRemote,
-             spinBLEClient.connectedRemote);
+    SS2K_LOG(BLE_CLIENT_LOG_TAG, "Devices not connected: %s (cfgHRM='%s' cfgPM='%s' cfgRemote='%s')", 
+             notConnectedDevices, cfgHRM, cfgPM, cfgRemote);
     this->doScan = true;
-  } else {
-    // SS2K_LOG(BLE_CLIENT_LOG_TAG, "All required BLE devices connected or disabled (cfgHRM='%s' hrm=%d cfgPM='%s' pm=%d cad=%d cfgRemote='%s' remote=%d)", cfgHRM,
-    //          spinBLEClient.connectedHRM, cfgPM, spinBLEClient.connectedPM, spinBLEClient.connectedCD, cfgRemote, spinBLEClient.connectedRemote);
   }
 }
 
