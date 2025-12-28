@@ -53,6 +53,8 @@ class BLE_KickrBikeService {
   double getBaseGradient() const { return baseGradient; }
   double getEffectiveGradient() const;
   void applyGradientToTrainer();
+  void applyGearChange();
+  void applyGearChange(bool fromZwift);
   
   // Power control for ERG mode
   void setTargetPower(int watts);
@@ -91,7 +93,6 @@ class BLE_KickrBikeService {
   static const double gearRatios[KICKR_BIKE_NUM_GEARS];
   
   // Helper methods
-  void applyGearChange();
   double calculateEffectiveGrade(double baseGrade, double gearRatio);
   bool isRideOnMessage(const std::string& data);
   void updateTrainerPosition();

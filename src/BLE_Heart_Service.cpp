@@ -19,7 +19,7 @@ void BLE_Heart_Service::setupService(NimBLEServer *pServer, MyCharacteristicCall
   heartRateMeasurementCharacteristic->setCallbacks(chrCallbacks);
   pHeartService->start();
   // Add service UUID to DirCon MDNS
-  DirConManager::addBleServiceUuid(pHeartService->getUUID());
+  //DirConManager::addBleServiceUuid(pHeartService->getUUID());
 }
 
 void BLE_Heart_Service::deinit() {

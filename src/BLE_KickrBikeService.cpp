@@ -11,6 +11,7 @@
 #include "BLE_Common.h"
 #include <Constants.h>
 #include <algorithm>
+#include <array>
 #include <vector>
 
 namespace {
@@ -30,6 +31,98 @@ inline void appendVarintField(std::vector<uint8_t>& buffer, uint8_t fieldNumber,
 
 inline int32_t decodeZigZag32(uint32_t value) {
   return static_cast<int32_t>((value >> 1) ^ static_cast<uint32_t>(-static_cast<int32_t>(value & 0x01)));
+}
+
+inline bool decodeVarint32(const uint8_t* data, size_t endIndex, size_t& index, uint32_t& result) {
+  result = 0;
+  uint32_t shift = 0;
+  while (index < endIndex) {
+    uint8_t byte = data[index++];
+    result |= static_cast<uint32_t>(byte & 0x7F) << shift;
+    if ((byte & 0x80) == 0) {
+      return true;
+    }
+    shift += 7;
+    if (shift >= 32) {
+      return false;  // Overflow
+    }
+  }
+  return false;  // Incomplete varint
+}
+
+// Zwift Play opcodes/tokens derived from qdomyos-zwift reverse engineering.
+constexpr uint8_t ZWIFT_OPCODE_GEAR_EVENT = 0x03;
+constexpr uint8_t ZWIFT_OPCODE_GEAR_RESPONSE = 0x3C;
+constexpr size_t ZWIFT_CHAINRING_COUNT = 2;
+constexpr size_t ZWIFT_GEARS_PER_RING =
+    KICKR_BIKE_NUM_GEARS >= ZWIFT_CHAINRING_COUNT ? (KICKR_BIKE_NUM_GEARS / ZWIFT_CHAINRING_COUNT) : KICKR_BIKE_NUM_GEARS;
+
+struct GearProtoFields {
+  uint16_t token = 0;
+  uint8_t frontIndex = 0;
+  uint8_t rearIndex = 0;
+  uint8_t gearIndex = 0;
+};
+
+// Actual Zwift gear tokens captured from real Zwift communication.
+// Gears 1-24 from easiest to hardest.
+constexpr std::array<uint16_t, KICKR_BIKE_NUM_GEARS> zwiftGearTokens = {
+    7500, 8700, 9900, 11100, 12300, 13800, 15300, 16800,
+    18600, 20400, 22200, 24000, 26099, 28200, 30300, 32400,
+    34900, 37400, 39900, 42399, 45400, 48400, 51400, 54899};
+
+uint16_t gearTokenFromIndex(int gearIndex) {
+  if (gearIndex < 0 || gearIndex >= static_cast<int>(zwiftGearTokens.size())) {
+    return 0;
+  }
+  return zwiftGearTokens[gearIndex];
+}
+
+inline int gearNumberFromInboundToken(uint32_t token) {
+  for (size_t i = 0; i < zwiftGearTokens.size(); ++i) {
+    if (zwiftGearTokens[i] == static_cast<uint16_t>(token)) {
+      return static_cast<int>(i) + 1;  // Return 1-based gear number
+    }
+  }
+  return -1;  // Unknown token
+}
+
+GearProtoFields buildGearProtoFields(int gearIndex) {
+  GearProtoFields fields;
+  if (gearIndex < 0) {
+    return fields;
+  }
+  fields.token = gearTokenFromIndex(gearIndex);
+  if (fields.token == 0) {
+    return fields;
+  }
+  fields.gearIndex = static_cast<uint8_t>(gearIndex + 1);
+  const size_t perRing = ZWIFT_GEARS_PER_RING == 0 ? 1 : ZWIFT_GEARS_PER_RING;
+  const size_t frontIdx = static_cast<size_t>(gearIndex) / perRing;
+  const size_t rearIdx = static_cast<size_t>(gearIndex) % perRing;
+  fields.frontIndex = static_cast<uint8_t>(frontIdx + 1);
+  fields.rearIndex = static_cast<uint8_t>(rearIdx + 1);
+  return fields;
+}
+
+uint16_t lastReportedGearToken = 0;
+
+void emitGearFrame(NimBLECharacteristic* characteristic, const GearProtoFields& fields, uint8_t opcode) {
+  if (!characteristic || fields.token == 0) {
+    return;
+  }
+
+  std::vector<uint8_t> payload;
+  payload.reserve(16);
+  payload.push_back(opcode);
+  appendVarintField(payload, 1, fields.token);
+  appendVarintField(payload, 2, fields.frontIndex);
+  appendVarintField(payload, 3, fields.rearIndex);
+  appendVarintField(payload, 4, fields.gearIndex);
+  
+  SS2K_LOG(BLE_SERVER_LOG_TAG, "KICKR BIKE: Sending gear event opcode 0x%02X, token %u, size %d", opcode, fields.token, payload.size());
+  
+  spinBLEServer.notifyBleAndDircon(characteristic, payload.data(), payload.size());
 }
 }  // namespace
 
@@ -97,7 +190,7 @@ void BLE_KickrBikeService::setupService(NimBLEServer *pServer, MyCharacteristicC
   pKickrBikeService->start();
   
   // Add service UUID to DirCon MDNS (for discovery)
-  DirConManager::addBleServiceUuid(ZWIFT_RIDE_CUSTOM_SERVICE_UUID_SHORT);
+  // DirConManager::addBleServiceUuid(pKickrBikeService->getUUID());
   
   SS2K_LOG(BLE_SERVER_LOG_TAG, "KICKR BIKE Service initialized with %d gears", KICKR_BIKE_NUM_GEARS);
 }
@@ -151,6 +244,10 @@ double BLE_KickrBikeService::getCurrentGearRatio() const {
 }
 
 void BLE_KickrBikeService::applyGearChange() {
+  applyGearChange(false);
+}
+
+void BLE_KickrBikeService::applyGearChange(bool fromZwift) {
   // Recalculate effective gradient with new gear
   effectiveGradient = calculateEffectiveGrade(baseGradient, getCurrentGearRatio());
   
@@ -158,17 +255,23 @@ void BLE_KickrBikeService::applyGearChange() {
   if (isEnabled) {
     applyGradientToTrainer();
   }
-  
-  // Optionally notify clients about gear change via async TX characteristic
-  // This could be used to send gear status to connected apps
-  uint8_t gearStatus[2] = {
-    static_cast<uint8_t>(currentGear + 1),  // 1-indexed gear number
-    static_cast<uint8_t>((getCurrentGearRatio() * 100))  // Ratio as percentage
-  };
-  // log the full TX of our gear status
-  SS2K_LOG(BLE_SERVER_LOG_TAG, "KICKR BIKE: Gear status sent: Gear %d, Ratio %.2f", currentGear + 1, getCurrentGearRatio());
-  
-  spinBLEServer.notifyBleAndDircon(asyncTxCharacteristic, gearStatus, sizeof(gearStatus));
+
+  const GearProtoFields gearFields = buildGearProtoFields(currentGear);
+  if (gearFields.token != 0) {
+    // Only send gear event notification if we initiated the change (not Zwift)
+    if (!fromZwift) {
+      emitGearFrame(asyncTxCharacteristic, gearFields, ZWIFT_OPCODE_GEAR_EVENT);
+    }
+    lastReportedGearToken = gearFields.token;
+    const double ratio = getCurrentGearRatio();
+    SS2K_LOG(BLE_SERVER_LOG_TAG,
+             "KICKR BIKE: Zwift Play gear token 0x%03X -> gear %u (front %u, rear %u, ratio %.2f)",
+             gearFields.token,
+             gearFields.gearIndex,
+             gearFields.frontIndex,
+             gearFields.rearIndex,
+             ratio);
+  }
 }
 
 void BLE_KickrBikeService::setBaseGradient(double gradientPercent) {
@@ -266,12 +369,12 @@ void BLE_KickrBikeService::updateGearFromShifterPosition() {
 }
 
 bool BLE_KickrBikeService::isRideOnMessage(const std::string& data) {
-  // RideOn handshake prefix = 0x52 0x69 0x64 0x65 0x4f 0x6e
+  // RideOn handshake prefix = 0x52 0x69 0x64 0x65 0x4F 0x6E
   if (data.length() < 6) {
     return false;
   }
 
-  static const uint8_t rideOnPrefix[6] = {0x52, 0x69, 0x64, 0x65, 0x4f, 0x6e};
+  static const uint8_t rideOnPrefix[6] = {0x52, 0x69, 0x64, 0x65, 0x4F, 0x6E};
   for (size_t i = 0; i < 6; ++i) {
     if ((uint8_t)data[i] != rideOnPrefix[i]) {
       return false;
@@ -368,7 +471,7 @@ void BLE_KickrBikeService::processWrite(const std::string& value) {
 void BLE_KickrBikeService::sendRideOnResponse() {
   // Respond with "RideOn" + signature bytes (0x01 0x03)
   uint8_t response[8] = {
-    0x52, 0x69, 0x64, 0x65, 0x4f, 0x6e,  // "RideOn"
+    0x52, 0x69, 0x64, 0x65, 0x4F, 0x6E,  // "RideOn"
     0x01, 0x03                            // Signature
   };
   
@@ -456,27 +559,54 @@ void BLE_KickrBikeService::handleSetRequest(const uint8_t* data, size_t length) 
     return;
   }
 
-  // Zwift sends gradient updates as: 0x22 <len> 0x10 <varint gradient*100>
+  // Zwift gear select (from some controllers) arrives as:
+  // 2A <len> 10 <varint gearToken>
+  if (data[0] == 0x2A && data[1] >= 2) {
+    const uint8_t payloadLen = data[1];
+    const size_t payloadEnd = 2 + payloadLen;
+    if (payloadEnd <= length && data[2] == 0x10) {
+      size_t index = 3;
+      uint32_t token = 0;
+
+      if (!decodeVarint32(data, payloadEnd, index, token)) {
+        SS2K_LOG(BLE_SERVER_LOG_TAG, "KICKR BIKE: SET gear token varint overflow");
+        sendStatusResponse(0x02);
+        return;
+      }
+
+      const int gearNumber = gearNumberFromInboundToken(token);
+      if (gearNumber > 0) {
+        // Sync internal + external representation immediately (avoid incremental shifting logic).
+        currentGear = std::clamp(gearNumber - 1, 0, KICKR_BIKE_NUM_GEARS - 1);
+        lastShifterPosition = gearNumber;
+        rtConfig->setShifterPosition(gearNumber);
+        applyGearChange(true);  // fromZwift = true, don't echo back
+
+        SS2K_LOG(BLE_SERVER_LOG_TAG, "KICKR BIKE: SET gear token %lu -> gear %d", static_cast<unsigned long>(token), gearNumber);
+        sendStatusResponse(0x00);
+        return;
+      }
+
+      SS2K_LOG(BLE_SERVER_LOG_TAG,
+               "KICKR BIKE: SET unknown gear token %lu (add to zwiftInboundGearTokensObserved)",
+               static_cast<unsigned long>(token));
+      sendStatusResponse(0x00);
+      return;
+    }
+  }
+
+  // Zwift sends gradient updates as: 0x22 <len> 0x10 <varint gradient*100 (zigzag)>
   if (data[0] == 0x22 && data[1] >= 2) {
     uint8_t payloadLen = data[1];
     size_t payloadEnd = 2 + payloadLen;
     if (payloadEnd <= length && data[2] == 0x10) {
       size_t index = 3;
       uint32_t rawValue = 0;
-      uint8_t shift = 0;
 
-      while (index < payloadEnd) {
-        uint8_t byte = data[index++];
-        rawValue |= (static_cast<uint32_t>(byte & 0x7F) << shift);
-        if ((byte & 0x80) == 0) {
-          break;
-        }
-        shift += 7;
-        if (shift > 28) {
-          SS2K_LOG(BLE_SERVER_LOG_TAG, "KICKR BIKE: SET gradient varint overflow");
-          sendStatusResponse(0x02);
-          return;
-        }
+      if (!decodeVarint32(data, payloadEnd, index, rawValue)) {
+        SS2K_LOG(BLE_SERVER_LOG_TAG, "KICKR BIKE: SET gradient varint overflow");
+        sendStatusResponse(0x02);
+        return;
       }
 
       int32_t signedValue = decodeZigZag32(rawValue);
