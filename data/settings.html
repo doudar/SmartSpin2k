@@ -334,21 +334,11 @@
               if (el.type === 'checkbox') {
                 el.checked = !!obj[key];
               } else {
-                // Convert milliseconds to minutes for inactivityTimeout display
-                let value = obj[key];
-                if (key === 'inactivityTimeout') {
-                  value = Math.round(value / 60000);  // Convert ms to minutes
-                }
-                el.value = value;
+                el.value = obj[key];
               }
               const valueEl = document.getElementById(key + 'Value');
               if (valueEl) {
-                // Show the actual value in UI (minutes for inactivityTimeout)
-                let displayValue = obj[key];
-                if (key === 'inactivityTimeout') {
-                  displayValue = Math.round(obj[key] / 60000);  // Convert ms to minutes
-                }
-                updateSlider(displayValue, valueEl);
+                updateSlider(obj[key], valueEl);
               }
             }
           }
@@ -394,12 +384,7 @@
         if (element.type === 'checkbox') {
           if (element.checked) params.append(element.name, 'true');
         } else {
-          // Convert minutes to milliseconds for inactivityTimeout
-          let value = element.value;
-          if (element.name === 'inactivityTimeout') {
-            value = parseInt(element.value) * 60000;  // Convert minutes to ms
-          }
-          params.append(element.name, value);
+          params.append(element.name, element.value);
         }
         
         const toggleIds = Object.entries(settingsConfig)
