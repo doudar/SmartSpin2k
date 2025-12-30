@@ -104,10 +104,10 @@ const char* const DEFAULT_PASSWORD = "password";
 #define DEFAULT_MAX_WATTS 1000
 
 // Inactivity timeout for automatic reboot
-// Time in milliseconds before reboot when no activity is detected
-#define DEFAULT_INACTIVITY_TIMEOUT 1800000  // 30 minutes
-#define MIN_INACTIVITY_TIMEOUT 60000        // 1 minute
-#define MAX_INACTIVITY_TIMEOUT 172800000    // 48 hours
+// Time in minutes before reboot when no activity is detected
+#define DEFAULT_INACTIVITY_TIMEOUT 30
+#define MIN_INACTIVITY_TIMEOUT 1
+#define MAX_INACTIVITY_TIMEOUT 2880 // 48 hours
 
 // Minimum resistance on a Peloton Bike.
 // This is used to set the lower travel limit for the motor.

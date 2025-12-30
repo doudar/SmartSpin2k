@@ -816,20 +816,20 @@ void BLE_ss2kCustomCharacteristic::process(std::string rxValue) {
 
     case BLE_inactivityTimeout: {  // 0x2E
       LOG_BUF_APPEND("<-inactivityTimeout");
-      unsigned long timeout = userConfig->getInactivityTimeout();
+      int timeout = userConfig->getInactivityTimeout();
       if (rxValue[0] == cc_read) {
         returnValue[0] = cc_success;
-        returnValue[1] = (uint8_t)(timeout & 0xff);
-        returnValue[2] = (uint8_t)((timeout >> 8) & 0xff);
-        returnValue[3] = (uint8_t)((timeout >> 16) & 0xff);
-        returnValue[4] = (uint8_t)((timeout >> 24) & 0xff);
-        returnLength = 4;
+        returnValue[2] = (uint8_t)(timeout & 0xff);
+        returnValue[3] = (uint8_t)((timeout >> 8) & 0xff);
+        returnValue[4] = (uint8_t)((timeout >> 16) & 0xff);
+        returnValue[5] = (uint8_t)((timeout >> 24) & 0xff);
+        returnLength += 4;
       }
       if (rxValue[0] == cc_write) {
         returnValue[0] = cc_success;
-        unsigned long newTimeout = rxValue[2] | (rxValue[3] << 8) | (rxValue[4] << 16) | (rxValue[5] << 24);
+        int newTimeout = rxValue[2] | (rxValue[3] << 8) | (rxValue[4] << 16) | (rxValue[5] << 24);
         userConfig->setInactivityTimeout(newTimeout);
-        LOG_BUF_APPEND("(%lu ms)", userConfig->getInactivityTimeout());
+        LOG_BUF_APPEND("(%d min)", userConfig->getInactivityTimeout());
       }
     } break;
 
