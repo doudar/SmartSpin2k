@@ -14,6 +14,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Filter cadence for crazy values. Only >0 && <250 now accepted.
 - Filter watts for crazy values. Only >0 && <3000 now accepted. 
 - Fixed bug where scans may not happen even when configured devices aren't connected.  
+- Worked with Mark Roy to tune PID.
 
 ### Hardware
 

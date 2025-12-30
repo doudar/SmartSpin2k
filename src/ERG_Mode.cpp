@@ -222,6 +222,17 @@ void ErgMode::_inSetpointState(int newCadence, Measurement& newWatts) {
   // subtracting target from current watts
   float error = target - watts;
 
+  // modifying gains based on error
+  if (abs(error) < 20) {
+    Kp = Kp * .75;  // Stabilize for small errors
+    Ki = Ki * 0.0;  
+    Kd = Kd * 0.0;  
+  } else if (abs(error) < 10) {
+    Kp = Kp * 0.25;  // decrease further for tiny errors
+    Ki = Ki * 0.0;  
+    Kd = Kd * 0.0; 
+  }
+
   // Defining proportional term
   float proportional = Kp * error;
   if (newWatts.getValue() < userConfig->getMinWatts()) {
