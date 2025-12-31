@@ -59,7 +59,7 @@ void collectAndSet(NimBLEUUID charUUID, NimBLEUUID serviceUUID, std::string& uni
       // Peloton connected but using BLE Power Meter. So skip cad for Peloton UUID.
     } else {
       int cadence = round(sensorData->getCadence());
-      if (cadence > 0.0 && cadence < 250.0) {
+      if (cadence > 0 && cadence < 250) {
         rtConfig->cad.setValue(cadence);
         spinBLEClient.connectedCD = true;
         logBufLength += snprintf(logBuf + logBufLength, kLogBufMaxLength - logBufLength, " CD(%.2f)", fmodf(cadence, 1000.0));
