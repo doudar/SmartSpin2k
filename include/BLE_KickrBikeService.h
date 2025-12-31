@@ -26,7 +26,6 @@ class BLE_KickrBikeService {
   // Gear management
   void shiftUp();
   void shiftDown();
-  int getCurrentGear() const { return currentGear; }
   double getCurrentGearRatio() const;
   
   // Function to check shifter position and modify incline accordingly
@@ -39,6 +38,9 @@ class BLE_KickrBikeService {
   void sendRideData();
   void sendButtonPress(uint8_t buttonId);
   
+  // Wahoo gearing service notifications
+  void sendGearingNotification();
+  
   // Opcode message handlers
   void handleGetRequest(const uint8_t* data, size_t length);
   void handleSetRequest(const uint8_t* data, size_t length);
@@ -50,12 +52,8 @@ class BLE_KickrBikeService {
   void sendStatusResponse(uint8_t status);
   
   // Gradient/resistance control (independent of FTMS)
-  void setBaseGradient(double gradientPercent);
-  double getBaseGradient() const { return baseGradient; }
-  double getEffectiveGradient() const;
-  void applyGradientToTrainer();
-  void applyGearChange();
-  void applyGearChange(bool fromZwift);
+  void applyGradientToTrainer(float gradient);
+  void applyGearChange(bool fromZwift = false);
   
   // Power control for ERG mode
   void setTargetPower(int watts);
@@ -74,13 +72,14 @@ class BLE_KickrBikeService {
   BLECharacteristic *debugCharacteristic; // Optional debug characteristic
   BLECharacteristic *unknown6Characteristic; // Optional unknown characteristic
   
+  // Wahoo gearing service (separate from KICKR BIKE protocol)
+  BLEService *pGearingService;
+  BLECharacteristic *gearingCharacteristic;  // Notify characteristic for gear display
+  
   // Gear system state
-  int currentGear;
   int lastShifterPosition;
   
   // Gradient and resistance state (independent of FTMS)
-  double baseGradient;        // Base gradient set by Zwift (%)
-  double effectiveGradient;   // Gradient after gear ratio applied (%)
   int targetPower;            // Target power for ERG mode (watts)
   
   // Service state
@@ -89,6 +88,7 @@ class BLE_KickrBikeService {
   unsigned long lastKeepAliveTime;
   unsigned long lastGradientUpdateTime;
   unsigned long lastRideDataTime;
+  unsigned long lastGearingUpdateTime;
   
   // Gear ratio table (24 gears)
   static const double gearRatios[KICKR_BIKE_NUM_GEARS];
@@ -96,7 +96,6 @@ class BLE_KickrBikeService {
   // Helper methods
   double calculateEffectiveGrade(double baseGrade, double gearRatio);
   bool isRideOnMessage(const std::string& data);
-  void updateTrainerPosition();
 };
 
 // Custom callback class for KickrBike Sync RX characteristic

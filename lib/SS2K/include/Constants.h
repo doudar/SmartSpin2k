@@ -102,6 +102,11 @@
 #define ZWIFT_UNKNOWN_6_CHARACTERISTIC_UUID  NimBLEUUID("00000006-19CA-4651-86E5-FA29DCDD09D1")
 #define ZWIFT_RIDE_CUSTOM_SERVICE_UUID_SHORT NimBLEUUID((uint16_t)0xFC82)
 
+// Wahoo Gearing Service (KICKR BIKE gear display - separate from Zwift protocol)
+// This service provides gear information to Wahoo ELEMNT displays and other compatible devices
+#define WAHOO_GEARING_SERVICE_UUID      NimBLEUUID("a026ee0d-0a7d-4ab3-97fa-f1500f9feb8b")
+#define WAHOO_GEARING_CHARACTERISTIC_UUID NimBLEUUID("a026e03a-0a7d-4ab3-97fa-f1500f9feb8b")
+
 // BLE HID
 #define APPEARANCE_HID_GENERIC_UUID             NimBLEUUID((uint16_t)0x3C0)
 #define APPEARANCE_HID_KEYBOARD_UUID            NimBLEUUID((uint16_t)0x3C1)
