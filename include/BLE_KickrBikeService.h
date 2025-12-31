@@ -37,6 +37,7 @@ class BLE_KickrBikeService {
   void sendRideOnResponse();
   void sendKeepAlive();
   void sendRideData();
+  void sendButtonPress(uint8_t buttonId);
   
   // Opcode message handlers
   void handleGetRequest(const uint8_t* data, size_t length);

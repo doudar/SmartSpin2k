@@ -154,7 +154,7 @@ BLE_KickrBikeService::BLE_KickrBikeService()
 
 void BLE_KickrBikeService::setupService(NimBLEServer *pServer, MyCharacteristicCallbacks *chrCallbacks) {
   // Create the Zwift Ride service (KICKR BIKE protocol)
-  pKickrBikeService = spinBLEServer.pServer->createService(ZWIFT_CUSTOM_SERVICE_UUID);
+  pKickrBikeService = spinBLEServer.pServer->createService(ZWIFT_RIDE_CUSTOM_SERVICE_UUID_SHORT);
   
   // Create the three characteristics according to KICKR BIKE specification:
   // 1. Sync RX - Write characteristic for receiving commands from Zwift
@@ -218,6 +218,8 @@ void BLE_KickrBikeService::shiftUp() {
   if (currentGear < KICKR_BIKE_NUM_GEARS - 1) {
     currentGear++;
     applyGearChange();
+    // Send button press notification to Zwift (SHFT_UP_L_BTN = 0x00200)
+    sendButtonPress(2);
     SS2K_LOG(BLE_SERVER_LOG_TAG, "Shifted UP to gear %d (ratio: %.2f)", 
              currentGear + 1, getCurrentGearRatio());
   } else {
@@ -229,6 +231,8 @@ void BLE_KickrBikeService::shiftDown() {
   if (currentGear > 0) {
     currentGear--;
     applyGearChange();
+    // Send button press notification to Zwift (SHFT_DN_L_BTN = 0x00400)
+    sendButtonPress(5);
     SS2K_LOG(BLE_SERVER_LOG_TAG, "Shifted DOWN to gear %d (ratio: %.2f)", 
              currentGear + 1, getCurrentGearRatio());
   } else {
@@ -416,12 +420,8 @@ void BLE_KickrBikeService::processWrite(const std::string& value) {
     isHandshakeComplete = true;
     lastKeepAliveTime = millis();
     
-    // Send initial gear state to the app
-    const GearProtoFields gearFields = buildGearProtoFields(currentGear);
-    if (gearFields.token != 0) {
-      emitGearFrame(syncTxCharacteristic, gearFields, ZWIFT_OPCODE_GEAR_EVENT);
-      SS2K_LOG(BLE_SERVER_LOG_TAG, "KICKR BIKE: Sent initial gear state: gear %d", currentGear + 1);
-    }
+    // Don't send initial gear state - let Zwift request it if needed
+    // Sending it here can interfere with the handshake sequence
     
     return;
   }
@@ -533,6 +533,29 @@ void BLE_KickrBikeService::sendRideData() {
   spinBLEServer.notifyBleAndDircon(asyncTxCharacteristic, payload.data(), payload.size());
 }
 
+void BLE_KickrBikeService::sendButtonPress(uint8_t buttonMask) {
+  if (!isHandshakeComplete) {
+    return;
+  }
+
+  // Send button press notification using opcode 0x23 (RideKeyPadStatus)
+  // Based on Zwift Hub protocol RideButtonMask:
+  // SHFT_UP_L_BTN = 0x00200 (512)
+  // SHFT_DN_L_BTN = 0x00400 (1024)
+  // ButtonMap field contains bitmask of pressed buttons
+  std::vector<uint8_t> payload;
+  payload.reserve(8);
+  payload.push_back(0x23);  // Opcode for RideKeyPadStatus
+  
+  // Field 1: ButtonMap - bitmask of pressed buttons
+  uint32_t buttonMapValue = (buttonMask == 2) ? 0x00200 : 0x00400;  // 2=up(512), 5=down(1024)
+  appendVarintField(payload, 1, buttonMapValue);
+
+  spinBLEServer.notifyBleAndDircon(asyncTxCharacteristic, payload.data(), payload.size());
+  
+  SS2K_LOG(BLE_SERVER_LOG_TAG, "KICKR BIKE: Sent RideKeyPadStatus (ButtonMap: 0x%04X)", buttonMapValue);
+}
+
 // Opcode message handlers
 
 void BLE_KickrBikeService::handleGetRequest(const uint8_t* data, size_t length) {
@@ -601,6 +624,24 @@ void BLE_KickrBikeService::handleSetRequest(const uint8_t* data, size_t length) 
       sendStatusResponse(0x00);
       return;
     }
+  }
+
+  // ERG mode power target command:
+  // 0x18 <varint power> - Field 3 (PowerTarget) from HubCommand message
+  if (data[0] == 0x18) {
+    size_t index = 1;
+    uint32_t powerTarget = 0;
+    if (!decodeVarint32(data, length, index, powerTarget)) {
+      SS2K_LOG(BLE_SERVER_LOG_TAG, "KICKR BIKE: SET ERG power varint overflow");
+      sendStatusResponse(0x02);
+      return;
+    }
+    
+    SS2K_LOG(BLE_SERVER_LOG_TAG, "KICKR BIKE: SET ERG mode power target %lu W", 
+             static_cast<unsigned long>(powerTarget));
+    setTargetPower(powerTarget);
+    sendStatusResponse(0x00);
+    return;
   }
 
   // Zwift/Rouvy send simulation parameters as:

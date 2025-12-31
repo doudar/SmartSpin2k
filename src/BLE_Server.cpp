@@ -60,12 +60,12 @@ void startBLEServer() {
   ss2kCustomCharacteristic.setupService(spinBLEServer.pServer);
   deviceInformationService.setupService(spinBLEServer.pServer);
   //add all service UUIDs to advertisement vector
-  oServiceUUIDs.push_back(CSCSERVICE_UUID);
+  // oServiceUUIDs.push_back(CSCSERVICE_UUID);
   oServiceUUIDs.push_back(CYCLINGPOWERSERVICE_UUID);
   oServiceUUIDs.push_back(HEARTSERVICE_UUID);
   oServiceUUIDs.push_back(FITNESSMACHINESERVICE_UUID);
   //oServiceUUIDs.push_back(ZWIFT_RIDE_SERVICE_UUID);
-  //oServiceUUIDs.push_back(ZWIFT_RIDE_CUSTOM_SERVICE_UUID_SHORT);
+  oServiceUUIDs.push_back(ZWIFT_RIDE_CUSTOM_SERVICE_UUID_SHORT);
   oAdvertisementData.setFlags(0x06);  // General Discoverable, BR/EDR Not Supported
   oAdvertisementData.setCompleteServices16(oServiceUUIDs);
   pAdvertising->setAdvertisementData(oAdvertisementData);
