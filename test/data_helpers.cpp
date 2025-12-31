@@ -13,9 +13,16 @@
 #include <sstream>
 #include <string>
 #include <vector>
-#include <io.h>      // For _findfirst, _findnext, _findclose
-#include <direct.h>  // For _mkdir, _rmdir
 #include <algorithm> // For std::sort
+
+#ifdef _WIN32
+  #include <io.h>      // For _findfirst, _findnext, _findclose
+  #include <direct.h>  // For _mkdir, _rmdir
+#else
+  #include <dirent.h>  // For opendir, readdir, closedir
+  #include <sys/stat.h> // For mkdir
+  #include <unistd.h>  // For rmdir, unlink
+#endif
 
 // Helper function to load CSV data
 static void loadCSVToPTData(const std::string& filePath, PTData& ptData) {
@@ -63,9 +70,10 @@ static void createPowerTableHeatmap(const std::string& inputFilePath, const std:
     // If addTimeSlider is true, gather all .ptab files in ridedata and prepare their data
     std::vector<std::string> ptabFiles;
     if (addTimeSlider) {
-        // Windows directory scan for .ptab files
-        struct _finddata_t fileinfo;
+        // Directory scan for .ptab files
         std::string dirPath = "test/output/ridedata/";
+#ifdef _WIN32
+        struct _finddata_t fileinfo;
         std::string pattern = dirPath + "*.ptab";
         intptr_t hFile = _findfirst(pattern.c_str(), &fileinfo);
         if (hFile != -1) {
@@ -74,6 +82,19 @@ static void createPowerTableHeatmap(const std::string& inputFilePath, const std:
             } while (_findnext(hFile, &fileinfo) == 0);
             _findclose(hFile);
         }
+#else
+        DIR* dir = opendir(dirPath.c_str());
+        if (dir != nullptr) {
+            struct dirent* entry;
+            while ((entry = readdir(dir)) != nullptr) {
+                std::string filename = entry->d_name;
+                if (filename.size() > 5 && filename.substr(filename.size() - 5) == ".ptab") {
+                    ptabFiles.push_back(dirPath + filename);
+                }
+            }
+            closedir(dir);
+        }
+#endif
         // Sort files by timestamp in filename (assuming numeric)
         std::sort(ptabFiles.begin(), ptabFiles.end(), [](const std::string& a, const std::string& b) {
             // Extract numeric part from filename

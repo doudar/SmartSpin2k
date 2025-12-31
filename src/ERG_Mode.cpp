@@ -215,9 +215,9 @@ int32_t ErgMode::_setPointChangeState(int newCadence, Measurement& newWatts) {
 // PrevError
 int32_t ErgMode::_inSetpointState(int newCadence, Measurement& newWatts) {
   // Setting Gains For PID Loop
-  float Kp = userConfig->getERGSensitivity();
-  float Ki = 0.5;
-  float Kd = 0.1;
+  float Kp = userConfig->getERGSensitivity() * .5f;  // Proportional gain based on user sensitivity
+  float Ki = 0.0;
+  float Kd = 0.0;
 
   static float integral  = 0.0;
   static float prevError = 0.0;
@@ -230,12 +230,20 @@ int32_t ErgMode::_inSetpointState(int newCadence, Measurement& newWatts) {
   float error = target - watts;
 
   // modifying gains based on error
-  if (abs(error) < 10) {
+  if (abs(error) < 15) {
     Kp = Kp * 0.25;  // decrease further for tiny errors
     Ki = Ki * 0.0;
     Kd = Kd * 0.0;
-  } else if (abs(error) < 20) {
-    Kp = Kp * 0.75;  // Stabilize for small errors
+  } else if (abs(error) < 30) {
+    Kp = Kp * 0.5;  // Stabilize for small errors
+    Ki = Ki * 0.0;
+    Kd = Kd * 0.0;
+  } else if (abs(error) < 60) {
+    Kp = Kp * 0.75;  // Moderate for medium errors
+    Ki = Ki * 0.0;
+    Kd = Kd * 0.0;
+  } else if (abs(error) > 100) {
+    Kp = Kp * 1.25;  // Aggressive for large errors
     Ki = Ki * 0.0;
     Kd = Kd * 0.0;
   }
@@ -272,6 +280,14 @@ int32_t ErgMode::_inSetpointState(int newCadence, Measurement& newWatts) {
   if (millis() - lastTime > 5000) {
     lastTime = millis();
     SS2K_LOG(ERG_MODE_LOG_TAG, "Proportional: %f, Integral: %f, Derivative: %f", proportional, integralFinal, derivativeTerm);
+  }
+
+  // Cap the change to no more than we can move until the next reading
+  float maxChange = (userConfig->getStepperSpeed() * ERG_MODE_DELAY) / 1000.0f;  // max change based on stepper speed and delay
+  if (PID_output > maxChange) {
+    PID_output = maxChange;
+  } else if (PID_output < -maxChange) {
+    PID_output = -maxChange;
   }
 
   // Calculate new incline
