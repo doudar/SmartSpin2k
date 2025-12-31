@@ -413,6 +413,15 @@ void BLE_KickrBikeService::processWrite(const std::string& value) {
     return;
   }
   
+  // Debug: Print all incoming data
+  String hexDump;
+  for (size_t i = 0; i < value.length(); ++i) {
+    char buf[4];
+    snprintf(buf, sizeof(buf), "%02X ", (uint8_t)value[i]);
+    hexDump += buf;
+  }
+  SS2K_LOG(BLE_SERVER_LOG_TAG, "KICKR BIKE: RX (len=%d): %s", value.length(), hexDump.c_str());
+  
   // Check if this is the RideOn handshake (no opcode, just raw bytes)
   if (isRideOnMessage(value)) {
     SS2K_LOG(BLE_SERVER_LOG_TAG, "KICKR BIKE: Received RideOn handshake");
@@ -584,46 +593,10 @@ void BLE_KickrBikeService::handleGetRequest(const uint8_t* data, size_t length) 
 }
 
 void BLE_KickrBikeService::handleSetRequest(const uint8_t* data, size_t length) {
-  if (length < 3) {
+  if (length < 1) {
     SS2K_LOG(BLE_SERVER_LOG_TAG, "KICKR BIKE: SET request too short (%d)", length);
     sendStatusResponse(0x02);
     return;
-  }
-
-  // Zwift gear select (from some controllers) arrives as:
-  // 2A <len> 10 <varint gearToken>
-  if (data[0] == 0x2A && data[1] >= 2) {
-    const uint8_t payloadLen = data[1];
-    const size_t payloadEnd = 2 + payloadLen;
-    if (payloadEnd <= length && data[2] == 0x10) {
-      size_t index = 3;
-      uint32_t token = 0;
-
-      if (!decodeVarint32(data, payloadEnd, index, token)) {
-        SS2K_LOG(BLE_SERVER_LOG_TAG, "KICKR BIKE: SET gear token varint overflow");
-        sendStatusResponse(0x02);
-        return;
-      }
-
-      const int gearNumber = gearNumberFromInboundToken(token);
-      if (gearNumber > 0) {
-        // Sync internal + external representation immediately (avoid incremental shifting logic).
-        currentGear = std::clamp(gearNumber - 1, 0, KICKR_BIKE_NUM_GEARS - 1);
-        lastShifterPosition = gearNumber;
-        rtConfig->setShifterPosition(gearNumber);
-        applyGearChange(true);  // fromZwift = true, don't echo back
-
-        SS2K_LOG(BLE_SERVER_LOG_TAG, "KICKR BIKE: SET gear token %lu -> gear %d", static_cast<unsigned long>(token), gearNumber);
-        sendStatusResponse(0x00);
-        return;
-      }
-
-      SS2K_LOG(BLE_SERVER_LOG_TAG,
-               "KICKR BIKE: SET unknown gear token %lu (add to zwiftInboundGearTokensObserved)",
-               static_cast<unsigned long>(token));
-      sendStatusResponse(0x00);
-      return;
-    }
   }
 
   // ERG mode power target command:
@@ -637,9 +610,133 @@ void BLE_KickrBikeService::handleSetRequest(const uint8_t* data, size_t length) 
       return;
     }
     
-    SS2K_LOG(BLE_SERVER_LOG_TAG, "KICKR BIKE: SET ERG mode power target %lu W", 
+    SS2K_LOG(BLE_SERVER_LOG_TAG, "KICKR BIKE: SET ERG mode - Field 3 (PowerTarget) = %lu W", 
              static_cast<unsigned long>(powerTarget));
     setTargetPower(powerTarget);
+    sendStatusResponse(0x00);
+    return;
+  }
+
+  // Need at least 3 bytes for other SET commands
+  if (length < 3) {
+    SS2K_LOG(BLE_SERVER_LOG_TAG, "KICKR BIKE: SET request too short for this command (%d)", length);
+    sendStatusResponse(0x02);
+    return;
+  }
+
+  // Zwift gear select (from some controllers) arrives as:
+  // 2A <len> 10 <varint gearToken>
+  // OR physical parameters in SIM mode:
+  // 2A <len> [10 <gear_ratio>] [20 <bike_weight>] [28 <rider_weight>]
+  if (data[0] == 0x2A && data[1] >= 2) {
+    const uint8_t payloadLen = data[1];
+    const size_t payloadEnd = 2 + payloadLen;
+    
+    if (payloadEnd > length) {
+      SS2K_LOG(BLE_SERVER_LOG_TAG, "KICKR BIKE: SET 0x2A payload truncated");
+      sendStatusResponse(0x02);
+      return;
+    }
+    
+    // Check if this is a gear token (starts with field tag 0x10 and has short payload)
+    if (data[2] == 0x10 && payloadLen <= 4) {
+      size_t index = 3;
+      uint32_t token = 0;
+
+      if (!decodeVarint32(data, payloadEnd, index, token)) {
+        SS2K_LOG(BLE_SERVER_LOG_TAG, "KICKR BIKE: SET gear token varint overflow");
+        sendStatusResponse(0x02);
+        return;
+      }
+
+      const int gearNumber = gearNumberFromInboundToken(token);
+      SS2K_LOG(BLE_SERVER_LOG_TAG, "KICKR BIKE: Decoded gear token - Field 1 (token) = %lu, mapped to gear %d", 
+               static_cast<unsigned long>(token), gearNumber);
+      
+      if (gearNumber > 0) {
+        // Sync internal + external representation immediately (avoid incremental shifting logic).
+        currentGear = std::clamp(gearNumber - 1, 0, KICKR_BIKE_NUM_GEARS - 1);
+        lastShifterPosition = gearNumber;
+        rtConfig->setShifterPosition(gearNumber);
+        applyGearChange(true);  // fromZwift = true, don't echo back
+
+        SS2K_LOG(BLE_SERVER_LOG_TAG, "KICKR BIKE: Applied gear change to gear %d (0-indexed: %d)", gearNumber, currentGear);
+        sendStatusResponse(0x00);
+        return;
+      }
+
+      SS2K_LOG(BLE_SERVER_LOG_TAG,
+               "KICKR BIKE: Unknown gear token %lu not in lookup table (add to zwiftInboundGearTokensObserved)",
+               static_cast<unsigned long>(token));
+      sendStatusResponse(0x00);
+      return;
+    }
+    
+    // Otherwise, it's a PhysicalParam message (field 5 in HubCommand)
+    // Parse fields: field 2 = GearRatioX10000, field 4 = BikeWeightx100, field 5 = RiderWeightx100
+    SS2K_LOG(BLE_SERVER_LOG_TAG, "KICKR BIKE: Decoding PhysicalParam message (0x2A, len=%d)", payloadLen);
+    size_t index = 2;
+    uint32_t gearRatio = 0;
+    uint32_t bikeWeight = 0;
+    uint32_t riderWeight = 0;
+    bool hasGearRatio = false;
+    bool hasBikeWeight = false;
+    bool hasRiderWeight = false;
+    
+    while (index < payloadEnd) {
+      uint8_t fieldTag = data[index++];
+      
+      switch (fieldTag) {
+        case 0x10:  // Field 2: GearRatioX10000
+          if (!decodeVarint32(data, payloadEnd, index, gearRatio)) {
+            SS2K_LOG(BLE_SERVER_LOG_TAG, "KICKR BIKE: SET gear ratio varint overflow");
+            sendStatusResponse(0x02);
+            return;
+          }
+          hasGearRatio = true;
+          break;
+          
+        case 0x20:  // Field 4: BikeWeightx100
+          if (!decodeVarint32(data, payloadEnd, index, bikeWeight)) {
+            SS2K_LOG(BLE_SERVER_LOG_TAG, "KICKR BIKE: SET bike weight varint overflow");
+            sendStatusResponse(0x02);
+            return;
+          }
+          hasBikeWeight = true;
+          break;
+          
+        case 0x28:  // Field 5: RiderWeightx100
+          if (!decodeVarint32(data, payloadEnd, index, riderWeight)) {
+            SS2K_LOG(BLE_SERVER_LOG_TAG, "KICKR BIKE: SET rider weight varint overflow");
+            sendStatusResponse(0x02);
+            return;
+          }
+          hasRiderWeight = true;
+          break;
+          
+        default:
+          SS2K_LOG(BLE_SERVER_LOG_TAG, "KICKR BIKE: SET unknown PhysicalParam field tag 0x%02X", fieldTag);
+          break;
+      }
+    }
+    
+    // Log the physical parameters with field numbers and raw values
+    if (hasGearRatio) {
+      double ratio = static_cast<double>(gearRatio) / 10000.0;
+      SS2K_LOG(BLE_SERVER_LOG_TAG, "KICKR BIKE: Field 2 (GearRatioX10000) = %lu (raw), decoded ratio = %.4f", 
+               static_cast<unsigned long>(gearRatio), ratio);
+    }
+    if (hasBikeWeight) {
+      double weightKg = static_cast<double>(bikeWeight) / 100.0;
+      SS2K_LOG(BLE_SERVER_LOG_TAG, "KICKR BIKE: Field 4 (BikeWeightx100) = %lu (raw), decoded weight = %.2f kg", 
+               static_cast<unsigned long>(bikeWeight), weightKg);
+    }
+    if (hasRiderWeight) {
+      double weightKg = static_cast<double>(riderWeight) / 100.0;
+      SS2K_LOG(BLE_SERVER_LOG_TAG, "KICKR BIKE: Field 5 (RiderWeightx100) = %lu (raw), decoded weight = %.2f kg", 
+               static_cast<unsigned long>(riderWeight), weightKg);
+    }
+    
     sendStatusResponse(0x00);
     return;
   }
@@ -709,18 +806,32 @@ void BLE_KickrBikeService::handleSetRequest(const uint8_t* data, size_t length) 
       }
     }
 
+    // Log simulation message details
+    SS2K_LOG(BLE_SERVER_LOG_TAG, "KICKR BIKE: Decoded SimulationParam message (0x22, len=%d)", payloadLen);
+    
     // Apply grade if present
     if (hasGrade) {
       int32_t signedGrade = decodeZigZag32(gradeRaw);
       double gradientPercent = static_cast<double>(signedGrade) / 100.0;
-      SS2K_LOG(BLE_SERVER_LOG_TAG, "KICKR BIKE: SET gradient to %.2f%%", gradientPercent);
+      SS2K_LOG(BLE_SERVER_LOG_TAG, "KICKR BIKE: Field 2 (InclineX100) = %lu (raw), zigzag decoded = %ld, gradient = %.2f%%", 
+               static_cast<unsigned long>(gradeRaw), static_cast<long>(signedGrade), gradientPercent);
       setBaseGradient(gradientPercent);
     }
     
     // Log other parameters for debugging
     if (hasPower) {
-      SS2K_LOG(BLE_SERVER_LOG_TAG, "KICKR BIKE: SET power target %lu W (ignored in SIM mode)", 
+      SS2K_LOG(BLE_SERVER_LOG_TAG, "KICKR BIKE: Field 1 (Power) = %lu W (ignored in SIM mode)", 
                static_cast<unsigned long>(powerTarget));
+    }
+    if (windSpeed > 0) {
+      double windMs = static_cast<double>(static_cast<int32_t>(windSpeed)) / 100.0;
+      SS2K_LOG(BLE_SERVER_LOG_TAG, "KICKR BIKE: Field 3 (Wind) = %lu (raw), %.2f m/s", 
+               static_cast<unsigned long>(windSpeed), windMs);
+    }
+    if (rollingResistance > 0) {
+      double crr = static_cast<double>(rollingResistance) / 100000.0;
+      SS2K_LOG(BLE_SERVER_LOG_TAG, "KICKR BIKE: Field 4 (Crr) = %lu (raw), %.5f", 
+               static_cast<unsigned long>(rollingResistance), crr);
     }
 
     sendStatusResponse(0x00);
