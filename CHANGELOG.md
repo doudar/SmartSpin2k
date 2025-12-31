@@ -10,6 +10,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Added
 
 ### Changed
+
+### Hardware
+
+
+## [25.12.28]
+
+### Added
+
+### Changed
 - Removed >0 watts requirement to compute ERG.
 - Filter cadence for crazy values. Only >0 && <250 now accepted.
 - Filter watts for crazy values. Only >0 && <3000 now accepted. 
