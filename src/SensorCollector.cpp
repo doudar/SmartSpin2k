@@ -58,7 +58,7 @@ void collectAndSet(NimBLEUUID charUUID, NimBLEUUID serviceUUID, std::string& uni
     if ((charUUID == PELOTON_DATA_UUID) && !(strcmp(userConfig->getConnectedPowerMeter(), NONE) == 0 || strcmp(userConfig->getConnectedPowerMeter(), ANY) == 0)) {
       // Peloton connected but using BLE Power Meter. So skip cad for Peloton UUID.
     } else {
-      float cadence = sensorData->getCadence();
+      int cadence = round(sensorData->getCadence());
       if (cadence > 0.0 && cadence < 250.0) {
         rtConfig->cad.setValue(cadence);
         spinBLEClient.connectedCD = true;
@@ -75,7 +75,7 @@ void collectAndSet(NimBLEUUID charUUID, NimBLEUUID serviceUUID, std::string& uni
     if ((charUUID == PELOTON_DATA_UUID) && !((strcmp(userConfig->getConnectedPowerMeter(), NONE) == 0) || (strcmp(userConfig->getConnectedPowerMeter(), ANY) == 0))) {
       // Peloton connected but using BLE Power Meter. So skip power for Peloton UUID.
     } else {
-      int power = sensorData->getPower() * userConfig->getPowerCorrectionFactor();
+      int power = round(sensorData->getPower() * userConfig->getPowerCorrectionFactor());
       if (power > 0 && power < 3000) {
         rtConfig->watts.setValue(power);
         spinBLEClient.connectedPM = true;
@@ -88,10 +88,9 @@ void collectAndSet(NimBLEUUID charUUID, NimBLEUUID serviceUUID, std::string& uni
   }
 
   if (sensorData->hasSpeed()) {
-    float speed = sensorData->getSpeed();
-    rtConfig->setSimulatedSpeed(speed);
+    rtConfig->setSimulatedSpeed(sensorData->getSpeed());
     spinBLEClient.connectedSpeed = true;
-    logBufLength += snprintf(logBuf + logBufLength, kLogBufMaxLength - logBufLength, " SD(%.2f)", fmodf(speed, 1000.0));
+    logBufLength += snprintf(logBuf + logBufLength, kLogBufMaxLength - logBufLength, " SD(%.2f)", fmodf(sensorData->getSpeed(), 1000.0));
   }
 
   if (sensorData->hasResistance()) {
@@ -99,9 +98,8 @@ void collectAndSet(NimBLEUUID charUUID, NimBLEUUID serviceUUID, std::string& uni
     if ((ss2k->pelotonIsConnected) && (charUUID != PELOTON_DATA_UUID)) {
       // Peloton connected but using BLE Power Meter. So skip resistance for UUID's that aren't Peloton.
     } else {
-      int resistance = sensorData->getResistance();
-      rtConfig->resistance.setValue(resistance);
-      logBufLength += snprintf(logBuf + logBufLength, kLogBufMaxLength - logBufLength, " RS(%d)", resistance % 1000);
+      rtConfig->resistance.setValue(sensorData->getResistance());
+      logBufLength += snprintf(logBuf + logBufLength, kLogBufMaxLength - logBufLength, " RS(%d)", sensorData->getResistance() % 1000);
     }
   }
 
