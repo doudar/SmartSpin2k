@@ -121,7 +121,6 @@ void ErgMode::runERG() {
 void ErgMode::computeErg() {
   Measurement newWatts = rtConfig->watts;
   int newCadence       = rtConfig->cad.getValue();
-  int32_t result       = RETURN_ERROR;
 
   bool isUserSpinning = this->_userIsSpinning(newCadence, ss2k->getCurrentPosition());
   if (!isUserSpinning) {
@@ -142,28 +141,28 @@ void ErgMode::computeErg() {
   }
 
 #ifdef ERG_MODE_USE_POWER_TABLE
+// SetPoint changed
+#ifdef ERG_MODE_USE_PID
   if (abs(this->setPoint - newWatts.getTarget()) > ERG_MODE_PID_WINDOW && rtConfig->getHomed()) {
-    result = _setPointChangeState(newCadence, newWatts);
+#endif
+    _setPointChangeState(newCadence, newWatts);
+    return;
+#ifdef ERG_MODE_USE_PID
   }
 #endif
+#endif
+
 #ifdef ERG_MODE_USE_PID
   // Setpoint unchanged
-  if (result == INT32_MIN) {
-    result = _inSetpointState(newCadence, newWatts);
-  }
+  _inSetpointState(newCadence, newWatts);
 #endif
-  _updateValues(newCadence, newWatts, result);
 }
 
-int32_t ErgMode::_setPointChangeState(int newCadence, Measurement& newWatts) {
-  // It's better to undershoot increasing watts and overshoot decreasing watts, so lets set the lookup target to the nearest side of POWERTABLE_WATT_INCREMENT
-  int adjustedTarget  = newWatts.getTarget() >= newWatts.getValue() ? newWatts.getTarget() - POWERTABLE_WATT_INCREMENT : newWatts.getTarget() + POWERTABLE_WATT_INCREMENT;
-  int32_t tableResult = powerTable->lookup(adjustedTarget, newCadence);
+void ErgMode::_setPointChangeState(int newCadence, Measurement& newWatts) {
+  // It's better to undershoot increasing watts and overshoot decreasing watts, so lets set the lookup target to the nearest side of ERG_MODE_PID_WINDOW
+  int adjustedTarget = newWatts.getTarget() >= newWatts.getValue() ? newWatts.getTarget() - ERG_MODE_PID_WINDOW : newWatts.getTarget() + ERG_MODE_PID_WINDOW;
 
-  // A lot of times this likes to undershoot going from High to low. Lets fix it.
-  if (adjustedTarget < newWatts.getValue() && adjustedTarget < 200) {
-    adjustedTarget = (adjustedTarget + ss2k->getCurrentPosition()) / 2;
-  }
+  int32_t tableResult = powerTable->lookup(adjustedTarget, newCadence);
 
   // Test current watts against the table result. If We're already lower or higher than target, flag the result as a return error.
   if (tableResult != RETURN_ERROR) {
@@ -177,32 +176,26 @@ int32_t ErgMode::_setPointChangeState(int newCadence, Measurement& newWatts) {
     }
   }
 
-  // Sanity check - with homing enabled, we should never have a negative result. If we do, something went wrong.
-  if (rtConfig->getHomed() && tableResult < 0) {
-    SS2K_LOG(ERG_MODE_LOG_TAG, "PowerTable returned negative result with homing enabled. Using PID");
-    tableResult = RETURN_ERROR;
-  }
-
   // Handle return errors
   if (tableResult == RETURN_ERROR) {
     SS2K_LOG(ERG_MODE_LOG_TAG, "Lookup Error. Using PID");
-    tableResult = _inSetpointState(newCadence, newWatts);
-  } else {
-    SS2K_LOG(ERG_MODE_LOG_TAG, "SetPoint changed:%dw PowerTable Result: %d", adjustedTarget, tableResult);
-    if (tableResult != ss2k->getCurrentPosition()) {  // add some time to wait while the knob moves to target position.
-      isDelayed             = true;
-      long int stepDistance = abs(ss2k->getCurrentPosition() - tableResult);
-      // Calculate time to add based on step distance and stepper speed
-      long int timeToAdd = round(((double)stepDistance * 1000.0) / (double)userConfig->getStepperSpeed());
-      if (timeToAdd > 3000) {  // 3 seconds
-        SS2K_LOG(ERG_MODE_LOG_TAG, "Capping ERG seek time to 3 seconds");
-        timeToAdd = 3000;
-      }
-      ergTimer += timeToAdd;
-    }
-    ergTimer += (ERG_MODE_DELAY);  // Wait for power meter to register new watts
+    _inSetpointState(newCadence, newWatts);
+    return;
   }
-  return tableResult;
+
+  SS2K_LOG(ERG_MODE_LOG_TAG, "SetPoint changed:%dw PowerTable Result: %d", adjustedTarget, tableResult);
+  _updateValues(newCadence, newWatts, tableResult);
+
+  if (rtConfig->getTargetIncline() != ss2k->getCurrentPosition()) {  // add some time to wait while the knob moves to target position.
+    isDelayed     = true;
+    int timeToAdd = abs(ss2k->getCurrentPosition() - rtConfig->getTargetIncline());
+    if (timeToAdd > 3000) {  // 3 seconds
+      SS2K_LOG(ERG_MODE_LOG_TAG, "Capping ERG seek time to 3 seconds");
+      timeToAdd = 3000;
+    }
+    ergTimer += timeToAdd;
+  }
+  ergTimer += (ERG_MODE_DELAY);  // Wait for power meter to register new watts
 }
 
 // INTRODUCING PID CONTROL LOOP
@@ -213,7 +206,7 @@ int32_t ErgMode::_setPointChangeState(int newCadence, Measurement& newWatts) {
 // Derivative term: rate of change of error
 
 // PrevError
-int32_t ErgMode::_inSetpointState(int newCadence, Measurement& newWatts) {
+void ErgMode::_inSetpointState(int newCadence, Measurement& newWatts) {
   // Setting Gains For PID Loop
   float Kp = userConfig->getERGSensitivity();
   float Ki = 0.5;
@@ -265,8 +258,11 @@ int32_t ErgMode::_inSetpointState(int newCadence, Measurement& newWatts) {
 
   // Calculate new incline
   float newIncline = ss2k->getCurrentPosition() + PID_output;
-  prevError        = error;
-  return newIncline;
+
+  prevError = error;
+
+  // Apply the new values
+  _updateValues(newCadence, newWatts, newIncline);
 }
 
 void ErgMode::_updateValues(int newCadence, Measurement& newWatts, float newIncline) {

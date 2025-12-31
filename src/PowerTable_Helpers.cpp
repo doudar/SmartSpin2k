@@ -141,7 +141,6 @@ int32_t PTHelpers::lookup(int watts, int cad, PTData& ptData) {
       }
     }
   }
-
   if (resistance != RETURN_ERROR) {
     SS2K_LOG(PTDATA_LOG_TAG, "Extrapolated resistance: %d for watts=%d, cad=%d", resistance, watts, cad);
     // Return early if we found a valid extrapolated value
@@ -149,7 +148,7 @@ int32_t PTHelpers::lookup(int watts, int cad, PTData& ptData) {
     SS2K_LOG(PTDATA_LOG_TAG, "Extrapolation failed for watts=%d, cad=%d", watts, cad);
   }
 
-  return resistance;
+  return resistance;  // All lookup methods failed
 }
 
 /**

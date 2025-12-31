@@ -11,9 +11,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 - Removed >0 watts requirement to compute ERG.
-- Added proper rounding from float to int for power and cadence.
-- More ERG tweaks for Marc Roy. 
-- If homed, we throw out negative PowerTable returns. 
 
 ### Hardware
 
