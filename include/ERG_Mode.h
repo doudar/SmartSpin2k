@@ -35,10 +35,10 @@ class ErgMode {
   bool _userIsSpinning(int cadence, float incline);
 
   // calculate incline if setpoint (from Zwift) changes
-  void _setPointChangeState(int newCadence, Measurement& newWatts);
+  int32_t _setPointChangeState(int newCadence, Measurement& newWatts);
 
   // calculate incline if setpoint is unchanged
-  void _inSetpointState(int newCadence, Measurement& newWatts);
+  int32_t _inSetpointState(int newCadence, Measurement& newWatts);
 
   // update localvalues + incline, creates a log
   void _updateValues(int newCadence, Measurement& newWatts, float newIncline);
