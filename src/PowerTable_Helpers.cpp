@@ -375,7 +375,7 @@ int PTHelpers::extrapolateWattsFromCadence(int cad, int32_t targetPosition, PTDa
  * prerequisite for the PAVA functions to work correctly and prevent line crossings.
  * @param ptData The main power table data structure.
  */
-void fillGaps(PTData& ptData) {
+void PTHelpers::fillGaps(PTData& ptData) {
   for (int i = 0; i < POWERTABLE_CAD_SIZE; ++i) {     // For each row
     for (int j = 0; j < POWERTABLE_WATT_SIZE; ++j) {  // For each cell
       if (ptData.tableRow[i].tableEntry[j].targetPosition == INT16_MIN) {
@@ -615,7 +615,7 @@ void PTHelpers::enterData(PTData& ptData, ptIndex index, int pos) {
   }
 
   // // After updating a point, re-process the entire table to enforce global monotonicity.
-  fillGaps(ptData);
+  this->fillGaps(ptData);
   // for (int i = 0; i < 10; i++) {  // Run the PAVA functions multiple times to ensure convergence
   bool caddone  = false;
   bool wattdone = false;
@@ -636,9 +636,11 @@ void PTHelpers::enterData(PTData& ptData, ptIndex index, int pos) {
 
 void PTHelpers::clean(PTData& ptData) {
   int removed = 0;
+  
+  // First pass: remove entries with readings < 1 or negative positions
   for (int i = 0; i < POWERTABLE_CAD_SIZE; i++) {
     for (int j = 0; j < POWERTABLE_WATT_SIZE; j++) {
-      if (ptData.tableRow[i].tableEntry[j].readings < 1) {
+      if (ptData.tableRow[i].tableEntry[j].readings < 1 || ptData.tableRow[i].tableEntry[j].targetPosition < 0) {
         if (ptData.tableRow[i].tableEntry[j].targetPosition != INT16_MIN) {
           removed++;
         }
@@ -647,6 +649,42 @@ void PTHelpers::clean(PTData& ptData) {
       }
     }
   }
+  
+  // Second pass: remove duplicate values in columns (same resistance for multiple cadences)
+  // For each column, track all unique values and remove duplicates
+  for (int j = 0; j < POWERTABLE_WATT_SIZE; j++) {
+    for (int i = 0; i < POWERTABLE_CAD_SIZE; i++) {
+      if (ptData.tableRow[i].tableEntry[j].targetPosition == INT16_MIN) continue;
+      
+      int16_t currentValue = ptData.tableRow[i].tableEntry[j].targetPosition;
+      
+      // Check all other entries in this column for the same value
+      for (int k = i + 1; k < POWERTABLE_CAD_SIZE; k++) {
+        if (ptData.tableRow[k].tableEntry[j].targetPosition == currentValue) {
+          // Found duplicate - remove the one with fewer readings
+          // If readings are equal, keep the one at higher cadence (higher index)
+          if (ptData.tableRow[k].tableEntry[j].readings < ptData.tableRow[i].tableEntry[j].readings) {
+            ptData.tableRow[k].tableEntry[j].targetPosition = INT16_MIN;
+            ptData.tableRow[k].tableEntry[j].readings = 0;
+            removed++;
+          } else if (ptData.tableRow[k].tableEntry[j].readings > ptData.tableRow[i].tableEntry[j].readings) {
+            // Current entry has fewer readings, mark it for removal and update current to the better one
+            ptData.tableRow[i].tableEntry[j].targetPosition = INT16_MIN;
+            ptData.tableRow[i].tableEntry[j].readings = 0;
+            removed++;
+            break; // Move to next i since current is removed
+          } else {
+            // Readings are equal - keep the one at higher cadence (k), remove the one at i
+            ptData.tableRow[i].tableEntry[j].targetPosition = INT16_MIN;
+            ptData.tableRow[i].tableEntry[j].readings = 0;
+            removed++;
+            break; // Move to next i since current is removed
+          }
+        }
+      }
+    }
+  }
+  
   if (removed > 0) {
     SS2K_LOG(PTDATA_LOG_TAG, "Cleaned %d readings", removed);
   }

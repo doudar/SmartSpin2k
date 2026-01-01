@@ -25,7 +25,7 @@ void TestPTLookupWatts::test_pt_lookup_watts(void) {
   PTData ptData;
 
   // Load the power table data from the .ptab file
-  const std::string filePath = "test/data/power_table.ptab";
+  const std::string filePath = "test/data/Nebula3.ptab";
   loadCSVToPTData(filePath, ptData);
 
   // Create helpers object for lookup

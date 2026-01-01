@@ -35,8 +35,15 @@ static void loadCSVToPTData(const std::string& filePath, PTData& ptData) {
     std::string line;
     int rowIndex = 0;
 
-    // Skip the header line
-    std::getline(file, line);
+    // Skip metadata lines (starting with #) and the header line
+    while (std::getline(file, line)) {
+        if (line.empty() || line[0] == '#') {
+            continue; // Skip metadata lines
+        }
+        if (line.find("Cadence/Power") != std::string::npos) {
+            break; // Found and skip the header line
+        }
+    }
 
     while (std::getline(file, line) && rowIndex < POWERTABLE_CAD_SIZE) {
         std::istringstream lineStream(line);
@@ -49,8 +56,10 @@ static void loadCSVToPTData(const std::string& filePath, PTData& ptData) {
         while (std::getline(lineStream, cell, ',') && colIndex < POWERTABLE_WATT_SIZE) {
             if (!cell.empty()) {
                 ptData.tableRow[rowIndex].tableEntry[colIndex].targetPosition = std::stoi(cell);
+                ptData.tableRow[rowIndex].tableEntry[colIndex].readings = 5;  // Assign weight to loaded data
             } else {
                 ptData.tableRow[rowIndex].tableEntry[colIndex].targetPosition = INT16_MIN;
+                ptData.tableRow[rowIndex].tableEntry[colIndex].readings = 0;
             }
             colIndex++;
         }

@@ -11,6 +11,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 - Added feed forward, disabled PowerTable for ERG lookup. 
+- Added tests and removal of duplicates in pt column. 
+- Added removal of negative numbers in pt table. 
 
 ### Hardware
 
