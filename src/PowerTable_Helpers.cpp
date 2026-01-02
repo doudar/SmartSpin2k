@@ -19,6 +19,150 @@
 #include <cstdint>
 std::ofstream outFile("test/output/test_PowerTable_Helpers.txt", std::ios::trunc);
 
+
+/////////////////////////Testing Helpers/////////////////////////
+
+// --- Advanced Predictor ---
+class ResistanceModel {
+private:
+    // Coefficients (Normalizing makes these fit in float/double safely)
+    // Model: Z = b0 + b1*x + b2*y + b3*x^2 + b4*y^2 + b5*x*y
+    double b[6] = {0}; 
+    bool isQuadratic = false;
+    bool isValid = false;
+
+    // Normalization bounds (to keep math stable)
+    double minW = 0, maxW = 1;
+    double minR = 0, maxR = 1;
+
+    // Helper: Normalize a value to 0.0 - 1.0 range
+    double normW(double w) { return (w - minW) / (maxW - minW); }
+    double normR(double r) { return (r - minR) / (maxR - minR); }
+
+    // Gaussian Elimination Solver for NxN matrix
+    bool solveMatrix(std::vector<std::vector<double>> &A, std::vector<double> &B, int n) {
+        for (int i = 0; i < n; i++) {
+            // Pivot
+            int maxRow = i;
+            for (int k = i + 1; k < n; k++) {
+                if (abs(A[k][i]) > abs(A[maxRow][i])) maxRow = k;
+            }
+            std::swap(A[i], A[maxRow]);
+            std::swap(B[i], B[maxRow]);
+
+            if (abs(A[i][i]) < 1e-9) return false; // Singular matrix
+
+            for (int k = i + 1; k < n; k++) {
+                double c = -A[k][i] / A[i][i];
+                for (int j = i; j < n; j++) {
+                    if (i == j) A[k][j] = 0;
+                    else A[k][j] += c * A[i][j];
+                }
+                B[k] += c * B[i];
+            }
+        }
+
+        // Back substitution
+        for (int i = n - 1; i >= 0; i--) {
+            double sum = 0;
+            for (int j = i + 1; j < n; j++) sum += A[i][j] * b[j];
+            b[i] = (B[i] - sum) / A[i][i];
+        }
+        return true;
+    }
+
+public:
+    void fit(const PTData& data) {
+        isValid = false;
+        
+        // 1. Collect Valid Points & Find Bounds
+        struct Point { double w, r, z; };
+        std::vector<Point> points;
+        
+        minW = 1e9; maxW = -1e9; minR = 1e9; maxR = -1e9;
+
+        for (int r = 0; r < POWERTABLE_CAD_SIZE; r++) {
+            for (int c = 0; c < POWERTABLE_WATT_SIZE; c++) {
+                int16_t val = data.tableRow[r].tableEntry[c].targetPosition;
+                if (val == INT16_MIN) continue;
+
+                double w = 0 + (c * POWERTABLE_WATT_INCREMENT);
+                double rpm = MINIMUM_TABLE_CAD + (r * POWERTABLE_CAD_INCREMENT);
+                
+                points.push_back({w, rpm, (double)val});
+                
+                if (w < minW) minW = w; if (w > maxW) maxW = w;
+                if (rpm < minR) minR = rpm; if (rpm > maxR) maxR = rpm;
+            }
+        }
+
+        int N = points.size();
+        if (N < 4) return; // Not enough data for anything
+
+        // Avoid division by zero in normalization
+        if (abs(maxW - minW) < 1.0) maxW += 1.0;
+        if (abs(maxR - minR) < 1.0) maxR += 1.0;
+
+        // 2. Decide Model Complexity
+        // We need 6 points for Quadratic (Curve), 3 for Linear (Plane)
+        isQuadratic = (N >= 6); 
+        int numCoeffs = isQuadratic ? 6 : 3;
+
+        // 3. Build Matrices (Least Squares)
+        // System: A * b = B
+        std::vector<std::vector<double>> A(numCoeffs, std::vector<double>(numCoeffs, 0.0));
+        std::vector<double> B(numCoeffs, 0.0);
+
+        for (const auto& p : points) {
+            double x = normW(p.w);
+            double y = normR(p.r);
+            double z = p.z;
+            
+            // Terms array: [1, x, y, x^2, y^2, xy]
+            double terms[6];
+            terms[0] = 1.0;
+            terms[1] = x;
+            terms[2] = y;
+            if (isQuadratic) {
+                terms[3] = x * x;
+                terms[4] = y * y;
+                terms[5] = x * y;
+            }
+
+            // Add to Normal Matrix
+            for (int i = 0; i < numCoeffs; i++) {
+                for (int j = 0; j < numCoeffs; j++) {
+                    A[i][j] += terms[i] * terms[j];
+                }
+                B[i] += terms[i] * z;
+            }
+        }
+
+        // 4. Solve
+        isValid = solveMatrix(A, B, numCoeffs);
+    }
+
+    int16_t predict(double watts, double rpm) {
+        if (!isValid) return INT16_MIN;
+
+        // Normalize inputs using the bounds found during training
+        double x = normW(watts);
+        double y = normR(rpm);
+
+        double res = b[0] + b[1]*x + b[2]*y;
+        
+        if (isQuadratic) {
+            res += b[3]*x*x + b[4]*y*y + b[5]*x*y;
+        }
+
+        // Clamp to int16 range
+        if (res > 32767.0) return 32767;
+        if (res < -32768.0) return -32768;
+        return (int16_t)round(res);
+    }
+};
+///////////////////////////////////////////////END of testing Helpers///////////////////////////////////////////////
+
 #define SS2K_LOG(tag, format, ...)                                \
   {                                                               \
     char buffer[1024];                                            \
@@ -97,6 +241,10 @@ std::pair<std::vector<float>, std::vector<float>> PTHelpers::getColumn(int colum
 }
 
 int32_t PTHelpers::lookup(int watts, int cad, PTData& ptData) {
+  ResistanceModel resistanceModel;
+  resistanceModel.fit(ptData);
+  return resistanceModel.predict(watts, cad);
+
   ptIndex index = calculateIndex(watts, cad);
 
   // Define table boundaries
@@ -689,3 +837,4 @@ void PTHelpers::clean(PTData& ptData) {
     SS2K_LOG(PTDATA_LOG_TAG, "Cleaned %d readings", removed);
   }
 }
+

@@ -25,8 +25,30 @@ void TestPTLookupWatts::test_pt_lookup_watts(void) {
   PTData ptData;
 
   // Load the power table data from the .ptab file
-  const std::string filePath = "test/data/Nebula3.ptab";
+  const std::string filePath = "test/data/converged_nebula3.ptab";
   loadCSVToPTData(filePath, ptData);
+
+    // Print the loaded power table data
+  outFile << "\n=== Power Table Data ===\n";
+  outFile << "Cadence/Power";
+  for (int j = 0; j < POWERTABLE_WATT_SIZE; j++) {
+    outFile << "," << (j * POWERTABLE_WATT_INCREMENT) << "W";
+  }
+  outFile << "\n";
+  
+  for (int i = 0; i < POWERTABLE_CAD_SIZE; i++) {
+    outFile << (MINIMUM_TABLE_CAD + i * POWERTABLE_CAD_INCREMENT) << "RPM";
+    for (int j = 0; j < POWERTABLE_WATT_SIZE; j++) {
+      outFile << ",";
+      if (ptData.tableRow[i].tableEntry[j].targetPosition != INT16_MIN) {
+        outFile << ptData.tableRow[i].tableEntry[j].targetPosition;
+      } else {
+        outFile << " ";
+      }
+    }
+    outFile << "\n";
+  }
+  outFile << "=== End Power Table ===\n\n";
 
   // Create helpers object for lookup
   PTHelpers helpers;
