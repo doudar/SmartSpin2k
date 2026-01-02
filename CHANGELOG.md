@@ -30,6 +30,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Added proper rounding from float to int for power and cadence.
 - More ERG tweaks for Marc Roy. 
 - If homed, we throw out negative PowerTable returns. 
+- After startup homing, set gear 8.
 
 ### Hardware
 
