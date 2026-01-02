@@ -215,75 +215,42 @@ int32_t ErgMode::_setPointChangeState(int newCadence, Measurement& newWatts) {
 // PrevError
 int32_t ErgMode::_inSetpointState(int newCadence, Measurement& newWatts) {
   // Setting Gains For PID Loop
-  float Kp = userConfig->getERGSensitivity() * .5f;  // Proportional gain based on user sensitivity
-  float Ki = 0.0;
-  float Kd = 0.0;
-
-  static float integral  = 0.0;
-  static float prevError = 0.0;
+  double Kp = userConfig->getERGSensitivity();  // Proportional gain based on user sensitivity
 
   // retrieves the current Watt output
   int watts = newWatts.getValue();
   // retrieves target Watt output
   int target = newWatts.getTarget();
   // subtracting target from current watts
-  float error = target - watts;
+  int error = target - watts;
 
   // modifying gains based on error
-  if (abs(error) < 15) {
+  if (abs(error) < 10) {
     Kp = Kp * 0.25;  // decrease further for tiny errors
-    Ki = Ki * 0.0;
-    Kd = Kd * 0.0;
-  } else if (abs(error) < 30) {
-    Kp = Kp * 0.5;  // Stabilize for small errors
-    Ki = Ki * 0.0;
-    Kd = Kd * 0.0;
-  } else if (abs(error) < 60) {
+  } else if (abs(error) < 50) {
     Kp = Kp * 0.75;  // Moderate for medium errors
-    Ki = Ki * 0.0;
-    Kd = Kd * 0.0;
   } else if (abs(error) > 100) {
     Kp = Kp * 1.25;  // Aggressive for large errors
-    Ki = Ki * 0.0;
-    Kd = Kd * 0.0;
   }
 
   // Defining proportional term
-  float proportional = Kp * error;
+  double proportional = Kp * error;
   if (newWatts.getValue() < userConfig->getMinWatts()) {
     proportional = proportional * userConfig->getERGSensitivity();  // increase proportional term when at very low watts. Prevents Zwift from timeout on initial interval.
   }
 
-  // Defining integral term
-  integral += error;
-  float integralFinal = Ki * integral;
-
-  // Clamping down integral term
-  float integralMax = 60 * userConfig->getERGSensitivity();
-  float integralMin = -60 * userConfig->getERGSensitivity();
-
-  if (integral > integralMax) {
-    integral = integralMax;
-  } else if (integral < integralMin) {
-    integral = integralMin;
-  }
-
-  // Defining derivative term
-  float derivative     = error - prevError;  // Difference between current and previous errors
-  float derivativeTerm = Kd * derivative;
-
   // final PID output
-  float PID_output = proportional + integralFinal + derivativeTerm;
+  double PID_output = proportional;
 
-  // log proportional, integral, derivative every five seconds
+  // log proportional every five seconds
   static unsigned long lastTime = 0;
   if (millis() - lastTime > 5000) {
     lastTime = millis();
-    SS2K_LOG(ERG_MODE_LOG_TAG, "Proportional: %f, Integral: %f, Derivative: %f", proportional, integralFinal, derivativeTerm);
+    SS2K_LOG(ERG_MODE_LOG_TAG, "Proportional: %f", proportional);
   }
 
   // Cap the change to no more than we can move until the next reading
-  float maxChange = (userConfig->getStepperSpeed() * ERG_MODE_DELAY) / 1000.0f;  // max change based on stepper speed and delay
+  int maxChange = round((long)((userConfig->getStepperSpeed() * ERG_MODE_DELAY)) / 1000.0f);  // max change based on stepper speed and delay
   if (PID_output > maxChange) {
     PID_output = maxChange;
   } else if (PID_output < -maxChange) {
@@ -292,7 +259,6 @@ int32_t ErgMode::_inSetpointState(int newCadence, Measurement& newWatts) {
 
   // Calculate new incline
   float newIncline = ss2k->getCurrentPosition() + PID_output;
-  prevError        = error;
   return newIncline;
 }
 
