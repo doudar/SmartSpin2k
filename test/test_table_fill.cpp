@@ -14,15 +14,22 @@
 #include <string>
 #include <vector>
 #include <regex>
-#include <direct.h> // for _mkdir, _rmdir
-#include <io.h>     // for _findfirst, _findnext, _findclose, _unlink
+
+#ifdef _WIN32
+  #include <direct.h> // for _mkdir, _rmdir
+  #include <io.h>     // for _findfirst, _findnext, _findclose, _unlink
+#else
+  #include <dirent.h>  // for opendir, readdir, closedir
+  #include <sys/stat.h> // for mkdir
+  #include <unistd.h>  // for rmdir, unlink
+#endif
+
 #include "data_helpers.cpp"
 
 // Helper to clean and recreate a directory
-
-// Helper to clean and recreate a directory (Windows version)
 static void cleanAndCreateDir(const std::string& dirPath) {
-    // Remove all files in the directory
+#ifdef _WIN32
+    // Remove all files in the directory (Windows)
     struct _finddata_t fileinfo;
     std::string pattern = dirPath + "*";
     intptr_t hFile = _findfirst(pattern.c_str(), &fileinfo);
@@ -39,6 +46,25 @@ static void cleanAndCreateDir(const std::string& dirPath) {
     _rmdir(dirPath.c_str());
     // Recreate the directory
     _mkdir(dirPath.c_str());
+#else
+    // Remove all files in the directory (POSIX)
+    DIR* dir = opendir(dirPath.c_str());
+    if (dir != nullptr) {
+        struct dirent* entry;
+        while ((entry = readdir(dir)) != nullptr) {
+            std::string filename = entry->d_name;
+            if (filename != "." && filename != "..") {
+                std::string filepath = dirPath + filename;
+                unlink(filepath.c_str());
+            }
+        }
+        closedir(dir);
+    }
+    // Remove the directory itself if it exists
+    rmdir(dirPath.c_str());
+    // Recreate the directory
+    mkdir(dirPath.c_str(), 0755);
+#endif
 }
 
 void TestTableFill::test_fill_incomplete_table(void) {
@@ -97,8 +123,9 @@ void TestTableFill::test_fill_incomplete_table(void) {
     logFile.close();
 
     // Check that at least one .ptab file was created
-    // Count .ptab files in outputDir (Windows version)
+    // Count .ptab files in outputDir
     int ptabCount = 0;
+#ifdef _WIN32
     struct _finddata_t fileinfo;
     std::string pattern = outputDir + "*.ptab";
     intptr_t hFile = _findfirst(pattern.c_str(), &fileinfo);
@@ -108,5 +135,18 @@ void TestTableFill::test_fill_incomplete_table(void) {
         } while (_findnext(hFile, &fileinfo) == 0);
         _findclose(hFile);
     }
+#else
+    DIR* dir = opendir(outputDir.c_str());
+    if (dir != nullptr) {
+        struct dirent* entry;
+        while ((entry = readdir(dir)) != nullptr) {
+            std::string filename = entry->d_name;
+            if (filename.size() > 5 && filename.substr(filename.size() - 5) == ".ptab") {
+                ptabCount++;
+            }
+        }
+        closedir(dir);
+    }
+#endif
     TEST_ASSERT_TRUE_MESSAGE(ptabCount > 0, "No .ptab files were created in output directory");
 }

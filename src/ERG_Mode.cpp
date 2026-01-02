@@ -121,6 +121,7 @@ void ErgMode::runERG() {
 void ErgMode::computeErg() {
   Measurement newWatts = rtConfig->watts;
   int newCadence       = rtConfig->cad.getValue();
+  int32_t result       = RETURN_ERROR;
 
   bool isUserSpinning = this->_userIsSpinning(newCadence, ss2k->getCurrentPosition());
   if (!isUserSpinning) {
@@ -141,28 +142,28 @@ void ErgMode::computeErg() {
   }
 
 #ifdef ERG_MODE_USE_POWER_TABLE
-// SetPoint changed
-#ifdef ERG_MODE_USE_PID
   if (abs(this->setPoint - newWatts.getTarget()) > ERG_MODE_PID_WINDOW && rtConfig->getHomed()) {
-#endif
-    _setPointChangeState(newCadence, newWatts);
-    return;
-#ifdef ERG_MODE_USE_PID
+    result = _setPointChangeState(newCadence, newWatts);
   }
 #endif
-#endif
-
 #ifdef ERG_MODE_USE_PID
   // Setpoint unchanged
-  _inSetpointState(newCadence, newWatts);
+  if (result == INT32_MIN) {
+    result = _inSetpointState(newCadence, newWatts);
+  }
 #endif
+  _updateValues(newCadence, newWatts, result);
 }
 
-void ErgMode::_setPointChangeState(int newCadence, Measurement& newWatts) {
-  // It's better to undershoot increasing watts and overshoot decreasing watts, so lets set the lookup target to the nearest side of ERG_MODE_PID_WINDOW
-  int adjustedTarget = newWatts.getTarget() >= newWatts.getValue() ? newWatts.getTarget() - ERG_MODE_PID_WINDOW : newWatts.getTarget() + ERG_MODE_PID_WINDOW;
-
+int32_t ErgMode::_setPointChangeState(int newCadence, Measurement& newWatts) {
+  // It's better to undershoot increasing watts and overshoot decreasing watts, so lets set the lookup target to the nearest side of POWERTABLE_WATT_INCREMENT
+  int adjustedTarget  = newWatts.getTarget() >= newWatts.getValue() ? newWatts.getTarget() - POWERTABLE_WATT_INCREMENT : newWatts.getTarget() + POWERTABLE_WATT_INCREMENT;
   int32_t tableResult = powerTable->lookup(adjustedTarget, newCadence);
+
+  // A lot of times this likes to undershoot going from High to low. Lets fix it.
+  if (adjustedTarget < newWatts.getValue() && adjustedTarget < 200) {
+    adjustedTarget = (adjustedTarget + ss2k->getCurrentPosition()) / 2;
+  }
 
   // Test current watts against the table result. If We're already lower or higher than target, flag the result as a return error.
   if (tableResult != RETURN_ERROR) {
@@ -176,26 +177,32 @@ void ErgMode::_setPointChangeState(int newCadence, Measurement& newWatts) {
     }
   }
 
+  // Sanity check - with homing enabled, we should never have a negative result. If we do, something went wrong.
+  if (rtConfig->getHomed() && tableResult < 0) {
+    SS2K_LOG(ERG_MODE_LOG_TAG, "PowerTable returned negative result with homing enabled. Using PID");
+    tableResult = RETURN_ERROR;
+  }
+
   // Handle return errors
   if (tableResult == RETURN_ERROR) {
     SS2K_LOG(ERG_MODE_LOG_TAG, "Lookup Error. Using PID");
-    _inSetpointState(newCadence, newWatts);
-    return;
-  }
-
-  SS2K_LOG(ERG_MODE_LOG_TAG, "SetPoint changed:%dw PowerTable Result: %d", adjustedTarget, tableResult);
-  _updateValues(newCadence, newWatts, tableResult);
-
-  if (rtConfig->getTargetIncline() != ss2k->getCurrentPosition()) {  // add some time to wait while the knob moves to target position.
-    isDelayed     = true;
-    int timeToAdd = abs(ss2k->getCurrentPosition() - rtConfig->getTargetIncline());
-    if (timeToAdd > 3000) {  // 3 seconds
-      SS2K_LOG(ERG_MODE_LOG_TAG, "Capping ERG seek time to 3 seconds");
-      timeToAdd = 3000;
+    tableResult = _inSetpointState(newCadence, newWatts);
+  } else {
+    SS2K_LOG(ERG_MODE_LOG_TAG, "SetPoint changed:%dw PowerTable Result: %d", adjustedTarget, tableResult);
+    if (tableResult != ss2k->getCurrentPosition()) {  // add some time to wait while the knob moves to target position.
+      isDelayed             = true;
+      long int stepDistance = abs(ss2k->getCurrentPosition() - tableResult);
+      // Calculate time to add based on step distance and stepper speed
+      long int timeToAdd = round(((double)stepDistance * 1000.0) / (double)userConfig->getStepperSpeed());
+      if (timeToAdd > 3000) {  // 3 seconds
+        SS2K_LOG(ERG_MODE_LOG_TAG, "Capping ERG seek time to 3 seconds");
+        timeToAdd = 3000;
+      }
+      ergTimer += timeToAdd;
     }
-    ergTimer += timeToAdd;
+    ergTimer += (ERG_MODE_DELAY);  // Wait for power meter to register new watts
   }
-  ergTimer += (ERG_MODE_DELAY);  // Wait for power meter to register new watts
+  return tableResult;
 }
 
 // INTRODUCING PID CONTROL LOOP
@@ -206,63 +213,53 @@ void ErgMode::_setPointChangeState(int newCadence, Measurement& newWatts) {
 // Derivative term: rate of change of error
 
 // PrevError
-void ErgMode::_inSetpointState(int newCadence, Measurement& newWatts) {
+int32_t ErgMode::_inSetpointState(int newCadence, Measurement& newWatts) {
   // Setting Gains For PID Loop
-  float Kp = userConfig->getERGSensitivity();
-  float Ki = 0.5;
-  float Kd = 0.1;
-
-  static float integral  = 0.0;
-  static float prevError = 0.0;
+  double Kp = userConfig->getERGSensitivity();  // Proportional gain based on user sensitivity
 
   // retrieves the current Watt output
   int watts = newWatts.getValue();
   // retrieves target Watt output
   int target = newWatts.getTarget();
   // subtracting target from current watts
-  float error = target - watts;
+  int error = target - watts;
+
+  // modifying gains based on error
+  if (abs(error) < 10) {
+    Kp = Kp * 0.25;  // decrease further for tiny errors
+  } else if (abs(error) < 50) {
+    Kp = Kp * 0.75;  // Moderate for medium errors
+  } else if (abs(error) > 100) {
+    Kp = Kp * 1.25;  // Aggressive for large errors
+  }
 
   // Defining proportional term
-  float proportional = Kp * error;
+  double proportional = Kp * error;
   if (newWatts.getValue() < userConfig->getMinWatts()) {
     proportional = proportional * userConfig->getERGSensitivity();  // increase proportional term when at very low watts. Prevents Zwift from timeout on initial interval.
   }
 
-  // Defining integral term
-  integral += error;
-  float integralFinal = Ki * integral;
-
-  // Clamping down integral term
-  float integralMax = 60 * userConfig->getERGSensitivity();
-  float integralMin = -60 * userConfig->getERGSensitivity();
-
-  if (integral > integralMax) {
-    integral = integralMax;
-  } else if (integral < integralMin) {
-    integral = integralMin;
-  }
-
-  // Defining derivative term
-  float derivative     = error - prevError;  // Difference between current and previous errors
-  float derivativeTerm = Kd * derivative;
-
   // final PID output
-  float PID_output = proportional + integralFinal + derivativeTerm;
+  double PID_output = proportional;
 
-  // log proportional, integral, derivative every five seconds
+  // log proportional every five seconds
   static unsigned long lastTime = 0;
   if (millis() - lastTime > 5000) {
     lastTime = millis();
-    SS2K_LOG(ERG_MODE_LOG_TAG, "Proportional: %f, Integral: %f, Derivative: %f", proportional, integralFinal, derivativeTerm);
+    SS2K_LOG(ERG_MODE_LOG_TAG, "Proportional: %f", proportional);
+  }
+
+  // Cap the change to no more than we can move until the next reading
+  int maxChange = round((long)((userConfig->getStepperSpeed() * ERG_MODE_DELAY)) / 1000.0f);  // max change based on stepper speed and delay
+  if (PID_output > maxChange) {
+    PID_output = maxChange;
+  } else if (PID_output < -maxChange) {
+    PID_output = -maxChange;
   }
 
   // Calculate new incline
   float newIncline = ss2k->getCurrentPosition() + PID_output;
-
-  prevError = error;
-
-  // Apply the new values
-  _updateValues(newCadence, newWatts, newIncline);
+  return newIncline;
 }
 
 void ErgMode::_updateValues(int newCadence, Measurement& newWatts, float newIncline) {

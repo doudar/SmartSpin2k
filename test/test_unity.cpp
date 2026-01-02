@@ -73,6 +73,10 @@ void setup() {
    RUN_TEST(test4.test_save_and_load);
    TestTableFill test5;
    RUN_TEST(test5.test_fill_incomplete_table);
+   TestPAVAConvergence test6;
+   RUN_TEST(test6.test_pava_convergence_nebula3);
+   RUN_TEST(test6.test_pava_convergence_nebula);
+   RUN_TEST(test6.test_pava_convergence_better);
   }
 
   // BLE Device Unique Name Tests

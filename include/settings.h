@@ -77,7 +77,7 @@ const char* const DEFAULT_PASSWORD = "password";
 // I.E. If the difference between ERG target and Current watts were 30, and the Shift step is defined as 600 steps,
 // and ERG_Sensitivity were 1.0, ERG mode would move the stepper motor 600 steps to compensate. With an ERG_Sensitivity of 2.0, the stepper
 // would move 1200 steps to compensate, however ERG_Sensitivity values much different than 1.0 imply shiftStep has been improperly configured.
-#define ERG_SENSITIVITY 2.0f
+#define ERG_SENSITIVITY 3.0f
 
 // Number of watts per shift expected by ERG mode for it's calculation. The user should target this number by adjusting Shift Step until WATTS_PER_SHIFT
 // is obtained as closely as possible during each shift.
@@ -276,8 +276,8 @@ constexpr const char* ANY = "any";
 // Uncomment to use guardrails for ERG mode in the stepper loop.
 #define ERG_GUARDRAILS
 
-//Uncomment to enable the use of the power table for ERG mode.
-#define ERG_MODE_USE_POWER_TABLE
+// Uncomment to enable the use of the power table for ERG mode.
+// #define ERG_MODE_USE_POWER_TABLE
 
 // Uncomment to use the PID controller for ERG mode.
 #define ERG_MODE_USE_PID

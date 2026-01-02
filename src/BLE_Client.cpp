@@ -239,6 +239,7 @@ void bleClientTask(void* pvParameters) {
           ss2k->goHome(true);
         } else {  // Startup Homing
           ss2k->goHome(false);
+          rtConfig->setShifterPosition(8);  // Set to middle position after homing on startup
         }
         spinBLEServer.spinDownFlag = 0;
       }
