@@ -30,7 +30,7 @@ void ErgMode::runERG() {
 
   if ((millis() > ergTimer)) {
     if (isDelayed) {
-      SS2K_LOG(ERG_MODE_LOG_TAG, "ERG wait expired");
+      SS2K_LOG(ERG_MODE_LOG_TAG, "ERG wait expired, pos: %d, tgt: %d", ss2k->getCurrentPosition(), rtConfig->getTargetIncline());
       isDelayed = false;
     }
 
@@ -157,25 +157,8 @@ void ErgMode::computeErg() {
 
 int32_t ErgMode::_setPointChangeState(int newCadence, Measurement& newWatts) {
   // It's better to undershoot increasing watts and overshoot decreasing watts, so lets set the lookup target to the nearest side of POWERTABLE_WATT_INCREMENT
-  int adjustedTarget  = newWatts.getTarget() >= newWatts.getValue() ? newWatts.getTarget() - POWERTABLE_WATT_INCREMENT : newWatts.getTarget() + POWERTABLE_WATT_INCREMENT;
-  int32_t tableResult = powerTable->lookup(adjustedTarget, newCadence);
-
-  // A lot of times this likes to undershoot going from High to low. Lets fix it.
-  if (adjustedTarget < newWatts.getValue() && adjustedTarget < 200) {
-    adjustedTarget = (adjustedTarget + ss2k->getCurrentPosition()) / 2;
-  }
-
-  // Test current watts against the table result. If We're already lower or higher than target, flag the result as a return error.
-  if (tableResult != RETURN_ERROR) {
-    if (rtConfig->watts.getValue() > adjustedTarget && tableResult > ss2k->getCurrentPosition()) {
-      SS2K_LOG(ERG_MODE_LOG_TAG, "Table Result Failed High Test: %d", tableResult);
-      tableResult = RETURN_ERROR;
-    }
-    if (rtConfig->watts.getValue() < adjustedTarget && tableResult < ss2k->getCurrentPosition()) {
-      SS2K_LOG(ERG_MODE_LOG_TAG, "Table Result Failed Low Test: %d", tableResult);
-      tableResult = RETURN_ERROR;
-    }
-  }
+  int adjustedWattTarget  = newWatts.getTarget() >= newWatts.getValue() ? newWatts.getTarget() - POWERTABLE_WATT_INCREMENT : newWatts.getTarget() + POWERTABLE_WATT_INCREMENT;
+  int32_t tableResult = powerTable->lookup(adjustedWattTarget, newCadence);
 
   // Sanity check - with homing enabled, we should never have a negative result. If we do, something went wrong.
   if (rtConfig->getHomed() && tableResult < 0) {
@@ -183,21 +166,33 @@ int32_t ErgMode::_setPointChangeState(int newCadence, Measurement& newWatts) {
     tableResult = RETURN_ERROR;
   }
 
+  // Test current watts against the table result. If We're already lower or higher than target, flag the result as a return error.
+  if (tableResult != RETURN_ERROR) {
+    if (adjustedWattTarget > newWatts.getValue() && tableResult < ss2k->getCurrentPosition()) {
+      SS2K_LOG(ERG_MODE_LOG_TAG, "Table Result Failed increasing Test: %d", tableResult);
+      tableResult = RETURN_ERROR;
+    }
+    if ((adjustedWattTarget < newWatts.getValue()) && tableResult > ss2k->getCurrentPosition()) {
+      SS2K_LOG(ERG_MODE_LOG_TAG, "Table Result Failed decreasing Test: %d", tableResult);
+      tableResult = RETURN_ERROR;
+    }
+  }
+
   // Handle return errors
   if (tableResult == RETURN_ERROR) {
     SS2K_LOG(ERG_MODE_LOG_TAG, "Lookup Error. Using PID");
     tableResult = _inSetpointState(newCadence, newWatts);
   } else {
-    SS2K_LOG(ERG_MODE_LOG_TAG, "SetPoint changed:%dw PowerTable Result: %d", adjustedTarget, tableResult);
     if (tableResult != ss2k->getCurrentPosition()) {  // add some time to wait while the knob moves to target position.
       isDelayed             = true;
       long int stepDistance = abs(ss2k->getCurrentPosition() - tableResult);
       // Calculate time to add based on step distance and stepper speed
-      long int timeToAdd = round(((double)stepDistance * 1000.0) / (double)userConfig->getStepperSpeed());
-      if (timeToAdd > 3000) {  // 3 seconds
-        SS2K_LOG(ERG_MODE_LOG_TAG, "Capping ERG seek time to 3 seconds");
-        timeToAdd = 3000;
+      long int timeToAdd = round(((double)stepDistance * 1000.0) / (double)userConfig->getStepperSpeed() + ERG_MODE_DELAY);
+      if (timeToAdd > 10000) {  // 10 seconds
+        SS2K_LOG(ERG_MODE_LOG_TAG, "Capping ERG seek time to 10 seconds");
+        timeToAdd = 10000;
       }
+      SS2K_LOG(ERG_MODE_LOG_TAG, "SetPoint changed:%dw Waiting:%dms PowerTable Result: %d", adjustedWattTarget, timeToAdd, tableResult);
       ergTimer += timeToAdd;
     }
     ergTimer += (ERG_MODE_DELAY);  // Wait for power meter to register new watts

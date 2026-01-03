@@ -19,150 +19,6 @@
 #include <cstdint>
 std::ofstream outFile("test/output/test_PowerTable_Helpers.txt", std::ios::trunc);
 
-
-/////////////////////////Testing Helpers/////////////////////////
-
-// --- Advanced Predictor ---
-class ResistanceModel {
-private:
-    // Coefficients (Normalizing makes these fit in float/double safely)
-    // Model: Z = b0 + b1*x + b2*y + b3*x^2 + b4*y^2 + b5*x*y
-    double b[6] = {0}; 
-    bool isQuadratic = false;
-    bool isValid = false;
-
-    // Normalization bounds (to keep math stable)
-    double minW = 0, maxW = 1;
-    double minR = 0, maxR = 1;
-
-    // Helper: Normalize a value to 0.0 - 1.0 range
-    double normW(double w) { return (w - minW) / (maxW - minW); }
-    double normR(double r) { return (r - minR) / (maxR - minR); }
-
-    // Gaussian Elimination Solver for NxN matrix
-    bool solveMatrix(std::vector<std::vector<double>> &A, std::vector<double> &B, int n) {
-        for (int i = 0; i < n; i++) {
-            // Pivot
-            int maxRow = i;
-            for (int k = i + 1; k < n; k++) {
-                if (abs(A[k][i]) > abs(A[maxRow][i])) maxRow = k;
-            }
-            std::swap(A[i], A[maxRow]);
-            std::swap(B[i], B[maxRow]);
-
-            if (abs(A[i][i]) < 1e-9) return false; // Singular matrix
-
-            for (int k = i + 1; k < n; k++) {
-                double c = -A[k][i] / A[i][i];
-                for (int j = i; j < n; j++) {
-                    if (i == j) A[k][j] = 0;
-                    else A[k][j] += c * A[i][j];
-                }
-                B[k] += c * B[i];
-            }
-        }
-
-        // Back substitution
-        for (int i = n - 1; i >= 0; i--) {
-            double sum = 0;
-            for (int j = i + 1; j < n; j++) sum += A[i][j] * b[j];
-            b[i] = (B[i] - sum) / A[i][i];
-        }
-        return true;
-    }
-
-public:
-    void fit(const PTData& data) {
-        isValid = false;
-        
-        // 1. Collect Valid Points & Find Bounds
-        struct Point { double w, r, z; };
-        std::vector<Point> points;
-        
-        minW = 1e9; maxW = -1e9; minR = 1e9; maxR = -1e9;
-
-        for (int r = 0; r < POWERTABLE_CAD_SIZE; r++) {
-            for (int c = 0; c < POWERTABLE_WATT_SIZE; c++) {
-                int16_t val = data.tableRow[r].tableEntry[c].targetPosition;
-                if (val == INT16_MIN) continue;
-
-                double w = 0 + (c * POWERTABLE_WATT_INCREMENT);
-                double rpm = MINIMUM_TABLE_CAD + (r * POWERTABLE_CAD_INCREMENT);
-                
-                points.push_back({w, rpm, (double)val});
-                
-                if (w < minW) minW = w; if (w > maxW) maxW = w;
-                if (rpm < minR) minR = rpm; if (rpm > maxR) maxR = rpm;
-            }
-        }
-
-        int N = points.size();
-        if (N < 4) return; // Not enough data for anything
-
-        // Avoid division by zero in normalization
-        if (abs(maxW - minW) < 1.0) maxW += 1.0;
-        if (abs(maxR - minR) < 1.0) maxR += 1.0;
-
-        // 2. Decide Model Complexity
-        // We need 6 points for Quadratic (Curve), 3 for Linear (Plane)
-        isQuadratic = (N >= 6); 
-        int numCoeffs = isQuadratic ? 6 : 3;
-
-        // 3. Build Matrices (Least Squares)
-        // System: A * b = B
-        std::vector<std::vector<double>> A(numCoeffs, std::vector<double>(numCoeffs, 0.0));
-        std::vector<double> B(numCoeffs, 0.0);
-
-        for (const auto& p : points) {
-            double x = normW(p.w);
-            double y = normR(p.r);
-            double z = p.z;
-            
-            // Terms array: [1, x, y, x^2, y^2, xy]
-            double terms[6];
-            terms[0] = 1.0;
-            terms[1] = x;
-            terms[2] = y;
-            if (isQuadratic) {
-                terms[3] = x * x;
-                terms[4] = y * y;
-                terms[5] = x * y;
-            }
-
-            // Add to Normal Matrix
-            for (int i = 0; i < numCoeffs; i++) {
-                for (int j = 0; j < numCoeffs; j++) {
-                    A[i][j] += terms[i] * terms[j];
-                }
-                B[i] += terms[i] * z;
-            }
-        }
-
-        // 4. Solve
-        isValid = solveMatrix(A, B, numCoeffs);
-    }
-
-    int16_t predict(double watts, double rpm) {
-        if (!isValid) return INT16_MIN;
-
-        // Normalize inputs using the bounds found during training
-        double x = normW(watts);
-        double y = normR(rpm);
-
-        double res = b[0] + b[1]*x + b[2]*y;
-        
-        if (isQuadratic) {
-            res += b[3]*x*x + b[4]*y*y + b[5]*x*y;
-        }
-
-        // Clamp to int16 range
-        if (res > 32767.0) return 32767;
-        if (res < -32768.0) return -32768;
-        return (int16_t)round(res);
-    }
-};
-///////////////////////////////////////////////END of testing Helpers///////////////////////////////////////////////
-
 #define SS2K_LOG(tag, format, ...)                                \
   {                                                               \
     char buffer[1024];                                            \
@@ -172,6 +28,223 @@ public:
 #else
 #include "SS2KLog.h"
 #endif
+
+/////////////////////////Testing Helpers/////////////////////////
+
+// --- Advanced Predictor ---
+
+// Gaussian Elimination Solver for NxN matrix
+bool ResistanceModel::solveMatrix(std::vector<std::vector<double>>& A, std::vector<double>& B, int n) {
+  for (int i = 0; i < n; i++) {
+    // Pivot
+    int maxRow = i;
+    for (int k = i + 1; k < n; k++) {
+      if (abs(A[k][i]) > abs(A[maxRow][i])) maxRow = k;
+    }
+    std::swap(A[i], A[maxRow]);
+    std::swap(B[i], B[maxRow]);
+
+    if (abs(A[i][i]) < 1e-9) return false;  // Singular matrix
+
+    for (int k = i + 1; k < n; k++) {
+      double c = -A[k][i] / A[i][i];
+      for (int j = i; j < n; j++) {
+        if (i == j)
+          A[k][j] = 0;
+        else
+          A[k][j] += c * A[i][j];
+      }
+      B[k] += c * B[i];
+    }
+  }
+
+  // Back substitution
+  for (int i = n - 1; i >= 0; i--) {
+    double sum = 0;
+    for (int j = i + 1; j < n; j++) sum += A[i][j] * b[j];
+    b[i] = (B[i] - sum) / A[i][i];
+  }
+  return true;
+}
+
+void ResistanceModel::fit(const PTData& data) {
+  long int timer = millis();
+  isValid = false;
+
+  // 1. Collect Valid Points & Find Bounds
+  struct Point {
+    double w, r, z;
+  };
+  std::vector<Point> points;
+
+  minW = 1e9;
+  maxW = -1e9;
+  minR = 1e9;
+  maxR = -1e9;
+
+  for (int r = 0; r < POWERTABLE_CAD_SIZE; r++) {
+    for (int c = 0; c < POWERTABLE_WATT_SIZE; c++) {
+      int16_t val = data.tableRow[r].tableEntry[c].targetPosition;
+      if (val == INT16_MIN) continue;
+
+      double w   = 0 + (c * POWERTABLE_WATT_INCREMENT);
+      double rpm = MINIMUM_TABLE_CAD + (r * POWERTABLE_CAD_INCREMENT);
+
+      points.push_back({w, rpm, (double)val});
+
+      if (w < minW) minW = w;
+      if (w > maxW) maxW = w;
+      if (rpm < minR) minR = rpm;
+      if (rpm > maxR) maxR = rpm;
+    }
+  }
+
+  int N = points.size();
+  if (N < 4) return;  // Not enough data for anything
+
+  // Avoid division by zero in normalization
+  if (abs(maxW - minW) < 1.0) maxW += 1.0;
+  if (abs(maxR - minR) < 1.0) maxR += 1.0;
+
+  // 2. Decide Model Complexity
+  // We need 6 points for Quadratic (Curve), 3 for Linear (Plane)
+  isQuadratic   = (N >= 6);
+  int numCoeffs = isQuadratic ? 6 : 3;
+
+  // 3. Build Matrices (Least Squares)
+  // System: A * b = B
+  std::vector<std::vector<double>> A(numCoeffs, std::vector<double>(numCoeffs, 0.0));
+  std::vector<double> B(numCoeffs, 0.0);
+
+  for (const auto& p : points) {
+    double x = normW(p.w);
+    double y = normR(p.r);
+    double z = p.z;
+
+    // Terms array: [1, x, y, x^2, y^2, xy]
+    double terms[6];
+    terms[0] = 1.0;
+    terms[1] = x;
+    terms[2] = y;
+    if (isQuadratic) {
+      terms[3] = x * x;
+      terms[4] = y * y;
+      terms[5] = x * y;
+    }
+
+    // Add to Normal Matrix
+    for (int i = 0; i < numCoeffs; i++) {
+      for (int j = 0; j < numCoeffs; j++) {
+        A[i][j] += terms[i] * terms[j];
+      }
+      B[i] += terms[i] * z;
+    }
+  }
+
+  // 4. Solve
+  isValid = solveMatrix(A, B, numCoeffs);
+  SS2K_LOG(PTDATA_LOG_TAG, "Resistance Model fit in %lu ms. Valid: %s, Points: %d, Model: %s", millis() - timer,
+           isValid ? "Yes" : "No", N, isQuadratic ? "Quadratic" : "Linear");
+}
+
+int16_t ResistanceModel::predict(double watts, double rpm) {
+  if (!isValid) return INT16_MIN;
+
+  // Normalize inputs using the bounds found during training
+  double x = normW(watts);
+  double y = normR(rpm);
+
+  double res = b[0] + b[1] * x + b[2] * y;
+
+  if (isQuadratic) {
+    res += b[3] * x * x + b[4] * y * y + b[5] * x * y;
+  }
+
+  // Clamp to int16 range
+  if (res > 32767.0) return 32767;
+  if (res < -32768.0) return -32768;
+  return (int16_t)round(res);
+}
+
+/**
+ * Inverse prediction: Given a Resistance (TargetPosition) and Cadence,
+ * calculate the required Watts.
+ */
+int ResistanceModel::predictWatts(int32_t resistance, float cadence) {
+  if (!isValid) return 0;  // Or appropriate error code
+
+  // 1. Normalize the inputs (Cadence only, we solve for X)
+  double y = normR(cadence);
+  double Z = (double)resistance;
+
+  double predictedNormWatts = 0.0;
+
+  // 2. Setup Quadratic Equation Coefficients: A*x^2 + B*x + C = 0
+  // If Linear: Z = b0 + b1*x + b2*y  ->  b1*x = Z - b0 - b2*y
+  // If Quad:   Z = b0 + b1*x + b2*y + b3*x^2 + b4*y^2 + b5*x*y
+  // Rearranged for x: (b3)*x^2 + (b1 + b5*y)*x + (b0 + b2*y + b4*y^2 - Z) = 0
+
+  double QA = isQuadratic ? b[3] : 0.0;
+  double QB = b[1];
+  double QC = b[0] + (b[2] * y) - Z;
+
+  if (isQuadratic) {
+    QB += b[5] * y;
+    QC += b[4] * y * y;
+  }
+
+  // 3. Solve
+  if (abs(QA) < 1e-9) {
+    // --- Linear Solve (or Quadratic term is 0) ---
+    // Eq: QB * x + QC = 0  ->  x = -QC / QB
+    if (abs(QB) < 1e-9) return 0;  // Div by zero protection (Horizontal line)
+    predictedNormWatts = -QC / QB;
+  } else {
+    // --- Quadratic Solve ---
+    // x = (-B +/- sqrt(B^2 - 4AC)) / 2A
+    double delta = (QB * QB) - (4 * QA * QC);
+
+    if (delta < 0) {
+      // No real solution (The resistance is impossible at this cadence)
+      // We return the vertex (closest possible watts)
+      predictedNormWatts = -QB / (2 * QA);
+    } else {
+      double sqrtDelta = std::sqrt(delta);
+      double x1        = (-QB + sqrtDelta) / (2 * QA);
+      double x2        = (-QB - sqrtDelta) / (2 * QA);
+
+      // We have two Watt answers. Which one is real?
+      // Logic: 0.0 to 1.0 is the range of "known data".
+      // We pick the one strictly within range, or the closest positive value.
+      bool x1In = (x1 >= 0.0 && x1 <= 1.0);
+      bool x2In = (x2 >= 0.0 && x2 <= 1.0);
+
+      if (x1In && !x2In)
+        predictedNormWatts = x1;
+      else if (!x1In && x2In)
+        predictedNormWatts = x2;
+      else {
+        // Both in or both out?
+        // Physical resistance usually increases with Watts.
+        // We typically want the root where the slope is positive,
+        // but simply taking the one closest to our valid range (0-1) is robust.
+        double dist1       = (x1 < 0) ? -x1 : (x1 > 1 ? x1 - 1 : 0);
+        double dist2       = (x2 < 0) ? -x2 : (x2 > 1 ? x2 - 1 : 0);
+        predictedNormWatts = (dist1 < dist2) ? x1 : x2;
+      }
+    }
+  }
+
+  // 4. Denormalize
+  // norm = (val - min) / (max - min)  ->  val = norm * (max - min) + min
+  double finalWatts = predictedNormWatts * (maxW - minW) + minW;
+
+  // 5. Clamp to logical limits (e.g., no negative watts)
+  if (finalWatts < 0) finalWatts = 0;
+
+  return (int)round(finalWatts);
+}
+///////////////////////////////////////////////END of testing Helpers///////////////////////////////////////////////
 
 // Calculate index in the table for the given watts and cadence
 ptIndex PTHelpers::calculateIndex(int watts, int cad) {
@@ -241,63 +314,10 @@ std::pair<std::vector<float>, std::vector<float>> PTHelpers::getColumn(int colum
 }
 
 int32_t PTHelpers::lookup(int watts, int cad, PTData& ptData) {
-  ResistanceModel resistanceModel;
-  resistanceModel.fit(ptData);
-  return resistanceModel.predict(watts, cad);
-
-  ptIndex index = calculateIndex(watts, cad);
-
-  // Define table boundaries
-  const int MIN_CAD_VAL  = MINIMUM_TABLE_CAD;
-  const int MAX_CAD_VAL  = MINIMUM_TABLE_CAD + (POWERTABLE_CAD_SIZE - 1) * POWERTABLE_CAD_INCREMENT;
-  const int MIN_WATT_VAL = 0;  // Assuming watts index start from 0
-  const int MAX_WATT_VAL = (POWERTABLE_WATT_SIZE - 1) * POWERTABLE_WATT_INCREMENT;
-  int32_t resistance     = RETURN_ERROR;
-  std::pair<std::vector<float>, std::vector<float>> dataPoints;
-
-  bool isCadOutOfTable = cad < MIN_CAD_VAL || cad > MAX_CAD_VAL;
-  // Watts < 0 is also out of table, ensure watts is not negative before typical checks
-  bool isWattOutOfTable = watts < MIN_WATT_VAL || watts > MAX_WATT_VAL;
-
-  // ---- A. Handle Out-of-Table simple Extrapolation ----
-  if (isCadOutOfTable && !isWattOutOfTable) {
-    int targetWattIndex = index.wattIndex;
-    // Clamp targetWattIndex to be within table bounds for selecting the column
-    if (targetWattIndex < 0) targetWattIndex = 0;
-    dataPoints = getColumn(targetWattIndex, ptData);
-    if (dataPoints.first.size() >= 2) {
-      float extrapolatedVal = linearExtrapolate(dataPoints, dataPoints.first.size(), static_cast<float>(cad));
-      if (extrapolatedVal != INT16_MIN && !std::isnan(extrapolatedVal) && !std::isinf(extrapolatedVal)) {
-        resistance = static_cast<int32_t>(round(extrapolatedVal)) * TABLE_DIVISOR;
-      }
-    }
+  if (!resistanceModel.getIsValid()) {
+    resistanceModel.fit(ptData);
   }
-
-  // A.2. Attempt Watt Extrapolation if watts are out of bounds
-  if (!isCadOutOfTable) {
-    int targetCadIndex = index.cadIndex;
-    dataPoints.first.clear();
-    dataPoints.second.clear();
-    // Clamp targetCadIndex to be within table bounds for selecting the row
-    if (targetCadIndex < 0) targetCadIndex = 0;
-
-    dataPoints = getRow(targetCadIndex, ptData);
-    if (dataPoints.first.size() >= 2) {
-      float extrapolatedVal = linearExtrapolate(dataPoints, dataPoints.first.size(), static_cast<float>(watts));
-      if (extrapolatedVal != INT16_MIN && !std::isnan(extrapolatedVal) && !std::isinf(extrapolatedVal)) {
-        resistance = static_cast<int32_t>(round(extrapolatedVal)) * TABLE_DIVISOR;
-      }
-    }
-  }
-
-  if (resistance != RETURN_ERROR) {
-    SS2K_LOG(PTDATA_LOG_TAG, "Extrapolated resistance: %d for watts=%d, cad=%d", resistance, watts, cad);
-    // Return early if we found a valid extrapolated value
-  } else {
-    SS2K_LOG(PTDATA_LOG_TAG, "Extrapolation failed for watts=%d, cad=%d", watts, cad);
-  }
-
-  return resistance;
+  return resistanceModel.predict(watts, cad) * TABLE_DIVISOR;
 }
 
 /**
@@ -385,40 +405,15 @@ int PTHelpers::getTotalReadings(PTData& ptData) {
 }
 
 // Use the powertable to preform a reverse lookup of the target position to find the watts at a given cadence.
-int32_t PTHelpers::lookupWatts(int cad, int32_t targetPosition, PTData& ptData) {
-  if (cad < POWERTABLE_CAD_INCREMENT * 2) {
-    return 0;
+int PTHelpers::lookupWatts(int cad, int32_t targetPosition, PTData& ptData) {
+  if (!resistanceModel.getIsValid()) {
+    resistanceModel.fit(ptData);
   }
-
-  // Calculate center point value
-  int centerWatts = extrapolateWattsFromCadence(cad, targetPosition, ptData);
-
-  // Sample additional points for Gaussian smoothing
-  int cadLower      = cad - POWERTABLE_CAD_INCREMENT;
-  int cadHigher     = cad + POWERTABLE_CAD_INCREMENT;
-  int32_t posLower  = targetPosition - 500;
-  int32_t posHigher = targetPosition + 500;
-
-  // Calculate watts for the additional points
-  int wattsLowerCad  = extrapolateWattsFromCadence(cadLower, targetPosition, ptData);
-  int wattsHigherCad = extrapolateWattsFromCadence(cadHigher, targetPosition, ptData);
-  int wattsLowerPos  = extrapolateWattsFromCadence(cad, posLower, ptData);
-  int wattsHigherPos = extrapolateWattsFromCadence(cad, posHigher, ptData);
-
-  // Apply Gaussian weights (center point has highest weight)
-  const float centerWeight   = 0.5f;
-  const float adjacentWeight = 0.125f;  // Each adjacent point gets 1/8 weight
-
-  // Calculate weighted average
-  float weightedSum =
-      centerWatts * centerWeight + wattsLowerCad * adjacentWeight + wattsHigherCad * adjacentWeight + wattsLowerPos * adjacentWeight + wattsHigherPos * adjacentWeight;
-
-  int smoothedWatts = static_cast<int>(round(weightedSum));
-
-  // Ensure non-negative value
-  if (smoothedWatts < 0) smoothedWatts = 0;
-
-  return smoothedWatts;
+  int wattsOut = resistanceModel.predictWatts(targetPosition / TABLE_DIVISOR, static_cast<float>(cad));
+  if (wattsOut < cad / 2) {
+    wattsOut = cad / 2;  // enforce a minimum wattage based on cadence to avoid absurdly low wattage outputs
+  }
+  return wattsOut;
 }
 
 int PTHelpers::extrapolateWattsFromCadence(int cad, int32_t targetPosition, PTData& ptData) {
@@ -524,6 +519,8 @@ int PTHelpers::extrapolateWattsFromCadence(int cad, int32_t targetPosition, PTDa
  * @param ptData The main power table data structure.
  */
 void PTHelpers::fillGaps(PTData& ptData) {
+
+  /*
   for (int i = 0; i < POWERTABLE_CAD_SIZE; ++i) {     // For each row
     for (int j = 0; j < POWERTABLE_WATT_SIZE; ++j) {  // For each cell
       if (ptData.tableRow[i].tableEntry[j].targetPosition == INT16_MIN) {
@@ -565,7 +562,7 @@ void PTHelpers::fillGaps(PTData& ptData) {
         }
       }
     }
-  }
+  }*/
 }
 
 bool PTHelpers::fillAllWattColumns(PTData& ptData) {
@@ -784,7 +781,7 @@ void PTHelpers::enterData(PTData& ptData, ptIndex index, int pos) {
 
 void PTHelpers::clean(PTData& ptData) {
   int removed = 0;
-  
+
   // First pass: remove entries with readings < 1 or negative positions
   for (int i = 0; i < POWERTABLE_CAD_SIZE; i++) {
     for (int j = 0; j < POWERTABLE_WATT_SIZE; j++) {
@@ -797,15 +794,15 @@ void PTHelpers::clean(PTData& ptData) {
       }
     }
   }
-  
+
   // Second pass: remove duplicate values in columns (same resistance for multiple cadences)
   // For each column, track all unique values and remove duplicates
   for (int j = 0; j < POWERTABLE_WATT_SIZE; j++) {
     for (int i = 0; i < POWERTABLE_CAD_SIZE; i++) {
       if (ptData.tableRow[i].tableEntry[j].targetPosition == INT16_MIN) continue;
-      
+
       int16_t currentValue = ptData.tableRow[i].tableEntry[j].targetPosition;
-      
+
       // Check all other entries in this column for the same value
       for (int k = i + 1; k < POWERTABLE_CAD_SIZE; k++) {
         if (ptData.tableRow[k].tableEntry[j].targetPosition == currentValue) {
@@ -813,28 +810,27 @@ void PTHelpers::clean(PTData& ptData) {
           // If readings are equal, keep the one at higher cadence (higher index)
           if (ptData.tableRow[k].tableEntry[j].readings < ptData.tableRow[i].tableEntry[j].readings) {
             ptData.tableRow[k].tableEntry[j].targetPosition = INT16_MIN;
-            ptData.tableRow[k].tableEntry[j].readings = 0;
+            ptData.tableRow[k].tableEntry[j].readings       = 0;
             removed++;
           } else if (ptData.tableRow[k].tableEntry[j].readings > ptData.tableRow[i].tableEntry[j].readings) {
             // Current entry has fewer readings, mark it for removal and update current to the better one
             ptData.tableRow[i].tableEntry[j].targetPosition = INT16_MIN;
-            ptData.tableRow[i].tableEntry[j].readings = 0;
+            ptData.tableRow[i].tableEntry[j].readings       = 0;
             removed++;
-            break; // Move to next i since current is removed
+            break;  // Move to next i since current is removed
           } else {
             // Readings are equal - keep the one at higher cadence (k), remove the one at i
             ptData.tableRow[i].tableEntry[j].targetPosition = INT16_MIN;
-            ptData.tableRow[i].tableEntry[j].readings = 0;
+            ptData.tableRow[i].tableEntry[j].readings       = 0;
             removed++;
-            break; // Move to next i since current is removed
+            break;  // Move to next i since current is removed
           }
         }
       }
     }
   }
-  
+
   if (removed > 0) {
     SS2K_LOG(PTDATA_LOG_TAG, "Cleaned %d readings", removed);
   }
 }
-

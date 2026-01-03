@@ -186,6 +186,7 @@ void PowerTable::newEntry(PowerBuffer& powerBuffer) {
   }
 
   ptHelpers.enterData(ptData, index, (int)targetPosition);
+  ptHelpers.resistanceModel.fit(ptData);
   fillTableFlag = true;  // set flag to fill table
   BLE_ss2kCustomCharacteristic::notify(0x27, index.cadIndex);
 }

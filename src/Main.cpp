@@ -322,9 +322,9 @@ void SS2K::maintenanceLoop(void* pvParameters) {
       }
 #endif  // DEBUG_STACK
       // Log userParameters
-      SS2K_LOG(MAIN_LOG_TAG, "PM Con %d, CAD con %d, HRM Con %d, W %d, Cad %d, HR %d, Gear %d, Res %d, Target Position %d", spinBLEClient.connectedPM, spinBLEClient.connectedCD,
+      SS2K_LOG(MAIN_LOG_TAG, "PM Con %d, CAD con %d, HRM Con %d, W %d, Cad %d, HR %d, Gear %d, Res %d, Current Pos %d, Target Pos %d", spinBLEClient.connectedPM, spinBLEClient.connectedCD,
                spinBLEClient.connectedHRM, rtConfig->watts.getValue(), rtConfig->cad.getValue(), rtConfig->hr.getValue(), rtConfig->getShifterPosition(),
-               rtConfig->resistance.getValue(), ss2k->targetPosition);
+               rtConfig->resistance.getValue(), ss2k->getCurrentPosition(), ss2k->getTargetPosition());
 
       intervalTimer2 = millis();
     }
@@ -377,7 +377,7 @@ void SS2K::FTMSModeShiftModifier() {
 
       default:  // Sim Mode
       {
-        SS2K_LOG(MAIN_LOG_TAG, "Shift %+d pos %d tgt %d min %d max %d r_min %d r_max %d", shiftDelta, rtConfig->getShifterPosition(), ss2k->targetPosition, rtConfig->getMinStep(),
+        SS2K_LOG(MAIN_LOG_TAG, "Shift %+d pos %d tgt %d min %d max %d r_min %d r_max %d", shiftDelta, rtConfig->getShifterPosition(), ss2k->getTargetPosition(), rtConfig->getMinStep(),
                  rtConfig->getMaxStep(), rtConfig->getMinResistance(), rtConfig->getMaxResistance());
         // Block Shifts further out of bounds
         if (((ss2k->targetPosition + shiftDelta * userConfig->getShiftStep()) < rtConfig->getMinStep()) && (shiftDelta < 0)) {
