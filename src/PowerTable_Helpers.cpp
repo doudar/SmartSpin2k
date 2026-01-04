@@ -610,6 +610,8 @@ void PTHelpers::enterData(PTData& ptData, ptIndex index, int pos) {
     entry.readings++;
   }
 
+    // After updating a point, re-process the entire table to enforce global monotonicity.
+  resistanceModel.fit(ptData);
   // // After updating a point, re-process the entire table to enforce global monotonicity.
   this->fillGaps(ptData);
   // for (int i = 0; i < 10; i++) {  // Run the PAVA functions multiple times to ensure convergence
@@ -627,8 +629,7 @@ void PTHelpers::enterData(PTData& ptData, ptIndex index, int pos) {
     SS2K_LOG(PTDATA_LOG_TAG, "PAVA iteration done, still converging: cad %d, watt %d, Loop %d", caddone, wattdone, loop);
   }
 
-  // After updating a point, re-process the entire table to enforce global monotonicity.
-  resistanceModel.fit(ptData);
+
   if (resistanceModel.getIsValid()) {
     this->fill(ptData);
   }

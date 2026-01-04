@@ -272,16 +272,21 @@ static void createPowerTableHeatmap(const std::string& inputFilePath, const std:
     htmlFile << "</div>\n";
 
     // Add Y-axis range control HTML *before* the script that uses it
-    htmlFile << "<div style=\"width: 80%; margin: 20px auto; display: flex; flex-direction: column; align-items: center;\">\n";
-    htmlFile << "  <label for=\"yAxisRange\" style=\"margin-bottom: 5px;\">Adjust Y-axis maximum value: <span id=\"yAxisRangeValue\">" << maxValue << "</span></label>\n";
+    htmlFile << "<div style=\"width: 80%; margin: 20px auto; display: flex; flex-direction: column; align-items: center; gap: 8px;\">\n";
+    htmlFile << "  <label for=\"yAxisRange\">Adjust Y-axis maximum value: <span id=\"yAxisRangeValue\">" << maxValue << "</span></label>\n";
     htmlFile << "  <input type=\"range\" id=\"yAxisRange\" min=\"" << minValue + 50 << "\" max=\"" << maxValue + 100 << "\" step=\"10\" value=\"" << maxValue << "\" style=\"width: 50%;\">\n";
+    htmlFile << "  <label style=\"display: flex; align-items: center; gap: 6px; font-size: 0.9rem;\">\n";
+    htmlFile << "    <input type=\"checkbox\" id=\"yAxisLock\"> Lock Y-axis slider\n";
+    htmlFile << "  </label>\n";
     htmlFile << "</div>\n";
 
     // Start script for chart and slider logic
     htmlFile << "<script>\n";
     htmlFile << "  const ctx = document.getElementById('resistanceWattChart');\n";
     htmlFile << "  const yAxisRange = document.getElementById('yAxisRange');\n";
-    htmlFile << "  const yAxisRangeValue = document.getElementById('yAxisRangeValue');\n\n";
+    htmlFile << "  const yAxisRangeValue = document.getElementById('yAxisRangeValue');\n";
+    htmlFile << "  const yAxisLock = document.getElementById('yAxisLock');\n";
+    htmlFile << "  let yAxisLocked = false;\n\n";
 
     // If addTimeSlider, add logic to update chart and table on slider move
     if (addTimeSlider && !ptabFiles.empty()) {
@@ -352,12 +357,14 @@ static void createPowerTableHeatmap(const std::string& inputFilePath, const std:
         htmlFile << "    else {\n";
         htmlFile << "      chart = new Chart(ctx, { type: 'line', data: { datasets }, options: { responsive: true, maintainAspectRatio: false, plugins: { title: { display: true, text: 'Resistance vs. Watts by Cadence', font: { size: 18 } }, legend: { position: 'bottom', labels: { usePointStyle: true } } }, scales: { x: { type: 'linear', title: { display: true, text: 'Watts' }, min: 0, max: " << (POWERTABLE_WATT_SIZE * POWERTABLE_WATT_INCREMENT) << " }, y: { title: { display: true, text: 'Resistance' }, min: 0, max: maxValue } } } }); }\n";
         htmlFile << "    timeSliderValue.textContent = ptabTimestamps[idx];\n";
-        htmlFile << "    // Also update yAxisRange slider\n";
-        htmlFile << "    yAxisRange.min = 50;\n";
-        htmlFile << "    yAxisRange.max = maxValue + 100;\n";
-        htmlFile << "    yAxisRange.value = maxValue;\n";
-        htmlFile << "    yAxisRangeValue.textContent = maxValue;\n";
-        htmlFile << "    if (chart) { chart.options.scales.y.max = maxValue; chart.options.scales.y.min = 0; chart.update('none'); }\n";
+        htmlFile << "    const selectedMax = yAxisLocked ? parseInt(yAxisRange.value) : maxValue;\n";
+        htmlFile << "    if (!yAxisLocked) {\n";
+        htmlFile << "      yAxisRange.min = 50;\n";
+        htmlFile << "      yAxisRange.max = maxValue + 100;\n";
+        htmlFile << "      yAxisRange.value = maxValue;\n";
+        htmlFile << "    }\n";
+        htmlFile << "    yAxisRangeValue.textContent = selectedMax;\n";
+        htmlFile << "    if (chart) { chart.options.scales.y.max = selectedMax; chart.options.scales.y.min = 0; chart.update('none'); }\n";
         htmlFile << "  }\n";
         htmlFile << "  timeSlider.addEventListener('input', function() { updateChartAndTable(this.value); });\n";
         htmlFile << "  updateChartAndTable(0);\n";
@@ -423,23 +430,31 @@ static void createPowerTableHeatmap(const std::string& inputFilePath, const std:
         htmlFile << "    if (chart) { chart.data.datasets = datasets; chart.update('none'); }\n";
         htmlFile << "    else {\n";
         htmlFile << "      chart = new Chart(ctx, { type: 'line', data: { datasets }, options: { responsive: true, maintainAspectRatio: false, plugins: { title: { display: true, text: 'Resistance vs. Watts by Cadence', font: { size: 18 } }, legend: { position: 'bottom', labels: { usePointStyle: true } } }, scales: { x: { type: 'linear', title: { display: true, text: 'Watts' }, min: 0, max: " << (POWERTABLE_WATT_SIZE * POWERTABLE_WATT_INCREMENT) << " }, y: { title: { display: true, text: 'Resistance' }, min: 0, max: maxValue } } } }); }\n";
-        htmlFile << "    // Also update yAxisRange slider\n";
-        htmlFile << "    yAxisRange.min = 50;\n";
-        htmlFile << "    yAxisRange.max = maxValue + 100;\n";
-        htmlFile << "    yAxisRange.value = maxValue;\n";
-        htmlFile << "    yAxisRangeValue.textContent = maxValue;\n";
-        htmlFile << "    if (chart) { chart.options.scales.y.max = maxValue; chart.options.scales.y.min = 0; chart.update('none'); }\n";
+        htmlFile << "    const selectedMax = yAxisLocked ? parseInt(yAxisRange.value) : maxValue;\n";
+        htmlFile << "    if (!yAxisLocked) {\n";
+        htmlFile << "      yAxisRange.min = 50;\n";
+        htmlFile << "      yAxisRange.max = maxValue + 100;\n";
+        htmlFile << "      yAxisRange.value = maxValue;\n";
+        htmlFile << "    }\n";
+        htmlFile << "    yAxisRangeValue.textContent = selectedMax;\n";
+        htmlFile << "    if (chart) { chart.options.scales.y.max = selectedMax; chart.options.scales.y.min = 0; chart.update('none'); }\n";
         htmlFile << "  }\n";
         htmlFile << "  updateChartAndTable(0);\n";
     }
 
     // Add event listener for range input (y-axis)
     htmlFile << "  function updateYAxisRange() {\n";
+    htmlFile << "    if (yAxisLocked) { return; }\n";
     htmlFile << "    const newMax = parseInt(yAxisRange.value);\n";
     htmlFile << "    yAxisRangeValue.textContent = newMax;\n";
-    htmlFile << "    if (chart) { chart.options.scales.y.max = newMax; chart.update('none'); }\n";
+    htmlFile << "    if (chart) { chart.options.scales.y.max = newMax; chart.options.scales.y.min = 0; chart.update('none'); }\n";
     htmlFile << "  }\n\n";
     htmlFile << "  yAxisRange.addEventListener('input', updateYAxisRange);\n";
+    htmlFile << "  yAxisLock.addEventListener('change', () => {\n";
+    htmlFile << "    yAxisLocked = yAxisLock.checked;\n";
+    htmlFile << "    yAxisRange.disabled = yAxisLocked;\n";
+    htmlFile << "    if (!yAxisLocked) { updateYAxisRange(); }\n";
+    htmlFile << "  });\n";
     htmlFile << "</script>\n";
 
     // HTML footer
