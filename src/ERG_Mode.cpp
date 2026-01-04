@@ -50,6 +50,10 @@ void ErgMode::runERG() {
         powerTable->saveFlag = false;
       }
     }
+    // Load power table if not yet loaded this session
+    if(!powerTable->_hasBeenLoadedThisSession) {
+      powerTable->_manageSaveState();
+    }
 
     if (rtConfig->cad.getValue()) {
       hasConnectedPowerMeter = spinBLEClient.connectedPM;
