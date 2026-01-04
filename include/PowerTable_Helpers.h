@@ -8,7 +8,6 @@
 #pragma once
 
 #include "SmartSpin_parameters.h"
-#include <vector>
 
 #define PTDATA_LOG_TAG "PTData"
 
@@ -91,7 +90,7 @@ class ResistanceModel {
   // Helper: Normalize a value to 0.0 - 1.0 range
   double normW(double w) { return (w - minW) / (maxW - minW); }
   double normR(double r) { return (r - minR) / (maxR - minR); }
-  bool solveMatrix(std::vector<std::vector<double>>& A, std::vector<double>& B, int n);
+  bool solveMatrix(double A[6][6], double B[6], int n);
 
  public:
   void fit(const PTData& data);
@@ -104,16 +103,14 @@ class PTHelpers {
  public:
   ResistanceModel resistanceModel;
   int32_t lookup(int watts, int cad, PTData& ptData);
-  float linearExtrapolate(std::pair<std::vector<float>, std::vector<float>> xy, size_t n, float j);
   int lookupWatts(int cad, int32_t targetPosition, PTData& ptData);
-  int32_t extrapolateCadenceWatts(int cad, float targetPosition, PTData& ptData);
-  int extrapolateWattsFromCadence(int cad, int32_t targetPosition, PTData& ptData);
   // return number of readings in the table. If minReadings is set, it will only count entries with at least that many readings.
   int getNumEntries(PTData& ptData, int minReadings = 0);
   int getTotalReadings(PTData& ptData);
   ptIndex calculateIndex(int watts, int cad);
   void enterData(PTData& ptData, ptIndex index, int pos);
   void clean(PTData& ptData);
+  void fill(PTData& ptData);
   void fillGaps(PTData& ptData);
   bool fillAllWattColumns(PTData& ptData);
   bool fillAllCadenceLines(PTData& ptData);

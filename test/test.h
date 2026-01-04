@@ -37,11 +37,6 @@ class TestPTLookupWatts {
    static void test_pt_lookup_watts(void);
  };
 
-class TestLinearExtrapolate {
-  public:
-   static void test_linear_extrapolate(void);
-};
-
 class TestWritePowerTable {
   public:
     static void test_save_and_load(void);
@@ -50,13 +45,6 @@ class TestWritePowerTable {
 class TestTableFill {
   public:
     static void test_fill_incomplete_table(void);
-};
-
-class TestPAVAConvergence {
-  public:
-    static void test_pava_convergence_nebula3(void);
-    static void test_pava_convergence_nebula(void);
-    static void test_pava_convergence_better(void);
 };
 
 class TestAdevName2UniqueName {

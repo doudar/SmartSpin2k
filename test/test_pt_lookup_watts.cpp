@@ -70,7 +70,7 @@ void TestPTLookupWatts::test_pt_lookup_watts(void) {
   int cadenceStep = 1;
 
 #define MIN_TEST_RANGE     0
-#define MAX_TEST_RANGE     1600
+#define MAX_TEST_RANGE     1600 * TABLE_DIVISOR
 #define POINTS_PER_CADENCE 10
   // Define resistance test points (using a smaller range for testing efficiency)
   int resistancePoints = POINTS_PER_CADENCE;
