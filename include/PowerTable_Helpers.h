@@ -102,8 +102,6 @@ class PTHelpers {
   ResistanceModel resistanceModel;
   int32_t lookup(int watts, int cad, PTData& ptData);
   int lookupWatts(int cad, int32_t targetPosition, PTData& ptData);
-  // return number of readings in the table. If minReadings is set, it will only count entries with at least that many readings.
-  int getNumEntries(PTData& ptData, int minReadings = 0);
   int getTotalReadings(PTData& ptData);
   ptIndex calculateIndex(int watts, int cad);
   void enterData(PTData& ptData, ptIndex index, int pos);
@@ -112,7 +110,4 @@ class PTHelpers {
   void fillGaps(PTData& ptData);
   bool fillAllWattColumns(PTData& ptData);
   bool fillAllCadenceLines(PTData& ptData);
-  std::pair<std::vector<float>, std::vector<float>> getRow(int row, PTData& ptData);
-  std::pair<std::vector<float>, std::vector<float>> getColumn(int column, PTData& ptData);
-  void safeSmooth(PTData& ptData);
 };

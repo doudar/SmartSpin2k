@@ -39,9 +39,7 @@ unsigned long millis() {
 #include "SS2KLog.h"
 #endif
 
-/////////////////////////Testing Helpers/////////////////////////
-
-// --- Advanced Predictor ---
+/////////////////////////Resistance Model/////////////////////////
 
 // Gaussian Elimination Solver for NxN matrix
 bool ResistanceModel::solveMatrix(double A[6][6], double B[6], int n) {
@@ -276,7 +274,7 @@ int ResistanceModel::predictWatts(int32_t resistance, float cadence) {
 
   return (int)round(finalWatts);
 }
-///////////////////////////////////////////////END of testing Helpers///////////////////////////////////////////////
+///////////////////////////////////////////////Resistance Model///////////////////////////////////////////////
 
 
 /**
@@ -400,62 +398,6 @@ ptIndex PTHelpers::calculateIndex(int watts, int cad) {
   return index;
 }
 
-/**
- * @brief Retrieves the x and y values from a specific row of the power table.
- *
- * This function extracts the x and y values from the specified row of the power table
- * in the provided PTData object. It skips entries where the target position is set
- * to INT16_MIN, which indicates an invalid or uninitialized entry.
- *
- * @param row The index of the row to retrieve data from.
- * @param ptData Reference to the PTData object containing the power table data.
- * @return A pair of vectors:
- *         - The first vector contains the x values (watt increments).
- *         - The second vector contains the y values (target positions).
- */
-std::pair<std::vector<float>, std::vector<float>> PTHelpers::getRow(int row, PTData& ptData) {
-  std::vector<float> xValues;
-  std::vector<float> yValues;
-  // clamp row to be within table bounds
-  if (row < 0) row = 0;
-  if (row >= POWERTABLE_CAD_SIZE) row = POWERTABLE_CAD_SIZE - 1;
-  for (int j = 0; j < POWERTABLE_WATT_SIZE; ++j) {
-    if (ptData.tableRow[row].tableEntry[j].targetPosition != INT16_MIN) {
-      xValues.push_back(static_cast<float>(j * POWERTABLE_WATT_INCREMENT));
-      yValues.push_back(static_cast<float>(ptData.tableRow[row].tableEntry[j].targetPosition));
-    }
-  }
-  return {xValues, yValues};
-}
-
-/**
- * @brief Extracts the x and y values for a specific column from the power table data.
- *
- * This function iterates through the rows of the power table data and retrieves
- * the x and y values for the specified column. The x values are calculated based
- * on the cadence index, and the y values are extracted from the target position
- * of the table entries. Only valid entries (where the target position is not
- * INT16_MIN) are included in the result.
- *
- * @param column The index of the column to extract data from.
- * @param ptData Reference to the PTData structure containing the power table data.
- * @return A pair of vectors, where the first vector contains the x values and the
- *         second vector contains the corresponding y values.
- */
-std::pair<std::vector<float>, std::vector<float>> PTHelpers::getColumn(int column, PTData& ptData) {
-  std::vector<float> xValues;
-  std::vector<float> yValues;
-  // clamp column to be within table bounds
-  if (column < 0) column = 0;
-  if (column >= POWERTABLE_WATT_SIZE) column = POWERTABLE_WATT_SIZE - 1;
-  for (int i = 0; i < POWERTABLE_CAD_SIZE; ++i) {
-    if (ptData.tableRow[i].tableEntry[column].targetPosition != INT16_MIN) {
-      xValues.push_back(static_cast<float>(MINIMUM_TABLE_CAD + i * POWERTABLE_CAD_INCREMENT));
-      yValues.push_back(static_cast<float>(ptData.tableRow[i].tableEntry[column].targetPosition));
-    }
-  }
-  return {xValues, yValues};
-}
 
 int32_t PTHelpers::lookup(int watts, int cad, PTData& ptData) {
   if (!resistanceModel.getIsValid()) {
@@ -691,94 +633,5 @@ void PTHelpers::clean(PTData& ptData) {
 
   if (removed > 0) {
     SS2K_LOG(PTDATA_LOG_TAG, "Cleaned %d readings", removed);
-  }
-}
-
-/**
- * @brief "Safe" Smoothing.
- * Only smooths cells that have low confidence (few readings).
- * This allows "interpolated" gaps to relax into smooth curves,
- * but prevents "Real" ride data (Anchors) from being flattened.
- */
-void PTHelpers::safeSmooth(PTData& ptData) {
-  int16_t smoothedGrid[POWERTABLE_CAD_SIZE][POWERTABLE_WATT_SIZE];
-
-  // CONFIGURATION:
-  // Any cell with this many readings (or more) is considered "Truth"
-  // and will NOT be modified.
-  const int LOCK_THRESHOLD = 5;
-
-  // Weights
-  const int W_ADJ = 1;
-  const int W_CAD = 2;
-
-  for (int r = 0; r < POWERTABLE_CAD_SIZE; r++) {
-    for (int c = 0; c < POWERTABLE_WATT_SIZE; c++) {
-      TableEntry& current = ptData.tableRow[r].tableEntry[c];
-
-      // 1. If this is a "High Confidence" cell, skip it.
-      // We also skip empty cells.
-      if (current.targetPosition == INT16_MIN || current.readings >= LOCK_THRESHOLD) {
-        smoothedGrid[r][c] = INT16_MIN;  // Mark as "Do Not Touch"
-        continue;
-      }
-
-      // 2. Otherwise, calculate the smoothed value
-      long sum    = 0;
-      int divisor = 0;
-
-      // Self (Low weight since we know it's low confidence)
-      sum += (long)current.targetPosition;
-      divisor += 1;
-
-      // Left
-      if (c > 0) {
-        TableEntry& n = ptData.tableRow[r].tableEntry[c - 1];
-        if (n.targetPosition != INT16_MIN) {
-          sum += (long)n.targetPosition * W_ADJ;
-          divisor += W_ADJ;
-        }
-      }
-      // Right
-      if (c < POWERTABLE_WATT_SIZE - 1) {
-        TableEntry& n = ptData.tableRow[r].tableEntry[c + 1];
-        if (n.targetPosition != INT16_MIN) {
-          sum += (long)n.targetPosition * W_ADJ;
-          divisor += W_ADJ;
-        }
-      }
-      // Up
-      if (r > 0) {
-        TableEntry& n = ptData.tableRow[r - 1].tableEntry[c];
-        if (n.targetPosition != INT16_MIN) {
-          sum += (long)n.targetPosition * W_CAD;
-          divisor += W_CAD;
-        }
-      }
-      // Down
-      if (r < POWERTABLE_CAD_SIZE - 1) {
-        TableEntry& n = ptData.tableRow[r + 1].tableEntry[c];
-        if (n.targetPosition != INT16_MIN) {
-          sum += (long)n.targetPosition * W_CAD;
-          divisor += W_CAD;
-        }
-      }
-
-      if (divisor > 0) {
-        smoothedGrid[r][c] = (int16_t)(sum / divisor);
-      } else {
-        smoothedGrid[r][c] = current.targetPosition;
-      }
-    }
-  }
-
-  // Write back ONLY the modified cells
-  for (int r = 0; r < POWERTABLE_CAD_SIZE; r++) {
-    for (int c = 0; c < POWERTABLE_WATT_SIZE; c++) {
-      // Only update if we calculated a new value AND the original was unlocked
-      if (smoothedGrid[r][c] != INT16_MIN) {
-        ptData.tableRow[r].tableEntry[c].targetPosition = smoothedGrid[r][c];
-      }
-    }
   }
 }
