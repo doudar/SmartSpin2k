@@ -86,7 +86,7 @@ bool ResistanceModel::solveMatrix(double A[6][6], double B[6], int n) {
 }
 
 void ResistanceModel::fit(const PTData& data) {
-  // long int timer = millis();
+  long int timer = millis();
   isValid = false;
 
   // 1. Collect Valid Points & Find Bounds
@@ -104,7 +104,7 @@ void ResistanceModel::fit(const PTData& data) {
   for (int r = 0; r < POWERTABLE_CAD_SIZE; r++) {
     for (int c = 0; c < POWERTABLE_WATT_SIZE; c++) {
       int16_t val = data.tableRow[r].tableEntry[c].targetPosition;
-      if (val == INT16_MIN) continue;
+      if (val == INT16_MIN || data.tableRow[r].tableEntry[c].readings < 2) continue;
 
       double w   = 0 + (c * POWERTABLE_WATT_INCREMENT);
       double rpm = MINIMUM_TABLE_CAD + (r * POWERTABLE_CAD_INCREMENT);
@@ -126,8 +126,8 @@ void ResistanceModel::fit(const PTData& data) {
   if (std::fabs(maxR - minR) < 1.0) maxR += 1.0;
 
   // 2. Decide Model Complexity
-  // Require 9 points for the complex curve to ensure stability
-  isQuadratic   = (N >= 9) ? true : false;
+  // Require 10 points for the complex curve to ensure stability
+  isQuadratic   = (N >= 10) ? true : false;
   int numCoeffs = isQuadratic ? 6 : 3;
 
   // 3. Build Matrices (Stack Allocated)
@@ -160,12 +160,12 @@ void ResistanceModel::fit(const PTData& data) {
   // 4. Solve
   isValid = solveMatrix(A, B, numCoeffs);
 
-  // SS2K_LOG(PTDATA_LOG_TAG, "Fit Valid: %d, N: %d, Quad: %d", isValid, N, isQuadratic);
+  SS2K_LOG(PTDATA_LOG_TAG, "Fit Valid: %d, N: %d, Quad: %d, Time: %ld ms", isValid, N, isQuadratic, millis() - timer);
 }
 
 int16_t ResistanceModel::predict(double watts, double rpm) {
   if (!isValid) return INT16_MIN;
-  //SS2K_LOG(PTDATA_LOG_TAG, "Predicting for Watts: %.2f, RPM: %.2f", watts, rpm);
+  // SS2K_LOG(PTDATA_LOG_TAG, "Predicting for Watts: %.2f, RPM: %.2f", watts, rpm);
 
   // Normalize inputs using the bounds found during training
   double x = normW(watts);
@@ -278,6 +278,118 @@ int ResistanceModel::predictWatts(int32_t resistance, float cadence) {
 }
 ///////////////////////////////////////////////END of testing Helpers///////////////////////////////////////////////
 
+
+/**
+ * @brief Enters a new data point and then enforces monotonicity on the whole table.
+ * * This function first calculates the running average for the given data point.
+ * Then, it calls the PAVA helper functions to ensure the entire table remains
+ * monotonically increasing across both watts and cadence.
+ * * @param ptData The main power table data structure.
+ * @param index The watt and cadence index for the new data point.
+ * @param pos The measured targetPosition for this data point.
+ */
+void PTHelpers::enterData(PTData& ptData, ptIndex index, int pos) {
+  // Reference to the specific table entry for cleaner code
+  TableEntry& entry = ptData.tableRow[index.cadIndex].tableEntry[index.wattIndex];
+
+  int left       = INT16_MIN;
+  int down       = INT16_MIN;
+  bool moveTable = false;
+  clean(ptData);
+
+  // Get the topmost value in the column
+
+  if (entry.readings == 0) {  // if first reading in this entry
+    entry.readings = 1; // Initialize readings to 1 (total will be 2 after this loop) 1 alone is used for automatic computations.
+    SS2K_LOG(PTDATA_LOG_TAG, "New entry recorded (%d)(%d)(%d)", index.cadIndex, index.wattIndex, pos);
+  } else {  // Average and update the readings.
+    // Use floating point for accuracy in averaging
+    float current_total_pos = (float)entry.targetPosition * entry.readings;
+    float new_avg_pos       = (pos + current_total_pos) / (entry.readings + 1.0f);
+    pos                     = (int16_t)new_avg_pos;
+
+    SS2K_LOG(PTDATA_LOG_TAG, "Existing entry averaged (%d)(%d)(%d), readings(%d)", index.cadIndex, index.wattIndex, pos, entry.readings);
+  }
+
+  // Get the value to the left of the new entry
+  for (int i = index.wattIndex - 1; i > 0; i--) {
+    if (ptData.tableRow[index.cadIndex].tableEntry[i].targetPosition > pos) {
+      left = ptData.tableRow[index.cadIndex].tableEntry[i].targetPosition;
+      SS2K_LOG(PTDATA_LOG_TAG, "Greater Left Found %d, %d, tp%d", index.cadIndex, i, ptData.tableRow[index.cadIndex].tableEntry[i].targetPosition);
+      ptData.tableRow[index.cadIndex].tableEntry[i].readings--;
+      moveTable = true;
+      break;
+    }
+  }
+
+  // get the value below the new entry
+  for (int j = index.cadIndex + 1; j < POWERTABLE_CAD_SIZE - 1; j++) {
+    if (ptData.tableRow[j].tableEntry[index.wattIndex].targetPosition > pos) {
+      SS2K_LOG(PTDATA_LOG_TAG, "Greater Down Found %d, %d, tp%d", j, index.wattIndex, ptData.tableRow[j].tableEntry[index.wattIndex].targetPosition);
+      down = ptData.tableRow[j].tableEntry[index.wattIndex].targetPosition;
+      ptData.tableRow[j].tableEntry[index.wattIndex].readings--;
+      moveTable = true;
+      break;
+    }
+  }
+
+  // get the value to the right of the entry
+  for (int i = index.wattIndex + 1; i < POWERTABLE_WATT_SIZE - 1; i++) {
+    if (ptData.tableRow[index.cadIndex].tableEntry[i].targetPosition != INT16_MIN && ptData.tableRow[index.cadIndex].tableEntry[i].targetPosition < pos) {
+      SS2K_LOG(PTDATA_LOG_TAG, "Lower Right Found %d, %d, tp%d", index.cadIndex, i, ptData.tableRow[index.cadIndex].tableEntry[i].targetPosition);
+      ptData.tableRow[index.cadIndex].tableEntry[i].readings--;
+      moveTable = true;
+      break;
+    }
+  }
+
+  // get the value above the entry
+  for (int j = index.cadIndex - 1; j > 0; j--) {
+    if (ptData.tableRow[j].tableEntry[index.wattIndex].targetPosition != INT16_MIN && ptData.tableRow[j].tableEntry[index.wattIndex].targetPosition < pos) {
+      SS2K_LOG(PTDATA_LOG_TAG, "Lower Up Found %d, %d, tp%d", j, index.wattIndex, ptData.tableRow[j].tableEntry[index.wattIndex].targetPosition);
+      ptData.tableRow[j].tableEntry[index.wattIndex].readings--;
+      moveTable = true;
+      break;
+    }
+  }
+
+  if (moveTable) {
+    // clean(ptData);
+    return;
+  }
+
+  entry.targetPosition = pos;  // Update the target position with the new average
+  // Increment readings, capping at the max value.
+  if (entry.readings < MAX_NEIGHBOR_WEIGHT && !moveTable) {
+    entry.readings++;
+  }
+
+  // // After updating a point, re-process the entire table to enforce global monotonicity.
+  this->fillGaps(ptData);
+  // for (int i = 0; i < 10; i++) {  // Run the PAVA functions multiple times to ensure convergence
+  bool caddone  = false;
+  bool wattdone = false;
+  int loop      = 0;
+  while ((!caddone || !wattdone) && loop < 2) {
+    loop++;
+    if (!caddone) {
+      caddone = fillAllCadenceLines(ptData);
+    }
+    if (!wattdone) {
+      wattdone = fillAllWattColumns(ptData);
+    }
+    SS2K_LOG(PTDATA_LOG_TAG, "PAVA iteration done, still converging: cad %d, watt %d, Loop %d", caddone, wattdone, loop);
+  }
+  // Remove zig-zags in data.
+  //this->safeSmooth(ptData);
+  // After updating a point, re-process the entire table to enforce global monotonicity.
+  resistanceModel.fit(ptData);
+
+  if (resistanceModel.getIsValid()) {
+    this->fill(ptData);
+  }
+}
+
 // Calculate index in the table for the given watts and cadence
 ptIndex PTHelpers::calculateIndex(int watts, int cad) {
   ptIndex index;
@@ -382,12 +494,12 @@ int PTHelpers::lookupWatts(int cad, int32_t targetPosition, PTData& ptData) {
 void PTHelpers::fill(PTData& ptData) {
   for (int i = 0; i < POWERTABLE_CAD_SIZE; i++) {
     for (int j = 0; j < POWERTABLE_WATT_SIZE; j++) {
-      if (ptData.tableRow[i].tableEntry[j].targetPosition == INT16_MIN) {
+      if (ptData.tableRow[i].tableEntry[j].readings <= 1) {
         int cadence                                     = MINIMUM_TABLE_CAD + (i * POWERTABLE_CAD_INCREMENT);
         int watts                                       = j * POWERTABLE_WATT_INCREMENT;
         int16_t predictedPosition                       = resistanceModel.predict(watts, cadence);
-        ptData.tableRow[i].tableEntry[j].targetPosition = predictedPosition;
-        //ptData.tableRow[i].tableEntry[j].readings       = 1;  // Mark as inferred with low confidence
+        ptData.tableRow[i].tableEntry[j].targetPosition = ptData.tableRow[i].tableEntry[j].targetPosition == INT16_MIN ? predictedPosition : (predictedPosition + ptData.tableRow[i].tableEntry[j].targetPosition) / 2;  // Blend predicted with existing low-confidence value
+        ptData.tableRow[i].tableEntry[j].readings       = 1;  // Mark as inferred with low confidence
       }
     }
   }
@@ -525,123 +637,14 @@ bool PTHelpers::fillAllCadenceLines(PTData& ptData) {
   return converged;
 }
 
-/**
- * @brief Enters a new data point and then enforces monotonicity on the whole table.
- * * This function first calculates the running average for the given data point.
- * Then, it calls the PAVA helper functions to ensure the entire table remains
- * monotonically increasing across both watts and cadence.
- * * @param ptData The main power table data structure.
- * @param index The watt and cadence index for the new data point.
- * @param pos The measured targetPosition for this data point.
- */
-void PTHelpers::enterData(PTData& ptData, ptIndex index, int pos) {
-  // Reference to the specific table entry for cleaner code
-  TableEntry& entry = ptData.tableRow[index.cadIndex].tableEntry[index.wattIndex];
-
-  int left       = INT16_MIN;
-  int down       = INT16_MIN;
-  bool moveTable = false;
-  clean(ptData);
-
-  // Get the topmost value in the column
-
-  if (entry.readings == 0) {  // if first reading in this entry
-
-    SS2K_LOG(PTDATA_LOG_TAG, "New entry recorded (%d)(%d)(%d)", index.cadIndex, index.wattIndex, pos);
-  } else {  // Average and update the readings.
-    // Use floating point for accuracy in averaging
-    float current_total_pos = (float)entry.targetPosition * entry.readings;
-    float new_avg_pos       = (pos + current_total_pos) / (entry.readings + 1.0f);
-    pos                     = (int16_t)new_avg_pos;
-
-    SS2K_LOG(PTDATA_LOG_TAG, "Existing entry averaged (%d)(%d)(%d), readings(%d)", index.cadIndex, index.wattIndex, pos, entry.readings);
-  }
-
-  // Get the value to the left of the new entry
-  for (int i = index.wattIndex - 1; i > 0; i--) {
-    if (ptData.tableRow[index.cadIndex].tableEntry[i].targetPosition > pos) {
-      left = ptData.tableRow[index.cadIndex].tableEntry[i].targetPosition;
-      SS2K_LOG(PTDATA_LOG_TAG, "Greater Left Found %d, %d, tp%d", index.cadIndex, i, ptData.tableRow[index.cadIndex].tableEntry[i].targetPosition);
-      ptData.tableRow[index.cadIndex].tableEntry[i].readings--;
-      moveTable = true;
-      break;
-    }
-  }
-
-  // get the value below the new entry
-  for (int j = index.cadIndex + 1; j < POWERTABLE_CAD_SIZE - 1; j++) {
-    if (ptData.tableRow[j].tableEntry[index.wattIndex].targetPosition > pos) {
-      SS2K_LOG(PTDATA_LOG_TAG, "Greater Down Found %d, %d, tp%d", j, index.wattIndex, ptData.tableRow[j].tableEntry[index.wattIndex].targetPosition);
-      down = ptData.tableRow[j].tableEntry[index.wattIndex].targetPosition;
-      ptData.tableRow[j].tableEntry[index.wattIndex].readings--;
-      moveTable = true;
-      break;
-    }
-  }
-
-  // get the value to the right of the entry
-  for (int i = index.wattIndex + 1; i < POWERTABLE_WATT_SIZE - 1; i++) {
-    if (ptData.tableRow[index.cadIndex].tableEntry[i].targetPosition != INT16_MIN && ptData.tableRow[index.cadIndex].tableEntry[i].targetPosition < pos) {
-      SS2K_LOG(PTDATA_LOG_TAG, "Lower Right Found %d, %d, tp%d", index.cadIndex, i, ptData.tableRow[index.cadIndex].tableEntry[i].targetPosition);
-      ptData.tableRow[index.cadIndex].tableEntry[i].readings--;
-      moveTable = true;
-      break;
-    }
-  }
-
-  // get the value above the entry
-  for (int j = index.cadIndex - 1; j > 0; j--) {
-    if (ptData.tableRow[j].tableEntry[index.wattIndex].targetPosition != INT16_MIN && ptData.tableRow[j].tableEntry[index.wattIndex].targetPosition < pos) {
-      SS2K_LOG(PTDATA_LOG_TAG, "Lower Up Found %d, %d, tp%d", j, index.wattIndex, ptData.tableRow[j].tableEntry[index.wattIndex].targetPosition);
-      ptData.tableRow[j].tableEntry[index.wattIndex].readings--;
-      moveTable = true;
-      break;
-    }
-  }
-
-  if (moveTable) {
-    //clean(ptData);
-    return;
-  }
-
-  entry.targetPosition = pos;  // Update the target position with the new average
-  // Increment readings, capping at the max value.
-  if (entry.readings < MAX_NEIGHBOR_WEIGHT && !moveTable) {
-    entry.readings++;
-  }
-
-    // After updating a point, re-process the entire table to enforce global monotonicity.
-  resistanceModel.fit(ptData);
-  // // After updating a point, re-process the entire table to enforce global monotonicity.
-  this->fillGaps(ptData);
-  // for (int i = 0; i < 10; i++) {  // Run the PAVA functions multiple times to ensure convergence
-  bool caddone  = false;
-  bool wattdone = false;
-  int loop      = 0;
-  while ((!caddone || !wattdone) && loop < 3) {
-    loop++;
-    if (!caddone) {
-      caddone = fillAllCadenceLines(ptData);
-    }
-    if (!wattdone) {
-      wattdone = fillAllWattColumns(ptData);
-    }
-    SS2K_LOG(PTDATA_LOG_TAG, "PAVA iteration done, still converging: cad %d, watt %d, Loop %d", caddone, wattdone, loop);
-  }
-
-
-  if (resistanceModel.getIsValid()) {
-    this->fill(ptData);
-  }
-}
-
 void PTHelpers::clean(PTData& ptData) {
   int removed = 0;
 
   // First pass: remove entries with readings < 1 or negative positions
   for (int i = 0; i < POWERTABLE_CAD_SIZE; i++) {
     for (int j = 0; j < POWERTABLE_WATT_SIZE; j++) {
-      if (ptData.tableRow[i].tableEntry[j].readings < 1 || ptData.tableRow[i].tableEntry[j].targetPosition < 0) {
+      //human readings are 2+
+      if (ptData.tableRow[i].tableEntry[j].readings < 2 || ptData.tableRow[i].tableEntry[j].targetPosition < 0) {
         if (ptData.tableRow[i].tableEntry[j].targetPosition != INT16_MIN) {
           removed++;
         }
@@ -688,5 +691,94 @@ void PTHelpers::clean(PTData& ptData) {
 
   if (removed > 0) {
     SS2K_LOG(PTDATA_LOG_TAG, "Cleaned %d readings", removed);
+  }
+}
+
+/**
+ * @brief "Safe" Smoothing.
+ * Only smooths cells that have low confidence (few readings).
+ * This allows "interpolated" gaps to relax into smooth curves,
+ * but prevents "Real" ride data (Anchors) from being flattened.
+ */
+void PTHelpers::safeSmooth(PTData& ptData) {
+  int16_t smoothedGrid[POWERTABLE_CAD_SIZE][POWERTABLE_WATT_SIZE];
+
+  // CONFIGURATION:
+  // Any cell with this many readings (or more) is considered "Truth"
+  // and will NOT be modified.
+  const int LOCK_THRESHOLD = 5;
+
+  // Weights
+  const int W_ADJ = 1;
+  const int W_CAD = 2;
+
+  for (int r = 0; r < POWERTABLE_CAD_SIZE; r++) {
+    for (int c = 0; c < POWERTABLE_WATT_SIZE; c++) {
+      TableEntry& current = ptData.tableRow[r].tableEntry[c];
+
+      // 1. If this is a "High Confidence" cell, skip it.
+      // We also skip empty cells.
+      if (current.targetPosition == INT16_MIN || current.readings >= LOCK_THRESHOLD) {
+        smoothedGrid[r][c] = INT16_MIN;  // Mark as "Do Not Touch"
+        continue;
+      }
+
+      // 2. Otherwise, calculate the smoothed value
+      long sum    = 0;
+      int divisor = 0;
+
+      // Self (Low weight since we know it's low confidence)
+      sum += (long)current.targetPosition;
+      divisor += 1;
+
+      // Left
+      if (c > 0) {
+        TableEntry& n = ptData.tableRow[r].tableEntry[c - 1];
+        if (n.targetPosition != INT16_MIN) {
+          sum += (long)n.targetPosition * W_ADJ;
+          divisor += W_ADJ;
+        }
+      }
+      // Right
+      if (c < POWERTABLE_WATT_SIZE - 1) {
+        TableEntry& n = ptData.tableRow[r].tableEntry[c + 1];
+        if (n.targetPosition != INT16_MIN) {
+          sum += (long)n.targetPosition * W_ADJ;
+          divisor += W_ADJ;
+        }
+      }
+      // Up
+      if (r > 0) {
+        TableEntry& n = ptData.tableRow[r - 1].tableEntry[c];
+        if (n.targetPosition != INT16_MIN) {
+          sum += (long)n.targetPosition * W_CAD;
+          divisor += W_CAD;
+        }
+      }
+      // Down
+      if (r < POWERTABLE_CAD_SIZE - 1) {
+        TableEntry& n = ptData.tableRow[r + 1].tableEntry[c];
+        if (n.targetPosition != INT16_MIN) {
+          sum += (long)n.targetPosition * W_CAD;
+          divisor += W_CAD;
+        }
+      }
+
+      if (divisor > 0) {
+        smoothedGrid[r][c] = (int16_t)(sum / divisor);
+      } else {
+        smoothedGrid[r][c] = current.targetPosition;
+      }
+    }
+  }
+
+  // Write back ONLY the modified cells
+  for (int r = 0; r < POWERTABLE_CAD_SIZE; r++) {
+    for (int c = 0; c < POWERTABLE_WATT_SIZE; c++) {
+      // Only update if we calculated a new value AND the original was unlocked
+      if (smoothedGrid[r][c] != INT16_MIN) {
+        ptData.tableRow[r].tableEntry[c].targetPosition = smoothedGrid[r][c];
+      }
+    }
   }
 }

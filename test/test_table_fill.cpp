@@ -76,7 +76,7 @@ void TestTableFill::test_fill_incomplete_table(void) {
     cleanAndCreateDir(outputDir);
 
     // Open Ride_Log.txt
-    std::ifstream rideLog("test/data/Ride_Log3.txt");
+    std::ifstream rideLog("test/data/ride_log3.txt");
 
     // Prepare regex for Averaged Entry lines
     std::regex entryRegex(R"(\[(\d+)\]\[E\]\(PTable\): Averaged Entry: watts=([\d\.\-]+), cad=([\d\.\-]+), targetPosition=([\d\.\-]+), \((\d+)\)\((\d+)\))");

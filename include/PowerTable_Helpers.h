@@ -12,8 +12,6 @@
 #define PTDATA_LOG_TAG "PTData"
 
 #define RETURN_ERROR               INT32_MIN
-#define FREE_HEAP_FOR_COMPLEX_MATH 30000
-#define COMPUTATION_TIMEOUT_MS     25
 
 class PowerEntry {
  public:
@@ -116,4 +114,5 @@ class PTHelpers {
   bool fillAllCadenceLines(PTData& ptData);
   std::pair<std::vector<float>, std::vector<float>> getRow(int row, PTData& ptData);
   std::pair<std::vector<float>, std::vector<float>> getColumn(int column, PTData& ptData);
+  void safeSmooth(PTData& ptData);
 };
