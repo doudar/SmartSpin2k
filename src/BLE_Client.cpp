@@ -724,7 +724,11 @@ void SpinBLEClient::postConnect() {
           }
           // update resistance range if supported:
           auto resistanceRangeCharacteristic = pClient->getService(FITNESSMACHINESERVICE_UUID)->getCharacteristic(FITNESSMACHINERESISTANCELEVELRANGE_UUID);
-          if (resistanceRangeCharacteristic && resistanceRangeCharacteristic->canRead()) {
+          // Schwinn IC4 bikes don't transmit in the proper format, so we need to ignore this on bikes with names that start with "IC Bike"
+          if (adevName.startsWith("IC Bike")) {
+            SS2K_LOG(BLE_CLIENT_LOG_TAG, "Ignoring FTMS Resistance Range characteristic on IC Bike device: %s", _BLEd.uniqueName.c_str());
+            resistanceRangeCharacteristic = nullptr;
+          } else if (resistanceRangeCharacteristic && resistanceRangeCharacteristic->canRead()) {
             auto rr = resistanceRangeCharacteristic->readValue();
             if (rr.size() >= 6) {
               const uint8_t* b = reinterpret_cast<const uint8_t*>(rr.data());
@@ -749,6 +753,15 @@ void SpinBLEClient::postConnect() {
 
               rtConfig->resistance.setMin(minRes);
               rtConfig->resistance.setMax(maxRes);
+              // log the entire characteristic info
+              String rrLog = "FTMS Resistance Range raw data:";
+              for (size_t i = 0; i < rr.size(); i++) {
+                char buf[3];
+                snprintf(buf, sizeof(buf), "%02X", static_cast<uint8_t>(rr[i]));
+                rrLog += " " + String(buf);
+              }
+              SS2K_LOG(BLE_CLIENT_LOG_TAG, "%s", rrLog.c_str());
+
               SS2K_LOG(BLE_CLIENT_LOG_TAG, "FTMS Resistance Range: raw min=%.1f raw max=%.1f inc=%.1f -> set %d->%d", minF, maxF, incF, minRes, maxRes);
             } else {
               SS2K_LOG(BLE_CLIENT_LOG_TAG, "FTMS Resistance Range characteristic too short (%d bytes)", rr.size());
@@ -931,8 +944,7 @@ void SpinBLEClient::checkBLEReconnect() {
   }
 
   if (offset > 0) {
-    SS2K_LOG(BLE_CLIENT_LOG_TAG, "Devices not connected: %s (cfgHRM='%s' cfgPM='%s' cfgRemote='%s')", 
-             notConnectedDevices, cfgHRM, cfgPM, cfgRemote);
+    SS2K_LOG(BLE_CLIENT_LOG_TAG, "Devices not connected: %s (cfgHRM='%s' cfgPM='%s' cfgRemote='%s')", notConnectedDevices, cfgHRM, cfgPM, cfgRemote);
     this->doScan = true;
   }
 }
@@ -1086,7 +1098,7 @@ void SpinBLEAdvertisedDevice::set(const NimBLEAdvertisedDevice* device, int id, 
       for (auto& pService : services) {
         BLEUUID serviceUUID = pService->getUUID();
         if (serviceUUID == HEARTSERVICE_UUID) {
-          this->isHRM                = true;
+          this->isHRM = true;
           if (cfgHrmIsNone || cfgHrmIsAny || hrmNameMatch || hrmAddrMatch) {
             spinBLEClient.connectedHRM = true;
             SS2K_LOG(BLE_CLIENT_LOG_TAG, "Registered HRM on Connect");

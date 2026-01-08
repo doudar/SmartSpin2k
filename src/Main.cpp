@@ -349,7 +349,7 @@ void SS2K::FTMSModeShiftModifier() {
         SS2K_LOG(MAIN_LOG_TAG, "ERG Shift. New Target: %dw", rtConfig->watts.getTarget());
 // Format output for FTMS passthrough
 #ifndef INTERNAL_ERG_4EXT_FTMS
-        int adjustedTarget         = rtConfig->watts.getTarget() / userConfig->getPowerCorrectionFactor();
+        int adjustedTarget         = round(rtConfig->watts.getTarget() / userConfig->getPowerCorrectionFactor());
         const uint8_t translated[] = {FitnessMachineControlPointProcedure::SetTargetPower, (uint8_t)(adjustedTarget & 0xff), (uint8_t)(adjustedTarget >> 8)};
         spinBLEClient.FTMSControlPointWrite(translated, 3);
 #endif
@@ -525,7 +525,7 @@ void SS2K::_resistanceMove() {
     if (resistancePercent < 0) resistancePercent = 0;
     if (resistancePercent > 100) resistancePercent = 100;
     int64_t span = (int64_t)maxPos - (int64_t)minPos;
-    int32_t pos  = minPos + (int32_t)((span * resistancePercent) / 100);
+    int32_t pos  = minPos + (int32_t)round((span * resistancePercent) / 100.0f);
     if (usePwr) {  // fallback to using ERG
       rtConfig->watts.setTarget(pos);
       rtConfig->setFTMSMode(FitnessMachineControlPointProcedure::SetTargetPower);
@@ -654,7 +654,7 @@ void SS2K::_findEndStop(bool moveForward) {
     totalSgResult += driver.SG_RESULT();
     delay(10);  // Small delay between samples
   }
-  threshold = totalSgResult / SAMPLES_TO_AVERAGE;
+  threshold = round(totalSgResult / (float)SAMPLES_TO_AVERAGE);
 
   SS2K_LOG(MAIN_LOG_TAG, "Homing %s. Stable Threshold: %d, Sensitivity: %d", moveForward ? "forward (max)" : "backward (min)", threshold, userConfig->getHomingSensitivity());
 
@@ -756,7 +756,7 @@ void SS2K::_findFTMSHome(bool bothDirections) {
   ss2k->updateStepperSpeed(1500);  // Use a slow-medium speed for homing
 
   // first back off of the stop if we're already there
-  int midTarget = (rtConfig->resistance.getMax() - rtConfig->resistance.getMin()) / 4;
+  int midTarget = round((rtConfig->resistance.getMax() - rtConfig->resistance.getMin()) / 4.0f);
   rtConfig->resistance.setTarget(midTarget);
   runHomingSweep(midTarget, nullptr, false);
   runHomingSweep(rtConfig->resistance.getMin(), "Homing to Min Resistance... Current: %d, Target: %d", false);

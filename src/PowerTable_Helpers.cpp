@@ -223,9 +223,9 @@ int ResistanceModel::predictWatts(int32_t resistance, float cadence) {
   }
 
   // 3. Solve
-  if (abs(QA) < 1e-9) {
+  if (std::fabs(QA) < 1e-9) {
     // --- Linear Solve ---
-    if (abs(QB) < 1e-9) return 0;
+    if (std::fabs(QB) < 1e-9) return 0;
     predictedNormWatts = -QC / QB;
   } else {
     // --- Quadratic Solve ---
@@ -596,6 +596,7 @@ void PTHelpers::clean(PTData& ptData) {
     }
   }
 
+  /*
   // Second pass: remove duplicate values in columns (same resistance for multiple cadences)
   // For each column, track all unique values and remove duplicates
   for (int j = 0; j < POWERTABLE_WATT_SIZE; j++) {
@@ -629,7 +630,7 @@ void PTHelpers::clean(PTData& ptData) {
         }
       }
     }
-  }
+  }*/
 
   if (removed > 0) {
     SS2K_LOG(PTDATA_LOG_TAG, "Cleaned %d readings", removed);

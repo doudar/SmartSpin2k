@@ -49,7 +49,7 @@ void PelotonData::decode(uint8_t *data, size_t length) {
   switch (data[1]) {
     case PELOTON_POW_ID:
       if (value >= 0) {
-        power = value / 10;
+        power = std::round(value / 10);
       } else {
         power = 0;
       }

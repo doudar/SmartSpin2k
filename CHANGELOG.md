@@ -13,6 +13,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Added feed forward, disabled PowerTable for ERG lookup. 
 - Added tests and removal of duplicates in pt column. 
 - Added removal of negative numbers in pt table. 
+- Refined ERG mode (stateful increase/decrease handling, smarter wait timers, improved PID logging).
+- Adjusted FTMS resistance handling: ignore malformed IC Bike ranges, log raw range data, and skip IC Bike resistance samples.
+- Rounded cadence/power calculations across CSC, CyclePower, Peloton, FTMS decoding; clamp invalid cadence values.
+- Applied rounding for FTMS shift targets/resistance mapping and homing thresholds; use fabs in resistance model and paused duplicate cleanup.
 
 ### Hardware
 
