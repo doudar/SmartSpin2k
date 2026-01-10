@@ -76,6 +76,7 @@ class RuntimeParameters {
   int minResistance    = -DEFAULT_RESISTANCE_RANGE;
   int maxResistance    = DEFAULT_RESISTANCE_RANGE;
   bool simTargetWatts  = false;
+  bool bleLogEnabled   = false;
 
  public:
   Measurement watts;
@@ -113,6 +114,9 @@ class RuntimeParameters {
 
   void setMaxResistance(int max) { maxResistance = max; }
   int getMaxResistance() { return maxResistance; }
+
+  void setBleLogEnabled(bool enabled) { bleLogEnabled = enabled; }
+  bool getBleLogEnabled() { return bleLogEnabled; }
 
   String returnJSON();
 };
