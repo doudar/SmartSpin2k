@@ -831,7 +831,7 @@ void BLE_ss2kCustomCharacteristic::process(std::string rxValue) {
       }
       break;
 
-    case BLE_BLELogging:  // 0x2F
+    case BLE_BLELogging:  // 0x30
       LOG_BUF_APPEND("<-BLELogging");
       if (rxValue[0] == cc_read) {
         returnValue[0] = cc_success;

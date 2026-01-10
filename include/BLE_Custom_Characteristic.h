@@ -63,7 +63,7 @@ const uint8_t BLE_hMax                  = 0x2B;  // Maximum homing value
 const uint8_t BLE_homingSensitivity     = 0x2C;  // Homing sensitivity value
 const uint8_t BLE_pTab4Pwr              = 0x2D;  // Use power values for power table
 const uint8_t BLE_UDPLogging            = 0x2E;  // Enable or disable UDP logging
-const uint8_t BLE_BLELogging            = 0x2F;  // Enable or disable BLE logging
+const uint8_t BLE_BLELogging            = 0x30;  // Enable or disable BLE logging
 
 class BLE_ss2kCustomCharacteristic {
  public:
