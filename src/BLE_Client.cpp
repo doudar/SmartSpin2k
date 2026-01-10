@@ -239,6 +239,7 @@ void bleClientTask(void* pvParameters) {
           ss2k->goHome(true);
         } else {  // Startup Homing
           ss2k->goHome(false);
+          rtConfig->setShifterPosition(8);  // Set to middle position after homing on startup
         }
         spinBLEServer.spinDownFlag = 0;
       }
@@ -723,7 +724,11 @@ void SpinBLEClient::postConnect() {
           }
           // update resistance range if supported:
           auto resistanceRangeCharacteristic = pClient->getService(FITNESSMACHINESERVICE_UUID)->getCharacteristic(FITNESSMACHINERESISTANCELEVELRANGE_UUID);
-          if (resistanceRangeCharacteristic && resistanceRangeCharacteristic->canRead()) {
+          // Schwinn IC4 bikes don't transmit in the proper format, so we need to ignore this on bikes with names that start with "IC Bike"
+          if (adevName.startsWith("IC Bike")) {
+            SS2K_LOG(BLE_CLIENT_LOG_TAG, "Ignoring FTMS Resistance Range characteristic on IC Bike device: %s", _BLEd.uniqueName.c_str());
+            resistanceRangeCharacteristic = nullptr;
+          } else if (resistanceRangeCharacteristic && resistanceRangeCharacteristic->canRead()) {
             auto rr = resistanceRangeCharacteristic->readValue();
             if (rr.size() >= 6) {
               const uint8_t* b = reinterpret_cast<const uint8_t*>(rr.data());
@@ -748,6 +753,15 @@ void SpinBLEClient::postConnect() {
 
               rtConfig->resistance.setMin(minRes);
               rtConfig->resistance.setMax(maxRes);
+              // log the entire characteristic info
+              String rrLog = "FTMS Resistance Range raw data:";
+              for (size_t i = 0; i < rr.size(); i++) {
+                char buf[3];
+                snprintf(buf, sizeof(buf), "%02X", static_cast<uint8_t>(rr[i]));
+                rrLog += " " + String(buf);
+              }
+              SS2K_LOG(BLE_CLIENT_LOG_TAG, "%s", rrLog.c_str());
+
               SS2K_LOG(BLE_CLIENT_LOG_TAG, "FTMS Resistance Range: raw min=%.1f raw max=%.1f inc=%.1f -> set %d->%d", minF, maxF, incF, minRes, maxRes);
             } else {
               SS2K_LOG(BLE_CLIENT_LOG_TAG, "FTMS Resistance Range characteristic too short (%d bytes)", rr.size());
@@ -891,32 +905,47 @@ void SpinBLEClient::checkBLEReconnect() {
   char notConnectedDevices[32] = {0};
   size_t offset                = 0;
 
-  // Diagnostic: capture current config strings and states
   const char* cfgHRM    = userConfig->getConnectedHeartMonitor();
   const char* cfgPM     = userConfig->getConnectedPowerMeter();
   const char* cfgRemote = userConfig->getConnectedRemote();
-  bool wantHRM          = (strcmp(cfgHRM, NONE) != 0);
-  bool wantPM           = (strcmp(cfgPM, NONE) != 0);
-  bool wantRemote       = (strcmp(cfgRemote, NONE) != 0);
 
-  if (wantHRM && !spinBLEClient.connectedHRM) {
-    offset += snprintf(notConnectedDevices + offset, sizeof(notConnectedDevices) - offset, "HRM ");
+  // Helper lambda to check if a device with the given name is currently connected
+  auto isDeviceConnected = [&](const char* configName) -> bool {
+    for (auto& _BLEd : spinBLEClient.myBLEDevices) {
+      if (_BLEd.isPostConnected && _BLEd.uniqueName == configName) {
+        return true;
+      }
+    }
+    return false;
+  };
+
+  // Check HRM: skip if "NONE", use flag if "ANY", otherwise check by name
+  if (strcmp(cfgHRM, NONE) != 0) {
+    bool hrmConnected = (strcmp(cfgHRM, ANY) == 0) ? spinBLEClient.connectedHRM : isDeviceConnected(cfgHRM);
+    if (!hrmConnected) {
+      offset += snprintf(notConnectedDevices + offset, sizeof(notConnectedDevices) - offset, "HRM ");
+    }
   }
-  if (wantPM && !(spinBLEClient.connectedPM || spinBLEClient.connectedCD)) {
-    offset += snprintf(notConnectedDevices + offset, sizeof(notConnectedDevices) - offset, "PM ");
+
+  // Check PM: skip if "NONE", use flag if "ANY", otherwise check by name
+  if (strcmp(cfgPM, NONE) != 0) {
+    bool pmConnected = (strcmp(cfgPM, ANY) == 0) ? (spinBLEClient.connectedPM || spinBLEClient.connectedCD) : isDeviceConnected(cfgPM);
+    if (!pmConnected) {
+      offset += snprintf(notConnectedDevices + offset, sizeof(notConnectedDevices) - offset, "PM ");
+    }
   }
-  if (wantRemote && !(spinBLEClient.connectedRemote)) {
-    offset += snprintf(notConnectedDevices + offset, sizeof(notConnectedDevices) - offset, "Remote ");
+
+  // Check Remote: skip if "NONE", use flag if "ANY", otherwise check by name
+  if (strcmp(cfgRemote, NONE) != 0) {
+    bool remoteConnected = (strcmp(cfgRemote, ANY) == 0) ? spinBLEClient.connectedRemote : isDeviceConnected(cfgRemote);
+    if (!remoteConnected) {
+      offset += snprintf(notConnectedDevices + offset, sizeof(notConnectedDevices) - offset, "Remote ");
+    }
   }
+
   if (offset > 0) {
-    SS2K_LOG(BLE_CLIENT_LOG_TAG,
-             "Devices not connected: %s (cfgHRM='%s' needHRM=%d hrmState=%d cfgPM='%s' needPM=%d pmState=%d cadState=%d cfgRemote='%s' needRemote=%d remoteState=%d)",
-             notConnectedDevices, cfgHRM, wantHRM, spinBLEClient.connectedHRM, cfgPM, wantPM, spinBLEClient.connectedPM, spinBLEClient.connectedCD, cfgRemote, wantRemote,
-             spinBLEClient.connectedRemote);
+    SS2K_LOG(BLE_CLIENT_LOG_TAG, "Devices not connected: %s (cfgHRM='%s' cfgPM='%s' cfgRemote='%s')", notConnectedDevices, cfgHRM, cfgPM, cfgRemote);
     this->doScan = true;
-  } else {
-    // SS2K_LOG(BLE_CLIENT_LOG_TAG, "All required BLE devices connected or disabled (cfgHRM='%s' hrm=%d cfgPM='%s' pm=%d cad=%d cfgRemote='%s' remote=%d)", cfgHRM,
-    //          spinBLEClient.connectedHRM, cfgPM, spinBLEClient.connectedPM, spinBLEClient.connectedCD, cfgRemote, spinBLEClient.connectedRemote);
   }
 }
 
@@ -1069,7 +1098,7 @@ void SpinBLEAdvertisedDevice::set(const NimBLEAdvertisedDevice* device, int id, 
       for (auto& pService : services) {
         BLEUUID serviceUUID = pService->getUUID();
         if (serviceUUID == HEARTSERVICE_UUID) {
-          this->isHRM                = true;
+          this->isHRM = true;
           if (cfgHrmIsNone || cfgHrmIsAny || hrmNameMatch || hrmAddrMatch) {
             spinBLEClient.connectedHRM = true;
             SS2K_LOG(BLE_CLIENT_LOG_TAG, "Registered HRM on Connect");

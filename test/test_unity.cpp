@@ -9,10 +9,10 @@
 #include "test.h"
 
 #ifndef ARDUINO
-#include <sys/stat.h> // For mkdir
-#include <sys/types.h> // For mode_t, often required with sys/stat.h
-#include <errno.h>    // For errno and EEXIST
-#include <stdio.h>    // For perror
+#include <sys/stat.h>   // For mkdir
+#include <sys/types.h>  // For mode_t, often required with sys/stat.h
+#include <errno.h>      // For errno and EEXIST
+#include <stdio.h>      // For perror
 #endif
 
 // Basic test functions
@@ -60,19 +60,17 @@ void setup() {
     RUN_TEST(test.test_parses_heartrate);
     RUN_TEST(test.test_parses_speed);
   }
-  
+
   // Power Table Lookup Tests
   {
-   TestLinearExtrapolate test3;
-   RUN_TEST(test3.test_linear_extrapolate);
-   TestPTLookupResistance test;
-   RUN_TEST(test.test_pt_lookup_resistance);
-   TestPTLookupWatts test2;
-   RUN_TEST(test2.test_pt_lookup_watts);
-   TestWritePowerTable test4;
-   RUN_TEST(test4.test_save_and_load);
-   TestTableFill test5;
-   RUN_TEST(test5.test_fill_incomplete_table);
+    TestPTLookupResistance test;
+    RUN_TEST(test.test_pt_lookup_resistance);
+    TestPTLookupWatts test2;
+    RUN_TEST(test2.test_pt_lookup_watts);
+    TestWritePowerTable test4;
+    RUN_TEST(test4.test_save_and_load);
+    TestTableFill test5;
+    RUN_TEST(test5.test_fill_incomplete_table);
   }
 
   // BLE Device Unique Name Tests
@@ -95,32 +93,32 @@ void loop() {
 
 // For native testing
 #ifndef ARDUINO
-int main(int argc, char **argv) {
+int main(int argc, char** argv) {
   // Create test/output directory if it doesn't exist for native builds
   const char* dir_path = "test/output";
-  // Attempt to create the directory. 
-  // On POSIX systems, mkdir requires <sys/stat.h> and <sys/types.h>.
-  // Mode 0777 gives read, write, execute permissions for owner, group, and others.
-  #ifdef _WIN32
-    int result = mkdir(dir_path); // Use _mkdir on Windows
-  #else
-    int result = mkdir(dir_path, 0777); // Use mkdir on POSIX systems
-  #endif
-  
-    if (result == -1) {
-      // If mkdir failed, check why
-  #ifdef _WIN32
-      if (errno != EEXIST) {
-  #else
-      if (errno != EEXIST) {
-  #endif
-        // EEXIST means the directory already exists, which is not an error for our purpose.
-        // For any other error, print it.
-        perror("Error creating directory test/output");
-        // Depending on requirements, you might want to exit here or let tests proceed/fail.
-      }
-      // If errno is EEXIST, directory already exists, which is fine.
+// Attempt to create the directory.
+// On POSIX systems, mkdir requires <sys/stat.h> and <sys/types.h>.
+// Mode 0777 gives read, write, execute permissions for owner, group, and others.
+#ifdef _WIN32
+  int result = mkdir(dir_path);  // Use _mkdir on Windows
+#else
+  int result = mkdir(dir_path, 0777);  // Use mkdir on POSIX systems
+#endif
+
+  if (result == -1) {
+    // If mkdir failed, check why
+#ifdef _WIN32
+    if (errno != EEXIST) {
+#else
+    if (errno != EEXIST) {
+#endif
+      // EEXIST means the directory already exists, which is not an error for our purpose.
+      // For any other error, print it.
+      perror("Error creating directory test/output");
+      // Depending on requirements, you might want to exit here or let tests proceed/fail.
     }
+    // If errno is EEXIST, directory already exists, which is fine.
+  }
 
   setup();
   return 0;

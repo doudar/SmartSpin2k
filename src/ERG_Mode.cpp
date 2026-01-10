@@ -28,9 +28,37 @@ void ErgMode::runERG() {
   static bool simulationRunning      = false;
   static int loopCounter             = 0;
 
+  if (mode == Mode::INCREASING) {
+    if (rtConfig->watts.getValue() > rtConfig->watts.getTarget()) {  // Resume PID control
+      ergTimer = 0;
+      mode     = Mode::MAINTAIN;
+      SS2K_LOG(ERG_MODE_LOG_TAG, "ERG increasing target reached.");
+    } else if (rtConfig->watts.getValue() >= this->prevWatts.getValue()) {
+      // power is still increasing, wait longer
+      return;
+    }
+  } else if (mode == Mode::DECREASING) {
+    if (rtConfig->watts.getValue() < rtConfig->watts.getTarget())  // Resume PID control
+    {
+      ergTimer = 0;
+      mode     = Mode::MAINTAIN;
+      SS2K_LOG(ERG_MODE_LOG_TAG, "ERG decreasing target reached.");
+    } else if (rtConfig->watts.getValue() <= this->prevWatts.getValue()) {
+      // power is still decreasing, wait longer
+      return;
+    }
+  }
+  if (isDelayed && (ss2k->getCurrentPosition() == ss2k->getTargetPosition())) {
+    SS2K_LOG(ERG_MODE_LOG_TAG, "ERG delay cleared,  %dw, tgt %dw, pos %d, tgt %d", rtConfig->watts.getValue(), rtConfig->watts.getTarget(), ss2k->getCurrentPosition(),
+             ss2k->getTargetPosition());
+    ergTimer  = millis() + ERG_MODE_DELAY;
+    isDelayed = false;
+  }
+
   if ((millis() > ergTimer)) {
     if (isDelayed) {
-      SS2K_LOG(ERG_MODE_LOG_TAG, "ERG wait expired");
+      SS2K_LOG(ERG_MODE_LOG_TAG, "ERG wait expired, %dw, tgt %dw, pos %d, tgt %d", rtConfig->watts.getValue(), rtConfig->watts.getTarget(), ss2k->getCurrentPosition(),
+               ss2k->getTargetPosition());
       isDelayed = false;
     }
 
@@ -49,6 +77,10 @@ void ErgMode::runERG() {
         saveFlagCooldown     = 0;
         powerTable->saveFlag = false;
       }
+    }
+    // Load power table if not yet loaded this session
+    if (!powerTable->_hasBeenLoadedThisSession) {
+      powerTable->_manageSaveState();
     }
 
     if (rtConfig->cad.getValue()) {
@@ -119,59 +151,61 @@ void ErgMode::runERG() {
 
 // as a note, Trainer Road sends 50w target whenever the app is connected.
 void ErgMode::computeErg() {
-  Measurement newWatts = rtConfig->watts;
-  int newCadence       = rtConfig->cad.getValue();
+  int32_t result = RETURN_ERROR;
 
-  bool isUserSpinning = this->_userIsSpinning(newCadence, ss2k->getCurrentPosition());
+  bool isUserSpinning = this->_userIsSpinning(rtConfig->cad.getValue(), ss2k->getCurrentPosition());
   if (!isUserSpinning) {
     SS2K_LOG(ERG_MODE_LOG_TAG, "ERG Mode but no User Spin");
     return;
   }
 
   // set minimum set point to minimum bike watts if app sends set point lower than minimum bike watts.
-  if (newWatts.getTarget() < userConfig->getMinWatts()) {
+  if (rtConfig->watts.getTarget() < userConfig->getMinWatts()) {
     SS2K_LOG(ERG_MODE_LOG_TAG, "ERG Target Below Minumum Value.");
-    newWatts.setTarget(userConfig->getMinWatts());
+    rtConfig->watts.setTarget(userConfig->getMinWatts());
   }
 
   // check for new torque value or new set point, if watts < 0 treat as faulty
-  if ((this->watts.getTimestamp() == newWatts.getTimestamp() && this->setPoint == newWatts.getTarget()) || newWatts.getValue() < 0) {
+  if ((this->prevWatts.getTimestamp() == rtConfig->watts.getTimestamp() && this->prevWatts.getTarget() == rtConfig->watts.getTarget()) || rtConfig->watts.getValue() < 0) {
     SS2K_LOG(ERG_MODE_LOG_TAG, "Watts previously processed.");
     return;
   }
 
 #ifdef ERG_MODE_USE_POWER_TABLE
-// SetPoint changed
-#ifdef ERG_MODE_USE_PID
-  if (abs(this->setPoint - newWatts.getTarget()) > ERG_MODE_PID_WINDOW && rtConfig->getHomed()) {
-#endif
-    _setPointChangeState(newCadence, newWatts);
-    return;
-#ifdef ERG_MODE_USE_PID
+  if (abs(this->prevWatts.getTarget() - rtConfig->watts.getTarget()) > POWERTABLE_CAD_INCREMENT && rtConfig->getHomed()) {
+    result = _setPointChangeState();
   }
 #endif
-#endif
-
 #ifdef ERG_MODE_USE_PID
   // Setpoint unchanged
-  _inSetpointState(newCadence, newWatts);
+  if (result == INT32_MIN) {
+    result = _inSetpointState();
+  }
 #endif
+  _updateValues(result);
 }
 
-void ErgMode::_setPointChangeState(int newCadence, Measurement& newWatts) {
-  // It's better to undershoot increasing watts and overshoot decreasing watts, so lets set the lookup target to the nearest side of ERG_MODE_PID_WINDOW
-  int adjustedTarget = newWatts.getTarget() >= newWatts.getValue() ? newWatts.getTarget() - ERG_MODE_PID_WINDOW : newWatts.getTarget() + ERG_MODE_PID_WINDOW;
+int32_t ErgMode::_setPointChangeState() {
+  mode = (rtConfig->watts.getTarget() > rtConfig->watts.getValue()) ? Mode::INCREASING : Mode::DECREASING;
+  // It's better to undershoot increasing watts and overshoot decreasing watts, so lets set the lookup target to the nearest side of POWERTABLE_WATT_INCREMENT
+  int adjustedWattTarget = (mode == Mode::INCREASING) ? rtConfig->watts.getTarget() - POWERTABLE_WATT_INCREMENT : rtConfig->watts.getTarget() + POWERTABLE_WATT_INCREMENT;
+  int32_t tableResult    = powerTable->lookup(adjustedWattTarget,
+                                           (mode == Mode::INCREASING) ? rtConfig->cad.getValue() + POWERTABLE_CAD_INCREMENT : rtConfig->cad.getValue() - POWERTABLE_CAD_INCREMENT);
 
-  int32_t tableResult = powerTable->lookup(adjustedTarget, newCadence);
+  // Sanity check - with homing enabled, we should never have a negative result. If we do, something went wrong.
+  if (rtConfig->getHomed() && tableResult < 0) {
+    SS2K_LOG(ERG_MODE_LOG_TAG, "PowerTable returned negative result with homing enabled. Using PID");
+    tableResult = RETURN_ERROR;
+  }
 
   // Test current watts against the table result. If We're already lower or higher than target, flag the result as a return error.
   if (tableResult != RETURN_ERROR) {
-    if (rtConfig->watts.getValue() > adjustedTarget && tableResult > ss2k->getCurrentPosition()) {
-      SS2K_LOG(ERG_MODE_LOG_TAG, "Table Result Failed High Test: %d", tableResult);
+    if (adjustedWattTarget > rtConfig->watts.getValue() && tableResult < ss2k->getCurrentPosition()) {
+      SS2K_LOG(ERG_MODE_LOG_TAG, "Table Result Failed increasing Test: %d", tableResult);
       tableResult = RETURN_ERROR;
     }
-    if (rtConfig->watts.getValue() < adjustedTarget && tableResult < ss2k->getCurrentPosition()) {
-      SS2K_LOG(ERG_MODE_LOG_TAG, "Table Result Failed Low Test: %d", tableResult);
+    if ((adjustedWattTarget < rtConfig->watts.getValue()) && tableResult > ss2k->getCurrentPosition()) {
+      SS2K_LOG(ERG_MODE_LOG_TAG, "Table Result Failed decreasing Test: %d", tableResult);
       tableResult = RETURN_ERROR;
     }
   }
@@ -179,23 +213,23 @@ void ErgMode::_setPointChangeState(int newCadence, Measurement& newWatts) {
   // Handle return errors
   if (tableResult == RETURN_ERROR) {
     SS2K_LOG(ERG_MODE_LOG_TAG, "Lookup Error. Using PID");
-    _inSetpointState(newCadence, newWatts);
-    return;
-  }
-
-  SS2K_LOG(ERG_MODE_LOG_TAG, "SetPoint changed:%dw PowerTable Result: %d", adjustedTarget, tableResult);
-  _updateValues(newCadence, newWatts, tableResult);
-
-  if (rtConfig->getTargetIncline() != ss2k->getCurrentPosition()) {  // add some time to wait while the knob moves to target position.
-    isDelayed     = true;
-    int timeToAdd = abs(ss2k->getCurrentPosition() - rtConfig->getTargetIncline());
-    if (timeToAdd > 3000) {  // 3 seconds
-      SS2K_LOG(ERG_MODE_LOG_TAG, "Capping ERG seek time to 3 seconds");
-      timeToAdd = 3000;
+    tableResult = _inSetpointState();
+  } else {
+    if (tableResult != ss2k->getCurrentPosition()) {  // add some time to wait while the knob moves to target position.
+      isDelayed             = true;
+      long int stepDistance = abs(ss2k->getCurrentPosition() - tableResult);
+      // Calculate time to add based on step distance and stepper speed
+      long int timeToAdd = round((((double)stepDistance * 1000.0) / (double)userConfig->getStepperSpeed()) * 2);
+      if (timeToAdd > 10000) {  // 10 seconds
+        SS2K_LOG(ERG_MODE_LOG_TAG, "Capping ERG seek time to 10 seconds");
+        timeToAdd = 10000;
+      }
+      SS2K_LOG(ERG_MODE_LOG_TAG, "Adjusted setpoint returned: %dw %drpm Waiting:%dms PowerTable Result: %d", adjustedWattTarget, rtConfig->cad.getValue(), timeToAdd, tableResult);
+      ergTimer += timeToAdd;
     }
-    ergTimer += timeToAdd;
+    ergTimer += (ERG_MODE_DELAY);  // Wait for power meter to register new watts
   }
-  ergTimer += (ERG_MODE_DELAY);  // Wait for power meter to register new watts
+  return tableResult;
 }
 
 // INTRODUCING PID CONTROL LOOP
@@ -206,83 +240,71 @@ void ErgMode::_setPointChangeState(int newCadence, Measurement& newWatts) {
 // Derivative term: rate of change of error
 
 // PrevError
-void ErgMode::_inSetpointState(int newCadence, Measurement& newWatts) {
+int32_t ErgMode::_inSetpointState() {
   // Setting Gains For PID Loop
-  float Kp = userConfig->getERGSensitivity();
-  float Ki = 0.5;
-  float Kd = 0.1;
-
-  static float integral  = 0.0;
-  static float prevError = 0.0;
+  double Kp = userConfig->getERGSensitivity();  // Proportional gain based on user sensitivity
 
   // retrieves the current Watt output
-  int watts = newWatts.getValue();
+  int watts = rtConfig->watts.getValue();
   // retrieves target Watt output
-  int target = newWatts.getTarget();
+  int target = rtConfig->watts.getTarget();
   // subtracting target from current watts
-  float error = target - watts;
+  int error = target - watts;
+
+  // modifying gains based on error
+  if (abs(error) < 10 || (mode != Mode::MAINTAIN)) {
+    Kp = Kp * 0.25;  // decrease further for tiny errors
+  } else if (abs(error) < 50) {
+    Kp = Kp * 0.75;  // Moderate for medium errors
+  } else if (abs(error) > 100) {
+    Kp = Kp * 1.25;  // Aggressive for large errors
+  }
+
+  mode = Mode::MAINTAIN;
 
   // Defining proportional term
-  float proportional = Kp * error;
-  if (newWatts.getValue() < userConfig->getMinWatts()) {
+  double proportional = Kp * error;
+  if (rtConfig->watts.getValue() < userConfig->getMinWatts()) {
     proportional = proportional * userConfig->getERGSensitivity();  // increase proportional term when at very low watts. Prevents Zwift from timeout on initial interval.
   }
 
-  // Defining integral term
-  integral += error;
-  float integralFinal = Ki * integral;
-
-  // Clamping down integral term
-  float integralMax = 60 * userConfig->getERGSensitivity();
-  float integralMin = -60 * userConfig->getERGSensitivity();
-
-  if (integral > integralMax) {
-    integral = integralMax;
-  } else if (integral < integralMin) {
-    integral = integralMin;
-  }
-
-  // Defining derivative term
-  float derivative     = error - prevError;  // Difference between current and previous errors
-  float derivativeTerm = Kd * derivative;
-
   // final PID output
-  float PID_output = proportional + integralFinal + derivativeTerm;
+  double PID_output = proportional;
 
-  // log proportional, integral, derivative every five seconds
+  // log proportional every five seconds
   static unsigned long lastTime = 0;
   if (millis() - lastTime > 5000) {
     lastTime = millis();
-    SS2K_LOG(ERG_MODE_LOG_TAG, "Proportional: %f, Integral: %f, Derivative: %f", proportional, integralFinal, derivativeTerm);
+    SS2K_LOG(ERG_MODE_LOG_TAG, "%dw, Target %dw, Proportional: %f", rtConfig->watts.getValue(), rtConfig->watts.getTarget(), proportional);
+  }
+
+  // Cap the change to no more than we can move until the next reading
+  int maxChange = round((long)((userConfig->getStepperSpeed() * ERG_MODE_DELAY)) / 1000.0f);  // max change based on stepper speed and delay
+  if (PID_output > maxChange) {
+    PID_output = maxChange;
+  } else if (PID_output < -maxChange) {
+    PID_output = -maxChange;
   }
 
   // Calculate new incline
   float newIncline = ss2k->getCurrentPosition() + PID_output;
-
-  prevError = error;
-
-  // Apply the new values
-  _updateValues(newCadence, newWatts, newIncline);
+  return newIncline;
 }
 
-void ErgMode::_updateValues(int newCadence, Measurement& newWatts, float newIncline) {
+void ErgMode::_updateValues(float newIncline) {
   rtConfig->setTargetIncline(newIncline);
-  _writeLog(ss2k->getCurrentPosition(), newIncline, this->setPoint, newWatts.getTarget(), this->watts.getValue(), newWatts.getValue(), this->cadence, newCadence);
+  _writeLog(ss2k->getCurrentPosition(), newIncline, this->prevWatts.getTarget(), rtConfig->watts.getTarget(), this->prevWatts.getValue(), rtConfig->watts.getValue(),
+            this->prevCadence.getValue(), rtConfig->cad.getValue());
 
-  this->watts    = newWatts;
-  this->setPoint = newWatts.getTarget();
-  this->cadence  = newCadence;
+  this->prevWatts   = rtConfig->watts;
+  this->prevCadence = rtConfig->cad;
 }
 
 bool ErgMode::_userIsSpinning(int cadence, float incline) {
   if (cadence <= MIN_ERG_CADENCE) {
-    if (!this->engineStopped) {       // Test so motor stop command only happens once.                                    // release tension
-      rtConfig->setTargetIncline(0);  // release incline
-      this->engineStopped = true;
-    }
+    rtConfig->setFTMSMode(FitnessMachineControlPointProcedure::SetIndoorBikeSimulationParameters);
     return false;  // Cadence too low, nothing to do here
   }
-
   this->engineStopped = false;
   return true;
 }

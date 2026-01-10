@@ -10,9 +10,33 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Added
 
 ### Changed
+- Added feed forward, disabled PowerTable for ERG lookup. 
+- Added tests and removal of duplicates in pt column. 
+- Added removal of negative numbers in pt table. 
+- Refined ERG mode (stateful increase/decrease handling, smarter wait timers, improved PID logging).
+- Adjusted FTMS resistance handling: ignore malformed IC Bike ranges, log raw range data, and skip IC Bike resistance samples.
+- Rounded cadence/power calculations across CSC, CyclePower, Peloton, FTMS decoding; clamp invalid cadence values.
+- Applied rounding for FTMS shift targets/resistance mapping and homing thresholds; use fabs in resistance model and paused duplicate cleanup.
+
+### Hardware
+
+
+## [25.12.28]
+
+### Added
+
+### Changed
 - Removed >0 watts requirement to compute ERG.
 - Removed sizes for JSON strings since they're dynamic now. 
 - Added variable inactivity timeout. 
+- Filter cadence for crazy values. Only >0 && <250 now accepted.
+- Filter watts for crazy values. Only >0 && <3000 now accepted. 
+- Fixed bug where scans may not happen even when configured devices aren't connected.  
+- Worked with Mark Roy to tune PID.
+- Added proper rounding from float to int for power and cadence.
+- More ERG tweaks for Marc Roy. 
+- If homed, we throw out negative PowerTable returns. 
+- After startup homing, set gear 8.
 
 ### Hardware
 
