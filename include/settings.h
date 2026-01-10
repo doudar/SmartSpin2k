@@ -270,15 +270,6 @@ constexpr const char* ANY = "any";
 // The client will be disconnected.
 #define BLE_CLIENT_DISCONNECT_TIMEOUT 5000
 
-#ifndef DEBUG_LOG_BUFFER_SIZE
-#define DEBUG_LOG_BUFFER_SIZE 600
-#endif
-
-// Max size of userconfig
-#define USERCONFIG_JSON_SIZE 2000 + DEBUG_LOG_BUFFER_SIZE
-
-#define RUNTIMECONFIG_JSON_SIZE 1000 + DEBUG_LOG_BUFFER_SIZE
-
 // Uncomment to use guardrails for ERG mode in the stepper loop.
 #define ERG_GUARDRAILS
 

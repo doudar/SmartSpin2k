@@ -11,6 +11,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 - Removed >0 watts requirement to compute ERG.
+- Removed sizes for JSON strings since they're dynamic now. 
+- Added variable inactivity timeout. 
 
 ### Hardware
 
