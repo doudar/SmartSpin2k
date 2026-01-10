@@ -14,34 +14,37 @@
 #define ERG_MODE_LOG_TAG     "ERG_Mode"
 #define ERG_MODE_DELAY       700
 
+struct Mode {
+  static const int MAINTAIN   = 0;
+  static const int DECREASING = 1;
+  static const int INCREASING = 2;
+};
+
 class ErgMode {
  public:
-   // What used to be in the ERGTaskLoop(). This is the main control function for ERG Mode and the powertable operations.
+  // What used to be in the ERGTaskLoop(). This is the main control function for ERG Mode and the powertable operations.
   void runERG();
   void computeErg();
   void _writeLog(float currentIncline, float newIncline, int currentSetPoint, int newSetPoint, int currentWatts, int newWatts, int currentCadence, int newCadence);
 
  private:
-  bool engineStopped   = false;
-  bool initialized     = false;
-  int setPoint         = 0;
-  int offsetMultiplier = 0;
-  int resistance       = 0;
-  int cadence          = 0;
+  bool engineStopped = false;
 
-  Measurement watts;
+  int mode = Mode::MAINTAIN;
+  Measurement prevWatts;
+  Measurement prevCadence;
 
   // check if user is spinning, reset incline if user stops spinning
   bool _userIsSpinning(int cadence, float incline);
 
   // calculate incline if setpoint (from Zwift) changes
-  int32_t _setPointChangeState(int newCadence, Measurement& newWatts);
+  int32_t _setPointChangeState();
 
   // calculate incline if setpoint is unchanged
-  int32_t _inSetpointState(int newCadence, Measurement& newWatts);
+  int32_t _inSetpointState();
 
   // update localvalues + incline, creates a log
-  void _updateValues(int newCadence, Measurement& newWatts, float newIncline);
+  void _updateValues(float newIncline);
 };
 
 extern ErgMode* ergMode;

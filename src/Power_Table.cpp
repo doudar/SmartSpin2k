@@ -68,7 +68,9 @@ void PowerTable::processPowerValue(PowerBuffer& powerBuffer, int cadence, Measur
         }
       }
       if (powerBuffer.powerEntry[POWER_SAMPLES - 1].readings == 1) {  // If buffer is full, create a new table entry and clear the buffer.
+        long int timer = millis();
         this->newEntry(powerBuffer);
+        SS2K_LOG(POWERTABLE_LOG_TAG, "New Entry Processed in %ld ms", millis() - timer);
         this->toLog();
         this->_manageSaveState();
         powerBuffer.reset();
@@ -186,7 +188,6 @@ void PowerTable::newEntry(PowerBuffer& powerBuffer) {
   }
 
   ptHelpers.enterData(ptData, index, (int)targetPosition);
-  fillTableFlag = true;  // set flag to fill table
   BLE_ss2kCustomCharacteristic::notify(0x27, index.cadIndex);
 }
 
@@ -367,6 +368,9 @@ bool PowerTable::reset() {
       this->ptData.tableRow[i].tableEntry[j].readings       = 0;
     }
   }
+  userConfig->setHMax(INT32_MIN);
+  userConfig->setHMin(INT32_MIN);
+  rtConfig->setHomed(false);
   File file = LittleFS.open(POWER_TABLE_FILENAME, FILE_READ);
   if (!file) {
     SS2K_LOG(POWERTABLE_LOG_TAG, "Failed to Load Power Table.");
