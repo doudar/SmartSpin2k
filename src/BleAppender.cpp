@@ -43,8 +43,15 @@ void BleAppender::Log(const char *message) {
   }
 
   // Prepare notification with status byte and code prefix
+  // Use fixed-size buffer to avoid stack overflow from VLA
   size_t messageLen = lastMessage.length();
-  uint8_t returnChar[messageLen + 2];
+  const size_t bufferSize = MAX_MESSAGE_SIZE + 2;  // +2 for status byte and code
+  uint8_t returnChar[bufferSize];
+  
+  if (messageLen > MAX_MESSAGE_SIZE) {
+    messageLen = MAX_MESSAGE_SIZE;  // Safety check
+  }
+  
   returnChar[0] = cc_success;
   returnChar[1] = BLE_BLELogging;
   memcpy(&returnChar[2], lastMessage.c_str(), messageLen);
