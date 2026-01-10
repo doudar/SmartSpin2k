@@ -168,6 +168,7 @@ int16_t ResistanceModel::predict(double watts, double rpm) {
   // Normalize inputs using the bounds found during training
   double x = normW(watts);
   double y = normR(rpm);
+  double overPeakDelta = 0.0;  // Preserve how far past the peak we are
 
   // If the model is quadratic and 'b[3]' (the x^2 term) is negative,
   // the curve is a downward-facing parabola (concave down).
@@ -183,7 +184,9 @@ int16_t ResistanceModel::predict(double watts, double rpm) {
 
     // If the requested x is to the right of the peak, clamp it to the peak.
     if (x > x_vertex) {
-      x = x_vertex;
+      overPeakDelta = x - x_vertex;
+      overPeakDelta = (overPeakDelta * TABLE_DIVISOR) * (watts/rpm);
+      x             = x_vertex;
     }
   }
 
@@ -192,6 +195,9 @@ int16_t ResistanceModel::predict(double watts, double rpm) {
   if (isQuadratic) {
     res += b[3] * x * x + b[4] * y * y + b[5] * x * y;
   }
+
+  // Allow a gentle linear rise past the peak instead of flattening
+  res += overPeakDelta;
 
   // Clamp to int16 range
   if (res > 32767.0) return 32767;
@@ -403,7 +409,7 @@ int32_t PTHelpers::lookup(int watts, int cad, PTData& ptData) {
   if (!resistanceModel.getIsValid()) {
     resistanceModel.fit(ptData);
   }
-  return resistanceModel.predict(watts, cad) * TABLE_DIVISOR;
+  return (resistanceModel.predict(watts, cad)) == INT16_MIN ? INT32_MIN : resistanceModel.predict(watts, cad) * TABLE_DIVISOR;
 }
 
 // returns the total number of readings in the power table

@@ -458,35 +458,48 @@ void SS2K::moveStepper() {
       ss2k->syncMode = false;
     }
 
+    bool _closeToTarget = (abs(stepper->getCurrentPosition() - rtConfig->getMinStep()) <= (userConfig->getShiftStep() / 2)) ||
+                          (abs(stepper->getCurrentPosition() - rtConfig->getMaxStep()) <= (userConfig->getShiftStep() / 2));
+
     if (ss2k->pelotonIsConnected && !rtConfig->getHomed()) {
-      if ((rtConfig->resistance.getValue() > rtConfig->getMinResistance()) && (rtConfig->resistance.getValue() < rtConfig->getMaxResistance())) {
-        stepper->moveTo(ss2k->targetPosition);
-      } else if (rtConfig->resistance.getValue() <= rtConfig->getMinResistance()) {  // Limit Stepper to Min Resistance
-        if (rtConfig->resistance.getValue() != rtConfig->getMinResistance()) {
-          stepper->moveTo(stepper->getCurrentPosition() + 20);
-        }
-        // Let the user Shift Out of this Position
-        if (ss2k->targetPosition > stepper->getCurrentPosition()) {
-          stepper->moveTo(ss2k->targetPosition);
-        }
-      } else {  // Limit Stepper to Max Resistance
-        if (rtConfig->resistance.getValue() != rtConfig->getMaxResistance()) {
-          stepper->moveTo(stepper->getCurrentPosition() - 20);
-        }
-        // Let the user Shift Out of this Position
-        if (ss2k->targetPosition < stepper->getCurrentPosition()) {
-          stepper->moveTo(ss2k->targetPosition);
+      // Peloton + not homed: gently walk away from the edges unless the user is actively shifting past them
+      if (rtConfig->resistance.getValue() < rtConfig->getMinResistance()) {  // Below allowed resistance
+        // Nudge upward unless the user already asked to move higher
+        if (ss2k->targetPosition <= ss2k->getCurrentPosition()) {
+          ss2k->targetPosition = ss2k->getCurrentPosition() + 20;
         }
       }
-    } else {  // Normal move code for non-Peloton
-      if ((ss2k->targetPosition >= rtConfig->getMinStep()) && (ss2k->targetPosition <= rtConfig->getMaxStep())) {
-        stepper->moveTo(ss2k->targetPosition);
-      } else if (ss2k->targetPosition <= rtConfig->getMinStep()) {  // Limit Stepper to Min Position
-        stepper->moveTo(rtConfig->getMinStep() + 1);
-      } else {  // Limit Stepper to Max Position
-        stepper->moveTo(rtConfig->getMaxStep() - 1);
+      if (rtConfig->resistance.getValue() > rtConfig->getMaxResistance()) {
+        // Nudge downward unless the user already asked to move lower
+        if (ss2k->targetPosition > ss2k->getCurrentPosition()) {
+          ss2k->targetPosition = ss2k->getCurrentPosition() - 20;
+        }
+      }
+    } else if (!rtConfig->getHomed()) {  // Not homed: keep target inside the provisional range and learn bounds when power looks valid
+      // Flag when current position is within half a shift step of either bound
+      bool _closeToTarget = (abs(ss2k->getCurrentPosition() - rtConfig->getMinStep()) <= (userConfig->getShiftStep() / 2)) ||
+                            (abs(ss2k->getCurrentPosition() - rtConfig->getMaxStep()) <= (userConfig->getShiftStep() / 2));
+
+      if (ss2k->targetPosition < rtConfig->getMinStep()) {
+        // if (_closeToTarget && rtConfig->cad.getValue() > 0 && rtConfig->watts.getValue() > userConfig->getMinWatts() + POWERTABLE_WATT_INCREMENT) {
+        //   rtConfig->setMinStep(ss2k->targetPosition);  // Learn a tighter min bound from real effort
+        // }
+        ss2k->targetPosition = rtConfig->getMinStep() + 1;
+      } else if (ss2k->targetPosition > rtConfig->getMaxStep()) {
+        // if (_closeToTarget && rtConfig->cad.getValue() > 0 && rtConfig->watts.getValue() < userConfig->getMaxWatts() - POWERTABLE_WATT_INCREMENT) {
+        //   rtConfig->setMaxStep(ss2k->targetPosition);  // Learn a tighter max bound from real effort
+        // }
+        ss2k->targetPosition = rtConfig->getMaxStep() - 1;
+      }
+    } else {  // Homed: simple clamp to the known good range
+      if (ss2k->targetPosition < rtConfig->getMinStep()) {
+        ss2k->targetPosition = rtConfig->getMinStep() + 1;
+      } else if (ss2k->targetPosition > rtConfig->getMaxStep()) {
+        ss2k->targetPosition = rtConfig->getMaxStep() - 1;
       }
     }
+
+    stepper->moveTo(ss2k->targetPosition);
 
     if (rtConfig->cad.getValue() > 1) {
       stepper->enableOutputs();
