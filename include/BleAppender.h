@@ -17,7 +17,7 @@ class BleAppender : public ILogAppender {
   const char *getLastMessage();
 
  private:
-  static const size_t MAX_MESSAGE_SIZE = 180;  // MTU-safe size
+  static const size_t MAX_MESSAGE_SIZE = 500;  // MTU-safe size
   std::string lastMessage;
   void trimMessage(const char *message);
 };
