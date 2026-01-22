@@ -410,6 +410,36 @@ void ScanCallbacks::onResult(const NimBLEAdvertisedDevice* advertisedDevice) {
     }
     SS2K_LOG(BLE_CLIENT_LOG_TAG, "Found device %s with %s", aDevName.c_str(), servicesStr.c_str());
     if (serviceInfo) {
+      // Add device to foundDevices list
+      JsonDocument devices;
+      const char* foundDevicesJson = userConfig->getFoundDevices();
+      if (foundDevicesJson[0] != '\0') {
+        deserializeJson(devices, foundDevicesJson);
+      }
+
+      bool isDuplicateLocal = false;
+      for (JsonPair kv : devices.as<JsonObject>()) {
+        JsonObject obj = kv.value().as<JsonObject>();
+        if (obj["name"] && obj["name"] == aDevName) {
+          isDuplicateLocal = true;
+          break;
+        }
+      }
+
+      if (!isDuplicateLocal) {
+        String deviceKey           = "device " + String(devices.size());
+        devices[deviceKey]["name"] = aDevName;
+        // Workaround for IC4 not advertising FTMS as the first service.
+        if (advertisedDevice->isAdvertisingService(FITNESSMACHINESERVICE_UUID)) {
+          devices[deviceKey]["UUID"] = FITNESSMACHINESERVICE_UUID.toString();
+        } else {
+          devices[deviceKey]["UUID"] = serviceInfo->serviceUUID.toString();
+        }
+        String output;
+        serializeJson(devices, output);
+        userConfig->setFoundDevices(output);
+      }
+
       SS2K_LOG(BLE_CLIENT_LOG_TAG, "Supported Device: %s with service %s", aDevName.c_str(), serviceInfo->name.c_str());
       const NimBLEUUID& primaryServiceUUID = serviceInfo->serviceUUID;
       // check to see if we're already connected to this device
@@ -528,48 +558,7 @@ void SpinBLEClient::scanProcess(int duration) {
 }
 
 void ScanCallbacks::onScanEnd(const NimBLEScanResults& results, int reason) {
-  int count = results.getCount();
-  JsonDocument devices;
-
-  // Check if 'devices' JSON document already exists and has content; if so, deserialize it.
-  const char* foundDevicesJson = userConfig->getFoundDevices();
-  if (foundDevicesJson[0] != '\0') {
-    deserializeJson(devices, userConfig->getFoundDevices());
-  }
-
-  for (int i = 0; i < count; i++) {
-    const NimBLEAdvertisedDevice* d = results.getDevice(i);
-
-    // Check for duplicates by name or address before adding
-    bool isDuplicate = false;
-    for (JsonPair kv : devices.as<JsonObject>()) {
-      JsonObject obj = kv.value().as<JsonObject>();
-      if (obj["name"] && obj["name"] == spinBLEClient.adevName2UniqueName(d)) {
-        isDuplicate = true;
-        break;
-      }
-    }
-
-    if (!isDuplicate && d->haveServiceUUID() && isDeviceSupported(d, spinBLEClient.adevName2UniqueName(d).c_str())) {
-      String device = "device " + String(devices.size());  // Use the current size to index the new device
-
-      devices[device]["name"] = spinBLEClient.adevName2UniqueName(d);
-
-      // Workaround for IC4 not advertising FTMS as the first service.
-      // Potentially others may need to be added in the future.
-      // The symptom was the bike name not showing up in the HTML.
-      if (d->haveServiceUUID() && d->isAdvertisingService(FITNESSMACHINESERVICE_UUID)) {
-        devices[device]["UUID"] = FITNESSMACHINESERVICE_UUID.toString();
-      } else {
-        devices[device]["UUID"] = d->getServiceUUID().toString();
-      }
-    }
-  }
-
-  String output;
-  serializeJson(devices, output);
-  SS2K_LOG(BLE_CLIENT_LOG_TAG, "Found Devices: %s", output.c_str());
-  userConfig->setFoundDevices(output);  // Save the updated JSON document
+  SS2K_LOG(BLE_CLIENT_LOG_TAG, "Scan Ended");
 }
 
 // remove the last connected BLE Power Meter
