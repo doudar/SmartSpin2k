@@ -657,6 +657,12 @@ void HTTP_Server::settingsProcessor() {
       userConfig->setPowerCorrectionFactor(powerCorrectionFactor);
     }
   }
+  if (!server.arg("inactivityTimeout").isEmpty()) {
+    uint64_t inactivityTimeout = server.arg("inactivityTimeout").toInt();
+    if (inactivityTimeout >= MIN_INACTIVITY_TIMEOUT && inactivityTimeout <= MAX_INACTIVITY_TIMEOUT) {
+      userConfig->setInactivityTimeout(inactivityTimeout);
+    }
+  }
   if (!server.arg("blePMDropdown").isEmpty()) {
     wasBTUpdate = true;
     if (server.arg("blePMDropdown")) {

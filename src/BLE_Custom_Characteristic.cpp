@@ -88,7 +88,7 @@ This characteristic allows for reading and writing various user configuration pa
 #include <BLE_Custom_Characteristic.h>
 #include <Constants.h>
 
-void BLE_ss2kCustomCharacteristic::setupService(NimBLEServer *pServer) {
+void BLE_ss2kCustomCharacteristic::setupService(NimBLEServer* pServer) {
   pSmartSpin2kService = spinBLEServer.pServer->createService(SMARTSPIN2K_SERVICE_UUID);
   smartSpin2kCharacteristic =
       pSmartSpin2kService->createCharacteristic(SMARTSPIN2K_CHARACTERISTIC_UUID, NIMBLE_PROPERTY::WRITE | NIMBLE_PROPERTY::INDICATE | NIMBLE_PROPERTY::NOTIFY);
@@ -99,17 +99,17 @@ void BLE_ss2kCustomCharacteristic::setupService(NimBLEServer *pServer) {
 
 void BLE_ss2kCustomCharacteristic::update() {}
 
-void ss2kCustomCharacteristicCallbacks::onWrite(NimBLECharacteristic *pCharacteristic, NimBLEConnInfo &connInfo) {
+void ss2kCustomCharacteristicCallbacks::onWrite(NimBLECharacteristic* pCharacteristic, NimBLEConnInfo& connInfo) {
   std::string rxValue = pCharacteristic->getValue();
   // SS2K_LOG(CUSTOM_CHAR_LOG_TAG, "Write from %s", connInfo.getAddress().toString().c_str());
   BLE_ss2kCustomCharacteristic::process(rxValue);
 }
 
-void ss2kCustomCharacteristicCallbacks::onSubscribe(NimBLECharacteristic *pCharacteristic, NimBLEConnInfo &connInfo, uint16_t subValue) {
+void ss2kCustomCharacteristicCallbacks::onSubscribe(NimBLECharacteristic* pCharacteristic, NimBLEConnInfo& connInfo, uint16_t subValue) {
   SS2K_LOG(CUSTOM_CHAR_LOG_TAG, "Subscribe from %s", connInfo.getAddress().toString().c_str());
   NimBLEDevice::setMTU(515);
 }
-void ss2kCustomCharacteristicCallbacks::onStatus(NimBLECharacteristic *pCharacteristic, int code) {
+void ss2kCustomCharacteristicCallbacks::onStatus(NimBLECharacteristic* pCharacteristic, int code) {
 // loop through and accumulate the data into a C++ string
 #ifdef CUSTOM_CHAR_DEBUG
   std::string characteristicValue = pCharacteristic->getValue();
@@ -137,8 +137,8 @@ void BLE_ss2kCustomCharacteristic::process(std::string rxValue) {
   if (NimBLEDevice::getServer()->getServiceByUUID(SMARTSPIN2K_SERVICE_UUID) == nullptr) {
     return;
   }
-  NimBLECharacteristic *pCharacteristic = NimBLEDevice::getServer()->getServiceByUUID(SMARTSPIN2K_SERVICE_UUID)->getCharacteristic(SMARTSPIN2K_CHARACTERISTIC_UUID);
-  uint8_t *pData                        = reinterpret_cast<uint8_t *>(&rxValue[0]);
+  NimBLECharacteristic* pCharacteristic = NimBLEDevice::getServer()->getServiceByUUID(SMARTSPIN2K_SERVICE_UUID)->getCharacteristic(SMARTSPIN2K_CHARACTERISTIC_UUID);
+  uint8_t* pData                        = reinterpret_cast<uint8_t*>(&rxValue[0]);
 
 #ifdef CUSTOM_CHAR_DEBUG
 #define LOG_BUF_APPEND(...) logBufLength += snprintf(logBuf + logBufLength, kLogBufCapacity - logBufLength, __VA_ARGS__)
@@ -166,7 +166,7 @@ void BLE_ss2kCustomCharacteristic::process(std::string rxValue) {
         returnString   = userConfig->getFirmwareUpdateURL();
       } else if (rxValue[0] == cc_write) {
         returnValue[0] = cc_success;
-        String str     = (char *)pData;
+        String str     = (char*)pData;
         str.remove(0, 2);
         userConfig->setFirmwareUpdateURL(str);
         LOG_BUF_APPEND("(%s)", userConfig->getFirmwareUpdateURL());
@@ -257,7 +257,7 @@ void BLE_ss2kCustomCharacteristic::process(std::string rxValue) {
         returnString   = userConfig->getDeviceName();
       } else if (rxValue[0] == cc_write) {
         returnValue[0] = cc_success;
-        String str     = (char *)pData;
+        String str     = (char*)pData;
         str.remove(0, 2);
         userConfig->setDeviceName(str);
         LOG_BUF_APPEND("(%s)", userConfig->getDeviceName());
@@ -420,7 +420,7 @@ void BLE_ss2kCustomCharacteristic::process(std::string rxValue) {
         returnString   = userConfig->getSsid();
       } else if (rxValue[0] == cc_write) {
         returnValue[0] = cc_success;
-        String str     = (char *)pData;
+        String str     = (char*)pData;
         str.remove(0, 2);
         userConfig->setSsid(str);
         LOG_BUF_APPEND("(%s)", userConfig->getSsid());
@@ -434,7 +434,7 @@ void BLE_ss2kCustomCharacteristic::process(std::string rxValue) {
         returnString   = userConfig->getPassword();
       } else if (rxValue[0] == cc_write) {
         returnValue[0] = cc_success;
-        String str     = (char *)pData;
+        String str     = (char*)pData;
         str.remove(0, 2);
         userConfig->setPassword(str);
         LOG_BUF_APPEND("(%s)", "******");
@@ -448,7 +448,7 @@ void BLE_ss2kCustomCharacteristic::process(std::string rxValue) {
         returnString   = userConfig->getFoundDevices();
       } else if (rxValue[0] == cc_write) {
         returnValue[0] = cc_success;
-        String str     = (char *)pData;
+        String str     = (char*)pData;
         str.remove(0, 2);
         userConfig->setFoundDevices(str);
         LOG_BUF_APPEND("(%s)", userConfig->getFoundDevices());
@@ -462,7 +462,7 @@ void BLE_ss2kCustomCharacteristic::process(std::string rxValue) {
         returnString   = userConfig->getConnectedPowerMeter();
       } else if (rxValue[0] == cc_write) {
         returnValue[0] = cc_success;
-        String str     = (char *)pData;
+        String str     = (char*)pData;
         str.remove(0, 2);
         userConfig->setConnectedPowerMeter(str);
         LOG_BUF_APPEND("(%s)", userConfig->getConnectedPowerMeter());
@@ -476,7 +476,7 @@ void BLE_ss2kCustomCharacteristic::process(std::string rxValue) {
         returnString   = userConfig->getConnectedHeartMonitor();
       } else if (rxValue[0] == cc_write) {
         returnValue[0] = cc_success;
-        String str     = (char *)pData;
+        String str     = (char*)pData;
         str.remove(0, 2);
         userConfig->setConnectedHeartMonitor(str);
         LOG_BUF_APPEND("(%s)", userConfig->getConnectedHeartMonitor());
@@ -758,7 +758,7 @@ void BLE_ss2kCustomCharacteristic::process(std::string rxValue) {
       }
       if (rxValue[0] == cc_write) {
         returnValue[0] = cc_success;
-        int32_t hMin = int32_t((uint8_t)(rxValue[2]) << 0 | (uint8_t)(rxValue[3]) << 8 | (uint8_t)(rxValue[4]) << 16 | (uint8_t)(rxValue[5]) << 24);
+        int32_t hMin   = int32_t((uint8_t)(rxValue[2]) << 0 | (uint8_t)(rxValue[3]) << 8 | (uint8_t)(rxValue[4]) << 16 | (uint8_t)(rxValue[5]) << 24);
         userConfig->setHMin(hMin);
         rtConfig->setMinStep(hMin);
         LOG_BUF_APPEND(" (%d)", hMin);
@@ -827,6 +827,25 @@ void BLE_ss2kCustomCharacteristic::process(std::string rxValue) {
         LOG_BUF_APPEND("(%s)", userConfig->getUdpLogEnabled() ? "true" : "false");
       }
       break;
+
+    case BLE_inactivityTimeout: {  // 0x2F
+      LOG_BUF_APPEND("<-inactivityTimeout");
+      int timeout = userConfig->getInactivityTimeout();
+      if (rxValue[0] == cc_read) {
+        returnValue[0] = cc_success;
+        returnValue[2] = (uint8_t)(timeout & 0xff);
+        returnValue[3] = (uint8_t)((timeout >> 8) & 0xff);
+        returnValue[4] = (uint8_t)((timeout >> 16) & 0xff);
+        returnValue[5] = (uint8_t)((timeout >> 24) & 0xff);
+        returnLength += 4;
+      }
+      if (rxValue[0] == cc_write) {
+        returnValue[0] = cc_success;
+        int newTimeout = rxValue[2] | (rxValue[3] << 8) | (rxValue[4] << 16) | (rxValue[5] << 24);
+        userConfig->setInactivityTimeout(newTimeout);
+        LOG_BUF_APPEND("(%d min)", userConfig->getInactivityTimeout());
+      }
+    } break;
 
     default:
       LOG_BUF_APPEND("<-Unknown Characteristic");
@@ -1013,6 +1032,11 @@ void BLE_ss2kCustomCharacteristic::parseNemit() {
   if (userConfig->getUdpLogEnabled() != _oldParams.getUdpLogEnabled()) {
     _oldParams.setUdpLogEnabled(userConfig->getUdpLogEnabled());
     BLE_ss2kCustomCharacteristic::notify(BLE_UDPLogging);
+    return;
+  }
+  if (userConfig->getInactivityTimeout() != _oldParams.getInactivityTimeout()) {
+    _oldParams.setInactivityTimeout(userConfig->getInactivityTimeout());
+    BLE_ss2kCustomCharacteristic::notify(BLE_inactivityTimeout);
     return;
   }
 }

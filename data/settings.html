@@ -179,6 +179,15 @@
         tooltip: 'Use cadence to calculate power output',
         tooltipText: 'Use the PowerTable for Power instead of PM',
         defaultValue: false
+      },
+      inactivityTimeout: {
+        type: 'slider',
+        title: 'Inactivity Reboot Timeout',
+        tooltip: 'Idle time before auto-reboot',
+        tooltipText: 'Automatically reboot if device is inactive (no power, HR, or cadence changes) for this duration. Minimum 1 minute, maximum 48 hours.',
+        min: 1, max: 2880, step: 15,
+        defaultValue: 30,
+        unit: 'min'
       }
     };
 

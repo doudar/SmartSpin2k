@@ -103,6 +103,12 @@ const char* const DEFAULT_PASSWORD = "password";
 // This is used to set the upper travel limit for the motor.
 #define DEFAULT_MAX_WATTS 1000
 
+// Inactivity timeout for automatic reboot
+// Time in minutes before reboot when no activity is detected
+#define DEFAULT_INACTIVITY_TIMEOUT 30
+#define MIN_INACTIVITY_TIMEOUT 1
+#define MAX_INACTIVITY_TIMEOUT 2880 // 48 hours
+
 // Minimum resistance on a Peloton Bike.
 // This is used to set the lower travel limit for the motor.
 #define MIN_PELOTON_RESISTANCE 5
@@ -263,15 +269,6 @@ constexpr const char* ANY = "any";
 // If no data is received from a connected device after this duration,
 // The client will be disconnected.
 #define BLE_CLIENT_DISCONNECT_TIMEOUT 5000
-
-#ifndef DEBUG_LOG_BUFFER_SIZE
-#define DEBUG_LOG_BUFFER_SIZE 600
-#endif
-
-// Max size of userconfig
-#define USERCONFIG_JSON_SIZE 2000 + DEBUG_LOG_BUFFER_SIZE
-
-#define RUNTIMECONFIG_JSON_SIZE 1000 + DEBUG_LOG_BUFFER_SIZE
 
 // Uncomment to use guardrails for ERG mode in the stepper loop.
 // #define ERG_GUARDRAILS

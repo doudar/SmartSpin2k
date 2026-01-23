@@ -296,9 +296,9 @@ void SS2K::maintenanceLoop(void* pvParameters) {
       static float _oldTargetIncline = 0.0f;
       if (_oldHR == rtConfig->hr.getValue() && _oldWatts == rtConfig->watts.getValue() && _oldTargetIncline == rtConfig->getTargetIncline()) {
         // Inactivity detected
-        if (((millis() - rebootTimer) > 1800000)) {
+        if (((millis() - rebootTimer) > userConfig->getInactivityTimeout() * 60000)) {
           // Timer expired
-          SS2K_LOG(MAIN_LOG_TAG, "Rebooting due to inactivity.");
+          SS2K_LOG(MAIN_LOG_TAG, "Rebooting due to inactivity. Timeout: %d min", userConfig->getInactivityTimeout());
           ss2k->rebootFlag = true;
           logHandler.writeLogs();
           webSocketAppender.Loop();
