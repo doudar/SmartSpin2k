@@ -10,6 +10,26 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Added
 
 ### Changed
+
+### Hardware
+
+
+## [26.1.22]
+
+### Added
+
+### Changed
+
+### Hardware
+- Added Sole SB1200
+- Batch reduced image sizes of reference photos. 
+
+
+## [26.1.10]
+
+### Added
+
+### Changed
 - Updated BLE scan results to include connected devices when using "ANY" wildcard.
 - Added feed forward, disabled PowerTable for ERG lookup. 
 - Added tests and removal of duplicates in pt column. 
