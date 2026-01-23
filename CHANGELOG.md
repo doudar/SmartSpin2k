@@ -12,6 +12,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Changed
 
 ### Hardware
+
+
+## [26.1.22]
+
+### Added
+
+### Changed
+
+### Hardware
 - Added Sole SB1200
 - Batch reduced image sizes of reference photos. 
 
