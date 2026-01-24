@@ -9,15 +9,16 @@
 
 #include "LogAppender.h"
 #include <string>
+#include <queue>
 
 class BleAppender : public ILogAppender {
  public:
   void Log(const char *message);
   void Initialize();
-  const char *getLastMessage();
+  std::string getLastMessage();
 
  private:
   static const size_t MAX_MESSAGE_SIZE = 500;  // MTU-safe size
-  std::string lastMessage;
-  void trimMessage(const char *message);
+  std::queue<std::string> messageQueue;
+  void appendMessage(const char *message);
 };

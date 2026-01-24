@@ -17,19 +17,26 @@ void BleAppender::Log(const char *message) {
   }
 
   // Cache the message
-  trimMessage(message);
+  appendMessage(message);
 
   // Use the existing custom characteristic notification mechanism
-  BLE_ss2kCustomCharacteristic::notify(BLE_BLELogging);
+  // only notify if there are messages to send
+  if (!messageQueue.empty()) {
+    BLE_ss2kCustomCharacteristic::notify(BLE_BLELogging);
+  }
 }
 
-const char *BleAppender::getLastMessage() {
-  return lastMessage.c_str();
+std::string BleAppender::getLastMessage() {
+  if (!messageQueue.empty()) {
+    std::string msg = messageQueue.front();
+    messageQueue.pop();
+    return msg;
+  }
+  return "";
 }
 
-void BleAppender::trimMessage(const char *message) {
+void BleAppender::appendMessage(const char *message) {
   if (message == nullptr) {
-    lastMessage = "";
     return;
   }
 
@@ -39,10 +46,14 @@ void BleAppender::trimMessage(const char *message) {
     msg.pop_back();
   }
 
-  // Trim to MTU-safe size
+  if (msg.empty()) {
+    return;
+  }
+
+  // Truncate message if it's too long on its own
   if (msg.length() > MAX_MESSAGE_SIZE) {
     msg = msg.substr(0, MAX_MESSAGE_SIZE);
   }
 
-  lastMessage = msg;
+  messageQueue.push(msg);
 }
