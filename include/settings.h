@@ -17,8 +17,8 @@ const char* const DEVICE_NAME = "SmartSpin2k";
 const char* const DEFAULT_PASSWORD = "password";
 
 // default URL To get Updates From.
-// If changed you'll also need to get a root certificate from the new server
-// and put it in /include/cert.h
+// HTTPS connections use setInsecure() to avoid certificate expiration issues.
+// No manual certificate management needed.
 #define FW_UPDATEURL "https://raw.githubusercontent.com/doudar/OTAUpdates/main/"
 
 // File that contains Version info

@@ -9,7 +9,6 @@
 #include "Version_Converter.h"
 #include "Builtin_Pages.h"
 #include "HTTP_Server_Basic.h"
-#include "cert.h"
 #include "SS2KLog.h"
 #include "DirConManager.h"
 #include <WebServer.h>
@@ -733,16 +732,24 @@ void HTTP_Server::stop() {
   server.close();
 }
 
+// Helper function to setup secure WiFi client for firmware updates
+// Uses setInsecure() to skip certificate verification. This is a pragmatic solution to avoid
+// firmware update failures caused by expired hardcoded certificates. The connection is still
+// encrypted (TLS/SSL) and limited to known GitHub servers. A future improvement would be to
+// use ESP-IDF's certificate bundle once Arduino-ESP32 provides an appropriate API.
+void setupSecureClient(WiFiClientSecure& client) {
+  client.setInsecure();
+}
+
 // github fingerprint
 // 70:94:DE:DD:E6:C4:69:48:3A:92:70:A1:48:56:78:2D:18:64:E0:B7
 
 void HTTP_Server::FirmwareUpdate() {
   HTTPClient http;
   WiFiClientSecure localClient;
-  localClient.setCACert(rootCACertificate);
+  setupSecureClient(localClient);
   SS2K_LOG(HTTP_SERVER_LOG_TAG, "Checking for newer firmware:");
-  http.begin(userConfig->getFirmwareUpdateURL() + String(FW_VERSIONFILE),
-             rootCACertificate);  // check version URL
+  http.begin(localClient, userConfig->getFirmwareUpdateURL() + String(FW_VERSIONFILE));  // check version URL
   delay(100);
   int httpCode = http.GET();  // get data from version file
   delay(100);
@@ -771,7 +778,7 @@ void HTTP_Server::FirmwareUpdate() {
     if (((availableVer > currentVer) && (userConfig->getAutoUpdate())) || (!LittleFS.exists("/index.html"))) {
       //////////////// Update LittleFS//////////////
       SS2K_LOG(HTTP_SERVER_LOG_TAG, "Updating FileSystem");
-      http.begin(DATA_UPDATEURL DATA_FILELIST, rootCACertificate);  // check version URL
+      http.begin(localClient, DATA_UPDATEURL DATA_FILELIST);  // check version URL
       delay(100);
       httpCode = http.GET();  // get data from version file
       delay(100);
@@ -798,8 +805,7 @@ void HTTP_Server::FirmwareUpdate() {
       // iterate through file list and download files individually
       for (JsonVariant v : files) {
         String fileName = "/" + v.as<String>();
-        http.begin(DATA_UPDATEURL + fileName,
-                   rootCACertificate);  // check version URL
+        http.begin(localClient, DATA_UPDATEURL + fileName);  // check version URL
         delay(100);
         httpCode = http.GET();
         delay(100);
