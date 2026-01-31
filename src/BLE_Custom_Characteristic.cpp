@@ -605,7 +605,7 @@ void BLE_ss2kCustomCharacteristic::process(std::string rxValue) {
       }
       if (rxValue[0] == cc_write) {
         returnValue[0] = cc_success;
-        userConfig->setERGSensitivity((bytes_to_u16(rxValue[3], rxValue[2])) / 10);
+        userConfig->setERGSensitivity((bytes_to_u16(rxValue[3], rxValue[2])) / 10.0);
         LOG_BUF_APPEND("(%f)", userConfig->getERGSensitivity());
       }
     } break;
