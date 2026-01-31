@@ -165,14 +165,14 @@ void ErgMode::computeErg() {
     rtConfig->watts.setTarget(userConfig->getMinWatts());
   }
 
-  // check for new torque value or new set point, if watts < 0 treat as faulty
+  // check for new watt value or new set point, if watts < 0 treat as faulty
   if ((this->prevWatts.getTimestamp() == rtConfig->watts.getTimestamp() && this->prevWatts.getTarget() == rtConfig->watts.getTarget()) || rtConfig->watts.getValue() < 0) {
     SS2K_LOG(ERG_MODE_LOG_TAG, "Watts previously processed.");
     return;
   }
 
 #ifdef ERG_MODE_USE_POWER_TABLE
-  if (abs(this->prevWatts.getTarget() - rtConfig->watts.getTarget()) > POWERTABLE_CAD_INCREMENT && rtConfig->getHomed()) {
+  if (abs(this->prevWatts.getTarget() - rtConfig->watts.getTarget()) > POWERTABLE_WATT_INCREMENT && rtConfig->getHomed()) {
     result = _setPointChangeState();
   }
 #endif
@@ -188,7 +188,7 @@ void ErgMode::computeErg() {
 int32_t ErgMode::_setPointChangeState() {
   mode = (rtConfig->watts.getTarget() > rtConfig->watts.getValue()) ? Mode::INCREASING : Mode::DECREASING;
   // It's better to undershoot increasing watts and overshoot decreasing watts, so lets set the lookup target to the nearest side of POWERTABLE_WATT_INCREMENT
-  int adjustedWattTarget = (mode == Mode::INCREASING) ? rtConfig->watts.getTarget() - POWERTABLE_WATT_INCREMENT : rtConfig->watts.getTarget() + POWERTABLE_WATT_INCREMENT;
+  int adjustedWattTarget = (mode == Mode::INCREASING) ? rtConfig->watts.getTarget() - ERG_MODE_PID_WINDOW : rtConfig->watts.getTarget() + ERG_MODE_PID_WINDOW;
   int32_t tableResult    = powerTable->lookup(adjustedWattTarget,
                                            (mode == Mode::INCREASING) ? rtConfig->cad.getValue() + POWERTABLE_CAD_INCREMENT : rtConfig->cad.getValue() - POWERTABLE_CAD_INCREMENT);
 
@@ -200,11 +200,11 @@ int32_t ErgMode::_setPointChangeState() {
 
   // Test current watts against the table result. If We're already lower or higher than target, flag the result as a return error.
   if (tableResult != RETURN_ERROR) {
-    if (adjustedWattTarget > rtConfig->watts.getValue() && tableResult < ss2k->getCurrentPosition()) {
+    if (mode == Mode::INCREASING && tableResult < ss2k->getCurrentPosition()) {
       SS2K_LOG(ERG_MODE_LOG_TAG, "Table Result Failed increasing Test: %d", tableResult);
       tableResult = RETURN_ERROR;
     }
-    if ((adjustedWattTarget < rtConfig->watts.getValue()) && tableResult > ss2k->getCurrentPosition()) {
+    if (mode == Mode::DECREASING && tableResult > ss2k->getCurrentPosition()) {
       SS2K_LOG(ERG_MODE_LOG_TAG, "Table Result Failed decreasing Test: %d", tableResult);
       tableResult = RETURN_ERROR;
     }
@@ -303,6 +303,7 @@ void ErgMode::_updateValues(float newIncline) {
 bool ErgMode::_userIsSpinning(int cadence, float incline) {
   if (cadence <= MIN_ERG_CADENCE) {
     rtConfig->setFTMSMode(FitnessMachineControlPointProcedure::SetIndoorBikeSimulationParameters);
+    rtConfig->setTargetIncline(1.0f);
     return false;  // Cadence too low, nothing to do here
   }
   this->engineStopped = false;
