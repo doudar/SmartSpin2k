@@ -17,6 +17,7 @@
 #include "Power_Table.h"
 #include "UdpAppender.h"
 #include "WebsocketAppender.h"
+#include "BleAppender.h"
 #include "BLE_Custom_Characteristic.h"
 #include "BLE_Definitions.h"
 #include <Constants.h>
@@ -52,6 +53,7 @@ RuntimeParameters* rtConfig = new RuntimeParameters;
 ///////////// Log Appender /////////////
 UdpAppender udpAppender;
 WebSocketAppender webSocketAppender;
+BleAppender bleAppender;
 
 ///////////// BEGIN SETUP /////////////
 #ifndef UNIT_TEST
@@ -141,6 +143,7 @@ extern "C" void app_main() {
   // Configure and Initialize Logger
   logHandler.addAppender(&webSocketAppender);
   logHandler.addAppender(&udpAppender);
+  logHandler.addAppender(&bleAppender);
   logHandler.initialize();
   ss2k->startTasks();
   httpServer.start();

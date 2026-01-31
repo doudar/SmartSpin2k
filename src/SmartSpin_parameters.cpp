@@ -38,6 +38,7 @@ JsonDocument doc;
   doc["maxStep"]          = this->maxStep;
   doc["minResistance"]    = this->minResistance;
   doc["maxResistance"]    = this->maxResistance;
+  doc["bleLogEnabled"]    = this->bleLogEnabled;
 
   String output;
   serializeJson(doc, output);

@@ -157,7 +157,7 @@ void MyServerCallbacks::onDisconnect(NimBLEServer* pServer) {
 }
 
 void MyServerCallbacks::onMTUChange(uint16_t MTU, NimBLEConnInfo& connInfo) {
-  SS2K_LOG(BLE_SERVER_LOG_TAG, "MTU updated: %u for connection ID: %u", MTU, connInfo.getConnHandle());
+  //SS2K_LOG(BLE_SERVER_LOG_TAG, "MTU updated: %u for connection ID: %u", MTU, connInfo.getConnHandle());
 }
 
 bool MyServerCallbacks::onConnParamsUpdateRequest(uint16_t handle, const ble_gap_upd_params* params) {
