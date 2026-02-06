@@ -314,8 +314,6 @@ bool SpinBLEClient::connectToServer() {
   SS2K_LOG(BLE_CLIENT_LOG_TAG, " - Created new client");
   pClient->setClientCallbacks(&myClientCallback, false);
   pClient->setSelfDelete(true, true);
-  // Initial connection parameters: 15ms interval, 0 latency, 1000ms timeout (kept from previous logic)
-  pClient->setConnectionParams(connectionParams[0], connectionParams[1], connectionParams[2], 1000);
   pClient->setConnectTimeout(10000);  // 10 seconds
   if (!pClient->connect(myDevice, true, false, false)) {
     return handleFailedClientConnect();
@@ -654,7 +652,8 @@ void SpinBLEClient::postConnect() {
       SS2K_LOG(BLE_CLIENT_LOG_TAG, "Post connecting: %s , ConnID %d, PrimaryChar %s", adevName.c_str(), _BLEd.connectedClientID, _BLEd.charUUID.toString().c_str());
       NimBLEClient* pClient = NimBLEDevice::getClientByPeerAddress(_BLEd.peerAddress);
       if (pClient) {
-        BLEDevice::getServer()->updateConnParams(pClient->getConnHandle(), connectionParams[0], connectionParams[1], connectionParams[2], connectionParams[3]);
+        pClient->exchangeMTU();
+        pClient->updateConnParams(connectionParams[0], connectionParams[1], connectionParams[2], connectionParams[3]);
         _BLEd.isPostConnected = subscribeToAllNotifications(pClient);
         if (!_BLEd.isPostConnected) {
           SS2K_LOG(BLE_CLIENT_LOG_TAG, "Failed to subscribe to notifications for %s", adevName.c_str());
