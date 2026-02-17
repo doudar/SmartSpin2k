@@ -119,6 +119,32 @@ footer{margin-top:2rem;padding:1rem 0;border-top:1px solid var(--border);display
 .dev-links{display:flex;align-items:center;gap:1rem}
 .dev-link{color:var(--text-secondary);font-size:.9rem}
 .separator{color:rgba(255,255,255,.3)}
+.accordion-header {
+  background-color: #03254c99;
+  color: #2a9df4;
+  cursor: pointer;
+  padding: 18px;
+  width: 100%;
+  text-align: left;
+  border: none;
+  outline: none;
+  transition: background-color 0.4s ease;
+}
+.accordion-header:hover {
+  background-color: #ddd;
+}
+.accordion-content {
+  padding: 0 18px;
+  background-color: #1167b1;
+  /* Start hidden */
+  max-height: 0;
+  overflow: hidden;
+  transition: max-height 0.3s ease-out;
+}
+/* Class added by JavaScript when active */
+.accordion-header.active {
+  background-color: #03254c99;
+}
 @keyframes fadeIn{from{opacity:0;transform:translateY(-10px)}to{opacity:1;transform:translateY(0)}}
 @keyframes spin{from{transform:rotate(0)}to{transform:rotate(360deg)}}
 @keyframes pulse{0%{box-shadow:0 0 0 0 rgba(220,53,69,.4)}70%{box-shadow:0 0 0 10px rgba(220,53,69,0)}100%{box-shadow:0 0 0 0 rgba(220,53,69,0)}}
