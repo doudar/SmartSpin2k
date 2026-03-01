@@ -29,7 +29,7 @@
 // maxInterval – [in] The maximum connection interval in 1.25ms units.
 // latency – [in] The number of packets allowed to skip (extends max interval).
 // timeout – [in] The timeout time in 10ms units before disconnecting.
-const uint16_t connectionParams[] = {24, 48, 0, 200};
+const uint16_t connectionParams[] = {24, 72, 1, 300};
 
 // Vector of supported BLE services and their corresponding characteristic UUIDs
 struct BLEServiceInfo {
@@ -201,6 +201,7 @@ class SpinBLEClient {
   // connected one.
   void removeDuplicates(NimBLEClient* pClient);
   void resetDevices(NimBLEClient* pClient);
+  bool allDevicesPostConnected();
   void postConnect();
   void FTMSControlPointWrite(const uint8_t* pData, int length);
   void connectBLE_HID(NimBLEClient* pClient);
@@ -228,6 +229,7 @@ class MyClientCallback : public NimBLEClientCallbacks {
  public:
   void onConnect(NimBLEClient* pClient) override;
   void onDisconnect(NimBLEClient* pClient, int reason) override;
+  void onMTUChange(NimBLEClient* pClient, uint16_t MTU) override;
 };
 
 extern SpinBLEClient spinBLEClient;

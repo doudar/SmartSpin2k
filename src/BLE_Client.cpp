@@ -190,7 +190,10 @@ void bleClientTask(void* pvParameters) {
     }
 
     // Post connect previously connected clients. This needs to be before connect, as it takes a while to complete the connection (let it loop once.)
-    spinBLEClient.postConnect();
+    if (!spinBLEClient.allDevicesPostConnected()) {
+      delay(500);
+      spinBLEClient.postConnect();
+    }
 
     // Connect BLE Servers to this client
     for (int x = 0; x < NUM_BLE_DEVICES; x++) {
@@ -218,7 +221,11 @@ void bleClientTask(void* pvParameters) {
     if (((millis() - scanDelay) > BLE_RECONNECT_SCAN_INTERVAL)) {
       spinBLEClient.checkBLEReconnect();
       if (spinBLEClient.doScan) {
-        spinBLEClient.scanProcess(DEFAULT_SCAN_DURATION);
+        if (spinBLEClient.allDevicesPostConnected()) {
+          spinBLEClient.scanProcess(DEFAULT_SCAN_DURATION);
+        } else {
+          SS2K_LOG(BLE_CLIENT_LOG_TAG, "Scan Blocked - Not all devices post connected.");
+        }
       }
       scanDelay = millis();
     }
@@ -339,6 +346,10 @@ bool SpinBLEClient::connectToServer() {
  **                       Remove as you see fit for your needs                        */
 
 void MyClientCallback::onConnect(NimBLEClient* pClient) { SS2K_LOG(BLE_CLIENT_LOG_TAG, "Connected, %s", pClient->getPeerAddress().toString().c_str()); }
+
+void MyClientCallback::onMTUChange(NimBLEClient* pClient, uint16_t MTU) {
+  SS2K_LOG(BLE_CLIENT_LOG_TAG, "Client MTU updated: %u for connection ID: %u", MTU, pClient->getConnHandle());
+}
 
 void MyClientCallback::onDisconnect(NimBLEClient* pClient, int reason) {
   NimBLEAddress addr = pClient->getPeerAddress();
@@ -555,9 +566,7 @@ void SpinBLEClient::scanProcess(int duration) {
   pBLEScan->start(duration, false, true);
 }
 
-void ScanCallbacks::onScanEnd(const NimBLEScanResults& results, int reason) {
-  SS2K_LOG(BLE_CLIENT_LOG_TAG, "Scan Ended");
-}
+void ScanCallbacks::onScanEnd(const NimBLEScanResults& results, int reason) { SS2K_LOG(BLE_CLIENT_LOG_TAG, "Scan Ended"); }
 
 // remove the last connected BLE Power Meter
 void SpinBLEClient::removeDuplicates(NimBLEClient* pClient) {
@@ -595,6 +604,15 @@ void SpinBLEClient::resetDevices(NimBLEClient* pClient) {
       _BLEd.reset();
     }
   }
+}
+
+bool SpinBLEClient::allDevicesPostConnected() {
+  for (auto& _BLEd : myBLEDevices) {
+    if (_BLEd.connectedClientID != BLE_HS_CONN_HANDLE_NONE && !_BLEd.isPostConnected) {
+      return false;
+    }
+  }
+  return true;
 }
 
 // Control a connected FTMS trainer. If no args are passed, treat it like an external stepper motor.
@@ -653,7 +671,9 @@ void SpinBLEClient::postConnect() {
       NimBLEClient* pClient = NimBLEDevice::getClientByPeerAddress(_BLEd.peerAddress);
       if (pClient) {
         pClient->exchangeMTU();
+        delay(50);
         pClient->updateConnParams(connectionParams[0], connectionParams[1], connectionParams[2], connectionParams[3]);
+        delay(50);
         _BLEd.isPostConnected = subscribeToAllNotifications(pClient);
         if (!_BLEd.isPostConnected) {
           SS2K_LOG(BLE_CLIENT_LOG_TAG, "Failed to subscribe to notifications for %s", adevName.c_str());

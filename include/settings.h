@@ -262,7 +262,7 @@ constexpr const char* ANY = "any";
 // Sometimes nimble doesn't detect that a device has disconnected.
 // If no data is received from a connected device after this duration,
 // The client will be disconnected.
-#define BLE_CLIENT_DISCONNECT_TIMEOUT 5000
+#define BLE_CLIENT_DISCONNECT_TIMEOUT 10000
 
 #ifndef DEBUG_LOG_BUFFER_SIZE
 #define DEBUG_LOG_BUFFER_SIZE 600
