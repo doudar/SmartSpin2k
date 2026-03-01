@@ -21,7 +21,7 @@
 #define DIRCON_MAX_CLIENTS           1
 #define DIRCON_RECEIVE_BUFFER_SIZE   256
 #define DIRCON_SEND_BUFFER_SIZE      256
-#define DIRCON_MAX_CHARACTERISTICS   10   // maximum number of characteristics to track for subscriptions
+#define DIRCON_MAX_CHARACTERISTICS   20   // maximum number of characteristics to track for subscriptions
 
 class DirConManager {
  public:
@@ -33,7 +33,7 @@ class DirConManager {
   static void addBleServiceUuid(const NimBLEUUID& serviceUuid);
 
   // Notify DirCon clients about BLE characteristic changes
-  static void notifyCharacteristic(const NimBLEUUID& serviceUuid, const NimBLEUUID& characteristicUuid, uint8_t* data, size_t length);
+  static void notifyCharacteristic(const NimBLEUUID& serviceUuid, const NimBLEUUID& characteristicUuid, uint8_t* data, size_t length, bool onlySubscribers = true);
 
  private:
   // Core functionality
@@ -56,7 +56,7 @@ class DirConManager {
   static bool processDirConMessage(DirConMessage* message, size_t clientIndex);
   static void sendErrorResponse(uint8_t messageId, uint8_t sequenceNumber, uint8_t errorCode, size_t clientIndex);
   static void sendResponse(DirConMessage* message, size_t clientIndex);
-  static void broadcastNotification(const NimBLEUUID& characteristicUuid, uint8_t* data, size_t length);
+  static void broadcastNotification(const NimBLEUUID& characteristicUuid, uint8_t* data, size_t length, bool onlySubscribers = true);
 
   // Service and characteristic handling
   static std::vector<NimBLEUUID> getAvailableServices();

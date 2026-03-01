@@ -24,6 +24,7 @@
 #include "settings.h"
 // #include "BLE_Wattbike_Service.h"
 #include "BLE_Fitness_Machine_Service.h"
+#include "BLE_Zwift_Service.h"
 #include "DirConManager.h"
 
 // Stepper Motor Serial
@@ -339,6 +340,23 @@ void SS2K::maintenanceLoop(void* pvParameters) {
 void SS2K::FTMSModeShiftModifier() {
   int shiftDelta = rtConfig->getShifterPosition() - ss2k->lastShifterPosition;
   if (shiftDelta) {  // Shift detected
+    // When Zwift virtual shifting is active, forward shifts to Zwift
+    // instead of handling them internally. Zwift sends gear changes
+    // back via the custom trainer protocol which we already handle.
+    if (zwiftService.isConnected()) {
+      int absDelta = abs(shiftDelta);
+      for (int i = 0; i < absDelta; i++) {
+        if (shiftDelta > 0) {
+          zwiftService.sendShiftUp();
+        } else {
+          zwiftService.sendShiftDown();
+        }
+      }
+      // Reset shifter position since we're not handling internally
+      //rtConfig->setShifterPosition(ss2k->lastShifterPosition);
+      //BLE_ss2kCustomCharacteristic::notify(BLE_shifterPosition);
+      //return;
+    }
     switch (rtConfig->getFTMSMode()) {
       case FitnessMachineControlPointProcedure::SetTargetPower:  // ERG Mode
       {

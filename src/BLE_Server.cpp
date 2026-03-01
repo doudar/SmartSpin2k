@@ -19,6 +19,7 @@
 #include "BLE_Fitness_Machine_Service.h"
 #include "BLE_Custom_Characteristic.h"
 #include "BLE_Device_Information_Service.h"
+#include "BLE_Zwift_Service.h"
 
 // BLE Server Settings
 SpinBLEServer spinBLEServer;
@@ -31,6 +32,7 @@ BLE_Heart_Service heartService;
 BLE_Fitness_Machine_Service fitnessMachineService;
 BLE_ss2kCustomCharacteristic ss2kCustomCharacteristic;
 BLE_Device_Information_Service deviceInformationService;
+BLE_Zwift_Service zwiftService;
 // BLE_Wattbike_Service wattbikeService;
 // BLE_SB20_Service sb20Service;
 
@@ -54,13 +56,17 @@ void startBLEServer() {
   fitnessMachineService.setupService(spinBLEServer.pServer, &chrCallbacks);
   ss2kCustomCharacteristic.setupService(spinBLEServer.pServer);
   deviceInformationService.setupService(spinBLEServer.pServer);
+  zwiftService.setupService(spinBLEServer.pServer);
   //add all service UUIDs to advertisement vector
-  oServiceUUIDs.push_back(CSCSERVICE_UUID);
-  oServiceUUIDs.push_back(CYCLINGPOWERSERVICE_UUID);
-  oServiceUUIDs.push_back(HEARTSERVICE_UUID);
+  //oServiceUUIDs.push_back(CSCSERVICE_UUID);
+  //oServiceUUIDs.push_back(CYCLINGPOWERSERVICE_UUID);
+  //oServiceUUIDs.push_back(HEARTSERVICE_UUID);
   oServiceUUIDs.push_back(FITNESSMACHINESERVICE_UUID);
+  oServiceUUIDs.push_back(ZWIFT_RIDE_CUSTOM_SERVICE_UUID);
   oAdvertisementData.setFlags(0x06);  // General Discoverable, BR/EDR Not Supported
   oAdvertisementData.setCompleteServices16(oServiceUUIDs);
+  // No manufacturer data - SmartSpin2k is a third-party trainer, not a Zwift device.
+  // Zwift discovers the custom service (FC82) from the service UUID list.
   pAdvertising->setAdvertisementData(oAdvertisementData);
   pAdvertising->setScanResponseData(oScanResponseData);
   // wattbikeService.setupService(spinBLEServer.pServer);  // No callback needed
@@ -85,6 +91,7 @@ void SpinBLEServer::update() {
   cyclingPowerService.update();
   cyclingSpeedCadenceService.update();
   fitnessMachineService.update();
+  zwiftService.update();
   // wattbikeService.parseNemit();  // Changed from update() to parseNemit()
   // sb20Service.notify();
 }
@@ -149,6 +156,8 @@ void MyServerCallbacks::onConnect(NimBLEServer* pServer, NimBLEConnInfo& connInf
 void MyServerCallbacks::onDisconnect(NimBLEServer* pServer) {
   SS2K_LOG(BLE_SERVER_LOG_TAG, "Bluetooth Remote Client Disconnected. Remaining Clients: %d", pServer->getConnectedCount());
   BLEDevice::startAdvertising();
+  // Reset Zwift handshake state on any client disconnect
+  zwiftService.onClientDisconnect();
   // client disconnected while trying to write fw - reboot to clear the faulty upload.
   if (ss2k->isUpdating) {
     SS2K_LOG(BLE_SERVER_LOG_TAG, "Rebooting because of update interruption.", pServer->getConnectedCount());

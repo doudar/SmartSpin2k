@@ -9,6 +9,8 @@
 #include "SS2KLog.h"
 #include <algorithm>
 #include <BLE_Fitness_Machine_Service.h>
+#include <BLE_Zwift_Service.h>
+#include <Constants.h>
 
 #define DIRCON_LOG_TAG "DirConManager"
 
@@ -403,8 +405,8 @@ bool DirConManager::processDirConMessage(DirConMessage* message, size_t clientIn
         return false;
       }
 
-      // Check if write is allowed based on properties
-      if (!(characteristic->getProperties() & NIMBLE_PROPERTY::WRITE)) {
+      // Check if write is allowed based on properties (accept both WRITE and WRITE_NR)
+      if (!(characteristic->getProperties() & (NIMBLE_PROPERTY::WRITE | NIMBLE_PROPERTY::WRITE_NR))) {
         sendErrorResponse(DIRCON_MSGID_WRITE_CHARACTERISTIC, message->SequenceNumber, DIRCON_RESPCODE_CHARACTERISTIC_OPERATION_NOT_SUPPORTED, clientIndex);
         // log which characteristic failed
         SS2K_LOG(DIRCON_LOG_TAG, "Write operation not supported for characteristic %s", characteristic->getUUID().toString().c_str());
@@ -419,6 +421,15 @@ bool DirConManager::processDirConMessage(DirConMessage* message, size_t clientIn
         spinBLEServer.writeCache.push(characteristic->getValue());
         fitnessMachineService.processFTMSWrite();
         response.AdditionalData = characteristic->getValue();
+      }
+
+      // Handle Zwift sync_rx writes (handshake and protocol commands)
+      if (characteristic->getUUID().equals(NimBLEUUID(ZWIFT_SYNC_RX_CHARACTERISTIC_UUID))) {
+        // Auto-subscribe client to sync_tx and async so handshake response is delivered
+        addSubscription(clientIndex, NimBLEUUID(ZWIFT_SYNC_TX_CHARACTERISTIC_UUID));
+        addSubscription(clientIndex, NimBLEUUID(ZWIFT_ASYNC_CHARACTERISTIC_UUID));
+        std::string value(reinterpret_cast<const char*>(message->AdditionalData.data()), message->AdditionalData.size());
+        zwiftService.handleSyncRxWrite(value);
       }
 
       sendResponse(&response, clientIndex);
@@ -440,8 +451,8 @@ bool DirConManager::processDirConMessage(DirConMessage* message, size_t clientIn
         return false;
       }
 
-      // Check if notifications are allowed based on properties
-      if (!(characteristic->getProperties() & NIMBLE_PROPERTY::NOTIFY)) {
+      // Check if notifications are allowed based on properties (accept both NOTIFY and INDICATE)
+      if (!(characteristic->getProperties() & (NIMBLE_PROPERTY::NOTIFY | NIMBLE_PROPERTY::INDICATE))) {
         sendErrorResponse(DIRCON_MSGID_ENABLE_CHARACTERISTIC_NOTIFICATIONS, message->SequenceNumber, DIRCON_RESPCODE_CHARACTERISTIC_OPERATION_NOT_SUPPORTED, clientIndex);
         SS2K_LOG(DIRCON_LOG_TAG, "Notifications not supported for characteristic %s", characteristic->getUUID().toString().c_str());
         return false;
@@ -509,7 +520,7 @@ void DirConManager::sendResponse(DirConMessage* message, size_t clientIndex) {
   }
 }
 
-void DirConManager::notifyCharacteristic(const NimBLEUUID& serviceUuid, const NimBLEUUID& characteristicUuid, uint8_t* data, size_t length) {
+void DirConManager::notifyCharacteristic(const NimBLEUUID& serviceUuid, const NimBLEUUID& characteristicUuid, uint8_t* data, size_t length, bool onlySubscribers) {
   if (!started || !connectedClients()) {
     return;
   }
@@ -520,11 +531,11 @@ void DirConManager::notifyCharacteristic(const NimBLEUUID& serviceUuid, const Ni
     return;
   }
 
-  // Send notifications to subscribed clients
-  broadcastNotification(characteristicUuid, data, length);
+  // Send notifications to clients
+  broadcastNotification(characteristicUuid, data, length, onlySubscribers);
 }
 
-void DirConManager::broadcastNotification(const NimBLEUUID& characteristicUuid, uint8_t* data, size_t length) {
+void DirConManager::broadcastNotification(const NimBLEUUID& characteristicUuid, uint8_t* data, size_t length, bool onlySubscribers) {
   // Create a single notification message that will be reused for all clients
   static DirConMessage notification;  // Static to avoid repeated heap allocations
 
@@ -548,7 +559,7 @@ void DirConManager::broadcastNotification(const NimBLEUUID& characteristicUuid, 
 
   // Send to all connected clients
   for (int i = 0; i < DIRCON_MAX_CLIENTS; i++) {
-    if (!dirConClients[i].connected() || !hasSubscription(i, characteristicUuid)) {
+    if (!dirConClients[i].connected() || (onlySubscribers && !hasSubscription(i, characteristicUuid))) {
       continue;
     }
 #ifdef DEBUG_DIRCON_MESSAGES
@@ -582,6 +593,9 @@ std::vector<NimBLEUUID> DirConManager::getAvailableServices() {
 
     NimBLEUUID ftmsUuid = NimBLEUUID(FITNESSMACHINESERVICE_UUID);
     cachedServices.push_back(ftmsUuid);
+
+    NimBLEUUID zwiftUuid = NimBLEUUID(ZWIFT_CUSTOM_SERVICE_UUID);
+    cachedServices.push_back(zwiftUuid);
 
     // Log summary
     SS2K_LOG(DIRCON_LOG_TAG, "Initialized service discovery with %d services", cachedServices.size());
@@ -656,11 +670,17 @@ uint8_t DirConManager::getDirConProperties(uint32_t characteristicProperties) {
     properties |= DIRCON_CHAR_PROP_FLAG_READ;
   }
 
-  if (characteristicProperties & NIMBLE_PROPERTY::WRITE) {
+  if (characteristicProperties & (NIMBLE_PROPERTY::WRITE | NIMBLE_PROPERTY::WRITE_NR)) {
     properties |= DIRCON_CHAR_PROP_FLAG_WRITE;
   }
 
   if (characteristicProperties & NIMBLE_PROPERTY::NOTIFY) {
+    properties |= DIRCON_CHAR_PROP_FLAG_NOTIFY;
+  }
+
+  // DirCon protocol doesn't define a separate INDICATE flag;
+  // map INDICATE to NOTIFY so clients can subscribe to indicated characteristics
+  if (characteristicProperties & NIMBLE_PROPERTY::INDICATE) {
     properties |= DIRCON_CHAR_PROP_FLAG_NOTIFY;
   }
 
