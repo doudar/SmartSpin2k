@@ -12,24 +12,31 @@
 #include <Constants.h>
 
 // "RideOn" handshake bytes
-static const uint8_t RIDE_ON[] = {0x52, 0x69, 0x64, 0x65, 0x4F, 0x6E};
-static const size_t RIDE_ON_LEN = sizeof(RIDE_ON);
+static const char RideOn[7] = "RideOn";
+// static const uint8_t RIDE_ON[] = {0x52, 0x69, 0x64, 0x65, 0x4F, 0x6E};
+// static const size_t RIDE_ON_LEN = sizeof(RIDE_ON);
 
-// Response type bytes for Click v2 controller (BLE)
-static const uint8_t RESPONSE_START_CLICK[] = {0x02, 0x03};
-// Response type bytes for trainer protocol (DirCon)
-static const uint8_t RESPONSE_START_TRAINER[] = {0x02, 0x00};
-static const size_t RESPONSE_START_LEN = 2;
+// Response type bytes appended after RideOn for trainer emulation
+static const uint8_t RESPONSE_START[] = {0x02, 0x00};
+static const size_t RESPONSE_START_LEN = sizeof(RESPONSE_START);
 
-// Async RideOn answer (protobuf-encoded "RIDE_ON(0)") - sent on async after handshake
-static const uint8_t ASYNC_RIDEON_ANSWER[] = {
-    0x2a, 0x08, 0x03, 0x12, 0x0d, 0x22, 0x0b,
-    0x52, 0x49, 0x44, 0x45, 0x5f, 0x4f, 0x4e, 0x28, 0x30, 0x29,
-    0x00};
-static const size_t ASYNC_RIDEON_ANSWER_LEN = sizeof(ASYNC_RIDEON_ANSWER);
+// // Async RideOn answer (protobuf-encoded "RIDE_ON(0)") - sent on async after handshake
+// static const uint8_t ASYNC_RIDEON_ANSWER[] = {
+//     0x2a, 0x08, 0x03, 0x12, 0x0d, 0x22, 0x0b,
+//     0x52, 0x49, 0x44, 0x45, 0x5f, 0x4f, 0x4e, 0x28, 0x30, 0x29,
+//     0x00};
+// static const size_t ASYNC_RIDEON_ANSWER_LEN = sizeof(ASYNC_RIDEON_ANSWER);
 
-// Pre-computed "no buttons pressed" notification (opcode + protobuf varint for 0xFFFFFFFF)
-static const uint8_t ALL_RELEASED[] = {ZWIFT_CONTROLLER_NOTIFICATION_OPCODE, 0x08, 0xFF, 0xFF, 0xFF, 0xFF, 0x0F};
+// Pre-computed "no buttons pressed" Ride notification (opcode 0x23 + bitmap + analog data)
+static const uint8_t ALL_RELEASED[] = {
+    ZWIFT_CONTROLLER_NOTIFICATION_OPCODE,       // 0x23
+    0x08, 0xFF, 0xFF, 0xFF, 0xFF, 0x0F,         // field 1: bitmap = 0xFFFFFFFF (all released)
+    0x12, 0x18,                                  // field 2: length-delimited, 24 bytes
+    0x0A, 0x04, 0x08, 0x00, 0x10, 0x00,          // analog 0 (LEFT): value 0
+    0x0A, 0x04, 0x08, 0x01, 0x10, 0x00,          // analog 1 (RIGHT): value 0
+    0x0A, 0x04, 0x08, 0x02, 0x10, 0x00,          // analog 2: value 0
+    0x0A, 0x04, 0x08, 0x03, 0x10, 0x00           // analog 3: value 0
+};
 static const size_t ALL_RELEASED_LEN = sizeof(ALL_RELEASED);
 
 static ZwiftSyncRxCallbacks zwiftSyncRxCallbacks;
@@ -42,7 +49,6 @@ BLE_Zwift_Service::BLE_Zwift_Service()
       unknownCharacteristic5(nullptr),
       unknownCharacteristic6(nullptr),
       _handshakeComplete(false),
-      _trainerMode(false),
       _lastKeepaliveTime(0),
       _lastRidingDataTime(0),
       _gearRatioX10000(0) {}
@@ -102,7 +108,7 @@ void BLE_Zwift_Service::update() {
   unsigned long now = millis();
 
   // Send riding data periodically (trainer protocol only, not Click controller)
-  if (_trainerMode && (now - _lastRidingDataTime >= ZWIFT_RIDING_DATA_INTERVAL_MS)) {
+  if ((now - _lastRidingDataTime >= ZWIFT_RIDING_DATA_INTERVAL_MS)) {
     sendRidingData();
     _lastRidingDataTime = now;
   }
@@ -126,7 +132,6 @@ void BLE_Zwift_Service::onClientDisconnect() {
   if (_handshakeComplete) {
     SS2K_LOG(ZWIFT_LOG_TAG, "Zwift client disconnected");
     _handshakeComplete = false;
-    _trainerMode = false;
     _lastKeepaliveTime = 0;
     _lastRidingDataTime = 0;
     _gearRatioX10000 = 0;
@@ -156,18 +161,28 @@ void BLE_Zwift_Service::sendShiftDown() {
 }
 
 void BLE_Zwift_Service::sendButtonNotification(uint32_t buttonMask) {
-  // Build protobuf-encoded RideKeyPadStatus with inverted button map
-  // Field 1 (buttonMap) = ~buttonMask & 0xFFFFFFFF, wire type 0 (varint), tag = 0x08
+  // Build Ride format: opcode(1) + tag(1) + varint(max5) + analog(26) = max 33 bytes
   uint32_t buttonMap = ~buttonMask & 0xFFFFFFFF;
 
-  uint8_t buf[8];  // opcode(1) + tag(1) + varint(max 5) = max 7 bytes
-  buf[0] = ZWIFT_CONTROLLER_NOTIFICATION_OPCODE;
+  static const uint8_t analogData[] = {
+      0x12, 0x18,                               // field 2: length-delimited, 24 bytes
+      0x0A, 0x04, 0x08, 0x00, 0x10, 0x00,       // analog 0 (LEFT): value 0
+      0x0A, 0x04, 0x08, 0x01, 0x10, 0x00,       // analog 1 (RIGHT): value 0
+      0x0A, 0x04, 0x08, 0x02, 0x10, 0x00,       // analog 2: value 0
+      0x0A, 0x04, 0x08, 0x03, 0x10, 0x00        // analog 3: value 0
+  };
+
+  uint8_t buf[33];
+  buf[0] = ZWIFT_CONTROLLER_NOTIFICATION_OPCODE;  // 0x23
   buf[1] = 0x08;  // protobuf tag: field 1, varint
   size_t varintLen = encodeVarint32(buttonMap, &buf[2]);
+  size_t pos = 2 + varintLen;
+  memcpy(&buf[pos], analogData, sizeof(analogData));
+  pos += sizeof(analogData);
 
-  asyncCharacteristic->setValue(buf, 2 + varintLen);
+  asyncCharacteristic->setValue(buf, pos);
   asyncCharacteristic->notify();
-  DirConManager::notifyCharacteristic(NimBLEUUID(ZWIFT_CUSTOM_SERVICE_UUID), asyncCharacteristic->getUUID(), buf, 2 + varintLen);
+  DirConManager::notifyCharacteristic(NimBLEUUID(ZWIFT_CUSTOM_SERVICE_UUID), asyncCharacteristic->getUUID(), buf, pos);
 }
 
 size_t BLE_Zwift_Service::encodeVarint32(uint32_t value, uint8_t *buffer) {
@@ -204,27 +219,15 @@ void BLE_Zwift_Service::handleSyncRxWrite(const std::string &value, bool isDirCo
   const uint8_t *data = reinterpret_cast<const uint8_t *>(value.data());
 
   // Check if it starts with "RideOn" (handshake)
-  if (value.length() >= RIDE_ON_LEN && memcmp(data, RIDE_ON, RIDE_ON_LEN) == 0) {
+  if (value.length() >= 6 && memcmp(data, RideOn, 6) == 0) {
     SS2K_LOG(ZWIFT_LOG_TAG, "Received RideOn handshake from Zwift (%s)", isDirCon ? "DirCon/Trainer" : "BLE/Click");
 
-    // Build response: RideOn + type bytes (trainer or Click v2 depending on transport)
-    const uint8_t *responseType = isDirCon ? RESPONSE_START_TRAINER : RESPONSE_START_CLICK;
-    uint8_t response[RIDE_ON_LEN + RESPONSE_START_LEN];
-    memcpy(response, RIDE_ON, RIDE_ON_LEN);
-    memcpy(response + RIDE_ON_LEN, responseType, RESPONSE_START_LEN);
-
-    // Send sync_tx response (indicate) - to ALL DirCon clients (handshake must bypass subscription check)
-    syncTxCharacteristic->setValue(response, sizeof(response));
+    // Send sync_tx response (indicate)
+    syncTxCharacteristic->setValue({0x52, 0x69, 0x64, 0x65, 0x4F, 0x6E, 0x01, uint8_t(value.length())});
     syncTxCharacteristic->indicate();
-    DirConManager::notifyCharacteristic(NimBLEUUID(ZWIFT_CUSTOM_SERVICE_UUID), syncTxCharacteristic->getUUID(), response, sizeof(response), false);
-
-    // Trainer mode sends async RideOn answer; Click controller mode does not
+    
     if (isDirCon) {
-      asyncCharacteristic->setValue(ASYNC_RIDEON_ANSWER, ASYNC_RIDEON_ANSWER_LEN);
-      asyncCharacteristic->notify();
-      DirConManager::notifyCharacteristic(NimBLEUUID(ZWIFT_CUSTOM_SERVICE_UUID), asyncCharacteristic->getUUID(),
-                                          const_cast<uint8_t*>(ASYNC_RIDEON_ANSWER), ASYNC_RIDEON_ANSWER_LEN, false);
-      _trainerMode = true;
+      DirConManager::notifyCharacteristic(NimBLEUUID(ZWIFT_CUSTOM_SERVICE_UUID), syncTxCharacteristic->getUUID(), (uint8_t*)RideOn, 6, false);
     }
 
     _handshakeComplete = true;
@@ -459,8 +462,15 @@ size_t BLE_Zwift_Service::encodeUleb128(uint64_t value, uint8_t *buffer) {
 // ---- Callbacks ----
 
 void ZwiftSyncRxCallbacks::onWrite(NimBLECharacteristic *pCharacteristic, NimBLEConnInfo &connInfo) {
-  std::string value = pCharacteristic->getValue();
-  SS2K_LOG(ZWIFT_LOG_TAG, "Sync RX write from %s (len=%d)", connInfo.getAddress().toString().c_str(), value.length());
+  NimBLEAttValue value = pCharacteristic->getValue();
+//log the entire data recieved in 0x
+  std::string hexValue;
+  for (size_t i = 0; i < value.length(); i++) {
+      char buf[3];
+      snprintf(buf, sizeof(buf), "%02X", value[i]);
+      hexValue.append(buf);
+  }
+  SS2K_LOG(ZWIFT_LOG_TAG, "Sync RX write from %s (len=%d) %s", connInfo.getAddress().toString().c_str(), value.length(), hexValue.c_str());
   zwiftService.handleSyncRxWrite(value);
 }
 

@@ -537,7 +537,7 @@ void DirConManager::notifyCharacteristic(const NimBLEUUID& serviceUuid, const Ni
   if (findCharacteristic(characteristicUuid) == nullptr) {
     return;
   }
-
+  
   // Send notifications to clients
   broadcastNotification(characteristicUuid, data, length, onlySubscribers);
 }

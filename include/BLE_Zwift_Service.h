@@ -18,7 +18,7 @@
 #define ZWIFT_CLICK_V2_LEFT    0x0B  // Zwift Click v2 Left
 
 // Zwift protocol constants
-#define ZWIFT_CONTROLLER_NOTIFICATION_OPCODE 0x07
+#define ZWIFT_CONTROLLER_NOTIFICATION_OPCODE 0x23  // Zwift Ride key status message
 #define ZWIFT_EMPTY_MESSAGE_TYPE             0x15
 #define ZWIFT_BATTERY_LEVEL_TYPE             0x19
 
@@ -26,7 +26,8 @@
 #define ZWIFT_TRAINER_RIDING_DATA   0x03
 #define ZWIFT_TRAINER_CONTROL       0x04
 
-// Zwift Click button masks (inverted logic: 0 = pressed)
+// Zwift Ride button masks (inverted logic: 0 = pressed)
+// Bit layout per Zwift Ride protocol (note: bit 7 and bit 15 are unused gaps)
 #define ZWIFT_BTN_LEFT       0x00001
 #define ZWIFT_BTN_UP         0x00002
 #define ZWIFT_BTN_RIGHT      0x00004
@@ -34,15 +35,15 @@
 #define ZWIFT_BTN_A          0x00010
 #define ZWIFT_BTN_B          0x00020
 #define ZWIFT_BTN_Y          0x00040
-#define ZWIFT_BTN_Z          0x00080
-#define ZWIFT_BTN_SHFT_UP_L  0x00100
-#define ZWIFT_BTN_SHFT_DN_L  0x00200
-#define ZWIFT_BTN_POWERUP_L  0x00400
-#define ZWIFT_BTN_ONOFF_L    0x00800
-#define ZWIFT_BTN_SHFT_UP_R  0x01000
-#define ZWIFT_BTN_SHFT_DN_R  0x02000
-#define ZWIFT_BTN_POWERUP_R  0x04000
-#define ZWIFT_BTN_ONOFF_R    0x08000
+#define ZWIFT_BTN_Z          0x00100
+#define ZWIFT_BTN_SHFT_UP_L  0x00200
+#define ZWIFT_BTN_SHFT_DN_L  0x00400
+#define ZWIFT_BTN_POWERUP_L  0x00800
+#define ZWIFT_BTN_ONOFF_L    0x01000
+#define ZWIFT_BTN_SHFT_UP_R  0x02000
+#define ZWIFT_BTN_SHFT_DN_R  0x04000
+#define ZWIFT_BTN_POWERUP_R  0x10000
+#define ZWIFT_BTN_ONOFF_R    0x20000
 
 // Keepalive / riding data interval in milliseconds
 #define ZWIFT_KEEPALIVE_INTERVAL_MS 5000
@@ -84,7 +85,6 @@ class BLE_Zwift_Service {
   NimBLECharacteristic *unknownCharacteristic6;
 
   volatile bool _handshakeComplete;
-  volatile bool _trainerMode;  // true when DirCon trainer handshake, false for BLE Click
   unsigned long _lastKeepaliveTime;
   unsigned long _lastRidingDataTime;
   volatile uint32_t _gearRatioX10000;
