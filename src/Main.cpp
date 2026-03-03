@@ -343,6 +343,9 @@ void SS2K::FTMSModeShiftModifier() {
     // When Zwift virtual shifting is active, forward shifts to Zwift
     // instead of handling them internally. Zwift sends gear changes
     // back via the custom trainer protocol which we already handle.
+    // This needs to be moved so shift blocking/knob crashing prevention is enforced.
+    // Keeping here for now for development/testing purposes
+
     if (zwiftService.isConnected()) {
       int absDelta = abs(shiftDelta);
       for (int i = 0; i < absDelta; i++) {
@@ -352,10 +355,6 @@ void SS2K::FTMSModeShiftModifier() {
           zwiftService.sendShiftDown();
         }
       }
-      // Reset shifter position since we're not handling internally
-      //rtConfig->setShifterPosition(ss2k->lastShifterPosition);
-      //BLE_ss2kCustomCharacteristic::notify(BLE_shifterPosition);
-      //return;
     }
     switch (rtConfig->getFTMSMode()) {
       case FitnessMachineControlPointProcedure::SetTargetPower:  // ERG Mode

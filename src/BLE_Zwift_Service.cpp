@@ -430,6 +430,9 @@ void BLE_Zwift_Service::applyGearRatio() {
 
   int newShifterPos = closestIndex;
   rtConfig->setShifterPosition(newShifterPos);
+  // Also update lastShifterPosition so FTMSModeShiftModifier doesn't
+  // see this Zwift-driven change as a user shift and echo it back.
+  ss2k->setLastShifterPosition(newShifterPos);
   SS2K_LOG(ZWIFT_LOG_TAG, "Gear %d -> shifter position %d", closestIndex + 1, newShifterPos);
 }
 

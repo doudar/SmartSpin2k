@@ -65,6 +65,9 @@ class SS2K {
   int32_t getCurrentPosition() { return currentPosition; }
   void setCurrentPosition(int32_t cp) { currentPosition = cp; }
 
+  int getLastShifterPosition() { return lastShifterPosition; }
+  void setLastShifterPosition(int sp) { lastShifterPosition = sp; }
+
   void resetIfShiftersHeld();
   void startTasks();
   void stopTasks();
