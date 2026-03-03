@@ -53,6 +53,13 @@ bool DirConManager::start() {
     tcpServer->begin();
 
     started = true;
+
+    // BLE services call addBleServiceUuid() during setup, before DirCon starts,
+    // so those calls are silently dropped. Re-populate now that we're started.
+    for (const NimBLEUUID& uuid : getAvailableServices()) {
+      addBleServiceUuid(uuid);
+    }
+
     updateStatusMessage();
     SS2K_LOG(DIRCON_LOG_TAG, "%s", statusMessage.c_str());
     return true;
@@ -429,7 +436,7 @@ bool DirConManager::processDirConMessage(DirConMessage* message, size_t clientIn
         addSubscription(clientIndex, NimBLEUUID(ZWIFT_SYNC_TX_CHARACTERISTIC_UUID));
         addSubscription(clientIndex, NimBLEUUID(ZWIFT_ASYNC_CHARACTERISTIC_UUID));
         std::string value(reinterpret_cast<const char*>(message->AdditionalData.data()), message->AdditionalData.size());
-        zwiftService.handleSyncRxWrite(value);
+        zwiftService.handleSyncRxWrite(value, true);
       }
 
       sendResponse(&response, clientIndex);

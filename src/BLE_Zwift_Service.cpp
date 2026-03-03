@@ -15,9 +15,11 @@
 static const uint8_t RIDE_ON[] = {0x52, 0x69, 0x64, 0x65, 0x4F, 0x6E};
 static const size_t RIDE_ON_LEN = sizeof(RIDE_ON);
 
-// Response type bytes appended after RideOn for trainer emulation
-static const uint8_t RESPONSE_START[] = {0x02, 0x00};
-static const size_t RESPONSE_START_LEN = sizeof(RESPONSE_START);
+// Response type bytes for Click v2 controller (BLE)
+static const uint8_t RESPONSE_START_CLICK[] = {0x02, 0x03};
+// Response type bytes for trainer protocol (DirCon)
+static const uint8_t RESPONSE_START_TRAINER[] = {0x02, 0x00};
+static const size_t RESPONSE_START_LEN = 2;
 
 // Async RideOn answer (protobuf-encoded "RIDE_ON(0)") - sent on async after handshake
 static const uint8_t ASYNC_RIDEON_ANSWER[] = {
@@ -40,6 +42,7 @@ BLE_Zwift_Service::BLE_Zwift_Service()
       unknownCharacteristic5(nullptr),
       unknownCharacteristic6(nullptr),
       _handshakeComplete(false),
+      _trainerMode(false),
       _lastKeepaliveTime(0),
       _lastRidingDataTime(0),
       _gearRatioX10000(0) {}
@@ -98,8 +101,8 @@ void BLE_Zwift_Service::update() {
 
   unsigned long now = millis();
 
-  // Send riding data periodically (trainer protocol)
-  if (now - _lastRidingDataTime >= ZWIFT_RIDING_DATA_INTERVAL_MS) {
+  // Send riding data periodically (trainer protocol only, not Click controller)
+  if (_trainerMode && (now - _lastRidingDataTime >= ZWIFT_RIDING_DATA_INTERVAL_MS)) {
     sendRidingData();
     _lastRidingDataTime = now;
   }
@@ -123,6 +126,7 @@ void BLE_Zwift_Service::onClientDisconnect() {
   if (_handshakeComplete) {
     SS2K_LOG(ZWIFT_LOG_TAG, "Zwift client disconnected");
     _handshakeComplete = false;
+    _trainerMode = false;
     _lastKeepaliveTime = 0;
     _lastRidingDataTime = 0;
     _gearRatioX10000 = 0;
@@ -191,7 +195,7 @@ void BLE_Zwift_Service::sendKeepalive() {
                                       const_cast<uint8_t*>(ALL_RELEASED), ALL_RELEASED_LEN);
 }
 
-void BLE_Zwift_Service::handleSyncRxWrite(const std::string &value) {
+void BLE_Zwift_Service::handleSyncRxWrite(const std::string &value, bool isDirCon) {
   if (value.length() < 2) {
     SS2K_LOG(ZWIFT_LOG_TAG, "Received short write on sync_rx, ignoring");
     return;
@@ -201,30 +205,34 @@ void BLE_Zwift_Service::handleSyncRxWrite(const std::string &value) {
 
   // Check if it starts with "RideOn" (handshake)
   if (value.length() >= RIDE_ON_LEN && memcmp(data, RIDE_ON, RIDE_ON_LEN) == 0) {
-    SS2K_LOG(ZWIFT_LOG_TAG, "Received RideOn handshake from Zwift");
+    SS2K_LOG(ZWIFT_LOG_TAG, "Received RideOn handshake from Zwift (%s)", isDirCon ? "DirCon/Trainer" : "BLE/Click");
 
-    // Build response: RideOn + trainer type response bytes
+    // Build response: RideOn + type bytes (trainer or Click v2 depending on transport)
+    const uint8_t *responseType = isDirCon ? RESPONSE_START_TRAINER : RESPONSE_START_CLICK;
     uint8_t response[RIDE_ON_LEN + RESPONSE_START_LEN];
     memcpy(response, RIDE_ON, RIDE_ON_LEN);
-    memcpy(response + RIDE_ON_LEN, RESPONSE_START, RESPONSE_START_LEN);
+    memcpy(response + RIDE_ON_LEN, responseType, RESPONSE_START_LEN);
 
     // Send sync_tx response (indicate) - to ALL DirCon clients (handshake must bypass subscription check)
     syncTxCharacteristic->setValue(response, sizeof(response));
     syncTxCharacteristic->indicate();
     DirConManager::notifyCharacteristic(NimBLEUUID(ZWIFT_CUSTOM_SERVICE_UUID), syncTxCharacteristic->getUUID(), response, sizeof(response), false);
 
-    // Send async RideOn notification - to ALL DirCon clients
-    asyncCharacteristic->setValue(ASYNC_RIDEON_ANSWER, ASYNC_RIDEON_ANSWER_LEN);
-    asyncCharacteristic->notify();
-    DirConManager::notifyCharacteristic(NimBLEUUID(ZWIFT_CUSTOM_SERVICE_UUID), asyncCharacteristic->getUUID(),
-                                        const_cast<uint8_t*>(ASYNC_RIDEON_ANSWER), ASYNC_RIDEON_ANSWER_LEN, false);
+    // Trainer mode sends async RideOn answer; Click controller mode does not
+    if (isDirCon) {
+      asyncCharacteristic->setValue(ASYNC_RIDEON_ANSWER, ASYNC_RIDEON_ANSWER_LEN);
+      asyncCharacteristic->notify();
+      DirConManager::notifyCharacteristic(NimBLEUUID(ZWIFT_CUSTOM_SERVICE_UUID), asyncCharacteristic->getUUID(),
+                                          const_cast<uint8_t*>(ASYNC_RIDEON_ANSWER), ASYNC_RIDEON_ANSWER_LEN, false);
+      _trainerMode = true;
+    }
 
     _handshakeComplete = true;
     _lastKeepaliveTime = millis();
     _lastRidingDataTime = millis();
     _gearRatioX10000 = 0;
 
-    SS2K_LOG(ZWIFT_LOG_TAG, "Handshake complete - Zwift trainer protocol active");
+    SS2K_LOG(ZWIFT_LOG_TAG, "Handshake complete - %s mode active", isDirCon ? "Trainer" : "Click controller");
     return;
   }
 

@@ -72,7 +72,8 @@ class BLE_Zwift_Service {
   void sendShiftDown();
 
   // Handle incoming write to sync_rx (handshake and protocol commands)
-  void handleSyncRxWrite(const std::string &value);
+  // isDirCon=true uses trainer protocol, isDirCon=false uses Click v2 controller protocol
+  void handleSyncRxWrite(const std::string &value, bool isDirCon = false);
 
  private:
   NimBLEService *pZwiftService;
@@ -83,6 +84,7 @@ class BLE_Zwift_Service {
   NimBLECharacteristic *unknownCharacteristic6;
 
   volatile bool _handshakeComplete;
+  volatile bool _trainerMode;  // true when DirCon trainer handshake, false for BLE Click
   unsigned long _lastKeepaliveTime;
   unsigned long _lastRidingDataTime;
   volatile uint32_t _gearRatioX10000;

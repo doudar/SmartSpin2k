@@ -63,10 +63,14 @@ void startBLEServer() {
   //oServiceUUIDs.push_back(HEARTSERVICE_UUID);
   oServiceUUIDs.push_back(FITNESSMACHINESERVICE_UUID);
   oServiceUUIDs.push_back(ZWIFT_RIDE_CUSTOM_SERVICE_UUID);
+  oServiceUUIDs.push_back(ZWIFT_CUSTOM_SERVICE_UUID);
   oAdvertisementData.setFlags(0x06);  // General Discoverable, BR/EDR Not Supported
   oAdvertisementData.setCompleteServices16(oServiceUUIDs);
-  // No manufacturer data - SmartSpin2k is a third-party trainer, not a Zwift device.
-  // Zwift discovers the custom service (FC82) from the service UUID list.
+  // Zwift identifies controllers via manufacturer data with company ID 0x094A
+  NimBLEAddress bleAddr = BLEDevice::getAddress();
+  const uint8_t *addrVal = bleAddr.getVal();
+  static const uint8_t zwiftMfrData[] = { 0x4A, 0x09, 0x02, 0x58, 0x9A };
+  oAdvertisementData.setManufacturerData(zwiftMfrData, sizeof(zwiftMfrData));
   pAdvertising->setAdvertisementData(oAdvertisementData);
   pAdvertising->setScanResponseData(oScanResponseData);
   // wattbikeService.setupService(spinBLEServer.pServer);  // No callback needed
