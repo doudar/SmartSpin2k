@@ -20,12 +20,12 @@ static const char RideOn[7] = "RideOn";
 static const uint8_t RESPONSE_START[] = {0x02, 0x00};
 static const size_t RESPONSE_START_LEN = sizeof(RESPONSE_START);
 
-// // Async RideOn answer (protobuf-encoded "RIDE_ON(0)") - sent on async after handshake
-// static const uint8_t ASYNC_RIDEON_ANSWER[] = {
-//     0x2a, 0x08, 0x03, 0x12, 0x0d, 0x22, 0x0b,
-//     0x52, 0x49, 0x44, 0x45, 0x5f, 0x4f, 0x4e, 0x28, 0x30, 0x29,
-//     0x00};
-// static const size_t ASYNC_RIDEON_ANSWER_LEN = sizeof(ASYNC_RIDEON_ANSWER);
+// Async RideOn answer (protobuf-encoded "RIDE_ON(0)") - sent on async after handshake
+static const uint8_t ASYNC_RIDEON_ANSWER[] = {
+    0x2a, 0x08, 0x03, 0x12, 0x0d, 0x22, 0x0b,
+    0x52, 0x49, 0x44, 0x45, 0x5f, 0x4f, 0x4e, 0x28, 0x30, 0x29,
+    0x00};
+static const size_t ASYNC_RIDEON_ANSWER_LEN = sizeof(ASYNC_RIDEON_ANSWER);
 
 // Pre-computed "no buttons pressed" Ride notification (opcode 0x23 + bitmap + analog data)
 static const uint8_t ALL_RELEASED[] = {
@@ -220,14 +220,24 @@ void BLE_Zwift_Service::handleSyncRxWrite(const std::string &value, bool isDirCo
 
   // Check if it starts with "RideOn" (handshake)
   if (value.length() >= 6 && memcmp(data, RideOn, 6) == 0) {
-    SS2K_LOG(ZWIFT_LOG_TAG, "Received RideOn handshake from Zwift (%s)", isDirCon ? "DirCon/Trainer" : "BLE/Click");
+    SS2K_LOG(ZWIFT_LOG_TAG, "Received RideOn handshake from Zwift (%s)", isDirCon ? "DirCon" : "BLE");
 
-    // Send sync_tx response (indicate)
-    syncTxCharacteristic->setValue({0x52, 0x69, 0x64, 0x65, 0x4F, 0x6E, 0x01, uint8_t(value.length())});
+    // Send sync_tx response: "RideOn" + trainer response start bytes {0x02, 0x00}
+    uint8_t syncResponse[6 + RESPONSE_START_LEN];
+    memcpy(syncResponse, RideOn, 6);
+    memcpy(syncResponse + 6, RESPONSE_START, RESPONSE_START_LEN);
+    syncTxCharacteristic->setValue(syncResponse, sizeof(syncResponse));
     syncTxCharacteristic->indicate();
+
+    // Send async RideOn answer (protobuf "RIDE_ON(0)") to signal trainer capability
+    asyncCharacteristic->setValue(ASYNC_RIDEON_ANSWER, ASYNC_RIDEON_ANSWER_LEN);
+    asyncCharacteristic->notify();
     
     if (isDirCon) {
-      DirConManager::notifyCharacteristic(NimBLEUUID(ZWIFT_CUSTOM_SERVICE_UUID), syncTxCharacteristic->getUUID(), (uint8_t*)RideOn, 6, false);
+      DirConManager::notifyCharacteristic(NimBLEUUID(ZWIFT_CUSTOM_SERVICE_UUID), syncTxCharacteristic->getUUID(),
+                                          syncResponse, sizeof(syncResponse), false);
+      DirConManager::notifyCharacteristic(NimBLEUUID(ZWIFT_CUSTOM_SERVICE_UUID), asyncCharacteristic->getUUID(),
+                                          const_cast<uint8_t*>(ASYNC_RIDEON_ANSWER), ASYNC_RIDEON_ANSWER_LEN, false);
     }
 
     _handshakeComplete = true;
@@ -235,7 +245,7 @@ void BLE_Zwift_Service::handleSyncRxWrite(const std::string &value, bool isDirCo
     _lastRidingDataTime = millis();
     _gearRatioX10000 = 0;
 
-    SS2K_LOG(ZWIFT_LOG_TAG, "Handshake complete - %s mode active", isDirCon ? "Trainer" : "Click controller");
+    SS2K_LOG(ZWIFT_LOG_TAG, "Handshake complete - %s mode active", isDirCon ? "DirCon" : "BLE");
     return;
   }
 
@@ -296,21 +306,70 @@ void BLE_Zwift_Service::handleZwiftCommand(const uint8_t *data, size_t length) {
   uint8_t opcode = data[0];
 
   switch (opcode) {
-    case 0x00: {  // Info/status request
-      // Parse optional parameter from the request
+    case 0x00: {  // Info/status request (HubRequest protobuf)
+      // Parse DataId from HubRequest: field 1 (tag 0x08) = DataId varint
       uint64_t param = 0;
-      if (length >= 2) {
+      if (length >= 3 && data[1] == 0x08) {
+        // Standard protobuf: 0x00 0x08 <DataId varint>
+        decodeUleb128(&data[2], length - 2, &param);
+      } else if (length >= 2) {
+        // Fallback: raw ULEB128 without protobuf tag
         decodeUleb128(&data[1], length - 1, &param);
       }
       SS2K_LOG(ZWIFT_LOG_TAG, "Info request (0x00) param=%llu", param);
 
-      // Respond to gear ratio query (parameter 520 per Makinolo blog)
-      if (param == 520 && _gearRatioX10000 > 0) {
-        uint8_t resp[16];
+      if (param == 520) {
+        // Gear ratio query - build 0x3c response directly into single buffer
+        uint32_t ratio = (_gearRatioX10000 > 0) ? _gearRatioX10000 : 15300;
+        uint8_t ratioEnc[5];
+        size_t ratioLen = encodeUleb128(static_cast<uint64_t>(ratio), ratioEnc);
+        size_t contentLen = 1 + ratioLen;       // 0x40 tag + ratio varint
+        size_t subContentLen = 2 + contentLen;  // 0x0A tag + 1-byte length + content
+
+        uint8_t resp[20];
         size_t pos = 0;
-        resp[pos++] = 0x00;  // Info response opcode
-        resp[pos++] = 0x10;  // protobuf field 2 tag (GearRatioX10000)
-        pos += encodeUleb128(static_cast<uint64_t>(_gearRatioX10000), &resp[pos]);
+        resp[pos++] = 0x3c;
+        resp[pos++] = 0x08;
+        pos += encodeUleb128(520ULL, &resp[pos]);
+        resp[pos++] = 0x12;
+        pos += encodeUleb128(static_cast<uint64_t>(subContentLen), &resp[pos]);
+        resp[pos++] = 0x0A;
+        pos += encodeUleb128(static_cast<uint64_t>(contentLen), &resp[pos]);
+        resp[pos++] = 0x40;
+        memcpy(&resp[pos], ratioEnc, ratioLen);
+        pos += ratioLen;
+
+        syncTxCharacteristic->setValue(resp, pos);
+        syncTxCharacteristic->indicate();
+        DirConManager::notifyCharacteristic(NimBLEUUID(ZWIFT_CUSTOM_SERVICE_UUID), syncTxCharacteristic->getUUID(), resp, pos);
+
+      } else if (param == 0) {
+        // Device info query - build 0x3c response directly into single buffer
+        const char *deviceName = userConfig->getDeviceName();
+        size_t nameLen = strlen(deviceName);
+        if (nameLen > 20) nameLen = 20;
+        // contentLen: 0x08+varint(1) + 0x10+varint(100) + 0x1A+varint(nameLen)+name = 6+nameLen
+        size_t contentLen = 6 + nameLen;
+        size_t subContentLen = 2 + contentLen;
+
+        uint8_t resp[40];
+        size_t pos = 0;
+        resp[pos++] = 0x3c;
+        resp[pos++] = 0x08;
+        pos += encodeUleb128(0ULL, &resp[pos]);
+        resp[pos++] = 0x12;
+        pos += encodeUleb128(static_cast<uint64_t>(subContentLen), &resp[pos]);
+        resp[pos++] = 0x0A;
+        pos += encodeUleb128(static_cast<uint64_t>(contentLen), &resp[pos]);
+        resp[pos++] = 0x08;
+        pos += encodeUleb128(1ULL, &resp[pos]);
+        resp[pos++] = 0x10;
+        pos += encodeUleb128(100ULL, &resp[pos]);
+        resp[pos++] = 0x1A;
+        pos += encodeUleb128(static_cast<uint64_t>(nameLen), &resp[pos]);
+        memcpy(&resp[pos], deviceName, nameLen);
+        pos += nameLen;
+
         syncTxCharacteristic->setValue(resp, pos);
         syncTxCharacteristic->indicate();
         DirConManager::notifyCharacteristic(NimBLEUUID(ZWIFT_CUSTOM_SERVICE_UUID), syncTxCharacteristic->getUUID(), resp, pos);
