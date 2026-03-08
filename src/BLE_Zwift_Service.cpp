@@ -239,6 +239,20 @@ void BLE_Zwift_Service::sendKeepalive() {
                                       const_cast<uint8_t*>(ALL_RELEASED), ALL_RELEASED_LEN);
 }
 
+bool BLE_Zwift_Service::handleDirConWrite(NimBLECharacteristic *characteristic, const uint8_t *data, size_t length,
+                                          NimBLEUUID *autoSubscribeUuids, size_t *autoSubscribeCount) {
+  *autoSubscribeCount = 0;
+  if (characteristic->getUUID().equals(NimBLEUUID(ZWIFT_SYNC_RX_CHARACTERISTIC_UUID))) {
+    autoSubscribeUuids[0] = NimBLEUUID(ZWIFT_SYNC_TX_CHARACTERISTIC_UUID);
+    autoSubscribeUuids[1] = NimBLEUUID(ZWIFT_ASYNC_CHARACTERISTIC_UUID);
+    *autoSubscribeCount = 2;
+    std::string value(reinterpret_cast<const char *>(data), length);
+    handleSyncRxWrite(value, true);
+    return true;
+  }
+  return false;
+}
+
 void BLE_Zwift_Service::handleSyncRxWrite(const std::string &value, bool isDirCon) {
   if (value.length() < 2) {
     SS2K_LOG(ZWIFT_LOG_TAG, "Received short write on sync_rx, ignoring");

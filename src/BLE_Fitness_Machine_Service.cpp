@@ -140,6 +140,15 @@ void BLE_Fitness_Machine_Service::update() {
                     fmodf((float)speedFtmsUnit / 100.0, 1000.0));
 }
 
+bool BLE_Fitness_Machine_Service::handleDirConWrite(NimBLECharacteristic *characteristic) {
+  if (characteristic->getUUID().equals(FITNESSMACHINECONTROLPOINT_UUID)) {
+    spinBLEServer.writeCache.push(characteristic->getValue());
+    processFTMSWrite();
+    return true;
+  }
+  return false;
+}
+
 // The things that happen when we receive a FitnessMachineControlPointProcedure from a Client.
 void BLE_Fitness_Machine_Service::processFTMSWrite() {
   while (!spinBLEServer.writeCache.empty()) {

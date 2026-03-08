@@ -423,20 +423,17 @@ bool DirConManager::processDirConMessage(DirConMessage* message, size_t clientIn
       // Write the value (setValue doesn't return a status in NimBLE)
       characteristic->setValue(message->AdditionalData.data(), message->AdditionalData.size());
 
-      // handle FTMS control Point Writes
-      if (characteristic->getUUID().equals(FITNESSMACHINECONTROLPOINT_UUID)) {
-        spinBLEServer.writeCache.push(characteristic->getValue());
-        fitnessMachineService.processFTMSWrite();
+      // Let each service handle its own write logic
+      if (fitnessMachineService.handleDirConWrite(characteristic)) {
         response.AdditionalData = characteristic->getValue();
       }
 
-      // Handle Zwift sync_rx writes (handshake and protocol commands)
-      if (characteristic->getUUID().equals(NimBLEUUID(ZWIFT_SYNC_RX_CHARACTERISTIC_UUID))) {
-        // Auto-subscribe client to sync_tx and async so handshake response is delivered
-        addSubscription(clientIndex, NimBLEUUID(ZWIFT_SYNC_TX_CHARACTERISTIC_UUID));
-        addSubscription(clientIndex, NimBLEUUID(ZWIFT_ASYNC_CHARACTERISTIC_UUID));
-        std::string value(reinterpret_cast<const char*>(message->AdditionalData.data()), message->AdditionalData.size());
-        zwiftService.handleSyncRxWrite(value, true);
+      NimBLEUUID autoSubUuids[4];
+      size_t autoSubCount = 0;
+      if (zwiftService.handleDirConWrite(characteristic, message->AdditionalData.data(), message->AdditionalData.size(), autoSubUuids, &autoSubCount)) {
+        for (size_t s = 0; s < autoSubCount; s++) {
+          addSubscription(clientIndex, autoSubUuids[s]);
+        }
       }
 
       sendResponse(&response, clientIndex);
