@@ -8,8 +8,6 @@
 #include "DirConManager.h"
 #include "SS2KLog.h"
 #include <algorithm>
-#include <BLE_Fitness_Machine_Service.h>
-#include <BLE_Zwift_Service.h>
 #include <Constants.h>
 
 #define DIRCON_LOG_TAG "DirConManager"
@@ -24,6 +22,8 @@ size_t DirConManager::receiveBufferLength[DIRCON_MAX_CLIENTS] = {0};
 uint8_t DirConManager::sendBuffer[DIRCON_SEND_BUFFER_SIZE];
 uint8_t DirConManager::lastSequenceNumber[DIRCON_MAX_CLIENTS]                           = {0};
 bool DirConManager::clientSubscriptions[DIRCON_MAX_CLIENTS][DIRCON_MAX_CHARACTERISTICS] = {false};
+DirConManager::ServiceRegistration DirConManager::registeredServices[DIRCON_MAX_SERVICES] = {};
+size_t DirConManager::registeredServiceCount = 0;
 
 // Static buffer to store the list of UUIDs to avoid dynamic string allocations
 static char uuidListBuffer[128] = "";
@@ -54,10 +54,10 @@ bool DirConManager::start() {
 
     started = true;
 
-    // BLE services call addBleServiceUuid() during setup, before DirCon starts,
-    // so those calls are silently dropped. Re-populate now that we're started.
-    for (const NimBLEUUID& uuid : getAvailableServices()) {
-      addBleServiceUuid(uuid);
+    // Registered services have been stored before DirCon starts.
+    // Now that we're started, publish them to MDNS.
+    for (size_t i = 0; i < registeredServiceCount; i++) {
+      addBleServiceUuid(registeredServices[i].serviceUuid);
     }
 
     updateStatusMessage();
@@ -161,6 +161,23 @@ void DirConManager::setupMDNS() {
 
   SS2K_LOG(DIRCON_LOG_TAG, "DirCon MDNS service setup complete");
 }
+
+void DirConManager::registerService(const NimBLEUUID& serviceUuid, DirConWriteHandler writeHandler) {
+  if (registeredServiceCount >= DIRCON_MAX_SERVICES) {
+    SS2K_LOG(DIRCON_LOG_TAG, "Warning: Cannot register service, max services (%d) reached", DIRCON_MAX_SERVICES);
+    return;
+  }
+
+  registeredServices[registeredServiceCount].serviceUuid  = serviceUuid;
+  registeredServices[registeredServiceCount].writeHandler  = writeHandler;
+  registeredServiceCount++;
+
+  SS2K_LOG(DIRCON_LOG_TAG, "Registered service %s (write handler: %s)", serviceUuid.toString().c_str(), writeHandler ? "yes" : "no");
+
+  // If DirCon is already started, publish to MDNS immediately
+  addBleServiceUuid(serviceUuid);
+}
+
 void DirConManager::addBleServiceUuid(const NimBLEUUID& serviceUuid) {
   if (!started) {
     return;
@@ -320,16 +337,14 @@ bool DirConManager::processDirConMessage(DirConMessage* message, size_t clientIn
       response.Identifier   = DIRCON_MSGID_DISCOVER_SERVICES;
       response.ResponseCode = DIRCON_RESPCODE_SUCCESS_REQUEST;
 
-      // Get all service UUIDs
-      std::vector<NimBLEUUID> services = getAvailableServices();
-      for (NimBLEUUID& service : services) {
-        // Add each service UUID to the response
-        response.AdditionalUUIDs.push_back(service);
+      // Get all registered service UUIDs
+      for (size_t i = 0; i < registeredServiceCount; i++) {
+        response.AdditionalUUIDs.push_back(registeredServices[i].serviceUuid);
       }
 
       // Log discovery request details
       SS2K_LOG(DIRCON_LOG_TAG, "Received service discovery request from client %d", clientIndex);
-      SS2K_LOG(DIRCON_LOG_TAG, "Responding with %d service UUIDs", services.size());
+      SS2K_LOG(DIRCON_LOG_TAG, "Responding with %d service UUIDs", registeredServiceCount);
 
       // Send the response
       sendResponse(&response, clientIndex);
@@ -423,16 +438,21 @@ bool DirConManager::processDirConMessage(DirConMessage* message, size_t clientIn
       // Write the value (setValue doesn't return a status in NimBLE)
       characteristic->setValue(message->AdditionalData.data(), message->AdditionalData.size());
 
-      // Let each service handle its own write logic
-      if (fitnessMachineService.handleDirConWrite(characteristic)) {
-        response.AdditionalData = characteristic->getValue();
-      }
-
-      NimBLEUUID autoSubUuids[4];
-      size_t autoSubCount = 0;
-      if (zwiftService.handleDirConWrite(characteristic, message->AdditionalData.data(), message->AdditionalData.size(), autoSubUuids, &autoSubCount)) {
-        for (size_t s = 0; s < autoSubCount; s++) {
-          addSubscription(clientIndex, autoSubUuids[s]);
+      // Let registered services handle the write via callbacks
+      for (size_t i = 0; i < registeredServiceCount; i++) {
+        if (registeredServices[i].writeHandler != nullptr) {
+          DirConWriteResult writeResult;
+          if (registeredServices[i].writeHandler(characteristic, message->AdditionalData.data(), message->AdditionalData.size(), &writeResult)) {
+            if (writeResult.updateResponseData) {
+              response.AdditionalData = characteristic->getValue();
+            }
+            for (size_t s = 0; s < writeResult.autoSubscribeCount; s++) {
+              if (!hasSubscription(clientIndex, writeResult.autoSubscribeUuids[s])) {
+                addSubscription(clientIndex, writeResult.autoSubscribeUuids[s]);
+              }
+            }
+            break;
+          }
         }
       }
 
@@ -576,39 +596,6 @@ void DirConManager::broadcastNotification(const NimBLEUUID& characteristicUuid, 
   }
 }
 
-// Static variable to hold the available services (initialized once)
-static std::vector<NimBLEUUID> cachedServices;
-static bool servicesInitialized = false;
-
-std::vector<NimBLEUUID> DirConManager::getAvailableServices() {
-  // Initialize the services list only once
-  if (!servicesInitialized) {
-    cachedServices.clear();
-
-    // Add each service with descriptive name for better debugging
-    NimBLEUUID cyclingPowerUuid = NimBLEUUID(CYCLINGPOWERSERVICE_UUID);
-    cachedServices.push_back(cyclingPowerUuid);
-
-    NimBLEUUID cscUuid = NimBLEUUID(CSCSERVICE_UUID);
-    cachedServices.push_back(cscUuid);
-
-    NimBLEUUID heartUuid = NimBLEUUID(HEARTSERVICE_UUID);
-    cachedServices.push_back(heartUuid);
-
-    NimBLEUUID ftmsUuid = NimBLEUUID(FITNESSMACHINESERVICE_UUID);
-    cachedServices.push_back(ftmsUuid);
-
-    NimBLEUUID zwiftUuid = NimBLEUUID(ZWIFT_RIDE_CUSTOM_SERVICE_UUID);
-    cachedServices.push_back(zwiftUuid);
-
-    // Log summary
-    SS2K_LOG(DIRCON_LOG_TAG, "Initialized service discovery with %d services", cachedServices.size());
-    servicesInitialized = true;
-  }
-
-  return cachedServices;
-}
-
 std::vector<NimBLECharacteristic*> DirConManager::getCharacteristics(const NimBLEUUID& serviceUuid) {
   std::vector<NimBLECharacteristic*> characteristics;
 
@@ -622,26 +609,7 @@ std::vector<NimBLECharacteristic*> DirConManager::getCharacteristics(const NimBL
       characteristics.push_back(const_cast<NimBLECharacteristic*>(characteristic));
     }
   }
-  // Find service-specific characteristics based on known UUIDs
-  /*if (serviceUuid.equals(CYCLINGPOWERSERVICE_UUID)) {
-    characteristics.push_back(service->getCharacteristic(CYCLINGPOWERMEASUREMENT_UUID));
-    characteristics.push_back(service->getCharacteristic(CYCLINGPOWERFEATURE_UUID));
-    characteristics.push_back(service->getCharacteristic(SENSORLOCATION_UUID));
-  } else if (serviceUuid.equals(CSCSERVICE_UUID)) {
-    characteristics.push_back(service->getCharacteristic(CSCMEASUREMENT_UUID));
-  } else if (serviceUuid.equals(HEARTSERVICE_UUID)) {
-    characteristics.push_back(service->getCharacteristic(HEARTCHARACTERISTIC_UUID));
-  } else if (serviceUuid.equals(FITNESSMACHINESERVICE_UUID)) {
-    characteristics.push_back(service->getCharacteristic(FITNESSMACHINEINDOORBIKEDATA_UUID));
-    characteristics.push_back(service->getCharacteristic(FITNESSMACHINEFEATURE_UUID));
-    characteristics.push_back(service->getCharacteristic(FITNESSMACHINECONTROLPOINT_UUID));
-    characteristics.push_back(service->getCharacteristic(FITNESSMACHINESTATUS_UUID));
-  } else if (serviceUuid.equals(DEVICE_INFORMATION_SERVICE_UUID)) {
-    // Add device info characteristics if needed
-  } else if (serviceUuid.equals(WATTBIKE_SERVICE_UUID)) {
-    // Add wattbike service characteristics
-  }
-*/
+
   // Filter out null characteristics
   auto it = std::remove_if(characteristics.begin(), characteristics.end(), [](NimBLECharacteristic* c) { return c == nullptr; });
   characteristics.erase(it, characteristics.end());
@@ -650,12 +618,9 @@ std::vector<NimBLECharacteristic*> DirConManager::getCharacteristics(const NimBL
 }
 
 NimBLECharacteristic* DirConManager::findCharacteristic(const NimBLEUUID& characteristicUuid) {
-  // Get cached services (doesn't allocate new memory)
-  const std::vector<NimBLEUUID>& services = getAvailableServices();
-
-  // Search through each service for the characteristic
-  for (const NimBLEUUID& serviceUuid : services) {
-    NimBLEService* service = NimBLEDevice::getServer()->getServiceByUUID(serviceUuid);
+  // Search through registered services for the characteristic
+  for (size_t i = 0; i < registeredServiceCount; i++) {
+    NimBLEService* service = NimBLEDevice::getServer()->getServiceByUUID(registeredServices[i].serviceUuid);
     if (service != nullptr) {
       NimBLECharacteristic* characteristic = service->getCharacteristic(characteristicUuid);
       if (characteristic != nullptr) {

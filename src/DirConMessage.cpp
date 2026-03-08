@@ -320,7 +320,12 @@ size_t DirConMessage::parse(uint8_t* data, size_t len, uint8_t sequenceNumber) {
       break;
 
     default:
-      SS2K_LOG(DIRCON_LOG_TAG, "Error parsing DirCon message: Unknown identifier %d", this->Identifier);
+      char hexBuf[len * 3 + 1];
+      for (size_t i = 0; i < len; i++) {
+        snprintf(hexBuf + i * 3, 4, "%02X ", data[i]);
+      }
+      hexBuf[len * 3] = '\0';
+      SS2K_LOG(DIRCON_LOG_TAG, "Error parsing DirCon message: Unknown identifier %d. Full message (%d bytes): %s", this->Identifier, len, hexBuf);
       this->Identifier = DIRCON_MSGID_ERROR;
       return 0;
       break;

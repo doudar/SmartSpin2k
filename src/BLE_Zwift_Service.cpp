@@ -122,8 +122,18 @@ void BLE_Zwift_Service::setupService(NimBLEServer *pServer) {
 
   pZwiftService->start();
 
-  // Add service UUID to DirCon MDNS
-  DirConManager::addBleServiceUuid(pZwiftService->getUUID());
+  // Register with DirCon for service discovery and write handling
+  DirConManager::registerService(pZwiftService->getUUID(), [](NimBLECharacteristic *characteristic, const uint8_t *data, size_t length, DirConWriteResult *result) -> bool {
+    if (characteristic->getUUID().equals(NimBLEUUID(ZWIFT_SYNC_RX_CHARACTERISTIC_UUID))) {
+      result->autoSubscribeUuids[0] = NimBLEUUID(ZWIFT_SYNC_TX_CHARACTERISTIC_UUID);
+      result->autoSubscribeUuids[1] = NimBLEUUID(ZWIFT_ASYNC_CHARACTERISTIC_UUID);
+      result->autoSubscribeCount    = 2;
+      std::string value(reinterpret_cast<const char *>(data), length);
+      zwiftService.handleSyncRxWrite(value, true);
+      return true;
+    }
+    return false;
+  });
 
   SS2K_LOG(ZWIFT_LOG_TAG, "Zwift Custom Service started");
 }
@@ -237,20 +247,6 @@ void BLE_Zwift_Service::sendKeepalive() {
   syncTxCharacteristic->indicate();
   DirConManager::notifyCharacteristic(NimBLEUUID(ZWIFT_CUSTOM_SERVICE_UUID), syncTxCharacteristic->getUUID(),
                                       const_cast<uint8_t*>(ALL_RELEASED), ALL_RELEASED_LEN);
-}
-
-bool BLE_Zwift_Service::handleDirConWrite(NimBLECharacteristic *characteristic, const uint8_t *data, size_t length,
-                                          NimBLEUUID *autoSubscribeUuids, size_t *autoSubscribeCount) {
-  *autoSubscribeCount = 0;
-  if (characteristic->getUUID().equals(NimBLEUUID(ZWIFT_SYNC_RX_CHARACTERISTIC_UUID))) {
-    autoSubscribeUuids[0] = NimBLEUUID(ZWIFT_SYNC_TX_CHARACTERISTIC_UUID);
-    autoSubscribeUuids[1] = NimBLEUUID(ZWIFT_ASYNC_CHARACTERISTIC_UUID);
-    *autoSubscribeCount = 2;
-    std::string value(reinterpret_cast<const char *>(data), length);
-    handleSyncRxWrite(value, true);
-    return true;
-  }
-  return false;
 }
 
 void BLE_Zwift_Service::handleSyncRxWrite(const std::string &value, bool isDirCon) {

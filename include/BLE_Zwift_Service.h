@@ -76,12 +76,6 @@ class BLE_Zwift_Service {
   // isDirCon=true uses trainer protocol, isDirCon=false uses Click v2 controller protocol
   void handleSyncRxWrite(const std::string &value, bool isDirCon = false);
 
-  // Handle a DirCon write to one of this service's characteristics.
-  // Returns true if the characteristic belongs to this service and was processed.
-  // autoSubscribeUuids is filled with characteristic UUIDs the client should be auto-subscribed to.
-  bool handleDirConWrite(NimBLECharacteristic *characteristic, const uint8_t *data, size_t length,
-                         NimBLEUUID *autoSubscribeUuids, size_t *autoSubscribeCount);
-
  private:
   NimBLEService *pZwiftService;
   NimBLECharacteristic *asyncCharacteristic;

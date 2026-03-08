@@ -17,10 +17,6 @@ class BLE_Fitness_Machine_Service {
   void update();
   bool spinDown(uint8_t response);
   void processFTMSWrite();
-
-  // Handle a DirCon write to one of this service's characteristics.
-  // Returns true if the characteristic belongs to this service and was processed.
-  bool handleDirConWrite(NimBLECharacteristic *characteristic);
   
  private:
   int calculateResistanceFromPosition();

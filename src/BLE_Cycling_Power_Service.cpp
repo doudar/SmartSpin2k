@@ -29,8 +29,8 @@ void BLE_Cycling_Power_Service::setupService(NimBLEServer *pServer, MyCharacteri
   cyclingPowerMeasurementCharacteristic->setCallbacks(chrCallbacks);
   pPowerMonitor->start();
 
-  // Add service UUID to DirCon MDNS
-  DirConManager::addBleServiceUuid(pPowerMonitor->getUUID());
+  // Register with DirCon for service discovery
+  DirConManager::registerService(pPowerMonitor->getUUID());
 }
 
 void BLE_Cycling_Power_Service::update() {

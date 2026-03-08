@@ -56,8 +56,16 @@ void BLE_Fitness_Machine_Service::setupService(NimBLEServer *pServer, MyCharacte
   fitnessMachineControlPoint->setCallbacks(chrCallbacks);
   pFitnessMachineService->start();
 
-  // Add service UUID to DirCon MDNS
-  DirConManager::addBleServiceUuid(pFitnessMachineService->getUUID());
+  // Register with DirCon for service discovery and write handling
+  DirConManager::registerService(pFitnessMachineService->getUUID(), [](NimBLECharacteristic *characteristic, const uint8_t *data, size_t length, DirConWriteResult *result) -> bool {
+    if (characteristic->getUUID().equals(FITNESSMACHINECONTROLPOINT_UUID)) {
+      spinBLEServer.writeCache.push(characteristic->getValue());
+      fitnessMachineService.processFTMSWrite();
+      result->updateResponseData = true;
+      return true;
+    }
+    return false;
+  });
 }
 
 void BLE_Fitness_Machine_Service::update() {
@@ -138,15 +146,6 @@ void BLE_Fitness_Machine_Service::update() {
   logCharacteristic(logBuf, kLogBufCapacity, ftmsIndoorBikeData.data(), ftmsIndoorBikeData.size(), FITNESSMACHINESERVICE_UUID, fitnessMachineIndoorBikeData->getUUID(),
                     "FTMS(IBD)[ HR(%d) CD(%.2f) PW(%d) SD(%.2f) ]", rtConfig->hr.getValue() % 1000, fmodf(rtConfig->cad.getValue(), 1000.0), rtConfig->watts.getValue() % 10000,
                     fmodf((float)speedFtmsUnit / 100.0, 1000.0));
-}
-
-bool BLE_Fitness_Machine_Service::handleDirConWrite(NimBLECharacteristic *characteristic) {
-  if (characteristic->getUUID().equals(FITNESSMACHINECONTROLPOINT_UUID)) {
-    spinBLEServer.writeCache.push(characteristic->getValue());
-    processFTMSWrite();
-    return true;
-  }
-  return false;
 }
 
 // The things that happen when we receive a FitnessMachineControlPointProcedure from a Client.
