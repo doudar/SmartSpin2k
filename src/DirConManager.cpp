@@ -601,7 +601,7 @@ std::vector<NimBLEUUID> DirConManager::getAvailableServices() {
     NimBLEUUID ftmsUuid = NimBLEUUID(FITNESSMACHINESERVICE_UUID);
     cachedServices.push_back(ftmsUuid);
 
-    NimBLEUUID zwiftUuid = NimBLEUUID(ZWIFT_CUSTOM_SERVICE_UUID);
+    NimBLEUUID zwiftUuid = NimBLEUUID(ZWIFT_RIDE_CUSTOM_SERVICE_UUID);
     cachedServices.push_back(zwiftUuid);
 
     // Log summary

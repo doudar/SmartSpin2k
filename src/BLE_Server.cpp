@@ -58,9 +58,9 @@ void startBLEServer() {
   deviceInformationService.setupService(spinBLEServer.pServer);
   zwiftService.setupService(spinBLEServer.pServer);
   //add all service UUIDs to advertisement vector
-  //oServiceUUIDs.push_back(CSCSERVICE_UUID);
-  //oServiceUUIDs.push_back(CYCLINGPOWERSERVICE_UUID);
-  //oServiceUUIDs.push_back(HEARTSERVICE_UUID);
+  oServiceUUIDs.push_back(CSCSERVICE_UUID);
+  oServiceUUIDs.push_back(CYCLINGPOWERSERVICE_UUID);
+  oServiceUUIDs.push_back(HEARTSERVICE_UUID);
   oServiceUUIDs.push_back(FITNESSMACHINESERVICE_UUID);
   oServiceUUIDs.push_back(ZWIFT_RIDE_CUSTOM_SERVICE_UUID);
   //oServiceUUIDs.push_back(ZWIFT_CUSTOM_SERVICE_UUID);

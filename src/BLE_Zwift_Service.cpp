@@ -11,6 +11,34 @@
 #include "DirConManager.h"
 #include <Constants.h>
 
+namespace {
+constexpr uint32_t kZwiftField5CounterStart = 836;
+constexpr uint32_t kZwiftField5CounterReset = 19000;
+constexpr uint32_t kZwiftField5CounterMax = 24000;
+constexpr uint32_t kZwiftField5IdleIncrement = 600;
+constexpr uint32_t kZwiftField5BaseIncrement = 400;
+constexpr uint32_t kZwiftField5MaxIncrement = 800;
+
+uint32_t g_zwiftField5Counter = kZwiftField5CounterStart;
+
+uint32_t getNextZwiftField5Counter(uint16_t power) {
+  uint32_t increment = kZwiftField5IdleIncrement;
+  if (power > 0) {
+    increment = kZwiftField5BaseIncrement + (static_cast<uint32_t>(power) * 2U);
+    if (increment > kZwiftField5MaxIncrement) {
+      increment = kZwiftField5MaxIncrement;
+    }
+  }
+
+  g_zwiftField5Counter += increment;
+  if (g_zwiftField5Counter > kZwiftField5CounterMax) {
+    g_zwiftField5Counter = kZwiftField5CounterReset;
+  }
+
+  return g_zwiftField5Counter;
+}
+}  // namespace
+
 // "RideOn" handshake bytes
 static const char RideOn[7] = "RideOn";
 // static const uint8_t RIDE_ON[] = {0x52, 0x69, 0x64, 0x65, 0x4F, 0x6E};
@@ -63,8 +91,8 @@ void BLE_Zwift_Service::setupService(NimBLEServer *pServer) {
   batteryLevelChar->setValue(&batteryLevel, 1);
   pBatteryService->start();
 
-  // Zwift Custom Service
-  pZwiftService = pServer->createService(ZWIFT_CUSTOM_SERVICE_UUID);
+  // Zwift Custom Service (use 0xFC82 to match advertisement)
+  pZwiftService = pServer->createService(ZWIFT_RIDE_CUSTOM_SERVICE_UUID);
 
   // Async characteristic: NOTIFY - sends button presses to Zwift
   asyncCharacteristic = pZwiftService->createCharacteristic(
@@ -135,6 +163,7 @@ void BLE_Zwift_Service::onClientDisconnect() {
     _lastKeepaliveTime = 0;
     _lastRidingDataTime = 0;
     _gearRatioX10000 = 0;
+    g_zwiftField5Counter = kZwiftField5CounterStart;
   }
 }
 
@@ -182,7 +211,7 @@ void BLE_Zwift_Service::sendButtonNotification(uint32_t buttonMask) {
 
   asyncCharacteristic->setValue(buf, pos);
   asyncCharacteristic->notify();
-  DirConManager::notifyCharacteristic(NimBLEUUID(ZWIFT_CUSTOM_SERVICE_UUID), asyncCharacteristic->getUUID(), buf, pos);
+  DirConManager::notifyCharacteristic(NimBLEUUID(ZWIFT_RIDE_CUSTOM_SERVICE_UUID), asyncCharacteristic->getUUID(), buf, pos);
 }
 
 size_t BLE_Zwift_Service::encodeVarint32(uint32_t value, uint8_t *buffer) {
@@ -198,7 +227,7 @@ size_t BLE_Zwift_Service::encodeVarint32(uint32_t value, uint8_t *buffer) {
 void BLE_Zwift_Service::sendAllButtonsReleased() {
   asyncCharacteristic->setValue(ALL_RELEASED, ALL_RELEASED_LEN);
   asyncCharacteristic->notify();
-  DirConManager::notifyCharacteristic(NimBLEUUID(ZWIFT_CUSTOM_SERVICE_UUID), asyncCharacteristic->getUUID(),
+  DirConManager::notifyCharacteristic(NimBLEUUID(ZWIFT_RIDE_CUSTOM_SERVICE_UUID), asyncCharacteristic->getUUID(),
                                       const_cast<uint8_t*>(ALL_RELEASED), ALL_RELEASED_LEN);
 }
 
@@ -234,9 +263,9 @@ void BLE_Zwift_Service::handleSyncRxWrite(const std::string &value, bool isDirCo
     asyncCharacteristic->notify();
     
     if (isDirCon) {
-      DirConManager::notifyCharacteristic(NimBLEUUID(ZWIFT_CUSTOM_SERVICE_UUID), syncTxCharacteristic->getUUID(),
+      DirConManager::notifyCharacteristic(NimBLEUUID(ZWIFT_RIDE_CUSTOM_SERVICE_UUID), syncTxCharacteristic->getUUID(),
                                           syncResponse, sizeof(syncResponse), false);
-      DirConManager::notifyCharacteristic(NimBLEUUID(ZWIFT_CUSTOM_SERVICE_UUID), asyncCharacteristic->getUUID(),
+      DirConManager::notifyCharacteristic(NimBLEUUID(ZWIFT_RIDE_CUSTOM_SERVICE_UUID), asyncCharacteristic->getUUID(),
                                           const_cast<uint8_t*>(ASYNC_RIDEON_ANSWER), ASYNC_RIDEON_ANSWER_LEN, false);
     }
 
@@ -244,6 +273,7 @@ void BLE_Zwift_Service::handleSyncRxWrite(const std::string &value, bool isDirCo
     _lastKeepaliveTime = millis();
     _lastRidingDataTime = millis();
     _gearRatioX10000 = 0;
+    g_zwiftField5Counter = kZwiftField5CounterStart;
 
     SS2K_LOG(ZWIFT_LOG_TAG, "Handshake complete - %s mode active", isDirCon ? "DirCon" : "BLE");
     return;
@@ -262,16 +292,20 @@ void BLE_Zwift_Service::handleSyncRxWrite(const std::string &value, bool isDirCo
 void BLE_Zwift_Service::sendRidingData() {
   uint8_t buf[48];
   size_t pos = 0;
+  const uint16_t powerWatts = static_cast<uint16_t>(rtConfig->watts.getValue());
+  const uint16_t cadence = static_cast<uint16_t>(rtConfig->cad.getValue());
+  const uint16_t heartRate = static_cast<uint16_t>(rtConfig->hr.getValue());
+  const uint32_t field5Counter = getNextZwiftField5Counter(powerWatts);
 
   buf[pos++] = ZWIFT_TRAINER_RIDING_DATA;  // 0x03
 
   // Field 1: Power (tag 0x08)
   buf[pos++] = 0x08;
-  pos += encodeUleb128(static_cast<uint64_t>(rtConfig->watts.getValue()), &buf[pos]);
+  pos += encodeUleb128(powerWatts, &buf[pos]);
 
   // Field 2: Cadence (tag 0x10)
   buf[pos++] = 0x10;
-  pos += encodeUleb128(static_cast<uint64_t>(rtConfig->cad.getValue()), &buf[pos]);
+  pos += encodeUleb128(cadence, &buf[pos]);
 
   // Field 3: SpeedX100 (tag 0x18)
   int speedX100 = 0;
@@ -285,11 +319,11 @@ void BLE_Zwift_Service::sendRidingData() {
 
   // Field 4: HR (tag 0x20)
   buf[pos++] = 0x20;
-  pos += encodeUleb128(static_cast<uint64_t>(rtConfig->hr.getValue()), &buf[pos]);
+  pos += encodeUleb128(heartRate, &buf[pos]);
 
-  // Field 5: Unknown1 (tag 0x28)
+  // Field 5: Rolling counter derived from the observed trainer payloads.
   buf[pos++] = 0x28;
-  pos += encodeUleb128(0ULL, &buf[pos]);
+  pos += encodeUleb128(field5Counter, &buf[pos]);
 
   // Field 6: Unknown2 (tag 0x30) - constant 25714 from SHIFTR reference
   buf[pos++] = 0x30;
@@ -297,7 +331,7 @@ void BLE_Zwift_Service::sendRidingData() {
 
   asyncCharacteristic->setValue(buf, pos);
   asyncCharacteristic->notify();
-  DirConManager::notifyCharacteristic(NimBLEUUID(ZWIFT_CUSTOM_SERVICE_UUID), asyncCharacteristic->getUUID(), buf, pos);
+  DirConManager::notifyCharacteristic(NimBLEUUID(ZWIFT_RIDE_CUSTOM_SERVICE_UUID), asyncCharacteristic->getUUID(), buf, pos);
 }
 
 void BLE_Zwift_Service::handleZwiftCommand(const uint8_t *data, size_t length) {
@@ -341,7 +375,7 @@ void BLE_Zwift_Service::handleZwiftCommand(const uint8_t *data, size_t length) {
 
         syncTxCharacteristic->setValue(resp, pos);
         syncTxCharacteristic->indicate();
-        DirConManager::notifyCharacteristic(NimBLEUUID(ZWIFT_CUSTOM_SERVICE_UUID), syncTxCharacteristic->getUUID(), resp, pos);
+        DirConManager::notifyCharacteristic(NimBLEUUID(ZWIFT_RIDE_CUSTOM_SERVICE_UUID), syncTxCharacteristic->getUUID(), resp, pos);
 
       } else if (param == 0) {
         // Device info query - build 0x3c response directly into single buffer
@@ -372,8 +406,8 @@ void BLE_Zwift_Service::handleZwiftCommand(const uint8_t *data, size_t length) {
 
         syncTxCharacteristic->setValue(resp, pos);
         syncTxCharacteristic->indicate();
-        DirConManager::notifyCharacteristic(NimBLEUUID(ZWIFT_CUSTOM_SERVICE_UUID), syncTxCharacteristic->getUUID(), resp, pos);
-        SS2K_LOG(ZWIFT_LOG_TAG, "Responded with gear ratio: %.4f", _gearRatioX10000 / 10000.0);
+        DirConManager::notifyCharacteristic(NimBLEUUID(ZWIFT_RIDE_CUSTOM_SERVICE_UUID), syncTxCharacteristic->getUUID(), resp, pos);
+        SS2K_LOG(ZWIFT_LOG_TAG, "Responded with device info");
       }
       break;
     }
@@ -404,13 +438,8 @@ void BLE_Zwift_Service::handleZwiftCommand(const uint8_t *data, size_t length) {
               if (decoded == 0) break;
               pos += decoded;
 
-              if (fieldTag == 0x10) {  // Field 2: Grade
-                int64_t grade = static_cast<int64_t>(fieldValue);
-                // Bit 0 is sign flag (Zwift's encoding)
-                if (grade & 0x01) {
-                  grade ^= 0x01;
-                  grade *= -1;
-                }
+              if (fieldTag == 0x10) {  // Field 2: Grade (zigzag encoded)
+                int64_t grade = static_cast<int64_t>((fieldValue >> 1) ^ -(fieldValue & 1));
                 SS2K_LOG(ZWIFT_LOG_TAG, "SIM grade: %.2f%%", grade / 100.0);
                 rtConfig->setFTMSMode(FitnessMachineControlPointProcedure::SetIndoorBikeSimulationParameters);
                 rtConfig->setTargetIncline(static_cast<int>(grade));
