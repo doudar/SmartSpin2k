@@ -76,10 +76,42 @@ BLE_Zwift_Service::BLE_Zwift_Service()
       syncTxCharacteristic(nullptr),
       unknownCharacteristic5(nullptr),
       unknownCharacteristic6(nullptr),
-      _handshakeComplete(false),
+      _lastActivityTime(0),
       _lastKeepaliveTime(0),
       _lastRidingDataTime(0),
       _gearRatioX10000(0) {}
+
+const char *BLE_Zwift_Service::getLogTag() const {
+  return isDirCon ? ZWIFT_DIRCON_LOG_TAG : ZWIFT_BLE_LOG_TAG;
+}
+
+void BLE_Zwift_Service::resetSession() {
+  _lastActivityTime = 0;
+  _lastKeepaliveTime = 0;
+  _lastRidingDataTime = 0;
+  _gearRatioX10000 = 0;
+  g_zwiftField5Counter = kZwiftField5CounterStart;
+}
+
+bool BLE_Zwift_Service::keepAlive(unsigned long now) {
+  
+  if ((now - _lastActivityTime >= ZWIFT_SESSION_TIMEOUT_MS) && isConnected()) {
+    SS2K_LOG(getLogTag(), "Zwift session timed out waiting for keepalive/activity");
+    resetSession();
+    return false;
+  }
+
+  if (now - _lastKeepaliveTime >= ZWIFT_KEEPALIVE_INTERVAL_MS && isConnected()) {
+  // Keepalive sent on sync_tx as "no buttons pressed" notification
+  syncTxCharacteristic->setValue(ALL_RELEASED, ALL_RELEASED_LEN);
+  syncTxCharacteristic->indicate();
+  DirConManager::notifyCharacteristic(NimBLEUUID(ZWIFT_CUSTOM_SERVICE_UUID), syncTxCharacteristic->getUUID(),
+                                      const_cast<uint8_t*>(ALL_RELEASED), ALL_RELEASED_LEN);
+    _lastKeepaliveTime = now;
+  }
+
+  return true;
+}
 
 void BLE_Zwift_Service::setupService(NimBLEServer *pServer) {
   // Battery Level Service (0x180F) - Zwift expects this on Click controllers
@@ -135,53 +167,35 @@ void BLE_Zwift_Service::setupService(NimBLEServer *pServer) {
     return false;
   });
 
-  SS2K_LOG(ZWIFT_LOG_TAG, "Zwift Custom Service started");
+  SS2K_LOG(getLogTag(), "Zwift Custom Service started");
 }
 
 void BLE_Zwift_Service::update() {
-  if (!_handshakeComplete) {
-    return;
-  }
 
   unsigned long now = millis();
+
+  if (!keepAlive(now)) {
+    return;
+  }
 
   // Send riding data periodically (trainer protocol only, not Click controller)
   if ((now - _lastRidingDataTime >= ZWIFT_RIDING_DATA_INTERVAL_MS)) {
     sendRidingData();
     _lastRidingDataTime = now;
   }
-
-  // Send keepalive on sync_tx every ZWIFT_KEEPALIVE_INTERVAL_MS
-  if (now - _lastKeepaliveTime >= ZWIFT_KEEPALIVE_INTERVAL_MS) {
-    sendKeepalive();
-    _lastKeepaliveTime = now;
-  }
 }
 
 bool BLE_Zwift_Service::isConnected() {
-  return _handshakeComplete;
+  unsigned long now = millis();
+  return now - _lastActivityTime < ZWIFT_SESSION_TIMEOUT_MS;
 }
 
 uint32_t BLE_Zwift_Service::getGearRatioX10000() {
   return _gearRatioX10000;
 }
 
-void BLE_Zwift_Service::onClientDisconnect() {
-  if (_handshakeComplete) {
-    SS2K_LOG(ZWIFT_LOG_TAG, "Zwift client disconnected");
-    _handshakeComplete = false;
-    _lastKeepaliveTime = 0;
-    _lastRidingDataTime = 0;
-    _gearRatioX10000 = 0;
-    g_zwiftField5Counter = kZwiftField5CounterStart;
-  }
-}
-
 void BLE_Zwift_Service::sendShiftUp() {
-  if (!_handshakeComplete) {
-    return;
-  }
-  SS2K_LOG(ZWIFT_LOG_TAG, "Sending shift up to Zwift");
+  SS2K_LOG(getLogTag(), "Sending shift up to Zwift");
   sendButtonNotification(ZWIFT_BTN_SHFT_UP_R);
   // Small delay then release - Zwift needs to see the transition
   vTaskDelay(50 / portTICK_PERIOD_MS);
@@ -189,10 +203,7 @@ void BLE_Zwift_Service::sendShiftUp() {
 }
 
 void BLE_Zwift_Service::sendShiftDown() {
-  if (!_handshakeComplete) {
-    return;
-  }
-  SS2K_LOG(ZWIFT_LOG_TAG, "Sending shift down to Zwift");
+  SS2K_LOG(getLogTag(), "Sending shift down to Zwift");
   sendButtonNotification(ZWIFT_BTN_SHFT_UP_L);
   // Small delay then release
   vTaskDelay(50 / portTICK_PERIOD_MS);
@@ -241,25 +252,20 @@ void BLE_Zwift_Service::sendAllButtonsReleased() {
                                       const_cast<uint8_t*>(ALL_RELEASED), ALL_RELEASED_LEN);
 }
 
-void BLE_Zwift_Service::sendKeepalive() {
-  // Keepalive sent on sync_tx as "no buttons pressed" notification
-  syncTxCharacteristic->setValue(ALL_RELEASED, ALL_RELEASED_LEN);
-  syncTxCharacteristic->indicate();
-  DirConManager::notifyCharacteristic(NimBLEUUID(ZWIFT_CUSTOM_SERVICE_UUID), syncTxCharacteristic->getUUID(),
-                                      const_cast<uint8_t*>(ALL_RELEASED), ALL_RELEASED_LEN);
-}
-
-void BLE_Zwift_Service::handleSyncRxWrite(const std::string &value, bool isDirCon) {
+void BLE_Zwift_Service::handleSyncRxWrite(const std::string &value, bool _isDirCon) {
+ isDirCon = _isDirCon;
   if (value.length() < 2) {
-    SS2K_LOG(ZWIFT_LOG_TAG, "Received short write on sync_rx, ignoring");
+    SS2K_LOG(getLogTag(), "Received short write on sync_rx, ignoring");
     return;
   }
+
+  _lastActivityTime = millis();
 
   const uint8_t *data = reinterpret_cast<const uint8_t *>(value.data());
 
   // Check if it starts with "RideOn" (handshake)
   if (value.length() >= 6 && memcmp(data, RideOn, 6) == 0) {
-    SS2K_LOG(ZWIFT_LOG_TAG, "Received RideOn handshake from Zwift (%s)", isDirCon ? "DirCon" : "BLE");
+    SS2K_LOG(getLogTag(), "Received RideOn handshake from Zwift (%s)", _isDirCon ? "DirCon" : "BLE");
 
     // Send sync_tx response: "RideOn" + trainer response start bytes {0x02, 0x00}
     uint8_t syncResponse[6 + RESPONSE_START_LEN];
@@ -272,29 +278,23 @@ void BLE_Zwift_Service::handleSyncRxWrite(const std::string &value, bool isDirCo
     asyncCharacteristic->setValue(ASYNC_RIDEON_ANSWER, ASYNC_RIDEON_ANSWER_LEN);
     asyncCharacteristic->notify();
     
-    if (isDirCon) {
+    if (_isDirCon) {
       DirConManager::notifyCharacteristic(NimBLEUUID(ZWIFT_RIDE_CUSTOM_SERVICE_UUID), syncTxCharacteristic->getUUID(),
                                           syncResponse, sizeof(syncResponse), false);
       DirConManager::notifyCharacteristic(NimBLEUUID(ZWIFT_RIDE_CUSTOM_SERVICE_UUID), asyncCharacteristic->getUUID(),
                                           const_cast<uint8_t*>(ASYNC_RIDEON_ANSWER), ASYNC_RIDEON_ANSWER_LEN, false);
     }
 
-    _handshakeComplete = true;
-    _lastKeepaliveTime = millis();
-    _lastRidingDataTime = millis();
-    _gearRatioX10000 = 0;
-    g_zwiftField5Counter = kZwiftField5CounterStart;
+    resetSession();
+    _lastActivityTime = millis();
+    _lastKeepaliveTime = _lastActivityTime;
+    _lastRidingDataTime = _lastActivityTime;
 
-    SS2K_LOG(ZWIFT_LOG_TAG, "Handshake complete - %s mode active", isDirCon ? "DirCon" : "BLE");
+    SS2K_LOG(getLogTag(), "Handshake complete - %s mode active", _isDirCon ? "DirCon" : "BLE");
     return;
   }
-
-  // Handle Zwift protocol commands (if handshake is complete)
-  if (_handshakeComplete) {
+    // Handshake is already complete, handle commands
     handleZwiftCommand(data, value.length());
-  } else {
-    SS2K_LOG(ZWIFT_LOG_TAG, "Received command before handshake (opcode=0x%02X), ignoring", data[0]);
-  }
 }
 
 // ---- Trainer Protocol Methods ----
@@ -360,7 +360,7 @@ void BLE_Zwift_Service::handleZwiftCommand(const uint8_t *data, size_t length) {
         // Fallback: raw ULEB128 without protobuf tag
         decodeUleb128(&data[1], length - 1, &param);
       }
-      SS2K_LOG(ZWIFT_LOG_TAG, "Info request (0x00) param=%llu", param);
+      SS2K_LOG(getLogTag(), "Info request (0x00) param=%llu", param);
 
       if (param == 520) {
         // Gear ratio query - build 0x3c response directly into single buffer
@@ -417,7 +417,7 @@ void BLE_Zwift_Service::handleZwiftCommand(const uint8_t *data, size_t length) {
         syncTxCharacteristic->setValue(resp, pos);
         syncTxCharacteristic->indicate();
         DirConManager::notifyCharacteristic(NimBLEUUID(ZWIFT_RIDE_CUSTOM_SERVICE_UUID), syncTxCharacteristic->getUUID(), resp, pos);
-        SS2K_LOG(ZWIFT_LOG_TAG, "Responded with device info");
+        SS2K_LOG(getLogTag(), "Responded with device info");
       }
       break;
     }
@@ -430,7 +430,7 @@ void BLE_Zwift_Service::handleZwiftCommand(const uint8_t *data, size_t length) {
           if (length >= 3) {
             uint64_t power = 0;
             decodeUleb128(&data[2], length - 2, &power);
-            SS2K_LOG(ZWIFT_LOG_TAG, "ERG power: %dW", static_cast<int>(power));
+            SS2K_LOG(getLogTag(), "ERG power: %dW", static_cast<int>(power));
             rtConfig->setFTMSMode(FitnessMachineControlPointProcedure::SetTargetPower);
             rtConfig->watts.setTarget(static_cast<int>(power));
           }
@@ -450,7 +450,7 @@ void BLE_Zwift_Service::handleZwiftCommand(const uint8_t *data, size_t length) {
 
               if (fieldTag == 0x10) {  // Field 2: Grade (zigzag encoded)
                 int64_t grade = static_cast<int64_t>((fieldValue >> 1) ^ -(fieldValue & 1));
-                SS2K_LOG(ZWIFT_LOG_TAG, "SIM grade: %.2f%%", grade / 100.0);
+                SS2K_LOG(getLogTag(), "SIM grade: %.2f%%", grade / 100.0);
                 rtConfig->setFTMSMode(FitnessMachineControlPointProcedure::SetIndoorBikeSimulationParameters);
                 rtConfig->setTargetIncline(static_cast<int>(grade));
               }
@@ -472,14 +472,14 @@ void BLE_Zwift_Service::handleZwiftCommand(const uint8_t *data, size_t length) {
 
               if (fieldTag == 0x10) {  // Field 2: GearRatioX10000
                 _gearRatioX10000 = static_cast<uint32_t>(fieldValue);
-                SS2K_LOG(ZWIFT_LOG_TAG, "Gear ratio: %.4f", _gearRatioX10000 / 10000.0);
+                SS2K_LOG(getLogTag(), "Gear ratio: %.4f", _gearRatioX10000 / 10000.0);
                 applyGearRatio();
               }
               // Fields 0x20 (bike weight) and 0x28 (rider weight) - logged for debugging
               else if (fieldTag == 0x20) {
-                SS2K_LOG(ZWIFT_LOG_TAG, "Bike weight: %.2fkg", fieldValue / 100.0);
+                SS2K_LOG(getLogTag(), "Bike weight: %.2fkg", fieldValue / 100.0);
               } else if (fieldTag == 0x28) {
-                SS2K_LOG(ZWIFT_LOG_TAG, "Rider weight: %.2fkg", fieldValue / 100.0);
+                SS2K_LOG(getLogTag(), "Rider weight: %.2fkg", fieldValue / 100.0);
               }
             }
           }
@@ -487,18 +487,18 @@ void BLE_Zwift_Service::handleZwiftCommand(const uint8_t *data, size_t length) {
         }
 
         default:
-          SS2K_LOG(ZWIFT_LOG_TAG, "Unknown control subtype: 0x%02X", subtype);
+          SS2K_LOG(getLogTag(), "Unknown control subtype: 0x%02X", subtype);
           break;
       }
       break;
     }
 
     case 0x41:  // Unknown request type (similar to info request)
-      SS2K_LOG(ZWIFT_LOG_TAG, "Request 0x41");
+      SS2K_LOG(getLogTag(), "Request 0x41");
       break;
 
     default:
-      SS2K_LOG(ZWIFT_LOG_TAG, "Unknown command opcode: 0x%02X", opcode);
+      SS2K_LOG(getLogTag(), "Unknown command opcode: 0x%02X", opcode);
       break;
   }
 }
@@ -531,7 +531,7 @@ void BLE_Zwift_Service::applyGearRatio() {
   // Also update lastShifterPosition so FTMSModeShiftModifier doesn't
   // see this Zwift-driven change as a user shift and echo it back.
   ss2k->setLastShifterPosition(newShifterPos);
-  SS2K_LOG(ZWIFT_LOG_TAG, "Gear %d -> shifter position %d", closestIndex + 1, newShifterPos);
+  SS2K_LOG(getLogTag(), "Gear %d -> shifter position %d", closestIndex + 1, newShifterPos);
 }
 
 size_t BLE_Zwift_Service::decodeUleb128(const uint8_t *buf, size_t bufLen, uint64_t *result) {
@@ -571,10 +571,10 @@ void ZwiftSyncRxCallbacks::onWrite(NimBLECharacteristic *pCharacteristic, NimBLE
       snprintf(buf, sizeof(buf), "%02X", value[i]);
       hexValue.append(buf);
   }
-  SS2K_LOG(ZWIFT_LOG_TAG, "Sync RX write from %s (len=%d) %s", connInfo.getAddress().toString().c_str(), value.length(), hexValue.c_str());
+  SS2K_LOG(zwiftService.getLogTag(), "Sync RX write from %s (len=%d) %s", connInfo.getAddress().toString().c_str(), value.length(), hexValue.c_str());
   zwiftService.handleSyncRxWrite(value);
 }
 
 void ZwiftSyncRxCallbacks::onSubscribe(NimBLECharacteristic *pCharacteristic, NimBLEConnInfo &connInfo, uint16_t subValue) {
-  SS2K_LOG(ZWIFT_LOG_TAG, "Subscription change on %s: %d", pCharacteristic->getUUID().toString().c_str(), subValue);
+  SS2K_LOG(zwiftService.getLogTag(), "Subscription change on %s: %d", pCharacteristic->getUUID().toString().c_str(), subValue);
 }

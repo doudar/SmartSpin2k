@@ -160,8 +160,6 @@ void MyServerCallbacks::onConnect(NimBLEServer* pServer, NimBLEConnInfo& connInf
 void MyServerCallbacks::onDisconnect(NimBLEServer* pServer) {
   SS2K_LOG(BLE_SERVER_LOG_TAG, "Bluetooth Remote Client Disconnected. Remaining Clients: %d", pServer->getConnectedCount());
   BLEDevice::startAdvertising();
-  // Reset Zwift handshake state on any client disconnect
-  zwiftService.onClientDisconnect();
   // client disconnected while trying to write fw - reboot to clear the faulty upload.
   if (ss2k->isUpdating) {
     SS2K_LOG(BLE_SERVER_LOG_TAG, "Rebooting because of update interruption.", pServer->getConnectedCount());

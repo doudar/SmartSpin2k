@@ -47,9 +47,10 @@
 
 // Keepalive / riding data interval in milliseconds
 #define ZWIFT_KEEPALIVE_INTERVAL_MS 5000
+#define ZWIFT_SESSION_TIMEOUT_MS (ZWIFT_KEEPALIVE_INTERVAL_MS * 2)
 #define ZWIFT_RIDING_DATA_INTERVAL_MS 250
-
-#define ZWIFT_LOG_TAG "BLE_Zwift"
+#define ZWIFT_BLE_LOG_TAG "BLE_Zwift"
+#define ZWIFT_DIRCON_LOG_TAG "DRC_Zwift"
 
 class BLE_Zwift_Service {
  public:
@@ -57,14 +58,11 @@ class BLE_Zwift_Service {
   void setupService(NimBLEServer *pServer);
   void update();
 
-  // Returns true if a Zwift client is connected and has completed handshake
+  // Returns true if a Zwift client has been used recently.
   bool isConnected();
 
   // Returns the current virtual gear ratio x10000 (0 = no virtual shifting active)
   uint32_t getGearRatioX10000();
-
-  // Called when a BLE client disconnects to reset handshake state
-  void onClientDisconnect();
 
   // Send a shift up notification to Zwift (key down + key up)
   void sendShiftUp();
@@ -84,10 +82,15 @@ class BLE_Zwift_Service {
   NimBLECharacteristic *unknownCharacteristic5;
   NimBLECharacteristic *unknownCharacteristic6;
 
-  volatile bool _handshakeComplete;
+  bool isDirCon;
+  unsigned long _lastActivityTime;
   unsigned long _lastKeepaliveTime;
   unsigned long _lastRidingDataTime;
-  volatile uint32_t _gearRatioX10000;
+  uint32_t _gearRatioX10000;
+
+  const char *getLogTag() const;
+  bool keepAlive(unsigned long now);
+  void resetSession();
 
   // Encode a button mask into a protobuf varint message and send as notification
   void sendButtonNotification(uint32_t buttonMask);
@@ -103,9 +106,6 @@ class BLE_Zwift_Service {
 
   // Send the "all buttons released" state
   void sendAllButtonsReleased();
-
-  // Send keepalive on sync_tx
-  void sendKeepalive();
 
   // Send riding data notification (trainer protocol message 0x03)
   void sendRidingData();
