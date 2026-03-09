@@ -20,8 +20,8 @@ WiFiServer* DirConManager::tcpServer = nullptr;
 uint8_t DirConManager::receiveBuffer[DIRCON_MAX_CLIENTS][DIRCON_RECEIVE_BUFFER_SIZE];
 size_t DirConManager::receiveBufferLength[DIRCON_MAX_CLIENTS] = {0};
 uint8_t DirConManager::sendBuffer[DIRCON_SEND_BUFFER_SIZE];
-uint8_t DirConManager::lastSequenceNumber[DIRCON_MAX_CLIENTS]                           = {0};
-bool DirConManager::clientSubscriptions[DIRCON_MAX_CLIENTS][DIRCON_MAX_CHARACTERISTICS] = {false};
+uint8_t DirConManager::lastSequenceNumber[DIRCON_MAX_CLIENTS] = {0};
+Subscription DirConManager::clientSubscriptions[DIRCON_MAX_CLIENTS][DIRCON_MAX_CHARACTERISTICS];
 DirConManager::ServiceRegistration DirConManager::registeredServices[DIRCON_MAX_SERVICES] = {};
 size_t DirConManager::registeredServiceCount = 0;
 
@@ -36,7 +36,7 @@ bool DirConManager::start() {
       receiveBufferLength[i] = 0;
       lastSequenceNumber[i]  = 0;
       for (int j = 0; j < DIRCON_MAX_CHARACTERISTICS; j++) {
-        clientSubscriptions[i][j] = false;
+        clientSubscriptions[i][j].active = false;
       }
     }
 
@@ -107,7 +107,7 @@ void DirConManager::update() {
   handleClientData();
 }
 
-// returns true if we have clients connected
+// returns the number of connected clients
 int DirConManager::connectedClients() {
   int connectedClients = 0;
   for (int i = 0; i < DIRCON_MAX_CLIENTS; i++) {
@@ -117,6 +117,7 @@ int DirConManager::connectedClients() {
   }
   return connectedClients;
 }
+
 void DirConManager::updateStatusMessage() {
   if (!started) {
     statusMessage = "DirCon service stopped";
@@ -169,7 +170,7 @@ void DirConManager::registerService(const NimBLEUUID& serviceUuid, DirConWriteHa
   }
 
   registeredServices[registeredServiceCount].serviceUuid  = serviceUuid;
-  registeredServices[registeredServiceCount].writeHandler  = writeHandler;
+  registeredServices[registeredServiceCount].writeHandler = writeHandler;
   registeredServiceCount++;
 
   SS2K_LOG(DIRCON_LOG_TAG, "Registered service %s (write handler: %s)", serviceUuid.toString().c_str(), writeHandler ? "yes" : "no");
@@ -192,7 +193,6 @@ void DirConManager::addBleServiceUuid(const NimBLEUUID& serviceUuid) {
 
   // Check if UUID is already in the list
   if (strstr(uuidListBuffer, shortUuid) != nullptr) {
-    // UUID already added
     return;
   }
 
@@ -245,7 +245,7 @@ void DirConManager::checkForNewClients() {
       receiveBufferLength[i] = 0;
       lastSequenceNumber[i]  = 0;
       for (int j = 0; j < DIRCON_MAX_CHARACTERISTICS; j++) {
-        clientSubscriptions[i][j] = false;
+        clientSubscriptions[i][j].active = false;
       }
 
       break;
@@ -333,7 +333,6 @@ bool DirConManager::processDirConMessage(DirConMessage* message, size_t clientIn
 
   switch (message->Identifier) {
     case DIRCON_MSGID_DISCOVER_SERVICES: {
-      // Handle service discovery
       response.Identifier   = DIRCON_MSGID_DISCOVER_SERVICES;
       response.ResponseCode = DIRCON_RESPCODE_SUCCESS_REQUEST;
 
@@ -342,29 +341,24 @@ bool DirConManager::processDirConMessage(DirConMessage* message, size_t clientIn
         response.AdditionalUUIDs.push_back(registeredServices[i].serviceUuid);
       }
 
-      // Log discovery request details
       SS2K_LOG(DIRCON_LOG_TAG, "Received service discovery request from client %d", clientIndex);
       SS2K_LOG(DIRCON_LOG_TAG, "Responding with %d service UUIDs", registeredServiceCount);
 
-      // Send the response
       sendResponse(&response, clientIndex);
       break;
     }
 
     case DIRCON_MSGID_DISCOVER_CHARACTERISTICS: {
-      // Handle characteristic discovery for a service
       response.Identifier   = DIRCON_MSGID_DISCOVER_CHARACTERISTICS;
       response.ResponseCode = DIRCON_RESPCODE_SUCCESS_REQUEST;
       response.UUID         = message->UUID;
 
-      // Get BLE service
       NimBLEService* service = NimBLEDevice::getServer()->getServiceByUUID(message->UUID);
       if (service == nullptr) {
         sendErrorResponse(DIRCON_MSGID_DISCOVER_CHARACTERISTICS, message->SequenceNumber, DIRCON_RESPCODE_SERVICE_NOT_FOUND, clientIndex);
         return false;
       }
 
-      // Get all characteristics for the service
       std::vector<NimBLECharacteristic*> characteristics = service->getCharacteristics();
       for (NimBLECharacteristic* characteristic : characteristics) {
         if (characteristic != nullptr) {
@@ -381,29 +375,23 @@ bool DirConManager::processDirConMessage(DirConMessage* message, size_t clientIn
     }
 
     case DIRCON_MSGID_READ_CHARACTERISTIC: {
-      // Handle characteristic read
       response.Identifier   = DIRCON_MSGID_READ_CHARACTERISTIC;
       response.ResponseCode = DIRCON_RESPCODE_SUCCESS_REQUEST;
       response.UUID         = message->UUID;
 
-      // Use the helper function to find the characteristic
       NimBLECharacteristic* characteristic = findCharacteristic(message->UUID);
-
       if (characteristic == nullptr) {
         sendErrorResponse(DIRCON_MSGID_READ_CHARACTERISTIC, message->SequenceNumber, DIRCON_RESPCODE_CHARACTERISTIC_NOT_FOUND, clientIndex);
         return false;
       }
 
-      // Check if read is allowed based on properties
       if (!(characteristic->getProperties() & NIMBLE_PROPERTY::READ)) {
         sendErrorResponse(DIRCON_MSGID_READ_CHARACTERISTIC, message->SequenceNumber, DIRCON_RESPCODE_CHARACTERISTIC_OPERATION_NOT_SUPPORTED, clientIndex);
         return false;
       }
 
-      // Read the value
       NimBLEAttValue value = characteristic->getValue();
       size_t length        = value.size();
-
       for (size_t i = 0; i < length; i++) {
         response.AdditionalData.push_back(value[i]);
       }
@@ -413,24 +401,19 @@ bool DirConManager::processDirConMessage(DirConMessage* message, size_t clientIn
     }
 
     case DIRCON_MSGID_WRITE_CHARACTERISTIC: {
-      // Handle characteristic write
       response.Identifier   = DIRCON_MSGID_WRITE_CHARACTERISTIC;
       response.ResponseCode = DIRCON_RESPCODE_SUCCESS_REQUEST;
       response.UUID         = message->UUID;
 
-      // Use the helper function to find the characteristic
       NimBLECharacteristic* characteristic = findCharacteristic(message->UUID);
-
       if (characteristic == nullptr) {
         sendErrorResponse(DIRCON_MSGID_WRITE_CHARACTERISTIC, message->SequenceNumber, DIRCON_RESPCODE_CHARACTERISTIC_NOT_FOUND, clientIndex);
         SS2K_LOG(DIRCON_LOG_TAG, "Write characteristic failed: characteristic %s not found", message->UUID.toString().c_str());
         return false;
       }
 
-      // Check if write is allowed based on properties (accept both WRITE and WRITE_NR)
       if (!(characteristic->getProperties() & (NIMBLE_PROPERTY::WRITE | NIMBLE_PROPERTY::WRITE_NR))) {
         sendErrorResponse(DIRCON_MSGID_WRITE_CHARACTERISTIC, message->SequenceNumber, DIRCON_RESPCODE_CHARACTERISTIC_OPERATION_NOT_SUPPORTED, clientIndex);
-        // log which characteristic failed
         SS2K_LOG(DIRCON_LOG_TAG, "Write operation not supported for characteristic %s", characteristic->getUUID().toString().c_str());
         return false;
       }
@@ -461,34 +444,28 @@ bool DirConManager::processDirConMessage(DirConMessage* message, size_t clientIn
     }
 
     case DIRCON_MSGID_ENABLE_CHARACTERISTIC_NOTIFICATIONS: {
-      // Handle notification subscription
       response.Identifier   = DIRCON_MSGID_ENABLE_CHARACTERISTIC_NOTIFICATIONS;
       response.ResponseCode = DIRCON_RESPCODE_SUCCESS_REQUEST;
       response.UUID         = message->UUID;
 
-      // Use the helper function to find the characteristic
       NimBLECharacteristic* characteristic = findCharacteristic(message->UUID);
-
       if (characteristic == nullptr) {
         sendErrorResponse(DIRCON_MSGID_ENABLE_CHARACTERISTIC_NOTIFICATIONS, message->SequenceNumber, DIRCON_RESPCODE_CHARACTERISTIC_NOT_FOUND, clientIndex);
         SS2K_LOG(DIRCON_LOG_TAG, "Enable notifications failed: characteristic %s not found", message->UUID.toString().c_str());
         return false;
       }
 
-      // Check if notifications are allowed based on properties (accept both NOTIFY and INDICATE)
       if (!(characteristic->getProperties() & (NIMBLE_PROPERTY::NOTIFY | NIMBLE_PROPERTY::INDICATE))) {
         sendErrorResponse(DIRCON_MSGID_ENABLE_CHARACTERISTIC_NOTIFICATIONS, message->SequenceNumber, DIRCON_RESPCODE_CHARACTERISTIC_OPERATION_NOT_SUPPORTED, clientIndex);
         SS2K_LOG(DIRCON_LOG_TAG, "Notifications not supported for characteristic %s", characteristic->getUUID().toString().c_str());
         return false;
       }
 
-      // Get enable/disable flag
       bool enableNotifications = false;
       if (message->AdditionalData.size() > 0) {
         enableNotifications = message->AdditionalData[0] != 0;
       }
 
-      // Update subscription
       if (enableNotifications) {
         addSubscription(clientIndex, message->UUID);
       } else {
@@ -500,7 +477,6 @@ bool DirConManager::processDirConMessage(DirConMessage* message, size_t clientIn
     }
 
     default:
-      // Unknown message type
       sendErrorResponse(message->Identifier, message->SequenceNumber, DIRCON_RESPCODE_UNKNOWN_MESSAGE_TYPE, clientIndex);
       success = false;
       break;
@@ -524,10 +500,8 @@ void DirConManager::sendResponse(DirConMessage* message, size_t clientIndex) {
     return;
   }
 
-  // Log the message type being sent
   SS2K_LOG(DIRCON_LOG_TAG, "Sending response message type 0x%02X to client %d", message->Identifier, clientIndex);
 
-  // For discover services, log additional details
   if (message->Identifier == DIRCON_MSGID_DISCOVER_SERVICES) {
     SS2K_LOG(DIRCON_LOG_TAG, "Discover services response contains %d UUIDs", message->AdditionalUUIDs.size());
     for (size_t i = 0; i < message->AdditionalUUIDs.size(); i++) {
@@ -537,7 +511,6 @@ void DirConManager::sendResponse(DirConMessage* message, size_t clientIndex) {
 
   std::vector<uint8_t>* encodedMessage = message->encode(lastSequenceNumber[clientIndex]);
   if (encodedMessage != nullptr && encodedMessage->size() > 0) {
-    // SS2K_LOG(DIRCON_LOG_TAG, "Sending %d bytes to client %d", encodedMessage->size(), clientIndex);
     dirConClients[clientIndex].write(encodedMessage->data(), encodedMessage->size());
   } else {
     SS2K_LOG(DIRCON_LOG_TAG, "Error: No encoded message to send");
@@ -549,57 +522,55 @@ void DirConManager::notifyCharacteristic(const NimBLEUUID& serviceUuid, const Ni
     return;
   }
 
-  // We can skip the service lookup since we're only validating that the characteristic exists
-  // and we'll directly broadcast to all clients anyway
   if (findCharacteristic(characteristicUuid) == nullptr) {
     return;
   }
-  
-  // Send notifications to clients
+
   broadcastNotification(characteristicUuid, data, length, onlySubscribers);
 }
 
-void DirConManager::broadcastNotification(const NimBLEUUID& characteristicUuid, uint8_t* data, size_t length, bool onlySubscribers) {
-  // Create a single notification message that will be reused for all clients
-  static DirConMessage notification;  // Static to avoid repeated heap allocations
+static SemaphoreHandle_t s_notifyMutex = xSemaphoreCreateMutex();
 
-  // Initialize the notification once
+void DirConManager::broadcastNotification(const NimBLEUUID& characteristicUuid, uint8_t* data, size_t length, bool onlySubscribers) {
+  DirConMessage notification;  // stack-allocated, safe per-call
+
   notification.Request    = false;
   notification.Identifier = DIRCON_MSGID_UNSOLICITED_CHARACTERISTIC_NOTIFICATION;
   notification.UUID       = characteristicUuid;
 
-  // Copy notification data (only done once)
   notification.AdditionalData.clear();
-  notification.AdditionalData.reserve(length);  // Pre-allocate space to avoid reallocations
+  notification.AdditionalData.reserve(length);
   for (size_t j = 0; j < length; j++) {
     notification.AdditionalData.push_back(data[j]);
   }
 
-  // Encode the message once
   std::vector<uint8_t>* encodedMessage = notification.encode(0);
   if (encodedMessage == nullptr || encodedMessage->size() == 0) {
-    return;  // Nothing to send
+    return;
   }
 
-  // Send to all connected clients
+  // Grab mutex before touching the TCP client
+  if (xSemaphoreTake(s_notifyMutex, pdMS_TO_TICKS(10)) != pdTRUE) {
+    SS2K_LOG(DIRCON_LOG_TAG, "broadcastNotification: failed to acquire mutex, dropping notification");
+    return;
+  }
+
   for (int i = 0; i < DIRCON_MAX_CLIENTS; i++) {
     if (!dirConClients[i].connected() || (onlySubscribers && !hasSubscription(i, characteristicUuid))) {
       continue;
     }
 #ifdef DEBUG_DIRCON_MESSAGES
-    bool sentDebug = false;
-    // Print the outgoing raw message bytes to serial
-    if (!sentDebug) DirConMessage::printVectorBytesToSerial(*encodedMessage, false);
-    sentDebug = true;
+    DirConMessage::printVectorBytesToSerial(*encodedMessage, false);
 #endif
     dirConClients[i].write(encodedMessage->data(), encodedMessage->size());
   }
+
+  xSemaphoreGive(s_notifyMutex);
 }
 
 std::vector<NimBLECharacteristic*> DirConManager::getCharacteristics(const NimBLEUUID& serviceUuid) {
   std::vector<NimBLECharacteristic*> characteristics;
 
-  // Get the service
   NimBLEService* service = NimBLEDevice::getServer()->getServiceByUUID(serviceUuid);
   if (service == nullptr) {
     return characteristics;
@@ -610,7 +581,6 @@ std::vector<NimBLECharacteristic*> DirConManager::getCharacteristics(const NimBL
     }
   }
 
-  // Filter out null characteristics
   auto it = std::remove_if(characteristics.begin(), characteristics.end(), [](NimBLECharacteristic* c) { return c == nullptr; });
   characteristics.erase(it, characteristics.end());
 
@@ -618,7 +588,6 @@ std::vector<NimBLECharacteristic*> DirConManager::getCharacteristics(const NimBL
 }
 
 NimBLECharacteristic* DirConManager::findCharacteristic(const NimBLEUUID& characteristicUuid) {
-  // Search through registered services for the characteristic
   for (size_t i = 0; i < registeredServiceCount; i++) {
     NimBLEService* service = NimBLEDevice::getServer()->getServiceByUUID(registeredServices[i].serviceUuid);
     if (service != nullptr) {
@@ -628,7 +597,6 @@ NimBLECharacteristic* DirConManager::findCharacteristic(const NimBLEUUID& charac
       }
     }
   }
-
   return nullptr;
 }
 
@@ -638,15 +606,12 @@ uint8_t DirConManager::getDirConProperties(uint32_t characteristicProperties) {
   if (characteristicProperties & NIMBLE_PROPERTY::READ) {
     properties |= DIRCON_CHAR_PROP_FLAG_READ;
   }
-
   if (characteristicProperties & (NIMBLE_PROPERTY::WRITE | NIMBLE_PROPERTY::WRITE_NR)) {
     properties |= DIRCON_CHAR_PROP_FLAG_WRITE;
   }
-
   if (characteristicProperties & NIMBLE_PROPERTY::NOTIFY) {
     properties |= DIRCON_CHAR_PROP_FLAG_NOTIFY;
   }
-
   // DirCon protocol doesn't define a separate INDICATE flag;
   // map INDICATE to NOTIFY so clients can subscribe to indicated characteristics
   if (characteristicProperties & NIMBLE_PROPERTY::INDICATE) {
@@ -656,39 +621,46 @@ uint8_t DirConManager::getDirConProperties(uint32_t characteristicProperties) {
   return properties;
 }
 
-size_t DirConManager::charSubscriptionIndex(const NimBLEUUID& characteristicUuid) {
-  // Simple hash function to get an index for the characteristic
-  // In a real implementation, this would be a proper data structure
-  std::string uuidStr = characteristicUuid.toString();
-  uint32_t hash       = 0;
-
-  for (char c : uuidStr) {
-    hash = ((hash << 5) + hash) + c;
-  }
-
-  return hash % DIRCON_MAX_CHARACTERISTICS;
-}
-
 void DirConManager::addSubscription(size_t clientIndex, const NimBLEUUID& characteristicUuid) {
-  size_t index                            = charSubscriptionIndex(characteristicUuid);
-  clientSubscriptions[clientIndex][index] = true;
-  SS2K_LOG(DIRCON_LOG_TAG, "Client %d subscribed to characteristic %s", clientIndex, characteristicUuid.toString().c_str());
+  for (int j = 0; j < DIRCON_MAX_CHARACTERISTICS; j++) {
+    if (clientSubscriptions[clientIndex][j].active &&
+        clientSubscriptions[clientIndex][j].uuid == characteristicUuid) {
+      return;  // already subscribed
+    }
+    if (!clientSubscriptions[clientIndex][j].active) {
+      clientSubscriptions[clientIndex][j].uuid   = characteristicUuid;
+      clientSubscriptions[clientIndex][j].active = true;
+      SS2K_LOG(DIRCON_LOG_TAG, "Client %d subscribed to characteristic %s", clientIndex, characteristicUuid.toString().c_str());
+      return;
+    }
+  }
+  SS2K_LOG(DIRCON_LOG_TAG, "Warning: no free subscription slot for client %d", clientIndex);
 }
 
 void DirConManager::removeSubscription(size_t clientIndex, const NimBLEUUID& characteristicUuid) {
-  size_t index                            = charSubscriptionIndex(characteristicUuid);
-  clientSubscriptions[clientIndex][index] = false;
-  SS2K_LOG(DIRCON_LOG_TAG, "Client %d unsubscribed from characteristic %s", clientIndex, characteristicUuid.toString().c_str());
+  for (int j = 0; j < DIRCON_MAX_CHARACTERISTICS; j++) {
+    if (clientSubscriptions[clientIndex][j].active &&
+        clientSubscriptions[clientIndex][j].uuid == characteristicUuid) {
+      clientSubscriptions[clientIndex][j].active = false;
+      SS2K_LOG(DIRCON_LOG_TAG, "Client %d unsubscribed from characteristic %s", clientIndex, characteristicUuid.toString().c_str());
+      return;
+    }
+  }
 }
 
 void DirConManager::removeAllSubscriptions(size_t clientIndex) {
-  for (int i = 0; i < DIRCON_MAX_CHARACTERISTICS; i++) {
-    clientSubscriptions[clientIndex][i] = false;
+  for (int j = 0; j < DIRCON_MAX_CHARACTERISTICS; j++) {
+    clientSubscriptions[clientIndex][j].active = false;
   }
   SS2K_LOG(DIRCON_LOG_TAG, "Removed all subscriptions for client %d", clientIndex);
 }
 
 bool DirConManager::hasSubscription(size_t clientIndex, const NimBLEUUID& characteristicUuid) {
-  size_t index = charSubscriptionIndex(characteristicUuid);
-  return clientSubscriptions[clientIndex][index];
+  for (int j = 0; j < DIRCON_MAX_CHARACTERISTICS; j++) {
+    if (clientSubscriptions[clientIndex][j].active &&
+        clientSubscriptions[clientIndex][j].uuid == characteristicUuid) {
+      return true;
+    }
+  }
+  return false;
 }

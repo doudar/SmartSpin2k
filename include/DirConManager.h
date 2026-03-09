@@ -33,6 +33,12 @@ struct DirConWriteResult {
   DirConWriteResult() : updateResponseData(false), autoSubscribeCount(0) {}
 };
 
+// Subscription entry: stores UUID alongside active flag to avoid hash collisions
+struct Subscription {
+  NimBLEUUID uuid;
+  bool active = false;
+};
+
 // Write handler callback: returns true if the characteristic was handled by this service
 typedef bool (*DirConWriteHandler)(NimBLECharacteristic* characteristic, const uint8_t* data, size_t length, DirConWriteResult* result);
 
@@ -87,8 +93,7 @@ class DirConManager {
   static NimBLECharacteristic* findCharacteristic(const NimBLEUUID& characteristicUuid);
 
   // Subscription tracking
-  static bool clientSubscriptions[DIRCON_MAX_CLIENTS][DIRCON_MAX_CHARACTERISTICS];  // Simple subscription tracking
-  static size_t charSubscriptionIndex(const NimBLEUUID& characteristicUuid);
+  static Subscription clientSubscriptions[DIRCON_MAX_CLIENTS][DIRCON_MAX_CHARACTERISTICS];
   static void addSubscription(size_t clientIndex, const NimBLEUUID& characteristicUuid);
   static void removeSubscription(size_t clientIndex, const NimBLEUUID& characteristicUuid);
   static void removeAllSubscriptions(size_t clientIndex);
