@@ -12,25 +12,25 @@
 #include <Constants.h>
 
 using ZwiftProtocol::CommandCode;
-using ZwiftProtocol::RideButtonMask;
-using ZwiftProtocol::WireType;
 using ZwiftProtocol::makeTag;
+using ZwiftProtocol::RideButtonMask;
 using ZwiftProtocol::toUnderlying;
+using ZwiftProtocol::WireType;
 
 namespace {
 constexpr uint8_t kRideAnalogButtonsPayloadSize = 0x18;
 
-constexpr uint8_t kRideKeypadButtonMapTag = makeTag(ZwiftProtocol::RideKeyPadStatus::Field::ButtonMap, WireType::Varint);
+constexpr uint8_t kRideKeypadButtonMapTag     = makeTag(ZwiftProtocol::RideKeyPadStatus::Field::ButtonMap, WireType::Varint);
 constexpr uint8_t kRideKeypadAnalogButtonsTag = makeTag(ZwiftProtocol::RideKeyPadStatus::Field::AnalogButtons, WireType::LengthDelimited);
-constexpr uint8_t kRideAnalogGroupStatusTag = makeTag(ZwiftProtocol::RideAnalogKeyGroup::Field::GroupStatus, WireType::LengthDelimited);
-constexpr uint8_t kRideAnalogLocationTag = makeTag(ZwiftProtocol::RideAnalogKeyPress::Field::Location, WireType::Varint);
-constexpr uint8_t kRideAnalogValueTag = makeTag(ZwiftProtocol::RideAnalogKeyPress::Field::AnalogValue, WireType::Varint);
+constexpr uint8_t kRideAnalogGroupStatusTag   = makeTag(ZwiftProtocol::RideAnalogKeyGroup::Field::GroupStatus, WireType::LengthDelimited);
+constexpr uint8_t kRideAnalogLocationTag      = makeTag(ZwiftProtocol::RideAnalogKeyPress::Field::Location, WireType::Varint);
+constexpr uint8_t kRideAnalogValueTag         = makeTag(ZwiftProtocol::RideAnalogKeyPress::Field::AnalogValue, WireType::Varint);
 
 uint32_t getNextZwiftField5Counter(uint16_t power) {
   const int knownOutputs[] = {2864, 4060, 4636, 6803};
-  static int counter = 0;
+  static int counter       = 0;
   if (power > 0) {
-    counter ++;
+    counter++;
   } else {
     counter = 0;
   }
@@ -53,38 +53,38 @@ static const size_t ASYNC_RIDEON_ANSWER_LEN = sizeof(ASYNC_RIDEON_ANSWER);
 
 // Pre-computed "no buttons pressed" Ride notification (opcode 0x23 + bitmap + analog data)
 static const uint8_t ALL_RELEASED[] = {
-  toUnderlying(CommandCode::RideKeyPadStatus),
-  kRideKeypadButtonMapTag,
+    toUnderlying(CommandCode::RideKeyPadStatus),
+    kRideKeypadButtonMapTag,
     0xFF,
     0xFF,
     0xFF,
     0xFF,
     0x0F,  // field 1: bitmap = 0xFFFFFFFF (all released)
-  kRideKeypadAnalogButtonsTag,
-  kRideAnalogButtonsPayloadSize,
-  kRideAnalogGroupStatusTag,
+    kRideKeypadAnalogButtonsTag,
+    kRideAnalogButtonsPayloadSize,
+    kRideAnalogGroupStatusTag,
     0x04,
-  kRideAnalogLocationTag,
-  toUnderlying(ZwiftProtocol::RideAnalogLocation::Left),
-  kRideAnalogValueTag,
+    kRideAnalogLocationTag,
+    toUnderlying(ZwiftProtocol::RideAnalogLocation::Left),
+    kRideAnalogValueTag,
     0x00,  // analog 0 (LEFT): value 0
-  kRideAnalogGroupStatusTag,
+    kRideAnalogGroupStatusTag,
     0x04,
-  kRideAnalogLocationTag,
-  toUnderlying(ZwiftProtocol::RideAnalogLocation::Right),
-  kRideAnalogValueTag,
+    kRideAnalogLocationTag,
+    toUnderlying(ZwiftProtocol::RideAnalogLocation::Right),
+    kRideAnalogValueTag,
     0x00,  // analog 1 (RIGHT): value 0
-  kRideAnalogGroupStatusTag,
+    kRideAnalogGroupStatusTag,
     0x04,
-  kRideAnalogLocationTag,
-  toUnderlying(ZwiftProtocol::RideAnalogLocation::Up),
-  kRideAnalogValueTag,
+    kRideAnalogLocationTag,
+    toUnderlying(ZwiftProtocol::RideAnalogLocation::Up),
+    kRideAnalogValueTag,
     0x00,  // analog 2: value 0
-  kRideAnalogGroupStatusTag,
+    kRideAnalogGroupStatusTag,
     0x04,
-  kRideAnalogLocationTag,
-  toUnderlying(ZwiftProtocol::RideAnalogLocation::Down),
-  kRideAnalogValueTag,
+    kRideAnalogLocationTag,
+    toUnderlying(ZwiftProtocol::RideAnalogLocation::Down),
+    kRideAnalogValueTag,
     0x00  // analog 3: value 0
 };
 static const size_t ALL_RELEASED_LEN = sizeof(ALL_RELEASED);
@@ -106,10 +106,10 @@ BLE_Zwift_Service::BLE_Zwift_Service()
 const char* BLE_Zwift_Service::getLogTag() const { return isDirCon ? kZwiftDirConLogTag : kZwiftBleLogTag; }
 
 void BLE_Zwift_Service::resetSession() {
-  _lastActivityTime    = 0;
-  _lastKeepaliveTime   = 0;
-  _lastRidingDataTime  = 0;
-  _gearRatioX10000     = 0;
+  _lastActivityTime   = 0;
+  _lastKeepaliveTime  = 0;
+  _lastRidingDataTime = 0;
+  _gearRatioX10000    = 0;
 }
 
 bool BLE_Zwift_Service::keepAlive(unsigned long now) {
@@ -139,7 +139,7 @@ void BLE_Zwift_Service::setupService(NimBLEServer* pServer) {
   pBatteryService->start();
 
   // Zwift Custom Service (use 0xFC82 to match advertisement)
-  pZwiftService = pServer->createService(ZWIFT_RIDE_CUSTOM_SERVICE_UUID);
+  pZwiftService = pServer->createService(ZWIFT_CUSTOM_SERVICE_UUID);
 
   // Async characteristic: NOTIFY - sends button presses to Zwift
   asyncCharacteristic = pZwiftService->createCharacteristic(ZWIFT_ASYNC_CHARACTERISTIC_UUID, NIMBLE_PROPERTY::NOTIFY);
@@ -202,7 +202,7 @@ void BLE_Zwift_Service::update() {
 
   // Field 3: SpeedX100 (tag 0x18)
   int speedX100 = rtConfig->getSimulatedSpeed();
-  zData[pos++] = makeTag(ZwiftProtocol::HubRidingData::Field::SpeedX100, WireType::Varint);
+  zData[pos++]  = makeTag(ZwiftProtocol::HubRidingData::Field::SpeedX100, WireType::Varint);
   pos += encodeUleb128(static_cast<uint64_t>(speedX100), &zData[pos]);
 
   // Field 4: HR (tag 0x20)
@@ -217,16 +217,16 @@ void BLE_Zwift_Service::update() {
   zData[pos++] = makeTag(ZwiftProtocol::HubRidingData::Field::Unknown2, WireType::Varint);
   pos += encodeUleb128(30091, &zData[pos]);
 
-  //every 5 seconds, print the zData for debugging.
-  static unsigned long lastDebugTime = 0;
-  if (now - lastDebugTime >= 5000) {
-    lastDebugTime = now;
-    SS2K_LOG(getLogTag(), "Zwift riding data: %s", toHexString(zData, pos).c_str());
-  }
+  // every 5 seconds, print the zData for debugging.
+  // static unsigned long lastDebugTime = 0;
+  // if (now - lastDebugTime >= 5000) {
+  //   lastDebugTime = now;
+  //   SS2K_LOG(getLogTag(), "Zwift riding data: %s", toHexString(zData, pos).c_str());
+  // }
 
   asyncCharacteristic->setValue(zData, pos);
   asyncCharacteristic->notify();
-  DirConManager::notifyCharacteristic(NimBLEUUID(ZWIFT_RIDE_CUSTOM_SERVICE_UUID), asyncCharacteristic->getUUID(), zData, pos);
+  DirConManager::notifyCharacteristic(NimBLEUUID(ZWIFT_CUSTOM_SERVICE_UUID), asyncCharacteristic->getUUID(), zData, pos);
 }
 
 bool BLE_Zwift_Service::isConnected() {
@@ -256,13 +256,19 @@ void BLE_Zwift_Service::sendButtonNotification(RideButtonMask buttonMask) {
   // Build Ride format: opcode(1) + tag(1) + varint(max5) + analog(26) = max 33 bytes
   uint32_t buttonMap = toUnderlying(~buttonMask);
 
-  static const uint8_t analogData[] = {
-      kRideKeypadAnalogButtonsTag, kRideKeypadAnalogButtonsTag + 0x06,
-      kRideAnalogGroupStatusTag, 0x04, kRideAnalogLocationTag, toUnderlying(ZwiftProtocol::RideAnalogLocation::Left), kRideAnalogValueTag, 0x00,
-      kRideAnalogGroupStatusTag, 0x04, kRideAnalogLocationTag, toUnderlying(ZwiftProtocol::RideAnalogLocation::Right), kRideAnalogValueTag, 0x00,
-      kRideAnalogGroupStatusTag, 0x04, kRideAnalogLocationTag, toUnderlying(ZwiftProtocol::RideAnalogLocation::Up), kRideAnalogValueTag, 0x00,
-      kRideAnalogGroupStatusTag, 0x04, kRideAnalogLocationTag, toUnderlying(ZwiftProtocol::RideAnalogLocation::Down), kRideAnalogValueTag, 0x00
-  };
+  static const uint8_t analogData[] = {kRideKeypadAnalogButtonsTag, kRideKeypadAnalogButtonsTag + 0x06,
+                                       kRideAnalogGroupStatusTag,   0x04,
+                                       kRideAnalogLocationTag,      toUnderlying(ZwiftProtocol::RideAnalogLocation::Left),
+                                       kRideAnalogValueTag,         0x00,
+                                       kRideAnalogGroupStatusTag,   0x04,
+                                       kRideAnalogLocationTag,      toUnderlying(ZwiftProtocol::RideAnalogLocation::Right),
+                                       kRideAnalogValueTag,         0x00,
+                                       kRideAnalogGroupStatusTag,   0x04,
+                                       kRideAnalogLocationTag,      toUnderlying(ZwiftProtocol::RideAnalogLocation::Up),
+                                       kRideAnalogValueTag,         0x00,
+                                       kRideAnalogGroupStatusTag,   0x04,
+                                       kRideAnalogLocationTag,      toUnderlying(ZwiftProtocol::RideAnalogLocation::Down),
+                                       kRideAnalogValueTag,         0x00};
 
   uint8_t buf[33];
   buf[0]           = toUnderlying(CommandCode::RideKeyPadStatus);
@@ -274,7 +280,7 @@ void BLE_Zwift_Service::sendButtonNotification(RideButtonMask buttonMask) {
 
   asyncCharacteristic->setValue(buf, pos);
   asyncCharacteristic->notify();
-  DirConManager::notifyCharacteristic(NimBLEUUID(ZWIFT_RIDE_CUSTOM_SERVICE_UUID), asyncCharacteristic->getUUID(), buf, pos);
+  DirConManager::notifyCharacteristic(NimBLEUUID(ZWIFT_CUSTOM_SERVICE_UUID), asyncCharacteristic->getUUID(), buf, pos);
 }
 
 size_t BLE_Zwift_Service::encodeVarint32(uint32_t value, uint8_t* buffer) {
@@ -290,7 +296,7 @@ size_t BLE_Zwift_Service::encodeVarint32(uint32_t value, uint8_t* buffer) {
 void BLE_Zwift_Service::sendAllButtonsReleased() {
   asyncCharacteristic->setValue(ALL_RELEASED, ALL_RELEASED_LEN);
   asyncCharacteristic->notify();
-  DirConManager::notifyCharacteristic(NimBLEUUID(ZWIFT_RIDE_CUSTOM_SERVICE_UUID), asyncCharacteristic->getUUID(), const_cast<uint8_t*>(ALL_RELEASED), ALL_RELEASED_LEN);
+  DirConManager::notifyCharacteristic(NimBLEUUID(ZWIFT_CUSTOM_SERVICE_UUID), asyncCharacteristic->getUUID(), const_cast<uint8_t*>(ALL_RELEASED), ALL_RELEASED_LEN);
 }
 
 void BLE_Zwift_Service::handleSyncRxWrite(const std::string& value, bool _isDirCon) {
@@ -320,9 +326,9 @@ void BLE_Zwift_Service::handleSyncRxWrite(const std::string& value, bool _isDirC
     asyncCharacteristic->notify();
 
     if (_isDirCon) {
-      DirConManager::notifyCharacteristic(NimBLEUUID(ZWIFT_RIDE_CUSTOM_SERVICE_UUID), syncTxCharacteristic->getUUID(), syncResponse, sizeof(syncResponse), false);
-      DirConManager::notifyCharacteristic(NimBLEUUID(ZWIFT_RIDE_CUSTOM_SERVICE_UUID), asyncCharacteristic->getUUID(), const_cast<uint8_t*>(ASYNC_RIDEON_ANSWER),
-                                          ASYNC_RIDEON_ANSWER_LEN, false);
+      DirConManager::notifyCharacteristic(NimBLEUUID(ZWIFT_CUSTOM_SERVICE_UUID), syncTxCharacteristic->getUUID(), syncResponse, sizeof(syncResponse), false);
+      DirConManager::notifyCharacteristic(NimBLEUUID(ZWIFT_CUSTOM_SERVICE_UUID), asyncCharacteristic->getUUID(), const_cast<uint8_t*>(ASYNC_RIDEON_ANSWER), ASYNC_RIDEON_ANSWER_LEN,
+                                          false);
     }
 
     resetSession();
@@ -378,7 +384,7 @@ void BLE_Zwift_Service::handleZwiftCommand(const uint8_t* data, size_t length) {
 
         syncTxCharacteristic->setValue(resp, pos);
         syncTxCharacteristic->indicate();
-        DirConManager::notifyCharacteristic(NimBLEUUID(ZWIFT_RIDE_CUSTOM_SERVICE_UUID), syncTxCharacteristic->getUUID(), resp, pos);
+        DirConManager::notifyCharacteristic(NimBLEUUID(ZWIFT_CUSTOM_SERVICE_UUID), syncTxCharacteristic->getUUID(), resp, pos);
 
       } else if (param == toUnderlying(ZwiftProtocol::HubRequest::DataId::GeneralInfo)) {
         // Device info query - build DeviceInformation response directly into single buffer
@@ -408,7 +414,7 @@ void BLE_Zwift_Service::handleZwiftCommand(const uint8_t* data, size_t length) {
 
         syncTxCharacteristic->setValue(resp, pos);
         syncTxCharacteristic->indicate();
-        DirConManager::notifyCharacteristic(NimBLEUUID(ZWIFT_RIDE_CUSTOM_SERVICE_UUID), syncTxCharacteristic->getUUID(), resp, pos);
+        DirConManager::notifyCharacteristic(NimBLEUUID(ZWIFT_CUSTOM_SERVICE_UUID), syncTxCharacteristic->getUUID(), resp, pos);
         SS2K_LOG(getLogTag(), "Responded with device info");
       }
       break;
