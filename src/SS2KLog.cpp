@@ -56,18 +56,27 @@ void LogHandler::writev(esp_log_level_t level, const char *module, const char *f
   }
 
   char formatString[256];
-  sprintf(formatString, "[%6lu][%c](%s): %s", millis(), _logLevelToLetter(level), module, format);
+  snprintf(formatString, sizeof(formatString), "[%6lu][%c](%s): %s", millis(), _logLevelToLetter(level), module, format);
 
   const size_t buffer_size = 512;
   char buffer[buffer_size];
   int written = vsnprintf(buffer, buffer_size, formatString, args);
+  if (written < 0) {
+    buffer[0] = '\0';
+    written = 0;
+  }
+
+  size_t bytesToSend = static_cast<size_t>(written);
+  if (bytesToSend >= buffer_size) {
+    bytesToSend = buffer_size - 1;
+  }
 
   // Default logger -> write all to serial if connected
   if (Serial) {
     Serial.println(buffer);
   }
 
-  xMessageBufferSend(_messageBufferHandle, buffer, written, 0);
+  xMessageBufferSend(_messageBufferHandle, buffer, bytesToSend, 0);
   xSemaphoreGive(_logBufferMutex);
 }
 
@@ -92,6 +101,29 @@ void ss2k_remove_newlines(std::string *str) {
   while ((pos = (*str).find("\n", pos)) != std::string::npos) {
     (*str).replace(pos, 1, " ");
   }
+}
+
+std::string toHexString(const uint8_t *data, size_t dataLength) {
+  std::string result;
+  if (data == nullptr || dataLength == 0) {
+    return result;
+  }
+
+  result.reserve((dataLength * 3) - 1);
+  char byteBuffer[4];
+  for (size_t index = 0; index < dataLength; ++index) {
+    snprintf(byteBuffer, sizeof(byteBuffer), "%02x", data[index]);
+    result += byteBuffer;
+    if (index + 1 < dataLength) {
+      result += ' ';
+    }
+  }
+
+  return result;
+}
+
+std::string toHexString(const char *data, size_t dataLength) {
+  return toHexString(reinterpret_cast<const uint8_t *>(data), dataLength);
 }
 
 int ss2k_log_hex_to_buffer(const byte *data, const size_t data_length, char *buffer, const int buffer_offset, const size_t buffer_length) {

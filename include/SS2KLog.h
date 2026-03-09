@@ -17,6 +17,7 @@
 #include <freertos/semphr.h>
 #include <freertos/message_buffer.h>
 #include "LogAppender.h"
+#include <string>
 #include <vector>
 
 #define SS2K_LOG_TAG    "SS2K"
@@ -78,6 +79,9 @@ class LogHandler {
 extern LogHandler logHandler;
 
 void ss2k_remove_newlines(std::string *str);
+
+std::string toHexString(const uint8_t *data, size_t dataLength);
+std::string toHexString(const char *data, size_t dataLength);
 
 int ss2k_log_hex_to_buffer(const byte *data, const size_t data_length, char *buffer, const int buffer_offset, const size_t buffer_length);
 int ss2k_log_hex_to_buffer(const char *data, const size_t data_length, char *buffer, const int buffer_offset, const size_t buffer_length);

@@ -57,21 +57,32 @@ void startBLEServer() {
   ss2kCustomCharacteristic.setupService(spinBLEServer.pServer);
   deviceInformationService.setupService(spinBLEServer.pServer);
   zwiftService.setupService(spinBLEServer.pServer);
-  //add all service UUIDs to advertisement vector
-  oServiceUUIDs.push_back(CSCSERVICE_UUID);
-  oServiceUUIDs.push_back(CYCLINGPOWERSERVICE_UUID);
-  oServiceUUIDs.push_back(HEARTSERVICE_UUID);
-  oServiceUUIDs.push_back(FITNESSMACHINESERVICE_UUID);
-  oServiceUUIDs.push_back(ZWIFT_RIDE_CUSTOM_SERVICE_UUID);
-  //oServiceUUIDs.push_back(ZWIFT_CUSTOM_SERVICE_UUID);
-  oAdvertisementData.setFlags(0x06);  // General Discoverable, BR/EDR Not Supported
-  oAdvertisementData.setCompleteServices16(oServiceUUIDs);
-  // Zwift identifies controllers via manufacturer data with company ID 0x094A
-  NimBLEAddress bleAddr = BLEDevice::getAddress();
-  const uint8_t *addrVal = bleAddr.getVal();
-  static const uint8_t zwiftMfrData[] = { 0x4A, 0x09, 0x08, 0x58, 0x9A };
-  oAdvertisementData.setManufacturerData(zwiftMfrData, sizeof(zwiftMfrData));
-  pAdvertising->setAdvertisementData(oAdvertisementData);
+  // add all service UUIDs to advertisement vector
+  // oServiceUUIDs.push_back(CSCSERVICE_UUID);
+  // oServiceUUIDs.push_back(CYCLINGPOWERSERVICE_UUID);
+  // oServiceUUIDs.push_back(HEARTSERVICE_UUID);
+  // oServiceUUIDs.push_back(FITNESSMACHINESERVICE_UUID);
+  // oServiceUUIDs.push_back(ZWIFT_RIDE_CUSTOM_SERVICE_UUID);
+  // oServiceUUIDs.push_back(ZWIFT_CUSTOM_SERVICE_UUID);
+  // oAdvertisementData.setFlags(0x06);  // General Discoverable, BR/EDR Not Supported
+  // oAdvertisementData.setCompleteServices16(oServiceUUIDs);
+  //  Zwift identifies controllers via manufacturer data with company ID 0x094A
+  // oAdvertisementData.setManufacturerData(zwiftMfrData, sizeof(zwiftMfrData));
+  // pAdvertising->setAdvertisementData(oAdvertisementData);
+  // set the last two bytes of the mfr address to the last two bytes of our BLE address in little endian
+  uint8_t zwiftMfrData[] = {0x4A, 0x09, 0x01, 0x58, 0x9A};
+  const std::string bleAddress = BLEDevice::getAddress().toString();  // "aa:bb:cc:dd:ee:ff"
+  unsigned int mac[6]          = {0};
+  if (sscanf(bleAddress.c_str(), "%02x:%02x:%02x:%02x:%02x:%02x", &mac[0], &mac[1], &mac[2], &mac[3], &mac[4], &mac[5]) == 6) {
+    // BLE address tail bytes are ee:ff in string form -> little endian in mfr data is ff, ee
+    zwiftMfrData[3] = static_cast<uint8_t>(mac[5]);
+    zwiftMfrData[4] = static_cast<uint8_t>(mac[4]);
+  }
+  pAdvertising->setManufacturerData(zwiftMfrData, sizeof(zwiftMfrData));
+  //pAdvertising->addServiceUUID(CYCLINGPOWERSERVICE_UUID);
+  pAdvertising->addServiceUUID(HEARTSERVICE_UUID);
+  // pAdvertising->addServiceUUID(FITNESSMACHINESERVICE_UUID);
+  pAdvertising->addServiceUUID(ZWIFT_CUSTOM_SERVICE_UUID);
   pAdvertising->setScanResponseData(oScanResponseData);
   // wattbikeService.setupService(spinBLEServer.pServer);  // No callback needed
   // sb20Service.begin();
@@ -168,7 +179,7 @@ void MyServerCallbacks::onDisconnect(NimBLEServer* pServer) {
 }
 
 void MyServerCallbacks::onMTUChange(uint16_t MTU, NimBLEConnInfo& connInfo) {
-  //SS2K_LOG(BLE_SERVER_LOG_TAG, "MTU updated: %u for connection ID: %u", MTU, connInfo.getConnHandle());
+  // SS2K_LOG(BLE_SERVER_LOG_TAG, "MTU updated: %u for connection ID: %u", MTU, connInfo.getConnHandle());
 }
 
 bool MyServerCallbacks::onConnParamsUpdateRequest(uint16_t handle, const ble_gap_upd_params* params) {

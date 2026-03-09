@@ -8,49 +8,24 @@
 #pragma once
 
 #include <NimBLEDevice.h>
+#include "Zwift_Protocol_Messages.h"
 
 // Zwift manufacturer ID
-#define ZWIFT_MANUFACTURER_ID 0x094A
+inline constexpr uint16_t kZwiftManufacturerId = 0x094A;
 
 // Zwift device type identifiers (from manufacturer data)
-#define ZWIFT_BC1              0x09  // Zwift Click v1
-#define ZWIFT_CLICK_V2_RIGHT   0x0A  // Zwift Click v2 Right
-#define ZWIFT_CLICK_V2_LEFT    0x0B  // Zwift Click v2 Left
-
-// Zwift protocol constants
-#define ZWIFT_CONTROLLER_NOTIFICATION_OPCODE 0x23  // Zwift Ride key status message
-#define ZWIFT_EMPTY_MESSAGE_TYPE             0x15
-#define ZWIFT_BATTERY_LEVEL_TYPE             0x19
-
-// Zwift trainer protocol message opcodes
-#define ZWIFT_TRAINER_RIDING_DATA   0x03
-#define ZWIFT_TRAINER_CONTROL       0x04
-
-// Zwift Ride button masks (inverted logic: 0 = pressed)
-// Bit layout per Zwift Ride protocol (note: bit 7 and bit 15 are unused gaps)
-#define ZWIFT_BTN_LEFT       0x00001
-#define ZWIFT_BTN_UP         0x00002
-#define ZWIFT_BTN_RIGHT      0x00004
-#define ZWIFT_BTN_DOWN       0x00008
-#define ZWIFT_BTN_A          0x00010
-#define ZWIFT_BTN_B          0x00020
-#define ZWIFT_BTN_Y          0x00040
-#define ZWIFT_BTN_Z          0x00100
-#define ZWIFT_BTN_SHFT_UP_L  0x00200
-#define ZWIFT_BTN_SHFT_DN_L  0x00400
-#define ZWIFT_BTN_POWERUP_L  0x00800
-#define ZWIFT_BTN_ONOFF_L    0x01000
-#define ZWIFT_BTN_SHFT_UP_R  0x02000
-#define ZWIFT_BTN_SHFT_DN_R  0x04000
-#define ZWIFT_BTN_POWERUP_R  0x10000
-#define ZWIFT_BTN_ONOFF_R    0x20000
+enum class ZwiftDeviceType : uint8_t {
+  BC1 = 0x09,
+  ClickV2Right = 0x0A,
+  ClickV2Left = 0x0B,
+};
 
 // Keepalive / riding data interval in milliseconds
-#define ZWIFT_KEEPALIVE_INTERVAL_MS 5000
-#define ZWIFT_SESSION_TIMEOUT_MS (ZWIFT_KEEPALIVE_INTERVAL_MS * 2)
-#define ZWIFT_RIDING_DATA_INTERVAL_MS 250
-#define ZWIFT_BLE_LOG_TAG "BLE_Zwift"
-#define ZWIFT_DIRCON_LOG_TAG "DRC_Zwift"
+inline constexpr unsigned long kZwiftKeepaliveIntervalMs = 5000;
+inline constexpr unsigned long kZwiftSessionTimeoutMs = kZwiftKeepaliveIntervalMs * 2;
+inline constexpr unsigned long kZwiftRidingDataIntervalMs = 250;
+inline constexpr char kZwiftBleLogTag[] = "BLE_Zwift";
+inline constexpr char kZwiftDirConLogTag[] = "DRC_Zwift";
 
 class BLE_Zwift_Service {
  public:
@@ -93,7 +68,7 @@ class BLE_Zwift_Service {
   void resetSession();
 
   // Encode a button mask into a protobuf varint message and send as notification
-  void sendButtonNotification(uint32_t buttonMask);
+  void sendButtonNotification(ZwiftProtocol::RideButtonMask buttonMask);
 
   // Encode uint32 as protobuf varint, returns number of bytes written
   static size_t encodeVarint32(uint32_t value, uint8_t *buffer);
@@ -106,9 +81,6 @@ class BLE_Zwift_Service {
 
   // Send the "all buttons released" state
   void sendAllButtonsReleased();
-
-  // Send riding data notification (trainer protocol message 0x03)
-  void sendRidingData();
 
   // Handle Zwift trainer protocol command (non-RideOn messages)
   void handleZwiftCommand(const uint8_t *data, size_t length);
