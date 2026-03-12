@@ -89,6 +89,29 @@ static const uint8_t ALL_RELEASED[] = {
 };
 static const size_t ALL_RELEASED_LEN = sizeof(ALL_RELEASED);
 
+static const uint8_t ASK6_PREFIX[] = {
+  toUnderlying(CommandCode::HubCommand),
+  makeTag(ZwiftProtocol::HubCommand::Field::Physical, WireType::LengthDelimited),
+  0x04,
+  makeTag(ZwiftProtocol::PhysicalParam::Field::GearRatioX10000, WireType::Varint),
+};
+
+static const uint8_t ASK7_PREFIX[] = {
+  toUnderlying(CommandCode::HubCommand),
+  makeTag(ZwiftProtocol::HubCommand::Field::Physical, WireType::LengthDelimited),
+  0x03,
+  makeTag(ZwiftProtocol::PhysicalParam::Field::GearRatioX10000, WireType::Varint),
+};
+
+// Ask 6: 3-byte ratio echo in sync_tx plus fixed async status frame.
+static const uint8_t ASK6_SYNC_TX_TEMPLATE[] = {0x3c, 0x08, 0x88, 0x04, 0x12, 0x06, 0x0a, 0x04, 0x40, 0x00, 0x00, 0x00};
+static const uint8_t ASK6_ASYNC_STATUS[]     = {0x03, 0x08, 0x00, 0x10, 0x00, 0x18, 0x27, 0xe7, 0x20, 0x00, 0x28, 0x96, 0x14, 0x30, 0x93, 0xed, 0x01};
+
+// Ask 7: 2-byte ratio echo in sync_tx plus fixed async status frame.
+// SubContent(5 bytes) = Content tag(0x0a) + Content len(0x03) + ReplyData tag(0x40) + 2 data bytes
+static const uint8_t ASK7_SYNC_TX_TEMPLATE[] = {0x3c, 0x08, 0x88, 0x04, 0x12, 0x05, 0x0a, 0x03, 0x40, 0x00, 0x00};
+static const uint8_t ASK7_ASYNC_STATUS[]     = {0x03, 0x08, 0x00, 0x10, 0x00, 0x18, 0x27, 0xe7, 0x20, 0x00, 0x28, 0x00, 0x30, 0x93, 0xed, 0x01};
+
 static ZwiftSyncRxCallbacks zwiftSyncRxCallbacks;
 
 BLE_Zwift_Service::BLE_Zwift_Service()
@@ -123,7 +146,7 @@ bool BLE_Zwift_Service::keepAlive(unsigned long now) {
     // Keepalive sent on sync_tx as "no buttons pressed" notification
     syncTxCharacteristic->setValue(ALL_RELEASED, ALL_RELEASED_LEN);
     syncTxCharacteristic->indicate();
-    DirConManager::notifyCharacteristic(NimBLEUUID(ZWIFT_CUSTOM_SERVICE_UUID), syncTxCharacteristic->getUUID(), const_cast<uint8_t*>(ALL_RELEASED), ALL_RELEASED_LEN);
+    DirConManager::notifyCharacteristic(NimBLEUUID(ZWIFT_RIDE_CUSTOM_SERVICE_UUID), syncTxCharacteristic->getUUID(), const_cast<uint8_t*>(ALL_RELEASED), ALL_RELEASED_LEN);
     _lastKeepaliveTime = now;
   }
 
@@ -139,7 +162,7 @@ void BLE_Zwift_Service::setupService(NimBLEServer* pServer) {
   pBatteryService->start();
 
   // Zwift Custom Service (use 0xFC82 to match advertisement)
-  pZwiftService = pServer->createService(ZWIFT_CUSTOM_SERVICE_UUID);
+  pZwiftService = pServer->createService(ZWIFT_RIDE_CUSTOM_SERVICE_UUID);
 
   // Async characteristic: NOTIFY - sends button presses to Zwift
   asyncCharacteristic = pZwiftService->createCharacteristic(ZWIFT_ASYNC_CHARACTERISTIC_UUID, NIMBLE_PROPERTY::NOTIFY);
@@ -226,7 +249,7 @@ void BLE_Zwift_Service::update() {
 
   asyncCharacteristic->setValue(zData, pos);
   asyncCharacteristic->notify();
-  DirConManager::notifyCharacteristic(NimBLEUUID(ZWIFT_CUSTOM_SERVICE_UUID), asyncCharacteristic->getUUID(), zData, pos);
+  DirConManager::notifyCharacteristic(NimBLEUUID(ZWIFT_RIDE_CUSTOM_SERVICE_UUID), asyncCharacteristic->getUUID(), zData, pos);
 }
 
 bool BLE_Zwift_Service::isConnected() {
@@ -235,6 +258,102 @@ bool BLE_Zwift_Service::isConnected() {
 }
 
 uint32_t BLE_Zwift_Service::getGearRatioX10000() { return _gearRatioX10000; }
+
+void BLE_Zwift_Service::sendSyncTxPayload(const uint8_t* payload, size_t length) {
+  if (syncTxCharacteristic == nullptr || payload == nullptr || length == 0) {
+    return;
+  }
+
+  syncTxCharacteristic->setValue(payload, length);
+  syncTxCharacteristic->indicate();
+  DirConManager::notifyCharacteristic(NimBLEUUID(ZWIFT_RIDE_CUSTOM_SERVICE_UUID), syncTxCharacteristic->getUUID(), const_cast<uint8_t*>(payload), length);
+}
+
+void BLE_Zwift_Service::sendAsyncPayload(const uint8_t* payload, size_t length) {
+  if (asyncCharacteristic == nullptr || payload == nullptr || length == 0) {
+    return;
+  }
+
+  asyncCharacteristic->setValue(payload, length);
+  asyncCharacteristic->notify();
+  DirConManager::notifyCharacteristic(NimBLEUUID(ZWIFT_RIDE_CUSTOM_SERVICE_UUID), asyncCharacteristic->getUUID(), const_cast<uint8_t*>(payload), length);
+}
+
+void BLE_Zwift_Service::sendGearRatioSyncTx() {
+  uint32_t ratio = (_gearRatioX10000 > 0) ? _gearRatioX10000 : 15300;
+  uint8_t ratioEnc[5];
+  size_t ratioLen      = encodeUleb128(static_cast<uint64_t>(ratio), ratioEnc);
+  size_t contentLen    = 1 + ratioLen;
+  size_t subContentLen = 2 + contentLen;
+
+  uint8_t resp[20];
+  size_t pos  = 0;
+  resp[pos++] = toUnderlying(CommandCode::DeviceInformation);
+  resp[pos++] = makeTag(ZwiftProtocol::DeviceInformation::Field::InformationId, WireType::Varint);
+  pos += encodeUleb128(toUnderlying(ZwiftProtocol::HubRequest::DataId::GearRatio), &resp[pos]);
+  resp[pos++] = makeTag(ZwiftProtocol::DeviceInformation::Field::SubContent, WireType::LengthDelimited);
+  pos += encodeUleb128(static_cast<uint64_t>(subContentLen), &resp[pos]);
+  resp[pos++] = makeTag(ZwiftProtocol::SubContent::Field::Content, WireType::LengthDelimited);
+  pos += encodeUleb128(static_cast<uint64_t>(contentLen), &resp[pos]);
+  resp[pos++] = makeTag(ZwiftProtocol::DeviceInformationContent::Field::ReplyData, WireType::Varint);
+  memcpy(&resp[pos], ratioEnc, ratioLen);
+  pos += ratioLen;
+
+  sendSyncTxPayload(resp, pos);
+}
+
+void BLE_Zwift_Service::sendGeneralInfoSyncTx() {
+  const char* deviceName = userConfig->getDeviceName();
+  size_t nameLen         = strlen(deviceName);
+  if (nameLen > 20) nameLen = 20;
+
+  // Build content first to measure actual size (avoids ULEB128 length miscalculation)
+  uint8_t content[40];
+  size_t cpos = 0;
+  content[cpos++] = makeTag(ZwiftProtocol::DeviceInformationContent::Field::Unknown1, WireType::Varint);
+  cpos += encodeUleb128(1ULL, &content[cpos]);
+  content[cpos++] = makeTag(ZwiftProtocol::DeviceInformationContent::Field::SoftwareVersion, WireType::Varint);
+  cpos += encodeUleb128(200ULL, &content[cpos]);
+  content[cpos++] = makeTag(ZwiftProtocol::DeviceInformationContent::Field::DeviceName, WireType::LengthDelimited);
+  cpos += encodeUleb128(static_cast<uint64_t>(nameLen), &content[cpos]);
+  memcpy(&content[cpos], deviceName, nameLen);
+  cpos += nameLen;
+
+  size_t contentLen    = cpos;
+  size_t subContentLen = 1 + encodeUleb128Len(contentLen) + contentLen;
+
+  uint8_t resp[60];
+  size_t pos  = 0;
+  resp[pos++] = toUnderlying(CommandCode::DeviceInformation);
+  resp[pos++] = makeTag(ZwiftProtocol::DeviceInformation::Field::InformationId, WireType::Varint);
+  pos += encodeUleb128(toUnderlying(ZwiftProtocol::HubRequest::DataId::GeneralInfo), &resp[pos]);
+  resp[pos++] = makeTag(ZwiftProtocol::DeviceInformation::Field::SubContent, WireType::LengthDelimited);
+  pos += encodeUleb128(static_cast<uint64_t>(subContentLen), &resp[pos]);
+  resp[pos++] = makeTag(ZwiftProtocol::SubContent::Field::Content, WireType::LengthDelimited);
+  pos += encodeUleb128(static_cast<uint64_t>(contentLen), &resp[pos]);
+  memcpy(&resp[pos], content, cpos);
+  pos += cpos;
+
+  sendSyncTxPayload(resp, pos);
+}
+
+void BLE_Zwift_Service::sendTrainerConfigStatus() {
+  // TRAINER_CONFIG_STATUS with Category 3: virtual_shifting_mode = 1
+  // Wire format (protobuf):
+  //   0x1A = field 3 (Category3_VirtualShift), wire type 2 (LEN)
+  //   0x02 = sub-message length (2 bytes)
+  //   0x08 = field 1 (virtual_shifting_mode), wire type 0 (varint)
+  //   0x01 = value 1 (virtual shifting enabled)
+  static const uint8_t payload[] = {
+    toUnderlying(CommandCode::TrainerConfigStatus),  // 0x05 opcode
+    0x1A,  // protobuf: field 3, wire type LEN
+    0x02,  // sub-message length: 2 bytes
+    0x08,  // protobuf: field 1, wire type varint
+    0x01   // value: 1 (virtual shifting enabled)
+  };
+  SS2K_LOG(getLogTag(), "Sending TrainerConfigStatus: virtual_shifting_mode=1");
+  sendAsyncPayload(payload, sizeof(payload));
+}
 
 void BLE_Zwift_Service::sendShiftUp() {
   SS2K_LOG(getLogTag(), "Sending shift up to Zwift");
@@ -280,7 +399,7 @@ void BLE_Zwift_Service::sendButtonNotification(RideButtonMask buttonMask) {
 
   asyncCharacteristic->setValue(buf, pos);
   asyncCharacteristic->notify();
-  DirConManager::notifyCharacteristic(NimBLEUUID(ZWIFT_CUSTOM_SERVICE_UUID), asyncCharacteristic->getUUID(), buf, pos);
+  DirConManager::notifyCharacteristic(NimBLEUUID(ZWIFT_RIDE_CUSTOM_SERVICE_UUID), asyncCharacteristic->getUUID(), buf, pos);
 }
 
 size_t BLE_Zwift_Service::encodeVarint32(uint32_t value, uint8_t* buffer) {
@@ -296,7 +415,7 @@ size_t BLE_Zwift_Service::encodeVarint32(uint32_t value, uint8_t* buffer) {
 void BLE_Zwift_Service::sendAllButtonsReleased() {
   asyncCharacteristic->setValue(ALL_RELEASED, ALL_RELEASED_LEN);
   asyncCharacteristic->notify();
-  DirConManager::notifyCharacteristic(NimBLEUUID(ZWIFT_CUSTOM_SERVICE_UUID), asyncCharacteristic->getUUID(), const_cast<uint8_t*>(ALL_RELEASED), ALL_RELEASED_LEN);
+  DirConManager::notifyCharacteristic(NimBLEUUID(ZWIFT_RIDE_CUSTOM_SERVICE_UUID), asyncCharacteristic->getUUID(), const_cast<uint8_t*>(ALL_RELEASED), ALL_RELEASED_LEN);
 }
 
 void BLE_Zwift_Service::handleSyncRxWrite(const std::string& value, bool _isDirCon) {
@@ -326,8 +445,8 @@ void BLE_Zwift_Service::handleSyncRxWrite(const std::string& value, bool _isDirC
     asyncCharacteristic->notify();
 
     if (_isDirCon) {
-      DirConManager::notifyCharacteristic(NimBLEUUID(ZWIFT_CUSTOM_SERVICE_UUID), syncTxCharacteristic->getUUID(), syncResponse, sizeof(syncResponse), false);
-      DirConManager::notifyCharacteristic(NimBLEUUID(ZWIFT_CUSTOM_SERVICE_UUID), asyncCharacteristic->getUUID(), const_cast<uint8_t*>(ASYNC_RIDEON_ANSWER), ASYNC_RIDEON_ANSWER_LEN,
+      DirConManager::notifyCharacteristic(NimBLEUUID(ZWIFT_RIDE_CUSTOM_SERVICE_UUID), syncTxCharacteristic->getUUID(), syncResponse, sizeof(syncResponse), false);
+      DirConManager::notifyCharacteristic(NimBLEUUID(ZWIFT_RIDE_CUSTOM_SERVICE_UUID), asyncCharacteristic->getUUID(), const_cast<uint8_t*>(ASYNC_RIDEON_ANSWER), ASYNC_RIDEON_ANSWER_LEN,
                                           false);
     }
 
@@ -337,6 +456,9 @@ void BLE_Zwift_Service::handleSyncRxWrite(const std::string& value, bool _isDirC
     _lastRidingDataTime = _lastActivityTime;
 
     SS2K_LOG(getLogTag(), "Handshake complete - %s mode active", _isDirCon ? "DirCon" : "BLE");
+
+    // TODO: TrainerConfigStatus message has missing required fields - disabled until proper format is determined
+    // sendTrainerConfigStatus();
     return;
   }
   // Handshake is already complete, handle commands
@@ -362,65 +484,20 @@ void BLE_Zwift_Service::handleZwiftCommand(const uint8_t* data, size_t length) {
       SS2K_LOG(getLogTag(), "Info request (0x%02X) param=%llu", opcode, param);
 
       if (param == toUnderlying(ZwiftProtocol::HubRequest::DataId::GearRatio)) {
-        // Gear ratio query - build DeviceInformation response directly into single buffer
-        uint32_t ratio = (_gearRatioX10000 > 0) ? _gearRatioX10000 : 15300;
-        uint8_t ratioEnc[5];
-        size_t ratioLen      = encodeUleb128(static_cast<uint64_t>(ratio), ratioEnc);
-        size_t contentLen    = 1 + ratioLen;
-        size_t subContentLen = 2 + contentLen;
-
-        uint8_t resp[20];
-        size_t pos  = 0;
-        resp[pos++] = toUnderlying(CommandCode::DeviceInformation);
-        resp[pos++] = makeTag(ZwiftProtocol::DeviceInformation::Field::InformationId, WireType::Varint);
-        pos += encodeUleb128(toUnderlying(ZwiftProtocol::HubRequest::DataId::GearRatio), &resp[pos]);
-        resp[pos++] = makeTag(ZwiftProtocol::DeviceInformation::Field::SubContent, WireType::LengthDelimited);
-        pos += encodeUleb128(static_cast<uint64_t>(subContentLen), &resp[pos]);
-        resp[pos++] = makeTag(ZwiftProtocol::SubContent::Field::Content, WireType::LengthDelimited);
-        pos += encodeUleb128(static_cast<uint64_t>(contentLen), &resp[pos]);
-        resp[pos++] = makeTag(ZwiftProtocol::DeviceInformationContent::Field::ReplyData, WireType::Varint);
-        memcpy(&resp[pos], ratioEnc, ratioLen);
-        pos += ratioLen;
-
-        syncTxCharacteristic->setValue(resp, pos);
-        syncTxCharacteristic->indicate();
-        DirConManager::notifyCharacteristic(NimBLEUUID(ZWIFT_CUSTOM_SERVICE_UUID), syncTxCharacteristic->getUUID(), resp, pos);
+        sendGearRatioSyncTx();
 
       } else if (param == toUnderlying(ZwiftProtocol::HubRequest::DataId::GeneralInfo)) {
-        // Device info query - build DeviceInformation response directly into single buffer
-        const char* deviceName = userConfig->getDeviceName();
-        size_t nameLen         = strlen(deviceName);
-        if (nameLen > 20) nameLen = 20;
-        size_t contentLen    = 6 + nameLen;
-        size_t subContentLen = 2 + contentLen;
-
-        uint8_t resp[40];
-        size_t pos  = 0;
-        resp[pos++] = toUnderlying(CommandCode::DeviceInformation);
-        resp[pos++] = makeTag(ZwiftProtocol::DeviceInformation::Field::InformationId, WireType::Varint);
-        pos += encodeUleb128(toUnderlying(ZwiftProtocol::HubRequest::DataId::GeneralInfo), &resp[pos]);
-        resp[pos++] = makeTag(ZwiftProtocol::DeviceInformation::Field::SubContent, WireType::LengthDelimited);
-        pos += encodeUleb128(static_cast<uint64_t>(subContentLen), &resp[pos]);
-        resp[pos++] = makeTag(ZwiftProtocol::SubContent::Field::Content, WireType::LengthDelimited);
-        pos += encodeUleb128(static_cast<uint64_t>(contentLen), &resp[pos]);
-        resp[pos++] = makeTag(ZwiftProtocol::DeviceInformationContent::Field::Unknown1, WireType::Varint);
-        pos += encodeUleb128(1ULL, &resp[pos]);
-        resp[pos++] = makeTag(ZwiftProtocol::DeviceInformationContent::Field::SoftwareVersion, WireType::Varint);
-        pos += encodeUleb128(100ULL, &resp[pos]);
-        resp[pos++] = makeTag(ZwiftProtocol::DeviceInformationContent::Field::DeviceName, WireType::LengthDelimited);
-        pos += encodeUleb128(static_cast<uint64_t>(nameLen), &resp[pos]);
-        memcpy(&resp[pos], deviceName, nameLen);
-        pos += nameLen;
-
-        syncTxCharacteristic->setValue(resp, pos);
-        syncTxCharacteristic->indicate();
-        DirConManager::notifyCharacteristic(NimBLEUUID(ZWIFT_CUSTOM_SERVICE_UUID), syncTxCharacteristic->getUUID(), resp, pos);
+        sendGeneralInfoSyncTx();
         SS2K_LOG(getLogTag(), "Responded with device info");
       }
       break;
     }
 
     case toUnderlying(CommandCode::HubCommand): {
+      if (length < 2) {
+        break;
+      }
+
       uint8_t subtype = data[1];
 
       switch (subtype) {
@@ -459,6 +536,9 @@ void BLE_Zwift_Service::handleZwiftCommand(const uint8_t* data, size_t length) {
 
         case makeTag(ZwiftProtocol::HubCommand::Field::Physical, WireType::LengthDelimited): {
           if (length >= 4) {
+            bool isAsk6 = (length >= 7 && memcmp(data, ASK6_PREFIX, sizeof(ASK6_PREFIX)) == 0);
+            bool isAsk7 = (length >= 6 && memcmp(data, ASK7_PREFIX, sizeof(ASK7_PREFIX)) == 0);
+
             uint8_t subLen = data[2];
             size_t pos     = 3;
             while (pos < static_cast<size_t>(3 + subLen) && pos < length) {
@@ -470,8 +550,29 @@ void BLE_Zwift_Service::handleZwiftCommand(const uint8_t* data, size_t length) {
 
               if (fieldTag == makeTag(ZwiftProtocol::PhysicalParam::Field::GearRatioX10000, WireType::Varint)) {
                 _gearRatioX10000 = static_cast<uint32_t>(fieldValue);
-                SS2K_LOG(getLogTag(), "Gear ratio: %.4f", _gearRatioX10000 / 10000.0);
+                SS2K_LOG(getLogTag(), "Ask %d Gear ratio: %.4f", isAsk6 ? 6 : (isAsk7 ? 7 : 0), _gearRatioX10000 / 10000.0);
                 applyGearRatio();
+
+                if (isAsk6) {
+                  // Ask 6: send syncTx first, then async
+                  uint8_t txAck[sizeof(ASK6_SYNC_TX_TEMPLATE)];
+                  memcpy(txAck, ASK6_SYNC_TX_TEMPLATE, sizeof(txAck));
+                  txAck[9]  = data[4];
+                  txAck[10] = data[5];
+                  txAck[11] = data[6];
+                  sendSyncTxPayload(txAck, sizeof(txAck));
+                  sendAsyncPayload(ASK6_ASYNC_STATUS, sizeof(ASK6_ASYNC_STATUS));
+                } else if (isAsk7) {
+                  // Ask 7: send async first, then syncTx
+                  sendAsyncPayload(ASK7_ASYNC_STATUS, sizeof(ASK7_ASYNC_STATUS));
+                  uint8_t txAck[sizeof(ASK7_SYNC_TX_TEMPLATE)];
+                  memcpy(txAck, ASK7_SYNC_TX_TEMPLATE, sizeof(txAck));
+                  txAck[9] = data[4];
+                  txAck[10] = data[5];
+                  sendSyncTxPayload(txAck, sizeof(txAck));
+                } else {
+                  sendGearRatioSyncTx();
+                }
               }
               // Fields 0x20 (bike weight) and 0x28 (rider weight) - logged for debugging
               else if (fieldTag == makeTag(ZwiftProtocol::PhysicalParam::Field::BikeWeightX100, WireType::Varint)) {
@@ -488,6 +589,8 @@ void BLE_Zwift_Service::handleZwiftCommand(const uint8_t* data, size_t length) {
           SS2K_LOG(getLogTag(), "Unknown control subtype: 0x%02X", subtype);
           break;
       }
+      // TODO: TrainerConfigStatus message has missing required fields - disabled until proper format is determined
+      // sendTrainerConfigStatus();
       break;
     }
 
@@ -553,6 +656,12 @@ size_t BLE_Zwift_Service::encodeUleb128(uint64_t value, uint8_t* buffer) {
     buffer[i++] = byte;
   } while (value);
   return i;
+}
+
+size_t BLE_Zwift_Service::encodeUleb128Len(uint64_t value) {
+  size_t len = 0;
+  do { value >>= 7; len++; } while (value);
+  return len;
 }
 
 // ---- Callbacks ----

@@ -34,10 +34,10 @@ void BLE_Device_Information_Service::setupService(NimBLEServer* pServer) {
   pHardwareRevisionCharacteristic->setValue((String)userConfig->getDeviceName());
 
   pFirmwareRevisionCharacteristic = pDeviceInformationService->createCharacteristic(FIRMWARE_REVISION_UUID, NIMBLE_PROPERTY::READ);
-  pFirmwareRevisionCharacteristic->setValue((String)ESP.getChipRevision());
+  pFirmwareRevisionCharacteristic->setValue(219);
 
   pSoftwareRevisionCharacteristic = pDeviceInformationService->createCharacteristic(SOFTWARE_REVISION_UUID, NIMBLE_PROPERTY::READ);
-  pSoftwareRevisionCharacteristic->setValue(FIRMWARE_VERSION);
+  pSoftwareRevisionCharacteristic->setValue(219);
 
   pSystemIDCharacteristic = pDeviceInformationService->createCharacteristic(SYSTEM_ID_UUID, NIMBLE_PROPERTY::READ);
   pSystemIDCharacteristic->setValue((String)userConfig->getDeviceName());

@@ -75,12 +75,29 @@ class BLE_Zwift_Service {
 
   // Encode uint64 as ULEB128 varint, returns number of bytes written
   static size_t encodeUleb128(uint64_t value, uint8_t *buffer);
+  // Returns the number of bytes a ULEB128-encoded value would occupy
+  static size_t encodeUleb128Len(uint64_t value);
 
   // Decode ULEB128 varint from buffer, returns number of bytes consumed
   static size_t decodeUleb128(const uint8_t *buf, size_t bufLen, uint64_t *result);
 
   // Send the "all buttons released" state
   void sendAllButtonsReleased();
+
+  // Send a fully-built payload on sync_tx and mirror it through DirCon.
+  void sendSyncTxPayload(const uint8_t *payload, size_t length);
+
+  // Send a fully-built payload on async and mirror it through DirCon.
+  void sendAsyncPayload(const uint8_t *payload, size_t length);
+
+  // Send current GearRatio device information on sync_tx.
+  void sendGearRatioSyncTx();
+
+  // Send current GeneralInfo device information on sync_tx.
+  void sendGeneralInfoSyncTx();
+
+  // Send TRAINER_CONFIG_STATUS with virtual_shifting_mode=1 on async.
+  void sendTrainerConfigStatus();
 
   // Handle Zwift trainer protocol command (non-RideOn messages)
   void handleZwiftCommand(const uint8_t *data, size_t length);

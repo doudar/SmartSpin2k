@@ -21,6 +21,7 @@ enum class CommandCode : uint8_t {
 	HubRequest = 0x00,
 	HubRidingData = 0x03,
 	HubCommand = 0x04,
+	TrainerConfigStatus = 0x05,  // Device → Zwift: report trainer config (virtual shifting)
 	PlayKeyPadStatus = 0x07,
 	PlayCommand = 0x12,
 	Idle = 0x19,

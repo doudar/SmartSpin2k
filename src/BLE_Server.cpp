@@ -57,7 +57,7 @@ void startBLEServer() {
 
   // Zwift identifies controllers via manufacturer data with company ID 0x094A.
   // Set the last two bytes to the last two bytes of our BLE address in little endian.
-  uint8_t zwiftMfrData[] = {0x4A, 0x09, 0x01, 0x58, 0x9A};
+  uint8_t zwiftMfrData[] = {0x4A, 0x09, 0x0B, 0x58, 0x9A};
   const std::string bleAddress = BLEDevice::getAddress().toString();  // "aa:bb:cc:dd:ee:ff"
   unsigned int mac[6]          = {0};
   if (sscanf(bleAddress.c_str(), "%02x:%02x:%02x:%02x:%02x:%02x", &mac[0], &mac[1], &mac[2], &mac[3], &mac[4], &mac[5]) == 6) {
@@ -67,7 +67,7 @@ void startBLEServer() {
   }
   pAdvertising->setManufacturerData(zwiftMfrData, sizeof(zwiftMfrData));
   pAdvertising->addServiceUUID(HEARTSERVICE_UUID);
-  pAdvertising->addServiceUUID(ZWIFT_CUSTOM_SERVICE_UUID);
+  pAdvertising->addServiceUUID(ZWIFT_RIDE_CUSTOM_SERVICE_UUID);
 
   // Put the device name and SmartSpin2k service UUID in the scan response to avoid
   // overflowing the primary ad packet (which already carries manufacturer data + service UUIDs).
