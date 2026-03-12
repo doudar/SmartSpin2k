@@ -11,8 +11,6 @@
 #include "DirConManager.h"
 #include <Constants.h>
 
-#include <cstdio>
-
 using ZwiftProtocol::CommandCode;
 using ZwiftProtocol::makeTag;
 using ZwiftProtocol::RideButtonMask;
@@ -21,14 +19,6 @@ using ZwiftProtocol::WireType;
 
 namespace {
 constexpr uint8_t kRideAnalogButtonsPayloadSize = 0x18;
-constexpr char kZwiftGeneralInfoHardwareVersion[] = "SmartSpin2k";
-constexpr char kZwiftGeneralInfoProtocolVersion[] = "4.9.9";
-
-String buildZwiftGeneralInfoSerialNumber(uint64_t efuseMac) {
-  char serialNumber[13];
-  snprintf(serialNumber, sizeof(serialNumber), "%012llX", efuseMac & 0xFFFFFFFFFFFFULL);
-  return String(serialNumber);
-}
 
 constexpr uint8_t kRideKeypadButtonMapTag     = makeTag(ZwiftProtocol::RideKeyPadStatus::Field::ButtonMap, WireType::Varint);
 constexpr uint8_t kRideKeypadAnalogButtonsTag = makeTag(ZwiftProtocol::RideKeyPadStatus::Field::AnalogButtons, WireType::LengthDelimited);
@@ -305,41 +295,25 @@ void BLE_Zwift_Service::sendGearRatioSyncTx() {
 
 void BLE_Zwift_Service::sendGeneralInfoSyncTx() {
   const char* deviceName = userConfig->getDeviceName();
-  const String serialNumber = buildZwiftGeneralInfoSerialNumber(ESP.getEfuseMac());
-  size_t nameLen            = strlen(deviceName);
-  const size_t serialLen    = serialNumber.length();
-  constexpr size_t hardwareVersionLen = sizeof(kZwiftGeneralInfoHardwareVersion) - 1;
-  constexpr size_t protocolVersionLen = sizeof(kZwiftGeneralInfoProtocolVersion) - 1;
+  size_t nameLen         = strlen(deviceName);
   if (nameLen > 20) nameLen = 20;
 
-  // Build content first to measure actual size (avoids ULEB128 length miscalculation)
-  uint8_t content[80];
+  // Keep GeneralInfo minimal to match the currently recovered ZPDeviceInformation shape.
+  uint8_t content[40];
   size_t cpos = 0;
   content[cpos++] = makeTag(ZwiftProtocol::DeviceInformationContent::Field::Unknown1, WireType::Varint);
   cpos += encodeUleb128(1ULL, &content[cpos]);
   content[cpos++] = makeTag(ZwiftProtocol::DeviceInformationContent::Field::SoftwareVersion, WireType::Varint);
-  cpos += encodeUleb128(200ULL, &content[cpos]);
+  cpos += encodeUleb128(100ULL, &content[cpos]);
   content[cpos++] = makeTag(ZwiftProtocol::DeviceInformationContent::Field::DeviceName, WireType::LengthDelimited);
   cpos += encodeUleb128(static_cast<uint64_t>(nameLen), &content[cpos]);
   memcpy(&content[cpos], deviceName, nameLen);
   cpos += nameLen;
-  content[cpos++] = makeTag(ZwiftProtocol::DeviceInformationContent::Field::SerialNumber, WireType::LengthDelimited);
-  cpos += encodeUleb128(static_cast<uint64_t>(serialLen), &content[cpos]);
-  memcpy(&content[cpos], serialNumber.c_str(), serialLen);
-  cpos += serialLen;
-  content[cpos++] = makeTag(ZwiftProtocol::DeviceInformationContent::Field::HardwareVersion, WireType::LengthDelimited);
-  cpos += encodeUleb128(static_cast<uint64_t>(hardwareVersionLen), &content[cpos]);
-  memcpy(&content[cpos], kZwiftGeneralInfoHardwareVersion, hardwareVersionLen);
-  cpos += hardwareVersionLen;
-  content[cpos++] = makeTag(ZwiftProtocol::DeviceInformationContent::Field::ProtocolVersion, WireType::LengthDelimited);
-  cpos += encodeUleb128(static_cast<uint64_t>(protocolVersionLen), &content[cpos]);
-  memcpy(&content[cpos], kZwiftGeneralInfoProtocolVersion, protocolVersionLen);
-  cpos += protocolVersionLen;
 
   size_t contentLen    = cpos;
   size_t subContentLen = 1 + encodeUleb128Len(contentLen) + contentLen;
 
-  uint8_t resp[100];
+  uint8_t resp[60];
   size_t pos  = 0;
   resp[pos++] = toUnderlying(CommandCode::DeviceInformation);
   resp[pos++] = makeTag(ZwiftProtocol::DeviceInformation::Field::InformationId, WireType::Varint);
@@ -490,7 +464,6 @@ void BLE_Zwift_Service::handleSyncRxWrite(const std::string& value, bool _isDirC
 
     SS2K_LOG(getLogTag(), "Handshake complete - %s mode active", _isDirCon ? "DirCon" : "BLE");
 
-    sendTrainerConfigSimulationStatus(15300, 15300);
     sendTrainerConfigVirtualShiftStatus();
     return;
   }
@@ -591,16 +564,13 @@ void BLE_Zwift_Service::handleZwiftCommand(const uint8_t* data, size_t length) {
                 if (isAsk6) {
                   // Ask 6: send sync_tx ratio echo first, then async trainer-config confirmation.
                   sendGearRatioSyncTx();
-                  sendTrainerConfigSimulationStatus(reportedRatio, reportedRatio);
                   sendTrainerConfigVirtualShiftStatus();
                 } else if (isAsk7) {
                   // Ask 7: preserve the observed async-then-sync ordering.
-                  sendTrainerConfigSimulationStatus(reportedRatio, reportedRatio);
                   sendTrainerConfigVirtualShiftStatus();
                   sendGearRatioSyncTx();
                 } else {
                   sendGearRatioSyncTx();
-                  sendTrainerConfigSimulationStatus(reportedRatio, reportedRatio);
                   sendTrainerConfigVirtualShiftStatus();
                 }
               }
