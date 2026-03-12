@@ -96,8 +96,11 @@ class BLE_Zwift_Service {
   // Send current GeneralInfo device information on sync_tx.
   void sendGeneralInfoSyncTx();
 
-  // Send TRAINER_CONFIG_STATUS with virtual_shifting_mode=1 on async.
-  void sendTrainerConfigStatus();
+  // Send TRAINER_CONFIG_STATUS category 2 with reported real/virtual gear ratios.
+  void sendTrainerConfigSimulationStatus(uint32_t realGearRatioX10000, uint32_t virtualGearRatioX10000);
+
+  // Send TRAINER_CONFIG_STATUS category 3 with virtual_shifting_mode=1 on async.
+  void sendTrainerConfigVirtualShiftStatus(uint8_t virtualShiftingMode = 1);
 
   // Handle Zwift trainer protocol command (non-RideOn messages)
   void handleZwiftCommand(const uint8_t *data, size_t length);

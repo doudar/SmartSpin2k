@@ -65,9 +65,10 @@ void startBLEServer() {
     zwiftMfrData[3] = static_cast<uint8_t>(mac[5]);
     zwiftMfrData[4] = static_cast<uint8_t>(mac[4]);
   }
-  pAdvertising->setManufacturerData(zwiftMfrData, sizeof(zwiftMfrData));
+  // pAdvertising->setManufacturerData(zwiftMfrData, sizeof(zwiftMfrData));
   pAdvertising->addServiceUUID(HEARTSERVICE_UUID);
-  pAdvertising->addServiceUUID(ZWIFT_RIDE_CUSTOM_SERVICE_UUID);
+  // pAdvertising->addServiceUUID(ZWIFT_RIDE_CUSTOM_SERVICE_UUID);
+  pAdvertising->addServiceUUID(FITNESSMACHINESERVICE_UUID);
 
   // Put the device name and SmartSpin2k service UUID in the scan response to avoid
   // overflowing the primary ad packet (which already carries manufacturer data + service UUIDs).

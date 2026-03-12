@@ -94,6 +94,43 @@ enum class Field : uint8_t {
 };
 }  // namespace HubCommand
 
+namespace TrainerConfigStatus {
+enum class Field : uint8_t {
+	GearIndex = 1,
+	Simulation = 2,
+	VirtualShift = 3,
+	Tilt = 4,
+	Unknown5 = 5,
+};
+}  // namespace TrainerConfigStatus
+
+namespace TrainerConfigSimulation {
+enum class Field : uint8_t {
+	Resistance = 1,
+	ErgPower = 2,
+	AveragingWindow = 3,
+	Wind = 4,
+	Grade = 5,
+	RealGearRatio = 6,
+	VirtualGearRatio = 7,
+	Cw = 8,
+	WheelDiameter = 9,
+	BikeMass = 10,
+	RiderMass = 11,
+	Crr = 12,
+	FrontalArea = 13,
+	EBrake = 14,
+};
+}  // namespace TrainerConfigSimulation
+
+namespace TrainerConfigVirtualShift {
+enum class Field : uint8_t {
+	VirtualShiftingMode = 1,
+	Field2 = 2,
+	Field3 = 3,
+};
+}  // namespace TrainerConfigVirtualShift
+
 enum class PlayButtonStatus : uint8_t {
 	On = 0,
 	Off = 1,
@@ -206,17 +243,18 @@ enum class Field : uint8_t {
 
 namespace DeviceInformationContent {
 enum class Field : uint8_t {
-	Unknown1 = 1,
-	SoftwareVersion = 2,
-	DeviceName = 3,
-	Unknown4 = 4,
-	Unknown5 = 5,
-	SerialNumber = 6,
-	HardwareVersion = 7,
-	ReplyData = 8,
-	Unknown9 = 9,
-	Unknown10 = 10,
-	Unknown13 = 13,
+Unknown1 = 1,
+SoftwareVersion = 2,
+DeviceName = 3,
+Unknown4 = 4,
+Unknown5 = 5,
+SerialNumber = 6,
+HardwareVersion = 7,
+ReplyData = 8,
+Unknown9 = 9,
+ProtocolVersion = 10,
+Unknown10 = 10,
+Unknown13 = 13,
 };
 }  // namespace DeviceInformationContent
 
