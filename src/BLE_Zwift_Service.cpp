@@ -90,17 +90,17 @@ static const uint8_t ALL_RELEASED[] = {
 static const size_t ALL_RELEASED_LEN = sizeof(ALL_RELEASED);
 
 static const uint8_t ASK6_PREFIX[] = {
-  toUnderlying(CommandCode::HubCommand),
-  makeTag(ZwiftProtocol::HubCommand::Field::Physical, WireType::LengthDelimited),
-  0x04,
-  makeTag(ZwiftProtocol::PhysicalParam::Field::GearRatioX10000, WireType::Varint),
+    toUnderlying(CommandCode::HubCommand),
+    makeTag(ZwiftProtocol::HubCommand::Field::Physical, WireType::LengthDelimited),
+    0x04,
+    makeTag(ZwiftProtocol::PhysicalParam::Field::GearRatioX10000, WireType::Varint),
 };
 
 static const uint8_t ASK7_PREFIX[] = {
-  toUnderlying(CommandCode::HubCommand),
-  makeTag(ZwiftProtocol::HubCommand::Field::Physical, WireType::LengthDelimited),
-  0x03,
-  makeTag(ZwiftProtocol::PhysicalParam::Field::GearRatioX10000, WireType::Varint),
+    toUnderlying(CommandCode::HubCommand),
+    makeTag(ZwiftProtocol::HubCommand::Field::Physical, WireType::LengthDelimited),
+    0x03,
+    makeTag(ZwiftProtocol::PhysicalParam::Field::GearRatioX10000, WireType::Varint),
 };
 
 static ZwiftSyncRxCallbacks zwiftSyncRxCallbacks;
@@ -191,11 +191,46 @@ void BLE_Zwift_Service::setupService(NimBLEServer* pServer) {
 }
 
 void BLE_Zwift_Service::update() {
-  unsigned long now = millis();
+  unsigned long now                     = millis();
+  static unsigned long lastadvTime      = 0;
+  static bool advertiseManufacturerData = true;
+  static bool swapAdv                   = false;
+  const unsigned long advSwapIntervalMs = 10000;  // Toggle Manufacturer data advertisement every 10 seconds with current BLE address
+  NimBLEAdvertising* pAdvertising       = NimBLEDevice::getAdvertising();
 
   if (!keepAlive(now)) {
     return;
   }
+
+  // // Zwift identifies controllers via manufacturer data with company ID 0x094A.
+  // // Set the last two bytes to the last two bytes of our BLE address in little endian.
+  // // We can't advertise this continuously however because Zwift doesn't configure virtual shifting correctly if it's on.
+  // if (now - lastadvTime >= advSwapIntervalMs) {
+  //   lastadvTime               = now;
+  //   advertiseManufacturerData = !advertiseManufacturerData;
+  //   swapAdv                   = !swapAdv;
+  // }
+
+  // if (advertiseManufacturerData && swapAdv) {
+  //   SS2K_LOG(getLogTag(), "Advertising Zwift Manufacturer Data");
+  //   uint8_t zwiftMfrData[]       = {0x4A, 0x09, 0x0B, 0x58, 0x9A};
+  //   const std::string bleAddress = BLEDevice::getAddress().toString();  // "aa:bb:cc:dd:ee:ff"
+  //   unsigned int mac[6]          = {0};
+  //   if (sscanf(bleAddress.c_str(), "%02x:%02x:%02x:%02x:%02x:%02x", &mac[0], &mac[1], &mac[2], &mac[3], &mac[4], &mac[5]) == 6) {
+  //     // BLE address tail bytes are ee:ff in string form -> little endian in mfr data is ff, ee
+  //     zwiftMfrData[3] = static_cast<uint8_t>(mac[5]);
+  //     zwiftMfrData[4] = static_cast<uint8_t>(mac[4]);
+  //   }
+  //   pAdvertising->removeServices();
+  //   pAdvertising->setManufacturerData(zwiftMfrData, sizeof(zwiftMfrData));
+  //   swapAdv = !swapAdv;
+  // } else if (swapAdv) {
+  //   SS2K_LOG(getLogTag(), "Stopping Zwift Service Advertisement");
+  //   pAdvertising->setManufacturerData(nullptr, 0);
+  //   pAdvertising->addServiceUUID(FITNESSMACHINESERVICE_UUID);
+  //   pAdvertising->addServiceUUID(HEARTSERVICE_UUID);
+  //   swapAdv = !swapAdv;
+  // }
 
   uint8_t zData[48];
   size_t pos                   = 0;
@@ -300,7 +335,7 @@ void BLE_Zwift_Service::sendGeneralInfoSyncTx() {
 
   // Keep GeneralInfo minimal to match the currently recovered ZPDeviceInformation shape.
   uint8_t content[40];
-  size_t cpos = 0;
+  size_t cpos     = 0;
   content[cpos++] = makeTag(ZwiftProtocol::DeviceInformationContent::Field::Unknown1, WireType::Varint);
   cpos += encodeUleb128(1ULL, &content[cpos]);
   content[cpos++] = makeTag(ZwiftProtocol::DeviceInformationContent::Field::SoftwareVersion, WireType::Varint);
@@ -338,7 +373,7 @@ void BLE_Zwift_Service::sendTrainerConfigSimulationStatus(uint32_t realGearRatio
   cpos += encodeUleb128(virtualGearRatioX10000, &content[cpos]);
 
   uint8_t payload[20];
-  size_t pos  = 0;
+  size_t pos     = 0;
   payload[pos++] = toUnderlying(CommandCode::TrainerConfigStatus);
   payload[pos++] = makeTag(ZwiftProtocol::TrainerConfigStatus::Field::Simulation, WireType::LengthDelimited);
   pos += encodeUleb128(static_cast<uint64_t>(cpos), &payload[pos]);
@@ -351,7 +386,7 @@ void BLE_Zwift_Service::sendTrainerConfigSimulationStatus(uint32_t realGearRatio
 
 void BLE_Zwift_Service::sendTrainerConfigVirtualShiftStatus(uint8_t virtualShiftingMode) {
   uint8_t payload[8];
-  size_t pos  = 0;
+  size_t pos     = 0;
   payload[pos++] = toUnderlying(CommandCode::TrainerConfigStatus);
   payload[pos++] = makeTag(ZwiftProtocol::TrainerConfigStatus::Field::VirtualShift, WireType::LengthDelimited);
   payload[pos++] = 0x02;
@@ -453,8 +488,8 @@ void BLE_Zwift_Service::handleSyncRxWrite(const std::string& value, bool _isDirC
 
     if (_isDirCon) {
       DirConManager::notifyCharacteristic(NimBLEUUID(ZWIFT_RIDE_CUSTOM_SERVICE_UUID), syncTxCharacteristic->getUUID(), syncResponse, sizeof(syncResponse), false);
-      DirConManager::notifyCharacteristic(NimBLEUUID(ZWIFT_RIDE_CUSTOM_SERVICE_UUID), asyncCharacteristic->getUUID(), const_cast<uint8_t*>(ASYNC_RIDEON_ANSWER), ASYNC_RIDEON_ANSWER_LEN,
-                                          false);
+      DirConManager::notifyCharacteristic(NimBLEUUID(ZWIFT_RIDE_CUSTOM_SERVICE_UUID), asyncCharacteristic->getUUID(), const_cast<uint8_t*>(ASYNC_RIDEON_ANSWER),
+                                          ASYNC_RIDEON_ANSWER_LEN, false);
     }
 
     resetSession();
@@ -658,7 +693,10 @@ size_t BLE_Zwift_Service::encodeUleb128(uint64_t value, uint8_t* buffer) {
 
 size_t BLE_Zwift_Service::encodeUleb128Len(uint64_t value) {
   size_t len = 0;
-  do { value >>= 7; len++; } while (value);
+  do {
+    value >>= 7;
+    len++;
+  } while (value);
   return len;
 }
 
