@@ -30,7 +30,7 @@ struct DirConWriteResult {
   NimBLEUUID autoSubscribeUuids[4];  // UUIDs to auto-subscribe the client to
   size_t autoSubscribeCount;         // Number of valid entries in autoSubscribeUuids
 
-  DirConWriteResult() : updateResponseData(false), autoSubscribeCount(0) {}
+  DirConWriteResult() : updateResponseData(false), autoSubscribeUuids(), autoSubscribeCount(0) {}
 };
 
 // Subscription entry: stores UUID alongside active flag to avoid hash collisions

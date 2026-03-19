@@ -253,7 +253,6 @@ HardwareVersion = 7,
 ReplyData = 8,
 Unknown9 = 9,
 ProtocolVersion = 10,
-Unknown10 = 10,
 Unknown13 = 13,
 };
 }  // namespace DeviceInformationContent
