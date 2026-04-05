@@ -193,14 +193,58 @@ const char* const DEFAULT_PASSWORD = "password";
 // TMC2209 SoftwareSerial transmit pin
 #define r2_STEPPER_SERIAL_TX 19
 
-// TMC2209 SoftwareSerial receive pin
+// Peloton Serial receive pin
 #define r2_AUX_SERIAL_RX 22
 
-// TMC2209 SoftwareSerial transmit pin
+// Peloton Serial transmit pin
 #define r2_AUX_SERIAL_TX 21
 
 // Reduce current setting by this divisor (0-31)
 #define r2_PWR_SCALER 12
+////////////////////////////////////////////////////////
+//////////// Defines for hardware Revision 3 ////////////
+
+// Board Name
+#define r3_NAME "Revision Three"
+
+// ID Voltage on IO4. Values are 0-4095 (0-3.3v) This board is identified by 1v which is 1241. 
+#define r3_VERSION_VOLTAGE 1241
+
+// Hardware pin for Shift Up
+#define r3_SHIFT_UP_PIN 13
+
+// Hardware pin for Shift Down
+#define r3_SHIFT_DOWN_PIN 14
+
+// Hardware pin for stepper Enable
+#define r3_ENABLE_PIN 48
+
+// Hardware pin for stepper step
+#define r3_STEP_PIN 21
+
+// Hardware pin for stepper dir
+#define r3_DIR_PIN 47
+
+// TMC2209 SoftwareSerial receive pin
+#define r3_STEPPER_SERIAL_RX 12
+
+// TMC2209 SoftwareSerial transmit pin
+#define r3_STEPPER_SERIAL_TX 11
+
+// Peloton Serial receive pin
+#define r3_AUX_SERIAL_RX 18
+
+// Peloton Serial transmit pin
+#define r3_AUX_SERIAL_TX 17
+
+// Peloton Serial receive pin
+#define r3_AUX_SERIAL2_RX 16
+
+// Peloton Serial transmit pin
+#define r3_AUX_SERIAL2_TX 15
+
+// Reduce current setting by this divisor (0-31)
+#define r3_PWR_SCALER 12
 ////////////////////////////////////////////////////////
 
 // TMC2208/TMC2224 HardwareSerial port
