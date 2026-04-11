@@ -65,7 +65,7 @@ Key directories and their purpose:
 /include             -- Header files and configuration
 /test                -- Unity unit tests for native environment
 /data                -- Web interface HTML/CSS files
-/Hardware            -- 3D printing files and PCB designs
+/Hardware            -- migrated to https://github.com/doudar/SS2k-Hardware
 /.github/workflows   -- CI/CD pipeline definitions
 ```
 
@@ -94,7 +94,7 @@ External libraries loaded automatically by PlatformIO:
 ### Hardware Compatibility
 - ESP32 DevKit v1 board (primary target)
 - TMC2209 stepper motor driver
-- Custom PCB designs in Hardware/ directory
+- Custom PCB designs in https://github.com/doudar/SS2k-Hardware/tree/main/Hardware
 - Support for multiple bike mount configurations
 
 ### Known Issues and Limitations
