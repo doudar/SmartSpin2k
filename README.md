@@ -1,4 +1,4 @@
-<img src="https://raw.githubusercontent.com/doudar/SmartSpin2k/develop/Pictures/ss2k_wiki_banner.png" alt="ss2k banner" height="124">
+<img src="https://raw.githubusercontent.com/doudar/SS2k-Hardware/main/Pictures/ss2k_wiki_banner.png" alt="ss2k banner" height="124">
 
 # You can visit us at [Facebook](https://www.facebook.com/groups/716297469953492/)
 # Did you know there's a SmartSpin2k companion App?
