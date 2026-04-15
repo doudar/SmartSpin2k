@@ -18,6 +18,8 @@
 #define DIRCON_MDNS_SERVICE_NAME     "_wahoo-fitness-tnp"
 #define DIRCON_MDNS_SERVICE_PROTOCOL "tcp"
 #define DIRCON_TCP_PORT              8081
+#define OPENBIKECONTROL_MDNS_SERVICE_NAME "_openbikecontrol"
+#define OPENBIKECONTROL_MDNS_SERVICE_PROTOCOL "tcp"
 #define DIRCON_MAX_CLIENTS           1
 #define DIRCON_RECEIVE_BUFFER_SIZE   256
 #define DIRCON_SEND_BUFFER_SIZE      256

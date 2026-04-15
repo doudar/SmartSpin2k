@@ -20,6 +20,7 @@
 #include "BLE_Custom_Characteristic.h"
 #include "BLE_Device_Information_Service.h"
 #include "BLE_Zwift_Service.h"
+#include "BLE_OpenBikeControl_Service.h"
 
 // BLE Server Settings
 SpinBLEServer spinBLEServer;
@@ -33,6 +34,7 @@ BLE_Fitness_Machine_Service fitnessMachineService;
 BLE_ss2kCustomCharacteristic ss2kCustomCharacteristic;
 BLE_Device_Information_Service deviceInformationService;
 BLE_Zwift_Service zwiftService;
+BLE_OpenBikeControl_Service openBikeControlService;
 // BLE_Wattbike_Service wattbikeService;
 // BLE_SB20_Service sb20Service;
 
@@ -54,9 +56,11 @@ void startBLEServer() {
   ss2kCustomCharacteristic.setupService(spinBLEServer.pServer);
   deviceInformationService.setupService(spinBLEServer.pServer);
   zwiftService.setupService(spinBLEServer.pServer);
+  openBikeControlService.setupService(spinBLEServer.pServer);
   pAdvertising->addServiceUUID(HEARTSERVICE_UUID);
   // pAdvertising->addServiceUUID(ZWIFT_RIDE_CUSTOM_SERVICE_UUID);
   pAdvertising->addServiceUUID(FITNESSMACHINESERVICE_UUID);
+  pAdvertising->addServiceUUID(OPENBIKECONTROL_SERVICE_UUID);
 
   // Put the device name and SmartSpin2k service UUID in the scan response to avoid
   // overflowing the primary ad packet (which already carries manufacturer data + service UUIDs).
@@ -86,6 +90,7 @@ void SpinBLEServer::update() {
   cyclingSpeedCadenceService.update();
   fitnessMachineService.update();
   zwiftService.update();
+  // OpenBikeControl sends event-driven notifications from shift handlers.
   // wattbikeService.parseNemit();  // Changed from update() to parseNemit()
   // sb20Service.notify();
 }

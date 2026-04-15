@@ -25,6 +25,7 @@
 // #include "BLE_Wattbike_Service.h"
 #include "BLE_Fitness_Machine_Service.h"
 #include "BLE_Zwift_Service.h"
+#include "BLE_OpenBikeControl_Service.h"
 #include "DirConManager.h"
 
 // Stepper Motor Serial
@@ -346,13 +347,22 @@ void SS2K::FTMSModeShiftModifier() {
     // This needs to be moved so shift blocking/knob crashing prevention is enforced.
     // Keeping here for now for development/testing purposes
 
+    int absDelta = abs(shiftDelta);
     if (zwiftService.isConnected()) {
-      int absDelta = abs(shiftDelta);
       for (int i = 0; i < absDelta; i++) {
         if (shiftDelta > 0) {
           zwiftService.sendShiftUp();
         } else {
           zwiftService.sendShiftDown();
+        }
+      }
+    }
+    if (openBikeControlService.isConnected()) {
+      for (int i = 0; i < absDelta; i++) {
+        if (shiftDelta > 0) {
+          openBikeControlService.sendShiftUp();
+        } else {
+          openBikeControlService.sendShiftDown();
         }
       }
     }
