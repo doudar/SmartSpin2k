@@ -14,7 +14,7 @@ Install required tools and dependencies:
 
 ### Build the Firmware
 - **CRITICAL**: Build takes 15-45 minutes depending on network connectivity. NEVER CANCEL. Set timeout to 60+ minutes.
-- `pio run --environment release` -- builds ESP32 firmware. NEVER CANCEL: Build takes 15-45 minutes on first run due to platform/toolchain downloads.
+- `pio run --environment release-s3` -- builds ESP32-S3 firmware. NEVER CANCEL: Build takes 15-45 minutes on first run due to platform/toolchain downloads.
 - `pio run --target buildfs` -- builds filesystem. Takes 2-5 minutes.
 - **Network Issues**: If platform downloads fail with HTTPClientError, this is due to firewall/network restrictions. The build cannot proceed without internet access to download ESP32 toolchain.
 
@@ -42,7 +42,7 @@ Install required tools and dependencies:
 
 ### Manual Testing Scenarios
 After making code changes, always validate:
-1. **Build Validation**: Ensure `pio run --environment release` completes successfully.
+1. **Build Validation**: Ensure `pio run --environment release-s3` completes successfully.
 2. **Test Validation**: Ensure `pio test --environment native` passes all Unity tests.
 3. **Code Quality**: Run `pre-commit run --all-files` and fix any license header issues.
 4. **BLE Service Changes**: When modifying BLE services, verify characteristic UUIDs match the CustomCharacteristic.md specification.
@@ -92,7 +92,7 @@ External libraries loaded automatically by PlatformIO:
 - Over-the-air update URL: configured in settings.h
 
 ### Hardware Compatibility
-- ESP32 DevKit v1 board (primary target)
+- ESP32-S3-DevKitC-1 board (primary target)
 - TMC2209 stepper motor driver
 - Custom PCB designs in Hardware/ directory
 - Support for multiple bike mount configurations

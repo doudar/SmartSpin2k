@@ -32,37 +32,9 @@ class Board {
 
 class Boards {
  public:
-  Board rev1;
-  Board rev2;
   Board rev3;
 
   Boards() {
-    // Rev 1
-    rev1.name               = r3_NAME;
-    rev1.versionVoltage     = r3_VERSION_VOLTAGE;
-    rev1.shiftUpPin         = r3_SHIFT_UP_PIN;
-    rev1.shiftDownPin       = r3_SHIFT_DOWN_PIN;
-    rev1.enablePin          = r3_ENABLE_PIN;
-    rev1.stepPin            = r3_STEP_PIN;
-    rev1.dirPin             = r3_DIR_PIN;
-    rev1.stepperSerialTxPin = r3_STEPPER_SERIAL_TX;
-    rev1.stepperSerialRxPin = r3_STEPPER_SERIAL_RX;
-    rev1.auxSerialTxPin     = 0;
-    rev1.auxSerialRxPin     = 0;
-    rev1.pwrScaler          = r3_PWR_SCALER;
-    // Rev 2
-    rev2.name               = r2_NAME;
-    rev2.versionVoltage     = r2_VERSION_VOLTAGE;
-    rev2.shiftUpPin         = r2_SHIFT_UP_PIN;
-    rev2.shiftDownPin       = r2_SHIFT_DOWN_PIN;
-    rev2.enablePin          = r2_ENABLE_PIN;
-    rev2.stepPin            = r2_STEP_PIN;
-    rev2.dirPin             = r2_DIR_PIN;
-    rev2.stepperSerialTxPin = r2_STEPPER_SERIAL_TX;
-    rev2.stepperSerialRxPin = r2_STEPPER_SERIAL_RX;
-    rev2.auxSerialTxPin     = r2_AUX_SERIAL_TX;
-    rev2.auxSerialRxPin     = r2_AUX_SERIAL_RX;
-    rev2.pwrScaler          = r2_PWR_SCALER;
     // Rev 3
     rev3.name               = r3_NAME;
     rev3.versionVoltage     = r3_VERSION_VOLTAGE;

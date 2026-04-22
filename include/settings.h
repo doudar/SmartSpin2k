@@ -129,79 +129,6 @@ const char* const DEFAULT_PASSWORD = "password";
 // Default debounce delay for shifters. Increase if you have false shifts. Decrease if shifting takes too long.
 #define DEBOUNCE_DELAY 200
 
-// Hardware Revision check pin
-#define REV_PIN 34
-
-//////////// Defines for hardware Revision 1 ////////////
-
-// Board Name
-#define r1_NAME "Revision One"
-
-// ID Voltage on pin 34. Values are 0-4095 (0-3.3v)
-#define r1_VERSION_VOLTAGE 0
-
-// Hardware pin for Shift Up
-#define r1_SHIFT_UP_PIN 19
-
-// Hardware pin for Shift Down
-#define r1_SHIFT_DOWN_PIN 18
-
-// Hardware pin for stepper Enable
-#define r1_ENABLE_PIN 13
-
-// Hardware pin for stepper step
-#define r1_STEP_PIN 25
-
-// Hardware pin for stepper dir
-#define r1_DIR_PIN 33
-
-// TMC2208/TMC2224 SoftwareSerial receive pin
-#define r1_STEPPER_SERIAL_RX 14
-
-// TMC2208/TMC2224 SoftwareSerial transmit pin
-#define r1_STEPPER_SERIAL_TX 12
-
-// Reduce current setting by this divisor (0-31)
-#define r1_PWR_SCALER 31
-////////////////////////////////////////////////////////
-//////////// Defines for hardware Revision 2 ////////////
-
-// Board Name
-#define r2_NAME "Revision Two"
-
-// ID Voltage on pin 34. Values are 0-4095 (0-3.3v)
-#define r2_VERSION_VOLTAGE 4095
-
-// Hardware pin for Shift Up
-#define r2_SHIFT_UP_PIN 26
-
-// Hardware pin for Shift Down
-#define r2_SHIFT_DOWN_PIN 32
-
-// Hardware pin for stepper Enable
-#define r2_ENABLE_PIN 27
-
-// Hardware pin for stepper step
-#define r2_STEP_PIN 25
-
-// Hardware pin for stepper dir
-#define r2_DIR_PIN 33
-
-// TMC2209 SoftwareSerial receive pin
-#define r2_STEPPER_SERIAL_RX 18
-
-// TMC2209 SoftwareSerial transmit pin
-#define r2_STEPPER_SERIAL_TX 19
-
-// Peloton Serial receive pin
-#define r2_AUX_SERIAL_RX 22
-
-// Peloton Serial transmit pin
-#define r2_AUX_SERIAL_TX 21
-
-// Reduce current setting by this divisor (0-31)
-#define r2_PWR_SCALER 12
-////////////////////////////////////////////////////////
 //////////// Defines for hardware Revision 3 ////////////
 
 // Board Name
@@ -251,7 +178,7 @@ const char* const DEFAULT_PASSWORD = "password";
 #define SERIAL_PORT stepperSerial
 
 // Match to your driver
-#define R_SENSE 0.11f
+#define R_SENSE 0.04f
 
 // Hardware pin for indicator LED *note* internal LED on esp32 Dev board is pin
 // 2

@@ -72,18 +72,12 @@ extern "C" void app_main() {
   // Serial port for debugging purposes
   Serial.begin(115200);
   SS2K_LOG(MAIN_LOG_TAG, "Compiled %s%s", __DATE__, __TIME__);
-  pinMode(REV_PIN, INPUT);
-  int actualVoltage = analogRead(REV_PIN);
-  if (actualVoltage - boards.rev1.versionVoltage >= boards.rev2.versionVoltage - actualVoltage) {
-    currentBoard = boards.rev2;
-  } else {
-    currentBoard = boards.rev1;
-  }
+  currentBoard = boards.rev3;
   SS2K_LOG(MAIN_LOG_TAG, "Current Board Revision is: %s", currentBoard.name);
 
   // initialize Stepper serial port
 
-  stepperSerial.begin(57600, SERIAL_8N2, currentBoard.stepperSerialRxPin, currentBoard.stepperSerialTxPin);
+  stepperSerial.begin(57600, SERIAL_8N1, currentBoard.stepperSerialRxPin, currentBoard.stepperSerialTxPin);
   // initialize aux serial port (Peloton)
   if (currentBoard.auxSerialTxPin) {
     auxSerial.begin(19200, SERIAL_8N1, currentBoard.auxSerialRxPin, currentBoard.auxSerialTxPin, false);
@@ -821,7 +815,7 @@ void SS2K::goHome(bool bothDirections) {
     }
   }
 
-  if (!stepper || currentBoard.name != r2_NAME) {
+  if (!stepper || currentBoard.name != r3_NAME) {
     SS2K_LOG(MAIN_LOG_TAG, "Homing not supported or stepper not initialized.");
     fitnessMachineService.spinDown(FitnessMachineStatus::SpinDown_Error);
     return;
@@ -876,17 +870,31 @@ void SS2K::goHome(bool bothDirections) {
 void SS2K::updateStepperPower(int pwr) {
   uint16_t rmsPwr = (pwr == 0) ? userConfig->getStepperPower() : pwr;
   driver.rms_current(rmsPwr, HOLD_PWR_SCALER);
-  uint16_t current = driver.cs2rms(driver.cs_actual());
-  SS2K_LOG(MAIN_LOG_TAG, "Stepper power is now %d.  read:%d", rmsPwr, current);
+  SS2K_LOG(MAIN_LOG_TAG, "Stepper power is now %d mA (driver setpoint %d mA)", rmsPwr, driver.rms_current());
 }
 
 // Applies current StealthChop to driver
 void SS2K::updateStealthChop() {
-  bool t_bool = userConfig->getStealthChop();
-  driver.en_spreadCycle(!t_bool);
-  driver.pwm_autoscale(t_bool);
-  driver.pwm_autograd(t_bool);
-  SS2K_LOG(MAIN_LOG_TAG, "StealthChop is now %d", t_bool);
+  bool stealthChopEnabled = userConfig->getStealthChop();
+  driver.en_spreadCycle(!stealthChopEnabled);
+  driver.pwm_autoscale(stealthChopEnabled);
+  driver.pwm_autograd(stealthChopEnabled);
+
+  // Reuse homing sensitivity as CoolStep load tolerance when StealthChop is active.
+  uint8_t coolstepTolerance = (uint8_t)constrain(userConfig->getHomingSensitivity(), 0, 255);
+  if (stealthChopEnabled) {
+    driver.SGTHRS(coolstepTolerance);
+    driver.semin(1);  // Enable CoolStep
+    driver.seup(1);
+    driver.sedn(1);
+    driver.semax((uint8_t)constrain((coolstepTolerance / 16) + 1, 1, 15));
+    driver.seimin(false);
+  } else {
+    driver.semin(0);  // Disable CoolStep
+    driver.SGTHRS(0);
+  }
+
+  SS2K_LOG(MAIN_LOG_TAG, "StealthChop:%d CoolStep:%d SGTHRS:%d", stealthChopEnabled, stealthChopEnabled, coolstepTolerance);
 }
 
 // Applies userconfig stepper speed if speed not specified

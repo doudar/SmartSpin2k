@@ -54,7 +54,7 @@ jobs:
       - name: Install PlatformIO
         run: python -m pip install platformio
       - name: Pre-install PlatformIO packages (release env)
-        run: platformio pkg install -e release
+        run: platformio pkg install -e release-s3
       - name: Ensure ESP-IDF component manager is available
         shell: bash
         run: |
@@ -76,12 +76,12 @@ jobs:
       - name: Check pre-commit hooks
         uses: pre-commit/action@v3.0.1
       - name: Build firmware
-        run: platformio run -e release
+        run: platformio run -e release-s3
       - name: Build filesystem
-        run: platformio run -e release --target buildfs
+        run: platformio run -e release-s3 --target buildfs
       - name: Create artifacts
         run: |
-          7z a SmartSpin2kFirmware-${{ steps.date.outputs.date }}.bin.zip ./.pio/build/release/*.bin
+          7z a SmartSpin2kFirmware-${{ steps.date.outputs.date }}.bin.zip ./.pio/build/release-s3/*.bin
       - name: Archive
         uses: actions/upload-artifact@v4
         with:
