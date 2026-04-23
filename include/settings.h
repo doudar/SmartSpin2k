@@ -331,8 +331,8 @@ constexpr const char* ANY = "any";
 
 // Task Stack Sizes
 // In theory you can subtract whatever is left in the report from DEBUG_STACK for each task
-#define MAIN_STACK       4500
-#define BLE_CLIENT_STACK 6000 //Scans and connects to BLE devices. Holds the BLE Notify Data. 
+#define MAIN_STACK       8000
+#define BLE_CLIENT_STACK 8000 //Scans and connects to BLE devices. Holds the BLE Notify Data. 
 
 // Uncomment to enable stack size debugging info
 // #define DEBUG_STACK

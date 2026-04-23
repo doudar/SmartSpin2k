@@ -107,7 +107,8 @@ extern "C" void app_main() {
 
   // print littleFS free space and all file sizes on partition
   Serial.printf("LittleFS Total Bytes:%lu, Used Bytes:%lu\n", LittleFS.totalBytes(), LittleFS.usedBytes());
-
+  // print amount of ram and psram available as well as cpu clock speed
+  SS2K_LOG(MAIN_LOG_TAG, "Free Heap: %u, Heap Size: %u, PSRAM size: %u, CPU Freq: %dMHz", esp_get_free_heap_size(), ESP.getHeapSize(), ESP.getPsramSize(), ESP.getCpuFreqMHz());
   // Check for firmware update. It's important that this stays before BLE &
   // HTTP setup because otherwise they use too much traffic and the device
   // fails to update which really sucks when it corrupts your settings.
