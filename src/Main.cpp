@@ -812,8 +812,8 @@ void SS2K::goHome(bool bothDirections) {
     }
   }
 
-  // if we're using real resistance from a FTMS bike, find those values for the reported min and max resistance instead of using hard stops.
-  if (!rtConfig->resistance.getSimulate() && userConfig->getConnectedPowerMeter() != NONE && rtConfig->resistance.getMax() > 0) {
+  // if we're using real resistance from a FTMS bike or Peloton serial, use resistance feedback for homing instead of hard stops.
+  if (!rtConfig->resistance.getSimulate() && (userConfig->getConnectedPowerMeter() != NONE || ss2k->pelotonIsConnected) && rtConfig->resistance.getMax() > 0) {
     ss2k->_findFTMSHome(bothDirections);
     if (rtConfig->getHomed()) {
       fitnessMachineService.spinDown(FitnessMachineStatus::SpinDown_Success);
@@ -955,6 +955,8 @@ bool SS2K::pelotonConnected() {
   if (millis() - rtConfig->resistance.getTimestamp() < 5000 && !rtConfig->resistance.getSimulate()) {
     rtConfig->setMinResistance(MIN_PELOTON_RESISTANCE);
     rtConfig->setMaxResistance(MAX_PELOTON_RESISTANCE);
+    rtConfig->resistance.setMin(MIN_PELOTON_RESISTANCE);
+    rtConfig->resistance.setMax(MAX_PELOTON_RESISTANCE);
     return true;
   } else {
     rtConfig->setMinResistance(-DEFAULT_RESISTANCE_RANGE);

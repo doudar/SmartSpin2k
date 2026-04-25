@@ -10,6 +10,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Added
 
 ### Changed
+- Fix Peloton serial homing to use resistance feedback instead of StallGuard sensorless detection.
+  StallGuard fired prematurely on Peloton's continuously-increasing magnetic resistance, causing
+  hMax to be set at ~50% of the actual physical travel range. pelotonConnected() now sets
+  resistance.setMin/setMax (the homing target bounds) so that _findFTMSHome() receives valid
+  targets, and goHome() now includes ss2k->pelotonIsConnected in its FTMS homing condition so
+  Peloton serial users take the resistance-feedback path rather than falling through to StallGuard.
+- Replace hardcoded post-homing gear 8 with a calculated midpoint (hMax / (2 * shiftStep)).
+  The hardcoded value assumed a correctly-ranged hMax; for Peloton serial users whose hMax was
+  only ~50% of physical range, starting at gear 8 left no room to shift up. The calculated
+  value places the motor at the center of the actual calibrated travel range.
 
 ### Hardware
 

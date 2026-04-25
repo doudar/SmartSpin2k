@@ -239,7 +239,8 @@ void bleClientTask(void* pvParameters) {
           ss2k->goHome(true);
         } else {  // Startup Homing
           ss2k->goHome(false);
-          rtConfig->setShifterPosition(8);  // Set to middle position after homing on startup
+          int startGear = (userConfig->getShiftStep() > 0) ? (userConfig->getHMax() / (2 * userConfig->getShiftStep())) : 4;
+          rtConfig->setShifterPosition(startGear > 0 ? startGear : 0);  // Start at ~midpoint of calibrated travel range
         }
         spinBLEServer.spinDownFlag = 0;
       }
