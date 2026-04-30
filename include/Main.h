@@ -53,7 +53,7 @@ class SS2K {
   static void ARDUINO_ISR_ATTR handleUpShift();
   static void ARDUINO_ISR_ATTR handleDownShift();
   static void moveStepper();
-  void _findEndStop(bool moveForward);
+  bool _findEndStop(bool moveForward);
   void _findFTMSHome(bool bothDirections = false);
   void _resistanceMove();
 
