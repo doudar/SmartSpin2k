@@ -194,14 +194,19 @@ void SS2K::setupTMCStepperDriver(bool reset) {
 #define HOME_TIMEOUT                  30000
 #define HOMING_SG_SAMPLE_COUNT        24
 #define HOMING_SG_MIN_SAMPLE_MARGIN   10
+#define HOMING_SG_MAX_THRESHOLD_DRIFT 30
 #define HOMING_TAP_MAX_ATTEMPTS       10
+#define HOMING_TAP_REQUIRED_STABLE    3
 #define HOMING_TAP_TOLERANCE          150
+#define HOMING_RECOVERY_BACKOFF_MULT  3
 #define HOMING_MAX_SENSITIVITY        100
 
 struct HomingSgBaseline {
   int threshold;
   int sensitivity;
 };
+
+static int lastHomingSgThreshold = 0;
 
 static HomingSgBaseline getHomingSgBaseline() {
   int samples[HOMING_SG_SAMPLE_COUNT];
@@ -266,6 +271,7 @@ bool SS2K::_findEndStop(bool moveForward) {
   delay(300);
 
   baseline = getHomingSgBaseline();
+  lastHomingSgThreshold = baseline.threshold;
 
   SS2K_LOG(MAIN_LOG_TAG, "Homing %s. Stable Threshold: %d, Sensitivity: %d", moveForward ? "forward (max)" : "backward (min)", baseline.threshold, baseline.sensitivity);
 
@@ -425,11 +431,20 @@ void SS2K::goHome(bool bothDirections) {
 
   const int32_t homingBackoffSteps = (userConfig->getShiftStep() > DEFAULT_SHIFT_STEP ? userConfig->getShiftStep() : DEFAULT_SHIFT_STEP) * 2;
 
-  auto backOffEndStop = [&](bool moveForward) { stepper->move(moveForward ? -homingBackoffSteps : homingBackoffSteps, true); };
+  auto backOffEndStop = [&](bool moveForward, bool recovery = false) {
+    int32_t backoffSteps = recovery ? homingBackoffSteps * HOMING_RECOVERY_BACKOFF_MULT : homingBackoffSteps;
+    if (recovery) updateStepperPower(userConfig->getStepperPower());
+    stepper->move(moveForward ? -backoffSteps : backoffSteps, true);
+    if (recovery) updateStepperPower(userConfig->getStepperPower() * PWR_SCALER_FOR_HOMING);
+  };
 
   auto findStableEndStop = [&](bool moveForward, const char* endStopName) -> bool {
     int32_t previousPosition = 0;
     bool havePrevious        = false;
+    bool haveBaseThreshold   = false;
+    int baseThreshold        = 0;
+    int stableTapCount       = 0;
+    int requiredStableTaps   = 2;
 
     for (int attempt = 1; attempt <= HOMING_TAP_MAX_ATTEMPTS; attempt++) {
       if (!ss2k->_findEndStop(moveForward)) {
@@ -438,16 +453,40 @@ void SS2K::goHome(bool bothDirections) {
       }
 
       int32_t foundPosition = stepper->getCurrentPosition();
+      int thresholdDelta     = abs(lastHomingSgThreshold - baseThreshold);
+      int thresholdReference = max(abs(baseThreshold), 1);
+      if (haveBaseThreshold && (thresholdDelta * 100) > (thresholdReference * HOMING_SG_MAX_THRESHOLD_DRIFT)) {
+        SS2K_LOG(MAIN_LOG_TAG, "%s homing SG threshold drifted from %d to %d. Recovering from possible stalled baseline.", endStopName, baseThreshold, lastHomingSgThreshold);
+        backOffEndStop(moveForward, true);
+        haveBaseThreshold = false;
+        havePrevious      = false;
+        stableTapCount    = 0;
+        requiredStableTaps = 2;
+        continue;
+      }
+
+      if (!haveBaseThreshold) {
+        baseThreshold     = lastHomingSgThreshold;
+        haveBaseThreshold = true;
+      }
+
       if (havePrevious) {
         int32_t tapDelta = abs(foundPosition - previousPosition);
         SS2K_LOG(MAIN_LOG_TAG, "%s end stop tap %d/%d found %d, previous %d, delta %d steps", endStopName, attempt, HOMING_TAP_MAX_ATTEMPTS, foundPosition, previousPosition,
                  tapDelta);
         if (tapDelta <= HOMING_TAP_TOLERANCE) {
-          SS2K_LOG(MAIN_LOG_TAG, "%s end stop stable within %d steps.", endStopName, HOMING_TAP_TOLERANCE);
-          return true;
+          stableTapCount++;
+          if (stableTapCount >= requiredStableTaps) {
+            SS2K_LOG(MAIN_LOG_TAG, "%s end stop stable with %d consecutive taps within %d steps.", endStopName, stableTapCount, HOMING_TAP_TOLERANCE);
+            return true;
+          }
+        } else {
+          if (attempt == 2) requiredStableTaps = HOMING_TAP_REQUIRED_STABLE;
+          stableTapCount = 1;
         }
       } else {
         SS2K_LOG(MAIN_LOG_TAG, "%s end stop tap %d/%d found %d", endStopName, attempt, HOMING_TAP_MAX_ATTEMPTS, foundPosition);
+        stableTapCount = 1;
       }
 
       previousPosition = foundPosition;
