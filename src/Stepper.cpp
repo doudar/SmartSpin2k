@@ -257,6 +257,7 @@ bool SS2K::_findEndStop(bool moveForward) {
 
   // --- SETUP DRIVER FOR SENSORLESS HOMING ---
   // Use very low power for sensitive stall detection
+  updateStealthChop(false);
   updateStepperPower(userConfig->getStepperPower() * PWR_SCALER_FOR_HOMING);  // Use reduced power for homing. This prevents a stuck knob, we can free it using higher power.
   updateStepperSpeed(1500);                                                   // Use a slow-medium speed for homing
 
@@ -557,7 +558,7 @@ void SS2K::updateStepperPower(int pwr) {
 }
 
 // Applies current StealthChop to driver
-void SS2K::updateStealthChop() {
+void SS2K::updateStealthChop(bool coolStepEnabled) {
   bool stealthChopEnabled = userConfig->getStealthChop();
   driver.en_spreadCycle(!stealthChopEnabled);
   driver.pwm_autoscale(stealthChopEnabled);
@@ -565,7 +566,7 @@ void SS2K::updateStealthChop() {
 
   // Reuse homing sensitivity as CoolStep load tolerance when StealthChop is active.
   uint8_t coolstepTolerance = (uint8_t)constrain(userConfig->getHomingSensitivity(), 0, 255);
-  if (stealthChopEnabled) {
+  if (stealthChopEnabled && coolStepEnabled) {
     driver.SGTHRS(coolstepTolerance);
     driver.semin(1);  // Enable CoolStep
     driver.seup(1);
@@ -577,7 +578,7 @@ void SS2K::updateStealthChop() {
     driver.SGTHRS(0);
   }
 
-  SS2K_LOG(MAIN_LOG_TAG, "StealthChop:%d CoolStep:%d SGTHRS:%d", stealthChopEnabled, stealthChopEnabled, coolstepTolerance);
+  SS2K_LOG(MAIN_LOG_TAG, "StealthChop:%d CoolStep:%d SGTHRS:%d", stealthChopEnabled, stealthChopEnabled && coolStepEnabled, coolstepTolerance);
 }
 
 // Applies userconfig stepper speed if speed not specified

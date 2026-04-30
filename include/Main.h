@@ -71,7 +71,7 @@ class SS2K {
   void restartWifi();
   void setupTMCStepperDriver(bool reset = false);
   void updateStepperPower(int pwr = 0);
-  void updateStealthChop();
+  void updateStealthChop(bool coolStepEnabled = true);
   void updateStepperSpeed(int speed = 0);
   void FTMSModeShiftModifier();
   static void rxSerial(void);
