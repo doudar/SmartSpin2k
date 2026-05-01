@@ -54,12 +54,13 @@ void startBLEServer() {
   fitnessMachineService.setupService(spinBLEServer.pServer, &chrCallbacks);
   ss2kCustomCharacteristic.setupService(spinBLEServer.pServer);
   deviceInformationService.setupService(spinBLEServer.pServer);
-  //add all service UUIDs to advertisement vector
+  // add all service UUIDs to advertisement vector
   oServiceUUIDs.push_back(CSCSERVICE_UUID);
   oServiceUUIDs.push_back(CYCLINGPOWERSERVICE_UUID);
   oServiceUUIDs.push_back(HEARTSERVICE_UUID);
   oServiceUUIDs.push_back(FITNESSMACHINESERVICE_UUID);
-  oAdvertisementData.setFlags(0x06);  // General Discoverable, BR/EDR Not Supported
+  oAdvertisementData.setFlags(0x06);         // General Discoverable, BR/EDR Not Supported
+  oAdvertisementData.setAppearance(0x0484);  // Cycling: Power Sensor - required for Garmin discovery
   oAdvertisementData.setCompleteServices16(oServiceUUIDs);
   pAdvertising->setAdvertisementData(oAdvertisementData);
   pAdvertising->setScanResponseData(oScanResponseData);
@@ -157,7 +158,7 @@ void MyServerCallbacks::onDisconnect(NimBLEServer* pServer) {
 }
 
 void MyServerCallbacks::onMTUChange(uint16_t MTU, NimBLEConnInfo& connInfo) {
-  //SS2K_LOG(BLE_SERVER_LOG_TAG, "MTU updated: %u for connection ID: %u", MTU, connInfo.getConnHandle());
+  // SS2K_LOG(BLE_SERVER_LOG_TAG, "MTU updated: %u for connection ID: %u", MTU, connInfo.getConnHandle());
 }
 
 bool MyServerCallbacks::onConnParamsUpdateRequest(uint16_t handle, const ble_gap_upd_params* params) {
