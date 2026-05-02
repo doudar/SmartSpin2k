@@ -8,8 +8,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+- Added CoolStep support for StealthChop stepper operation.
 
 ### Changed
+- Improved StallGuard homing reliability with trimmed SG baseline sampling, threshold drift recovery, and stricter multi-tap end stop confirmation.
+- Disable CoolStep during StallGuard homing to keep homing current behavior more consistent.
 
 ### Hardware
 

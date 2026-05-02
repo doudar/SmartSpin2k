@@ -20,8 +20,6 @@ FastAccelStepper* stepper     = NULL;
 
 extern Board currentBoard;
 
-const int LOG_INTERVAL = 1000;
-
 void SS2K::moveStepper() {
   bool _stepperDir = userConfig->getStepperDir();
   if (stepper) {
@@ -82,18 +80,9 @@ void SS2K::moveStepper() {
       }
     } else if (!rtConfig->getHomed()) {  // Not homed: keep target inside the provisional range and learn bounds when power looks valid
       // Flag when current position is within half a shift step of either bound
-      bool _closeToTarget = (abs(ss2k->getCurrentPosition() - rtConfig->getMinStep()) <= (userConfig->getShiftStep() / 2)) ||
-                            (abs(ss2k->getCurrentPosition() - rtConfig->getMaxStep()) <= (userConfig->getShiftStep() / 2));
-
       if (ss2k->targetPosition < rtConfig->getMinStep()) {
-        // if (_closeToTarget && rtConfig->cad.getValue() > 0 && rtConfig->watts.getValue() > userConfig->getMinWatts() + POWERTABLE_WATT_INCREMENT) {
-        //   rtConfig->setMinStep(ss2k->targetPosition);  // Learn a tighter min bound from real effort
-        // }
         ss2k->targetPosition = rtConfig->getMinStep() + 1;
       } else if (ss2k->targetPosition > rtConfig->getMaxStep()) {
-        // if (_closeToTarget && rtConfig->cad.getValue() > 0 && rtConfig->watts.getValue() < userConfig->getMaxWatts() - POWERTABLE_WATT_INCREMENT) {
-        //   rtConfig->setMaxStep(ss2k->targetPosition);  // Learn a tighter max bound from real effort
-        // }
         ss2k->targetPosition = rtConfig->getMaxStep() - 1;
       }
     } else {  // Homed: simple clamp to the known good range
@@ -111,14 +100,6 @@ void SS2K::moveStepper() {
       stepper->setAutoEnable(false);
     } else {
       stepper->setAutoEnable(true);
-    }
-
-    if (_stepperDir != userConfig->getStepperDir()) {  // User changed the config direction of the stepper wires
-      _stepperDir = userConfig->getStepperDir();
-      while (stepper->isRunning()) {  // Wait until the motor stops running
-        delay(100);
-      }
-      stepper->setDirectionPin(currentBoard.dirPin, _stepperDir);
     }
   }
 }
@@ -190,21 +171,6 @@ void SS2K::setupTMCStepperDriver(bool reset) {
   this->updateStepperPower();
   this->setCurrentPosition(stepper->getCurrentPosition());
 }
-
-#define HOME_TIMEOUT                  30000
-#define HOMING_SG_SAMPLE_COUNT        24
-#define HOMING_SG_MIN_SAMPLE_MARGIN   10
-#define HOMING_SG_MAX_THRESHOLD_DRIFT 30
-#define HOMING_TAP_MAX_ATTEMPTS       10
-#define HOMING_TAP_REQUIRED_STABLE    3
-#define HOMING_TAP_TOLERANCE          150
-#define HOMING_RECOVERY_BACKOFF_MULT  3
-#define HOMING_MAX_SENSITIVITY        100
-
-struct HomingSgBaseline {
-  int threshold;
-  int sensitivity;
-};
 
 static int lastHomingSgThreshold = 0;
 
@@ -602,7 +568,6 @@ void SS2K::updateStepperSpeed(int speed) {
   if (abs(s - speed) < 5) {
     return;
   }
-  speed = speed;
   // SS2K_LOG(MAIN_LOG_TAG, "StepperSpeed is now %d, %d", speed, s);
   stepper->setSpeedInHz(speed);
 }
