@@ -8,6 +8,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+
+### Changed
+
+### Hardware
+
+
+## [26.5.2]
+
+### Added
 - Added CoolStep support for StealthChop stepper operation.
 
 ### Changed
