@@ -7,7 +7,7 @@
 
 /*
  * Automatically updated CA certificate for raw.githubusercontent.com
- * Last updated: 2026-03-03 22:05:48
+ * Last updated: 2026-04-05 08:58:47
  */
 
 #pragma once

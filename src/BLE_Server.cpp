@@ -48,32 +48,32 @@ void startBLEServer() {
   BLEAdvertising* pAdvertising = BLEDevice::getAdvertising();
   pAdvertising->enableScanResponse(true);
   NimBLEAdvertisementData oScanResponseData;
-  std::vector<NimBLEUUID> oServiceUUIDs;
+  NimBLEAdvertisementData oAdvertisementData;
   cyclingSpeedCadenceService.setupService(spinBLEServer.pServer, &chrCallbacks);
   cyclingPowerService.setupService(spinBLEServer.pServer, &chrCallbacks);
   heartService.setupService(spinBLEServer.pServer, &chrCallbacks);
   fitnessMachineService.setupService(spinBLEServer.pServer, &chrCallbacks);
   ss2kCustomCharacteristic.setupService(spinBLEServer.pServer);
   deviceInformationService.setupService(spinBLEServer.pServer);
-  zwiftService.setupService(spinBLEServer.pServer);
-  openBikeControlService.setupService(spinBLEServer.pServer);
-  pAdvertising->addServiceUUID(HEARTSERVICE_UUID);
-  // pAdvertising->addServiceUUID(ZWIFT_RIDE_CUSTOM_SERVICE_UUID);
-  pAdvertising->addServiceUUID(FITNESSMACHINESERVICE_UUID);
-  pAdvertising->addServiceUUID(OPENBIKECONTROL_SERVICE_UUID);
 
-  // Put the device name and SmartSpin2k service UUID in the scan response to avoid
-  // overflowing the primary ad packet (which already carries manufacturer data + service UUIDs).
-  oScanResponseData.setName(userConfig->getDeviceName());
+  // Primary advertising packet: mimic real power meters (CPS UUID + appearance only)
+  // Garmin's power meter scanner requires CPS as the sole/primary advertised service.
+  // Other services (HRM, CSC, FTMS) are still discoverable via GATT after connection.
+  std::vector<NimBLEUUID> primaryServiceUUIDs;
+  primaryServiceUUIDs.push_back(CYCLINGPOWERSERVICE_UUID);
+  oAdvertisementData.setFlags(0x06);                          // General Discoverable, BR/EDR Not Supported
+  oAdvertisementData.setAppearance(0x0484);                   // Cycling: Power Sensor
+  oAdvertisementData.setCompleteServices16(primaryServiceUUIDs);
+  oAdvertisementData.setName(userConfig->getDeviceName());    // Include name in primary packet
+  pAdvertising->setAdvertisementData(oAdvertisementData);
+
+  // Scan response: custom service UUID for SS2K app discovery
   oScanResponseData.setCompleteServices(SMARTSPIN2K_SERVICE_UUID);
   pAdvertising->setScanResponseData(oScanResponseData);
 
   // wattbikeService.setupService(spinBLEServer.pServer);  // No callback needed
   // sb20Service.begin();
   BLEFirmwareSetup(spinBLEServer.pServer);
-
-  // const std::string fitnessData = {0b00000001, 0b00100000, 0b00000000};
-  // pAdvertising->setServiceData(FITNESSMACHINESERVICE_UUID, fitnessData);
   pAdvertising->setMaxInterval(250);
   pAdvertising->setMinInterval(160);
   pAdvertising->start();

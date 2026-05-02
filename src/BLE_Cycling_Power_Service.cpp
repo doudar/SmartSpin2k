@@ -12,7 +12,7 @@ BLE_Cycling_Power_Service::BLE_Cycling_Power_Service() : pPowerMonitor(nullptr),
 void BLE_Cycling_Power_Service::setupService(NimBLEServer *pServer, MyCharacteristicCallbacks *chrCallbacks) {
   // Power Meter service setup
   pPowerMonitor                         = spinBLEServer.pServer->createService(CYCLINGPOWERSERVICE_UUID);
-  cyclingPowerMeasurementCharacteristic = pPowerMonitor->createCharacteristic(CYCLINGPOWERMEASUREMENT_UUID, NIMBLE_PROPERTY::READ | NIMBLE_PROPERTY::NOTIFY);
+  cyclingPowerMeasurementCharacteristic = pPowerMonitor->createCharacteristic(CYCLINGPOWERMEASUREMENT_UUID, NIMBLE_PROPERTY::NOTIFY);
   cyclingPowerFeatureCharacteristic     = pPowerMonitor->createCharacteristic(CYCLINGPOWERFEATURE_UUID, NIMBLE_PROPERTY::READ);
   sensorLocationCharacteristic          = pPowerMonitor->createCharacteristic(SENSORLOCATION_UUID, NIMBLE_PROPERTY::READ);
   byte cpsLocation[1]                   = {0b0101};  // sensor location 5 == left crank

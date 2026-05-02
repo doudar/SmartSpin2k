@@ -53,7 +53,7 @@ class SS2K {
   static void ARDUINO_ISR_ATTR handleUpShift();
   static void ARDUINO_ISR_ATTR handleDownShift();
   static void moveStepper();
-  void _findEndStop(bool moveForward);
+  bool _findEndStop(bool moveForward);
   void _findFTMSHome(bool bothDirections = false);
   void _resistanceMove();
 
@@ -74,7 +74,7 @@ class SS2K {
   void restartWifi();
   void setupTMCStepperDriver(bool reset = false);
   void updateStepperPower(int pwr = 0);
-  void updateStealthChop();
+  void updateStealthChop(bool coolStepEnabled = true);
   void updateStepperSpeed(int speed = 0);
   void FTMSModeShiftModifier();
   static void rxSerial(void);

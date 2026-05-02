@@ -172,7 +172,7 @@ void ErgMode::computeErg() {
   }
 
 #ifdef ERG_MODE_USE_POWER_TABLE
-  if (abs(this->prevWatts.getTarget() - rtConfig->watts.getTarget()) > POWERTABLE_WATT_INCREMENT && rtConfig->getHomed()) {
+  if (abs(this->prevWatts.getTarget() - rtConfig->watts.getTarget()) > (POWERTABLE_WATT_INCREMENT + ERG_MODE_PID_WINDOW) && rtConfig->getHomed()) {
     result = _setPointChangeState();
   }
 #endif
@@ -200,11 +200,11 @@ int32_t ErgMode::_setPointChangeState() {
 
   // Test current watts against the table result. If We're already lower or higher than target, flag the result as a return error.
   if (tableResult != RETURN_ERROR) {
-    if (mode == Mode::INCREASING && tableResult < ss2k->getCurrentPosition()) {
+    if (mode == Mode::INCREASING && tableResult <= ss2k->getCurrentPosition()) {
       SS2K_LOG(ERG_MODE_LOG_TAG, "Table Result Failed increasing Test: %d", tableResult);
       tableResult = RETURN_ERROR;
     }
-    if (mode == Mode::DECREASING && tableResult > ss2k->getCurrentPosition()) {
+    if (mode == Mode::DECREASING && tableResult >= ss2k->getCurrentPosition()) {
       SS2K_LOG(ERG_MODE_LOG_TAG, "Table Result Failed decreasing Test: %d", tableResult);
       tableResult = RETURN_ERROR;
     }
