@@ -61,9 +61,6 @@ void SS2K::moveStepper() {
       ss2k->syncMode = false;
     }
 
-    bool _closeToTarget = (abs(stepper->getCurrentPosition() - rtConfig->getMinStep()) <= (userConfig->getShiftStep() / 2)) ||
-                          (abs(stepper->getCurrentPosition() - rtConfig->getMaxStep()) <= (userConfig->getShiftStep() / 2));
-
     if (ss2k->pelotonIsConnected && !rtConfig->getHomed()) {
       // Peloton + not homed: gently walk away from the edges unless the user is actively shifting past them
       if (rtConfig->resistance.getValue() < rtConfig->getMinResistance()) {  // Below allowed resistance
@@ -78,8 +75,7 @@ void SS2K::moveStepper() {
           ss2k->targetPosition = ss2k->getCurrentPosition() - 20;
         }
       }
-    } else if (!rtConfig->getHomed()) {  // Not homed: keep target inside the provisional range and learn bounds when power looks valid
-      // Flag when current position is within half a shift step of either bound
+    } else if (!rtConfig->getHomed()) {  // Not homed: keep target inside the provisional range.
       if (ss2k->targetPosition < rtConfig->getMinStep()) {
         ss2k->targetPosition = rtConfig->getMinStep() + 1;
       } else if (ss2k->targetPosition > rtConfig->getMaxStep()) {
