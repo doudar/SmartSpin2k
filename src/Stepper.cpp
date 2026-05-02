@@ -21,7 +21,7 @@ FastAccelStepper* stepper     = NULL;
 extern Board currentBoard;
 
 void SS2K::moveStepper() {
-  bool _stepperDir = userConfig->getStepperDir();
+  static bool _stepperDir = userConfig->getStepperDir();
   if (stepper) {
     ss2k->stepperIsRunning = stepper->isRunning();
     ss2k->currentPosition  = stepper->getCurrentPosition();
@@ -96,6 +96,13 @@ void SS2K::moveStepper() {
       stepper->setAutoEnable(false);
     } else {
       stepper->setAutoEnable(true);
+    }
+    if (_stepperDir != userConfig->getStepperDir()) {  // User changed the config direction of the stepper wires
+      _stepperDir = userConfig->getStepperDir();
+      while (stepper->isRunning()) {  // Wait until the motor stops running
+        delay(100);
+      }
+      stepper->setDirectionPin(currentBoard.dirPin, _stepperDir);
     }
   }
 }
@@ -172,7 +179,7 @@ static int lastHomingSgThreshold = 0;
 
 static HomingSgBaseline getHomingSgBaseline() {
   int samples[HOMING_SG_SAMPLE_COUNT];
-  int totalSgResult = 0;
+  int totalSgResult  = 0;
   int minSampleIndex = 0;
   int maxSampleIndex = 0;
 
@@ -204,8 +211,8 @@ static HomingSgBaseline getHomingSgBaseline() {
   int measuredSensitivity = max(userConfig->getHomingSensitivity(), normalLowDrop + max(userConfig->getHomingSensitivity() / 2, HOMING_SG_MIN_SAMPLE_MARGIN));
   int maxSensitivity      = min(HOMING_MAX_SENSITIVITY, max(threshold, 1));
   measuredSensitivity     = constrain(measuredSensitivity + 10, 1, maxSensitivity);
-  SS2K_LOG(MAIN_LOG_TAG, "Homing SG baseline used %d/%d trimmed samples. Dropped: %d/%d, Spread: %d-%d, measured sensitivity: %d", trimmedCount,
-           HOMING_SG_SAMPLE_COUNT, samples[minSampleIndex], samples[maxSampleIndex], trimmedMin, trimmedMax, measuredSensitivity);
+  SS2K_LOG(MAIN_LOG_TAG, "Homing SG baseline used %d/%d trimmed samples. Dropped: %d/%d, Spread: %d-%d, measured sensitivity: %d", trimmedCount, HOMING_SG_SAMPLE_COUNT,
+           samples[minSampleIndex], samples[maxSampleIndex], trimmedMin, trimmedMax, measuredSensitivity);
   return {threshold, measuredSensitivity};
 }
 
@@ -233,7 +240,7 @@ bool SS2K::_findEndStop(bool moveForward) {
   // Wait for the motor to reach a stable speed before sampling
   delay(300);
 
-  baseline = getHomingSgBaseline();
+  baseline              = getHomingSgBaseline();
   lastHomingSgThreshold = baseline.threshold;
 
   SS2K_LOG(MAIN_LOG_TAG, "Homing %s. Stable Threshold: %d, Sensitivity: %d", moveForward ? "forward (max)" : "backward (min)", baseline.threshold, baseline.sensitivity);
@@ -415,15 +422,15 @@ void SS2K::goHome(bool bothDirections) {
         return false;
       }
 
-      int32_t foundPosition = stepper->getCurrentPosition();
+      int32_t foundPosition  = stepper->getCurrentPosition();
       int thresholdDelta     = abs(lastHomingSgThreshold - baseThreshold);
       int thresholdReference = max(abs(baseThreshold), 1);
       if (haveBaseThreshold && (thresholdDelta * 100) > (thresholdReference * HOMING_SG_MAX_THRESHOLD_DRIFT)) {
         SS2K_LOG(MAIN_LOG_TAG, "%s homing SG threshold drifted from %d to %d. Recovering from possible stalled baseline.", endStopName, baseThreshold, lastHomingSgThreshold);
         backOffEndStop(moveForward, true);
-        haveBaseThreshold = false;
-        havePrevious      = false;
-        stableTapCount    = 0;
+        haveBaseThreshold  = false;
+        havePrevious       = false;
+        stableTapCount     = 0;
         requiredStableTaps = 2;
         continue;
       }
