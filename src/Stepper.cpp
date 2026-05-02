@@ -104,7 +104,7 @@ void SS2K::moveStepper() {
       }
       stepper->setDirectionPin(currentBoard.dirPin, _stepperDir);
     }
-    ss2k->currentPosition  = stepper->getCurrentPosition();
+    ss2k->currentPosition = stepper->getCurrentPosition();
   }
 }
 
