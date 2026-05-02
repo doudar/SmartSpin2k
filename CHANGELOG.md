@@ -10,6 +10,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Added
 
 ### Changed
+- Adjusted BLE advertising to present SmartSpin2k as a cycling power sensor for improved Garmin discovery and pairing.
+- Updated BLE setup to use a public device address for Garmin compatibility.
 
 ### Hardware
 
