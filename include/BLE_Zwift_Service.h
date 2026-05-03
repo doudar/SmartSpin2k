@@ -96,6 +96,9 @@ class BLE_Zwift_Service {
   // Send current GeneralInfo device information on sync_tx.
   void sendGeneralInfoSyncTx();
 
+  // Send current power/cadence/speed/heart-rate riding data on async.
+  void sendRidingData();
+
   // Send TRAINER_CONFIG_STATUS category 2 with reported real/virtual gear ratios.
   void sendTrainerConfigSimulationStatus(uint32_t realGearRatioX10000, uint32_t virtualGearRatioX10000);
 

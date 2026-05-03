@@ -55,10 +55,15 @@ void startBLEServer() {
   fitnessMachineService.setupService(spinBLEServer.pServer, &chrCallbacks);
   ss2kCustomCharacteristic.setupService(spinBLEServer.pServer);
   deviceInformationService.setupService(spinBLEServer.pServer);
-  zwiftService.setupService(spinBLEServer.pServer);
-  openBikeControlService.setupService(spinBLEServer.pServer);
+  // zwiftService.setupService(spinBLEServer.pServer);
+  // openBikeControlService.setupService(spinBLEServer.pServer);
+  // Garmin devices need this in the primary advertisement to recognize the device as a cycling power sensor.
   pAdvertising->addServiceUUID(CSCSERVICE_UUID);
+  // pAdvertising->addServiceUUID(CYCLINGPOWERSERVICE_UUID);
+  // pAdvertising->addServiceUUID(HEARTSERVICE_UUID);
+  // uncoment to enable as controller. Zwift won't pair as ct and controller at the same time.
   // pAdvertising->addServiceUUID(ZWIFT_RIDE_CUSTOM_SERVICE_UUID);
+  // Most apps look for the fitness machine service UUID to recognize the device as a smart trainer.
   pAdvertising->addServiceUUID(FITNESSMACHINESERVICE_UUID);
   //pAdvertising->addServiceUUID(OPENBIKECONTROL_SERVICE_UUID);
 
@@ -89,7 +94,7 @@ void SpinBLEServer::update() {
   cyclingPowerService.update();
   cyclingSpeedCadenceService.update();
   fitnessMachineService.update();
-  zwiftService.update();
+  // zwiftService.update();
   // OpenBikeControl sends event-driven notifications from shift handlers.
   // wattbikeService.parseNemit();  // Changed from update() to parseNemit()
   // sb20Service.notify();

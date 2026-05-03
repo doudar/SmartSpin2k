@@ -137,7 +137,7 @@ bool BLE_Zwift_Service::keepAlive(unsigned long now) {
     // Keepalive sent on sync_tx as "no buttons pressed" notification
     syncTxCharacteristic->setValue(ALL_RELEASED, ALL_RELEASED_LEN);
     syncTxCharacteristic->indicate();
-    DirConManager::notifyCharacteristic(NimBLEUUID(ZWIFT_RIDE_CUSTOM_SERVICE_UUID), syncTxCharacteristic->getUUID(), const_cast<uint8_t*>(ALL_RELEASED), ALL_RELEASED_LEN);
+    DirConManager::notifyCharacteristic(NimBLEUUID(ZWIFT_CUSTOM_SERVICE_UUID), syncTxCharacteristic->getUUID(), const_cast<uint8_t*>(ALL_RELEASED), ALL_RELEASED_LEN);
     _lastKeepaliveTime = now;
   }
 
@@ -232,50 +232,7 @@ void BLE_Zwift_Service::update() {
   //   swapAdv = !swapAdv;
   // }
 
-  uint8_t zData[48];
-  size_t pos                   = 0;
-  const uint16_t powerWatts    = static_cast<uint16_t>(rtConfig->watts.getValue());
-  const uint16_t cadence       = static_cast<uint16_t>(rtConfig->cad.getValue());
-  const uint16_t heartRate     = static_cast<uint16_t>(rtConfig->hr.getValue());
-  const uint32_t field5Counter = getNextZwiftField5Counter(powerWatts);
-
-  zData[pos++] = toUnderlying(CommandCode::HubRidingData);
-
-  // Field 1: Power (tag 0x08)
-  zData[pos++] = makeTag(ZwiftProtocol::HubRidingData::Field::Power, WireType::Varint);
-  pos += encodeUleb128(powerWatts, &zData[pos]);
-
-  // Field 2: Cadence (tag 0x10)
-  zData[pos++] = makeTag(ZwiftProtocol::HubRidingData::Field::Cadence, WireType::Varint);
-  pos += encodeUleb128(cadence, &zData[pos]);
-
-  // Field 3: SpeedX100 (tag 0x18)
-  int speedX100 = rtConfig->getSimulatedSpeed();
-  zData[pos++]  = makeTag(ZwiftProtocol::HubRidingData::Field::SpeedX100, WireType::Varint);
-  pos += encodeUleb128(static_cast<uint64_t>(speedX100), &zData[pos]);
-
-  // Field 4: HR (tag 0x20)
-  zData[pos++] = makeTag(ZwiftProtocol::HubRidingData::Field::HeartRate, WireType::Varint);
-  pos += encodeUleb128(heartRate, &zData[pos]);
-
-  // Field 5: Rolling counter derived from the observed trainer payloads.
-  zData[pos++] = makeTag(ZwiftProtocol::HubRidingData::Field::Unknown1, WireType::Varint);
-  pos += encodeUleb128(field5Counter, &zData[pos]);
-
-  // Field 6: Unknown2 (tag 0x30) - constant 25714 from SHIFTR reference
-  zData[pos++] = makeTag(ZwiftProtocol::HubRidingData::Field::Unknown2, WireType::Varint);
-  pos += encodeUleb128(30091, &zData[pos]);
-
-  // every 5 seconds, print the zData for debugging.
-  // static unsigned long lastDebugTime = 0;
-  // if (now - lastDebugTime >= 5000) {
-  //   lastDebugTime = now;
-  //   SS2K_LOG(getLogTag(), "Zwift riding data: %s", toHexString(zData, pos).c_str());
-  // }
-
-  asyncCharacteristic->setValue(zData, pos);
-  asyncCharacteristic->notify();
-  DirConManager::notifyCharacteristic(NimBLEUUID(ZWIFT_RIDE_CUSTOM_SERVICE_UUID), asyncCharacteristic->getUUID(), zData, pos);
+  sendRidingData();
 }
 
 bool BLE_Zwift_Service::isConnected() {
@@ -292,7 +249,7 @@ void BLE_Zwift_Service::sendSyncTxPayload(const uint8_t* payload, size_t length)
 
   syncTxCharacteristic->setValue(payload, length);
   syncTxCharacteristic->indicate();
-  DirConManager::notifyCharacteristic(NimBLEUUID(ZWIFT_RIDE_CUSTOM_SERVICE_UUID), syncTxCharacteristic->getUUID(), const_cast<uint8_t*>(payload), length);
+  DirConManager::notifyCharacteristic(NimBLEUUID(ZWIFT_CUSTOM_SERVICE_UUID), syncTxCharacteristic->getUUID(), const_cast<uint8_t*>(payload), length);
 }
 
 void BLE_Zwift_Service::sendAsyncPayload(const uint8_t* payload, size_t length) {
@@ -302,7 +259,39 @@ void BLE_Zwift_Service::sendAsyncPayload(const uint8_t* payload, size_t length) 
 
   asyncCharacteristic->setValue(payload, length);
   asyncCharacteristic->notify();
-  DirConManager::notifyCharacteristic(NimBLEUUID(ZWIFT_RIDE_CUSTOM_SERVICE_UUID), asyncCharacteristic->getUUID(), const_cast<uint8_t*>(payload), length);
+  DirConManager::notifyCharacteristic(NimBLEUUID(ZWIFT_CUSTOM_SERVICE_UUID), asyncCharacteristic->getUUID(), const_cast<uint8_t*>(payload), length);
+}
+
+void BLE_Zwift_Service::sendRidingData() {
+  uint8_t zData[48];
+  size_t pos                   = 0;
+  const uint16_t powerWatts    = static_cast<uint16_t>(rtConfig->watts.getValue());
+  const uint16_t cadence       = static_cast<uint16_t>(rtConfig->cad.getValue());
+  const uint16_t heartRate     = static_cast<uint16_t>(rtConfig->hr.getValue());
+  const uint32_t field5Counter = getNextZwiftField5Counter(powerWatts);
+
+  zData[pos++] = toUnderlying(CommandCode::HubRidingData);
+
+  zData[pos++] = makeTag(ZwiftProtocol::HubRidingData::Field::Power, WireType::Varint);
+  pos += encodeUleb128(powerWatts, &zData[pos]);
+
+  zData[pos++] = makeTag(ZwiftProtocol::HubRidingData::Field::Cadence, WireType::Varint);
+  pos += encodeUleb128(cadence, &zData[pos]);
+
+  int speedX100 = rtConfig->getSimulatedSpeed();
+  zData[pos++]  = makeTag(ZwiftProtocol::HubRidingData::Field::SpeedX100, WireType::Varint);
+  pos += encodeUleb128(static_cast<uint64_t>(speedX100), &zData[pos]);
+
+  zData[pos++] = makeTag(ZwiftProtocol::HubRidingData::Field::HeartRate, WireType::Varint);
+  pos += encodeUleb128(heartRate, &zData[pos]);
+
+  zData[pos++] = makeTag(ZwiftProtocol::HubRidingData::Field::Unknown1, WireType::Varint);
+  pos += encodeUleb128(field5Counter, &zData[pos]);
+
+  zData[pos++] = makeTag(ZwiftProtocol::HubRidingData::Field::Unknown2, WireType::Varint);
+  pos += encodeUleb128(30091, &zData[pos]);
+
+  sendAsyncPayload(zData, pos);
 }
 
 void BLE_Zwift_Service::sendGearRatioSyncTx() {
@@ -499,6 +488,8 @@ void BLE_Zwift_Service::handleSyncRxWrite(const std::string& value, bool _isDirC
 
     SS2K_LOG(getLogTag(), "Handshake complete - %s mode active", _isDirCon ? "DirCon" : "BLE");
 
+    sendGeneralInfoSyncTx();
+    sendRidingData();
     sendTrainerConfigVirtualShiftStatus();
     return;
   }
@@ -594,8 +585,6 @@ void BLE_Zwift_Service::handleZwiftCommand(const uint8_t* data, size_t length) {
                 SS2K_LOG(getLogTag(), "Ask %d Gear ratio: %.4f", isAsk6 ? 6 : (isAsk7 ? 7 : 0), _gearRatioX10000 / 10000.0);
                 applyGearRatio();
 
-                const uint32_t reportedRatio = (_gearRatioX10000 > 0) ? _gearRatioX10000 : 15300;
-
                 if (isAsk6) {
                   // Ask 6: send sync_tx ratio echo first, then async trainer-config confirmation.
                   sendGearRatioSyncTx();
@@ -643,7 +632,6 @@ void BLE_Zwift_Service::applyGearRatio() {
   // Zwift virtual gear ratios (24 gears, from 0.75 to 5.49)
   static const uint32_t gearRatios[] = {7500,  8700,  9900,  11100, 12300, 13800, 15300, 16800, 18600, 20400, 22200, 24000,
                                         26100, 28200, 30300, 32400, 34900, 37400, 39900, 42400, 45400, 48400, 51400, 54900};
-  // static const int kDefaultGearIndex = 11;  // ratio 2.40 (≈ 34T/14T)
   static const int kNumGears = sizeof(gearRatios) / sizeof(gearRatios[0]);
 
   // Find closest gear index
