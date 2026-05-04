@@ -59,7 +59,7 @@ void startBLEServer() {
   // openBikeControlService.setupService(spinBLEServer.pServer);
   pAdvertising->addServiceUUID(CYCLINGPOWERSERVICE_UUID);
   pAdvertising->addServiceUUID(CSCSERVICE_UUID);
-  pAdvertising->addServiceUUID(HEARTSERVICE_UUID);
+  // pAdvertising->addServiceUUID(HEARTSERVICE_UUID);
   // Most apps look for the fitness machine service UUID to recognize the device as a smart trainer.
   pAdvertising->addServiceUUID(FITNESSMACHINESERVICE_UUID);
   // uncoment to enable as controller. Zwift won't pair as ct and controller at the same time.
