@@ -46,7 +46,7 @@ void startBLEServer() {
 
   // start services
   BLEAdvertising* pAdvertising = BLEDevice::getAdvertising();
- pAdvertising->enableScanResponse(true);
+  pAdvertising->enableScanResponse(true);
   NimBLEAdvertisementData oScanResponseData;
   std::vector<NimBLEUUID> oServiceUUIDs;
   cyclingSpeedCadenceService.setupService(spinBLEServer.pServer, &chrCallbacks);
@@ -57,16 +57,16 @@ void startBLEServer() {
   deviceInformationService.setupService(spinBLEServer.pServer);
   // zwiftService.setupService(spinBLEServer.pServer);
   // openBikeControlService.setupService(spinBLEServer.pServer);
-  // Garmin devices need this in the primary advertisement to recognize the device as a cycling power sensor.
+  pAdvertising->addServiceUUID(CYCLINGPOWERSERVICE_UUID);
   pAdvertising->addServiceUUID(CSCSERVICE_UUID);
-  // pAdvertising->addServiceUUID(CYCLINGPOWERSERVICE_UUID);
-  // pAdvertising->addServiceUUID(HEARTSERVICE_UUID);
-  // uncoment to enable as controller. Zwift won't pair as ct and controller at the same time.
-  // pAdvertising->addServiceUUID(ZWIFT_RIDE_CUSTOM_SERVICE_UUID);
+  pAdvertising->addServiceUUID(HEARTSERVICE_UUID);
   // Most apps look for the fitness machine service UUID to recognize the device as a smart trainer.
   pAdvertising->addServiceUUID(FITNESSMACHINESERVICE_UUID);
-  //pAdvertising->addServiceUUID(OPENBIKECONTROL_SERVICE_UUID);
-
+  // uncoment to enable as controller. Zwift won't pair as ct and controller at the same time.
+  // pAdvertising->addServiceUUID(ZWIFT_RIDE_CUSTOM_SERVICE_UUID);
+  // pAdvertising->addServiceUUID(OPENBIKECONTROL_SERVICE_UUID);
+  // Garmin devices need this in the primary advertisement to recognize the device as a cycling power sensor.
+  pAdvertising->setAppearance(0x0484);  // Cycling Power Sensor, per https://www.bluetooth.com/specifications/assigned-numbers/generic-access-profile/
   // Put the device name and SmartSpin2k service UUID in the scan response to avoid
   // overflowing the primary ad packet (which already carries manufacturer data + service UUIDs).
   oScanResponseData.setName(userConfig->getDeviceName());
