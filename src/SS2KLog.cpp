@@ -7,6 +7,7 @@
 
 #include "SS2KLog.h"
 #include "Main.h"
+#include <type_traits>
 
 LogHandler logHandler = LogHandler();
 
@@ -44,30 +45,39 @@ void LogHandler::writeLogs() {
 }
 
 void LogHandler::writev(esp_log_level_t level, const char *module, const char *format, va_list args) {
+  if (_messageBufferHandle == NULL) {
+    ESP_LOGE(LOG_HANDLER_TAG, "Can not send log message. Message Buffer is NULL");
+    return;
+  }
+
   if (xSemaphoreTake(_logBufferMutex, 10) == pdFALSE) {
     // Must use ESP_LOG here using of SSK_LOG creates dead lock
     ESP_LOGE(LOG_HANDLER_TAG, "Can not write log message. Write is blocked by other task.");
     return;
   }
 
-  if (_messageBufferHandle == NULL) {
-    ESP_LOGE(LOG_HANDLER_TAG, "Can not send log message. Message Buffer is NULL");
-    return;
-  }
-
   char formatString[256];
-  sprintf(formatString, "[%6lu][%c](%s): %s", millis(), _logLevelToLetter(level), module, format);
+  snprintf(formatString, sizeof(formatString), "[%6lu][%c](%s): %s", millis(), _logLevelToLetter(level), module, format);
 
   const size_t buffer_size = 512;
   char buffer[buffer_size];
   int written = vsnprintf(buffer, buffer_size, formatString, args);
+  if (written < 0) {
+    buffer[0] = '\0';
+    written = 0;
+  }
+
+  size_t bytesToSend = static_cast<size_t>(written);
+  if (bytesToSend >= buffer_size) {
+    bytesToSend = buffer_size - 1;
+  }
 
   // Default logger -> write all to serial if connected
   if (Serial) {
     Serial.println(buffer);
   }
 
-  xMessageBufferSend(_messageBufferHandle, buffer, written, 0);
+  xMessageBufferSend(_messageBufferHandle, buffer, bytesToSend, 0);
   xSemaphoreGive(_logBufferMutex);
 }
 
@@ -94,21 +104,44 @@ void ss2k_remove_newlines(std::string *str) {
   }
 }
 
-int ss2k_log_hex_to_buffer(const byte *data, const size_t data_length, char *buffer, const int buffer_offset, const size_t buffer_length) {
+template <typename T>
+std::string toHexString(const T *data, size_t dataLength) {
+  static_assert(std::is_same<T, uint8_t>::value || std::is_same<T, char>::value, "toHexString only supports uint8_t and char data");
+
+  std::string result;
+  if (data == nullptr || dataLength == 0) {
+    return result;
+  }
+
+  result.reserve((dataLength * 3) - 1);
+  char byteBuffer[4];
+  for (size_t index = 0; index < dataLength; ++index) {
+    snprintf(byteBuffer, sizeof(byteBuffer), "%02x", static_cast<unsigned char>(data[index]));
+    result += byteBuffer;
+    if (index + 1 < dataLength) {
+      result += ' ';
+    }
+  }
+
+  return result;
+}
+
+template std::string toHexString<uint8_t>(const uint8_t *data, size_t dataLength);
+template std::string toHexString<char>(const char *data, size_t dataLength);
+
+template <typename T>
+int ss2k_log_hex_to_buffer(const T *data, const size_t data_length, char *buffer, const int buffer_offset, const size_t buffer_length) {
+  static_assert(std::is_same<T, byte>::value || std::is_same<T, char>::value, "ss2k_log_hex_to_buffer only supports byte and char data");
+
   int written = 0;
   for (int data_offset = 0; data_offset < data_length; data_offset++) {
-    written += snprintf(buffer + buffer_offset + written, buffer_length - written + buffer_offset, "%02x ", *(data + data_offset));
+    written += snprintf(buffer + buffer_offset + written, buffer_length - written + buffer_offset, "%02x ", static_cast<unsigned char>(*(data + data_offset)));
   }
   return written;
 }
 
-int ss2k_log_hex_to_buffer(const char *data, const size_t data_length, char *buffer, const int buffer_offset, const size_t buffer_length) {
-  int written = 0;
-  for (int data_offset = 0; data_offset < data_length; data_offset++) {
-    written += snprintf(buffer + buffer_offset + written, buffer_length - written + buffer_offset, "%02x ", *(data + data_offset));
-  }
-  return written;
-}
+template int ss2k_log_hex_to_buffer<byte>(const byte *data, const size_t data_length, char *buffer, const int buffer_offset, const size_t buffer_length);
+template int ss2k_log_hex_to_buffer<char>(const char *data, const size_t data_length, char *buffer, const int buffer_offset, const size_t buffer_length);
 
 void ss2k_log_write(esp_log_level_t level, const char *module, const char *format, ...) {
   va_list args;
