@@ -29,6 +29,9 @@ class BLE_OpenBikeControl_Service {
   NimBLECharacteristic *appInformationCharacteristic;
   unsigned long _lastClientActivityMs;
 
+  static void setupMDNS();
+  static void addServiceUuidToMDNS(const NimBLEUUID& serviceUuid);
+
   void sendButtonState(uint8_t buttonId, uint8_t state);
   void markClientActivity();
 };

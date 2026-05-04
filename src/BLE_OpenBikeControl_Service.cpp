@@ -10,6 +10,13 @@
 #include "Main.h"
 #include "SS2KLog.h"
 #include <Constants.h>
+#include <ESPmDNS.h>
+#include <WiFi.h>
+#include <cctype>
+#include <cstring>
+
+#define OPENBIKECONTROL_MDNS_SERVICE_NAME     "_openbikecontrol"
+#define OPENBIKECONTROL_MDNS_SERVICE_PROTOCOL "tcp"
 
 namespace {
 constexpr uint8_t kOpenBikeControlButtonStateMessageType = 0x01;
@@ -23,6 +30,11 @@ constexpr unsigned long kOpenBikeControlSessionTimeoutMs = 15000;
 constexpr char kOpenBikeControlLogTag[]                  = "BLE_OBC";
 }  // namespace
 
+static char fullUuidListBuffer[512] = "";
+static size_t fullUuidListLength    = 0;
+static bool openBikeControlServiceSetupCalled = false;
+static bool openBikeControlMdnsStarted        = false;
+
 static OpenBikeControlHapticCallbacks obcHapticCallbacks;
 static OpenBikeControlAppInfoCallbacks obcAppInfoCallbacks;
 static OpenBikeControlButtonStateCallbacks obcButtonStateCallbacks;
@@ -34,7 +46,73 @@ BLE_OpenBikeControl_Service::BLE_OpenBikeControl_Service()
       appInformationCharacteristic(nullptr),
       _lastClientActivityMs(0) {}
 
+void BLE_OpenBikeControl_Service::setupMDNS() {
+  if (!openBikeControlServiceSetupCalled || openBikeControlMdnsStarted) {
+    return;
+  }
+
+  static char macAddress[18];  // MAC format: 11:22:33:44:55:66\0
+  static char obcId[13];       // aabbccddeeff\0
+
+  strcpy(macAddress, WiFi.macAddress().c_str());
+  size_t out = 0;
+  for (size_t i = 0; macAddress[i] != '\0' && out < sizeof(obcId) - 1; i++) {
+    if (macAddress[i] != ':') {
+      obcId[out++] = static_cast<char>(tolower(static_cast<unsigned char>(macAddress[i])));
+    }
+  }
+  obcId[out] = '\0';
+
+  SS2K_LOG(kOpenBikeControlLogTag, "Adding OpenBikeControl MDNS service: %s.%s on port %d", OPENBIKECONTROL_MDNS_SERVICE_NAME,
+           OPENBIKECONTROL_MDNS_SERVICE_PROTOCOL, DIRCON_TCP_PORT);
+  if (MDNS.addService(OPENBIKECONTROL_MDNS_SERVICE_NAME, OPENBIKECONTROL_MDNS_SERVICE_PROTOCOL, DIRCON_TCP_PORT)) {
+    openBikeControlMdnsStarted = true;
+    MDNS.addServiceTxt(OPENBIKECONTROL_MDNS_SERVICE_NAME, OPENBIKECONTROL_MDNS_SERVICE_PROTOCOL, "version", "1");
+    MDNS.addServiceTxt(OPENBIKECONTROL_MDNS_SERVICE_NAME, OPENBIKECONTROL_MDNS_SERVICE_PROTOCOL, "id", static_cast<const char *>(obcId));
+    MDNS.addServiceTxt(OPENBIKECONTROL_MDNS_SERVICE_NAME, OPENBIKECONTROL_MDNS_SERVICE_PROTOCOL, "name", userConfig->getDeviceName());
+    MDNS.addServiceTxt(OPENBIKECONTROL_MDNS_SERVICE_NAME, OPENBIKECONTROL_MDNS_SERVICE_PROTOCOL, "service-uuids", "");
+    MDNS.addServiceTxt(OPENBIKECONTROL_MDNS_SERVICE_NAME, OPENBIKECONTROL_MDNS_SERVICE_PROTOCOL, "manufacturer", "SmartSpin2k");
+    MDNS.addServiceTxt(OPENBIKECONTROL_MDNS_SERVICE_NAME, OPENBIKECONTROL_MDNS_SERVICE_PROTOCOL, "model", "SmartSpin2k");
+  } else {
+    SS2K_LOG(kOpenBikeControlLogTag, "Failed to add OpenBikeControl MDNS service");
+  }
+}
+
+void BLE_OpenBikeControl_Service::addServiceUuidToMDNS(const NimBLEUUID& serviceUuid) {
+  if (!openBikeControlServiceSetupCalled) {
+    return;
+  }
+
+  setupMDNS();
+  if (!openBikeControlMdnsStarted) {
+    return;
+  }
+
+  std::string fullUuidStr = serviceUuid.toString();
+  const char *fullUuid    = fullUuidStr.c_str();
+
+  if (strstr(fullUuidListBuffer, fullUuid) != nullptr) {
+    return;
+  }
+
+  size_t fullUuidLen      = strlen(fullUuid);
+  bool needFullUuidComma  = (fullUuidListLength > 0);
+  size_t fullRequiredSize = fullUuidLen + (needFullUuidComma ? 1 : 0);
+  if (fullUuidListLength + fullRequiredSize < sizeof(fullUuidListBuffer) - 1) {
+    if (needFullUuidComma) {
+      fullUuidListBuffer[fullUuidListLength++] = ',';
+    }
+    strcpy(&fullUuidListBuffer[fullUuidListLength], fullUuid);
+    fullUuidListLength += fullUuidLen;
+    MDNS.addServiceTxt(OPENBIKECONTROL_MDNS_SERVICE_NAME, OPENBIKECONTROL_MDNS_SERVICE_PROTOCOL, "service-uuids", (const char *)fullUuidListBuffer);
+  } else {
+    SS2K_LOG(kOpenBikeControlLogTag, "Warning: Not enough space to add full UUID %s", fullUuid);
+  }
+}
+
 void BLE_OpenBikeControl_Service::setupService(NimBLEServer *pServer) {
+  openBikeControlServiceSetupCalled = true;
+
   pOpenBikeControlService = pServer->createService(OPENBIKECONTROL_SERVICE_UUID);
 
   buttonStateCharacteristic = pOpenBikeControlService->createCharacteristic(OPENBIKECONTROL_BUTTON_STATE_CHARACTERISTIC_UUID, NIMBLE_PROPERTY::READ | NIMBLE_PROPERTY::NOTIFY);
@@ -54,22 +132,24 @@ void BLE_OpenBikeControl_Service::setupService(NimBLEServer *pServer) {
 
   pOpenBikeControlService->start();
 
-  DirConManager::registerService(pOpenBikeControlService->getUUID(),
-                                 [](NimBLECharacteristic *characteristic, const uint8_t *data, size_t length, DirConWriteResult *result) -> bool {
-                                   if (characteristic->getUUID().equals(NimBLEUUID(OPENBIKECONTROL_HAPTIC_CHARACTERISTIC_UUID))) {
-                                     openBikeControlService.handleHapticWrite(data, length, true);
-                                     result->autoSubscribeUuids[0] = NimBLEUUID(OPENBIKECONTROL_BUTTON_STATE_CHARACTERISTIC_UUID);
-                                     result->autoSubscribeCount    = 1;
-                                     return true;
-                                   }
-                                   if (characteristic->getUUID().equals(NimBLEUUID(OPENBIKECONTROL_APP_INFO_CHARACTERISTIC_UUID))) {
-                                     openBikeControlService.handleAppInfoWrite(data, length, true);
-                                     result->autoSubscribeUuids[0] = NimBLEUUID(OPENBIKECONTROL_BUTTON_STATE_CHARACTERISTIC_UUID);
-                                     result->autoSubscribeCount    = 1;
-                                     return true;
-                                   }
-                                   return false;
-                                 });
+  DirConManager::registerService(
+      pOpenBikeControlService->getUUID(),
+      [](NimBLECharacteristic *characteristic, const uint8_t *data, size_t length, DirConWriteResult *result) -> bool {
+        if (characteristic->getUUID().equals(NimBLEUUID(OPENBIKECONTROL_HAPTIC_CHARACTERISTIC_UUID))) {
+          openBikeControlService.handleHapticWrite(data, length, true);
+          result->autoSubscribeUuids[0] = NimBLEUUID(OPENBIKECONTROL_BUTTON_STATE_CHARACTERISTIC_UUID);
+          result->autoSubscribeCount    = 1;
+          return true;
+        }
+        if (characteristic->getUUID().equals(NimBLEUUID(OPENBIKECONTROL_APP_INFO_CHARACTERISTIC_UUID))) {
+          openBikeControlService.handleAppInfoWrite(data, length, true);
+          result->autoSubscribeUuids[0] = NimBLEUUID(OPENBIKECONTROL_BUTTON_STATE_CHARACTERISTIC_UUID);
+          result->autoSubscribeCount    = 1;
+          return true;
+        }
+        return false;
+      },
+      BLE_OpenBikeControl_Service::addServiceUuidToMDNS);
 
   SS2K_LOG(kOpenBikeControlLogTag, "OpenBikeControl service started");
 }

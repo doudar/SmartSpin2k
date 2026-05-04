@@ -18,8 +18,6 @@
 #define DIRCON_MDNS_SERVICE_NAME     "_wahoo-fitness-tnp"
 #define DIRCON_MDNS_SERVICE_PROTOCOL "tcp"
 #define DIRCON_TCP_PORT              8081
-#define OPENBIKECONTROL_MDNS_SERVICE_NAME "_openbikecontrol"
-#define OPENBIKECONTROL_MDNS_SERVICE_PROTOCOL "tcp"
 #define DIRCON_MAX_CLIENTS           1
 #define DIRCON_RECEIVE_BUFFER_SIZE   256
 #define DIRCON_SEND_BUFFER_SIZE      256
@@ -43,6 +41,7 @@ struct Subscription {
 
 // Write handler callback: returns true if the characteristic was handled by this service
 typedef bool (*DirConWriteHandler)(NimBLECharacteristic* characteristic, const uint8_t* data, size_t length, DirConWriteResult* result);
+typedef void (*DirConAdvertiseHandler)(const NimBLEUUID& serviceUuid);
 
 class DirConManager {
  public:
@@ -52,7 +51,7 @@ class DirConManager {
 
   // Register a BLE service with DirCon for discovery and optional write handling.
   // Services call this during setup. Write handler may be nullptr for read-only/notify-only services.
-  static void registerService(const NimBLEUUID& serviceUuid, DirConWriteHandler writeHandler = nullptr);
+  static void registerService(const NimBLEUUID& serviceUuid, DirConWriteHandler writeHandler = nullptr, DirConAdvertiseHandler advertiseHandler = nullptr);
 
   // Notify DirCon clients about BLE characteristic changes
   static void notifyCharacteristic(const NimBLEUUID& serviceUuid, const NimBLEUUID& characteristicUuid, uint8_t* data, size_t length, bool onlySubscribers = true);
@@ -62,6 +61,7 @@ class DirConManager {
   struct ServiceRegistration {
     NimBLEUUID serviceUuid;
     DirConWriteHandler writeHandler;
+    DirConAdvertiseHandler advertiseHandler;
   };
   static ServiceRegistration registeredServices[DIRCON_MAX_SERVICES];
   static size_t registeredServiceCount;

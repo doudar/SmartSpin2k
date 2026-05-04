@@ -59,6 +59,7 @@ void startBLEServer() {
   // openBikeControlService.setupService(spinBLEServer.pServer);
   pAdvertising->addServiceUUID(CYCLINGPOWERSERVICE_UUID);
   pAdvertising->addServiceUUID(CSCSERVICE_UUID);
+  // Garmin watches won't connect if HR is advertised. 
   // pAdvertising->addServiceUUID(HEARTSERVICE_UUID);
   // Most apps look for the fitness machine service UUID to recognize the device as a smart trainer.
   pAdvertising->addServiceUUID(FITNESSMACHINESERVICE_UUID);
@@ -69,6 +70,7 @@ void startBLEServer() {
   pAdvertising->setAppearance(0x0484);  // Cycling Power Sensor, per https://www.bluetooth.com/specifications/assigned-numbers/generic-access-profile/
   // Put the device name and SmartSpin2k service UUID in the scan response to avoid
   // overflowing the primary ad packet (which already carries manufacturer data + service UUIDs).
+  pAdvertising->setName(userConfig->getDeviceName()); //Due to cutbacks in other data, adding this to primary advertisement for now as well.
   oScanResponseData.setName(userConfig->getDeviceName());
   oScanResponseData.setCompleteServices(SMARTSPIN2K_SERVICE_UUID);
   pAdvertising->setScanResponseData(oScanResponseData);

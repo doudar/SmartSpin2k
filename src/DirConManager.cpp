@@ -8,7 +8,6 @@
 #include "DirConManager.h"
 #include "SS2KLog.h"
 #include <algorithm>
-#include <cctype>
 #include <Constants.h>
 
 #define DIRCON_LOG_TAG "DirConManager"
@@ -29,45 +28,44 @@ size_t DirConManager::registeredServiceCount = 0;
 // Static buffer to store the list of UUIDs to avoid dynamic string allocations
 static char uuidListBuffer[128] = "";
 static size_t uuidListLength    = 0;
-static char fullUuidListBuffer[512] = "";
-static size_t fullUuidListLength    = 0;
 
 bool DirConManager::start() {
-  if (!started) {
-    // Initialize buffers
-    for (int i = 0; i < DIRCON_MAX_CLIENTS; i++) {
-      receiveBufferLength[i] = 0;
-      lastSequenceNumber[i]  = 0;
-      for (int j = 0; j < DIRCON_MAX_CHARACTERISTICS; j++) {
-        clientSubscriptions[i][j].active = false;
-      }
-    }
-
-    // Setup MDNS service
-    setupMDNS();
-
-    // Create TCP server
-    tcpServer = new WiFiServer(DIRCON_TCP_PORT);
-    if (tcpServer == nullptr) {
-      SS2K_LOG(DIRCON_LOG_TAG, "Failed to create TCP server");
-      return false;
-    }
-
-    tcpServer->begin();
-
-    started = true;
-
-    // Registered services have been stored before DirCon starts.
-    // Now that we're started, publish them to MDNS.
-    for (size_t i = 0; i < registeredServiceCount; i++) {
-      addBleServiceUuid(registeredServices[i].serviceUuid);
-    }
-
-    updateStatusMessage();
-    SS2K_LOG(DIRCON_LOG_TAG, "%s", statusMessage.c_str());
+  if (started) {
     return true;
   }
-  return false;
+
+  // Initialize buffers
+  for (int i = 0; i < DIRCON_MAX_CLIENTS; i++) {
+    receiveBufferLength[i] = 0;
+    lastSequenceNumber[i]  = 0;
+    for (int j = 0; j < DIRCON_MAX_CHARACTERISTICS; j++) {
+      clientSubscriptions[i][j].active = false;
+    }
+  }
+
+  // Setup MDNS service
+  setupMDNS();
+
+  // Create TCP server
+  tcpServer = new WiFiServer(DIRCON_TCP_PORT);
+  if (tcpServer == nullptr) {
+    SS2K_LOG(DIRCON_LOG_TAG, "Failed to create TCP server");
+    return false;
+  }
+
+  tcpServer->begin();
+
+  started = true;
+
+  // Registered services have been stored before DirCon starts.
+  // Now that we're started, publish them to MDNS.
+  for (size_t i = 0; i < registeredServiceCount; i++) {
+    addBleServiceUuid(registeredServices[i].serviceUuid);
+  }
+
+  updateStatusMessage();
+  SS2K_LOG(DIRCON_LOG_TAG, "%s", statusMessage.c_str());
+  return true;
 }
 
 void DirConManager::stop() {
@@ -133,7 +131,6 @@ void DirConManager::setupMDNS() {
   // Static buffers for strings to avoid repeated allocations
   static char macAddress[18];    // MAC format: 11:22:33:44:55:66\0
   static char serialNumber[12];  // SS2K-112233445566\0
-  static char obcId[13];         // aabbccddeeff\0
 
   // Get device MAC address using existing buffer
   strcpy(macAddress, WiFi.macAddress().c_str());
@@ -143,15 +140,6 @@ void DirConManager::setupMDNS() {
       *p = '-';
     }
   }
-
-  // Build OpenBikeControl id from MAC without separators
-  size_t out = 0;
-  for (size_t i = 0; macAddress[i] != '\0' && out < sizeof(obcId) - 1; i++) {
-    if (macAddress[i] != '-') {
-      obcId[out++] = static_cast<char>(tolower(static_cast<unsigned char>(macAddress[i])));
-    }
-  }
-  obcId[out] = '\0';
 
   // Create a unique serial number (using MAC address), and remove the dashes and change the letters to decimal numbers.
   snprintf(serialNumber, sizeof(serialNumber), "%02X%02X%02X%02X%02X%02X", macAddress[0], macAddress[1], macAddress[3], macAddress[4], macAddress[6], macAddress[7]);
@@ -173,24 +161,10 @@ void DirConManager::setupMDNS() {
   // Initially empty, will be updated when BLE is initialized
   MDNS.addServiceTxt(DIRCON_MDNS_SERVICE_NAME, DIRCON_MDNS_SERVICE_PROTOCOL, "ble-service-uuids", "");
 
-  // Add OpenBikeControl mDNS service advertisement
-  SS2K_LOG(DIRCON_LOG_TAG, "Adding OpenBikeControl MDNS service: %s.%s on port %d", OPENBIKECONTROL_MDNS_SERVICE_NAME, OPENBIKECONTROL_MDNS_SERVICE_PROTOCOL,
-           DIRCON_TCP_PORT);
-  if (MDNS.addService(OPENBIKECONTROL_MDNS_SERVICE_NAME, OPENBIKECONTROL_MDNS_SERVICE_PROTOCOL, DIRCON_TCP_PORT)) {
-    MDNS.addServiceTxt(OPENBIKECONTROL_MDNS_SERVICE_NAME, OPENBIKECONTROL_MDNS_SERVICE_PROTOCOL, "version", "1");
-    MDNS.addServiceTxt(OPENBIKECONTROL_MDNS_SERVICE_NAME, OPENBIKECONTROL_MDNS_SERVICE_PROTOCOL, "id", static_cast<const char *>(obcId));
-    MDNS.addServiceTxt(OPENBIKECONTROL_MDNS_SERVICE_NAME, OPENBIKECONTROL_MDNS_SERVICE_PROTOCOL, "name", userConfig->getDeviceName());
-    MDNS.addServiceTxt(OPENBIKECONTROL_MDNS_SERVICE_NAME, OPENBIKECONTROL_MDNS_SERVICE_PROTOCOL, "service-uuids", "");
-    MDNS.addServiceTxt(OPENBIKECONTROL_MDNS_SERVICE_NAME, OPENBIKECONTROL_MDNS_SERVICE_PROTOCOL, "manufacturer", "SmartSpin2k");
-    MDNS.addServiceTxt(OPENBIKECONTROL_MDNS_SERVICE_NAME, OPENBIKECONTROL_MDNS_SERVICE_PROTOCOL, "model", "SmartSpin2k");
-  } else {
-    SS2K_LOG(DIRCON_LOG_TAG, "Failed to add OpenBikeControl MDNS service");
-  }
-
   SS2K_LOG(DIRCON_LOG_TAG, "DirCon MDNS service setup complete");
 }
 
-void DirConManager::registerService(const NimBLEUUID& serviceUuid, DirConWriteHandler writeHandler) {
+void DirConManager::registerService(const NimBLEUUID& serviceUuid, DirConWriteHandler writeHandler, DirConAdvertiseHandler advertiseHandler) {
   if (registeredServiceCount >= DIRCON_MAX_SERVICES) {
     SS2K_LOG(DIRCON_LOG_TAG, "Warning: Cannot register service, max services (%d) reached", DIRCON_MAX_SERVICES);
     return;
@@ -198,6 +172,7 @@ void DirConManager::registerService(const NimBLEUUID& serviceUuid, DirConWriteHa
 
   registeredServices[registeredServiceCount].serviceUuid  = serviceUuid;
   registeredServices[registeredServiceCount].writeHandler = writeHandler;
+  registeredServices[registeredServiceCount].advertiseHandler = advertiseHandler;
   registeredServiceCount++;
 
   SS2K_LOG(DIRCON_LOG_TAG, "Registered service %s (write handler: %s)", serviceUuid.toString().c_str(), writeHandler ? "yes" : "no");
@@ -217,8 +192,6 @@ void DirConManager::addBleServiceUuid(const NimBLEUUID& serviceUuid) {
   // Get the 16-bit UUID string representation
   std::string uuidStr   = uuid.to16().toString();
   const char* shortUuid = uuidStr.c_str();
-  std::string fullUuidStr = serviceUuid.toString();
-  const char* fullUuid    = fullUuidStr.c_str();
 
   if (strstr(uuidListBuffer, shortUuid) == nullptr) {
     // Calculate if we have enough space for the UUID plus a comma
@@ -245,20 +218,9 @@ void DirConManager::addBleServiceUuid(const NimBLEUUID& serviceUuid) {
     }
   }
 
-  // Maintain full UUID list for OpenBikeControl mDNS TXT record.
-  if (strstr(fullUuidListBuffer, fullUuid) == nullptr) {
-    size_t fullUuidLen      = strlen(fullUuid);
-    bool needFullUuidComma  = (fullUuidListLength > 0);
-    size_t fullRequiredSize = fullUuidLen + (needFullUuidComma ? 1 : 0);
-    if (fullUuidListLength + fullRequiredSize < sizeof(fullUuidListBuffer) - 1) {
-      if (needFullUuidComma) {
-        fullUuidListBuffer[fullUuidListLength++] = ',';
-      }
-      strcpy(&fullUuidListBuffer[fullUuidListLength], fullUuid);
-      fullUuidListLength += fullUuidLen;
-      MDNS.addServiceTxt(OPENBIKECONTROL_MDNS_SERVICE_NAME, OPENBIKECONTROL_MDNS_SERVICE_PROTOCOL, "service-uuids", (const char*)fullUuidListBuffer);
-    } else {
-      SS2K_LOG(DIRCON_LOG_TAG, "Warning: Not enough space to add full UUID %s", fullUuid);
+  for (size_t i = 0; i < registeredServiceCount; i++) {
+    if (registeredServices[i].advertiseHandler != nullptr && registeredServices[i].serviceUuid.equals(serviceUuid)) {
+      registeredServices[i].advertiseHandler(serviceUuid);
     }
   }
 }
