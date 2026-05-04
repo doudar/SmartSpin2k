@@ -122,7 +122,7 @@ void CyclePowerData::decode(uint8_t *data, size_t length) {
       // This casting behavior makes sure the roll over works correctly. Unit tests confirm
       const float crankChange = (uint16_t)((this->crankRev - this->lastCrankRev) * 1024);
       const float timeElapsed = (uint16_t)(this->crankEventTime - this->lastCrankEventTime);
-      float cadence           = (crankChange / timeElapsed) * 60;
+      float cadence           = std::round((crankChange / timeElapsed) * 60);  // cadence in RPM
       if (cadence > 1) {
         if (cadence > 200) {  // Human is unlikely producing 200+ cadence
           // Cadence Error: Could happen if cadence measurements were missed

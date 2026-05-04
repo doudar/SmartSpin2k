@@ -10,6 +10,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Added
 
 ### Changed
+- Adjusted BLE advertising to present SmartSpin2k as a cycling power sensor for improved Garmin discovery and pairing.
+- Updated BLE setup to use a public device address for Garmin compatibility.
 
 ### Hardware
 
@@ -20,6 +22,95 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
  - links card update
+## [26.5.2]
+
+### Added
+- Added CoolStep support for StealthChop stepper operation.
+
+### Changed
+- Improved StallGuard homing reliability with trimmed SG baseline sampling, threshold drift recovery, and stricter multi-tap end stop confirmation.
+- Disable CoolStep during StallGuard homing to keep homing current behavior more consistent.
+
+### Hardware
+
+
+## [26.4.5]
+
+### Added
+
+### Changed
+
+### Hardware
+
+
+## [26.1.31]
+
+### Added
+
+### Changed
+
+### Hardware
+
+
+## [26.1.22]
+
+### Added
+
+### Changed
+
+### Hardware
+- Added Sole SB1200
+- Batch reduced image sizes of reference photos. 
+
+
+## [26.1.10]
+
+### Added
+
+### Changed
+- Updated BLE scan results to include connected devices when using "ANY" wildcard.
+- Added feed forward, disabled PowerTable for ERG lookup. 
+- Added tests and removal of duplicates in pt column. 
+- Added removal of negative numbers in pt table. 
+- Refined ERG mode (stateful increase/decrease handling, smarter wait timers, improved PID logging).
+- Adjusted FTMS resistance handling: ignore malformed IC Bike ranges, log raw range data, and skip IC Bike resistance samples.
+- Rounded cadence/power calculations across CSC, CyclePower, Peloton, FTMS decoding; clamp invalid cadence values.
+- Applied rounding for FTMS shift targets/resistance mapping and homing thresholds; use fabs in resistance model and paused duplicate cleanup.
+- Fixed ERG mode logic to use correct watt increment and PID window for target calculation.
+- Improved power table result validation during ERG mode transitions.
+- Reset target incline to 1.0 when spinning stops in ERG mode.
+
+### Hardware
+
+
+## [25.12.28]
+
+### Added
+
+### Changed
+- Removed >0 watts requirement to compute ERG.
+- Filter cadence for crazy values. Only >0 && <250 now accepted.
+- Filter watts for crazy values. Only >0 && <3000 now accepted. 
+- Fixed bug where scans may not happen even when configured devices aren't connected.  
+- Worked with Mark Roy to tune PID.
+- Added proper rounding from float to int for power and cadence.
+- More ERG tweaks for Marc Roy. 
+- If homed, we throw out negative PowerTable returns. 
+- After startup homing, set gear 8.
+
+### Hardware
+
+
+## [25.12.17]
+
+### Added
+
+### Changed
+ - Links card update.
+ - Removed indications from Control Point Characteristic to make Zwift on Android happy. 
+ - IC4 reported HR won't override other HRM.
+ - Improved ERG response for homed tables.
+ - Slightly faster Peloton bike + homing.
 
 ### Hardware
 
@@ -930,4 +1021,4 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Holding both shifters for 3 seconds after boot preforms a BLE device scan/reconnect.
 
 - Bugfixes:
-- Automatic Updates setting switch now works :)
+- Automatic Updates setting switch now works :
