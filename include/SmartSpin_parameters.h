@@ -22,6 +22,8 @@ class Measurement {
   bool simulate;
   int value;
   int target;
+  int min;
+  int max;
   unsigned long timestamp;
 
  public:
@@ -41,6 +43,13 @@ class Measurement {
     target          = tar;
     this->timestamp = millis();
   }
+
+  void setMin(int min) { this->min = min; }
+  int getMin() { return min; }
+
+  void setMax(int max) { this->max = max; }
+  int getMax() { return max; }
+
   int getTarget() { return target; }
 
   long getTimestamp() { return timestamp; }
@@ -49,6 +58,8 @@ class Measurement {
     this->simulate  = false;
     this->value     = 0;
     this->target    = 0;
+    this->min       = 0;
+    this->max       = 0;
     this->timestamp = millis();
   }
 };
@@ -65,6 +76,7 @@ class RuntimeParameters {
   int minResistance    = -DEFAULT_RESISTANCE_RANGE;
   int maxResistance    = DEFAULT_RESISTANCE_RANGE;
   bool simTargetWatts  = false;
+  bool bleLogEnabled   = false;
 
  public:
   Measurement watts;
@@ -102,6 +114,9 @@ class RuntimeParameters {
 
   void setMaxResistance(int max) { maxResistance = max; }
   int getMaxResistance() { return maxResistance; }
+
+  void setBleLogEnabled(bool enabled) { bleLogEnabled = enabled; }
+  bool getBleLogEnabled() { return bleLogEnabled; }
 
   String returnJSON();
 };

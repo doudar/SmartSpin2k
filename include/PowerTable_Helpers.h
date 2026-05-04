@@ -8,13 +8,10 @@
 #pragma once
 
 #include "SmartSpin_parameters.h"
-#include <vector>
 
 #define PTDATA_LOG_TAG "PTData"
 
 #define RETURN_ERROR               INT32_MIN
-#define FREE_HEAP_FOR_COMPLEX_MATH 30000
-#define COMPUTATION_TIMEOUT_MS 25
 
 class PowerEntry {
  public:
@@ -76,21 +73,41 @@ class PTData {
   TableRow tableRow[POWERTABLE_CAD_SIZE];
 };
 
+class ResistanceModel {
+ private:
+  // Coefficients (Normalizing makes these fit in float/double safely)
+  // Model: Z = b0 + b1*x + b2*y + b3*x^2 + b4*y^2 + b5*x*y
+  double b[6]      = {0};
+  bool isQuadratic = false;
+  bool isValid     = false;
+
+  // Normalization bounds (to keep math stable)
+  double minW = 0, maxW = 1;
+  double minR = 0, maxR = 1;
+
+  // Helper: Normalize a value to 0.0 - 1.0 range
+  double normW(double w) { return (w - minW) / (maxW - minW); }
+  double normR(double r) { return (r - minR) / (maxR - minR); }
+  bool solveMatrix(double A[6][6], double B[6], int n);
+
+ public:
+  void fit(const PTData& data);
+  int16_t predict(double watts, double rpm);
+  int predictWatts(int32_t resistance, float cadence);
+  bool getIsValid() { return isValid; }
+};
+
 class PTHelpers {
  public:
+  ResistanceModel resistanceModel;
   int32_t lookup(int watts, int cad, PTData& ptData);
-  float linearExtrapolate(std::pair<std::vector<float>, std::vector<float>> xy, size_t n, float j);
-  int32_t lookupWatts(int cad, int32_t targetPosition, PTData& ptData);
-  int32_t extrapolateCadenceWatts(int cad, float targetPosition, PTData& ptData);
-  int extrapolateWattsFromCadence(int cad, int32_t targetPosition, PTData& ptData);
-    // return number of readings in the table. If minReadings is set, it will only count entries with at least that many readings.
-  int getNumEntries(PTData& ptData, int minReadings = 0);
+  int lookupWatts(int cad, int32_t targetPosition, PTData& ptData);
   int getTotalReadings(PTData& ptData);
   ptIndex calculateIndex(int watts, int cad);
-  void enterData(PTData& ptData,ptIndex index, int pos);
+  void enterData(PTData& ptData, ptIndex index, int pos);
   void clean(PTData& ptData);
+  void fill(PTData& ptData);
+  void fillGaps(PTData& ptData);
   bool fillAllWattColumns(PTData& ptData);
   bool fillAllCadenceLines(PTData& ptData);
-  std::pair<std::vector<float>, std::vector<float>> getRow(int row, PTData& ptData);
-  std::pair<std::vector<float>, std::vector<float>> getColumn(int column, PTData& ptData);
 };

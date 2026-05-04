@@ -88,10 +88,10 @@ void CscSensorData::decode(uint8_t *data, size_t length) {
         // Time is in 1/1024th of a second
         float revolutions = crankRevolutions - lastCrankRevolutions;
         float timeMinutes = (timeDiff / 1024.0f) / 60.0f;
-        float cadence = revolutions / timeMinutes;
+        float cadence = std::round(revolutions / timeMinutes);
         
         if (cadence > 1) {
-          if (cadence > 200) {  // Human is unlikely producing 200+ cadence
+          if (cadence > 200 || cadence < 0) {  // Human is unlikely producing 200+ cadence
             // Cadence Error: Could happen if cadence measurements were missed
             //                Leave cadence unchanged
             cadence = this->cadence;

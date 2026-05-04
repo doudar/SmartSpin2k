@@ -22,7 +22,7 @@ jobs:
 
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v5
+        uses: actions/checkout@v6
         with:
           # fetch-depth overridden internally for Copilot anyway; keep explicit for normal runs
           fetch-depth: 0
@@ -33,7 +33,7 @@ jobs:
           python-version: '3.x'
 
       - name: Cache PlatformIO core and packages
-        uses: actions/cache@v4
+        uses: actions/cache@v5
         with:
           path: |
             ~/.platformio

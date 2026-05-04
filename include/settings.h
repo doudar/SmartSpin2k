@@ -46,7 +46,7 @@ const char* const DEFAULT_PASSWORD = "password";
 // into actual stepper steps that move the stepper motor. It takes 2,181.76 steps to rotate the knob 1 full revolution. with hardware version 1.
 // Incline_Multiplier may be able to be removed in the future by dividing ShiftSteps by ~200 to get this value but we're not quite ready
 // to make that commitment yet.
-#define INCLINE_MULTIPLIER 5.0f
+#define INCLINE_MULTIPLIER 7.0f
 
 // Minumum value for power correction factor user setting
 #define MIN_PCF .5f
@@ -67,11 +67,17 @@ const char* const DEFAULT_PASSWORD = "password";
 // Stepper Max Speed in steps/s
 #define DEFAULT_STEPPER_SPEED 3500
 
+// Stepper Hold Power Scaler. Divides the RMS current to get hold current.
+#define HOLD_PWR_SCALER .3f
+
+// Power Scaler for Homing. Reduces the power during homing to improve stall detection.
+#define PWR_SCALER_FOR_HOMING 0.8f
+
 // Default ERG Sensitivity. Predicated on # of Shifts (further defined by shift steps) per 30 watts of resistance change.
 // I.E. If the difference between ERG target and Current watts were 30, and the Shift step is defined as 600 steps,
 // and ERG_Sensitivity were 1.0, ERG mode would move the stepper motor 600 steps to compensate. With an ERG_Sensitivity of 2.0, the stepper
 // would move 1200 steps to compensate, however ERG_Sensitivity values much different than 1.0 imply shiftStep has been improperly configured.
-#define ERG_SENSITIVITY 5.0f
+#define ERG_SENSITIVITY 3.0f
 
 // Number of watts per shift expected by ERG mode for it's calculation. The user should target this number by adjusting Shift Step until WATTS_PER_SHIFT
 // is obtained as closely as possible during each shift.
@@ -95,7 +101,7 @@ const char* const DEFAULT_PASSWORD = "password";
 
 // Default Max Watts that the brake on the spin bike can absorb from the user.
 // This is used to set the upper travel limit for the motor.
-#define DEFAULT_MAX_WATTS 1400
+#define DEFAULT_MAX_WATTS 1000
 
 // Minimum resistance on a Peloton Bike.
 // This is used to set the lower travel limit for the motor.
@@ -201,7 +207,7 @@ const char* const DEFAULT_PASSWORD = "password";
 #define SERIAL_PORT stepperSerial
 
 // Match to your driver
-#define R_SENSE 0.11f
+#define R_SENSE 0.08f
 
 // Hardware pin for indicator LED *note* internal LED on esp32 Dev board is pin
 // 2
@@ -270,11 +276,14 @@ constexpr const char* ANY = "any";
 // Uncomment to use guardrails for ERG mode in the stepper loop.
 #define ERG_GUARDRAILS
 
-//Uncomment to enable the use of the power table for ERG mode.
+// Uncomment to enable the use of the power table for ERG mode.
 #define ERG_MODE_USE_POWER_TABLE
 
 // Uncomment to use the PID controller for ERG mode.
 #define ERG_MODE_USE_PID
+
+// Window where ERG mode will use PID instead of Power Table for initial changes.
+#define ERG_MODE_PID_WINDOW 20
 
 // PowerTable Version
 #define TABLE_VERSION 6
@@ -355,7 +364,7 @@ constexpr const char* ANY = "any";
 #define BLE_CLIENT_STACK 6000 //Scans and connects to BLE devices. Holds the BLE Notify Data. 
 
 // Uncomment to enable stack size debugging info
-#define DEBUG_STACK
+// #define DEBUG_STACK
 
 // Uncomment to enable HR->PWR debugging info. Always displays HR->PWR
 // Calculation. Never sets userConfig->setSimulatedPower();

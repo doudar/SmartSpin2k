@@ -1,4 +1,4 @@
-<img src="https://raw.githubusercontent.com/doudar/SmartSpin2k/develop/Pictures/ss2k_wiki_banner.png" alt="ss2k banner" height="124">
+<img src="https://raw.githubusercontent.com/doudar/SS2k-Hardware/main/Pictures/ss2k_wiki_banner.png" alt="ss2k banner" height="124">
 
 # You can visit us at [Facebook](https://www.facebook.com/groups/716297469953492/)
 # Did you know there's a SmartSpin2k companion App?
@@ -22,7 +22,7 @@ Or for Android devices:
 # About
 SmartSpin2k is a DIY project that allows you to turn any spin bike into a smart trainer. With SmartSpin2k, you can connect your spin bike to Zwift, TrainerRoad, or other popular training apps. This allows you to control your bike's resistance automatically, track your performance, and compete with other riders online.
 
-SmartSpin2k is easy to build and requires only a few simple tools. The [entire build process](https://github.com/doudar/SmartSpin2k/blob/develop/SS2kR3BuildingInstructions.pdf) can be completed in under an hour.
+SmartSpin2k is easy to build and requires only a few simple tools. The [entire build process](https://github.com/doudar/SS2k-Hardware/blob/main/SS2kR3BuildingInstructions.pdf) can be completed in under an hour.
 
 If you are looking for a way to turn your spin bike into a smart trainer, SmartSpin2k is the perfect solution. With its new features and improvements, SmartSpin2k rev 3 is the best version yet.
 
@@ -34,7 +34,7 @@ To get started with SmartSpin2k, you will need the following:
 * A 3D printer.
 * A soldering iron and basic soldering skills.
 
-Once you have these materials, you can follow the [these instructions](https://github.com/doudar/SmartSpin2k/blob/develop/SS2kR3BuildingInstructions.pdf) to build your own SmartSpin2k. If you'd prefer to buy a pre-assembled kit, we have them for sale at [SmartSpin2k.com](https://www.smartspin2k.com/purchase-kits) 
+Once you have these materials, you can follow the [these instructions](https://github.com/doudar/SS2k-Hardware/blob/main/SS2kR3BuildingInstructions.pdf) to build your own SmartSpin2k. If you'd prefer to buy a pre-assembled kit, we have them for sale at [SmartSpin2k.com](https://www.smartspin2k.com/purchase-kits) 
 
 ## Features
 
@@ -51,6 +51,7 @@ SmartSpin2k is a great way to turn any spin bike into a smart trainer. With its 
 
 ### Documentation
 Everything you need to know is in the [SS2K Wiki](https://github.com/doudar/SmartSpin2k/wiki)
+Hardware files and build assets are in [SS2k-Hardware](https://github.com/doudar/SS2k-Hardware).
 
 ## Contributing
 1. Install Microsoft Visual Code. https://code.visualstudio.com/
@@ -65,9 +66,9 @@ Everything you need to know is in the [SS2K Wiki](https://github.com/doudar/Smar
 If you experience an issue after upgrading firmware, please follow these instructions in the Wiki. Flashing instructions are available [HERE.](https://github.com/doudar/SmartSpin2k/wiki/Loading-Software)
 
 ## Licensing
-The hardware designs in this project are licensed under the [CERN Open Hardware License Version 2 - Permissive license](Hardware/LICENSE).
+The hardware designs are licensed under the [CERN Open Hardware License Version 2 - Permissive license](https://github.com/doudar/SS2k-Hardware/blob/main/Hardware/LICENSE).
 The software in this project is licensed under the [GNU GENERAL PUBLIC LICENSE Version 2, June 1991 license](LICENSE).
 
-<img src="Pictures/Schwinn_IC4_MOD.png" alt="Hardware 2.0"/> 
+<img src="https://raw.githubusercontent.com/doudar/SS2k-Hardware/main/Pictures/Schwinn_IC4_MOD.png" alt="Hardware 2.0"/> 
 
-[_^^@eMadman's IC4 model_](https://github.com/doudar/SmartSpin2k/tree/develop/Hardware/MODS/Case%20V2%20-%20Schwinn%20IC4%20Mod)
+[_^^@eMadman's IC4 model_](https://github.com/doudar/SS2k-Hardware/tree/main/Hardware/V2%20-%20Through%20Hole/Direct%20Mount)

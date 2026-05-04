@@ -7,6 +7,8 @@
 
 #pragma once
 
+#include <array>
+
 // The .xml file is wrong, make sure to reference the actual FTMS .pdf
 struct FitnessMachineIndoorBikeDataFlags {
   enum Types : uint16_t {
@@ -232,6 +234,9 @@ inline CyclingPowerFeatureFlags::Types operator|(CyclingPowerFeatureFlags::Types
 
 class CyclingPowerMeasurement {
  public:
+  static constexpr size_t MaxPayloadLength = 14;
+  using Buffer                            = std::array<uint8_t, MaxPayloadLength>;
+
   // Flags definition as per specification
   struct Flags {
     uint16_t pedalPowerBalancePresent : 1;
@@ -260,38 +265,52 @@ class CyclingPowerMeasurement {
   uint16_t cumulativeCrankRevolutions;
   uint16_t lastCrankEventTime;
 
-  std::vector<uint8_t> toByteArray() {
-    std::vector<uint8_t> data;
-    // Add flags to data vector
-    data.push_back(static_cast<uint8_t>(*(reinterpret_cast<uint16_t*>(&flags)) & 0xFF));
-    data.push_back(static_cast<uint8_t>((*(reinterpret_cast<uint16_t*>(&flags)) >> 8) & 0xFF));
+  size_t toByteArray(Buffer& data) const {
+    size_t offset       = 0;
+    uint16_t flagBits   = 0;
+    flagBits           |= flags.pedalPowerBalancePresent ? (1U << 0) : 0;
+    flagBits           |= flags.pedalPowerBalanceReference ? (1U << 1) : 0;
+    flagBits           |= flags.accumulatedTorquePresent ? (1U << 2) : 0;
+    flagBits           |= flags.accumulatedTorqueSource ? (1U << 3) : 0;
+    flagBits           |= flags.wheelRevolutionDataPresent ? (1U << 4) : 0;
+    flagBits           |= flags.crankRevolutionDataPresent ? (1U << 5) : 0;
+    flagBits           |= flags.extremeForceMagnitudesPresent ? (1U << 6) : 0;
+    flagBits           |= flags.extremeTorqueMagnitudesPresent ? (1U << 7) : 0;
+    flagBits           |= flags.extremeAnglesPresent ? (1U << 8) : 0;
+    flagBits           |= flags.topDeadSpotAnglePresent ? (1U << 9) : 0;
+    flagBits           |= flags.bottomDeadSpotAnglePresent ? (1U << 10) : 0;
+    flagBits           |= flags.accumulatedEnergyPresent ? (1U << 11) : 0;
+    flagBits           |= flags.offsetCompensationIndicator ? (1U << 12) : 0;
+
+    data[offset++] = static_cast<uint8_t>(flagBits & 0xFF);
+    data[offset++] = static_cast<uint8_t>((flagBits >> 8) & 0xFF);
 
     // Add Instantaneous Power
-    data.push_back(static_cast<uint8_t>(instantaneousPower & 0xFF));
-    data.push_back(static_cast<uint8_t>((instantaneousPower >> 8) & 0xFF));
+    data[offset++] = static_cast<uint8_t>(instantaneousPower & 0xFF);
+    data[offset++] = static_cast<uint8_t>((instantaneousPower >> 8) & 0xFF);
 
     // Conditional fields based on flags
     if (flags.wheelRevolutionDataPresent) {
       // Add wheel revolution data if present
-      data.push_back(static_cast<uint8_t>(cumulativeWheelRevolutions & 0xFF));
-      data.push_back(static_cast<uint8_t>((cumulativeWheelRevolutions >> 8) & 0xFF));
-      data.push_back(static_cast<uint8_t>((cumulativeWheelRevolutions >> 16) & 0xFF));
-      data.push_back(static_cast<uint8_t>((cumulativeWheelRevolutions >> 24) & 0xFF));
+      data[offset++] = static_cast<uint8_t>(cumulativeWheelRevolutions & 0xFF);
+      data[offset++] = static_cast<uint8_t>((cumulativeWheelRevolutions >> 8) & 0xFF);
+      data[offset++] = static_cast<uint8_t>((cumulativeWheelRevolutions >> 16) & 0xFF);
+      data[offset++] = static_cast<uint8_t>((cumulativeWheelRevolutions >> 24) & 0xFF);
 
-      data.push_back(static_cast<uint8_t>(lastWheelEventTime & 0xFF));
-      data.push_back(static_cast<uint8_t>((lastWheelEventTime >> 8) & 0xFF));
+      data[offset++] = static_cast<uint8_t>(lastWheelEventTime & 0xFF);
+      data[offset++] = static_cast<uint8_t>((lastWheelEventTime >> 8) & 0xFF);
     }
     // Conditional fields based on flags
     if (flags.crankRevolutionDataPresent) {
       // Add crank revolution data if present
-      data.push_back(static_cast<uint8_t>(cumulativeCrankRevolutions & 0xFF));
-      data.push_back(static_cast<uint8_t>((cumulativeCrankRevolutions >> 8) & 0xFF));
+      data[offset++] = static_cast<uint8_t>(cumulativeCrankRevolutions & 0xFF);
+      data[offset++] = static_cast<uint8_t>((cumulativeCrankRevolutions >> 8) & 0xFF);
 
-      data.push_back(static_cast<uint8_t>(lastCrankEventTime & 0xFF));
-      data.push_back(static_cast<uint8_t>((lastCrankEventTime >> 8) & 0xFF));
+      data[offset++] = static_cast<uint8_t>(lastCrankEventTime & 0xFF);
+      data[offset++] = static_cast<uint8_t>((lastCrankEventTime >> 8) & 0xFF);
     }
 
-    return data;
+    return offset;
   }
 };
 
@@ -312,6 +331,9 @@ inline CyclingSpeedCadenceFeatureFlags::Types operator|(CyclingSpeedCadenceFeatu
 
 class CscMeasurement {
  public:
+  static constexpr size_t MaxPayloadLength = 11;
+  using Buffer                            = std::array<uint8_t, MaxPayloadLength>;
+
   // Flags definition as per specification
   struct Flags {
     uint8_t wheelRevolutionDataPresent : 1;
@@ -330,33 +352,35 @@ class CscMeasurement {
     *(reinterpret_cast<uint8_t*>(&flags)) = 0;
   }
 
-  std::vector<uint8_t> toByteArray() {
-    std::vector<uint8_t> data;
+  size_t toByteArray(Buffer& data) const {
+    size_t offset     = 0;
+    uint8_t flagBits  = 0;
+    flagBits         |= flags.wheelRevolutionDataPresent ? (1U << 0) : 0;
+    flagBits         |= flags.crankRevolutionDataPresent ? (1U << 1) : 0;
 
-    // Add flags to data vector
-    data.push_back(*(reinterpret_cast<uint8_t*>(&flags)));
+    data[offset++] = flagBits;
 
     // Conditional fields based on flags
     if (flags.wheelRevolutionDataPresent) {
       // Add wheel revolution data if present
       for (int i = 0; i < 4; ++i) {
-        data.push_back((cumulativeWheelRevolutions >> (i * 8)) & 0xFF);
+        data[offset++] = static_cast<uint8_t>((cumulativeWheelRevolutions >> (i * 8)) & 0xFF);
       }
       for (int i = 0; i < 2; ++i) {
-        data.push_back((lastWheelEventTime >> (i * 8)) & 0xFF);
+        data[offset++] = static_cast<uint8_t>((lastWheelEventTime >> (i * 8)) & 0xFF);
       }
     }
 
     if (flags.crankRevolutionDataPresent) {
       // Add crank revolution data if present
       for (int i = 0; i < 2; ++i) {
-        data.push_back((cumulativeCrankRevolutions >> (i * 8)) & 0xFF);
+        data[offset++] = static_cast<uint8_t>((cumulativeCrankRevolutions >> (i * 8)) & 0xFF);
       }
       for (int i = 0; i < 2; ++i) {
-        data.push_back((lastCrankEventTime >> (i * 8)) & 0xFF);
+        data[offset++] = static_cast<uint8_t>((lastCrankEventTime >> (i * 8)) & 0xFF);
       }
     }
 
-    return data;
+    return offset;
   }
 };

@@ -18,6 +18,7 @@ JLL|IC400|Any|35-45
 Joroto|X2|Any|20
 LeMond|RevMaster|Any|75
 Life Fitness|ICG 8|Any|35-60
+Merach|Any|Any|70
 Peloton|Bike|Any|75 (90 for slammed bars)
 PooBoo|?|Any|60-80
 PooBoo|616M2|Any|50

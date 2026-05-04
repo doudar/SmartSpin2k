@@ -76,6 +76,8 @@ From BLE_common.h
 |BLE_targetPosition        |0x19   |int36|Position (in steps) the motor is maintaining.      |
 |BLE_externalControl       |0x1A   |bool |01 disables internal calculation of targetPosition.|
 |BLE_syncMode              |0x1B   |bool |01 stops motor movement for external calibration   |
+|BLE_UDPLogging            |0x2E   |bool |Enable/disable UDP log streaming                   |
+|BLE_BLELogging            |0x30   |bool/str|Write: enable/disable BLE log streaming. Read: returns last log message|
 
 *syncMode will disable the movement of the stepper motor by forcing stepperPosition = targetPosition prior to the motor control. While this mode is enabled, it allows the client to set parameters like incline and shifterPosition without moving the motor from it's current position. Once the parameters are set, this mode should be turned back off and SS2K will resume normal operation.
 

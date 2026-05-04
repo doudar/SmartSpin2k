@@ -121,4 +121,5 @@
     ],
     "idf.pythonInstallPath": "C:\\Users\\anthony\\.espressif\\tools\\idf-python\\3.11.2\\python.exe",
     "idf.flashType": "UART",
+    "liveServer.settings.port": 5501,
 }
