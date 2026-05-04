@@ -88,7 +88,7 @@ jobs:
           name: all-artifacts
           path: SmartSpin2kFirmware-${{ steps.date.outputs.date }}.bin.zip
       - name: Download Artifacts
-        uses: actions/download-artifact@v5
+        uses: actions/download-artifact@v6
         with:
           name: all-artifacts
       - name: Get tag info
