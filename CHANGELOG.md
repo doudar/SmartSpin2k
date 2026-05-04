@@ -16,6 +16,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Hardware
 
 
+## [25.12.11]
+
+### Added
+
+### Changed
+ - links card update
 ## [26.5.2]
 
 ### Added
