@@ -23,7 +23,7 @@ void TestWritePowerTable::test_save_and_load(void) {
   PTData ptData;
 
   // Load the power table data from the source .ptab file
-  const std::string inputFilePath = "test/data/power_table.ptab";
+  const std::string inputFilePath = "test/data/Nebula3.ptab";
   loadCSVToPTData(inputFilePath, ptData);
   logFile << "Loaded power table from: " << inputFilePath << "\n";
 

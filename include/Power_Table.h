@@ -17,7 +17,6 @@ class PowerTable {
  public:
   bool saveFlag                  = false;
   bool _hasBeenLoadedThisSession = false;
-  bool fillTableFlag           = false;
 
   PTData ptData;
   PTHelpers ptHelpers;

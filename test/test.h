@@ -37,11 +37,6 @@ class TestPTLookupWatts {
    static void test_pt_lookup_watts(void);
  };
 
-class TestLinearExtrapolate {
-  public:
-   static void test_linear_extrapolate(void);
-};
-
 class TestWritePowerTable {
   public:
     static void test_save_and_load(void);

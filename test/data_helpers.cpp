@@ -13,9 +13,16 @@
 #include <sstream>
 #include <string>
 #include <vector>
-#include <io.h>      // For _findfirst, _findnext, _findclose
-#include <direct.h>  // For _mkdir, _rmdir
 #include <algorithm> // For std::sort
+
+#ifdef _WIN32
+  #include <io.h>      // For _findfirst, _findnext, _findclose
+  #include <direct.h>  // For _mkdir, _rmdir
+#else
+  #include <dirent.h>  // For opendir, readdir, closedir
+  #include <sys/stat.h> // For mkdir
+  #include <unistd.h>  // For rmdir, unlink
+#endif
 
 // Helper function to load CSV data
 static void loadCSVToPTData(const std::string& filePath, PTData& ptData) {
@@ -28,8 +35,15 @@ static void loadCSVToPTData(const std::string& filePath, PTData& ptData) {
     std::string line;
     int rowIndex = 0;
 
-    // Skip the header line
-    std::getline(file, line);
+    // Skip metadata lines (starting with #) and the header line
+    while (std::getline(file, line)) {
+        if (line.empty() || line[0] == '#') {
+            continue; // Skip metadata lines
+        }
+        if (line.find("Cadence/Power") != std::string::npos) {
+            break; // Found and skip the header line
+        }
+    }
 
     while (std::getline(file, line) && rowIndex < POWERTABLE_CAD_SIZE) {
         std::istringstream lineStream(line);
@@ -42,8 +56,10 @@ static void loadCSVToPTData(const std::string& filePath, PTData& ptData) {
         while (std::getline(lineStream, cell, ',') && colIndex < POWERTABLE_WATT_SIZE) {
             if (!cell.empty()) {
                 ptData.tableRow[rowIndex].tableEntry[colIndex].targetPosition = std::stoi(cell);
+                ptData.tableRow[rowIndex].tableEntry[colIndex].readings = 5;  // Assign weight to loaded data
             } else {
                 ptData.tableRow[rowIndex].tableEntry[colIndex].targetPosition = INT16_MIN;
+                ptData.tableRow[rowIndex].tableEntry[colIndex].readings = 0;
             }
             colIndex++;
         }
@@ -63,9 +79,10 @@ static void createPowerTableHeatmap(const std::string& inputFilePath, const std:
     // If addTimeSlider is true, gather all .ptab files in ridedata and prepare their data
     std::vector<std::string> ptabFiles;
     if (addTimeSlider) {
-        // Windows directory scan for .ptab files
-        struct _finddata_t fileinfo;
+        // Directory scan for .ptab files
         std::string dirPath = "test/output/ridedata/";
+#ifdef _WIN32
+        struct _finddata_t fileinfo;
         std::string pattern = dirPath + "*.ptab";
         intptr_t hFile = _findfirst(pattern.c_str(), &fileinfo);
         if (hFile != -1) {
@@ -74,6 +91,19 @@ static void createPowerTableHeatmap(const std::string& inputFilePath, const std:
             } while (_findnext(hFile, &fileinfo) == 0);
             _findclose(hFile);
         }
+#else
+        DIR* dir = opendir(dirPath.c_str());
+        if (dir != nullptr) {
+            struct dirent* entry;
+            while ((entry = readdir(dir)) != nullptr) {
+                std::string filename = entry->d_name;
+                if (filename.size() > 5 && filename.substr(filename.size() - 5) == ".ptab") {
+                    ptabFiles.push_back(dirPath + filename);
+                }
+            }
+            closedir(dir);
+        }
+#endif
         // Sort files by timestamp in filename (assuming numeric)
         std::sort(ptabFiles.begin(), ptabFiles.end(), [](const std::string& a, const std::string& b) {
             // Extract numeric part from filename
@@ -242,16 +272,21 @@ static void createPowerTableHeatmap(const std::string& inputFilePath, const std:
     htmlFile << "</div>\n";
 
     // Add Y-axis range control HTML *before* the script that uses it
-    htmlFile << "<div style=\"width: 80%; margin: 20px auto; display: flex; flex-direction: column; align-items: center;\">\n";
-    htmlFile << "  <label for=\"yAxisRange\" style=\"margin-bottom: 5px;\">Adjust Y-axis maximum value: <span id=\"yAxisRangeValue\">" << maxValue << "</span></label>\n";
+    htmlFile << "<div style=\"width: 80%; margin: 20px auto; display: flex; flex-direction: column; align-items: center; gap: 8px;\">\n";
+    htmlFile << "  <label for=\"yAxisRange\">Adjust Y-axis maximum value: <span id=\"yAxisRangeValue\">" << maxValue << "</span></label>\n";
     htmlFile << "  <input type=\"range\" id=\"yAxisRange\" min=\"" << minValue + 50 << "\" max=\"" << maxValue + 100 << "\" step=\"10\" value=\"" << maxValue << "\" style=\"width: 50%;\">\n";
+    htmlFile << "  <label style=\"display: flex; align-items: center; gap: 6px; font-size: 0.9rem;\">\n";
+    htmlFile << "    <input type=\"checkbox\" id=\"yAxisLock\"> Lock Y-axis slider\n";
+    htmlFile << "  </label>\n";
     htmlFile << "</div>\n";
 
     // Start script for chart and slider logic
     htmlFile << "<script>\n";
     htmlFile << "  const ctx = document.getElementById('resistanceWattChart');\n";
     htmlFile << "  const yAxisRange = document.getElementById('yAxisRange');\n";
-    htmlFile << "  const yAxisRangeValue = document.getElementById('yAxisRangeValue');\n\n";
+    htmlFile << "  const yAxisRangeValue = document.getElementById('yAxisRangeValue');\n";
+    htmlFile << "  const yAxisLock = document.getElementById('yAxisLock');\n";
+    htmlFile << "  let yAxisLocked = false;\n\n";
 
     // If addTimeSlider, add logic to update chart and table on slider move
     if (addTimeSlider && !ptabFiles.empty()) {
@@ -320,14 +355,16 @@ static void createPowerTableHeatmap(const std::string& inputFilePath, const std:
         htmlFile << "    const datasets = getDatasetFromPTab(ptab);\n";
         htmlFile << "    if (chart) { chart.data.datasets = datasets; chart.update('none'); }\n";
         htmlFile << "    else {\n";
-        htmlFile << "      chart = new Chart(ctx, { type: 'line', data: { datasets }, options: { responsive: true, maintainAspectRatio: false, plugins: { title: { display: true, text: 'Resistance vs. Watts by Cadence', font: { size: 18 } }, legend: { position: 'bottom', labels: { usePointStyle: true } } }, scales: { x: { type: 'linear', title: { display: true, text: 'Watts' }, min: 0, max: " << (POWERTABLE_WATT_SIZE * POWERTABLE_WATT_INCREMENT) << " }, y: { title: { display: true, text: 'Resistance' }, min: minValue, max: maxValue } } } }); }\n";
+        htmlFile << "      chart = new Chart(ctx, { type: 'line', data: { datasets }, options: { responsive: true, maintainAspectRatio: false, plugins: { title: { display: true, text: 'Resistance vs. Watts by Cadence', font: { size: 18 } }, legend: { position: 'bottom', labels: { usePointStyle: true } } }, scales: { x: { type: 'linear', title: { display: true, text: 'Watts' }, min: 0, max: " << (POWERTABLE_WATT_SIZE * POWERTABLE_WATT_INCREMENT) << " }, y: { title: { display: true, text: 'Resistance' }, min: 0, max: maxValue } } } }); }\n";
         htmlFile << "    timeSliderValue.textContent = ptabTimestamps[idx];\n";
-        htmlFile << "    // Also update yAxisRange slider\n";
-        htmlFile << "    yAxisRange.min = minValue + 50;\n";
-        htmlFile << "    yAxisRange.max = maxValue + 100;\n";
-        htmlFile << "    yAxisRange.value = maxValue;\n";
-        htmlFile << "    yAxisRangeValue.textContent = maxValue;\n";
-        htmlFile << "    if (chart) { chart.options.scales.y.max = maxValue; chart.options.scales.y.min = minValue; chart.update('none'); }\n";
+        htmlFile << "    const selectedMax = yAxisLocked ? parseInt(yAxisRange.value) : maxValue;\n";
+        htmlFile << "    if (!yAxisLocked) {\n";
+        htmlFile << "      yAxisRange.min = 50;\n";
+        htmlFile << "      yAxisRange.max = maxValue + 100;\n";
+        htmlFile << "      yAxisRange.value = maxValue;\n";
+        htmlFile << "    }\n";
+        htmlFile << "    yAxisRangeValue.textContent = selectedMax;\n";
+        htmlFile << "    if (chart) { chart.options.scales.y.max = selectedMax; chart.options.scales.y.min = 0; chart.update('none'); }\n";
         htmlFile << "  }\n";
         htmlFile << "  timeSlider.addEventListener('input', function() { updateChartAndTable(this.value); });\n";
         htmlFile << "  updateChartAndTable(0);\n";
@@ -392,24 +429,32 @@ static void createPowerTableHeatmap(const std::string& inputFilePath, const std:
         htmlFile << "    const datasets = getDatasetFromPTab(ptab);\n";
         htmlFile << "    if (chart) { chart.data.datasets = datasets; chart.update('none'); }\n";
         htmlFile << "    else {\n";
-        htmlFile << "      chart = new Chart(ctx, { type: 'line', data: { datasets }, options: { responsive: true, maintainAspectRatio: false, plugins: { title: { display: true, text: 'Resistance vs. Watts by Cadence', font: { size: 18 } }, legend: { position: 'bottom', labels: { usePointStyle: true } } }, scales: { x: { type: 'linear', title: { display: true, text: 'Watts' }, min: 0, max: " << (POWERTABLE_WATT_SIZE * POWERTABLE_WATT_INCREMENT) << " }, y: { title: { display: true, text: 'Resistance' }, min: minValue, max: maxValue } } } }); }\n";
-        htmlFile << "    // Also update yAxisRange slider\n";
-        htmlFile << "    yAxisRange.min = minValue + 50;\n";
-        htmlFile << "    yAxisRange.max = maxValue + 100;\n";
-        htmlFile << "    yAxisRange.value = maxValue;\n";
-        htmlFile << "    yAxisRangeValue.textContent = maxValue;\n";
-        htmlFile << "    if (chart) { chart.options.scales.y.max = maxValue; chart.options.scales.y.min = minValue; chart.update('none'); }\n";
+        htmlFile << "      chart = new Chart(ctx, { type: 'line', data: { datasets }, options: { responsive: true, maintainAspectRatio: false, plugins: { title: { display: true, text: 'Resistance vs. Watts by Cadence', font: { size: 18 } }, legend: { position: 'bottom', labels: { usePointStyle: true } } }, scales: { x: { type: 'linear', title: { display: true, text: 'Watts' }, min: 0, max: " << (POWERTABLE_WATT_SIZE * POWERTABLE_WATT_INCREMENT) << " }, y: { title: { display: true, text: 'Resistance' }, min: 0, max: maxValue } } } }); }\n";
+        htmlFile << "    const selectedMax = yAxisLocked ? parseInt(yAxisRange.value) : maxValue;\n";
+        htmlFile << "    if (!yAxisLocked) {\n";
+        htmlFile << "      yAxisRange.min = 50;\n";
+        htmlFile << "      yAxisRange.max = maxValue + 100;\n";
+        htmlFile << "      yAxisRange.value = maxValue;\n";
+        htmlFile << "    }\n";
+        htmlFile << "    yAxisRangeValue.textContent = selectedMax;\n";
+        htmlFile << "    if (chart) { chart.options.scales.y.max = selectedMax; chart.options.scales.y.min = 0; chart.update('none'); }\n";
         htmlFile << "  }\n";
         htmlFile << "  updateChartAndTable(0);\n";
     }
 
     // Add event listener for range input (y-axis)
     htmlFile << "  function updateYAxisRange() {\n";
+    htmlFile << "    if (yAxisLocked) { return; }\n";
     htmlFile << "    const newMax = parseInt(yAxisRange.value);\n";
     htmlFile << "    yAxisRangeValue.textContent = newMax;\n";
-    htmlFile << "    if (chart) { chart.options.scales.y.max = newMax; chart.update('none'); }\n";
+    htmlFile << "    if (chart) { chart.options.scales.y.max = newMax; chart.options.scales.y.min = 0; chart.update('none'); }\n";
     htmlFile << "  }\n\n";
     htmlFile << "  yAxisRange.addEventListener('input', updateYAxisRange);\n";
+    htmlFile << "  yAxisLock.addEventListener('change', () => {\n";
+    htmlFile << "    yAxisLocked = yAxisLock.checked;\n";
+    htmlFile << "    yAxisRange.disabled = yAxisLocked;\n";
+    htmlFile << "    if (!yAxisLocked) { updateYAxisRange(); }\n";
+    htmlFile << "  });\n";
     htmlFile << "</script>\n";
 
     // HTML footer

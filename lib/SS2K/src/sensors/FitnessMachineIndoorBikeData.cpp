@@ -81,7 +81,7 @@ void FitnessMachineIndoorBikeData::decode(uint8_t *data, size_t length) {
         }
         dataIndex += byteSize;
         value             = convert(value, byteSize, signedFlags[typeIndex]);
-        double_t result   = double_t(static_cast<int>((value * resolutions[typeIndex] * 10) + 0.5)) / 10.0;
+        double_t result   = double_t(static_cast<int>(std::round((value * resolutions[typeIndex] * 10) + 0.5)) / 10.0);
         values[typeIndex] = result;
         continue;
       }

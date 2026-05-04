@@ -53,7 +53,9 @@ class SS2K {
   static void ARDUINO_ISR_ATTR handleUpShift();
   static void ARDUINO_ISR_ATTR handleDownShift();
   static void moveStepper();
-  void _findEndStop(bool moveForward);
+  bool _findEndStop(bool moveForward);
+  void _findFTMSHome(bool bothDirections = false);
+  void _resistanceMove();
 
   // the position the stepper motor will move to
   int32_t getTargetPosition() { return targetPosition; }
@@ -63,13 +65,16 @@ class SS2K {
   int32_t getCurrentPosition() { return currentPosition; }
   void setCurrentPosition(int32_t cp) { currentPosition = cp; }
 
+  int getLastShifterPosition() { return lastShifterPosition; }
+  void setLastShifterPosition(int sp) { lastShifterPosition = sp; }
+
   void resetIfShiftersHeld();
   void startTasks();
   void stopTasks();
   void restartWifi();
   void setupTMCStepperDriver(bool reset = false);
   void updateStepperPower(int pwr = 0);
-  void updateStealthChop();
+  void updateStealthChop(bool coolStepEnabled = true);
   void updateStepperSpeed(int speed = 0);
   void FTMSModeShiftModifier();
   static void rxSerial(void);

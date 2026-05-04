@@ -21,7 +21,27 @@
 #define DIRCON_MAX_CLIENTS           1
 #define DIRCON_RECEIVE_BUFFER_SIZE   256
 #define DIRCON_SEND_BUFFER_SIZE      256
-#define DIRCON_MAX_CHARACTERISTICS   10   // maximum number of characteristics to track for subscriptions
+#define DIRCON_MAX_CHARACTERISTICS   20   // maximum number of characteristics to track for subscriptions
+#define DIRCON_MAX_SERVICES          10   // maximum number of services that can register with DirCon
+
+// Result struct populated by service write handler callbacks
+struct DirConWriteResult {
+  bool updateResponseData;           // If true, response includes characteristic's current value
+  NimBLEUUID autoSubscribeUuids[4];  // UUIDs to auto-subscribe the client to
+  size_t autoSubscribeCount;         // Number of valid entries in autoSubscribeUuids
+
+  DirConWriteResult() : updateResponseData(false), autoSubscribeUuids(), autoSubscribeCount(0) {}
+};
+
+// Subscription entry: stores UUID alongside active flag to avoid hash collisions
+struct Subscription {
+  NimBLEUUID uuid;
+  bool active = false;
+};
+
+// Write handler callback: returns true if the characteristic was handled by this service
+typedef bool (*DirConWriteHandler)(NimBLECharacteristic* characteristic, const uint8_t* data, size_t length, DirConWriteResult* result);
+typedef void (*DirConAdvertiseHandler)(const NimBLEUUID& serviceUuid);
 
 class DirConManager {
  public:
@@ -29,13 +49,23 @@ class DirConManager {
   static void stop();
   static void update();
 
-  // Add a BLE service UUID to DirCon MDNS service
-  static void addBleServiceUuid(const NimBLEUUID& serviceUuid);
+  // Register a BLE service with DirCon for discovery and optional write handling.
+  // Services call this during setup. Write handler may be nullptr for read-only/notify-only services.
+  static void registerService(const NimBLEUUID& serviceUuid, DirConWriteHandler writeHandler = nullptr, DirConAdvertiseHandler advertiseHandler = nullptr);
 
   // Notify DirCon clients about BLE characteristic changes
-  static void notifyCharacteristic(const NimBLEUUID& serviceUuid, const NimBLEUUID& characteristicUuid, uint8_t* data, size_t length);
+  static void notifyCharacteristic(const NimBLEUUID& serviceUuid, const NimBLEUUID& characteristicUuid, uint8_t* data, size_t length, bool onlySubscribers = true);
 
  private:
+  // Service registration
+  struct ServiceRegistration {
+    NimBLEUUID serviceUuid;
+    DirConWriteHandler writeHandler;
+    DirConAdvertiseHandler advertiseHandler;
+  };
+  static ServiceRegistration registeredServices[DIRCON_MAX_SERVICES];
+  static size_t registeredServiceCount;
+
   // Core functionality
   static bool started;
   static String statusMessage;
@@ -56,17 +86,16 @@ class DirConManager {
   static bool processDirConMessage(DirConMessage* message, size_t clientIndex);
   static void sendErrorResponse(uint8_t messageId, uint8_t sequenceNumber, uint8_t errorCode, size_t clientIndex);
   static void sendResponse(DirConMessage* message, size_t clientIndex);
-  static void broadcastNotification(const NimBLEUUID& characteristicUuid, uint8_t* data, size_t length);
+  static void broadcastNotification(const NimBLEUUID& characteristicUuid, uint8_t* data, size_t length, bool onlySubscribers = true);
 
   // Service and characteristic handling
-  static std::vector<NimBLEUUID> getAvailableServices();
+  static void addBleServiceUuid(const NimBLEUUID& serviceUuid);
   static std::vector<NimBLECharacteristic*> getCharacteristics(const NimBLEUUID& serviceUuid);
   static uint8_t getDirConProperties(uint32_t characteristicProperties);
   static NimBLECharacteristic* findCharacteristic(const NimBLEUUID& characteristicUuid);
 
   // Subscription tracking
-  static bool clientSubscriptions[DIRCON_MAX_CLIENTS][DIRCON_MAX_CHARACTERISTICS];  // Simple subscription tracking
-  static size_t charSubscriptionIndex(const NimBLEUUID& characteristicUuid);
+  static Subscription clientSubscriptions[DIRCON_MAX_CLIENTS][DIRCON_MAX_CHARACTERISTICS];
   static void addSubscription(size_t clientIndex, const NimBLEUUID& characteristicUuid);
   static void removeSubscription(size_t clientIndex, const NimBLEUUID& characteristicUuid);
   static void removeAllSubscriptions(size_t clientIndex);

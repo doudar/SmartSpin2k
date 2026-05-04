@@ -83,10 +83,14 @@ This characteristic allows for reading and writing various user configuration pa
 
 */
 
+
 #include <BLE_Common.h>
 #include <Power_Table.h>
 #include <BLE_Custom_Characteristic.h>
 #include <Constants.h>
+#include "BleAppender.h"
+
+extern BleAppender bleAppender;
 
 void BLE_ss2kCustomCharacteristic::setupService(NimBLEServer *pServer) {
   pSmartSpin2kService = spinBLEServer.pServer->createService(SMARTSPIN2K_SERVICE_UUID);
@@ -602,7 +606,7 @@ void BLE_ss2kCustomCharacteristic::process(std::string rxValue) {
       }
       if (rxValue[0] == cc_write) {
         returnValue[0] = cc_success;
-        userConfig->setERGSensitivity((bytes_to_u16(rxValue[3], rxValue[2])) / 10);
+        userConfig->setERGSensitivity((bytes_to_u16(rxValue[3], rxValue[2])) / 10.0);
         LOG_BUF_APPEND("(%f)", userConfig->getERGSensitivity());
       }
     } break;
@@ -814,6 +818,33 @@ void BLE_ss2kCustomCharacteristic::process(std::string rxValue) {
       }
       break;
 
+    case BLE_UDPLogging:  // 0x2E
+      LOG_BUF_APPEND("<-UDPLogging");
+      if (rxValue[0] == cc_read) {
+        returnValue[0] = cc_success;
+        returnValue[2] = (uint8_t)(userConfig->getUdpLogEnabled());
+        returnLength += 1;
+      }
+      if (rxValue[0] == cc_write) {
+        returnValue[0] = cc_success;
+        userConfig->setUdpLogEnabled(rxValue[2]);
+        LOG_BUF_APPEND("(%s)", userConfig->getUdpLogEnabled() ? "true" : "false");
+      }
+      break;
+
+    case BLE_BLELogging:  // 0x30
+      LOG_BUF_APPEND("<-BLELogging");
+      if (rxValue[0] == cc_read) {
+        returnValue[0] = cc_success;
+        returnString   = bleAppender.getLastMessage();
+      }
+      if (rxValue[0] == cc_write) {
+        returnValue[0] = cc_success;
+        rtConfig->setBleLogEnabled(rxValue[2]);
+        LOG_BUF_APPEND("(%s)", rtConfig->getBleLogEnabled() ? "true" : "false");
+      }
+      break;
+
     default:
       LOG_BUF_APPEND("<-Unknown Characteristic");
       returnValue[0] = cc_error;
@@ -994,6 +1025,11 @@ void BLE_ss2kCustomCharacteristic::parseNemit() {
     if (userConfig->getPTab4Pwr()) {
       spinBLEServer.spinDownFlag = 1;
     }
+    return;
+  }
+  if (userConfig->getUdpLogEnabled() != _oldParams.getUdpLogEnabled()) {
+    _oldParams.setUdpLogEnabled(userConfig->getUdpLogEnabled());
+    BLE_ss2kCustomCharacteristic::notify(BLE_UDPLogging);
     return;
   }
 }
