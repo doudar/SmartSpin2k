@@ -25,8 +25,8 @@ void BLE_Cycling_Speed_Cadence::setupService(NimBLEServer *pServer, MyCharacteri
   cscMeasurement->setCallbacks(chrCallbacks);
   pCyclingSpeedCadenceService->start();
 
-  // Add service UUID to DirCon MDNS
-  DirConManager::addBleServiceUuid(pCyclingSpeedCadenceService->getUUID());
+  // Register with DirCon for service discovery
+  DirConManager::registerService(pCyclingSpeedCadenceService->getUUID());
 }
 
 void BLE_Cycling_Speed_Cadence::update() {
@@ -49,18 +49,18 @@ void BLE_Cycling_Speed_Cadence::update() {
   csc.cumulativeCrankRevolutions = spinBLEClient.cscCumulativeCrankRev;
   csc.lastCrankEventTime         = spinBLEClient.cscLastCrankEvtTime;
 
-  auto byteArray = csc.toByteArray();
+  CscMeasurement::Buffer byteArray;
+  const size_t byteArrayLength = csc.toByteArray(byteArray);
 
   // Notify the cycling power measurement characteristic
   // Need to set the value before notifying so that read works correctly.
-  cscMeasurement->setValue(&byteArray[0], byteArray.size());
+  cscMeasurement->setValue(byteArray.data(), byteArrayLength);
   cscMeasurement->notify();
 
   const int kLogBufCapacity = 150;
   char logBuf[kLogBufCapacity];
-  const size_t byteArrayLength = byteArray.size();
 
-  logCharacteristic(logBuf, kLogBufCapacity, &byteArray[0], byteArrayLength, CSCSERVICE_UUID, cscMeasurement->getUUID(),
+  logCharacteristic(logBuf, kLogBufCapacity, byteArray.data(), byteArrayLength, CSCSERVICE_UUID, cscMeasurement->getUUID(),
                     "CSC(CSM)[ WheelRev(%lu) WheelTime(%u) CrankRev(%u) CrankTime(%u) ]", spinBLEClient.cscCumulativeWheelRev, spinBLEClient.cscLastWheelEvtTime,
                     spinBLEClient.cscCumulativeCrankRev, spinBLEClient.cscLastCrankEvtTime);
 }
