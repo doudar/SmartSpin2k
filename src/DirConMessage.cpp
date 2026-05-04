@@ -11,6 +11,8 @@
 
 #define DIRCON_LOG_TAG "DirConMessage"
 
+static constexpr size_t kDirConHexLogMaxBytes = 256;
+
 // Helper functions to print raw bytes to serial monitor
 #ifdef DEBUG_DIRCON_MESSAGES
 void printRawBytesToSerial(const uint8_t* data, size_t length, bool isIncoming) {
@@ -320,12 +322,13 @@ size_t DirConMessage::parse(uint8_t* data, size_t len, uint8_t sequenceNumber) {
       break;
 
     default:
-      char hexBuf[len * 3 + 1];
-      for (size_t i = 0; i < len; i++) {
+      char hexBuf[kDirConHexLogMaxBytes * 3 + 1];
+      const size_t bytesToLog = (len < kDirConHexLogMaxBytes) ? len : kDirConHexLogMaxBytes;
+      for (size_t i = 0; i < bytesToLog; i++) {
         snprintf(hexBuf + i * 3, 4, "%02X ", data[i]);
       }
-      hexBuf[len * 3] = '\0';
-      SS2K_LOG(DIRCON_LOG_TAG, "Error parsing DirCon message: Unknown identifier %d. Full message (%d bytes): %s", this->Identifier, len, hexBuf);
+      hexBuf[bytesToLog * 3] = '\0';
+      SS2K_LOG(DIRCON_LOG_TAG, "Error parsing DirCon message: Unknown identifier %d. Full message (%zu bytes): %s", this->Identifier, len, hexBuf);
       this->Identifier = DIRCON_MSGID_ERROR;
       return 0;
       break;

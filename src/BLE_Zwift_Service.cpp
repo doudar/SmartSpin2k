@@ -112,6 +112,7 @@ BLE_Zwift_Service::BLE_Zwift_Service()
       syncTxCharacteristic(nullptr),
       unknownCharacteristic5(nullptr),
       unknownCharacteristic6(nullptr),
+      isDirCon(false),
       _lastActivityTime(0),
       _lastKeepaliveTime(0),
       _lastRidingDataTime(0),
@@ -232,10 +233,17 @@ void BLE_Zwift_Service::update() {
   //   swapAdv = !swapAdv;
   // }
 
-  sendRidingData();
+  if (isConnected() && now - _lastRidingDataTime >= kZwiftRidingDataIntervalMs) {
+    sendRidingData();
+    _lastRidingDataTime = now;
+  }
 }
 
 bool BLE_Zwift_Service::isConnected() {
+  if (_lastActivityTime == 0) {
+    return false;
+  }
+
   unsigned long now = millis();
   return now - _lastActivityTime < kZwiftSessionTimeoutMs;
 }
@@ -650,7 +658,7 @@ void BLE_Zwift_Service::applyGearRatio() {
   // Also update lastShifterPosition so FTMSModeShiftModifier doesn't
   // see this Zwift-driven change as a user shift and echo it back.
   ss2k->setLastShifterPosition(newShifterPos);
-  SS2K_LOG(getLogTag(), "Gear %d -> shifter position %d", closestIndex + 1, newShifterPos);
+  SS2K_LOG(getLogTag(), "Gear %d -> shifter position %d", closestIndex, newShifterPos);
 }
 
 size_t BLE_Zwift_Service::decodeUleb128(const uint8_t* buf, size_t bufLen, uint64_t* result) {
@@ -699,7 +707,7 @@ void ZwiftSyncRxCallbacks::onWrite(NimBLECharacteristic* pCharacteristic, NimBLE
     snprintf(buf, sizeof(buf), "%02X", value[i]);
     hexValue.append(buf);
   }
-  SS2K_LOG(zwiftService.getLogTag(), "Sync RX write from %s (len=%d) %s", connInfo.getAddress().toString().c_str(), value.length(), hexValue.c_str());
+  SS2K_LOG(zwiftService.getLogTag(), "Sync RX write from %s (len=%zu) %s", connInfo.getAddress().toString().c_str(), value.length(), hexValue.c_str());
   zwiftService.handleSyncRxWrite(value);
 }
 
