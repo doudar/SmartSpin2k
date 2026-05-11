@@ -31,6 +31,7 @@ class HTTP_Server {
 };
 
 // wifi Function
+bool isWifiDisabled();
 void startWifi();
 void stopWifi();
 

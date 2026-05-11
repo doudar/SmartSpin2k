@@ -34,6 +34,10 @@ DNSServer dnsServer;
 HTTP_Server httpServer;
 WebServer server(80);
 
+bool isWifiDisabled() {
+  return strcmp(userConfig->getSsid(), "") == 0 || strcmp(userConfig->getSsid(), "none") == 0;
+}
+
 void _staSetup() {
   WiFi.setHostname(userConfig->getDeviceName());
   WiFi.mode(WIFI_STA);
@@ -57,9 +61,15 @@ void startWifi() {
   int i = 0;
 
   // Check if WiFi is disabled via special SSID values
-  if (strcmp(userConfig->getSsid(), "") == 0 || strcmp(userConfig->getSsid(), "none") == 0) {
+  if (isWifiDisabled()) {
     SS2K_LOG(HTTP_SERVER_LOG_TAG, "WiFi disabled via SSID configuration: '%s'", userConfig->getSsid());
     httpServer.internetConnection = false;
+    DirConManager::stop();
+    dnsServer.stop();
+    MDNS.end();
+    WiFi.disconnect(true, true);
+    WiFi.setAutoReconnect(false);
+    WiFi.mode(WIFI_MODE_NULL);
     return;
   }
 
@@ -141,21 +151,20 @@ void startWifi() {
 }
 
 void stopWifi() {
-  // Check if WiFi was disabled via special SSID values
-  if (strcmp(userConfig->getSsid(), "") == 0 || strcmp(userConfig->getSsid(), "none") == 0) {
-    SS2K_LOG(HTTP_SERVER_LOG_TAG, "WiFi was disabled, nothing to stop");
-    return;
-  }
-  
   SS2K_LOG(HTTP_SERVER_LOG_TAG, "Closing connection to: %s", userConfig->getSsid());
   // Stop DirCon service before disconnecting WiFi
   DirConManager::stop();
-  WiFi.disconnect();
+  dnsServer.stop();
+  MDNS.end();
+  WiFi.disconnect(true, true);
+  WiFi.setAutoReconnect(false);
+  WiFi.mode(WIFI_MODE_NULL);
+  httpServer.internetConnection = false;
 }
 
 void HTTP_Server::start() {
   // Don't start HTTP server if WiFi is disabled
-  if (strcmp(userConfig->getSsid(), "") == 0 || strcmp(userConfig->getSsid(), "none") == 0) {
+  if (isWifiDisabled()) {
     SS2K_LOG(HTTP_SERVER_LOG_TAG, "HTTP server not started - WiFi disabled");
     return;
   }
@@ -433,7 +442,7 @@ void HTTP_Server::start() {
 
 void HTTP_Server::webClientUpdate() {
   // Don't handle web clients if WiFi is disabled
-  if (strcmp(userConfig->getSsid(), "") == 0 || strcmp(userConfig->getSsid(), "none") == 0) {
+  if (isWifiDisabled()) {
     return;
   }
 
@@ -662,12 +671,6 @@ void HTTP_Server::settingsProcessor() {
 }
 
 void HTTP_Server::stop() {
-  // Don't try to stop HTTP server if WiFi is disabled
-  if (strcmp(userConfig->getSsid(), "") == 0 || strcmp(userConfig->getSsid(), "none") == 0) {
-    SS2K_LOG(HTTP_SERVER_LOG_TAG, "HTTP server was not started - WiFi disabled");
-    return;
-  }
-
   SS2K_LOG(HTTP_SERVER_LOG_TAG, "Stopping Http Server");
   server.stop();
   server.close();
@@ -678,7 +681,7 @@ void HTTP_Server::stop() {
 
 void HTTP_Server::FirmwareUpdate() {
   // Skip firmware update if WiFi is disabled
-  if (strcmp(userConfig->getSsid(), "") == 0 || strcmp(userConfig->getSsid(), "none") == 0) {
+  if (isWifiDisabled()) {
     SS2K_LOG(HTTP_SERVER_LOG_TAG, "Firmware update skipped - WiFi disabled");
     httpServer.internetConnection = false;
     return;

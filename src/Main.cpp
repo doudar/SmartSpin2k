@@ -139,18 +139,22 @@ extern "C" void app_main() {
 
   digitalWrite(LED_PIN, HIGH);
   // Configure and Initialize Logger
-  logHandler.addAppender(&webSocketAppender);
-  logHandler.addAppender(&udpAppender);
+  if (!isWifiDisabled()) {
+    logHandler.addAppender(&webSocketAppender);
+    logHandler.addAppender(&udpAppender);
+  }
   logHandler.initialize();
   ss2k->startTasks();
   httpServer.start();
 
   // Start DirCon TCP server for direct control over the bike trainer
-  SS2K_LOG(MAIN_LOG_TAG, "Starting DirCon TCP service");
-  if (DirConManager::start()) {
-    SS2K_LOG(MAIN_LOG_TAG, "DirCon TCP service started successfully");
-  } else {
-    SS2K_LOG(MAIN_LOG_TAG, "Failed to start DirCon TCP service");
+  if (!isWifiDisabled()) {
+    SS2K_LOG(MAIN_LOG_TAG, "Starting DirCon TCP service");
+    if (DirConManager::start()) {
+      SS2K_LOG(MAIN_LOG_TAG, "DirCon TCP service started successfully");
+    } else {
+      SS2K_LOG(MAIN_LOG_TAG, "Failed to start DirCon TCP service");
+    }
   }
 
 #ifdef TEST_PTAB4PWR

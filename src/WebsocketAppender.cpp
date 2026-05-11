@@ -7,6 +7,7 @@
 
 // see: https://github.com/gilmaimon/ArduinoWebsockets
 #include "WebsocketAppender.h"
+#include "HTTP_Server_Basic.h"
 
 WebSocketAppender::WebSocketAppender() {
   for (uint8_t index = 0; index < maxClients; index++) {
@@ -14,8 +15,16 @@ WebSocketAppender::WebSocketAppender() {
   }
 }
 
-void WebSocketAppender::Initialize() { _webSocketsServer.listen(WebSocketAppender::port); }
+void WebSocketAppender::Initialize() {
+  if (!isWifiDisabled()) {
+    _webSocketsServer.listen(WebSocketAppender::port);
+  }
+}
 void WebSocketAppender::Loop() {
+  if (isWifiDisabled()) {
+    return;
+  }
+
   // CheckConnectedClients();
   if (WiFi.status() == WL_CONNECTED && GetClientsCount() < maxClients) {
     if (_webSocketsServer.poll() == false) {
@@ -29,6 +38,10 @@ void WebSocketAppender::Loop() {
 }
 
 void WebSocketAppender::Log(const char* message) {
+  if (isWifiDisabled()) {
+    return;
+  }
+
   // Serial.println("Log websocket.");
   // Serial.printf("%d clients connected.\n", GetClientsCount());
 
