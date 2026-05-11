@@ -38,6 +38,16 @@ bool isWifiDisabled() {
   return strcmp(userConfig->getSsid(), "") == 0 || strcmp(userConfig->getSsid(), "none") == 0;
 }
 
+static void powerDownWifi() {
+  DirConManager::stop();
+  dnsServer.stop();
+  MDNS.end();
+  WiFi.disconnect(true, true);
+  WiFi.setAutoReconnect(false);
+  WiFi.mode(WIFI_MODE_NULL);
+  httpServer.internetConnection = false;
+}
+
 void _staSetup() {
   WiFi.setHostname(userConfig->getDeviceName());
   WiFi.mode(WIFI_STA);
@@ -63,13 +73,7 @@ void startWifi() {
   // Check if WiFi is disabled via special SSID values
   if (isWifiDisabled()) {
     SS2K_LOG(HTTP_SERVER_LOG_TAG, "WiFi disabled via SSID configuration: '%s'", userConfig->getSsid());
-    httpServer.internetConnection = false;
-    DirConManager::stop();
-    dnsServer.stop();
-    MDNS.end();
-    WiFi.disconnect(true, true);
-    WiFi.setAutoReconnect(false);
-    WiFi.mode(WIFI_MODE_NULL);
+    powerDownWifi();
     return;
   }
 
@@ -151,15 +155,12 @@ void startWifi() {
 }
 
 void stopWifi() {
-  SS2K_LOG(HTTP_SERVER_LOG_TAG, "Closing connection to: %s", userConfig->getSsid());
-  // Stop DirCon service before disconnecting WiFi
-  DirConManager::stop();
-  dnsServer.stop();
-  MDNS.end();
-  WiFi.disconnect(true, true);
-  WiFi.setAutoReconnect(false);
-  WiFi.mode(WIFI_MODE_NULL);
-  httpServer.internetConnection = false;
+  if (isWifiDisabled()) {
+    SS2K_LOG(HTTP_SERVER_LOG_TAG, "Stopping WiFi services while WiFi is disabled");
+  } else {
+    SS2K_LOG(HTTP_SERVER_LOG_TAG, "Closing connection to: %s", userConfig->getSsid());
+  }
+  powerDownWifi();
 }
 
 void HTTP_Server::start() {
