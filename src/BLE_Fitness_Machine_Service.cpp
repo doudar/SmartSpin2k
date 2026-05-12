@@ -6,7 +6,6 @@
  */
 #include "BLE_Fitness_Machine_Service.h"
 #include "DirConManager.h"
-#include "FTMS_Utils.h"
 #include "Main.h"
 #include <Constants.h>
 #include <vector>
@@ -247,7 +246,7 @@ void BLE_Fitness_Machine_Service::processFTMSWrite() {
         case FitnessMachineControlPointProcedure::SetTargetPower: {
           rtConfig->setFTMSMode((uint8_t)rxValue[0]);
           uint16_t requestedTargetPower = bytes_to_u16(rxValue[2], rxValue[1]);
-          if (ftmsTargetPowerRequestsFreeRide(requestedTargetPower)) {
+          if (requestedTargetPower == 0) {
             // Default sim params: wind 0, grade 0%, rolling resistance 0x28, wind resistance 0x33.
             const uint8_t simMode[] = {FitnessMachineControlPointProcedure::SetIndoorBikeSimulationParameters, 0x00, 0x00, 0x00, 0x00, 0x28, 0x33};
             rtConfig->setFTMSMode(FitnessMachineControlPointProcedure::SetIndoorBikeSimulationParameters);

@@ -56,9 +56,3 @@ public:
     static void test_device_without_name(void);
     static void test_backward_compatibility(void);
 };
-
-class TestFTMSFreeRide {
- public:
-  static void test_zero_watt_target_requests_free_ride(void);
-  static void test_nonzero_watt_target_stays_erg(void);
-};
