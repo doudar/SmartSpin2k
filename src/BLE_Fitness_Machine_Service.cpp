@@ -6,6 +6,7 @@
  */
 #include "BLE_Fitness_Machine_Service.h"
 #include "DirConManager.h"
+#include "FTMS_Utils.h"
 #include "Main.h"
 #include <Constants.h>
 #include <vector>
@@ -245,9 +246,20 @@ void BLE_Fitness_Machine_Service::processFTMSWrite() {
 
         case FitnessMachineControlPointProcedure::SetTargetPower: {
           rtConfig->setFTMSMode((uint8_t)rxValue[0]);
-          if (spinBLEClient.connectedPM || rtConfig->watts.getSimulate() || spinBLEClient.connectedCD) {
+          uint16_t requestedTargetPower = bytes_to_u16(rxValue[2], rxValue[1]);
+          if (ftmsTargetPowerRequestsFreeRide(requestedTargetPower)) {
+            const uint8_t simMode[] = {FitnessMachineControlPointProcedure::SetIndoorBikeSimulationParameters, 0x00, 0x00, 0x00, 0x00, 0x28, 0x33};
+            rtConfig->setFTMSMode(FitnessMachineControlPointProcedure::SetIndoorBikeSimulationParameters);
+            rtConfig->watts.setTarget(0);
+            rtConfig->setTargetIncline(0);
+            returnValue[2] = FitnessMachineControlPointResultCode::Success;
+            logBufLength += snprintf(logBuf + logBufLength, kLogBufCapacity - logBufLength, "-> ERG Mode Target: 0w, switching to Sim Mode");
+            ftmsStatus = {FitnessMachineStatus::IndoorBikeSimulationParametersChanged, simMode[1], simMode[2], simMode[3], simMode[4], simMode[5], simMode[6]};
+            ftmsTrainingStatus[1] = FitnessMachineTrainingStatus::ManualMode;
+            spinBLEClient.FTMSControlPointWrite(simMode, sizeof(simMode));
+          } else if (spinBLEClient.connectedPM || rtConfig->watts.getSimulate() || spinBLEClient.connectedCD) {
             returnValue[2] = FitnessMachineControlPointResultCode::Success;  // 0x01;
-            rtConfig->watts.setTarget(bytes_to_u16(rxValue[2], rxValue[1]));
+            rtConfig->watts.setTarget(requestedTargetPower);
             logBufLength += snprintf(logBuf + logBufLength, kLogBufCapacity - logBufLength, "-> ERG Mode Target: %d Current: %d Incline: %2f", rtConfig->watts.getTarget(),
                                      rtConfig->watts.getValue(), rtConfig->getTargetIncline() / 100);
             ftmsStatus            = {FitnessMachineStatus::TargetPowerChanged, (uint8_t)rxValue[1], (uint8_t)rxValue[2]};

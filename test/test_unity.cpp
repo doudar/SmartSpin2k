@@ -84,6 +84,13 @@ void setup() {
     RUN_TEST(test.test_backward_compatibility);
   }
 
+  // FTMS ERG free-ride handling tests
+  {
+    TestFTMSFreeRide test;
+    RUN_TEST(test.test_zero_watt_target_requests_free_ride);
+    RUN_TEST(test.test_nonzero_watt_target_stays_erg);
+  }
+
   UNITY_END();
 }
 
