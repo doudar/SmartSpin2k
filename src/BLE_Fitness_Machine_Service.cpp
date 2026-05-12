@@ -248,12 +248,14 @@ void BLE_Fitness_Machine_Service::processFTMSWrite() {
           rtConfig->setFTMSMode((uint8_t)rxValue[0]);
           uint16_t requestedTargetPower = bytes_to_u16(rxValue[2], rxValue[1]);
           if (ftmsTargetPowerRequestsFreeRide(requestedTargetPower)) {
+            // Default sim params: wind 0, grade 0%, rolling resistance 0x28, wind resistance 0x33.
             const uint8_t simMode[] = {FitnessMachineControlPointProcedure::SetIndoorBikeSimulationParameters, 0x00, 0x00, 0x00, 0x00, 0x28, 0x33};
             rtConfig->setFTMSMode(FitnessMachineControlPointProcedure::SetIndoorBikeSimulationParameters);
             rtConfig->watts.setTarget(0);
             rtConfig->setTargetIncline(0);
             returnValue[2] = FitnessMachineControlPointResultCode::Success;
-            logBufLength += snprintf(logBuf + logBufLength, kLogBufCapacity - logBufLength, "-> ERG Mode Target: 0w, switching to Sim Mode");
+            logBufLength +=
+                snprintf(logBuf + logBufLength, kLogBufCapacity - logBufLength, "-> ERG Mode Target: %dw, switching to Sim Mode", requestedTargetPower);
             ftmsStatus = {FitnessMachineStatus::IndoorBikeSimulationParametersChanged, simMode[1], simMode[2], simMode[3], simMode[4], simMode[5], simMode[6]};
             ftmsTrainingStatus[1] = FitnessMachineTrainingStatus::ManualMode;
             spinBLEClient.FTMSControlPointWrite(simMode, sizeof(simMode));
