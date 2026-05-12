@@ -52,6 +52,19 @@ RuntimeParameters *rtConfig = new RuntimeParameters;
 UdpAppender udpAppender;
 WebSocketAppender webSocketAppender;
 
+static void startNetworkServices() {
+  if (!isWifiDisabled()) {
+    httpServer.start();
+
+    SS2K_LOG(MAIN_LOG_TAG, "Starting DirCon TCP service");
+    if (DirConManager::start()) {
+      SS2K_LOG(MAIN_LOG_TAG, "DirCon TCP service started successfully");
+    } else {
+      SS2K_LOG(MAIN_LOG_TAG, "Failed to start DirCon TCP service");
+    }
+  }
+}
+
 ///////////// BEGIN SETUP /////////////
 #ifndef UNIT_TEST
 
@@ -147,17 +160,7 @@ extern "C" void app_main() {
   }
   logHandler.initialize();
   ss2k->startTasks();
-  if (!isWifiDisabled()) {
-    httpServer.start();
-
-    // Start DirCon TCP server for direct control over the bike trainer
-    SS2K_LOG(MAIN_LOG_TAG, "Starting DirCon TCP service");
-    if (DirConManager::start()) {
-      SS2K_LOG(MAIN_LOG_TAG, "DirCon TCP service started successfully");
-    } else {
-      SS2K_LOG(MAIN_LOG_TAG, "Failed to start DirCon TCP service");
-    }
-  }
+  startNetworkServices();
 
 #ifdef TEST_PTAB4PWR
   userConfig->setHMin(0);
@@ -426,14 +429,7 @@ void SS2K::restartWifi() {
   stopWifi();
   delay(100);
   startWifi();
-  if (!isWifiDisabled()) {
-    httpServer.start();
-    if (DirConManager::start()) {
-      SS2K_LOG(MAIN_LOG_TAG, "DirCon TCP service started successfully");
-    } else {
-      SS2K_LOG(MAIN_LOG_TAG, "Failed to start DirCon TCP service");
-    }
-  }
+  startNetworkServices();
 }
 
 void SS2K::moveStepper() {
