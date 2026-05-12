@@ -28,11 +28,6 @@ static char uuidListBuffer[128] = "";
 static size_t uuidListLength    = 0;
 
 bool DirConManager::start() {
-  if (isWifiDisabled()) {
-    SS2K_LOG(DIRCON_LOG_TAG, "DirCon service not started - WiFi disabled");
-    return false;
-  }
-
   if (!started) {
     // Initialize buffers
     for (int i = 0; i < DIRCON_MAX_CLIENTS; i++) {

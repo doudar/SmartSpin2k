@@ -116,7 +116,9 @@ extern "C" void app_main() {
   // HTTP setup because otherwise they use too much traffic and the device
   // fails to update which really sucks when it corrupts your settings.
   startWifi();
-  httpServer.FirmwareUpdate();
+  if (!isWifiDisabled()) {
+    httpServer.FirmwareUpdate();
+  }
 
   pinMode(currentBoard.shiftUpPin, INPUT_PULLUP);    // Push-Button with input Pullup
   pinMode(currentBoard.shiftDownPin, INPUT_PULLUP);  // Push-Button with input Pullup
@@ -145,10 +147,10 @@ extern "C" void app_main() {
   }
   logHandler.initialize();
   ss2k->startTasks();
-  httpServer.start();
-
-  // Start DirCon TCP server for direct control over the bike trainer
   if (!isWifiDisabled()) {
+    httpServer.start();
+
+    // Start DirCon TCP server for direct control over the bike trainer
     SS2K_LOG(MAIN_LOG_TAG, "Starting DirCon TCP service");
     if (DirConManager::start()) {
       SS2K_LOG(MAIN_LOG_TAG, "DirCon TCP service started successfully");
@@ -197,7 +199,9 @@ void SS2K::maintenanceLoop(void *pvParameters) {
       if ((millis() - bleTimer) > BLE_NOTIFY_DELAY) {
         BLECommunications();
         logHandler.writeLogs();
-        webSocketAppender.Loop();
+        if (!isWifiDisabled()) {
+          webSocketAppender.Loop();
+        }
         bleTimer = millis();
       }
       // Don't do these if updating and in spindown mode.
@@ -226,9 +230,11 @@ void SS2K::maintenanceLoop(void *pvParameters) {
     BLE_ss2kCustomCharacteristic::parseNemit();
     // Update Zwift Gear UI if shift happened
 
-    httpServer.webClientUpdate();
-    // Update DirCon protocol
-    DirConManager::update();
+    if (!isWifiDisabled()) {
+      httpServer.webClientUpdate();
+      // Update DirCon protocol
+      DirConManager::update();
+    }
     // If we're in ERG mode, modify shift commands to inc/dec the target watts instead.
 
     // If we have a resistance bike attached, slow down when we're close to the limits.
@@ -306,7 +312,9 @@ void SS2K::maintenanceLoop(void *pvParameters) {
           SS2K_LOG(MAIN_LOG_TAG, "Rebooting due to inactivity.");
           ss2k->rebootFlag = true;
           logHandler.writeLogs();
-          webSocketAppender.Loop();
+          if (!isWifiDisabled()) {
+            webSocketAppender.Loop();
+          }
         }
 
       } else {
@@ -418,7 +426,14 @@ void SS2K::restartWifi() {
   stopWifi();
   delay(100);
   startWifi();
-  httpServer.start();
+  if (!isWifiDisabled()) {
+    httpServer.start();
+    if (DirConManager::start()) {
+      SS2K_LOG(MAIN_LOG_TAG, "DirCon TCP service started successfully");
+    } else {
+      SS2K_LOG(MAIN_LOG_TAG, "Failed to start DirCon TCP service");
+    }
+  }
 }
 
 void SS2K::moveStepper() {

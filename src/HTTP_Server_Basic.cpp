@@ -42,7 +42,7 @@ static void powerDownWifi() {
   DirConManager::stop();
   dnsServer.stop();
   MDNS.end();
-  WiFi.disconnect(true, true);
+  WiFi.disconnect(true, false);
   WiFi.setAutoReconnect(false);
   WiFi.mode(WIFI_MODE_NULL);
   httpServer.internetConnection = false;
@@ -87,7 +87,7 @@ void startWifi() {
       i++;
       if (i > WIFI_CONNECT_TIMEOUT) {
         SS2K_LOG(HTTP_SERVER_LOG_TAG, "Couldn't Connect. Switching to AP mode");
-        WiFi.disconnect(true, true);
+        WiFi.disconnect(true, false);
         WiFi.setAutoReconnect(false);
         WiFi.mode(WIFI_MODE_NULL);
         delay(1000);
@@ -131,13 +131,6 @@ void startWifi() {
   SS2K_LOG(HTTP_SERVER_LOG_TAG, "Connected to %s IP address: %s", userConfig->getSsid(), myIP.toString().c_str());
   SS2K_LOG(HTTP_SERVER_LOG_TAG, "Open http://%s.local/", userConfig->getDeviceName());
 
-  // Initialize DirCon MDNS service
-  if (DirConManager::start()) {
-    SS2K_LOG(HTTP_SERVER_LOG_TAG, "DirCon service started successfully");
-  } else {
-    SS2K_LOG(HTTP_SERVER_LOG_TAG, "Error starting DirCon service");
-  }
-
   WiFi.setTxPower(WIFI_POWER_19_5dBm);
 
   if (WiFi.getMode() == WIFI_STA) {
@@ -164,12 +157,6 @@ void stopWifi() {
 }
 
 void HTTP_Server::start() {
-  // Don't start HTTP server if WiFi is disabled
-  if (isWifiDisabled()) {
-    SS2K_LOG(HTTP_SERVER_LOG_TAG, "HTTP server not started - WiFi disabled");
-    return;
-  }
-
   server.enableCORS(true);
   server.onNotFound(handleIndexFile);
 
@@ -442,11 +429,6 @@ void HTTP_Server::start() {
 }
 
 void HTTP_Server::webClientUpdate() {
-  // Don't handle web clients if WiFi is disabled
-  if (isWifiDisabled()) {
-    return;
-  }
-
   static unsigned long int _webClientTimer = millis();
   if (millis() - _webClientTimer > WEBSERVER_DELAY) {
     _webClientTimer                = millis();
@@ -681,13 +663,6 @@ void HTTP_Server::stop() {
 // 70:94:DE:DD:E6:C4:69:48:3A:92:70:A1:48:56:78:2D:18:64:E0:B7
 
 void HTTP_Server::FirmwareUpdate() {
-  // Skip firmware update if WiFi is disabled
-  if (isWifiDisabled()) {
-    SS2K_LOG(HTTP_SERVER_LOG_TAG, "Firmware update skipped - WiFi disabled");
-    httpServer.internetConnection = false;
-    return;
-  }
-
   HTTPClient http;
   WiFiClientSecure localClient;
   localClient.setCACert(rootCACertificate);
