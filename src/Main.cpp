@@ -10,6 +10,7 @@
 #include "SS2KLog.h"
 #include "esp_system.h"
 #include <Arduino.h>
+#include <Preferences.h>
 #include <LittleFS.h>
 #include <HardwareSerial.h>
 #include "ERG_Mode.h"
@@ -124,6 +125,14 @@ extern "C" void app_main() {
   digitalWrite(currentBoard.dirPin, LOW);
   digitalWrite(currentBoard.stepPin, LOW);
   digitalWrite(LED_PIN, LOW);
+
+  // LED quiet mode: allow 15 min on power-on or manual reboot; inhibit after inactivity reboot
+  {
+    bool inhibit = false;
+    {Preferences p; p.begin("led_ctrl", true); inhibit = p.getBool("inhibit", false); p.end();}
+    {Preferences p; p.begin("led_ctrl", false); p.putBool("inhibit", false); p.end();}
+    setLEDAllowedUntil((esp_reset_reason() == ESP_RST_POWERON || !inhibit) ? 15UL * 60UL * 1000UL : 0UL);
+  }
 
   ss2k->setupTMCStepperDriver();
 
@@ -295,6 +304,7 @@ void SS2K::maintenanceLoop(void* pvParameters) {
         if (((millis() - rebootTimer) > 1800000)) {
           // Timer expired
           SS2K_LOG(MAIN_LOG_TAG, "Rebooting due to inactivity.");
+          {Preferences p; p.begin("led_ctrl", false); p.putBool("inhibit", true); p.end();}
           ss2k->rebootFlag = true;
           logHandler.writeLogs();
           webSocketAppender.Loop();
@@ -306,6 +316,7 @@ void SS2K::maintenanceLoop(void* pvParameters) {
         _oldWatts         = rtConfig->watts.getValue();
         _oldTargetIncline = rtConfig->getTargetIncline();
         rebootTimer       = millis();
+        extendLEDWindow();
       }
 
 #ifdef DEBUG_STACK

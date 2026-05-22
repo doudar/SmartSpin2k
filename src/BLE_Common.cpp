@@ -10,10 +10,16 @@
 #include "BLE_Common.h"
 #include "Constants.h"
 
+#include <Arduino.h>
 #include <math.h>
 #include <sensors/SensorData.h>
 #include <sensors/SensorDataFactory.h>
 #include <NimBLEDevice.h>
+
+static uint32_t ledAllowedUntil = 15UL * 60UL * 1000UL;
+
+void setLEDAllowedUntil(uint32_t t) { ledAllowedUntil = t; }
+void extendLEDWindow() { ledAllowedUntil = millis() + 15UL * 60UL * 1000UL; }
 
 /**
  * @brief Retrieves the BLE service information for a given advertised device and device name.
@@ -142,14 +148,20 @@ void BLECommunications() {
     }
   }
 
-  // blink if no client connected
-  if (spinBLEServer.connectedClientCount() == 0) {
-    if ((millis() / 500) % 2 == 0) {
-      digitalWrite(LED_PIN, LOW);
+  static int _lastClientCount = -1;
+  int currentCount            = spinBLEServer.connectedClientCount();
+  if (currentCount != _lastClientCount) {
+    _lastClientCount = currentCount;
+    extendLEDWindow();
+  }
+
+  if (millis() < ledAllowedUntil) {
+    if (currentCount == 0) {
+      digitalWrite(LED_PIN, (millis() / 500) % 2 == 0 ? LOW : HIGH);
     } else {
       digitalWrite(LED_PIN, HIGH);
     }
   } else {
-    digitalWrite(LED_PIN, HIGH);
+    digitalWrite(LED_PIN, LOW);
   }
 }

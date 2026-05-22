@@ -70,6 +70,8 @@ void setupBLE();
 extern TaskHandle_t BLEClientTask;
 // ***********************Common**********************************
 void BLECommunications();
+void setLEDAllowedUntil(uint32_t t);
+void extendLEDWindow();
 
 // Check if a BLE device supports any of our supported services
 bool isDeviceSupported(const NimBLEAdvertisedDevice* advertisedDevice, const String& deviceName = "");
