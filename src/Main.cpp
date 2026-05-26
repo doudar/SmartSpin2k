@@ -44,6 +44,11 @@ SS2K* ss2k                  = new SS2K;
 userParameters* userConfig  = new userParameters;
 RuntimeParameters* rtConfig = new RuntimeParameters;
 
+namespace {
+constexpr char kLedControlNamespace[] = "led_ctrl";
+constexpr char kLedInhibitKey[]       = "inhibit";
+}  // namespace
+
 ///////////// Log Appender /////////////
 UdpAppender udpAppender;
 WebSocketAppender webSocketAppender;
@@ -128,10 +133,17 @@ extern "C" void app_main() {
 
   // LED quiet mode: allow 15 min on power-on or manual reboot; inhibit after inactivity reboot
   {
-    bool inhibit = false;
-    {Preferences p; p.begin("led_ctrl", true); inhibit = p.getBool("inhibit", false); p.end();}
-    {Preferences p; p.begin("led_ctrl", false); p.putBool("inhibit", false); p.end();}
-    setLEDAllowedUntil((esp_reset_reason() == ESP_RST_POWERON || !inhibit) ? 15UL * 60UL * 1000UL : 0UL);
+    Preferences ledPreferences;
+
+    ledPreferences.begin(kLedControlNamespace, true);
+    bool inhibit = ledPreferences.getBool(kLedInhibitKey, false);
+    ledPreferences.end();
+
+    ledPreferences.begin(kLedControlNamespace, false);
+    ledPreferences.putBool(kLedInhibitKey, false);
+    ledPreferences.end();
+
+    setLEDAllowedUntil((esp_reset_reason() == ESP_RST_POWERON || !inhibit) ? kLedAllowedWindowMs : 0UL);
   }
 
   ss2k->setupTMCStepperDriver();
@@ -304,7 +316,13 @@ void SS2K::maintenanceLoop(void* pvParameters) {
         if (((millis() - rebootTimer) > 1800000)) {
           // Timer expired
           SS2K_LOG(MAIN_LOG_TAG, "Rebooting due to inactivity.");
-          {Preferences p; p.begin("led_ctrl", false); p.putBool("inhibit", true); p.end();}
+          {
+            Preferences ledPreferences;
+            // Inhibit the startup LED window after inactivity reboot; app_main clears this flag after reading it.
+            ledPreferences.begin(kLedControlNamespace, false);
+            ledPreferences.putBool(kLedInhibitKey, true);
+            ledPreferences.end();
+          }
           ss2k->rebootFlag = true;
           logHandler.writeLogs();
           webSocketAppender.Loop();

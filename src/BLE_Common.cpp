@@ -16,10 +16,10 @@
 #include <sensors/SensorDataFactory.h>
 #include <NimBLEDevice.h>
 
-static uint32_t ledAllowedUntil = 15UL * 60UL * 1000UL;
+static uint32_t ledAllowedUntil = kLedAllowedWindowMs;
 
 void setLEDAllowedUntil(uint32_t t) { ledAllowedUntil = t; }
-void extendLEDWindow() { ledAllowedUntil = millis() + 15UL * 60UL * 1000UL; }
+void extendLEDWindow() { ledAllowedUntil = millis() + kLedAllowedWindowMs; }
 
 /**
  * @brief Retrieves the BLE service information for a given advertised device and device name.
