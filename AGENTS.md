@@ -2,6 +2,8 @@
 
 These notes are for coding agents working in this repository. They are intentionally focused on firmware/software behavior and ignore the physical design files in `Hardware/` or `hardware/`.
 
+Keep this file current while doing code work when it would help future agents: prune notes that become wrong, and add important discoveries. Many tasks will not need an `AGENTS.md` edit. Keep it concise and project-essential rather than comprehensive.
+
 ## Project Shape
 
 SmartSpin2k is ESP32 firmware for converting a spin bike into a BLE smart trainer. It:
@@ -79,7 +81,7 @@ Boot sequence:
 5. Load and re-save `userConfig`.
 6. Start WiFi and run firmware update check.
 7. Configure GPIO pins.
-8. Initialize LED quiet-mode preference.
+8. Initialize LED state; commanded-reboot quiet mode uses RTC memory so true power cycles still show startup blink behavior.
 9. Configure TMC/FastAccelStepper via `SS2K::setupTMCStepperDriver()`.
 10. Register log appenders.
 11. Start BLE via `setupBLE()`.
@@ -94,6 +96,7 @@ Boot sequence:
 - Always handle local shifter button state.
 - Notify changed custom-characteristic values via `BLE_ss2kCustomCharacteristic::parseNemit()`.
 - Update HTTP clients and DirCon.
+- Update LED status/diagnostics.
 - Slow stepper near Peloton resistance limits when unhomed.
 - Handle reboot/default-reset/save flags.
 - Every roughly 6 seconds, log status and reboot after 30 minutes of inactivity.
@@ -176,6 +179,7 @@ Important functions:
 - `goHome()`, `_findEndStop()`, `_findFTMSHome()`: homing procedures.
 - `setupTMCStepperDriver()`, `updateStepperPower()`, `updateStealthChop()`, `updateStepperSpeed()`: motor driver configuration.
 - `txSerial()`, `rxSerial()`, `pelotonConnected()`: Peloton aux serial integration.
+- `setLEDEnabled()`, `updateLED()`: main LED state and diagnostic blink/pulse behavior.
 
 ## Control Flow: Sensors To Stepper
 
@@ -554,6 +558,7 @@ Changing BLE server characteristics:
 - `Hardware/` is physical design material and should be ignored for firmware/software analysis unless explicitly requested.
 - Some paths and folder names differ by case (`Hardware` vs `hardware`); use both excludes in searches.
 - `compile_commands.json`, `.pio/`, `managed_components/`, map files, and generated logs are large/noisy.
+- LED behavior is owned by `SS2K`/`src/Main.cpp`, not BLE common code. Its reboot inhibit flag is `RTC_DATA_ATTR`, which should survive `ESP.restart()` but clear on power loss.
 - `SensorDataFactory` intentionally caches parser objects per unique device/characteristic.
 - `Measurement` timestamps matter for ERG deduplication.
 - `PowerTable` stores positions divided by `TABLE_DIVISOR`; lookup returns full-scale positions.

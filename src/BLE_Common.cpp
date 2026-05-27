@@ -16,11 +16,6 @@
 #include <sensors/SensorDataFactory.h>
 #include <NimBLEDevice.h>
 
-static uint32_t ledAllowedUntil = kLedAllowedWindowMs;
-
-void setLEDAllowedUntil(uint32_t t) { ledAllowedUntil = t; }
-void extendLEDWindow() { ledAllowedUntil = millis() + kLedAllowedWindowMs; }
-
 /**
  * @brief Retrieves the BLE service information for a given advertised device and device name.
  *
@@ -148,20 +143,4 @@ void BLECommunications() {
     }
   }
 
-  static int _lastClientCount = -1;
-  int currentCount            = spinBLEServer.connectedClientCount();
-  if (currentCount != _lastClientCount) {
-    _lastClientCount = currentCount;
-    extendLEDWindow();
-  }
-
-  if (millis() < ledAllowedUntil) {
-    if (currentCount == 0) {
-      digitalWrite(LED_PIN, (millis() / 500) % 2 == 0 ? LOW : HIGH);
-    } else {
-      digitalWrite(LED_PIN, HIGH);
-    }
-  } else {
-    digitalWrite(LED_PIN, LOW);
-  }
 }

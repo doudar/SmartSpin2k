@@ -69,11 +69,7 @@ using BLEServices::SUPPORTED_SERVICES;
 void setupBLE();
 extern TaskHandle_t BLEClientTask;
 // ***********************Common**********************************
-inline constexpr uint32_t kLedAllowedWindowMs = 15UL * 60UL * 1000UL;
-
 void BLECommunications();
-void setLEDAllowedUntil(uint32_t t);
-void extendLEDWindow();
 
 // Check if a BLE device supports any of our supported services
 bool isDeviceSupported(const NimBLEAdvertisedDevice* advertisedDevice, const String& deviceName = "");
