@@ -8,7 +8,6 @@
 #include "Main.h"
 #include "Stepper.h"
 #include "SS2KLog.h"
-#include "esp_system.h"
 #include <Arduino.h>
 #include <LittleFS.h>
 #include <HardwareSerial.h>
@@ -42,6 +41,26 @@ PowerTable* powerTable      = new PowerTable;
 SS2K* ss2k                  = new SS2K;
 userParameters* userConfig  = new userParameters;
 RuntimeParameters* rtConfig = new RuntimeParameters;
+
+#ifndef UNIT_TEST
+namespace {
+RTC_NOINIT_ATTR bool inhibitLedOnBoot = false;
+
+  // RTC memory survives commanded ESP.restart() calls but not power loss. A set
+  // flag means the previous reboot was intentional, so consume it and keep the
+  // LED quiet until activity turns it back on.
+bool shouldStartWithLedEnabled() {
+  bool inhibitLed = inhibitLedOnBoot;
+  inhibitLedOnBoot = false;
+  return !inhibitLed;
+}
+
+// Set a flag in RTC memory to keep the LED off on the next boot.
+void keepLedOffAfterReboot() {
+  inhibitLedOnBoot = true;
+}
+}  // namespace
+#endif
 
 ///////////// Log Appender /////////////
 UdpAppender udpAppender;
@@ -124,6 +143,7 @@ extern "C" void app_main() {
   digitalWrite(currentBoard.dirPin, LOW);
   digitalWrite(currentBoard.stepPin, LOW);
   digitalWrite(LED_PIN, LOW);
+  ss2k->setLEDEnabled(shouldStartWithLedEnabled());
 
   ss2k->setupTMCStepperDriver();
 
@@ -132,7 +152,7 @@ extern "C" void app_main() {
   // disableCore0WDT();  // Disable the watchdog timer on core 0 (so long stepper
   //  moves don't cause problems)
 
-  digitalWrite(LED_PIN, HIGH);
+  digitalWrite(LED_PIN, LOW);
   // Configure and Initialize Logger
   logHandler.addAppender(&webSocketAppender);
   logHandler.addAppender(&udpAppender);
@@ -160,7 +180,7 @@ extern "C" void app_main() {
 #endif
 
   ss2k->resetIfShiftersHeld();
-  digitalWrite(LED_PIN, HIGH);
+  digitalWrite(LED_PIN, LOW);
 
   xTaskCreatePinnedToCore(SS2K::maintenanceLoop,     /* Task function. */
                           "maintenanceLoopFunction", /* name of task. */
@@ -221,6 +241,7 @@ void SS2K::maintenanceLoop(void* pvParameters) {
     httpServer.webClientUpdate();
     // Update DirCon protocol
     DirConManager::update();
+    ss2k->updateLED();
     // If we're in ERG mode, modify shift commands to inc/dec the target watts instead.
 
     // If we have a resistance bike attached, slow down when we're close to the limits.
@@ -295,6 +316,7 @@ void SS2K::maintenanceLoop(void* pvParameters) {
         if (((millis() - rebootTimer) > 1800000)) {
           // Timer expired
           SS2K_LOG(MAIN_LOG_TAG, "Rebooting due to inactivity.");
+          keepLedOffAfterReboot();
           ss2k->rebootFlag = true;
           logHandler.writeLogs();
           webSocketAppender.Loop();
@@ -306,6 +328,7 @@ void SS2K::maintenanceLoop(void* pvParameters) {
         _oldWatts         = rtConfig->watts.getValue();
         _oldTargetIncline = rtConfig->getTargetIncline();
         rebootTimer       = millis();
+        ss2k->setLEDEnabled(true); 
       }
 
 #ifdef DEBUG_STACK
@@ -329,9 +352,48 @@ void SS2K::maintenanceLoop(void* pvParameters) {
 
 #endif  // UNIT_TEST
 
+void SS2K::setLEDEnabled(bool enabled) {
+  ledEnabled = enabled;
+  if (!enabled) {
+    digitalWrite(LED_PIN, LOW);
+  }
+}
+
+void SS2K::updateLED() {
+  if (!ledEnabled) {
+    digitalWrite(LED_PIN, LOW);
+    return;
+  }
+
+  int currentCount = spinBLEServer.connectedClientCount();
+  if (currentCount == 0) {
+    // No app/client connected yet: simple idle blink.
+    digitalWrite(LED_PIN, (millis() / 500) % 2 == 0 ? LOW : HIGH);
+    return;
+  }
+
+  // Connected: stay mostly on, then count clients as brief off-pulses.
+  constexpr unsigned long pulseOffTime = 200;
+  constexpr unsigned long pulseGap     = 300;
+  constexpr unsigned long countGap     = 5000;
+  unsigned long pulsePeriod            = pulseOffTime + pulseGap;
+  unsigned long cycleDuration          = currentCount * pulsePeriod + countGap;
+  unsigned long cyclePosition           = millis() % cycleDuration;
+
+  // After the diagnostic pulses, return to solid-on connected status.
+  if (cyclePosition >= currentCount * pulsePeriod) {
+    digitalWrite(LED_PIN, HIGH);
+    return;
+  }
+
+  // Each pulse starts with a short off dip, followed by on-time between dips.
+  digitalWrite(LED_PIN, (cyclePosition % pulsePeriod) < pulseOffTime ? LOW : HIGH);
+}
+
 void SS2K::FTMSModeShiftModifier() {
   int shiftDelta = rtConfig->getShifterPosition() - ss2k->lastShifterPosition;
   if (shiftDelta) {  // Shift detected
+    ss2k->setLEDEnabled(true);
     // When Zwift virtual shifting is active, forward shifts to Zwift
     // instead of handling them internally. Zwift sends gear changes
     // back via the custom trainer protocol which we already handle.

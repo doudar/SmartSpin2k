@@ -10,6 +10,7 @@
 #include "BLE_Common.h"
 #include "Constants.h"
 
+#include <Arduino.h>
 #include <math.h>
 #include <sensors/SensorData.h>
 #include <sensors/SensorDataFactory.h>
@@ -142,14 +143,4 @@ void BLECommunications() {
     }
   }
 
-  // blink if no client connected
-  if (spinBLEServer.connectedClientCount() == 0) {
-    if ((millis() / 500) % 2 == 0) {
-      digitalWrite(LED_PIN, LOW);
-    } else {
-      digitalWrite(LED_PIN, HIGH);
-    }
-  } else {
-    digitalWrite(LED_PIN, HIGH);
-  }
 }

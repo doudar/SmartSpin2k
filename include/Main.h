@@ -35,6 +35,7 @@ class SS2K {
   unsigned long int scanDelayStart;
   int32_t targetPosition;
   int32_t currentPosition;
+  bool ledEnabled;
   void handleShiftButtons();
 
  public:
@@ -81,12 +82,15 @@ class SS2K {
   void txSerial();
   bool pelotonConnected();
   void goHome(bool bothDirections = false);
+  void setLEDEnabled(bool enabled);
+  void updateLED();
 
   SS2K() {
     upButtonState        = RELEASED;
     downButtonState      = RELEASED;
     targetPosition      = 0;
     currentPosition     = 0;
+    ledEnabled          = false;
     stepperIsRunning    = false;
     externalControl     = false;
     syncMode            = false;
