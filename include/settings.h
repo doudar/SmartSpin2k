@@ -10,6 +10,12 @@
 // Update firmware on boot?
 #define AUTO_FIRMWARE_UPDATE true
 
+// Dedicated EMC/EMI test mode. Runs the motor continuously, alternating
+// direction every interval, with WiFi and BLE disabled.
+#define EMC_EMI_TEST_MODE true
+#define EMC_EMI_TEST_DIRECTION_INTERVAL_MS 5000
+#define EMC_EMI_TEST_LED_BLINK_MS 500
+
 // Default Bluetooth WiFi and MDNS Name
 const char* const DEVICE_NAME = "SmartSpin2k";
 

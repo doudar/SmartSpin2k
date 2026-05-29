@@ -24,6 +24,10 @@
 // #include "BLE_Wattbike_Service.h"
 #include "BLE_Fitness_Machine_Service.h"
 #include "DirConManager.h"
+#include "esp_wifi.h"
+#ifdef CONFIG_BT_ENABLED
+#include "esp32-hal-bt.h"
+#endif
 
 // Peloton Serial
 HardwareSerial auxSerial(1);
@@ -48,6 +52,70 @@ BleAppender bleAppender;
 
 ///////////// BEGIN SETUP /////////////
 #ifndef UNIT_TEST
+
+#if EMC_EMI_TEST_MODE
+namespace {
+void disableEmcEmiTestRadios() {
+  esp_wifi_stop();
+  esp_wifi_deinit();
+#ifdef CONFIG_BT_ENABLED
+  btStop();
+#endif
+  SS2K_LOG(MAIN_LOG_TAG, "EMC/EMI test mode: WiFi and BLE radios disabled.");
+}
+
+void updateEmcEmiTestLed(unsigned long now) {
+  digitalWrite(LED_PIN, ((now / EMC_EMI_TEST_LED_BLINK_MS) % 2) ? HIGH : LOW);
+}
+
+void runEmcEmiTestLoop() {
+  disableEmcEmiTestRadios();
+
+  if (!stepper) {
+    SS2K_LOG(MAIN_LOG_TAG, "EMC/EMI test mode: stepper initialization failed.");
+    while (true) {
+      updateEmcEmiTestLed(millis());
+      delay(10);
+    }
+  }
+
+  stepper->enableOutputs();
+  stepper->setAutoEnable(false);
+  stepper->runForward();
+  SS2K_LOG(MAIN_LOG_TAG, "EMC/EMI test mode: motor running forward.");
+
+  bool runForward = true;
+  unsigned long directionTimer = millis();
+
+  while (true) {
+    unsigned long now = millis();
+    updateEmcEmiTestLed(now);
+
+    if ((now - directionTimer) >= EMC_EMI_TEST_DIRECTION_INTERVAL_MS) {
+      stepper->stopMove();
+      unsigned long stopTimer = millis();
+      while (stepper->isRunning() && (millis() - stopTimer) < 1000) {
+        updateEmcEmiTestLed(millis());
+        delay(10);
+      }
+
+      runForward = !runForward;
+      if (runForward) {
+        stepper->runForward();
+      } else {
+        stepper->runBackward();
+      }
+      directionTimer = millis();
+      SS2K_LOG(MAIN_LOG_TAG, "EMC/EMI test mode: motor running %s.", runForward ? "forward" : "backward");
+    }
+
+    ss2k->stepperIsRunning = stepper->isRunning();
+    ss2k->setCurrentPosition(stepper->getCurrentPosition());
+    delay(10);
+  }
+}
+}  // namespace
+#endif
 
 void SS2K::startTasks() {
   SS2K_LOG(MAIN_LOG_TAG, "Start BLE + ERG Tasks");
@@ -103,8 +171,10 @@ extern "C" void app_main() {
   // Check for firmware update. It's important that this stays before BLE &
   // HTTP setup because otherwise they use too much traffic and the device
   // fails to update which really sucks when it corrupts your settings.
+#if !EMC_EMI_TEST_MODE
   startWifi();
   httpServer.FirmwareUpdate();
+#endif
 
   pinMode(currentBoard.shiftUpPin, INPUT_PULLUP);    // Push-Button with input Pullup
   pinMode(currentBoard.shiftDownPin, INPUT_PULLUP);  // Push-Button with input Pullup
@@ -119,6 +189,10 @@ extern "C" void app_main() {
   digitalWrite(LED_PIN, LOW);
 
   ss2k->setupTMCStepperDriver();
+
+#if EMC_EMI_TEST_MODE
+  runEmcEmiTestLoop();
+#endif
 
   SS2K_LOG(MAIN_LOG_TAG, "Setting up cpu Tasks");
 
