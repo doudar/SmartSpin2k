@@ -20,7 +20,7 @@ jobs:
           restore-keys: |
             ${{ runner.os }}-platformio-
       - name: Ensure changelog is updated
-        uses: dangoslen/changelog-enforcer@v3.6.1
+        uses: dangoslen/changelog-enforcer@v3.7.0
       - name: Set up python
         uses: actions/setup-python@v6
         with:
