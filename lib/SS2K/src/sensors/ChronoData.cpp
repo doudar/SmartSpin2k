@@ -5,6 +5,7 @@
  * SPDX-License-Identifier: GPL-2.0-only
  */
 
+#include "endian.h"
 #include "sensors/ChronoData.h"
 
 bool ChronoData::hasHeartRate() { return false; }
@@ -35,7 +36,7 @@ void ChronoData::decode(uint8_t *data, size_t length) {
     power   = INT_MIN;
     return;
   }
-  cadence = (data[8] | (data[9] << 8)) / 10.0f;  // bytes 8-9, uint16 little-endian, ÷10 RPM
-  power   = data[17] | (data[18] << 8);          // bytes 17-18, uint16 little-endian, watts
+  cadence = get_le16(&data[8]) / 10.0f;  // bytes 8-9, uint16 little-endian, ÷10 RPM
+  power   = get_le16(&data[17]);         // bytes 17-18, uint16 little-endian, watts
   hasData = true;
 }

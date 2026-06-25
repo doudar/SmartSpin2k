@@ -344,7 +344,8 @@ void MyClientCallback::onDisconnect(NimBLEClient* pClient, int reason) {
       SS2K_LOG(BLE_CLIENT_LOG_TAG, "Detected %s Disconnect", spinBLEClient.myBLEDevices[i].serviceUUID.toString().c_str());
       if ((spinBLEClient.myBLEDevices[i].charUUID == CYCLINGPOWERMEASUREMENT_UUID) || (spinBLEClient.myBLEDevices[i].charUUID == FITNESSMACHINEINDOORBIKEDATA_UUID) ||
           (spinBLEClient.myBLEDevices[i].charUUID == FLYWHEEL_UART_RX_UUID) || (spinBLEClient.myBLEDevices[i].charUUID == ECHELON_SERVICE_UUID) ||
-          (spinBLEClient.myBLEDevices[i].charUUID == CYCLINGPOWERSERVICE_UUID) || (spinBLEClient.myBLEDevices[i].charUUID == CSCSERVICE_UUID)) {
+          (spinBLEClient.myBLEDevices[i].charUUID == CHRONO_DATA_UUID) || (spinBLEClient.myBLEDevices[i].charUUID == CYCLINGPOWERSERVICE_UUID) ||
+          (spinBLEClient.myBLEDevices[i].charUUID == CSCSERVICE_UUID)) {
         SS2K_LOG(BLE_CLIENT_LOG_TAG, "Deregistered PM on Disconnect");
       }
       if ((spinBLEClient.myBLEDevices[i].charUUID == HEARTCHARACTERISTIC_UUID)) {
@@ -1094,7 +1095,7 @@ void SpinBLEAdvertisedDevice::set(const NimBLEAdvertisedDevice* device, int id, 
           SS2K_LOG(BLE_CLIENT_LOG_TAG, "Registered CSC on Connect");
         } else if (serviceUUID == CYCLINGPOWERSERVICE_UUID || serviceUUID == FITNESSMACHINESERVICE_UUID ||
                    (serviceUUID == FLYWHEEL_UART_SERVICE_UUID && this->uniqueName.find("Flywheel") != std::string::npos) || serviceUUID == ECHELON_DEVICE_UUID ||
-                   serviceUUID == PELOTON_DATA_UUID) {
+                   serviceUUID == CHRONO_SERVICE_UUID || serviceUUID == PELOTON_DATA_UUID) {
           this->isPM                = true;
           spinBLEClient.connectedPM = true;
           SS2K_LOG(BLE_CLIENT_LOG_TAG, "Registered PM on Connect");
