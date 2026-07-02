@@ -10,9 +10,10 @@
 // Update firmware on boot?
 #define AUTO_FIRMWARE_UPDATE true
 
-// Dedicated EMC/EMI test mode. Runs the motor continuously, alternating
-// direction every interval, with WiFi and BLE disabled.
+// Dedicated EMC/EMI test mode. Runs the motor continuously, optionally
+// alternating direction every interval, with WiFi and BLE disabled.
 #define EMC_EMI_TEST_MODE true
+inline bool EMC_EMI_TEST_RUN_FORWARD_AND_BACKWARD = false;
 #define EMC_EMI_TEST_DIRECTION_INTERVAL_MS 5000
 #define EMC_EMI_TEST_LED_BLINK_MS 500
 
@@ -62,7 +63,7 @@ const char* const DEFAULT_PASSWORD = "password";
 
 // Default Stepper Power.
 // Stepper peak current in ma. This is hardware restricted to a maximum of 2000ma on the TMC2225. RMS current is less.
-#define DEFAULT_STEPPER_POWER 900
+#define DEFAULT_STEPPER_POWER 500
 
 // Default Shift Step. The amount to move the stepper motor for a shift press.
 #define DEFAULT_SHIFT_STEP 1200
@@ -71,7 +72,7 @@ const char* const DEFAULT_PASSWORD = "password";
 #define STEPPER_ACCELERATION 3000
 
 // Stepper Max Speed in steps/s
-#define DEFAULT_STEPPER_SPEED 3500
+#define DEFAULT_STEPPER_SPEED 3000
 
 // Stepper Hold Power Scaler. Divides the RMS current to get hold current.
 #define HOLD_PWR_SCALER .3f

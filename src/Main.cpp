@@ -82,7 +82,9 @@ void runEmcEmiTestLoop() {
   stepper->enableOutputs();
   stepper->setAutoEnable(false);
   stepper->runForward();
-  SS2K_LOG(MAIN_LOG_TAG, "EMC/EMI test mode: motor running forward.");
+  SS2K_LOG(MAIN_LOG_TAG,
+           "EMC/EMI test mode: motor running forward%s.",
+           EMC_EMI_TEST_RUN_FORWARD_AND_BACKWARD ? "" : " only");
 
   bool runForward = true;
   unsigned long directionTimer = millis();
@@ -91,7 +93,7 @@ void runEmcEmiTestLoop() {
     unsigned long now = millis();
     updateEmcEmiTestLed(now);
 
-    if ((now - directionTimer) >= EMC_EMI_TEST_DIRECTION_INTERVAL_MS) {
+    if (EMC_EMI_TEST_RUN_FORWARD_AND_BACKWARD && (now - directionTimer) >= EMC_EMI_TEST_DIRECTION_INTERVAL_MS) {
       stepper->stopMove();
       unsigned long stopTimer = millis();
       while (stepper->isRunning() && (millis() - stopTimer) < 1000) {
