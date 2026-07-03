@@ -6,6 +6,7 @@
  */
 
 #include "DirConManager.h"
+#include "BLE_OpenBikeControl_Service.h"
 #include "SS2KLog.h"
 #include <algorithm>
 #include <Constants.h>
@@ -20,6 +21,7 @@ WiFiServer* DirConManager::tcpServer = nullptr;
 uint8_t DirConManager::receiveBuffer[DIRCON_MAX_CLIENTS][DIRCON_RECEIVE_BUFFER_SIZE];
 size_t DirConManager::receiveBufferLength[DIRCON_MAX_CLIENTS] = {0};
 uint8_t DirConManager::sendBuffer[DIRCON_SEND_BUFFER_SIZE];
+DirConClientProtocol DirConManager::clientProtocols[DIRCON_MAX_CLIENTS] = {DIRCON_CLIENT_PROTOCOL_UNKNOWN};
 uint8_t DirConManager::lastSequenceNumber[DIRCON_MAX_CLIENTS] = {0};
 Subscription DirConManager::clientSubscriptions[DIRCON_MAX_CLIENTS][DIRCON_MAX_CHARACTERISTICS];
 DirConManager::ServiceRegistration DirConManager::registeredServices[DIRCON_MAX_SERVICES] = {};
@@ -38,6 +40,7 @@ bool DirConManager::start() {
   for (int i = 0; i < DIRCON_MAX_CLIENTS; i++) {
     receiveBufferLength[i] = 0;
     lastSequenceNumber[i]  = 0;
+    clientProtocols[i]     = DIRCON_CLIENT_PROTOCOL_UNKNOWN;
     for (int j = 0; j < DIRCON_MAX_CHARACTERISTICS; j++) {
       clientSubscriptions[i][j].active = false;
     }
@@ -248,6 +251,7 @@ void DirConManager::checkForNewClients() {
       // Clear receive buffer and subscription state
       receiveBufferLength[i] = 0;
       lastSequenceNumber[i]  = 0;
+      clientProtocols[i]     = DIRCON_CLIENT_PROTOCOL_UNKNOWN;
       for (int j = 0; j < DIRCON_MAX_CHARACTERISTICS; j++) {
         clientSubscriptions[i][j].active = false;
       }
@@ -290,6 +294,21 @@ void DirConManager::handleClientData() {
         receiveBufferLength[i]++;
       }
 
+      if (clientProtocols[i] == DIRCON_CLIENT_PROTOCOL_UNKNOWN) {
+        if (isOpenBikeControlTcpMessage(receiveBuffer[i], receiveBufferLength[i])) {
+          clientProtocols[i] = DIRCON_CLIENT_PROTOCOL_OPENBIKECONTROL;
+          SS2K_LOG(DIRCON_LOG_TAG, "Client %d is using raw OpenBikeControl TCP", i);
+        } else if (isDirConTcpMessage(receiveBuffer[i], receiveBufferLength[i])) {
+          clientProtocols[i] = DIRCON_CLIENT_PROTOCOL_DIRCON;
+          SS2K_LOG(DIRCON_LOG_TAG, "Client %d is using DirCon TCP", i);
+        }
+      }
+
+      if (clientProtocols[i] == DIRCON_CLIENT_PROTOCOL_OPENBIKECONTROL) {
+        processOpenBikeControlTcpData(i);
+        continue;
+      }
+
       // Process messages in buffer
       size_t processedBytes = 0;
       while (processedBytes < receiveBufferLength[i]) {
@@ -321,6 +340,91 @@ void DirConManager::handleClientData() {
           receiveBufferLength[i] = 0;
         }
       }
+    }
+  }
+}
+
+bool DirConManager::isOpenBikeControlTcpMessage(uint8_t* data, size_t length) {
+  if (data == nullptr || length == 0) {
+    return false;
+  }
+  return data[0] == 0x00 || data[0] == 0x03 || data[0] == 0x04;
+}
+
+bool DirConManager::isDirConTcpMessage(uint8_t* data, size_t length) {
+  if (data == nullptr || length < DIRCON_MESSAGE_HEADER_LENGTH) {
+    return false;
+  }
+  uint16_t contentLength = (static_cast<uint16_t>(data[4]) << 8) | data[5];
+  return data[0] == 0x01 && data[1] >= DIRCON_MSGID_DISCOVER_SERVICES && data[1] <= DIRCON_MSGID_UNSOLICITED_CHARACTERISTIC_NOTIFICATION &&
+         contentLength <= DIRCON_MESSAGE_MAX_CONTENT_LENGTH;
+}
+
+void DirConManager::processOpenBikeControlTcpData(size_t clientIndex) {
+  if (clientIndex >= DIRCON_MAX_CLIENTS || receiveBufferLength[clientIndex] == 0) {
+    return;
+  }
+
+  uint8_t* data = receiveBuffer[clientIndex];
+  size_t length = receiveBufferLength[clientIndex];
+  size_t processedBytes = 0;
+
+  while (processedBytes < length) {
+    uint8_t messageType = data[processedBytes];
+
+    if (messageType == 0x00) {
+      processedBytes++;
+      continue;
+    }
+
+    if (messageType == 0x03) {
+      if ((length - processedBytes) < 4) {
+        break;
+      }
+      openBikeControlService.handleHapticWrite(data + processedBytes, 4, true);
+      processedBytes += 4;
+      continue;
+    }
+
+    if (messageType == 0x04) {
+      if ((length - processedBytes) < 5) {
+        break;
+      }
+
+      size_t appIdLengthIndex = processedBytes + 2;
+      size_t appIdLength      = data[appIdLengthIndex];
+      size_t appVersionLengthIndex = appIdLengthIndex + 1 + appIdLength;
+      if (appVersionLengthIndex >= length) {
+        break;
+      }
+
+      size_t appVersionLength = data[appVersionLengthIndex];
+      size_t buttonCountIndex = appVersionLengthIndex + 1 + appVersionLength;
+      if (buttonCountIndex >= length) {
+        break;
+      }
+
+      size_t buttonCount = data[buttonCountIndex];
+      size_t messageLength = (buttonCountIndex + 1 + buttonCount) - processedBytes;
+      if ((length - processedBytes) < messageLength) {
+        break;
+      }
+
+      openBikeControlService.handleAppInfoWrite(data + processedBytes, messageLength, true);
+      processedBytes += messageLength;
+      continue;
+    }
+
+    SS2K_LOG(DIRCON_LOG_TAG, "Ignoring unknown OpenBikeControl TCP message type 0x%02X from client %d", messageType, clientIndex);
+    processedBytes++;
+  }
+
+  if (processedBytes > 0) {
+    if (processedBytes < receiveBufferLength[clientIndex]) {
+      memmove(receiveBuffer[clientIndex], receiveBuffer[clientIndex] + processedBytes, receiveBufferLength[clientIndex] - processedBytes);
+      receiveBufferLength[clientIndex] -= processedBytes;
+    } else {
+      receiveBufferLength[clientIndex] = 0;
     }
   }
 }
@@ -560,6 +664,13 @@ void DirConManager::broadcastNotification(const NimBLEUUID& characteristicUuid, 
   }
 
   for (int i = 0; i < DIRCON_MAX_CLIENTS; i++) {
+    if (clientProtocols[i] == DIRCON_CLIENT_PROTOCOL_OPENBIKECONTROL) {
+      if (dirConClients[i].connected() && characteristicUuid.equals(NimBLEUUID(OPENBIKECONTROL_BUTTON_STATE_CHARACTERISTIC_UUID))) {
+        dirConClients[i].write(data, length);
+      }
+      continue;
+    }
+
     if (!dirConClients[i].connected() || (onlySubscribers && !hasSubscription(i, characteristicUuid))) {
       continue;
     }

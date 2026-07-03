@@ -18,7 +18,7 @@
 #define DIRCON_MDNS_SERVICE_NAME     "_wahoo-fitness-tnp"
 #define DIRCON_MDNS_SERVICE_PROTOCOL "tcp"
 #define DIRCON_TCP_PORT              8081
-#define DIRCON_MAX_CLIENTS           1
+#define DIRCON_MAX_CLIENTS           3
 #define DIRCON_RECEIVE_BUFFER_SIZE   256
 #define DIRCON_SEND_BUFFER_SIZE      256
 #define DIRCON_MAX_CHARACTERISTICS   20   // maximum number of characteristics to track for subscriptions
@@ -37,6 +37,12 @@ struct DirConWriteResult {
 struct Subscription {
   NimBLEUUID uuid;
   bool active = false;
+};
+
+enum DirConClientProtocol {
+  DIRCON_CLIENT_PROTOCOL_UNKNOWN = 0,
+  DIRCON_CLIENT_PROTOCOL_DIRCON,
+  DIRCON_CLIENT_PROTOCOL_OPENBIKECONTROL,
 };
 
 // Write handler callback: returns true if the characteristic was handled by this service
@@ -81,12 +87,16 @@ class DirConManager {
   static uint8_t receiveBuffer[DIRCON_MAX_CLIENTS][DIRCON_RECEIVE_BUFFER_SIZE];
   static size_t receiveBufferLength[DIRCON_MAX_CLIENTS];
   static uint8_t sendBuffer[DIRCON_SEND_BUFFER_SIZE];
+  static DirConClientProtocol clientProtocols[DIRCON_MAX_CLIENTS];
 
   // Message handling
   static bool processDirConMessage(DirConMessage* message, size_t clientIndex);
   static void sendErrorResponse(uint8_t messageId, uint8_t sequenceNumber, uint8_t errorCode, size_t clientIndex);
   static void sendResponse(DirConMessage* message, size_t clientIndex);
   static void broadcastNotification(const NimBLEUUID& characteristicUuid, uint8_t* data, size_t length, bool onlySubscribers = true);
+  static bool isOpenBikeControlTcpMessage(uint8_t* data, size_t length);
+  static bool isDirConTcpMessage(uint8_t* data, size_t length);
+  static void processOpenBikeControlTcpData(size_t clientIndex);
 
   // Service and characteristic handling
   static void addBleServiceUuid(const NimBLEUUID& serviceUuid);

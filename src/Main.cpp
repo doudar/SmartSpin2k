@@ -348,13 +348,12 @@ void SS2K::FTMSModeShiftModifier() {
         }
       }
     }
-    if (openBikeControlService.isConnected()) {
-      for (int i = 0; i < absDelta; i++) {
-        if (shiftDelta > 0) {
-          openBikeControlService.sendShiftUp();
-        } else {
-          openBikeControlService.sendShiftDown();
-        }
+    for (int i = 0; i < absDelta; i++) {
+      if (shiftDelta > 0) {
+        openBikeControlService.sendShiftUp();
+       } else {
+        openBikeControlService.sendShiftDown();
+      // openBikeControlService.sendGearSet(rtConfig->getShifterPosition());
       }
     }
     switch (rtConfig->getFTMSMode()) {
@@ -424,6 +423,7 @@ void SS2K::FTMSModeShiftModifier() {
         spinBLEClient.FTMSControlPointWrite(_controlData, 7);
       }
     }
+    openBikeControlService.sendGearSet(rtConfig->getShifterPosition());
     ss2k->lastShifterPosition = rtConfig->getShifterPosition();
     BLE_ss2kCustomCharacteristic::notify(BLE_shifterPosition);
   }

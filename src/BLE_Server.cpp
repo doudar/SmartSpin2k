@@ -55,7 +55,7 @@ void startBLEServer() {
   fitnessMachineService.setupService(spinBLEServer.pServer, &chrCallbacks);
   ss2kCustomCharacteristic.setupService(spinBLEServer.pServer);
   deviceInformationService.setupService(spinBLEServer.pServer);
-  // zwiftService.setupService(spinBLEServer.pServer);
+  zwiftService.setupService(spinBLEServer.pServer);
   // openBikeControlService.setupService(spinBLEServer.pServer);
   pAdvertising->addServiceUUID(CYCLINGPOWERSERVICE_UUID);
   pAdvertising->addServiceUUID(CSCSERVICE_UUID);
@@ -96,8 +96,8 @@ void SpinBLEServer::update() {
   cyclingPowerService.update();
   cyclingSpeedCadenceService.update();
   fitnessMachineService.update();
-  // zwiftService.update();
-  // OpenBikeControl sends event-driven notifications from shift handlers.
+  zwiftService.update();
+  // openBikeControlService.update();
   // wattbikeService.parseNemit();  // Changed from update() to parseNemit()
   // sb20Service.notify();
 }

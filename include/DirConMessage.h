@@ -12,6 +12,7 @@
 #include <NimBLEDevice.h>
 
 #define DIRCON_MESSAGE_HEADER_LENGTH 6
+#define DIRCON_MESSAGE_MAX_CONTENT_LENGTH 250
 
 // DirCon protocol message types
 #define DIRCON_CHAR_PROP_FLAG_READ 0x01

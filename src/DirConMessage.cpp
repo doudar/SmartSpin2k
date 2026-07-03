@@ -13,6 +13,16 @@
 
 static constexpr size_t kDirConHexLogMaxBytes = 256;
 
+static void logRawPrefix(const char* message, const uint8_t* data, size_t len) {
+  char hexBuf[kDirConHexLogMaxBytes * 3 + 1];
+  const size_t bytesToLog = (len < kDirConHexLogMaxBytes) ? len : kDirConHexLogMaxBytes;
+  for (size_t i = 0; i < bytesToLog; i++) {
+    snprintf(hexBuf + i * 3, 4, "%02X ", data[i]);
+  }
+  hexBuf[bytesToLog * 3] = '\0';
+  SS2K_LOG(DIRCON_LOG_TAG, "%s Full message prefix (%zu bytes): %s", message, bytesToLog, hexBuf);
+}
+
 // Helper functions to print raw bytes to serial monitor
 #ifdef DEBUG_DIRCON_MESSAGES
 void printRawBytesToSerial(const uint8_t* data, size_t length, bool isIncoming) {
@@ -180,6 +190,13 @@ size_t DirConMessage::parse(uint8_t* data, size_t len, uint8_t sequenceNumber) {
   this->AdditionalData.clear();
   this->AdditionalUUIDs.clear();
 
+  if (this->Length > DIRCON_MESSAGE_MAX_CONTENT_LENGTH) {
+    SS2K_LOG(DIRCON_LOG_TAG, "Error parsing DirCon message: Invalid content length %d > %d", this->Length, DIRCON_MESSAGE_MAX_CONTENT_LENGTH);
+    logRawPrefix("Invalid DirCon frame.", data, len);
+    this->Identifier = DIRCON_MSGID_ERROR;
+    return 1;
+  }
+
   if ((len - DIRCON_MESSAGE_HEADER_LENGTH) < this->Length) {
     SS2K_LOG(DIRCON_LOG_TAG, "Error parsing DirCon message: Content length %d < %d", (len - DIRCON_MESSAGE_HEADER_LENGTH), this->Length);
     this->Identifier = DIRCON_MSGID_ERROR;
@@ -322,15 +339,10 @@ size_t DirConMessage::parse(uint8_t* data, size_t len, uint8_t sequenceNumber) {
       break;
 
     default:
-      char hexBuf[kDirConHexLogMaxBytes * 3 + 1];
-      const size_t bytesToLog = (len < kDirConHexLogMaxBytes) ? len : kDirConHexLogMaxBytes;
-      for (size_t i = 0; i < bytesToLog; i++) {
-        snprintf(hexBuf + i * 3, 4, "%02X ", data[i]);
-      }
-      hexBuf[bytesToLog * 3] = '\0';
-      SS2K_LOG(DIRCON_LOG_TAG, "Error parsing DirCon message: Unknown identifier %d. Full message (%zu bytes): %s", this->Identifier, len, hexBuf);
+      SS2K_LOG(DIRCON_LOG_TAG, "Error parsing DirCon message: Unknown identifier %d", this->Identifier);
+      logRawPrefix("Unknown DirCon frame.", data, len);
       this->Identifier = DIRCON_MSGID_ERROR;
-      return 0;
+      return DIRCON_MESSAGE_HEADER_LENGTH + this->Length;
       break;
   }
 

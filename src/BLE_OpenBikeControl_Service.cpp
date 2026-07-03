@@ -20,13 +20,13 @@
 
 namespace {
 constexpr uint8_t kOpenBikeControlButtonStateMessageType = 0x01;
-constexpr uint8_t kOpenBikeControlHapticMessageType      = 0x03;
 constexpr uint8_t kOpenBikeControlAppInfoMessageType     = 0x04;
 constexpr uint8_t kOpenBikeControlShiftUpButtonId        = 0x01;
 constexpr uint8_t kOpenBikeControlShiftDownButtonId      = 0x02;
+constexpr uint8_t kOpenBikeControlGearSetButtonId        = 0x03;
 constexpr uint8_t kOpenBikeControlButtonReleasedState    = 0x00;
 constexpr uint8_t kOpenBikeControlButtonPressedState     = 0x01;
-constexpr unsigned long kOpenBikeControlSessionTimeoutMs = 15000;
+constexpr unsigned long kOpenBikeControlButtonPressMs     = 50;
 constexpr char kOpenBikeControlLogTag[]                  = "BLE_OBC";
 }  // namespace
 
@@ -44,7 +44,11 @@ BLE_OpenBikeControl_Service::BLE_OpenBikeControl_Service()
       buttonStateCharacteristic(nullptr),
       hapticFeedbackCharacteristic(nullptr),
       appInformationCharacteristic(nullptr),
-      _lastClientActivityMs(0) {}
+      _shiftUpReleaseAtMs(0),
+      _shiftDownReleaseAtMs(0),
+      _shiftUpReleasePending(false),
+      _shiftDownReleasePending(false),
+      _gearSetPending(false) {}
 
 void BLE_OpenBikeControl_Service::setupMDNS() {
   if (!openBikeControlServiceSetupCalled || openBikeControlMdnsStarted) {
@@ -154,14 +158,24 @@ void BLE_OpenBikeControl_Service::setupService(NimBLEServer *pServer) {
   SS2K_LOG(kOpenBikeControlLogTag, "OpenBikeControl service started");
 }
 
-bool BLE_OpenBikeControl_Service::isConnected() {
-  if (_lastClientActivityMs == 0) {
-    return false;
-  }
-  return (millis() - _lastClientActivityMs) < kOpenBikeControlSessionTimeoutMs;
-}
+void BLE_OpenBikeControl_Service::update() {
+  unsigned long now = millis();
 
-void BLE_OpenBikeControl_Service::markClientActivity() { _lastClientActivityMs = millis(); }
+  if (_shiftUpReleasePending && static_cast<long>(now - _shiftUpReleaseAtMs) >= 0) {
+    _shiftUpReleasePending = false;
+    sendButtonState(kOpenBikeControlShiftUpButtonId, kOpenBikeControlButtonReleasedState);
+  }
+
+  if (_shiftDownReleasePending && static_cast<long>(now - _shiftDownReleaseAtMs) >= 0) {
+    _shiftDownReleasePending = false;
+    sendButtonState(kOpenBikeControlShiftDownButtonId, kOpenBikeControlButtonReleasedState);
+  }
+
+  if (_gearSetPending) {
+    _gearSetPending = false;
+    sendGearSet(rtConfig->getShifterPosition());
+  }
+}
 
 void BLE_OpenBikeControl_Service::sendButtonState(uint8_t buttonId, uint8_t state) {
   if (buttonStateCharacteristic == nullptr) {
@@ -175,30 +189,41 @@ void BLE_OpenBikeControl_Service::sendButtonState(uint8_t buttonId, uint8_t stat
                                       sizeof(payload));
 }
 
+void BLE_OpenBikeControl_Service::scheduleButtonRelease(uint8_t buttonId) {
+  unsigned long releaseAtMs = millis() + kOpenBikeControlButtonPressMs;
+
+  if (buttonId == kOpenBikeControlShiftUpButtonId) {
+    _shiftUpReleaseAtMs      = releaseAtMs;
+    _shiftUpReleasePending   = true;
+  } else if (buttonId == kOpenBikeControlShiftDownButtonId) {
+    _shiftDownReleaseAtMs    = releaseAtMs;
+    _shiftDownReleasePending = true;
+  }
+}
+
 void BLE_OpenBikeControl_Service::sendShiftUp() {
   sendButtonState(kOpenBikeControlShiftUpButtonId, kOpenBikeControlButtonPressedState);
-  vTaskDelay(50 / portTICK_PERIOD_MS);
-  sendButtonState(kOpenBikeControlShiftUpButtonId, kOpenBikeControlButtonReleasedState);
+  scheduleButtonRelease(kOpenBikeControlShiftUpButtonId);
 }
 
 void BLE_OpenBikeControl_Service::sendShiftDown() {
   sendButtonState(kOpenBikeControlShiftDownButtonId, kOpenBikeControlButtonPressedState);
-  vTaskDelay(50 / portTICK_PERIOD_MS);
-  sendButtonState(kOpenBikeControlShiftDownButtonId, kOpenBikeControlButtonReleasedState);
+  scheduleButtonRelease(kOpenBikeControlShiftDownButtonId);
+}
+
+void BLE_OpenBikeControl_Service::sendGearSet(int gear) {
+  uint8_t gearValue = static_cast<uint8_t>(constrain(gear, 0, 255));
+  sendButtonState(kOpenBikeControlGearSetButtonId, gearValue);
 }
 
 void BLE_OpenBikeControl_Service::handleHapticWrite(const uint8_t *data, size_t length, bool isDirCon) {
-  if (data == nullptr || length < 4) {
-    SS2K_LOG(kOpenBikeControlLogTag, "Ignoring short haptic write");
-    return;
-  }
-  if (data[0] != kOpenBikeControlHapticMessageType) {
-    SS2K_LOG(kOpenBikeControlLogTag, "Ignoring invalid haptic message type 0x%02X", data[0]);
+  if (data == nullptr) {
+    SS2K_LOG(kOpenBikeControlLogTag, "Ignoring null haptic write");
     return;
   }
 
-  markClientActivity();
-  SS2K_LOG(kOpenBikeControlLogTag, "Haptic command from %s pattern=%u duration=%u intensity=%u", isDirCon ? "DirCon" : "BLE", data[1], data[2], data[3]);
+  std::string payload = toHexString(data, length);
+  SS2K_LOG(kOpenBikeControlLogTag, "Haptic write from %s len=%zu data=%s", isDirCon ? "DirCon" : "BLE", length, payload.c_str());
 }
 
 void BLE_OpenBikeControl_Service::handleAppInfoWrite(const uint8_t *data, size_t length, bool isDirCon) {
@@ -211,13 +236,13 @@ void BLE_OpenBikeControl_Service::handleAppInfoWrite(const uint8_t *data, size_t
     return;
   }
 
-  markClientActivity();
   SS2K_LOG(kOpenBikeControlLogTag, "App info update from %s (len=%d, version=%u)", isDirCon ? "DirCon" : "BLE", length, data[1]);
+  _gearSetPending = true;
 }
 
 void BLE_OpenBikeControl_Service::handleButtonStateSubscription(uint16_t subValue) {
   if (subValue > 0) {
-    markClientActivity();
+    _gearSetPending = true;
   }
 }
 

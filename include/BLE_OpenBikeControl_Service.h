@@ -14,9 +14,10 @@ class BLE_OpenBikeControl_Service {
   BLE_OpenBikeControl_Service();
 
   void setupService(NimBLEServer *pServer);
-  bool isConnected();
+  void update();
   void sendShiftUp();
   void sendShiftDown();
+  void sendGearSet(int gear);
 
   void handleHapticWrite(const uint8_t *data, size_t length, bool isDirCon = false);
   void handleAppInfoWrite(const uint8_t *data, size_t length, bool isDirCon = false);
@@ -27,13 +28,17 @@ class BLE_OpenBikeControl_Service {
   NimBLECharacteristic *buttonStateCharacteristic;
   NimBLECharacteristic *hapticFeedbackCharacteristic;
   NimBLECharacteristic *appInformationCharacteristic;
-  unsigned long _lastClientActivityMs;
+  unsigned long _shiftUpReleaseAtMs;
+  unsigned long _shiftDownReleaseAtMs;
+  bool _shiftUpReleasePending;
+  bool _shiftDownReleasePending;
+  bool _gearSetPending;
 
   static void setupMDNS();
   static void addServiceUuidToMDNS(const NimBLEUUID& serviceUuid);
 
   void sendButtonState(uint8_t buttonId, uint8_t state);
-  void markClientActivity();
+  void scheduleButtonRelease(uint8_t buttonId);
 };
 
 class OpenBikeControlHapticCallbacks : public NimBLECharacteristicCallbacks {
