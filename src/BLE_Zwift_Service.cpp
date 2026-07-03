@@ -13,19 +13,10 @@
 
 using ZwiftProtocol::CommandCode;
 using ZwiftProtocol::makeTag;
-using ZwiftProtocol::RideButtonMask;
 using ZwiftProtocol::toUnderlying;
 using ZwiftProtocol::WireType;
 
 namespace {
-constexpr uint8_t kRideAnalogButtonsPayloadSize = 0x18;
-
-constexpr uint8_t kRideKeypadButtonMapTag     = makeTag(ZwiftProtocol::RideKeyPadStatus::Field::ButtonMap, WireType::Varint);
-constexpr uint8_t kRideKeypadAnalogButtonsTag = makeTag(ZwiftProtocol::RideKeyPadStatus::Field::AnalogButtons, WireType::LengthDelimited);
-constexpr uint8_t kRideAnalogGroupStatusTag   = makeTag(ZwiftProtocol::RideAnalogKeyGroup::Field::GroupStatus, WireType::LengthDelimited);
-constexpr uint8_t kRideAnalogLocationTag      = makeTag(ZwiftProtocol::RideAnalogKeyPress::Field::Location, WireType::Varint);
-constexpr uint8_t kRideAnalogValueTag         = makeTag(ZwiftProtocol::RideAnalogKeyPress::Field::AnalogValue, WireType::Varint);
-
 uint32_t getNextZwiftField5Counter(uint16_t power) {
   const int knownOutputs[] = {2864, 4060, 4636, 6803};
   static int counter       = 0;
@@ -36,6 +27,11 @@ uint32_t getNextZwiftField5Counter(uint16_t power) {
   }
   return knownOutputs[counter % (sizeof(knownOutputs) / sizeof(knownOutputs[0]))];
 }
+
+// Zwift virtual gear ratios (24 gears, from 0.75 to 5.49)
+constexpr uint32_t gearRatios[] = {7500,  8700,  9900,  11100, 12300, 13800, 15300, 16800, 18600, 20400, 22200, 24000,
+                                   26100, 28200, 30300, 32400, 34900, 37400, 39900, 42400, 45400, 48400, 51400, 54900};
+constexpr int kNumGears = sizeof(gearRatios) / sizeof(gearRatios[0]);
 }  // namespace
 
 // "RideOn" handshake bytes
@@ -50,44 +46,6 @@ static const size_t RESPONSE_START_LEN = sizeof(RESPONSE_START);
 // Async RideOn answer (protobuf-encoded "RIDE_ON(0)") - sent on async after handshake
 static const uint8_t ASYNC_RIDEON_ANSWER[]  = {0x2a, 0x08, 0x03, 0x12, 0x0d, 0x22, 0x0b, 0x52, 0x49, 0x44, 0x45, 0x5f, 0x4f, 0x4e, 0x28, 0x30, 0x29, 0x00};
 static const size_t ASYNC_RIDEON_ANSWER_LEN = sizeof(ASYNC_RIDEON_ANSWER);
-
-// Pre-computed "no buttons pressed" Ride notification (opcode 0x23 + bitmap + analog data)
-static const uint8_t ALL_RELEASED[] = {
-    toUnderlying(CommandCode::RideKeyPadStatus),
-    kRideKeypadButtonMapTag,
-    0xFF,
-    0xFF,
-    0xFF,
-    0xFF,
-    0x0F,  // field 1: bitmap = 0xFFFFFFFF (all released)
-    kRideKeypadAnalogButtonsTag,
-    kRideAnalogButtonsPayloadSize,
-    kRideAnalogGroupStatusTag,
-    0x04,
-    kRideAnalogLocationTag,
-    toUnderlying(ZwiftProtocol::RideAnalogLocation::Left),
-    kRideAnalogValueTag,
-    0x00,  // analog 0 (LEFT): value 0
-    kRideAnalogGroupStatusTag,
-    0x04,
-    kRideAnalogLocationTag,
-    toUnderlying(ZwiftProtocol::RideAnalogLocation::Right),
-    kRideAnalogValueTag,
-    0x00,  // analog 1 (RIGHT): value 0
-    kRideAnalogGroupStatusTag,
-    0x04,
-    kRideAnalogLocationTag,
-    toUnderlying(ZwiftProtocol::RideAnalogLocation::Up),
-    kRideAnalogValueTag,
-    0x00,  // analog 2: value 0
-    kRideAnalogGroupStatusTag,
-    0x04,
-    kRideAnalogLocationTag,
-    toUnderlying(ZwiftProtocol::RideAnalogLocation::Down),
-    kRideAnalogValueTag,
-    0x00  // analog 3: value 0
-};
-static const size_t ALL_RELEASED_LEN = sizeof(ALL_RELEASED);
 
 static const uint8_t ASK6_PREFIX[] = {
     toUnderlying(CommandCode::HubCommand),
@@ -134,11 +92,8 @@ bool BLE_Zwift_Service::keepAlive(unsigned long now) {
     return false;
   }
 
-  if (now - _lastKeepaliveTime >= kZwiftKeepaliveIntervalMs && isConnected()) {
-    // Keepalive sent on sync_tx as "no buttons pressed" notification
-    syncTxCharacteristic->setValue(ALL_RELEASED, ALL_RELEASED_LEN);
-    syncTxCharacteristic->indicate();
-    DirConManager::notifyCharacteristic(NimBLEUUID(ZWIFT_CUSTOM_SERVICE_UUID), syncTxCharacteristic->getUUID(), const_cast<uint8_t*>(ALL_RELEASED), ALL_RELEASED_LEN);
+  if (isDirCon && now - _lastKeepaliveTime >= kZwiftKeepaliveIntervalMs && isConnected()) {
+    sendRidingData();
     _lastKeepaliveTime = now;
   }
 
@@ -233,7 +188,7 @@ void BLE_Zwift_Service::update() {
   //   swapAdv = !swapAdv;
   // }
 
-  if (isConnected() && now - _lastRidingDataTime >= kZwiftRidingDataIntervalMs) {
+  if (isDirCon && isConnected() && now - _lastRidingDataTime >= kZwiftRidingDataIntervalMs) {
     sendRidingData();
     _lastRidingDataTime = now;
   }
@@ -394,67 +349,15 @@ void BLE_Zwift_Service::sendTrainerConfigVirtualShiftStatus(uint8_t virtualShift
   sendAsyncPayload(payload, pos);
 }
 
-void BLE_Zwift_Service::sendShiftUp() {
-  SS2K_LOG(getLogTag(), "Sending shift up to Zwift");
-  sendButtonNotification(RideButtonMask::ShiftUpRight);
-  // Small delay then release - Zwift needs to see the transition
-  vTaskDelay(50 / portTICK_PERIOD_MS);
-  sendAllButtonsReleased();
-}
-
-void BLE_Zwift_Service::sendShiftDown() {
-  SS2K_LOG(getLogTag(), "Sending shift down to Zwift");
-  sendButtonNotification(RideButtonMask::ShiftUpLeft);
-  // Small delay then release
-  vTaskDelay(50 / portTICK_PERIOD_MS);
-  sendAllButtonsReleased();
-}
-
-void BLE_Zwift_Service::sendButtonNotification(RideButtonMask buttonMask) {
-  // Build Ride format: opcode(1) + tag(1) + varint(max5) + analog(26) = max 33 bytes
-  uint32_t buttonMap = toUnderlying(~buttonMask);
-
-  static const uint8_t analogData[] = {kRideKeypadAnalogButtonsTag, kRideKeypadAnalogButtonsTag + 0x06,
-                                       kRideAnalogGroupStatusTag,   0x04,
-                                       kRideAnalogLocationTag,      toUnderlying(ZwiftProtocol::RideAnalogLocation::Left),
-                                       kRideAnalogValueTag,         0x00,
-                                       kRideAnalogGroupStatusTag,   0x04,
-                                       kRideAnalogLocationTag,      toUnderlying(ZwiftProtocol::RideAnalogLocation::Right),
-                                       kRideAnalogValueTag,         0x00,
-                                       kRideAnalogGroupStatusTag,   0x04,
-                                       kRideAnalogLocationTag,      toUnderlying(ZwiftProtocol::RideAnalogLocation::Up),
-                                       kRideAnalogValueTag,         0x00,
-                                       kRideAnalogGroupStatusTag,   0x04,
-                                       kRideAnalogLocationTag,      toUnderlying(ZwiftProtocol::RideAnalogLocation::Down),
-                                       kRideAnalogValueTag,         0x00};
-
-  uint8_t buf[33];
-  buf[0]           = toUnderlying(CommandCode::RideKeyPadStatus);
-  buf[1]           = kRideKeypadButtonMapTag;
-  size_t varintLen = encodeVarint32(buttonMap, &buf[2]);
-  size_t pos       = 2 + varintLen;
-  memcpy(&buf[pos], analogData, sizeof(analogData));
-  pos += sizeof(analogData);
-
-  asyncCharacteristic->setValue(buf, pos);
-  asyncCharacteristic->notify();
-  DirConManager::notifyCharacteristic(NimBLEUUID(ZWIFT_RIDE_CUSTOM_SERVICE_UUID), asyncCharacteristic->getUUID(), buf, pos);
-}
-
-size_t BLE_Zwift_Service::encodeVarint32(uint32_t value, uint8_t* buffer) {
-  size_t i = 0;
-  while (value > 0x7F) {
-    buffer[i++] = static_cast<uint8_t>((value & 0x7F) | 0x80);
-    value >>= 7;
+void BLE_Zwift_Service::sendCurrentGearStatus() {
+  if (!isConnected()) {
+    return;
   }
-  buffer[i++] = static_cast<uint8_t>(value);
-  return i;
-}
 
-void BLE_Zwift_Service::sendAllButtonsReleased() {
-  asyncCharacteristic->setValue(ALL_RELEASED, ALL_RELEASED_LEN);
-  asyncCharacteristic->notify();
-  DirConManager::notifyCharacteristic(NimBLEUUID(ZWIFT_RIDE_CUSTOM_SERVICE_UUID), asyncCharacteristic->getUUID(), const_cast<uint8_t*>(ALL_RELEASED), ALL_RELEASED_LEN);
+  _gearRatioX10000 = gearToRatioX10000(rtConfig->getShifterPosition());
+  SS2K_LOG(getLogTag(), "Sending trainer gear status: gear=%d ratio=%.4f", rtConfig->getShifterPosition(), _gearRatioX10000 / 10000.0);
+  sendGearRatioSyncTx();
+  sendTrainerConfigSimulationStatus(_gearRatioX10000, _gearRatioX10000);
 }
 
 void BLE_Zwift_Service::handleSyncRxWrite(const std::string& value, bool _isDirCon) {
@@ -472,19 +375,25 @@ void BLE_Zwift_Service::handleSyncRxWrite(const std::string& value, bool _isDirC
   if (value.length() >= 6 && memcmp(data, RideOn, 6) == 0) {
     SS2K_LOG(getLogTag(), "Received RideOn handshake from Zwift (%s)", _isDirCon ? "DirCon" : "BLE");
 
-    // Send sync_tx response: "RideOn" + trainer response start bytes {0x02, 0x00}
     uint8_t syncResponse[6 + RESPONSE_START_LEN];
     memcpy(syncResponse, RideOn, 6);
-    memcpy(syncResponse + 6, RESPONSE_START, RESPONSE_START_LEN);
-    syncTxCharacteristic->setValue(syncResponse, sizeof(syncResponse));
-    syncTxCharacteristic->indicate();
-
-    // Send async RideOn answer (protobuf "RIDE_ON(0)") to signal trainer capability
-    asyncCharacteristic->setValue(ASYNC_RIDEON_ANSWER, ASYNC_RIDEON_ANSWER_LEN);
-    asyncCharacteristic->notify();
+    size_t syncResponseLen = 6;
 
     if (_isDirCon) {
-      DirConManager::notifyCharacteristic(NimBLEUUID(ZWIFT_RIDE_CUSTOM_SERVICE_UUID), syncTxCharacteristic->getUUID(), syncResponse, sizeof(syncResponse), false);
+      // DirCon accepts the trainer-style startup response.
+      memcpy(syncResponse + syncResponseLen, RESPONSE_START, RESPONSE_START_LEN);
+      syncResponseLen += RESPONSE_START_LEN;
+    }
+
+    syncTxCharacteristic->setValue(syncResponse, syncResponseLen);
+    syncTxCharacteristic->indicate();
+
+    if (_isDirCon) {
+      DirConManager::notifyCharacteristic(NimBLEUUID(ZWIFT_RIDE_CUSTOM_SERVICE_UUID), syncTxCharacteristic->getUUID(), syncResponse, syncResponseLen, false);
+
+      // Send async RideOn answer (protobuf "RIDE_ON(0)") to signal trainer capability.
+      asyncCharacteristic->setValue(ASYNC_RIDEON_ANSWER, ASYNC_RIDEON_ANSWER_LEN);
+      asyncCharacteristic->notify();
       DirConManager::notifyCharacteristic(NimBLEUUID(ZWIFT_RIDE_CUSTOM_SERVICE_UUID), asyncCharacteristic->getUUID(), const_cast<uint8_t*>(ASYNC_RIDEON_ANSWER),
                                           ASYNC_RIDEON_ANSWER_LEN, false);
     }
@@ -496,9 +405,11 @@ void BLE_Zwift_Service::handleSyncRxWrite(const std::string& value, bool _isDirC
 
     SS2K_LOG(getLogTag(), "Handshake complete - %s mode active", _isDirCon ? "DirCon" : "BLE");
 
-    sendGeneralInfoSyncTx();
-    sendRidingData();
-    sendTrainerConfigVirtualShiftStatus();
+    if (_isDirCon) {
+      sendGeneralInfoSyncTx();
+      sendRidingData();
+      sendTrainerConfigVirtualShiftStatus();
+    }
     return;
   }
   // Handshake is already complete, handle commands
@@ -637,11 +548,6 @@ void BLE_Zwift_Service::handleZwiftCommand(const uint8_t* data, size_t length) {
 void BLE_Zwift_Service::applyGearRatio() {
   if (_gearRatioX10000 == 0) return;
 
-  // Zwift virtual gear ratios (24 gears, from 0.75 to 5.49)
-  static const uint32_t gearRatios[] = {7500,  8700,  9900,  11100, 12300, 13800, 15300, 16800, 18600, 20400, 22200, 24000,
-                                        26100, 28200, 30300, 32400, 34900, 37400, 39900, 42400, 45400, 48400, 51400, 54900};
-  static const int kNumGears = sizeof(gearRatios) / sizeof(gearRatios[0]);
-
   // Find closest gear index
   int closestIndex     = 0;
   uint32_t closestDist = 0xFFFFFFFFU;
@@ -659,6 +565,11 @@ void BLE_Zwift_Service::applyGearRatio() {
   // see this Zwift-driven change as a user shift and echo it back.
   ss2k->setLastShifterPosition(newShifterPos);
   SS2K_LOG(getLogTag(), "Gear %d -> shifter position %d", closestIndex, newShifterPos);
+}
+
+uint32_t BLE_Zwift_Service::gearToRatioX10000(int gear) {
+  int gearIndex = constrain(gear, 1, kNumGears) - 1;
+  return gearRatios[gearIndex];
 }
 
 size_t BLE_Zwift_Service::decodeUleb128(const uint8_t* buf, size_t bufLen, uint64_t* result) {

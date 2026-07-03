@@ -332,21 +332,9 @@ void SS2K::maintenanceLoop(void* pvParameters) {
 void SS2K::FTMSModeShiftModifier() {
   int shiftDelta = rtConfig->getShifterPosition() - ss2k->lastShifterPosition;
   if (shiftDelta) {  // Shift detected
-    // When Zwift virtual shifting is active, forward shifts to Zwift
-    // instead of handling them internally. Zwift sends gear changes
-    // back via the custom trainer protocol which we already handle.
-    // This needs to be moved so shift blocking/knob crashing prevention is enforced.
-    // Keeping here for now for development/testing purposes
-
     int absDelta = abs(shiftDelta);
     if (zwiftService.isConnected()) {
-      for (int i = 0; i < absDelta; i++) {
-        if (shiftDelta > 0) {
-          zwiftService.sendShiftUp();
-        } else {
-          zwiftService.sendShiftDown();
-        }
-      }
+      zwiftService.sendCurrentGearStatus();
     }
     for (int i = 0; i < absDelta; i++) {
       if (shiftDelta > 0) {

@@ -39,14 +39,11 @@ class BLE_Zwift_Service {
   // Returns the current virtual gear ratio x10000 (0 = no virtual shifting active)
   uint32_t getGearRatioX10000();
 
-  // Send a shift up notification to Zwift (key down + key up)
-  void sendShiftUp();
+  // Send the current SmartSpin2k gear/ratio as trainer state.
+  void sendCurrentGearStatus();
 
-  // Send a shift down notification to Zwift (key down + key up)
-  void sendShiftDown();
-
-  // Handle incoming write to sync_rx (handshake and protocol commands)
-  // isDirCon=true uses trainer protocol, isDirCon=false uses Click v2 controller protocol
+  // Handle incoming write to sync_rx (handshake and protocol commands).
+  // DirCon uses trainer startup; BLE keeps the RideOn-compatible handshake.
   void handleSyncRxWrite(const std::string &value, bool isDirCon = false);
 
  private:
@@ -67,12 +64,6 @@ class BLE_Zwift_Service {
   bool keepAlive(unsigned long now);
   void resetSession();
 
-  // Encode a button mask into a protobuf varint message and send as notification
-  void sendButtonNotification(ZwiftProtocol::RideButtonMask buttonMask);
-
-  // Encode uint32 as protobuf varint, returns number of bytes written
-  static size_t encodeVarint32(uint32_t value, uint8_t *buffer);
-
   // Encode uint64 as ULEB128 varint, returns number of bytes written
   static size_t encodeUleb128(uint64_t value, uint8_t *buffer);
   // Returns the number of bytes a ULEB128-encoded value would occupy
@@ -80,9 +71,6 @@ class BLE_Zwift_Service {
 
   // Decode ULEB128 varint from buffer, returns number of bytes consumed
   static size_t decodeUleb128(const uint8_t *buf, size_t bufLen, uint64_t *result);
-
-  // Send the "all buttons released" state
-  void sendAllButtonsReleased();
 
   // Send a fully-built payload on sync_tx and mirror it through DirCon.
   void sendSyncTxPayload(const uint8_t *payload, size_t length);
@@ -110,6 +98,9 @@ class BLE_Zwift_Service {
 
   // Apply received gear ratio to shifter position
   void applyGearRatio();
+
+  // Convert local gear index to the Zwift virtual gear-ratio table.
+  static uint32_t gearToRatioX10000(int gear);
 
   friend class ZwiftSyncRxCallbacks;
 };
