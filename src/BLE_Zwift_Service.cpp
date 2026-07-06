@@ -9,6 +9,7 @@
 #include "Main.h"
 #include "SS2KLog.h"
 #include "DirConManager.h"
+#include "BLE_Custom_Characteristic.h"
 #include <Constants.h>
 
 using ZwiftProtocol::CommandCode;
@@ -564,6 +565,8 @@ void BLE_Zwift_Service::applyGearRatio() {
   // Also update lastShifterPosition so FTMSModeShiftModifier doesn't
   // see this Zwift-driven change as a user shift and echo it back.
   ss2k->setLastShifterPosition(newShifterPos);
+  // Notify the new gear on the custom characteristic so the SmartSpin2k app updates
+  BLE_ss2kCustomCharacteristic::notify(newShifterPos);
   SS2K_LOG(getLogTag(), "Gear %d -> shifter position %d", closestIndex, newShifterPos);
 }
 
