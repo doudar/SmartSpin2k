@@ -113,7 +113,7 @@
                 let option = document.createElement('option');
                 option.text = device.name || device.address;
 
-                if (['0x1818', '0x1826', '0x1816', '6e400001-b5a3-f393-e0a9-e50e24dcca9e', '0bf669f0-45f2-11e7-9598-0800200c9a66'].includes(device.UUID)) {
+                if (['0x1818', '0x1826', '0x1816', '6e400001-b5a3-f393-e0a9-e50e24dcca9e', '0bf669f0-45f2-11e7-9598-0800200c9a66', 'a026ee07-0a7d-4ab3-97fa-f1500f9feb8b'].includes(device.UUID)) {
                   PMDropdown.add(option.cloneNode(true));
                 }
                 if (device.UUID === '0x180d') {
