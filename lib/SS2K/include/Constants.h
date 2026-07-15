@@ -76,6 +76,11 @@
 #define ECHELON_WRITE_UUID   NimBLEUUID("0bf669f2-45f2-11e7-9598-0800200c9a66")
 #define ECHELON_DATA_UUID    NimBLEUUID("0bf669f4-45f2-11e7-9598-0800200c9a66")
 
+// Spinning / Precor Spinner Chrono Power (proprietary, no standard CPS/CSC)
+#define CHRONO_SERVICE_UUID NimBLEUUID("a026ee07-0a7d-4ab3-97fa-f1500f9feb8b")
+#define CHRONO_DATA_UUID    NimBLEUUID("a026e01d-0a7d-4ab3-97fa-f1500f9feb8b")
+#define CHRONO_BLE_NAME     "CHRONO"  // device advertises "CHRONO <n>"
+
 // Dummy UUID for Peloton Serial Data Interface
 #define PELOTON_DATA_UUID NimBLEUUID("00000000-0000-0000-0000-000000000321")
 #define PELOTON_ADDRESS   NimBLEAddress("00:00:00:00:00:00", 0)

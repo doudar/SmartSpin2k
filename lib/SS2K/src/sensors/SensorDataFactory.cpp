@@ -15,6 +15,7 @@
 #include "sensors/EchelonData.h"
 #include "sensors/PelotonData.h"
 #include "sensors/CscSensorData.h"
+#include "sensors/ChronoData.h"
 
 std::shared_ptr<SensorData> SensorDataFactory::getSensorData(const NimBLEUUID characteristicUUID, std::string& uniqueName, uint8_t *data, size_t length) {
   for (auto &it : SensorDataFactory::knownDevices) {
@@ -34,6 +35,8 @@ std::shared_ptr<SensorData> SensorDataFactory::getSensorData(const NimBLEUUID ch
     sensorData = std::shared_ptr<SensorData>(new FlywheelData());
   } else if (characteristicUUID == ECHELON_DATA_UUID) {
     sensorData = std::shared_ptr<SensorData>(new EchelonData());
+  } else if (characteristicUUID == CHRONO_DATA_UUID) {
+    sensorData = std::shared_ptr<SensorData>(new ChronoData());
   } else if (characteristicUUID == PELOTON_DATA_UUID) {
     sensorData = std::shared_ptr<SensorData>(new PelotonData());
   } else if (characteristicUUID == CSCMEASUREMENT_UUID) {
