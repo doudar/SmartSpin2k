@@ -37,6 +37,7 @@ class SS2K {
   int32_t currentPosition;
   bool ledEnabled;
   void handleShiftButtons();
+  static void finishSetup();
 
  public:
   bool stepperIsRunning;

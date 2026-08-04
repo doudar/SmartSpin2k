@@ -83,6 +83,21 @@ extern "C" void app_main() {
   initArduino();
   // Serial port for debugging purposes
   Serial.begin(115200);
+
+  BaseType_t taskCreated = xTaskCreatePinnedToCore(SS2K::maintenanceLoop,     /* Task function. */
+                                                   "maintenanceLoopFunction", /* name of task. */
+                                                   MAIN_STACK,                /* Stack size of task */
+                                                   NULL,                      /* parameter of the task */
+                                                   10,                        /* priority of the task */
+                                                   &maintenanceLoopTask,      /* task handle */
+                                                   1);                        /* pin task to core */
+  if (taskCreated != pdPASS) {
+    Serial.println("Failed to create maintenance task; restarting");
+    ESP.restart();
+  }
+}
+
+void SS2K::finishSetup() {
   SS2K_LOG(MAIN_LOG_TAG, "Compiled %s%s", __DATE__, __TIME__);
   pinMode(REV_PIN, INPUT);
   int actualVoltage = analogRead(REV_PIN);
@@ -199,14 +214,6 @@ extern "C" void app_main() {
 
   ss2k->resetIfShiftersHeld();
   digitalWrite(LED_PIN, LOW);
-
-  xTaskCreatePinnedToCore(SS2K::maintenanceLoop,     /* Task function. */
-                          "maintenanceLoopFunction", /* name of task. */
-                          MAIN_STACK,                /* Stack size of task */
-                          NULL,                      /* parameter of the task */
-                          10,                        /* priority of the task */
-                          &maintenanceLoopTask,      /* Task handle to keep track of created task */
-                          1);                        /* pin task to core */
 }
 
 void loop() {  // Delete this task so we can make one that's more memory efficient.
@@ -214,6 +221,8 @@ void loop() {  // Delete this task so we can make one that's more memory efficie
 }
 
 void SS2K::maintenanceLoop(void* pvParameters) {
+  finishSetup();
+
   static unsigned long intervalTimer2 = millis();
   static unsigned long rebootTimer    = millis();
 
@@ -351,7 +360,7 @@ void SS2K::maintenanceLoop(void* pvParameters) {
 
 #ifdef DEBUG_STACK
       if (!ss2k->isUpdating) {
-        SS2K_LOG(MAIN_LOG_TAG, "Main Task: %d", uxTaskGetStackHighWaterMark(maintenanceLoopTask));
+        SS2K_LOG(MAIN_LOG_TAG, "Maintenance Task: %d", uxTaskGetStackHighWaterMark(maintenanceLoopTask));
         SS2K_LOG(MAIN_LOG_TAG, "BLEClient: %d", uxTaskGetStackHighWaterMark(BLEClientTask));
         SS2K_LOG(MAIN_LOG_TAG, "Min Heap: %d", esp_get_minimum_free_heap_size());
         SS2K_LOG(MAIN_LOG_TAG, "Free Heap: %d", esp_get_free_heap_size());
