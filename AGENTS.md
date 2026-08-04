@@ -22,7 +22,8 @@ Primary software directories:
 - `lib/SS2K/`: core sensor parsing library used by firmware and native tests.
 - `lib/ArduinoCompat/`: native-test compatibility shims.
 - `test/`: Unity tests for native PlatformIO environment.
-- `data/`: web interface assets served by the firmware.
+- `data/`: web interface assets for classic ESP32 filesystem images.
+- `data_s3/`: ESP32-S3 filesystem assets; initially mirrors `data/` but may grow independently.
 - `.github/copilot-instructions.md`: older agent/build notes that may still be useful.
 
 ## Build And Test
@@ -30,10 +31,15 @@ Primary software directories:
 PlatformIO is the expected entry point.
 
 - Build firmware: `pio run --environment release`
+- Build ESP32-S3 firmware: `pio run --environment S3release`
 - Build filesystem: `pio run --target buildfs`
 - Run native tests: `pio test --environment native`
 - Static analysis: `pio check -e debug`
 - Pre-commit checks: `pre-commit run --all-files`
+
+Codex environment constraint:
+
+- Do not run PlatformIO firmware or filesystem builds from the Codex environment. The Windows Xtensa toolchain can hang and leave orphaned compiler processes here. Make the requested changes, run non-build checks where useful, and clearly leave PlatformIO build validation for the user to run manually.
 
 Important timing/network notes:
 

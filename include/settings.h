@@ -21,14 +21,23 @@ const char* const DEFAULT_PASSWORD = "password";
 // and put it in /include/cert.h
 #define FW_UPDATEURL "https://raw.githubusercontent.com/doudar/OTAUpdates/main/"
 
-// File that contains Version info
+// Target-specific OTA names prevent cross-flashing firmware or filesystems.
+#if defined(SMARTSPIN2K_S3)
+#define FW_VERSIONFILE "S3version.txt"
+#define FW_BINFILE     "S3firmware.bin"
+#define FS_BINFILE     "S3littlefs.bin"
+#else
 #define FW_VERSIONFILE "version.txt"
+#define FW_BINFILE     "firmware.bin"
+#define FS_BINFILE     "littlefs.bin"
+#endif
 
-// Path to the latest Firmware
-#define FW_BINFILE "firmware.bin"
-
-// Data directory Source
+// Web assets follow the filesystem layout for the selected firmware target.
+#if defined(SMARTSPIN2K_S3)
+#define DATA_UPDATEURL "https://raw.githubusercontent.com/doudar/SmartSpin2k/develop/data_s3"
+#else
 #define DATA_UPDATEURL "https://raw.githubusercontent.com/doudar/SmartSpin2k/develop/data"
+#endif
 
 #define DATA_FILELIST "/list.json"
 
@@ -129,8 +138,14 @@ const char* const DEFAULT_PASSWORD = "password";
 // Default debounce delay for shifters. Increase if you have false shifts. Decrease if shifting takes too long.
 #define DEBOUNCE_DELAY 200
 
+#if defined(SMARTSPIN2K_S3)
+// The S3 board moved the hardware-version resistor to GPIO4.
+#define REV_PIN                 4
+#define BOARD_VERSION_TOLERANCE 300
+#else
 // Hardware Revision check pin
 #define REV_PIN 34
+#endif
 
 //////////// Defines for hardware Revision 1 ////////////
 
@@ -203,11 +218,34 @@ const char* const DEFAULT_PASSWORD = "password";
 #define r2_PWR_SCALER 12
 ////////////////////////////////////////////////////////
 
+#if defined(SMARTSPIN2K_S3)
+//////////// Defines for hardware Revision 3 ////////////
+#define r3_NAME "Revision Three (ESP32-S3)"
+
+// 1.0 V on GPIO4 with the 12-bit ADC range (0-4095 for 0-3.3 V).
+#define r3_VERSION_VOLTAGE 1241
+#define r3_SHIFT_UP_PIN 13
+#define r3_SHIFT_DOWN_PIN 14
+#define r3_ENABLE_PIN 48
+#define r3_STEP_PIN 21
+#define r3_DIR_PIN 47
+#define r3_STEPPER_SERIAL_RX 12
+#define r3_STEPPER_SERIAL_TX 11
+#define r3_AUX_SERIAL_RX 18
+#define r3_AUX_SERIAL_TX 17
+#define r3_PWR_SCALER 12
+////////////////////////////////////////////////////////
+#endif
+
 // TMC2208/TMC2224 HardwareSerial port
 #define SERIAL_PORT stepperSerial
 
 // Match to your driver
+#if defined(SMARTSPIN2K_S3)
+#define R_SENSE 0.04f
+#else
 #define R_SENSE 0.08f
+#endif
 
 // Hardware pin for indicator LED *note* internal LED on esp32 Dev board is pin
 // 2
@@ -360,8 +398,13 @@ constexpr const char* ANY = "any";
 
 // Task Stack Sizes
 // In theory you can subtract whatever is left in the report from DEBUG_STACK for each task
+#if defined(SMARTSPIN2K_S3)
+#define MAIN_STACK       8000
+#define BLE_CLIENT_STACK 8000  // S3 has additional internal RAM and external QSPI PSRAM.
+#else
 #define MAIN_STACK       4500
-#define BLE_CLIENT_STACK 6000 //Scans and connects to BLE devices. Holds the BLE Notify Data. 
+#define BLE_CLIENT_STACK 6000  // Scans and connects to BLE devices. Holds the BLE Notify Data.
+#endif
 
 // Uncomment to enable stack size debugging info
 // #define DEBUG_STACK

@@ -1,0 +1,85 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>SmartSpin2k StreamFit</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <div class="page-container">
+    <header>
+      <nav aria-label="Main navigation">
+        <a href="index.html" class="back-link" aria-label="Back to main menu">← Main Menu</a>
+        <a href="http://github.com/doudar/SmartSpin2k" class="github-link">SmartSpin2k</a>
+      </nav>
+    </header>
+
+    <main>
+      <h1 class="brand">StreamFit</h1>
+
+      <div class="settings-section">
+        <div class="info-box">
+          <p>Upload a .fit file to simulate a recorded workout.</p>
+          <p class="note">Requires internet connection for file processing.</p>
+        </div>
+
+        <div class="upload-container">
+          <label for="file-selector" class="file-upload">
+            <div class="upload-icon">📂</div>
+            <span>Choose .fit file</span>
+            <input type="file" id="file-selector" accept=".fit" class="file-input"/>
+          </label>
+
+          <div id="status" class="status-message info">REQUIRES INTERNET CONNECTION</div>
+        </div>
+
+        <div class="metrics-grid">
+          <div class="metric-card">
+            <div class="metric-icon">❤️</div>
+            <div class="metric-label">Heart Rate</div>
+            <div id="heart_rate" class="metric-value">--</div>
+            <div class="metric-unit">BPM</div>
+          </div>
+
+          <div class="metric-card">
+            <div class="metric-icon">⚡</div>
+            <div class="metric-label">Power</div>
+            <div id="power" class="metric-value">--</div>
+            <div class="metric-unit">W</div>
+          </div>
+
+          <div class="metric-card">
+            <div class="metric-icon">🔄</div>
+            <div class="metric-label">Cadence</div>
+            <div id="cadence" class="metric-value">--</div>
+            <div class="metric-unit">RPM</div>
+          </div>
+        </div>
+
+        <div class="button-container">
+          <button type="button" id="stopBTN" class="warning-button">
+            <span class="button-icon">⏹</span>
+            Stop Simulation
+          </button>
+        </div>
+      </div>
+
+      <footer>
+        <a href="https://github.com/doudar/SmartSpin2k/wiki" class="help-link">Documentation</a>
+      </footer>
+    </main>
+  </div>
+
+  <script src="https://raw.githack.com/doudar/StreamFit/master/index.js"></script>
+  <script>
+    window.addEventListener('load', () => {
+      // Update file input label with selected filename
+      document.getElementById('file-selector').addEventListener('change', function(e) {
+        const fileName = e.target.files[0]?.name || 'Choose .fit file';
+        e.target.parentElement.querySelector('span').textContent = fileName;
+      });
+    });
+  </script>
+</body>
+</html>

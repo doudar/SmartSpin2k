@@ -1,0 +1,240 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>SmartSpin2k Status</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+
+<body>
+  <div class="page-container">
+    <header>
+      <nav aria-label="Main navigation">
+        <a href="index.html" class="back-link" aria-label="Back to main menu">← Main Menu</a>
+        <a href="http://github.com/doudar/SmartSpin2k" class="github-link">SmartSpin2k</a>
+      </nav>
+    </header>
+
+    <main>
+      <h1 class="brand">System Status</h1>
+
+      <div class="settings-section">
+        <div id="settings-container"></div>
+        <div id="runtime-container"></div>
+
+        <!-- Debug Console -->
+        <div class="debug-section">
+          <div class="debug-header">
+            <h2>Debug Console</h2>
+            <label class="follow-toggle">
+              <input type="checkbox" id="follow" name="follow" checked>
+              Auto-scroll
+            </label>
+          </div>
+          <pre id="debug" class="debug-console">Loading</pre>
+          <div class="button-group">
+            <button id="saveLogButton" class="secondary-button">Save Debug Log</button>
+          </div>
+        </div>
+      </div>
+    </main>
+  </div>
+
+  <script>
+    let updatePending = false;
+    let updateTimer;
+    let lastLogMessageTime = 0;
+    let websocket;
+    let logEntries = [];
+    let updateCounter = 0;
+    const maxLogentries = 1000;
+    const createdGroups = { settings: false, runtime: false };
+
+    document.addEventListener("visibilitychange", onVisibilityChanged);
+    document.addEventListener("mozvisibilitychange", onVisibilityChanged);
+    document.addEventListener("webkitvisibilitychange", onVisibilityChanged);
+    document.addEventListener("msvisibilitychange", onVisibilityChanged);
+
+    function onVisibilityChanged() {
+      if (document.hidden || document.mozHidden || document.webkitHidden || document.msHidden) {
+        stopUpdate();
+      } else {
+        startUpdate();
+      }
+    }
+
+    function startUpdate() {
+      if (!updateTimer) {
+        updateTimer = setInterval(() => {
+          updateCounter++;
+          if (updateCounter % 4 === 0) {
+            requestConfigValues();
+          } else {
+            requestRuntimeValues();
+          }
+          
+          setupLogging();
+        }, 2500);
+      }
+    }
+
+    function stopUpdate() {
+      clearInterval(updateTimer);
+      updateTimer = undefined;
+      updateCounter = 0; // Reset counter when updates are stopped
+    }
+
+    function formatKey(key) {
+      return key.replace(/([A-Z])/g, ' $1').replace(/^./, str => str.toUpperCase());
+    }
+
+    function updateValuesFromJson(data, groupType) {
+      const containerId = `${groupType}-container`;
+      const container = document.getElementById(containerId);
+      let groupCreated = createdGroups[groupType];
+
+      if (!groupCreated) {
+        const groupElement = document.createElement('div');
+        groupElement.className = 'status-group';
+        
+        const heading = document.createElement('h2');
+        heading.textContent = groupType === 'settings' ? 'Configuration' : 'Runtime Values';
+        groupElement.appendChild(heading);
+        
+        const grid = document.createElement('div');
+        grid.className = 'status-grid';
+        grid.id = `${groupType}-grid`;
+        groupElement.appendChild(grid);
+        
+        container.appendChild(groupElement);
+        createdGroups[groupType] = true;
+      }
+
+      const grid = document.getElementById(`${groupType}-grid`);
+      
+      Object.keys(data).forEach(key => {
+        if (key === 'password') return;
+        
+        const elementId = `${groupType}-${key}`;
+        let statusItem = document.getElementById(elementId);
+        
+        if (!statusItem) {
+          statusItem = document.createElement('div');
+          statusItem.className = 'status-item';
+          statusItem.id = elementId;
+          
+          const label = document.createElement('label');
+          label.setAttribute('for', key);
+          label.textContent = formatKey(key);
+          
+          const input = document.createElement('input');
+          input.type = 'text';
+          input.id = key;
+          input.name = key;
+          input.value = 'loading';
+          input.readOnly = true;
+          
+          statusItem.appendChild(label);
+          statusItem.appendChild(input);
+          grid.appendChild(statusItem);
+        }
+        
+        document.getElementById(key).value = data[key];
+      });
+    }
+
+    function requestConfigValues() {
+      if (updatePending) return;
+
+      updatePending = true;
+      fetch('/configJSON')
+        .then(response => response.json())
+        .then(data => {
+          updateValuesFromJson(data, 'settings');
+        })
+        .catch(error => console.error('Error:', error))
+        .finally(() => updatePending = false);
+    }
+
+    function requestRuntimeValues() {
+      if (updatePending) return;
+
+      updatePending = true;
+      fetch('/runtimeConfigJSON')
+        .then(response => response.json())
+        .then(data => {
+          updateValuesFromJson(data, 'runtime');
+        })
+        .catch(error => console.error('Error:', error))
+        .finally(() => updatePending = false);
+    }
+
+    function setupLogging() {
+      const debugElement = document.getElementById("debug");
+      const followElement = document.getElementById("follow");
+      const wsAddress = `ws://${document.location.host}:8080`;
+
+      try {
+        if (websocket) {
+          if ((Date.now() - lastLogMessageTime) > 60000) {
+            websocket.close();
+            websocket = null;
+          } else {
+            return;
+          }
+        }
+
+        lastLogMessageTime = Date.now();
+        websocket = new WebSocket(wsAddress);
+
+        websocket.onmessage = (evt) => {
+          if (!evt?.data) return;
+
+          lastLogMessageTime = Date.now();
+          logEntries.push(evt.data);
+
+          if (logEntries.length > maxLogentries) {
+            logEntries = logEntries.slice(1, logEntries.length - 10);
+          }
+
+          debugElement.innerHTML = logEntries.join("<br>");
+
+          if (followElement.checked) {
+            debugElement.scrollTop = debugElement.scrollHeight - debugElement.clientHeight;
+          }
+        };
+      } catch (e) {
+        console.error("Could not connect to Websocket.", e);
+        if (websocket) {
+          websocket.close();
+          websocket = undefined;
+        }
+      }
+    }
+
+    window.addEventListener('load', () => {
+      requestConfigValues();
+      setupLogging();
+      setTimeout(requestRuntimeValues, 200);
+      startUpdate();
+    });
+
+    document.getElementById('saveLogButton').addEventListener('click', () => {
+      const debugElement = document.getElementById('debug');
+      logContent = debugElement.textContent;
+      logContent = logContent.replace(/(\[\s*\d+\])/g, '\n$1');
+      const blob = new Blob([logContent], { type: 'text/plain' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = 'debug_log.txt';
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+    });
+  </script>
+</body>
+</html>

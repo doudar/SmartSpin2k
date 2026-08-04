@@ -1,0 +1,177 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>SmartSpin2k Bluetooth Scanner</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <div class="page-container">
+    <header>
+      <nav aria-label="Main navigation">
+        <a href="index.html" class="back-link" aria-label="Back to main menu">← Main Menu</a>
+        <a href="http://github.com/doudar/SmartSpin2k" class="github-link">SmartSpin2k</a>
+      </nav>
+    </header>
+
+    <main>
+      <div id="loadingWatermark" class="watermark" aria-hidden="true">Loading</div>
+      <h1 class="brand">Bluetooth Devices</h1>
+
+      <div class="settings-section">
+        <div class="device-status">
+          <h2>Connected Devices</h2>
+          <div class="status-grid">
+            <div class="status-item">
+              <span class="status-label">Power Meter</span>
+              <span id="connectedPowerMeter" class="status-value">loading</span>
+            </div>
+            <div class="status-item">
+              <span class="status-label">Heart Monitor</span>
+              <span id="connectedHeartMonitor" class="status-value">loading</span>
+            </div>
+            <div class="status-item">
+              <span class="status-label">Remote</span>
+              <span id="connectedRemote" class="status-value">loading</span>
+            </div>
+          </div>
+        </div>
+
+        <form action="/send_settings" class="settings-grid">
+          <div class="setting-group">
+            <h2>Device Selection</h2>
+            
+            <div class="input-group">
+              <label for="blePMDropdown" class="setting-label">Power Meter</label>
+              <select id="blePMDropdown" name="blePMDropdown" class="device-select">
+              </select>
+            </div>
+
+            <div class="input-group">
+              <label for="bleHRDropdown" class="setting-label">Heart Rate Monitor</label>
+              <select id="bleHRDropdown" name="bleHRDropdown" class="device-select">
+              </select>
+            </div>
+
+            <div class="input-group">
+              <label for="bleRemoteDropdown" class="setting-label">Remote Control</label>
+              <select id="bleRemoteDropdown" name="bleRemoteDropdown" class="device-select">
+              </select>
+            </div>
+          </div>
+
+          <div class="button-group">
+            <button type="submit" class="primary-button">Save Devices</button>
+          </div>
+        </form>
+
+        <div class="scan-section">
+          <form action="/BLEScan" class="scan-form">
+            <button type="submit" class="scan-button">
+              <span class="scan-icon">⟳</span>
+              <span>Scan for Devices</span>
+            </button>
+            <p class="scan-note">
+              Scan for new devices without saving current selections.<br>
+              <em>Tip: Hold both shifters for 3 seconds to scan/connect at any time.</em>
+            </p>
+          </form>
+        </div>
+
+        <footer>
+          <a href="https://github.com/doudar/SmartSpin2k/wiki/Pairing-Bluetooth-Sensors" class="help-link">Need Help?</a>
+        </footer>
+      </div>
+    </main>
+  </div>
+
+  <script>
+    let PMDropdown = document.getElementById('blePMDropdown');
+    let HRDropdown = document.getElementById('bleHRDropdown');
+    let remoteDropdown = document.getElementById('bleRemoteDropdown');
+    
+    function clearDropdowns() {
+      PMDropdown.length = 0;
+      HRDropdown.length = 0;
+      remoteDropdown.length = 0;
+    }
+
+    function requestConfigValues() {
+      fetch('/configJSON')
+        .then(response => response.json())
+        .then(data => {
+          clearDropdowns();
+          
+          // Process found devices if available
+          try {
+            const parsedDevices = JSON.parse(data.foundDevices);
+            
+            if (parsedDevices && typeof parsedDevices === 'object') {
+              // Add found devices to dropdowns
+              Object.values(parsedDevices).forEach(device => {
+                let option = document.createElement('option');
+                option.text = device.name || device.address;
+
+                if (['0x1818', '0x1826', '0x1816', '6e400001-b5a3-f393-e0a9-e50e24dcca9e', '0bf669f0-45f2-11e7-9598-0800200c9a66', 'a026ee07-0a7d-4ab3-97fa-f1500f9feb8b'].includes(device.UUID)) {
+                  PMDropdown.add(option.cloneNode(true));
+                }
+                if (device.UUID === '0x180d') {
+                  HRDropdown.add(option.cloneNode(true));
+                }
+                if (device.UUID === '0x1812') {
+                  remoteDropdown.add(option.cloneNode(true));
+                }
+              });
+            }
+          } catch (e) {
+            console.error('Error processing found devices:', e);
+          }
+
+          // Add connected devices
+          ['PowerMeter', 'HeartMonitor', 'Remote'].forEach(type => {
+            const connected = data[`connected${type}`];
+            document.getElementById(`connected${type}`).textContent = connected;
+            
+            let option = document.createElement('option');
+            option.text = connected;
+            
+            if (type === 'PowerMeter') PMDropdown.add(option);
+            if (type === 'HeartMonitor') HRDropdown.add(option);
+            if (type === 'Remote') remoteDropdown.add(option);
+          });
+
+          // Add any/none options
+          ['any', 'none'].forEach(value => {
+            let option = document.createElement('option');
+            option.text = value;
+            
+            if (value === 'any') {
+              PMDropdown.add(option.cloneNode(true));
+              HRDropdown.add(option.cloneNode(true));
+            } else {
+              PMDropdown.add(option.cloneNode(true));
+              HRDropdown.add(option.cloneNode(true));
+              remoteDropdown.add(option.cloneNode(true));
+            }
+          });
+
+          // Remove loading watermark
+          document.getElementById('loadingWatermark')?.remove();
+        })
+        .catch(error => console.error('Error:', error));
+    }
+
+    window.addEventListener('load', () => {
+      requestConfigValues();
+      
+      // Retry loading if values are still default
+      setInterval(() => {
+        if (document.getElementById('connectedPowerMeter').textContent === 'loading') {
+          requestConfigValues();
+        }
+      }, 1000);
+    });
+  </script>
+</body>
+</html>

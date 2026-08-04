@@ -86,16 +86,28 @@ extern "C" void app_main() {
   SS2K_LOG(MAIN_LOG_TAG, "Compiled %s%s", __DATE__, __TIME__);
   pinMode(REV_PIN, INPUT);
   int actualVoltage = analogRead(REV_PIN);
+#if defined(SMARTSPIN2K_S3)
+  currentBoard = boards.rev3;
+  SS2K_LOG(MAIN_LOG_TAG, "Board ID ADC on GPIO%d: %d (expected %d +/- %d)", REV_PIN, actualVoltage, currentBoard.versionVoltage, BOARD_VERSION_TOLERANCE);
+  if (abs(actualVoltage - currentBoard.versionVoltage) > BOARD_VERSION_TOLERANCE) {
+    SS2K_LOG(MAIN_LOG_TAG, "WARNING: Board ID resistor does not match the ESP32-S3 hardware revision");
+  }
+#else
   if (actualVoltage - boards.rev1.versionVoltage >= boards.rev2.versionVoltage - actualVoltage) {
     currentBoard = boards.rev2;
   } else {
     currentBoard = boards.rev1;
   }
+#endif
   SS2K_LOG(MAIN_LOG_TAG, "Current Board Revision is: %s", currentBoard.name);
 
   // initialize Stepper serial port
 
+#if defined(SMARTSPIN2K_S3)
+  stepperSerial.begin(57600, SERIAL_8N1, currentBoard.stepperSerialRxPin, currentBoard.stepperSerialTxPin);
+#else
   stepperSerial.begin(57600, SERIAL_8N2, currentBoard.stepperSerialRxPin, currentBoard.stepperSerialTxPin);
+#endif
   // initialize aux serial port (Peloton)
   if (currentBoard.auxSerialTxPin) {
     auxSerial.begin(19200, SERIAL_8N1, currentBoard.auxSerialRxPin, currentBoard.auxSerialTxPin, false);
@@ -125,6 +137,12 @@ extern "C" void app_main() {
 
   // print littleFS free space and all file sizes on partition
   Serial.printf("LittleFS Total Bytes:%lu, Used Bytes:%lu\n", LittleFS.totalBytes(), LittleFS.usedBytes());
+#if defined(SMARTSPIN2K_S3)
+  SS2K_LOG(MAIN_LOG_TAG, "S3 heap: %u bytes, PSRAM: %u bytes", ESP.getHeapSize(), ESP.getPsramSize());
+  if (!psramFound()) {
+    SS2K_LOG(MAIN_LOG_TAG, "WARNING: ESP32-S3 QSPI PSRAM was not detected");
+  }
+#endif
 
   // Check for firmware update. It's important that this stays before BLE &
   // HTTP setup because otherwise they use too much traffic and the device

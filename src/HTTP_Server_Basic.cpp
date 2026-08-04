@@ -62,6 +62,7 @@ void writeStoredBuildVersion(const String& version) {
 namespace {
 const char* OTA_REC_NS  = "ota_recover";  // namespace
 const char* OTA_REC_KEY = "ver";          // key storing last recovered firmware version
+bool otaUploadRejected  = false;
 
 String getNVSRecoveryVersion() {
   Preferences p;
@@ -406,6 +407,10 @@ void HTTP_Server::start() {
       // This is the correct and only place to send the final response to the client.
       []() {
         server.sendHeader("Connection", "close");
+        if (otaUploadRejected) {
+          server.send(400, "text/plain", "Wrong firmware target or unsupported image filename");
+          return;
+        }
         // Check if the Update process reported an error and send the final status.
         if (Update.hasError()) {
           // You can get more specific error information if you want
@@ -422,7 +427,10 @@ void HTTP_Server::start() {
       // It should not send any response to the client.
       []() {
         HTTPUpload &upload = server.upload();
-        if (upload.filename == String("firmware.bin").c_str()) {
+        if (upload.status == UPLOAD_FILE_START) {
+          otaUploadRejected = false;
+        }
+        if (upload.filename == FW_BINFILE) {
           if (upload.status == UPLOAD_FILE_START) {
             ss2k->isUpdating = true;  // Set the updating flag to true
             SS2K_LOG(HTTP_SERVER_LOG_TAG, "Update Start: %s", upload.filename.c_str());
@@ -448,7 +456,7 @@ void HTTP_Server::start() {
             // Setting this to reboot, even if upload fails.
             ss2k->rebootFlag = true;
           }
-        } else if (upload.filename == String("littlefs.bin").c_str()) {
+        } else if (upload.filename == FS_BINFILE) {
           if (upload.status == UPLOAD_FILE_START) {
             SS2K_LOG(HTTP_SERVER_LOG_TAG, "Update Start: %s", upload.filename.c_str());
             if (!Update.begin(UPDATE_SIZE_UNKNOWN, U_SPIFFS)) {
@@ -467,6 +475,11 @@ void HTTP_Server::start() {
             } else {
               Update.printError(Serial);
             }
+          }
+        } else if (upload.filename.endsWith(".bin")) {
+          if (upload.status == UPLOAD_FILE_START) {
+            otaUploadRejected = true;
+            SS2K_LOG(HTTP_SERVER_LOG_TAG, "Rejected image %s; expected %s or %s", upload.filename.c_str(), FW_BINFILE, FS_BINFILE);
           }
         } else {  // Handles other file uploads to LittleFS
           if (upload.status == UPLOAD_FILE_START) {

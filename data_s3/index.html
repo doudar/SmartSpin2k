@@ -1,0 +1,118 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>SmartSpin2k</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <div class="page-container">
+    <header>
+      <nav aria-label="Main navigation">
+        <a href="https://github.com/doudar/SmartSpin2k" class="github-link">GitHub</a>
+      </nav>
+    </header>
+
+    <main>
+      <h1 class="brand">SmartSpin2k</h1>
+      
+      <div class="dev-tools-grid">
+        <a href="shift.html" class="dev-tool-card">
+          <div class="tool-icon">⚙️</div>
+          <div class="tool-content">
+            <h2>Web Shifter</h2>
+            <p>Control gear shifting manually</p>
+            <ul class="tool-features">
+              <li>Manual gear control</li>
+              <li>Real-time shifting</li>
+            </ul>
+          </div>
+          <div class="card-arrow">→</div>
+        </a>
+
+        <a href="settings.html" class="dev-tool-card">
+          <div class="tool-icon">⚡</div>
+          <div class="tool-content">
+            <h2>Settings</h2>
+            <p>Configure device settings and preferences</p>
+            <ul class="tool-features">
+              <li>Device configuration</li>
+              <li>System preferences</li>
+            </ul>
+          </div>
+          <div class="card-arrow">→</div>
+        </a>
+
+        <a href="bluetoothscanner.html" class="dev-tool-card">
+          <div class="tool-icon">📱</div>
+          <div class="tool-content">
+            <h2>Bluetooth Scanner</h2>
+            <p>Connect and manage Bluetooth devices</p>
+            <ul class="tool-features">
+              <li>Device scanning</li>
+              <li>Connection management</li>
+            </ul>
+          </div>
+          <div class="card-arrow">→</div>
+        </a>
+
+        <a href="develop.html" class="dev-tool-card">
+          <div class="tool-icon">🔧</div>
+          <div class="tool-content">
+            <h2>Developer Tools</h2>
+            <p>Advanced tools and debugging options</p>
+            <ul class="tool-features">
+              <li>Debug console</li>
+              <li>System diagnostics</li>
+            </ul>
+          </div>
+          <div class="card-arrow">→</div>
+        </a>
+
+        <span class="dev-tool-card">
+          <div class="tool-icon">🛒</div>
+          <div class="tool-content">
+            <h2>SmartSpin2k Links</h2>
+            <ul class="tool-features">
+              <li><a href="https://SmartSpin2k.com" target=_blank>Official accessories and products</a></li>
+              <li><a href="https://github.com/doudar/SmartSpin2k/wiki" target=_blank>Wiki Documentation</li>
+              <li><a href="https://github.com/doudar/smartspin2k/" target=_blank>Firmware & Support</li>
+            </ul>
+          </div>
+          <div class="card-arrow">→</div></a>
+        </span>
+      </div>
+
+      <footer>
+        <a href="https://github.com/doudar/SmartSpin2k/wiki" class="help-link">SS2K Help</a>
+        <div class="version-info">
+          <span id="firmwareVersion">loading</span>
+        </div>
+      </footer>
+    </main>
+  </div>
+
+  <script>
+    function requestConfigValues() {
+      fetch('/configJSON')
+        .then(response => response.json())
+        .then(data => {
+          document.getElementById("firmwareVersion").textContent = data.firmwareVersion;
+        })
+        .catch(error => console.error('Error:', error));
+    }
+
+    window.addEventListener('load', () => {
+      requestConfigValues();
+    });
+
+    // Retry loading firmware version if it's still showing "loading"
+    setInterval(() => {
+      if (document.getElementById("firmwareVersion").textContent === "loading") {
+        requestConfigValues();
+      }
+    }, 1000);
+  </script>
+</body>
+</html>

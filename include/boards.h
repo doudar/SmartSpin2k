@@ -32,10 +32,28 @@ class Board {
 
 class Boards {
  public:
+#if defined(SMARTSPIN2K_S3)
+  Board rev3;
+#else
   Board rev1;
   Board rev2;
+#endif
 
   Boards() {
+#if defined(SMARTSPIN2K_S3)
+    rev3.name               = r3_NAME;
+    rev3.versionVoltage     = r3_VERSION_VOLTAGE;
+    rev3.shiftUpPin         = r3_SHIFT_UP_PIN;
+    rev3.shiftDownPin       = r3_SHIFT_DOWN_PIN;
+    rev3.enablePin          = r3_ENABLE_PIN;
+    rev3.stepPin            = r3_STEP_PIN;
+    rev3.dirPin             = r3_DIR_PIN;
+    rev3.stepperSerialTxPin = r3_STEPPER_SERIAL_TX;
+    rev3.stepperSerialRxPin = r3_STEPPER_SERIAL_RX;
+    rev3.auxSerialTxPin     = r3_AUX_SERIAL_TX;
+    rev3.auxSerialRxPin     = r3_AUX_SERIAL_RX;
+    rev3.pwrScaler          = r3_PWR_SCALER;
+#else
     // Rev 1
     rev1.name               = r1_NAME;
     rev1.versionVoltage     = r1_VERSION_VOLTAGE;
@@ -62,5 +80,6 @@ class Boards {
     rev2.auxSerialTxPin     = r2_AUX_SERIAL_TX;
     rev2.auxSerialRxPin     = r2_AUX_SERIAL_RX;
     rev2.pwrScaler          = r2_PWR_SCALER;
+#endif
   }
 };

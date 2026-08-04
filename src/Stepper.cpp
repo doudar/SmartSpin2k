@@ -394,7 +394,11 @@ void SS2K::goHome(bool bothDirections) {
     }
   }
 
+#if defined(SMARTSPIN2K_S3)
+  if (!stepper) {
+#else
   if (!stepper || currentBoard.name == r1_NAME) {
+#endif
     SS2K_LOG(MAIN_LOG_TAG, "Homing not supported or stepper not initialized.");
     fitnessMachineService.spinDown(FitnessMachineStatus::SpinDown_Error);
     return;

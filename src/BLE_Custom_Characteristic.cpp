@@ -832,6 +832,14 @@ void BLE_ss2kCustomCharacteristic::process(std::string rxValue) {
       }
       break;
 
+    case BLE_hardwareVersion:  // 0x2F
+      LOG_BUF_APPEND("<-Hardware Version");
+      if (rxValue[0] == cc_read) {
+        returnValue[0] = cc_success;
+        returnString   = currentBoard.name.c_str();
+      }
+      break;
+
     case BLE_BLELogging:  // 0x30
       LOG_BUF_APPEND("<-BLELogging");
       if (rxValue[0] == cc_read) {

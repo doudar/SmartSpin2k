@@ -117,6 +117,7 @@ class AuxSerialBuffer {
 };
 
 extern SS2K *ss2k;
+extern Board currentBoard;
 
 // Main program variable that stores most everything
 extern userParameters *userConfig;

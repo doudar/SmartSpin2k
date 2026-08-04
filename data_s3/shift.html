@@ -1,0 +1,85 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>SmartSpin2k Web Shifter</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <div class="page-container">
+    <header>
+      <nav aria-label="Main navigation">
+        <a href="index.html" class="back-link" aria-label="Back to main menu">← Main Menu</a>
+        <a href="http://github.com/doudar/SmartSpin2k" class="github-link">SmartSpin2k</a>
+      </nav>
+    </header>
+
+    <main>
+      <div id="loadingWatermark" class="watermark" aria-hidden="true">Loading</div>
+      <h1 class="brand">Web Shifter</h1>
+
+      <div class="shifter-container">
+        <div class="shift-controls">
+          <button type="button" id="shiftUp" onclick="sendShift(1)" class="shift-button shift-up" aria-label="Shift Up">
+            <span class="shift-arrow">▲</span>
+            <span class="shift-label">SHIFT UP</span>
+          </button>
+
+          <div class="gear-display">
+            <label for="shiftBox" class="gear-label">Current Gear</label>
+            <input type="text" id="shiftBox" class="gear-value" value="loading" readonly aria-live="polite">
+          </div>
+
+          <button type="button" id="shiftDown" onclick="sendShift(-1)" class="shift-button shift-down" aria-label="Shift Down">
+            <span class="shift-arrow">▼</span>
+            <span class="shift-label">SHIFT DOWN</span>
+          </button>
+        </div>
+      </div>
+    </main>
+  </div>
+
+  <script>
+    let updateTimer;
+    const shiftBox = document.getElementById('shiftBox');
+    
+    function sendShift(direction) {
+      const position = parseInt(shiftBox.value, 10);
+      const newPosition = position + direction;
+      shiftBox.value = newPosition;   
+      const button = direction > 0 ? 'shiftUp' : 'shiftDown';
+      const elem = document.getElementById(button);
+      elem.classList.add('active');
+      setTimeout(() => elem.classList.remove('active'), 200);
+
+      fetch('/shift?value=' + direction, { method: 'GET' })
+        .catch(error => {
+          console.error('Shift error:', error);
+          shiftBox.value = position; // Revert on error
+        });
+    }
+
+    function startUpdate() {
+      if (!updateTimer) {
+        updateTimer = setInterval(requestConfigValues, 3000);
+      }
+    }
+
+    function requestConfigValues() {
+      fetch('/runtimeConfigJSON')
+        .then(response => response.json())
+        .then(data => {
+          shiftBox.value = data.shifterPosition;
+          document.getElementById('loadingWatermark')?.remove();
+        })
+        .catch(() => startUpdate());
+    }
+
+    window.addEventListener('load', () => {
+      setTimeout(requestConfigValues, 500);
+      startUpdate();
+    });
+  </script>
+</body>
+</html>

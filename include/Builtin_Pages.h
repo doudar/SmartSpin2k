@@ -8,6 +8,7 @@
 #pragma once
 
 #include <Arduino.h>
+#include "settings.h"
 
 String OTAStyle =
     "<style>"
@@ -74,7 +75,7 @@ String OTAServerIndex =
     "<div style='background-color:#e0e0e0;border-radius:8px;margin-top:10px;'>"
     "<div id='prg' style='width:0%;background-color:#4CAF50;padding:2px;border-radius:8px;color:white;text-align:center;'>0%</div>"
     "</div>"
-    "<div>Valid files are firmware.bin or littlefs.bin</div>"
+    "<div>Valid files are " FW_BINFILE " or " FS_BINFILE "</div>"
     "</div>"
     "</body>"
     "<script>"
