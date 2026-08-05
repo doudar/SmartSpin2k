@@ -93,7 +93,7 @@ void collectAndSet(NimBLEUUID charUUID, NimBLEUUID serviceUUID, std::string& uni
     logBufLength += snprintf(logBuf + logBufLength, kLogBufMaxLength - logBufLength, " SD(%.2f)", fmodf(sensorData->getSpeed(), 1000.0));
   }
 
-  if (sensorData->hasResistance() && !uniqueName.starts_with("IC Bike")) { // Blacklist IC Bike resistance due to non-standard compliance
+  if (sensorData->hasResistance() && uniqueName.starts_with("Grupetto")) { // Blacklist everything not Grupetto. 
     rtConfig->resistance.setSimulate(false);  // Mark as real data
     if ((ss2k->pelotonIsConnected) && (charUUID != PELOTON_DATA_UUID)) {
       // Peloton connected but using BLE Power Meter. So skip resistance for UUID's that aren't Peloton.
