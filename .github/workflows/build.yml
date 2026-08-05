@@ -71,9 +71,13 @@ jobs:
         run: |
           cp ./.pio/build/release/firmware.bin firmware.bin
           cp ./.pio/build/release/littlefs.bin littlefs.bin
+          cp ./.pio/build/release/partitions.bin partitions.bin
+          cp ./.pio/build/release/bootloader.bin bootloader.bin
           cp ./.pio/build/S3release/S3firmware.bin S3firmware.bin
           cp ./.pio/build/S3release/S3littlefs.bin S3littlefs.bin
-          7z a SmartSpin2kFirmware-${{ steps.date.outputs.date }}.bin.zip firmware.bin littlefs.bin S3firmware.bin S3littlefs.bin
+          cp ./.pio/build/S3release/S3partitions.bin S3partitions.bin
+          cp ./.pio/build/S3release/S3bootloader.bin S3bootloader.bin
+          7z a SmartSpin2kFirmware-${{ steps.date.outputs.date }}.bin.zip firmware.bin littlefs.bin partitions.bin bootloader.bin S3firmware.bin S3littlefs.bin S3partitions.bin S3bootloader.bin
       - name: Archive
         uses: actions/upload-artifact@v5
         with:

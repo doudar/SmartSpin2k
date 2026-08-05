@@ -20,3 +20,5 @@ def rename_s3_artifact(source, target, env):
 if env.subst("$PIOENV") in ("S3release", "S3debug"):
     env.AddPostAction("$BUILD_DIR/${PROGNAME}.bin", rename_s3_artifact)
     env.AddPostAction("$BUILD_DIR/littlefs.bin", rename_s3_artifact)
+    env.AddPostAction("$BUILD_DIR/partitions.bin", rename_s3_artifact)
+    env.AddPostAction("$BUILD_DIR/bootloader.bin", rename_s3_artifact)

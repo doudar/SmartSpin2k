@@ -37,7 +37,8 @@ PlatformIO is the expected entry point.
 - Static analysis: `pio check -e debug`
 - Pre-commit checks: `pre-commit run --all-files`
 
-S3 firmware and filesystem builds rename PlatformIO's canonical artifacts to `S3firmware.bin` and `S3littlefs.bin` in the environment build directory; the unprefixed artifacts are removed.
+S3 firmware and filesystem builds prefix the generated binary names with `S3` (`S3firmware.bin`, `S3littlefs.bin`, `S3partitions.bin`, and `S3bootloader.bin`) in the environment build directory; the unprefixed artifacts are removed.
+The GitHub release archive includes firmware, LittleFS, partition-table, and bootloader binaries for both classic ESP32 and ESP32-S3 targets.
 
 Filesystem builds stage deterministic gzip copies of every HTML/CSS source file under the environment build directory. They also refresh the checked-in `.gz` companions and `list.json` in `data/` or `data_s3/`, which are consumed by repository-based automatic OTA updates.
 
