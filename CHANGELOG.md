@@ -16,6 +16,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Moved stepper homing tuning constants into `settings.h`.
 - Restyled the compact built-in recovery, OTA, and login pages and added visible feedback for image validation, upload failures, and reboot completion.
 - Added S3-prefixed PlatformIO build artifacts and updated the release workflow to package them directly.
+- Gzip HTML and CSS assets during LittleFS builds, serve them with the correct encoding, and make automatic filesystem updates binary-safe.
+- Automatic filesystem updates now remove files outside the server manifest while preserving settings and power-table data, track the installed filesystem release version, and never replace it with an older release.
+- Successful LittleFS uploads from the recovery page now reboot after acknowledging the upload so the replacement filesystem is mounted cleanly.
+- Fixed gzip web responses being labeled with duplicate content-encoding headers, which Firefox rejected.
 
 ### Hardware
 - Corrected the ESP32-S3 shift-up and shift-down pin assignments.

@@ -39,6 +39,8 @@ PlatformIO is the expected entry point.
 
 S3 firmware and filesystem builds retain PlatformIO's canonical artifacts and also create `S3firmware.bin` and `S3littlefs.bin` copies in the environment build directory.
 
+Filesystem builds stage deterministic gzip copies of every HTML/CSS source file under the environment build directory. They also refresh the checked-in `.gz` companions and `list.json` in `data/` or `data_s3/`, which are consumed by repository-based automatic OTA updates.
+
 Codex environment constraint:
 
 - Do not run PlatformIO firmware or filesystem builds from the Codex environment. The Windows Xtensa toolchain can hang and leave orphaned compiler processes here. Make the requested changes, run non-build checks where useful, and clearly leave PlatformIO build validation for the user to run manually.
@@ -490,6 +492,7 @@ Responsibilities:
 - Start/stop WiFi (`startWifi()`, `stopWifi()`).
 - Serve LittleFS web assets and built-in OTA pages.
 - Firmware update flow through `HTTP_Server::FirmwareUpdate()`.
+- Automatic filesystem updates treat remote `list.json` as an allowlist, preserve config/power-table/recovery metadata, and store the installed filesystem release version in NVS.
 - Settings JSON/API behavior through `settingsProcessor()`.
 - Periodic web client update through `webClientUpdate()`.
 - BLE scanner page support.
