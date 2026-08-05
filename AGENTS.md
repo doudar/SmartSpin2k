@@ -37,6 +37,8 @@ PlatformIO is the expected entry point.
 - Static analysis: `pio check -e debug`
 - Pre-commit checks: `pre-commit run --all-files`
 
+S3 firmware and filesystem builds retain PlatformIO's canonical artifacts and also create `S3firmware.bin` and `S3littlefs.bin` copies in the environment build directory.
+
 Codex environment constraint:
 
 - Do not run PlatformIO firmware or filesystem builds from the Codex environment. The Windows Xtensa toolchain can hang and leave orphaned compiler processes here. Make the requested changes, run non-build checks where useful, and clearly leave PlatformIO build validation for the user to run manually.
@@ -81,7 +83,7 @@ Boot entry is `app_main()` in `src/Main.cpp`.
 Boot sequence:
 
 1. Initialize Arduino/Serial.
-2. Detect hardware revision using `REV_PIN` and `boards.rev1/rev2`.
+2. Detect hardware revision using the revision pin and ADC values in `include/boards.h`.
 3. Start stepper serial and optional aux serial for Peloton.
 4. Mount LittleFS.
 5. Load and re-save `userConfig`.
@@ -516,10 +518,11 @@ Use `SS2K_LOG*` macros rather than raw `Serial.printf` unless matching nearby co
 - Stepper power, speed, acceleration, travel, and driver tuning.
 - ERG constants and compile-time feature flags.
 - Power-table sizes, increments, and quality constants.
-- Hardware pin assignments for board revisions.
 - BLE timing, reconnect, stack, and buffer sizes.
 - Peloton aux serial constants.
 - Homing thresholds and sensitivity defaults.
+
+Board-specific pin mappings, driver sense resistance, current scaling, revision detection values, homing capability, and homing-sensitivity scaling live in `include/boards.h`.
 
 When changing behavior, prefer adjusting named constants instead of scattering magic numbers.
 

@@ -138,119 +138,6 @@ const char* const DEFAULT_PASSWORD = "password";
 // Default debounce delay for shifters. Increase if you have false shifts. Decrease if shifting takes too long.
 #define DEBOUNCE_DELAY 200
 
-#if defined(SMARTSPIN2K_S3)
-// The S3 board moved the hardware-version resistor to GPIO4.
-#define REV_PIN                 4
-#define BOARD_VERSION_TOLERANCE 300
-#else
-// Hardware Revision check pin
-#define REV_PIN 34
-#endif
-
-//////////// Defines for hardware Revision 1 ////////////
-
-// Board Name
-#define r1_NAME "Revision One"
-
-// ID Voltage on pin 34. Values are 0-4095 (0-3.3v)
-#define r1_VERSION_VOLTAGE 0
-
-// Hardware pin for Shift Up
-#define r1_SHIFT_UP_PIN 19
-
-// Hardware pin for Shift Down
-#define r1_SHIFT_DOWN_PIN 18
-
-// Hardware pin for stepper Enable
-#define r1_ENABLE_PIN 13
-
-// Hardware pin for stepper step
-#define r1_STEP_PIN 25
-
-// Hardware pin for stepper dir
-#define r1_DIR_PIN 33
-
-// TMC2208/TMC2224 SoftwareSerial receive pin
-#define r1_STEPPER_SERIAL_RX 14
-
-// TMC2208/TMC2224 SoftwareSerial transmit pin
-#define r1_STEPPER_SERIAL_TX 12
-
-// Reduce current setting by this divisor (0-31)
-#define r1_PWR_SCALER 31
-////////////////////////////////////////////////////////
-//////////// Defines for hardware Revision 2 ////////////
-
-// Board Name
-#define r2_NAME "Revision Two"
-
-// ID Voltage on pin 34. Values are 0-4095 (0-3.3v)
-#define r2_VERSION_VOLTAGE 4095
-
-// Hardware pin for Shift Up
-#define r2_SHIFT_UP_PIN 26
-
-// Hardware pin for Shift Down
-#define r2_SHIFT_DOWN_PIN 32
-
-// Hardware pin for stepper Enable
-#define r2_ENABLE_PIN 27
-
-// Hardware pin for stepper step
-#define r2_STEP_PIN 25
-
-// Hardware pin for stepper dir
-#define r2_DIR_PIN 33
-
-// TMC2209 SoftwareSerial receive pin
-#define r2_STEPPER_SERIAL_RX 18
-
-// TMC2209 SoftwareSerial transmit pin
-#define r2_STEPPER_SERIAL_TX 19
-
-// TMC2209 SoftwareSerial receive pin
-#define r2_AUX_SERIAL_RX 22
-
-// TMC2209 SoftwareSerial transmit pin
-#define r2_AUX_SERIAL_TX 21
-
-// Reduce current setting by this divisor (0-31)
-#define r2_PWR_SCALER 12
-////////////////////////////////////////////////////////
-
-#if defined(SMARTSPIN2K_S3)
-//////////// Defines for hardware Revision 3 ////////////
-#define r3_NAME "Revision Three (ESP32-S3)"
-
-// 1.0 V on GPIO4 with the 12-bit ADC range (0-4095 for 0-3.3 V).
-#define r3_VERSION_VOLTAGE 1241
-#define r3_SHIFT_UP_PIN 13
-#define r3_SHIFT_DOWN_PIN 14
-#define r3_ENABLE_PIN 48
-#define r3_STEP_PIN 21
-#define r3_DIR_PIN 47
-#define r3_STEPPER_SERIAL_RX 12
-#define r3_STEPPER_SERIAL_TX 11
-#define r3_AUX_SERIAL_RX 18
-#define r3_AUX_SERIAL_TX 17
-#define r3_PWR_SCALER 12
-////////////////////////////////////////////////////////
-#endif
-
-// TMC2208/TMC2224 HardwareSerial port
-#define SERIAL_PORT stepperSerial
-
-// Match to your driver
-#if defined(SMARTSPIN2K_S3)
-#define R_SENSE 0.04f
-#else
-#define R_SENSE 0.08f
-#endif
-
-// Hardware pin for indicator LED *note* internal LED on esp32 Dev board is pin
-// 2
-#define LED_PIN 2
-
 // Reconnect tries removed: connections now always instantiate a new NimBLEClient
 
 // loop speed for the SmartSpin2k BLE communications
@@ -387,8 +274,19 @@ constexpr const char* ANY = "any";
 // Interval for polling ble battery updates
 #define BATTERY_UPDATE_INTERVAL_MILLIS 300000
 
-// Default homing sensitivity value
+// Base homing sensitivity before applying the detected board's scaler.
 #define DEFAULT_HOMING_SENSITIVITY 50
+
+// Stepper homing behavior
+#define HOME_TIMEOUT                  30000
+#define HOMING_SG_SAMPLE_COUNT        24
+#define HOMING_SG_MIN_SAMPLE_MARGIN   10
+#define HOMING_SG_MAX_THRESHOLD_DRIFT 30
+#define HOMING_TAP_MAX_ATTEMPTS       7
+#define HOMING_TAP_REQUIRED_STABLE    3
+#define HOMING_TAP_TOLERANCE          150
+#define HOMING_RECOVERY_BACKOFF_MULT  3
+#define HOMING_MAX_SENSITIVITY        100
 
 // BLE automatic reconnect interval in milliseconds.
 #define BLE_RECONNECT_SCAN_INTERVAL 6000

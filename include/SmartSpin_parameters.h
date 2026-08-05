@@ -142,7 +142,7 @@ class userParameters {
   int32_t hMin               = INT32_MIN;
   int32_t hMax               = INT32_MIN;
   bool FTMSControlPointWrite = false;
-  int homingSensitivity      = DEFAULT_HOMING_SENSITIVITY;  // Use default from settings.h
+  int homingSensitivity      = DEFAULT_HOMING_SENSITIVITY;
   String ssid;
   String password;
   String connectedPowerMeter   = CONNECTED_POWER_METER;

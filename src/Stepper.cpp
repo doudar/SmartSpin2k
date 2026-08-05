@@ -14,7 +14,8 @@
 #include <Constants.h>
 
 HardwareSerial stepperSerial(2);
-TMC2209Stepper driver(&SERIAL_PORT, R_SENSE, 0b00);  // Hardware Serial
+// Construct after hardware detection so the selected board's sense resistor is used.
+static TMC2209Stepper* driver = nullptr;
 FastAccelStepperEngine engine = FastAccelStepperEngine();
 FastAccelStepper* stepper     = NULL;
 
@@ -150,6 +151,10 @@ void SS2K::_resistanceMove() {
 }
 
 void SS2K::setupTMCStepperDriver(bool reset) {
+  if (!driver) {
+    driver = new TMC2209Stepper(&stepperSerial, currentBoard.rSense, 0b00);
+  }
+
   // FastAccel setup
   if (!reset) {
     engine.init();
@@ -161,15 +166,15 @@ void SS2K::setupTMCStepperDriver(bool reset) {
     stepper->setAcceleration(STEPPER_ACCELERATION);
     stepper->setDelayToDisable(65535);
     // TMC Driver Setup
-    driver.begin();
+    driver->begin();
   }
 
-  driver.pdn_disable(true);       // Use PDN pin to enable UART communication instead of grounding signal
-  driver.mstep_reg_select(true);  // Use register instead of ms1&ms2 pins for microstep selection
-  driver.microsteps(4);           // Set microsteps to 1/4
-  driver.iholddelay(5);           // Controls the number of clock cycles for motor power down after standstill is detected
-  driver.TPOWERDOWN(16);          // delay until hold current (0-255). 255 = 5.6s, 2 is minimum for StealthChop.
-  driver.toff(5);                 // needs >0 for driver enable. 1-15 controls duration of slow decay phase of pwm.
+  driver->pdn_disable(true);       // Use PDN pin to enable UART communication instead of grounding signal
+  driver->mstep_reg_select(true);  // Use register instead of ms1&ms2 pins for microstep selection
+  driver->microsteps(4);           // Set microsteps to 1/4
+  driver->iholddelay(5);           // Controls the number of clock cycles for motor power down after standstill is detected
+  driver->TPOWERDOWN(16);          // delay until hold current (0-255). 255 = 5.6s, 2 is minimum for StealthChop.
+  driver->toff(5);                 // needs >0 for driver enable. 1-15 controls duration of slow decay phase of pwm.
   this->updateStealthChop();
   this->updateStepperSpeed();
   this->updateStepperPower();
@@ -178,6 +183,10 @@ void SS2K::setupTMCStepperDriver(bool reset) {
 
 static int lastHomingSgThreshold = 0;
 
+static int getScaledHomingSensitivity() {
+  return round(userConfig->getHomingSensitivity() * currentBoard.homingSensitivityScaler);
+}
+
 static HomingSgBaseline getHomingSgBaseline() {
   int samples[HOMING_SG_SAMPLE_COUNT];
   int totalSgResult  = 0;
@@ -185,10 +194,10 @@ static HomingSgBaseline getHomingSgBaseline() {
   int maxSampleIndex = 0;
 
   for (int i = 0; i < HOMING_SG_SAMPLE_COUNT; i++) {
-    samples[i] = driver.SG_RESULT();
+    samples[i] = driver->SG_RESULT();
     if (samples[i] == 0) {
       delay(30);
-      samples[i] = driver.SG_RESULT();
+      samples[i] = driver->SG_RESULT();
     }
     totalSgResult += samples[i];
     if (samples[i] < samples[minSampleIndex]) minSampleIndex = i;
@@ -207,9 +216,10 @@ static HomingSgBaseline getHomingSgBaseline() {
     if (samples[i] > trimmedMax) trimmedMax = samples[i];
   }
 
-  int threshold           = round(trimmedTotal / (float)trimmedCount);
-  int normalLowDrop       = threshold - trimmedMin;
-  int measuredSensitivity = max(userConfig->getHomingSensitivity(), normalLowDrop + max(userConfig->getHomingSensitivity() / 2, HOMING_SG_MIN_SAMPLE_MARGIN));
+  int configuredSensitivity = getScaledHomingSensitivity();
+  int threshold             = round(trimmedTotal / (float)trimmedCount);
+  int normalLowDrop         = threshold - trimmedMin;
+  int measuredSensitivity   = max(configuredSensitivity, normalLowDrop + max(configuredSensitivity / 2, HOMING_SG_MIN_SAMPLE_MARGIN));
   int maxSensitivity      = min(HOMING_MAX_SENSITIVITY, max(threshold, 1));
   measuredSensitivity     = constrain(measuredSensitivity + 10, 1, maxSensitivity);
   SS2K_LOG(MAIN_LOG_TAG, "Homing SG baseline used %d/%d trimmed samples. Dropped: %d/%d, Spread: %d-%d, measured sensitivity: %d", trimmedCount, HOMING_SG_SAMPLE_COUNT,
@@ -223,7 +233,7 @@ static HomingSgBaseline getHomingSgBaseline() {
  */
 bool SS2K::_findEndStop(bool moveForward) {
   unsigned long timeoutTimer = millis();
-  HomingSgBaseline baseline  = {0, userConfig->getHomingSensitivity()};
+  HomingSgBaseline baseline  = {0, getScaledHomingSensitivity()};
 
   // --- SETUP DRIVER FOR SENSORLESS HOMING ---
   // Use very low power for sensitive stall detection
@@ -258,11 +268,11 @@ bool SS2K::_findEndStop(bool moveForward) {
       return false;
     }
 
-    currentSgResult = driver.SG_RESULT();
+    currentSgResult = driver->SG_RESULT();
     // if zero detected, wait 10ms and sample again.
     if (currentSgResult == 0) {
       delay(10);
-      currentSgResult = driver.SG_RESULT();
+      currentSgResult = driver->SG_RESULT();
     }
 
     // Periodically log the status for tuning
@@ -394,11 +404,7 @@ void SS2K::goHome(bool bothDirections) {
     }
   }
 
-#if defined(SMARTSPIN2K_S3)
-  if (!stepper) {
-#else
-  if (!stepper || currentBoard.name == r1_NAME) {
-#endif
+  if (!stepper || !currentBoard.homingSupported) {
     SS2K_LOG(MAIN_LOG_TAG, "Homing not supported or stepper not initialized.");
     fitnessMachineService.spinDown(FitnessMachineStatus::SpinDown_Error);
     return;
@@ -527,29 +533,29 @@ void SS2K::goHome(bool bothDirections) {
 // Applies current power to driver
 void SS2K::updateStepperPower(int pwr) {
   uint16_t rmsPwr = (pwr == 0) ? userConfig->getStepperPower() : pwr;
-  driver.rms_current(rmsPwr, HOLD_PWR_SCALER);
-  SS2K_LOG(MAIN_LOG_TAG, "Stepper power is now %d mA (driver setpoint %d mA)", rmsPwr, driver.rms_current());
+  driver->rms_current(rmsPwr, HOLD_PWR_SCALER);
+  SS2K_LOG(MAIN_LOG_TAG, "Stepper power is now %d mA (driver setpoint %d mA)", rmsPwr, driver->rms_current());
 }
 
 // Applies current StealthChop to driver
 void SS2K::updateStealthChop(bool coolStepEnabled) {
   bool stealthChopEnabled = userConfig->getStealthChop();
-  driver.en_spreadCycle(!stealthChopEnabled);
-  driver.pwm_autoscale(stealthChopEnabled);
-  driver.pwm_autograd(stealthChopEnabled);
+  driver->en_spreadCycle(!stealthChopEnabled);
+  driver->pwm_autoscale(stealthChopEnabled);
+  driver->pwm_autograd(stealthChopEnabled);
 
   // Reuse homing sensitivity as CoolStep load tolerance when StealthChop is active.
   uint8_t coolstepTolerance = (uint8_t)constrain(userConfig->getHomingSensitivity(), 0, 255);
   if (stealthChopEnabled && coolStepEnabled) {
-    driver.SGTHRS(coolstepTolerance);
-    driver.semin(1);  // Enable CoolStep
-    driver.seup(1);
-    driver.sedn(1);
-    driver.semax((uint8_t)constrain((coolstepTolerance / 16) + 1, 1, 15));
-    driver.seimin(false);
+    driver->SGTHRS(coolstepTolerance);
+    driver->semin(1);  // Enable CoolStep
+    driver->seup(1);
+    driver->sedn(1);
+    driver->semax((uint8_t)constrain((coolstepTolerance / 16) + 1, 1, 15));
+    driver->seimin(false);
   } else {
-    driver.semin(0);  // Disable CoolStep
-    driver.SGTHRS(0);
+    driver->semin(0);  // Disable CoolStep
+    driver->SGTHRS(0);
   }
 
   SS2K_LOG(MAIN_LOG_TAG, "StealthChop:%d CoolStep:%d SGTHRS:%d", stealthChopEnabled, stealthChopEnabled && coolStepEnabled, coolstepTolerance);

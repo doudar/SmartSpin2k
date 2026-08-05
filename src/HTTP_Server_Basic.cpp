@@ -408,7 +408,7 @@ void HTTP_Server::start() {
       []() {
         server.sendHeader("Connection", "close");
         if (otaUploadRejected) {
-          server.send(400, "text/plain", "Wrong firmware target or unsupported image filename");
+          server.send(400, "text/plain", String("Wrong image filename. Expected ") + FW_BINFILE + " or " + FS_BINFILE + ".");
           return;
         }
         // Check if the Update process reported an error and send the final status.
@@ -453,8 +453,6 @@ void HTTP_Server::start() {
               SS2K_LOG(HTTP_SERVER_LOG_TAG, "Unknown OTA issue on end.");
             }
             // The reboot will be triggered in the onComplete handler after the response.
-            // Setting this to reboot, even if upload fails.
-            ss2k->rebootFlag = true;
           }
         } else if (upload.filename == FS_BINFILE) {
           if (upload.status == UPLOAD_FILE_START) {

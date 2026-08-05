@@ -99,12 +99,18 @@ extern "C" void app_main() {
 
 void SS2K::finishSetup() {
   SS2K_LOG(MAIN_LOG_TAG, "Compiled %s%s", __DATE__, __TIME__);
-  pinMode(REV_PIN, INPUT);
-  int actualVoltage = analogRead(REV_PIN);
 #if defined(SMARTSPIN2K_S3)
   currentBoard = boards.rev3;
-  SS2K_LOG(MAIN_LOG_TAG, "Board ID ADC on GPIO%d: %d (expected %d +/- %d)", REV_PIN, actualVoltage, currentBoard.versionVoltage, BOARD_VERSION_TOLERANCE);
-  if (abs(actualVoltage - currentBoard.versionVoltage) > BOARD_VERSION_TOLERANCE) {
+#else
+  // Revisions one and two share the same hardware-detection pin.
+  currentBoard = boards.rev1;
+#endif
+  pinMode(currentBoard.revisionPin, INPUT);
+  int actualVoltage = analogRead(currentBoard.revisionPin);
+#if defined(SMARTSPIN2K_S3)
+  SS2K_LOG(MAIN_LOG_TAG, "Board ID ADC on GPIO%d: %d (expected %d +/- %d)", currentBoard.revisionPin, actualVoltage, currentBoard.versionVoltage,
+           currentBoard.versionTolerance);
+  if (abs(actualVoltage - currentBoard.versionVoltage) > currentBoard.versionTolerance) {
     SS2K_LOG(MAIN_LOG_TAG, "WARNING: Board ID resistor does not match the ESP32-S3 hardware revision");
   }
 #else
@@ -167,7 +173,7 @@ void SS2K::finishSetup() {
 
   pinMode(currentBoard.shiftUpPin, INPUT_PULLUP);    // Push-Button with input Pullup
   pinMode(currentBoard.shiftDownPin, INPUT_PULLUP);  // Push-Button with input Pullup
-  pinMode(LED_PIN, OUTPUT);
+  pinMode(currentBoard.ledPin, OUTPUT);
   pinMode(currentBoard.enablePin, OUTPUT);
   pinMode(currentBoard.dirPin, OUTPUT);   // Stepper Direction Pin
   pinMode(currentBoard.stepPin, OUTPUT);  // Stepper Step Pin
@@ -175,7 +181,7 @@ void SS2K::finishSetup() {
                HIGH);  // Should be called a disable Pin - High Disables FETs
   digitalWrite(currentBoard.dirPin, LOW);
   digitalWrite(currentBoard.stepPin, LOW);
-  digitalWrite(LED_PIN, LOW);
+  digitalWrite(currentBoard.ledPin, LOW);
   ss2k->setLEDEnabled(shouldStartWithLedEnabled());
 
   ss2k->setupTMCStepperDriver();
@@ -185,7 +191,7 @@ void SS2K::finishSetup() {
   // disableCore0WDT();  // Disable the watchdog timer on core 0 (so long stepper
   //  moves don't cause problems)
 
-  digitalWrite(LED_PIN, LOW);
+  digitalWrite(currentBoard.ledPin, LOW);
   // Configure and Initialize Logger
   logHandler.addAppender(&webSocketAppender);
   logHandler.addAppender(&udpAppender);
@@ -213,7 +219,7 @@ void SS2K::finishSetup() {
 #endif
 
   ss2k->resetIfShiftersHeld();
-  digitalWrite(LED_PIN, LOW);
+  digitalWrite(currentBoard.ledPin, LOW);
 }
 
 void loop() {  // Delete this task so we can make one that's more memory efficient.
@@ -382,20 +388,20 @@ void SS2K::maintenanceLoop(void* pvParameters) {
 void SS2K::setLEDEnabled(bool enabled) {
   ledEnabled = enabled;
   if (!enabled) {
-    digitalWrite(LED_PIN, LOW);
+    digitalWrite(currentBoard.ledPin, LOW);
   }
 }
 
 void SS2K::updateLED() {
   if (!ledEnabled) {
-    digitalWrite(LED_PIN, LOW);
+    digitalWrite(currentBoard.ledPin, LOW);
     return;
   }
 
   int currentCount = spinBLEServer.connectedClientCount();
   if (currentCount == 0) {
     // No app/client connected yet: simple idle blink.
-    digitalWrite(LED_PIN, (millis() / 500) % 2 == 0 ? LOW : HIGH);
+    digitalWrite(currentBoard.ledPin, (millis() / 500) % 2 == 0 ? LOW : HIGH);
     return;
   }
 
@@ -409,12 +415,12 @@ void SS2K::updateLED() {
 
   // After the diagnostic pulses, return to solid-on connected status.
   if (cyclePosition >= currentCount * pulsePeriod) {
-    digitalWrite(LED_PIN, HIGH);
+    digitalWrite(currentBoard.ledPin, HIGH);
     return;
   }
 
   // Each pulse starts with a short off dip, followed by on-time between dips.
-  digitalWrite(LED_PIN, (cyclePosition % pulsePeriod) < pulseOffTime ? LOW : HIGH);
+  digitalWrite(currentBoard.ledPin, (cyclePosition % pulsePeriod) < pulseOffTime ? LOW : HIGH);
 }
 
 void SS2K::FTMSModeShiftModifier() {
@@ -562,9 +568,9 @@ void SS2K::resetIfShiftersHeld() {
   if ((digitalRead(currentBoard.shiftUpPin) == LOW) && (digitalRead(currentBoard.shiftDownPin) == LOW)) {
     SS2K_LOG(MAIN_LOG_TAG, "Resetting to defaults via shifter buttons.");
     for (int x = 0; x < 10; x++) {  // blink fast to acknowledge
-      digitalWrite(LED_PIN, HIGH);
+      digitalWrite(currentBoard.ledPin, HIGH);
       delay(200);
-      digitalWrite(LED_PIN, LOW);
+      digitalWrite(currentBoard.ledPin, LOW);
     }
     for (int i = 0; i < 20; i++) {
       LittleFS.format();

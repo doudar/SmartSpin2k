@@ -10,8 +10,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Added
 
 ### Changed
+- Start the maintenance task directly from `app_main()` and finish initialization on its configurable stack, preventing HTTPS firmware checks from overflowing the ESP-IDF main task.
+- Consolidated board pin mappings, revision detection, current scaling, homing capability, and driver sense-resistor values in `boards.h`.
+- Added a board-specific homing-sensitivity scaler, making the ESP32-S3 default equivalent to 80 while revisions one and two remain at 50.
+- Moved stepper homing tuning constants into `settings.h`.
+- Restyled the compact built-in recovery, OTA, and login pages and added visible feedback for image validation, upload failures, and reboot completion.
+- Added S3-prefixed PlatformIO build artifacts and updated the release workflow to package them directly.
 
 ### Hardware
+- Corrected the ESP32-S3 shift-up and shift-down pin assignments.
 
 
 ## [26.7.15]
