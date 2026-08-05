@@ -313,6 +313,7 @@ Protocol:
 - `cc_read` reads a variable.
 - `cc_write` writes a variable.
 - Responses generally start with `cc_success` or `cc_error`, followed by the variable id and bytes/string.
+- Reading `BLE_allSettings` returns a versioned, MTU-sized sequence of indications whose payloads concatenate into the JSON from `userConfig->returnJSON()`.
 
 The giant switch in `BLE_ss2kCustomCharacteristic::process()` maps variable IDs to `userConfig`, `rtConfig`, and `ss2k` fields. Examples:
 

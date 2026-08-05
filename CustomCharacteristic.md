@@ -79,6 +79,7 @@ From BLE_common.h
 |BLE_UDPLogging            |0x2E   |bool |Enable/disable UDP log streaming                   |
 |BLE_hardwareVersion       |0x2F   |str  |Read-only detected hardware revision                |
 |BLE_BLELogging            |0x30   |bool/str|Write: enable/disable BLE log streaming. Read: returns last log message|
+|BLE_allSettings           |0x31   |JSON |Read-only chunked snapshot of all user settings         |
 
 *syncMode will disable the movement of the stepper motor by forcing stepperPosition = targetPosition prior to the motor control. While this mode is enabled, it allows the client to set parameters like incline and shifterPosition without moving the motor from it's current position. Once the parameters are set, this mode should be turned back off and SS2K will resume normal operation.
 
@@ -92,3 +93,20 @@ Hardware-version example:
 - Client writes: `0x01, 0x2F`
 - An ESP32-S3 board indicates: `0x80, 0x2F`, followed by the ASCII bytes for `Revision Three (ESP32-S3)`.
 - Writes to `0x2F` return `cc_error` because the detected hardware revision is read-only.
+
+All-settings snapshot:
+
+- Client writes `0x01, 0x31` and subscribes to indications on the custom characteristic.
+- The server serializes `userConfig->returnJSON()` once, then sends MTU-sized indications sequentially. Each indication is acknowledged before the next is sent.
+- Every indication begins with this seven-byte header:
+
+| Offset | Size | Meaning |
+|--------|------|---------|
+| 0 | 1 | `cc_success` (`0x80`) |
+| 1 | 1 | `BLE_allSettings` (`0x31`) |
+| 2 | 1 | Snapshot framing version (`0x01`) |
+| 3 | 2 | Zero-based chunk number, little-endian |
+| 5 | 2 | Total chunk count, little-endian |
+| 7 | remainder | UTF-8 JSON bytes |
+
+The client validates that it received chunks `0` through `chunk count - 1`, concatenates the bytes after each header, and parses the result as JSON. If the connection closes or a chunk is missing, discard the partial snapshot and issue the read command again. Unknown JSON properties should be ignored so newly added settings remain backward compatible. The snapshot includes sensitive settings such as the Wi-Fi password, consistent with the existing individual password read command.
