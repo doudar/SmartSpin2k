@@ -14,16 +14,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Hardware
 
 
-## [26.7.15]
-
-### Added
-- Support for Spinning Bike Chrono
-
-### Changed
-
-### Hardware
-
-
 ## [26.5.27]
 
 ### Added
