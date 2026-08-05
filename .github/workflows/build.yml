@@ -9,20 +9,20 @@ jobs:
   build:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7
         with:
           fetch-depth: 0
       - name: Cache PlatformIO
-        uses: actions/cache@v5
+        uses: actions/cache@v6
         with:
           path: ~/.platformio
           key: ${{ runner.os }}-platformio-${{ hashFiles('platformio.ini', '.github/workflows/build.yml') }}
           restore-keys: |
             ${{ runner.os }}-platformio-
       - name: Ensure changelog is updated
-        uses: dangoslen/changelog-enforcer@v3.6.1
+        uses: dangoslen/changelog-enforcer@v3.7.0
       - name: Set up python
-        uses: actions/setup-python@v6
+        uses: actions/setup-python@v7
         with:
           python-version: '3.11'
           architecture: 'x64'
@@ -41,7 +41,7 @@ jobs:
         with:
           tag: ${{ steps.date.outputs.date }}
           message: "Automatic release ${{ steps.date.outputs.date }}"
-      - uses: dorny/paths-filter@v3
+      - uses: dorny/paths-filter@v4
         id: changes
         with:
           filters: |
@@ -79,19 +79,19 @@ jobs:
           cp ./.pio/build/S3release/S3bootloader.bin S3bootloader.bin
           7z a SmartSpin2kFirmware-${{ steps.date.outputs.date }}.bin.zip firmware.bin littlefs.bin partitions.bin bootloader.bin S3firmware.bin S3littlefs.bin S3partitions.bin S3bootloader.bin
       - name: Archive
-        uses: actions/upload-artifact@v5
+        uses: actions/upload-artifact@v7
         with:
           name: all-artifacts
           path: SmartSpin2kFirmware-${{ steps.date.outputs.date }}.bin.zip
       - name: Download Artifacts
-        uses: actions/download-artifact@v6
+        uses: actions/download-artifact@v8
         with:
           name: all-artifacts
       - name: Get tag info
         id: tag_info
         run: echo "SOURCE_TAG=${{ steps.date.outputs.date }}" >> $GITHUB_OUTPUT
       - name: Create release
-        uses: softprops/action-gh-release@v2
+        uses: softprops/action-gh-release@v3
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:

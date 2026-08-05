@@ -7,10 +7,10 @@ jobs:
   pre-commit:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7
         with:
           fetch-depth: 0
-      - uses: dorny/paths-filter@v3
+      - uses: dorny/paths-filter@v4
         id: changes
         with:
           filters: |
@@ -19,8 +19,8 @@ jobs:
             hardware:
               - 'Hardware/**'
       - name: Ensure changelog is updated
-        uses: dangoslen/changelog-enforcer@v3.6.1
+        uses: dangoslen/changelog-enforcer@v3.7.0
       - name: Setup python
-        uses: actions/setup-python@v6
+        uses: actions/setup-python@v7
       - name: Check pre-commit hooks
         uses: pre-commit/action@v3.0.1
