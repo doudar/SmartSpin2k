@@ -497,6 +497,17 @@ void HTTP_Server::start() {
           // server.send(500, "text/plain", error_string_buffer);
           server.send(500, "text/plain", "FAIL");
         } else {
+          if (otaFilesystemUpload) {
+            // Update replaced the mounted partition underneath LittleFS. Remount
+            // the new image before restoring the in-memory user configuration.
+            LittleFS.end();
+            if (LittleFS.begin(false)) {
+              userConfig->saveToLittleFS();
+              SS2K_LOG(HTTP_SERVER_LOG_TAG, "Settings saved to the uploaded LittleFS image");
+            } else {
+              SS2K_LOGE(HTTP_SERVER_LOG_TAG, "Failed to remount LittleFS before saving settings");
+            }
+          }
           server.send(200, "text/plain", "OK");
           if (otaFilesystemUpload) {
             // The filesystem was replaced underneath the running web server. Reboot
@@ -556,7 +567,6 @@ void HTTP_Server::start() {
             // DO NOT send a response here.
             if (Update.end(true)) {
               SS2K_LOG(HTTP_SERVER_LOG_TAG, "Littlefs Upload Finished Successfully.");
-              userConfig->saveToLittleFS();
             } else {
               Update.printError(Serial);
             }
