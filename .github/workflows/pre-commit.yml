@@ -21,6 +21,6 @@ jobs:
       - name: Ensure changelog is updated
         uses: dangoslen/changelog-enforcer@v3.6.1
       - name: Setup python
-        uses: actions/setup-python@v6
+        uses: actions/setup-python@v7
       - name: Check pre-commit hooks
         uses: pre-commit/action@v3.0.1
