@@ -37,7 +37,7 @@ PlatformIO is the expected entry point.
 - Static analysis: `pio check -e debug`
 - Pre-commit checks: `pre-commit run --all-files`
 
-S3 firmware and filesystem builds retain PlatformIO's canonical artifacts and also create `S3firmware.bin` and `S3littlefs.bin` copies in the environment build directory.
+S3 firmware and filesystem builds rename PlatformIO's canonical artifacts to `S3firmware.bin` and `S3littlefs.bin` in the environment build directory; the unprefixed artifacts are removed.
 
 Filesystem builds stage deterministic gzip copies of every HTML/CSS source file under the environment build directory. They also refresh the checked-in `.gz` companions and `list.json` in `data/` or `data_s3/`, which are consumed by repository-based automatic OTA updates.
 
