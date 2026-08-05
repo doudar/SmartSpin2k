@@ -41,7 +41,7 @@ jobs:
         with:
           tag: ${{ steps.date.outputs.date }}
           message: "Automatic release ${{ steps.date.outputs.date }}"
-      - uses: dorny/paths-filter@v3
+      - uses: dorny/paths-filter@v4
         id: changes
         with:
           filters: |
