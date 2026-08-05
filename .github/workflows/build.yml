@@ -22,7 +22,7 @@ jobs:
       - name: Ensure changelog is updated
         uses: dangoslen/changelog-enforcer@v3.6.1
       - name: Set up python
-        uses: actions/setup-python@v6
+        uses: actions/setup-python@v7
         with:
           python-version: '3.11'
           architecture: 'x64'
