@@ -1,6 +1,7 @@
 .pio/
 .vscode/c_cpp_properties.json
 .vscode/ipch
+.vscode/launch.json
 .idea/
 test/tmp_pio_test_transport.cpp
 test/output/
@@ -25,3 +26,4 @@ sdkconfig.S3debug
 .vscode/settings.json
 *.map
 graphify-out/
+

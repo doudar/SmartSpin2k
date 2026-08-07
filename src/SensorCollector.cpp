@@ -94,12 +94,12 @@ void collectAndSet(NimBLEUUID charUUID, NimBLEUUID serviceUUID, std::string& uni
   }
 
   if (sensorData->hasResistance() && uniqueName.starts_with("Grupetto")) { // Blacklist everything not Grupetto. 
-    rtConfig->resistance.setSimulate(false);  // Mark as real data
-    if ((ss2k->pelotonIsConnected) && (charUUID != PELOTON_DATA_UUID)) {
+    if (charUUID == PELOTON_DATA_UUID) {
       // Peloton connected but using BLE Power Meter. So skip resistance for UUID's that aren't Peloton.
     } else {
       rtConfig->resistance.setValue(sensorData->getResistance());
       logBufLength += snprintf(logBuf + logBufLength, kLogBufMaxLength - logBufLength, " RS(%d)", sensorData->getResistance() % 1000);
+      rtConfig->resistance.setSimulate(false);  // Mark as real data
     }
   }
 

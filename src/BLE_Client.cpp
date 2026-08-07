@@ -322,6 +322,7 @@ bool SpinBLEClient::connectToServer() {
   }
 
   // Update the advertised device info
+  rtConfig->resistance.setSimulate(true); // Mark as simulated data until we get a real value from the device
   spinBLEClient.myBLEDevices[device_number].doConnect = false;
   spinBLEClient.myBLEDevices[device_number].set(myDevice, pClient->getConnHandle(), serviceUUID, charUUID);
   spinBLEClient.myBLEDevices[device_number].peerAddress = pClient->getPeerAddress();
