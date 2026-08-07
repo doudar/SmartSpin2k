@@ -299,7 +299,7 @@ bool SpinBLEClient::connectToServer() {
     return false;
   };
   // Always create a brand-new client for each connection attempt.
-  if (NimBLEDevice::getCreatedClientCount() >= NIMBLE_MAX_CONNECTIONS) {
+  if (NimBLEDevice::getCreatedClientCount() >= MYNEWT_VAL(BLE_MAX_CONNECTIONS)) {
     Serial.println("Max clients reached - no more connections available");
     return false;
   }

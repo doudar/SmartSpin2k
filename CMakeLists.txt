@@ -1,5 +1,6 @@
 cmake_minimum_required(VERSION 3.16.0)
 include($ENV{IDF_PATH}/tools/cmake/project.cmake)
+add_compile_definitions(ARDUINO_ARCH_ESP32=1)
 if(IDF_TARGET STREQUAL "esp32s3")
     set(SDKCONFIG_DEFAULTS "sdkconfig.defaults;sdkconfig.s3.defaults")
 endif()

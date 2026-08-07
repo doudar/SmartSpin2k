@@ -37,7 +37,7 @@ PlatformIO is the expected entry point.
 - Static analysis: `pio check -e debug`
 - Pre-commit checks: `pre-commit run --all-files`
 
-S3 firmware and filesystem builds prefix the generated binary names with `S3` (`S3firmware.bin`, `S3littlefs.bin`, `S3partitions.bin`, and `S3bootloader.bin`) in the environment build directory; the unprefixed artifacts are removed.
+S3 firmware and filesystem builds use `S3firmware.bin` and `S3littlefs.bin` as their native PlatformIO output/upload names. They also create `S3partitions.bin` and `S3bootloader.bin` copies for releases; the generic partition and bootloader intermediates remain because PlatformIO's flash uploader depends on those names.
 The GitHub release archive includes firmware, LittleFS, partition-table, and bootloader binaries for both classic ESP32 and ESP32-S3 targets.
 
 Filesystem builds stage deterministic gzip copies of every HTML/CSS source file under the environment build directory. They also refresh the checked-in `.gz` companions and `list.json` in `data/` or `data_s3/`, which are consumed by repository-based automatic OTA updates.
@@ -238,7 +238,7 @@ Key functions:
 
 - `SpinBLEClient::start()`: creates BLE client task and configures scanning.
 - `ScanCallbacks::onResult()`: filters supported devices, updates `foundDevices`, sets slots to connect when user config matches.
-- `SpinBLEClient::connectToServer()`: creates fresh NimBLE client, connects, sets slot state, removes duplicates.
+- `SpinBLEClient::connectToServer()`: creates fresh BLE client, connects, sets slot state, removes duplicates.
 - `subscribeToAllNotifications()`: subscribes to notify/indicate characteristics for supported services.
 - `SpinBLEClient::postConnect()`: completes service subscriptions, reads FTMS resistance range, starts FTMS training where needed, drains notification queues.
 - `SpinBLEClient::checkBLEReconnect()`: sets `doScan` when configured devices are missing.
@@ -275,7 +275,7 @@ Stateful parser caution:
 
 Primary files: `src/BLE_Server.cpp`, `src/BLE_Fitness_Machine_Service.cpp`, service-specific `src/BLE_*_Service.cpp`.
 
-`startBLEServer()` creates the NimBLE server and starts services:
+`startBLEServer()` creates the BLE server and starts services:
 
 - Cycling Speed/Cadence
 - Cycling Power
