@@ -21,6 +21,50 @@
 static unsigned long ergTimer = millis() + ERG_MODE_DELAY;
 static bool isDelayed         = false;
 
+namespace {
+constexpr int ERG_SLOPE_SAMPLE_WATTS       = POWERTABLE_WATT_INCREMENT;
+constexpr int ERG_LOW_GAIN_WATTS           = 120;
+constexpr int ERG_HIGH_GAIN_WATTS          = 400;
+constexpr int ERG_MIN_SCHEDULE_WATTS       = 30;
+constexpr double ERG_SLOPE_CONTROL_DIVISOR = 10.0;
+constexpr double ERG_GAIN_MIN_DIVISOR      = 4.0;
+constexpr double ERG_GAIN_MAX_MULTIPLIER   = 8.0;
+
+double fallbackErgGain(double sensitivity, int operatingWatts) {
+  if (operatingWatts < ERG_LOW_GAIN_WATTS) {
+    return sensitivity * ERG_LOW_GAIN_WATTS / std::max(operatingWatts, ERG_MIN_SCHEDULE_WATTS);
+  }
+  if (operatingWatts > ERG_HIGH_GAIN_WATTS) {
+    return sensitivity * ERG_HIGH_GAIN_WATTS / operatingWatts;
+  }
+  return sensitivity;
+}
+
+double scheduledErgGain(double sensitivity, int operatingWatts, int cadence, bool& usedPowerTable) {
+  usedPowerTable = false;
+
+  const int lowerWatts        = std::max(0, operatingWatts - ERG_SLOPE_SAMPLE_WATTS);
+  const int upperWatts        = operatingWatts + ERG_SLOPE_SAMPLE_WATTS;
+  const int32_t lowerPosition = powerTable->lookup(lowerWatts, cadence);
+  const int32_t upperPosition = powerTable->lookup(upperWatts, cadence);
+
+  double gain = fallbackErgGain(sensitivity, operatingWatts);
+  if (powerTable->ptHelpers.resistanceModel.getIsValid() && lowerPosition != RETURN_ERROR && upperPosition != RETURN_ERROR && upperPosition > lowerPosition) {
+    const double localStepsPerWatt = static_cast<double>(upperPosition - lowerPosition) / static_cast<double>(upperWatts - lowerWatts);
+    gain                           = localStepsPerWatt * sensitivity / ERG_SLOPE_CONTROL_DIVISOR;
+    usedPowerTable                 = true;
+  }
+
+  return gain;
+}
+
+double clampErgGain(double gain, double sensitivity) {
+  const double minimumGain = sensitivity / ERG_GAIN_MIN_DIVISOR;
+  const double maximumGain = sensitivity * ERG_GAIN_MAX_MULTIPLIER;
+  return std::max(minimumGain, std::min(gain, maximumGain));
+}
+}  // namespace
+
 void ErgMode::runERG() {
   static ErgMode ergMode;
   static PowerBuffer powerBuffer;
@@ -241,15 +285,18 @@ int32_t ErgMode::_setPointChangeState() {
 
 // PrevError
 int32_t ErgMode::_inSetpointState() {
-  // Setting Gains For PID Loop
-  double Kp = userConfig->getERGSensitivity();  // Proportional gain based on user sensitivity
-
   // retrieves the current Watt output
   int watts = rtConfig->watts.getValue();
   // retrieves target Watt output
   int target = rtConfig->watts.getTarget();
   // subtracting target from current watts
   int error = target - watts;
+
+  // Scale the proportional gain to the local power-table slope. This compensates for the eddy-current brake producing fewer watts per step at low resistance
+  // and more watts per step at high resistance. ERG sensitivity controls how much of the predicted correction is applied and bounds bad model slopes.
+  const double sensitivity = userConfig->getERGSensitivity();
+  bool usedPowerTable      = false;
+  double Kp                = scheduledErgGain(sensitivity, target, rtConfig->cad.getValue(), usedPowerTable);
 
   // modifying gains based on error
   if (abs(error) < 10 || (mode != Mode::MAINTAIN)) {
@@ -260,13 +307,15 @@ int32_t ErgMode::_inSetpointState() {
     Kp = Kp * 1.25;  // Aggressive for large errors
   }
 
+  if (watts < userConfig->getMinWatts()) {
+    Kp = Kp * sensitivity;  // Increase gain at very low watts to prevent Zwift from timing out on an initial interval.
+  }
+  Kp = clampErgGain(Kp, sensitivity);
+
   mode = Mode::MAINTAIN;
 
   // Defining proportional term
   double proportional = Kp * error;
-  if (rtConfig->watts.getValue() < userConfig->getMinWatts()) {
-    proportional = proportional * userConfig->getERGSensitivity();  // increase proportional term when at very low watts. Prevents Zwift from timeout on initial interval.
-  }
 
   // final PID output
   double PID_output = proportional;
@@ -275,7 +324,8 @@ int32_t ErgMode::_inSetpointState() {
   static unsigned long lastTime = 0;
   if (millis() - lastTime > 5000) {
     lastTime = millis();
-    SS2K_LOG(ERG_MODE_LOG_TAG, "%dw, Target %dw, Proportional: %f", rtConfig->watts.getValue(), rtConfig->watts.getTarget(), proportional);
+    SS2K_LOG(ERG_MODE_LOG_TAG, "%dw, Target %dw, Kp: %.3f (%s), Proportional: %f", rtConfig->watts.getValue(), rtConfig->watts.getTarget(), Kp,
+             usedPowerTable ? "table" : "fallback", proportional);
   }
 
   // Cap the change to no more than we can move until the next reading
