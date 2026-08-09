@@ -171,6 +171,7 @@ void _staSetup() {
   WiFi.mode(WIFI_STA);
   WiFi.begin(userConfig->getSsid(), userConfig->getPassword());
   WiFi.setAutoReconnect(true);
+  WiFi.setSleep(false);
 }
 
 void _APSetup() {
@@ -337,8 +338,7 @@ void HTTP_Server::start() {
     SS2K_LOG(HTTP_SERVER_LOG_TAG, "Scanning from web request");
     String response =
         "<!DOCTYPE html><html><body>Scanning for BLE Devices. Please wait "
-        "15 seconds.</body><script> setTimeout(\"location.href = 'http://" +
-        myIP.toString() + "/bluetoothscanner.html';\",15000);</script></html>";
+        "15 seconds.</body><script> setTimeout(\"location.href = '/bluetoothscanner.html';\",15000);</script></html>";
     // spinBLEClient.resetDevices();
     spinBLEClient.doScan = true;
     server.send(200, "text/html", response);
@@ -357,7 +357,7 @@ void HTTP_Server::start() {
 
   server.on("/reboot.html", []() {
     SS2K_LOG(HTTP_SERVER_LOG_TAG, "Rebooting from Web Request");
-    String response = "Rebooting....<script> setTimeout(\"location.href = 'http://" + myIP.toString() + "/index.html';\",500); </script>";
+    String response = "Rebooting....<script> setTimeout(\"location.href = '/index.html';\",500); </script>";
     server.send(200, "text/html", response);
     ss2k->rebootFlag = true;
   });
@@ -805,28 +805,24 @@ void HTTP_Server::settingsProcessor() {
   if (wasBTUpdate) {  // Special BT page update response
     response +=
         "Selections Saved!</h2></body><script> setTimeout(\"location.href "
-        "= 'http://" +
-        myIP.toString() + "/bluetoothscanner.html';\",1000);</script></html>";
+        "= '/bluetoothscanner.html';\",1000);</script></html>";
   } else if (wasSettingsUpdate) {  // Special Settings Page update response
     response +=
         "Network settings will be applied at next reboot. <br> Everything "
         "else is available immediately.</h2></body><script> "
-        "setTimeout(\"location.href = 'http://" +
-        myIP.toString() + "/settings.html';\",1000);</script></html>";
+        "setTimeout(\"location.href = '/settings.html';\",1000);</script></html>";
   } else {  // Normal response
     response +=
         "Network settings will be applied at next reboot. <br> Everything "
         "else is available immediately.</h2></body><script> "
-        "setTimeout(\"location.href = 'http://" +
-        myIP.toString() + "/index.html';\",1000);</script></html>";
+        "setTimeout(\"location.href = '/index.html';\",1000);</script></html>";
   }
   SS2K_LOG(HTTP_SERVER_LOG_TAG, "Config Updated From Web");
   ss2k->saveFlag = true;
   if (reboot) {
     response +=
         "Please wait while your settings are saved and SmartSpin2k reboots.</h2></body><script> "
-        "setTimeout(\"location.href = 'http://" +
-        myIP.toString() + "/bluetoothscanner.html';\",5000);</script></html>";
+        "setTimeout(\"location.href = '/bluetoothscanner.html';\",5000);</script></html>";
     server.send(200, "text/html", response);
     ss2k->rebootFlag = true;
   }
