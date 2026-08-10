@@ -12,6 +12,7 @@
 #include "cert.h"
 #include "SS2KLog.h"
 #include "DirConManager.h"
+#include "FirmwareImageValidation.h"
 #include <WebServer.h>
 #include <HTTPClient.h>
 #include <HTTPUpdate.h>
@@ -63,8 +64,59 @@ namespace {
 const char* OTA_REC_NS     = "ota_recover";  // namespace
 const char* OTA_REC_KEY    = "ver";          // key storing last recovered firmware version
 const char* OTA_FS_VER_KEY = "fs_ver";     // key storing the installed web-filesystem version
-bool otaUploadRejected     = false;
-bool otaFilesystemUpload   = false;
+bool otaUploadRejected      = false;
+bool otaFilesystemUpload    = false;
+bool otaFirmwareUpdateBegun = false;
+uint8_t otaFirmwareHeader[sizeof(esp_image_header_t)];
+size_t otaFirmwareHeaderLength = 0;
+String otaUploadError;
+
+void resetFirmwareUploadValidation() {
+  otaFirmwareUpdateBegun  = false;
+  otaFirmwareHeaderLength = 0;
+  otaUploadError           = "";
+}
+
+bool beginHttpRequest(HTTPClient& request, NetworkClient& client, const String& url) {
+  if (request.begin(client, url)) return true;
+  SS2K_LOGE(HTTP_SERVER_LOG_TAG, "Unable to initialize HTTP request for %s", url.c_str());
+  return false;
+}
+
+int beginHttpGet(HTTPClient& request, NetworkClient& client, const String& url) {
+  if (!beginHttpRequest(request, client, url)) return HTTPC_ERROR_CONNECTION_REFUSED;
+  return request.GET();
+}
+
+bool validateRemoteFirmwareHeader(HTTPClient& request, NetworkClient& client, const String& firmwareUrl) {
+  if (!beginHttpRequest(request, client, firmwareUrl)) return false;
+  // Some custom update servers may ignore Range and return the entire image.
+  // Close this connection after reading the header so unread image bytes cannot
+  // contaminate the subsequent HTTPUpdate request on the shared client.
+  request.setReuse(false);
+  request.addHeader("Range", String("bytes=0-") + (sizeof(esp_image_header_t) - 1));
+
+  const int httpCode = request.GET();
+  if (httpCode != HTTP_CODE_OK && httpCode != HTTP_CODE_PARTIAL_CONTENT) {
+    SS2K_LOGE(HTTP_SERVER_LOG_TAG, "Firmware header request failed for %s: HTTP %d", firmwareUrl.c_str(), httpCode);
+    request.end();
+    return false;
+  }
+
+  uint8_t headerBytes[sizeof(esp_image_header_t)];
+  NetworkClient* stream = request.getStreamPtr();
+  const size_t bytesRead = stream->readBytes(headerBytes, sizeof(headerBytes));
+  request.end();
+
+  const FirmwareImageHeaderValidation validation = validateFirmwareImageHeader(headerBytes, bytesRead);
+  if (validation.result != FirmwareImageHeaderResult::Valid) {
+    SS2K_LOGE(HTTP_SERVER_LOG_TAG, "Rejected remote firmware image: %s (expected chip 0x%04x, image chip 0x%04x)",
+              firmwareImageHeaderResultName(validation.result), CONFIG_IDF_FIRMWARE_CHIP_ID, static_cast<uint16_t>(validation.imageChipId));
+    return false;
+  }
+
+  return true;
+}
 
 bool filesystemIndexExists() {
   return LittleFS.exists("/index.html.gz") || LittleFS.exists("/index.html");
@@ -487,7 +539,8 @@ void HTTP_Server::start() {
       []() {
         server.sendHeader("Connection", "close");
         if (otaUploadRejected) {
-          server.send(400, "text/plain", String("Wrong image filename. Expected ") + FW_BINFILE + " or " + FS_BINFILE + ".");
+          server.send(400, "text/plain", otaUploadError.isEmpty() ? String("Wrong image filename. Expected ") + FW_BINFILE + " or " + FS_BINFILE + "."
+                                                                   : otaUploadError);
           return;
         }
         // Check if the Update process reported an error and send the final status.
@@ -525,28 +578,74 @@ void HTTP_Server::start() {
       []() {
         HTTPUpload &upload = server.upload();
         if (upload.status == UPLOAD_FILE_START) {
-          otaUploadRejected = false;
+          otaUploadRejected    = false;
           otaFilesystemUpload = upload.filename == FS_BINFILE;
+          resetFirmwareUploadValidation();
         }
         if (upload.filename == FW_BINFILE) {
           if (upload.status == UPLOAD_FILE_START) {
             ss2k->isUpdating = true;  // Set the updating flag to true
             SS2K_LOG(HTTP_SERVER_LOG_TAG, "Update Start: %s", upload.filename.c_str());
-            if (!Update.begin(UPDATE_SIZE_UNKNOWN, U_FLASH)) {
-              Update.printError(Serial);
-            }
           } else if (upload.status == UPLOAD_FILE_WRITE) {
-            /* flashing firmware to ESP*/
-            if (Update.write(upload.buf, upload.currentSize) != upload.currentSize) {
+            size_t chunkOffset = 0;
+            if (!otaFirmwareUpdateBegun && !otaUploadRejected) {
+              const size_t headerBytesNeeded = sizeof(otaFirmwareHeader) - otaFirmwareHeaderLength;
+              const size_t headerBytesInChunk = min(headerBytesNeeded, upload.currentSize);
+              memcpy(otaFirmwareHeader + otaFirmwareHeaderLength, upload.buf, headerBytesInChunk);
+              otaFirmwareHeaderLength += headerBytesInChunk;
+              chunkOffset += headerBytesInChunk;
+
+              if (otaFirmwareHeaderLength == sizeof(otaFirmwareHeader)) {
+                const FirmwareImageHeaderValidation validation = validateFirmwareImageHeader(otaFirmwareHeader, otaFirmwareHeaderLength);
+                if (validation.result != FirmwareImageHeaderResult::Valid) {
+                  otaUploadRejected = true;
+                  otaUploadError    = String("Rejected firmware image: ") + firmwareImageHeaderResultName(validation.result) + ".";
+                  ss2k->isUpdating  = false;
+                  SS2K_LOGE(HTTP_SERVER_LOG_TAG, "Rejected uploaded firmware image: %s (expected chip 0x%04x, image chip 0x%04x)",
+                            firmwareImageHeaderResultName(validation.result), CONFIG_IDF_FIRMWARE_CHIP_ID, static_cast<uint16_t>(validation.imageChipId));
+                  return;
+                }
+
+                if (!Update.begin(UPDATE_SIZE_UNKNOWN, U_FLASH)) {
+                  otaUploadRejected = true;
+                  otaUploadError    = "Unable to start firmware update.";
+                  ss2k->isUpdating  = false;
+                  Update.printError(Serial);
+                  return;
+                }
+                otaFirmwareUpdateBegun = true;
+
+                if (Update.write(otaFirmwareHeader, sizeof(otaFirmwareHeader)) != sizeof(otaFirmwareHeader)) {
+                  otaUploadRejected = true;
+                  otaUploadError    = "Failed to write firmware image header.";
+                  Update.printError(Serial);
+                  return;
+                }
+              }
+            }
+
+            if (!otaUploadRejected && otaFirmwareUpdateBegun && chunkOffset < upload.currentSize &&
+                Update.write(upload.buf + chunkOffset, upload.currentSize - chunkOffset) != upload.currentSize - chunkOffset) {
+              otaUploadRejected = true;
+              otaUploadError    = "Firmware upload write failed.";
               Update.printError(Serial);
               SS2K_LOG(HTTP_SERVER_LOG_TAG, "Upload Write Failed.");
             }
           } else if (upload.status == UPLOAD_FILE_END) {
             // Finalize the update. The true parameter tells it to flash the remaining buffer.
             // DO NOT send a response here.
-            if (Update.end(true)) {
+            if (otaUploadRejected) {
+              if (otaFirmwareUpdateBegun) Update.abort();
+              ss2k->isUpdating = false;
+            } else if (!otaFirmwareUpdateBegun) {
+              otaUploadRejected = true;
+              if (otaUploadError.isEmpty()) otaUploadError = "Firmware image header is incomplete.";
+              ss2k->isUpdating = false;
+            } else if (Update.end(true)) {
               SS2K_LOG(HTTP_SERVER_LOG_TAG, "Firmware Upload Finished Successfully.");
             } else {
+              otaUploadRejected = true;
+              otaUploadError    = "Firmware image validation failed.";
               Update.printError(Serial);
               SS2K_LOG(HTTP_SERVER_LOG_TAG, "Unknown OTA issue on end.");
             }
@@ -574,6 +673,7 @@ void HTTP_Server::start() {
         } else if (upload.filename.endsWith(".bin")) {
           if (upload.status == UPLOAD_FILE_START) {
             otaUploadRejected = true;
+            otaUploadError    = String("Wrong image filename. Expected ") + FW_BINFILE + " or " + FS_BINFILE + ".";
             SS2K_LOG(HTTP_SERVER_LOG_TAG, "Rejected image %s; expected %s or %s", upload.filename.c_str(), FW_BINFILE, FS_BINFILE);
           }
         } else {  // Handles other file uploads to LittleFS
@@ -843,11 +943,7 @@ void HTTP_Server::FirmwareUpdate() {
   WiFiClientSecure localClient;
   localClient.setCACert(rootCACertificate);
   SS2K_LOG(HTTP_SERVER_LOG_TAG, "Checking for newer firmware:");
-  http.begin(userConfig->getFirmwareUpdateURL() + String(FW_VERSIONFILE),
-             rootCACertificate);  // check version URL
-  delay(100);
-  int httpCode = http.GET();  // get data from version file
-  delay(100);
+  int httpCode = beginHttpGet(http, localClient, userConfig->getFirmwareUpdateURL() + String(FW_VERSIONFILE));
   String payload;
   if (httpCode == HTTP_CODE_OK) {  // if version received
     payload = http.getString();    // save received version
@@ -886,16 +982,10 @@ void HTTP_Server::FirmwareUpdate() {
     if (filesystemNeedsUpdate) {
       //////////////// Update LittleFS//////////////
       SS2K_LOG(HTTP_SERVER_LOG_TAG, "Updating FileSystem");
-      http.begin(DATA_UPDATEURL DATA_FILELIST, rootCACertificate);  // check version URL
-      delay(100);
-      httpCode = http.GET();  // get data from version file
-      delay(100);
+      httpCode = beginHttpGet(http, localClient, DATA_UPDATEURL DATA_FILELIST);
       JsonDocument doc;
       if (httpCode == HTTP_CODE_OK) {  // if version received
-        payload = http.getString();    // save received version
-        payload.trim();
-        // Deserialize the JSON document
-        DeserializationError error = deserializeJson(doc, payload);
+        DeserializationError error = deserializeJson(doc, http.getStream());
         if (error) {
           SS2K_LOG(HTTP_SERVER_LOG_TAG, "Failed to read file list");
           http.end();  // Make sure to end HTTP before returning
@@ -919,11 +1009,7 @@ void HTTP_Server::FirmwareUpdate() {
       // iterate through file list and download files individually
       for (JsonVariant v : files) {
         String fileName = "/" + v.as<String>();
-        http.begin(DATA_UPDATEURL + fileName,
-                   rootCACertificate);  // check version URL
-        delay(100);
-        httpCode = http.GET();
-        delay(100);
+        httpCode = beginHttpGet(http, localClient, DATA_UPDATEURL + fileName);
         if (httpCode == HTTP_CODE_OK) {
           LittleFS.remove(fileName);
           File file = LittleFS.open(fileName, FILE_WRITE, true);
@@ -972,7 +1058,12 @@ void HTTP_Server::FirmwareUpdate() {
     if (((availableVer > currentVer) || updateAnyway) && (userConfig->getAutoUpdate())) {
       SS2K_LOG(HTTP_SERVER_LOG_TAG, "New firmware detected!");
       SS2K_LOG(HTTP_SERVER_LOG_TAG, "Upgrading from %s to %s", FIRMWARE_VERSION, serverVersion.c_str());
-      t_httpUpdate_return ret = httpUpdate.update(localClient, userConfig->getFirmwareUpdateURL() + String(FW_BINFILE));
+      const String firmwareUrl = userConfig->getFirmwareUpdateURL() + String(FW_BINFILE);
+      if (!validateRemoteFirmwareHeader(http, localClient, firmwareUrl)) {
+        SS2K_LOGE(HTTP_SERVER_LOG_TAG, "Firmware update cancelled before flashing because image validation failed");
+        return;
+      }
+      t_httpUpdate_return ret = httpUpdate.update(localClient, firmwareUrl);
       switch (ret) {
         case HTTP_UPDATE_FAILED:
           SS2K_LOG(HTTP_SERVER_LOG_TAG, "HTTP_UPDATE_FAILED Error %d : %s", httpUpdate.getLastError(), httpUpdate.getLastErrorString().c_str());

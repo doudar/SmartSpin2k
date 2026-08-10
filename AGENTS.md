@@ -582,6 +582,7 @@ Changing BLE server characteristics:
 - `spinBLEServer.writeCache` is shared by BLE writes and DirCon writes.
 - `spinDownFlag` is a state machine trigger, not just a bool: `1` means home/startup-ish, `2+` means full spindown/homing.
 - `externalControl` bypasses normal target calculation but final state can still be affected by sync/clamping code.
+- Firmware OTA paths validate the incoming `esp_image_header_t` chip ID before starting flash writes; filesystem images are intentionally exempt from application-image validation.
 - Many BLE and motor changes cannot be fully validated without hardware.
 
 ## Search Tips
