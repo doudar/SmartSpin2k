@@ -340,13 +340,19 @@ void SS2K::maintenanceLoop(void* pvParameters) {
 
     // Things to do every 6 seconds
     if ((millis() - intervalTimer2) > 6007) {
-      // reboot every half hour if not in use.
-      static int _oldHR              = 0;
-      static int _oldWatts           = 0;
-      static float _oldTargetIncline = 0.0f;
-      if (_oldHR == rtConfig->hr.getValue() && _oldWatts == rtConfig->watts.getValue() && _oldTargetIncline == rtConfig->getTargetIncline()) {
-        // Inactivity detected
-        if (((millis() - rebootTimer) > 1800000)) {
+      // Reboot after half an hour without meaningful pedaling. Also treat unchanged values as inactive because disconnected servers can leave stale readings behind.
+      constexpr int inactivityThreshold             = 10;
+      constexpr unsigned long inactivityRebootDelay = 1800000;
+      static int oldHR                              = 0;
+      static int oldWatts                           = 0;
+      static int oldCadence                         = 0;
+      static float oldTargetIncline                 = 0.0f;
+      bool powerAndCadenceAreLow = rtConfig->watts.getValue() < inactivityThreshold && rtConfig->cad.getValue() < inactivityThreshold;
+      bool readingsAreUnchanged = oldHR == rtConfig->hr.getValue() && oldWatts == rtConfig->watts.getValue() && oldCadence == rtConfig->cad.getValue() &&
+                                  oldTargetIncline == rtConfig->getTargetIncline();
+      bool riderIsInactive      = powerAndCadenceAreLow || readingsAreUnchanged;
+      if (riderIsInactive) {
+        if ((millis() - rebootTimer) > inactivityRebootDelay) {
           // Timer expired
           SS2K_LOG(MAIN_LOG_TAG, "Rebooting due to inactivity.");
           keepLedOffAfterReboot();
@@ -354,14 +360,14 @@ void SS2K::maintenanceLoop(void* pvParameters) {
           logHandler.writeLogs();
           webSocketAppender.Loop();
         }
-
       } else {
-        // We have activity, update monitored values
-        _oldHR            = rtConfig->hr.getValue();
-        _oldWatts         = rtConfig->watts.getValue();
-        _oldTargetIncline = rtConfig->getTargetIncline();
-        rebootTimer       = millis();
-        ss2k->setLEDEnabled(true); 
+        // Fresh active readings restart the full inactivity window.
+        oldHR            = rtConfig->hr.getValue();
+        oldWatts         = rtConfig->watts.getValue();
+        oldCadence       = rtConfig->cad.getValue();
+        oldTargetIncline = rtConfig->getTargetIncline();
+        rebootTimer      = millis();
+        ss2k->setLEDEnabled(true);
       }
 
 #ifdef DEBUG_STACK
