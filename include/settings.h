@@ -289,10 +289,10 @@ constexpr const char* ANY = "any";
 #define HOMING_MAX_SENSITIVITY        100
 
 // BLE automatic reconnect interval in milliseconds.
-#define BLE_RECONNECT_SCAN_INTERVAL 6000
+#define BLE_RECONNECT_SCAN_INTERVAL 8000
 
 // Initial and web scan duration in milliseconds
-#define DEFAULT_SCAN_DURATION 4000
+#define DEFAULT_SCAN_DURATION 5000
 
 // Task Stack Sizes
 // In theory you can subtract whatever is left in the report from DEBUG_STACK for each task
