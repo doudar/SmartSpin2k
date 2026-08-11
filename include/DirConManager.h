@@ -18,7 +18,7 @@
 #define DIRCON_MDNS_SERVICE_NAME     "_wahoo-fitness-tnp"
 #define DIRCON_MDNS_SERVICE_PROTOCOL "tcp"
 #define DIRCON_TCP_PORT              8081
-#define DIRCON_MAX_CLIENTS           1
+#define DIRCON_MAX_CLIENTS           3
 #define DIRCON_RECEIVE_BUFFER_SIZE   256
 #define DIRCON_SEND_BUFFER_SIZE      256
 #define DIRCON_MAX_CHARACTERISTICS   20   // maximum number of characteristics to track for subscriptions
@@ -54,7 +54,7 @@ class DirConManager {
   static void registerService(const NimBLEUUID& serviceUuid, DirConWriteHandler writeHandler = nullptr, DirConAdvertiseHandler advertiseHandler = nullptr);
 
   // Notify DirCon clients about BLE characteristic changes
-  static void notifyCharacteristic(const NimBLEUUID& serviceUuid, const NimBLEUUID& characteristicUuid, uint8_t* data, size_t length, bool onlySubscribers = true);
+  static void notifyCharacteristic(const NimBLEUUID& serviceUuid, const NimBLEUUID& characteristicUuid, const uint8_t* data, size_t length, bool onlySubscribers = true);
 
  private:
   // Service registration
@@ -86,7 +86,7 @@ class DirConManager {
   static bool processDirConMessage(DirConMessage* message, size_t clientIndex);
   static void sendErrorResponse(uint8_t messageId, uint8_t sequenceNumber, uint8_t errorCode, size_t clientIndex);
   static void sendResponse(DirConMessage* message, size_t clientIndex);
-  static void broadcastNotification(const NimBLEUUID& characteristicUuid, uint8_t* data, size_t length, bool onlySubscribers = true);
+  static void broadcastNotification(const NimBLEUUID& characteristicUuid, const uint8_t* data, size_t length, bool onlySubscribers = true);
 
   // Service and characteristic handling
   static void addBleServiceUuid(const NimBLEUUID& serviceUuid);

@@ -5,6 +5,20 @@ Custom Characteristic for userConfig Variable manipulation via BLE
 SMARTSPIN2K_SERVICE_UUID        "77776277-7877-7774-4466-896665500000"
 SMARTSPIN2K_CHARACTERISTIC_UUID "77776277-7877-7774-4466-896665500001"
 
+The same service and characteristic are published in the DirCon mDNS service.
+A DirCon client sends the protocol bytes in a characteristic-write request and receives the custom-characteristic response bytes in that write response.
+Subscribed DirCon clients also receive changed-value notifications.
+
+The primary BLE advertisement includes the current Wi-Fi IPv4 address in manufacturer-specific data.
+The device name and SmartSpin2k service UUID remain in the scan response. The payload is:
+
+| Offset | Size | Meaning |
+|--------|------|---------|
+| 0 | 2 | Reserved development company identifier `0xFFFF`, little-endian |
+| 2 | 2 | ASCII payload marker `SS` |
+| 4 | 1 | Payload format version (`0x01`) |
+| 5 | 4 | IPv4 address octets in network/display order |
+
 An example follows to read/write 26.3kph to simulatedSpeed:
 
 simulatedSpeed is a float and first needs to be converted to int by *10 for transmission, so convert 26.3kph to 263 (multiply by 10)
@@ -94,11 +108,14 @@ Hardware-version example:
 - An ESP32-S3 board indicates: `0x80, 0x2F`, followed by the ASCII bytes for `Revision Three (ESP32-S3)`.
 - Writes to `0x2F` return `cc_error` because the detected hardware revision is read-only.
 
-All-settings snapshot:
+All-settings snapshot (BLE or DirCon):
 
-- Client writes `0x01, 0x31` and subscribes to indications on the custom characteristic.
-- The server serializes `userConfig->returnJSON()` once, then sends MTU-sized indications sequentially. Each indication is acknowledged before the next is sent.
-- Every indication begins with this seven-byte header:
+- Client writes `0x01, 0x31`. BLE clients subscribe to indications on the custom characteristic.
+  A DirCon client receives the first chunk in the characteristic-write response and is automatically subscribed for the remaining chunks.
+- The server serializes `userConfig->returnJSON()` once.
+  Over BLE, it sends MTU-sized indications sequentially and waits for each acknowledgement before sending the next.
+- Over DirCon, chunks use the same framing and arrive as characteristic notifications after the first write-response chunk.
+- Every snapshot chunk begins with this seven-byte header:
 
 | Offset | Size | Meaning |
 |--------|------|---------|

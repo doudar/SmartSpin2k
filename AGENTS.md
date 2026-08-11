@@ -285,6 +285,9 @@ Primary files: `src/BLE_Server.cpp`, `src/BLE_Fitness_Machine_Service.cpp`, serv
 - Device Information
 - BLE firmware update
 
+The primary BLE advertisement carries the current WiFi IPv4 address in versioned SmartSpin2k manufacturer data.
+The device name and 128-bit SmartSpin2k service UUID are kept in the scan response to stay within the legacy advertisement size limit.
+
 Zwift/OpenBikeControl services exist but are currently commented out in regular BLE advertising/setup; DirCon and the source files still matter.
 
 `SpinBLEServer::update()` refreshes wheel/crank revolution counters, then calls service `update()` methods. The FTMS service also processes pending writes.
@@ -481,6 +484,7 @@ DirCon exposes BLE-like services over TCP:
 - Handles discover-services, discover-characteristics, read, write, enable-notifications, and unsolicited notification messages.
 - Services register with `DirConManager::registerService()`.
 - FTMS registers a write handler in `BLE_Fitness_Machine_Service::setupService()` so DirCon writes to the FTMS control point run the same control logic as BLE writes.
+- The SmartSpin2k custom service registers a write handler so its request/response protocol also works over DirCon; changed-value notifications and chunked all-settings snapshots are mirrored over TCP.
 - BLE server updates call `DirConManager::notifyCharacteristic()` so TCP clients receive corresponding updates.
 
 DirCon uses static buffers and fixed client/subscription arrays. Be cautious with dynamic allocation and payload sizes.

@@ -521,7 +521,7 @@ void DirConManager::sendResponse(DirConMessage* message, size_t clientIndex) {
   }
 }
 
-void DirConManager::notifyCharacteristic(const NimBLEUUID& serviceUuid, const NimBLEUUID& characteristicUuid, uint8_t* data, size_t length, bool onlySubscribers) {
+void DirConManager::notifyCharacteristic(const NimBLEUUID& serviceUuid, const NimBLEUUID& characteristicUuid, const uint8_t* data, size_t length, bool onlySubscribers) {
   if (!started || !connectedClients()) {
     return;
   }
@@ -535,7 +535,7 @@ void DirConManager::notifyCharacteristic(const NimBLEUUID& serviceUuid, const Ni
 
 static SemaphoreHandle_t s_notifyMutex = xSemaphoreCreateMutex();
 
-void DirConManager::broadcastNotification(const NimBLEUUID& characteristicUuid, uint8_t* data, size_t length, bool onlySubscribers) {
+void DirConManager::broadcastNotification(const NimBLEUUID& characteristicUuid, const uint8_t* data, size_t length, bool onlySubscribers) {
   DirConMessage notification;  // stack-allocated, safe per-call
 
   notification.Request    = false;

@@ -72,7 +72,7 @@ class BLE_ss2kCustomCharacteristic {
   void setupService(NimBLEServer *pServer);
   void update();
   // Used internally for notify and onWrite Callback.
-  static void process(std::string rxValue, uint16_t connHandle = BLE_HS_CONN_HANDLE_NONE, uint16_t mtu = 23);
+  static void process(std::string rxValue, uint16_t connHandle = BLE_HS_CONN_HANDLE_NONE, uint16_t mtu = 23, bool indicateResponse = true);
   // Custom Characteristic value that needs to be notified
   static void notify(char _item, int tableRow = -1);
   // Notify any changed value in userConfig
