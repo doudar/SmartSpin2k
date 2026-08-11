@@ -82,6 +82,7 @@ void setup() {
     RUN_TEST(test.test_null_device_handling);
     RUN_TEST(test.test_device_without_name);
     RUN_TEST(test.test_backward_compatibility);
+    RUN_TEST(test.test_case_insensitive_device_matching);
   }
 
   UNITY_END();

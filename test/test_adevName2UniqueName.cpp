@@ -7,6 +7,7 @@
 
 #include <unity.h>
 #include <Arduino.h>
+#include "BLE_Device_Identity.h"
 #include "test.h"
 #include "settings.h"
 #include <string>
@@ -204,4 +205,12 @@ void TestAdevName2UniqueName::test_backward_compatibility() {
     TEST_ASSERT_EQUAL_STRING("TraditionalDevice 55", devices[0].uniqueName.c_str());
     TEST_ASSERT_EQUAL_STRING("AndroidDevice", devices[1].uniqueName.c_str());
     TEST_ASSERT_EQUAL_STRING("", devices[2].uniqueName.c_str());  // Empty slot
+}
+
+void TestAdevName2UniqueName::test_case_insensitive_device_matching() {
+    TEST_ASSERT_TRUE(bleDeviceIdentifierEquals("IC BIKE D0", "IC BIKE d0"));
+    TEST_ASSERT_TRUE(bleDeviceIdentifierEquals("aa:bb:cc:dd:ee:d0", "AA:BB:CC:DD:EE:D0"));
+    TEST_ASSERT_FALSE(bleDeviceIdentifierEquals("IC BIKE D0", "IC BIKE D1"));
+    TEST_ASSERT_FALSE(bleDeviceIdentifierEquals("IC BIKE D0", "OTHER BIKE d0"));
+    TEST_ASSERT_FALSE(bleDeviceIdentifierEquals("IC BIKE D0", nullptr));
 }

@@ -577,6 +577,7 @@ Changing BLE server characteristics:
 - `Measurement` timestamps matter for ERG deduplication.
 - `PowerTable` stores positions divided by `TABLE_DIVISOR`; lookup returns full-scale positions.
 - `PowerTable` persistence requires homing.
+- Saved BLE device identifiers are matched case-insensitively because NimBLE address formatting has changed between lowercase and uppercase across library versions.
 - `SpinBLEAdvertisedDevice::reset()` updates global connected flags before clearing local flags.
 - BLE address randomization is handled specially in `adevName2UniqueName()`; saved names depend on this behavior.
 - `spinBLEServer.writeCache` is shared by BLE writes and DirCon writes.

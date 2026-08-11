@@ -55,4 +55,5 @@ public:
     static void test_null_device_handling(void);
     static void test_device_without_name(void);
     static void test_backward_compatibility(void);
+    static void test_case_insensitive_device_matching(void);
 };

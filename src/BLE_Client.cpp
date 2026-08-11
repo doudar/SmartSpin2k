@@ -7,6 +7,7 @@
 
 #include "Main.h"
 #include "BLE_Common.h"
+#include "BLE_Device_Identity.h"
 #include "BLE_Fitness_Machine_Service.h"
 #include "SS2KLog.h"
 
@@ -416,7 +417,7 @@ void ScanCallbacks::onResult(const NimBLEAdvertisedDevice* advertisedDevice) {
       bool isDuplicateLocal = false;
       for (JsonPair kv : devices.as<JsonObject>()) {
         JsonObject obj = kv.value().as<JsonObject>();
-        if (obj["name"] && obj["name"] == aDevName) {
+        if (obj["name"] && bleDeviceIdentifierEquals(obj["name"].as<const char*>(), aDevName.c_str())) {
           isDuplicateLocal = true;
           break;
         }
@@ -441,7 +442,7 @@ void ScanCallbacks::onResult(const NimBLEAdvertisedDevice* advertisedDevice) {
       // check to see if we're already connected to this device
       for (size_t i = 0; i < NUM_BLE_DEVICES; i++) {
         if (spinBLEClient.myBLEDevices[i].advertisedDevice != nullptr) {
-          if (aDevName == String(spinBLEClient.myBLEDevices[i].uniqueName.c_str())) {
+          if (bleDeviceIdentifierEquals(aDevName.c_str(), spinBLEClient.myBLEDevices[i].uniqueName.c_str())) {
             SS2K_LOG(BLE_CLIENT_LOG_TAG, "%s already connected on slot %d", aDevName.c_str(), i);
             return;  // Already connected to this device
           }
@@ -452,8 +453,8 @@ void ScanCallbacks::onResult(const NimBLEAdvertisedDevice* advertisedDevice) {
         if (strcmp(userConfig->getConnectedRemote(), ANY) == 0) {
           SS2K_LOG(BLE_CLIENT_LOG_TAG, "%s %s%s", aDevName.c_str(), REMOTE, STRING_MATCHED_ANY);
         } else {
-          bool nameMatched = (aDevName == userConfig->getConnectedRemote()) ? true : false;
-          bool addrMatched = strcmp(aDevAddr, userConfig->getConnectedRemote()) == 0;
+          bool nameMatched = bleDeviceIdentifierEquals(aDevName.c_str(), userConfig->getConnectedRemote());
+          bool addrMatched = bleDeviceIdentifierEquals(aDevAddr, userConfig->getConnectedRemote());
           if (!nameMatched && !addrMatched || strcmp(userConfig->getConnectedRemote(), NONE) == 0) {
             SS2K_LOG(BLE_CLIENT_LOG_TAG, "%s %s%s%s", REMOTE, aDevName.c_str(), DIDNT_MATCH_THE_SAVED, userConfig->getConnectedRemote());
             return;  // Ignore this device;
@@ -465,8 +466,8 @@ void ScanCallbacks::onResult(const NimBLEAdvertisedDevice* advertisedDevice) {
         if (strcmp(userConfig->getConnectedHeartMonitor(), ANY) == 0) {
           SS2K_LOG(BLE_CLIENT_LOG_TAG, "%s %s%s", aDevName.c_str(), HRM, STRING_MATCHED_ANY);
         } else {
-          bool nameMatched = (aDevName == userConfig->getConnectedHeartMonitor()) ? true : false;
-          bool addrMatched = strcmp(aDevAddr, userConfig->getConnectedHeartMonitor()) == 0;
+          bool nameMatched = bleDeviceIdentifierEquals(aDevName.c_str(), userConfig->getConnectedHeartMonitor());
+          bool addrMatched = bleDeviceIdentifierEquals(aDevAddr, userConfig->getConnectedHeartMonitor());
           if (!nameMatched && !addrMatched || strcmp(userConfig->getConnectedHeartMonitor(), NONE) == 0) {
             SS2K_LOG(BLE_CLIENT_LOG_TAG, "%s %s%s%s", HRM, aDevName.c_str(), DIDNT_MATCH_THE_SAVED, userConfig->getConnectedHeartMonitor());
             return;  // Ignore this device;
@@ -479,7 +480,7 @@ void ScanCallbacks::onResult(const NimBLEAdvertisedDevice* advertisedDevice) {
         if (strcmp(userConfig->getConnectedPowerMeter(), ANY) == 0) {
           SS2K_LOG(BLE_CLIENT_LOG_TAG, "%s, %s%s", aDevName.c_str(), PM, STRING_MATCHED_ANY);
         } else {
-          bool nameMatched = (aDevName == userConfig->getConnectedPowerMeter()) ? true : false;
+          bool nameMatched = bleDeviceIdentifierEquals(aDevName.c_str(), userConfig->getConnectedPowerMeter());
           if (!nameMatched || strcmp(userConfig->getConnectedPowerMeter(), NONE) == 0) {
             SS2K_LOG(BLE_CLIENT_LOG_TAG, "%s %s%s%s", PM, aDevName.c_str(), DIDNT_MATCH_THE_SAVED, userConfig->getConnectedPowerMeter());
             return;  // Ignore this device;
@@ -500,7 +501,7 @@ void ScanCallbacks::onResult(const NimBLEAdvertisedDevice* advertisedDevice) {
           // Check if this is the same device using stable identifier
           if (!spinBLEClient.myBLEDevices[i].uniqueName.empty()) {
             // Use unique name comparison for stable identification
-            deviceMatches = (aDevName == String(spinBLEClient.myBLEDevices[i].uniqueName.c_str()));
+            deviceMatches = bleDeviceIdentifierEquals(aDevName.c_str(), spinBLEClient.myBLEDevices[i].uniqueName.c_str());
           } else {
             // Fall back to address comparison for backward compatibility
             deviceMatches = (advertisedDevice->getAddress() == spinBLEClient.myBLEDevices[i].peerAddress);
@@ -897,7 +898,7 @@ void SpinBLEClient::checkBLEReconnect() {
   // Helper lambda to check if a device with the given name is currently connected
   auto isDeviceConnected = [&](const char* configName) -> bool {
     for (auto& _BLEd : spinBLEClient.myBLEDevices) {
-      if (_BLEd.isPostConnected && _BLEd.uniqueName == configName) {
+      if (_BLEd.isPostConnected && bleDeviceIdentifierEquals(_BLEd.uniqueName.c_str(), configName)) {
         return true;
       }
     }
@@ -1075,8 +1076,8 @@ void SpinBLEAdvertisedDevice::set(const NimBLEAdvertisedDevice* device, int id, 
       const bool cfgHrmIsNone   = (strcmp(cfgHRM, NONE) == 0);
       const bool cfgHrmIsAny    = (strcmp(cfgHRM, ANY) == 0);
       const std::string addrStr = device->getAddress().toString();
-      const bool hrmNameMatch   = (adevName == cfgHRM);
-      const bool hrmAddrMatch   = (addrStr == cfgHRM);
+      const bool hrmNameMatch   = bleDeviceIdentifierEquals(adevName.c_str(), cfgHRM);
+      const bool hrmAddrMatch   = bleDeviceIdentifierEquals(addrStr.c_str(), cfgHRM);
 
       // Get all services
       const std::vector<NimBLERemoteService*>& services = pClient->getServices(true);
