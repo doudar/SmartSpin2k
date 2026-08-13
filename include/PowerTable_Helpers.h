@@ -95,6 +95,7 @@ class ResistanceModel {
   int16_t predict(double watts, double rpm);
   int predictWatts(int32_t resistance, float cadence);
   bool getIsValid() { return isValid; }
+  bool getIsQuadratic() { return isQuadratic; }
 };
 
 class PTHelpers {

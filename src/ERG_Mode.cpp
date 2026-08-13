@@ -29,6 +29,7 @@ constexpr int ERG_MIN_SCHEDULE_WATTS       = 30;
 constexpr double ERG_SLOPE_CONTROL_DIVISOR = 10.0;
 constexpr double ERG_GAIN_MIN_DIVISOR      = 4.0;
 constexpr double ERG_GAIN_MAX_MULTIPLIER   = 4.0;
+constexpr int ERG_LOG_INTERVAL_MS          = 2000;
 
 double fallbackErgGain(double sensitivity, int operatingWatts) {
   if (operatingWatts < ERG_LOW_GAIN_WATTS) {
@@ -49,7 +50,9 @@ double scheduledErgGain(double sensitivity, int operatingWatts, int cadence, boo
   const int32_t upperPosition = powerTable->lookup(upperWatts, cadence);
 
   double gain = fallbackErgGain(sensitivity, operatingWatts);
-  if (powerTable->ptHelpers.resistanceModel.getIsValid() && lowerPosition != RETURN_ERROR && upperPosition != RETURN_ERROR && upperPosition > lowerPosition) {
+  // Sparse linear fits are useful for lookup, but not stable enough to schedule ERG gain from their slope.
+  if (powerTable->ptHelpers.resistanceModel.getIsValid() && powerTable->ptHelpers.resistanceModel.getIsQuadratic() && lowerPosition != RETURN_ERROR && upperPosition != RETURN_ERROR &&
+      upperPosition > lowerPosition) {
     const double localStepsPerWatt = static_cast<double>(upperPosition - lowerPosition) / static_cast<double>(upperWatts - lowerWatts);
     gain                           = localStepsPerWatt * sensitivity / ERG_SLOPE_CONTROL_DIVISOR;
     usedPowerTable                 = true;
@@ -334,10 +337,10 @@ int32_t ErgMode::_inSetpointState() {
 
   // log output every five seconds
   static unsigned long lastTime = 0;
-  if (millis() - lastTime > 5000) {
+  if (millis() - lastTime > ERG_LOG_INTERVAL_MS) {
     lastTime = millis();
-    SS2K_LOG(ERG_MODE_LOG_TAG, "%dw, Target %dw, Kp: %.3f (%s), PID Output: %f, Moving to: %f", rtConfig->watts.getValue(), rtConfig->watts.getTarget(), Kp, usedPowerTable ? "table" : "fallback",
-             PID_output, newIncline);
+    SS2K_LOG(ERG_MODE_LOG_TAG, "%dw, Target %dw, Kp: %.3f (%s), PID Output: %f, Moving to: %f", rtConfig->watts.getValue(), rtConfig->watts.getTarget(), Kp,
+             usedPowerTable ? "table" : "fallback", PID_output, newIncline);
   }
 
   return newIncline;
