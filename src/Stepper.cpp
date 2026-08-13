@@ -21,6 +21,54 @@ FastAccelStepper* stepper     = NULL;
 
 extern Board currentBoard;
 
+namespace {
+
+constexpr uint8_t TMC2209_OTP_IHOLD_SHIFT      = 21;
+constexpr uint32_t TMC2209_OTP_IHOLD_MASK      = 0x03UL << TMC2209_OTP_IHOLD_SHIFT;
+constexpr uint32_t TMC2209_OTP_IHOLD_9_PERCENT = 0x01UL << TMC2209_OTP_IHOLD_SHIFT;
+constexpr uint16_t TMC2209_OTP_PROGRAM_IHOLD_9 = 0xBD25;  // Magic 0xBD, OTP byte 2, bit 5.
+
+void programTmc2209LowHoldCurrentOtp(TMC2209Stepper* tmcDriver) {
+  const uint8_t connectionStatus = tmcDriver->test_connection();
+
+  if (connectionStatus != 0) {
+    SS2K_LOG(MAIN_LOG_TAG, "Skipping TMC OTP check: UART connection test failed (%u)", static_cast<unsigned>(connectionStatus));
+    return;
+  }
+
+  uint32_t otpRead        = tmcDriver->OTP_READ();
+  const uint32_t otpIhold = otpRead & TMC2209_OTP_IHOLD_MASK;
+  if (otpIhold == TMC2209_OTP_IHOLD_9_PERCENT) {
+    SS2K_LOG(MAIN_LOG_TAG, "TMC OTP hold current is already programmed to 9%%");
+    return;
+  }
+  if (otpIhold != 0) {
+    const uint8_t otpIholdSetting = static_cast<uint8_t>(otpIhold >> TMC2209_OTP_IHOLD_SHIFT);
+    SS2K_LOG(MAIN_LOG_TAG, "TMC OTP hold current is already programmed (setting %u); leaving irreversible OTP unchanged", static_cast<unsigned>(otpIholdSetting));
+    return;
+  }
+ 
+  SS2K_LOG(MAIN_LOG_TAG, "Programming TMC OTP hold current to 9%%");
+  tmcDriver->OTP_PROG(TMC2209_OTP_PROGRAM_IHOLD_9);
+  delay(10);
+  otpRead = tmcDriver->OTP_READ();
+
+  if ((otpRead & TMC2209_OTP_IHOLD_MASK) != TMC2209_OTP_IHOLD_9_PERCENT) {
+    // The datasheet recommends retrying a missing OTP bit with a 100 ms programming time.
+    tmcDriver->OTP_PROG(TMC2209_OTP_PROGRAM_IHOLD_9);
+    delay(100);
+    otpRead = tmcDriver->OTP_READ();
+  }
+
+  if ((otpRead & TMC2209_OTP_IHOLD_MASK) == TMC2209_OTP_IHOLD_9_PERCENT) {
+    SS2K_LOG(MAIN_LOG_TAG, "TMC OTP hold current programmed and verified at 9%%");
+  } else {
+    SS2K_LOG(MAIN_LOG_TAG, "TMC OTP hold-current programming failed verification (OTP_READ=0x%06lX)", static_cast<unsigned long>(otpRead & 0xFFFFFFUL));
+  }
+}
+
+}  // namespace
+
 void SS2K::moveStepper() {
   static bool _stepperDir = userConfig->getStepperDir();
   if (stepper) {
@@ -167,6 +215,7 @@ void SS2K::setupTMCStepperDriver(bool reset) {
     stepper->setDelayToDisable(65535);
     // TMC Driver Setup
     driver->begin();
+    programTmc2209LowHoldCurrentOtp(driver);
   }
 
   driver->pdn_disable(true);       // Use PDN pin to enable UART communication instead of grounding signal
