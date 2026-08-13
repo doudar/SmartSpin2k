@@ -23,7 +23,6 @@ void BLE_Cycling_Speed_Cadence::setupService(NimBLEServer *pServer, MyCharacteri
 
   cscFeature->setValue(cscFeatureBytes, sizeof(cscFeatureBytes));
   cscMeasurement->setCallbacks(chrCallbacks);
-  pCyclingSpeedCadenceService->start();
 
   // Register with DirCon for service discovery
   DirConManager::registerService(pCyclingSpeedCadenceService->getUUID());

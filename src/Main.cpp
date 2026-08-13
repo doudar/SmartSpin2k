@@ -462,12 +462,13 @@ void SS2K::FTMSModeShiftModifier() {
       case FitnessMachineControlPointProcedure::SetTargetPower:  // ERG Mode
       {
         rtConfig->setShifterPosition(ss2k->lastShifterPosition);  // reset shifter position because we're remapping it to ERG target
-        if ((rtConfig->watts.getTarget() + (shiftDelta * ERG_PER_SHIFT) < userConfig->getMinWatts()) ||
-            (rtConfig->watts.getTarget() + (shiftDelta * ERG_PER_SHIFT) > userConfig->getMaxWatts())) {
-          SS2K_LOG(MAIN_LOG_TAG, "Shift to %dw blocked", rtConfig->watts.getTarget() + shiftDelta);
+        const int proposedTarget = rtConfig->watts.getTarget() + (shiftDelta * ERG_PER_SHIFT);
+        const int minimumTarget  = rtConfig->getHomed() ? 0 : userConfig->getMinWatts();
+        if (proposedTarget < minimumTarget || proposedTarget > userConfig->getMaxWatts()) {
+          SS2K_LOG(MAIN_LOG_TAG, "Shift to %dw blocked", proposedTarget);
           break;
         }
-        rtConfig->watts.setTarget(rtConfig->watts.getTarget() + (ERG_PER_SHIFT * shiftDelta));
+        rtConfig->watts.setTarget(proposedTarget);
         SS2K_LOG(MAIN_LOG_TAG, "ERG Shift. New Target: %dw", rtConfig->watts.getTarget());
 // Format output for FTMS passthrough
 #ifndef INTERNAL_ERG_4EXT_FTMS

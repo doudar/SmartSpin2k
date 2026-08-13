@@ -104,8 +104,8 @@ const char* const DEFAULT_PASSWORD = "password";
 // Minimum cadence where ERG mode stops.
 #define MIN_ERG_CADENCE 30
 
-// Default Min Watts to stop stepper.
-// This is used to set the lower travel limit for the motor.
+// Default minimum ERG target while the stepper is unhomed.
+// Homed operation uses the known stepper travel limits instead.
 #define DEFAULT_MIN_WATTS 50
 
 // Default Max Watts that the brake on the spin bike can absorb from the user.

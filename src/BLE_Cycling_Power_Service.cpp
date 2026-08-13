@@ -27,7 +27,6 @@ void BLE_Cycling_Power_Service::setupService(NimBLEServer *pServer, MyCharacteri
   cyclingPowerFeatureCharacteristic->setValue(cpFeature, sizeof(cpFeature));
   sensorLocationCharacteristic->setValue(cpsLocation, sizeof(cpsLocation));
   cyclingPowerMeasurementCharacteristic->setCallbacks(chrCallbacks);
-  pPowerMonitor->start();
 
   // Register with DirCon for service discovery
   DirConManager::registerService(pPowerMonitor->getUUID());

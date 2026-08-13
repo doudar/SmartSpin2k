@@ -233,7 +233,6 @@ void BLE_ss2kCustomCharacteristic::setupService(NimBLEServer *pServer) {
       pSmartSpin2kService->createCharacteristic(SMARTSPIN2K_CHARACTERISTIC_UUID, NIMBLE_PROPERTY::WRITE | NIMBLE_PROPERTY::INDICATE | NIMBLE_PROPERTY::NOTIFY);
   smartSpin2kCharacteristic->setValue(ss2kCustomCharacteristicValue, sizeof(ss2kCustomCharacteristicValue));
   smartSpin2kCharacteristic->setCallbacks(new ss2kCustomCharacteristicCallbacks());
-  pSmartSpin2kService->start();
 
   DirConManager::registerService(pSmartSpin2kService->getUUID(), [](NimBLECharacteristic* characteristic, const uint8_t* data, size_t length, DirConWriteResult* result) -> bool {
     if (!characteristic->getUUID().equals(SMARTSPIN2K_CHARACTERISTIC_UUID)) return false;

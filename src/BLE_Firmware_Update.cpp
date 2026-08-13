@@ -201,9 +201,6 @@ void BLEFirmwareSetup(NimBLEServer *pServer) {
   pOtaCharacteristic = pService->createCharacteristic(FIRMWARE_CHARACTERISTIC_OTA_UUID, NIMBLE_PROPERTY::WRITE);
   pOtaCharacteristic->setCallbacks(new otaCallback());
 
-  // 5. Start the service(s)
-  pService->start();
-
   // 6. Start advertising
   // spinBLEServer.pServer->getAdvertising()->addServiceUUID(pService->getUUID());
 

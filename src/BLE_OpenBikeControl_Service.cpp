@@ -130,8 +130,6 @@ void BLE_OpenBikeControl_Service::setupService(NimBLEServer *pServer) {
       pOpenBikeControlService->createCharacteristic(OPENBIKECONTROL_APP_INFO_CHARACTERISTIC_UUID, NIMBLE_PROPERTY::WRITE | NIMBLE_PROPERTY::WRITE_NR);
   appInformationCharacteristic->setCallbacks(&obcAppInfoCallbacks);
 
-  pOpenBikeControlService->start();
-
   DirConManager::registerService(
       pOpenBikeControlService->getUUID(),
       [](NimBLECharacteristic *characteristic, const uint8_t *data, size_t length, DirConWriteResult *result) -> bool {

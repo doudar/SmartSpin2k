@@ -28,7 +28,7 @@ constexpr int ERG_HIGH_GAIN_WATTS          = 400;
 constexpr int ERG_MIN_SCHEDULE_WATTS       = 30;
 constexpr double ERG_SLOPE_CONTROL_DIVISOR = 10.0;
 constexpr double ERG_GAIN_MIN_DIVISOR      = 4.0;
-constexpr double ERG_GAIN_MAX_MULTIPLIER   = 8.0;
+constexpr double ERG_GAIN_MAX_MULTIPLIER   = 4.0;
 
 double fallbackErgGain(double sensitivity, int operatingWatts) {
   if (operatingWatts < ERG_LOW_GAIN_WATTS) {
@@ -203,9 +203,10 @@ void ErgMode::computeErg() {
     return;
   }
 
-  // set minimum set point to minimum bike watts if app sends set point lower than minimum bike watts.
-  if (rtConfig->watts.getTarget() < userConfig->getMinWatts()) {
-    SS2K_LOG(ERG_MODE_LOG_TAG, "ERG Target Below Minumum Value.");
+  // Without known travel limits, keep ERG above the configured minimum bike watts.
+  // Once homed, moveStepper() clamps the commanded position to the known min/max step range instead.
+  if (!rtConfig->getHomed() && rtConfig->watts.getTarget() < userConfig->getMinWatts()) {
+    SS2K_LOG(ERG_MODE_LOG_TAG, "ERG target below minimum value while unhomed.");
     rtConfig->watts.setTarget(userConfig->getMinWatts());
   }
 
@@ -233,7 +234,7 @@ int32_t ErgMode::_setPointChangeState() {
   mode = (rtConfig->watts.getTarget() > rtConfig->watts.getValue()) ? Mode::INCREASING : Mode::DECREASING;
   // It's better to undershoot increasing watts and overshoot decreasing watts, so lets set the lookup target to the nearest side of POWERTABLE_WATT_INCREMENT
   int adjustedWattTarget = (mode == Mode::INCREASING) ? rtConfig->watts.getTarget() - ERG_MODE_PID_WINDOW : rtConfig->watts.getTarget() + ERG_MODE_PID_WINDOW;
-  int32_t tableResult    = powerTable->lookup(adjustedWattTarget,
+  int32_t tableResult = powerTable->lookup(adjustedWattTarget,
                                            (mode == Mode::INCREASING) ? rtConfig->cad.getValue() + POWERTABLE_CAD_INCREMENT : rtConfig->cad.getValue() - POWERTABLE_CAD_INCREMENT);
 
   // Sanity check - with homing enabled, we should never have a negative result. If we do, something went wrong.
@@ -320,14 +321,6 @@ int32_t ErgMode::_inSetpointState() {
   // final PID output
   double PID_output = proportional;
 
-  // log proportional every five seconds
-  static unsigned long lastTime = 0;
-  if (millis() - lastTime > 5000) {
-    lastTime = millis();
-    SS2K_LOG(ERG_MODE_LOG_TAG, "%dw, Target %dw, Kp: %.3f (%s), Proportional: %f", rtConfig->watts.getValue(), rtConfig->watts.getTarget(), Kp,
-             usedPowerTable ? "table" : "fallback", proportional);
-  }
-
   // Cap the change to no more than we can move until the next reading
   int maxChange = round((long)((userConfig->getStepperSpeed() * ERG_MODE_DELAY)) / 1000.0f);  // max change based on stepper speed and delay
   if (PID_output > maxChange) {
@@ -338,6 +331,15 @@ int32_t ErgMode::_inSetpointState() {
 
   // Calculate new incline
   float newIncline = ss2k->getCurrentPosition() + PID_output;
+
+  // log output every five seconds
+  static unsigned long lastTime = 0;
+  if (millis() - lastTime > 5000) {
+    lastTime = millis();
+    SS2K_LOG(ERG_MODE_LOG_TAG, "%dw, Target %dw, Kp: %.3f (%s), PID Output: %f, Moving to: %f", rtConfig->watts.getValue(), rtConfig->watts.getTarget(), Kp, usedPowerTable ? "table" : "fallback",
+             PID_output, newIncline);
+  }
+
   return newIncline;
 }
 
