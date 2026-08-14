@@ -20,5 +20,6 @@ struct HomingSgBaseline {
 };
 
 extern HardwareSerial stepperSerial;
+void initializeStepperSerial(bool restart = false);
 extern FastAccelStepperEngine engine;
 extern FastAccelStepper* stepper;

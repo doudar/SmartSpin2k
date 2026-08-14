@@ -588,7 +588,7 @@ Changing BLE server characteristics:
 - `spinDownFlag` is a state machine trigger, not just a bool: `1` means home/startup-ish, `2+` means full spindown/homing.
 - `externalControl` bypasses normal target calculation but final state can still be affected by sync/clamping code.
 - Firmware OTA paths validate the incoming `esp_image_header_t` chip ID before starting flash writes; filesystem images are intentionally exempt from application-image validation.
-- Initial TMC2209 setup checks `OTP_IHOLD`. If its two-bit field is unprogrammed, firmware irreversibly programs byte 2/bit 5 for the 9% standalone hold-current default; incompatible existing OTP values are never modified.
+- Stepper UART initialization drives TX high for 20 ms before starting hardware UART. Every TMC setup call tests the connection before configuration writes; one failure restarts UART with the same idle-high recovery pulse and aborts setup if the single retry fails. Initial setup also checks `OTP_IHOLD`; if its two-bit field is unprogrammed, firmware irreversibly programs byte 2/bit 5 for the 9% standalone hold-current default, while incompatible existing OTP values are never modified.
 - Many BLE and motor changes cannot be fully validated without hardware.
 
 ## Search Tips

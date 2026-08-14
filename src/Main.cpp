@@ -120,15 +120,11 @@ void SS2K::finishSetup() {
     currentBoard = boards.rev1;
   }
 #endif
-  SS2K_LOG(MAIN_LOG_TAG, "Current Board Revision is: %s", currentBoard.name);
+  SS2K_LOG(MAIN_LOG_TAG, "Current Board Revision is: %s", currentBoard.name.c_str());
 
   // initialize Stepper serial port
 
-#if defined(SMARTSPIN2K_S3)
-  stepperSerial.begin(57600, SERIAL_8N1, currentBoard.stepperSerialRxPin, currentBoard.stepperSerialTxPin);
-#else
-  stepperSerial.begin(57600, SERIAL_8N2, currentBoard.stepperSerialRxPin, currentBoard.stepperSerialTxPin);
-#endif
+  initializeStepperSerial();
   // initialize aux serial port (Peloton)
   if (currentBoard.auxSerialTxPin) {
     auxSerial.begin(19200, SERIAL_8N1, currentBoard.auxSerialRxPin, currentBoard.auxSerialTxPin, false);

@@ -21,6 +21,21 @@ FastAccelStepper* stepper     = NULL;
 
 extern Board currentBoard;
 
+void initializeStepperSerial(bool restart) {
+  if (restart) {
+    stepperSerial.end();
+  }
+
+  // The TMC2209 requires an idle-high interval to reset and resynchronize its
+  // UART receiver after an incomplete or invalid datagram. Drive TX manually
+  // before handing the pin to the UART peripheral so boot state is deterministic.
+  digitalWrite(currentBoard.stepperSerialTxPin, HIGH);
+  pinMode(currentBoard.stepperSerialTxPin, OUTPUT);
+  delay(20);
+
+  stepperSerial.begin(57600, SERIAL_8N1, currentBoard.stepperSerialRxPin, currentBoard.stepperSerialTxPin);
+}
+
 namespace {
 
 constexpr uint8_t TMC2209_OTP_IHOLD_SHIFT      = 21;
@@ -28,14 +43,26 @@ constexpr uint32_t TMC2209_OTP_IHOLD_MASK      = 0x03UL << TMC2209_OTP_IHOLD_SHI
 constexpr uint32_t TMC2209_OTP_IHOLD_9_PERCENT = 0x01UL << TMC2209_OTP_IHOLD_SHIFT;
 constexpr uint16_t TMC2209_OTP_PROGRAM_IHOLD_9 = 0xBD25;  // Magic 0xBD, OTP byte 2, bit 5.
 
-void programTmc2209LowHoldCurrentOtp(TMC2209Stepper* tmcDriver) {
-  const uint8_t connectionStatus = tmcDriver->test_connection();
-
-  if (connectionStatus != 0) {
-    SS2K_LOG(MAIN_LOG_TAG, "Skipping TMC OTP check: UART connection test failed (%u)", static_cast<unsigned>(connectionStatus));
-    return;
+bool recoverTmc2209Connection(TMC2209Stepper* tmcDriver) {
+  uint8_t connectionStatus = tmcDriver->test_connection();
+  if (connectionStatus == 0) {
+    return true;
   }
 
+  SS2K_LOG(MAIN_LOG_TAG, "TMC UART test failed (%u); forcing idle-high recovery", static_cast<unsigned>(connectionStatus));
+  initializeStepperSerial(true);
+  connectionStatus = tmcDriver->test_connection();
+
+  if (connectionStatus != 0) {
+    SS2K_LOG(MAIN_LOG_TAG, "TMC UART recovery failed (%u)", static_cast<unsigned>(connectionStatus));
+    return false;
+  }
+
+  SS2K_LOG(MAIN_LOG_TAG, "TMC UART recovered");
+  return true;
+}
+
+void programTmc2209LowHoldCurrentOtp(TMC2209Stepper* tmcDriver) {
   uint32_t otpRead        = tmcDriver->OTP_READ();
   const uint32_t otpIhold = otpRead & TMC2209_OTP_IHOLD_MASK;
   if (otpIhold == TMC2209_OTP_IHOLD_9_PERCENT) {
@@ -47,7 +74,7 @@ void programTmc2209LowHoldCurrentOtp(TMC2209Stepper* tmcDriver) {
     SS2K_LOG(MAIN_LOG_TAG, "TMC OTP hold current is already programmed (setting %u); leaving irreversible OTP unchanged", static_cast<unsigned>(otpIholdSetting));
     return;
   }
- 
+
   SS2K_LOG(MAIN_LOG_TAG, "Programming TMC OTP hold current to 9%%");
   tmcDriver->OTP_PROG(TMC2209_OTP_PROGRAM_IHOLD_9);
   delay(10);
@@ -202,9 +229,17 @@ void SS2K::setupTMCStepperDriver(bool reset) {
   if (!driver) {
     driver = new TMC2209Stepper(&stepperSerial, currentBoard.rSense, 0b00);
   }
+  const bool initializeFastAccel = !reset || stepper == nullptr;
+
+  // Verify communication before issuing any driver configuration writes. A
+  // failed recovery leaves the existing hardware state untouched.
+  if (!recoverTmc2209Connection(driver)) {
+    SS2K_LOG(MAIN_LOG_TAG, "Skipping TMC driver setup because UART is unavailable");
+    return;
+  }
 
   // FastAccel setup
-  if (!reset) {
+  if (initializeFastAccel) {
     engine.init();
     stepper = engine.stepperConnectToPin(currentBoard.stepPin);
     stepper->setDirectionPin(currentBoard.dirPin, userConfig->getStepperDir());
