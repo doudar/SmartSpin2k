@@ -11,6 +11,7 @@
 #include <ArduinoJson.h>
 #include <Constants.h>
 #include <NimBLEDevice.h>
+#include <WiFi.h>
 #include <cmath>
 #include <limits>
 #include "BLE_Cycling_Speed_Cadence.h"
@@ -37,6 +38,26 @@ BLE_Zwift_Service zwiftService;
 BLE_OpenBikeControl_Service openBikeControlService;
 // BLE_Wattbike_Service wattbikeService;
 // BLE_SB20_Service sb20Service;
+
+namespace {
+constexpr uint8_t SMARTSPIN2K_IP_ADVERTISEMENT_VERSION = 1;
+
+void addIpAddressToAdvertisement(NimBLEAdvertising* advertising) {
+  IPAddress ipAddress = WiFi.status() == WL_CONNECTED ? WiFi.localIP() : WiFi.softAPIP();
+  const uint8_t manufacturerData[] = {
+      0xff, 0xff,  // Reserved Bluetooth SIG company identifier for development/testing.
+      'S', 'S',    // SmartSpin2k payload marker.
+      SMARTSPIN2K_IP_ADVERTISEMENT_VERSION,
+      ipAddress[0], ipAddress[1], ipAddress[2], ipAddress[3],
+  };
+
+  if (advertising->setManufacturerData(manufacturerData, sizeof(manufacturerData))) {
+    SS2K_LOG(BLE_SERVER_LOG_TAG, "Advertising WiFi IP address %s", ipAddress.toString().c_str());
+  } else {
+    SS2K_LOGW(BLE_SERVER_LOG_TAG, "Unable to fit WiFi IP address in BLE advertisement data");
+  }
+}
+}  // namespace
 
 void startBLEServer() {
   // Server Setup
@@ -68,9 +89,9 @@ void startBLEServer() {
   // pAdvertising->addServiceUUID(OPENBIKECONTROL_SERVICE_UUID);
   // Garmin devices need this in the primary advertisement to recognize the device as a cycling power sensor.
   pAdvertising->setAppearance(0x0484);  // Cycling Power Sensor, per https://www.bluetooth.com/specifications/assigned-numbers/generic-access-profile/
-  // Put the device name and SmartSpin2k service UUID in the scan response to avoid
-  // overflowing the primary ad packet (which already carries manufacturer data + service UUIDs).
-  pAdvertising->setName(userConfig->getDeviceName()); //Due to cutbacks in other data, adding this to primary advertisement for now as well.
+  // Keep the name and 128-bit SmartSpin2k UUID in the scan response. The primary
+  // advertisement uses the space previously occupied by the duplicate name for the IP address.
+  addIpAddressToAdvertisement(pAdvertising);
   oScanResponseData.setName(userConfig->getDeviceName());
   oScanResponseData.setCompleteServices(SMARTSPIN2K_SERVICE_UUID);
   pAdvertising->setScanResponseData(oScanResponseData);
@@ -96,6 +117,7 @@ void SpinBLEServer::update() {
   cyclingPowerService.update();
   cyclingSpeedCadenceService.update();
   fitnessMachineService.update();
+  ss2kCustomCharacteristic.update();
   // zwiftService.update();
   // OpenBikeControl sends event-driven notifications from shift handlers.
   // wattbikeService.parseNemit();  // Changed from update() to parseNemit()

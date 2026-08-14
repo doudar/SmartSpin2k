@@ -12,6 +12,7 @@
 #include "cert.h"
 #include "SS2KLog.h"
 #include "DirConManager.h"
+#include "FirmwareImageValidation.h"
 #include <WebServer.h>
 #include <HTTPClient.h>
 #include <HTTPUpdate.h>
@@ -60,8 +61,139 @@ void writeStoredBuildVersion(const String& version) {
 
 // NVS guard helpers (one-time recovery per firmware version)
 namespace {
-const char* OTA_REC_NS  = "ota_recover";  // namespace
-const char* OTA_REC_KEY = "ver";          // key storing last recovered firmware version
+const char* OTA_REC_NS     = "ota_recover";  // namespace
+const char* OTA_REC_KEY    = "ver";          // key storing last recovered firmware version
+const char* OTA_FS_VER_KEY = "fs_ver";     // key storing the installed web-filesystem version
+bool otaUploadRejected      = false;
+bool otaFilesystemUpload    = false;
+bool otaFirmwareUpdateBegun = false;
+uint8_t otaFirmwareHeader[sizeof(esp_image_header_t)];
+size_t otaFirmwareHeaderLength = 0;
+String otaUploadError;
+
+void resetFirmwareUploadValidation() {
+  otaFirmwareUpdateBegun  = false;
+  otaFirmwareHeaderLength = 0;
+  otaUploadError           = "";
+}
+
+bool beginHttpRequest(HTTPClient& request, NetworkClient& client, const String& url) {
+  if (request.begin(client, url)) return true;
+  SS2K_LOGE(HTTP_SERVER_LOG_TAG, "Unable to initialize HTTP request for %s", url.c_str());
+  return false;
+}
+
+int beginHttpGet(HTTPClient& request, NetworkClient& client, const String& url) {
+  if (!beginHttpRequest(request, client, url)) return HTTPC_ERROR_CONNECTION_REFUSED;
+  return request.GET();
+}
+
+bool validateRemoteFirmwareHeader(HTTPClient& request, NetworkClient& client, const String& firmwareUrl) {
+  if (!beginHttpRequest(request, client, firmwareUrl)) return false;
+  // Some custom update servers may ignore Range and return the entire image.
+  // Close this connection after reading the header so unread image bytes cannot
+  // contaminate the subsequent HTTPUpdate request on the shared client.
+  request.setReuse(false);
+  request.addHeader("Range", String("bytes=0-") + (sizeof(esp_image_header_t) - 1));
+
+  const int httpCode = request.GET();
+  if (httpCode != HTTP_CODE_OK && httpCode != HTTP_CODE_PARTIAL_CONTENT) {
+    SS2K_LOGE(HTTP_SERVER_LOG_TAG, "Firmware header request failed for %s: HTTP %d", firmwareUrl.c_str(), httpCode);
+    request.end();
+    return false;
+  }
+
+  uint8_t headerBytes[sizeof(esp_image_header_t)];
+  NetworkClient* stream = request.getStreamPtr();
+  const size_t bytesRead = stream->readBytes(headerBytes, sizeof(headerBytes));
+  request.end();
+
+  const FirmwareImageHeaderValidation validation = validateFirmwareImageHeader(headerBytes, bytesRead);
+  if (validation.result != FirmwareImageHeaderResult::Valid) {
+    SS2K_LOGE(HTTP_SERVER_LOG_TAG, "Rejected remote firmware image: %s (expected chip 0x%04x, image chip 0x%04x)",
+              firmwareImageHeaderResultName(validation.result), CONFIG_IDF_FIRMWARE_CHIP_ID, static_cast<uint16_t>(validation.imageChipId));
+    return false;
+  }
+
+  return true;
+}
+
+bool filesystemIndexExists() {
+  return LittleFS.exists("/index.html.gz") || LittleFS.exists("/index.html");
+}
+
+String contentTypeForPath(String path) {
+  if (path.endsWith(".gz")) {
+    path.remove(path.length() - 3);
+  }
+  if (path.endsWith(".html")) return "text/html";
+  if (path.endsWith(".css")) return "text/css";
+  if (path.endsWith(".js")) return "application/javascript";
+  if (path.endsWith(".json")) return "application/json";
+  if (path.endsWith(".ico")) return "image/x-icon";
+  return "application/octet-stream";
+}
+
+String getNVSFilesystemVersion() {
+  Preferences p;
+  if (!p.begin(OTA_REC_NS, true)) return "";
+  String version = p.getString(OTA_FS_VER_KEY, "");
+  p.end();
+  return version;
+}
+
+bool setNVSFilesystemVersion(const String& version) {
+  Preferences p;
+  if (!p.begin(OTA_REC_NS, false)) return false;
+  size_t length = p.putString(OTA_FS_VER_KEY, version);
+  p.end();
+  return length > 0;
+}
+
+bool manifestContains(const JsonArray& files, const String& filename) {
+  for (JsonVariantConst entry : files) {
+    String manifestName = "/" + entry.as<String>();
+    if (manifestName == filename) return true;
+  }
+  return false;
+}
+
+bool pruneFilesystem(const JsonArray& files) {
+  bool success = true;
+  while (true) {
+    File root = LittleFS.open("/");
+    if (!root || !root.isDirectory()) {
+      SS2K_LOG(HTTP_SERVER_LOG_TAG, "Failed to inspect filesystem before update");
+      return false;
+    }
+
+    String staleName;
+    File entry = root.openNextFile();
+    while (entry) {
+      String filename = entry.name();
+      if (!filename.startsWith("/")) filename = "/" + filename;
+      bool preserved = filename == configFILENAME || filename == POWER_TABLE_FILENAME || filename == BUILD_VERSION_FILENAME;
+      if (!preserved && !manifestContains(files, filename)) {
+        staleName = filename;
+        entry.close();
+        break;
+      }
+      entry = root.openNextFile();
+    }
+    entry.close();
+    root.close();
+
+    if (staleName.isEmpty()) break;
+    if (LittleFS.remove(staleName)) {
+      SS2K_LOG(HTTP_SERVER_LOG_TAG, "Removed stale filesystem file: %s", staleName.c_str());
+    } else {
+      SS2K_LOG(HTTP_SERVER_LOG_TAG, "Failed to remove stale filesystem file: %s", staleName.c_str());
+      success = false;
+      break;
+    }
+  }
+  return success;
+}
 
 String getNVSRecoveryVersion() {
   Preferences p;
@@ -91,6 +223,7 @@ void _staSetup() {
   WiFi.mode(WIFI_STA);
   WiFi.begin(userConfig->getSsid(), userConfig->getPassword());
   WiFi.setAutoReconnect(true);
+  WiFi.setSleep(false);
 }
 
 void _APSetup() {
@@ -257,8 +390,7 @@ void HTTP_Server::start() {
     SS2K_LOG(HTTP_SERVER_LOG_TAG, "Scanning from web request");
     String response =
         "<!DOCTYPE html><html><body>Scanning for BLE Devices. Please wait "
-        "15 seconds.</body><script> setTimeout(\"location.href = 'http://" +
-        myIP.toString() + "/bluetoothscanner.html';\",15000);</script></html>";
+        "15 seconds.</body><script> setTimeout(\"location.href = '/bluetoothscanner.html';\",15000);</script></html>";
     // spinBLEClient.resetDevices();
     spinBLEClient.doScan = true;
     server.send(200, "text/html", response);
@@ -277,7 +409,7 @@ void HTTP_Server::start() {
 
   server.on("/reboot.html", []() {
     SS2K_LOG(HTTP_SERVER_LOG_TAG, "Rebooting from Web Request");
-    String response = "Rebooting....<script> setTimeout(\"location.href = 'http://" + myIP.toString() + "/index.html';\",500); </script>";
+    String response = "Rebooting....<script> setTimeout(\"location.href = '/index.html';\",500); </script>";
     server.send(200, "text/html", response);
     ss2k->rebootFlag = true;
   });
@@ -406,6 +538,11 @@ void HTTP_Server::start() {
       // This is the correct and only place to send the final response to the client.
       []() {
         server.sendHeader("Connection", "close");
+        if (otaUploadRejected) {
+          server.send(400, "text/plain", otaUploadError.isEmpty() ? String("Wrong image filename. Expected ") + FW_BINFILE + " or " + FS_BINFILE + "."
+                                                                   : otaUploadError);
+          return;
+        }
         // Check if the Update process reported an error and send the final status.
         if (Update.hasError()) {
           // You can get more specific error information if you want
@@ -413,42 +550,108 @@ void HTTP_Server::start() {
           // server.send(500, "text/plain", error_string_buffer);
           server.send(500, "text/plain", "FAIL");
         } else {
+          if (otaFilesystemUpload) {
+            // Update replaced the mounted partition underneath LittleFS. Remount
+            // the new image before restoring the in-memory user configuration.
+            LittleFS.end();
+            if (LittleFS.begin(false)) {
+              userConfig->saveToLittleFS();
+              SS2K_LOG(HTTP_SERVER_LOG_TAG, "Settings saved to the uploaded LittleFS image");
+            } else {
+              SS2K_LOGE(HTTP_SERVER_LOG_TAG, "Failed to remount LittleFS before saving settings");
+            }
+          }
           server.send(200, "text/plain", "OK");
-          // It's better to trigger the reboot after successfully notifying the client.
-          ss2k->rebootFlag = true;
+          if (otaFilesystemUpload) {
+            // The filesystem was replaced underneath the running web server. Reboot
+            // directly after allowing the response to reach the browser.
+            delay(500);
+            ESP.restart();
+          } else {
+            // Firmware uploads can use the normal cooperative reboot path.
+            ss2k->rebootFlag = true;
+          }
         }
       },
       // This is the onUpload callback. It handles the file data as it arrives.
       // It should not send any response to the client.
       []() {
         HTTPUpload &upload = server.upload();
-        if (upload.filename == String("firmware.bin").c_str()) {
+        if (upload.status == UPLOAD_FILE_START) {
+          otaUploadRejected    = false;
+          otaFilesystemUpload = upload.filename == FS_BINFILE;
+          resetFirmwareUploadValidation();
+        }
+        if (upload.filename == FW_BINFILE) {
           if (upload.status == UPLOAD_FILE_START) {
             ss2k->isUpdating = true;  // Set the updating flag to true
             SS2K_LOG(HTTP_SERVER_LOG_TAG, "Update Start: %s", upload.filename.c_str());
-            if (!Update.begin(UPDATE_SIZE_UNKNOWN, U_FLASH)) {
-              Update.printError(Serial);
-            }
           } else if (upload.status == UPLOAD_FILE_WRITE) {
-            /* flashing firmware to ESP*/
-            if (Update.write(upload.buf, upload.currentSize) != upload.currentSize) {
+            size_t chunkOffset = 0;
+            if (!otaFirmwareUpdateBegun && !otaUploadRejected) {
+              const size_t headerBytesNeeded = sizeof(otaFirmwareHeader) - otaFirmwareHeaderLength;
+              const size_t headerBytesInChunk = min(headerBytesNeeded, upload.currentSize);
+              memcpy(otaFirmwareHeader + otaFirmwareHeaderLength, upload.buf, headerBytesInChunk);
+              otaFirmwareHeaderLength += headerBytesInChunk;
+              chunkOffset += headerBytesInChunk;
+
+              if (otaFirmwareHeaderLength == sizeof(otaFirmwareHeader)) {
+                const FirmwareImageHeaderValidation validation = validateFirmwareImageHeader(otaFirmwareHeader, otaFirmwareHeaderLength);
+                if (validation.result != FirmwareImageHeaderResult::Valid) {
+                  otaUploadRejected = true;
+                  otaUploadError    = String("Rejected firmware image: ") + firmwareImageHeaderResultName(validation.result) + ".";
+                  ss2k->isUpdating  = false;
+                  SS2K_LOGE(HTTP_SERVER_LOG_TAG, "Rejected uploaded firmware image: %s (expected chip 0x%04x, image chip 0x%04x)",
+                            firmwareImageHeaderResultName(validation.result), CONFIG_IDF_FIRMWARE_CHIP_ID, static_cast<uint16_t>(validation.imageChipId));
+                  return;
+                }
+
+                if (!Update.begin(UPDATE_SIZE_UNKNOWN, U_FLASH)) {
+                  otaUploadRejected = true;
+                  otaUploadError    = "Unable to start firmware update.";
+                  ss2k->isUpdating  = false;
+                  Update.printError(Serial);
+                  return;
+                }
+                otaFirmwareUpdateBegun = true;
+
+                if (Update.write(otaFirmwareHeader, sizeof(otaFirmwareHeader)) != sizeof(otaFirmwareHeader)) {
+                  otaUploadRejected = true;
+                  otaUploadError    = "Failed to write firmware image header.";
+                  Update.printError(Serial);
+                  return;
+                }
+              }
+            }
+
+            if (!otaUploadRejected && otaFirmwareUpdateBegun && chunkOffset < upload.currentSize &&
+                Update.write(upload.buf + chunkOffset, upload.currentSize - chunkOffset) != upload.currentSize - chunkOffset) {
+              otaUploadRejected = true;
+              otaUploadError    = "Firmware upload write failed.";
               Update.printError(Serial);
               SS2K_LOG(HTTP_SERVER_LOG_TAG, "Upload Write Failed.");
             }
           } else if (upload.status == UPLOAD_FILE_END) {
             // Finalize the update. The true parameter tells it to flash the remaining buffer.
             // DO NOT send a response here.
-            if (Update.end(true)) {
+            if (otaUploadRejected) {
+              if (otaFirmwareUpdateBegun) Update.abort();
+              ss2k->isUpdating = false;
+            } else if (!otaFirmwareUpdateBegun) {
+              otaUploadRejected = true;
+              if (otaUploadError.isEmpty()) otaUploadError = "Firmware image header is incomplete.";
+              ss2k->isUpdating = false;
+            } else if (Update.end(true)) {
               SS2K_LOG(HTTP_SERVER_LOG_TAG, "Firmware Upload Finished Successfully.");
             } else {
+              otaUploadRejected = true;
+              otaUploadError    = "Firmware image validation failed.";
               Update.printError(Serial);
               SS2K_LOG(HTTP_SERVER_LOG_TAG, "Unknown OTA issue on end.");
             }
             // The reboot will be triggered in the onComplete handler after the response.
-            // Setting this to reboot, even if upload fails.
-            ss2k->rebootFlag = true;
           }
-        } else if (upload.filename == String("littlefs.bin").c_str()) {
+        } else if (upload.filename == FS_BINFILE) {
           if (upload.status == UPLOAD_FILE_START) {
             SS2K_LOG(HTTP_SERVER_LOG_TAG, "Update Start: %s", upload.filename.c_str());
             if (!Update.begin(UPDATE_SIZE_UNKNOWN, U_SPIFFS)) {
@@ -463,10 +666,15 @@ void HTTP_Server::start() {
             // DO NOT send a response here.
             if (Update.end(true)) {
               SS2K_LOG(HTTP_SERVER_LOG_TAG, "Littlefs Upload Finished Successfully.");
-              userConfig->saveToLittleFS();
             } else {
               Update.printError(Serial);
             }
+          }
+        } else if (upload.filename.endsWith(".bin")) {
+          if (upload.status == UPLOAD_FILE_START) {
+            otaUploadRejected = true;
+            otaUploadError    = String("Wrong image filename. Expected ") + FW_BINFILE + " or " + FS_BINFILE + ".";
+            SS2K_LOG(HTTP_SERVER_LOG_TAG, "Rejected image %s; expected %s or %s", upload.filename.c_str(), FW_BINFILE, FS_BINFILE);
           }
         } else {  // Handles other file uploads to LittleFS
           if (upload.status == UPLOAD_FILE_START) {
@@ -525,7 +733,7 @@ void HTTP_Server::handleBTScanner() {
 }
 
 void HTTP_Server::handleIndexFile() {
-  String filename = "/index.html";
+  String filename = LittleFS.exists("/index.html.gz") ? "/index.html.gz" : "/index.html";
   if (LittleFS.exists(filename)) {
     File file = LittleFS.open(filename, FILE_READ);
     server.streamFile(file, "text/html");
@@ -539,17 +747,15 @@ void HTTP_Server::handleIndexFile() {
 
 void HTTP_Server::handleLittleFSFile() {
   String filename = server.uri();
-  int dotPosition = filename.lastIndexOf(".");
-  String fileType = filename.substring((dotPosition + 1), filename.length());
+  if (!LittleFS.exists(filename) && LittleFS.exists(filename + ".gz")) {
+    filename += ".gz";
+  }
   if (LittleFS.exists(filename)) {
     File file = LittleFS.open(filename, FILE_READ);
-    if (fileType == "gz") {
-      fileType = "html";  // no need to change content type as it's done automatically by .streamfile below VV
-    }
-    server.streamFile(file, "text/" + fileType);
+    server.streamFile(file, contentTypeForPath(filename));
     file.close();
     SS2K_LOG(HTTP_SERVER_LOG_TAG, "Served %s", filename.c_str());
-  } else if (!LittleFS.exists("/index.html")) {
+  } else if (!filesystemIndexExists()) {
     SS2K_LOG(HTTP_SERVER_LOG_TAG, "%s not found and no filesystem. Sending builtin index.html", filename.c_str());
     handleIndexFile();
   } else {
@@ -699,28 +905,24 @@ void HTTP_Server::settingsProcessor() {
   if (wasBTUpdate) {  // Special BT page update response
     response +=
         "Selections Saved!</h2></body><script> setTimeout(\"location.href "
-        "= 'http://" +
-        myIP.toString() + "/bluetoothscanner.html';\",1000);</script></html>";
+        "= '/bluetoothscanner.html';\",1000);</script></html>";
   } else if (wasSettingsUpdate) {  // Special Settings Page update response
     response +=
         "Network settings will be applied at next reboot. <br> Everything "
         "else is available immediately.</h2></body><script> "
-        "setTimeout(\"location.href = 'http://" +
-        myIP.toString() + "/settings.html';\",1000);</script></html>";
+        "setTimeout(\"location.href = '/settings.html';\",1000);</script></html>";
   } else {  // Normal response
     response +=
         "Network settings will be applied at next reboot. <br> Everything "
         "else is available immediately.</h2></body><script> "
-        "setTimeout(\"location.href = 'http://" +
-        myIP.toString() + "/index.html';\",1000);</script></html>";
+        "setTimeout(\"location.href = '/index.html';\",1000);</script></html>";
   }
   SS2K_LOG(HTTP_SERVER_LOG_TAG, "Config Updated From Web");
   ss2k->saveFlag = true;
   if (reboot) {
     response +=
         "Please wait while your settings are saved and SmartSpin2k reboots.</h2></body><script> "
-        "setTimeout(\"location.href = 'http://" +
-        myIP.toString() + "/bluetoothscanner.html';\",5000);</script></html>";
+        "setTimeout(\"location.href = '/bluetoothscanner.html';\",5000);</script></html>";
     server.send(200, "text/html", response);
     ss2k->rebootFlag = true;
   }
@@ -741,11 +943,7 @@ void HTTP_Server::FirmwareUpdate() {
   WiFiClientSecure localClient;
   localClient.setCACert(rootCACertificate);
   SS2K_LOG(HTTP_SERVER_LOG_TAG, "Checking for newer firmware:");
-  http.begin(userConfig->getFirmwareUpdateURL() + String(FW_VERSIONFILE),
-             rootCACertificate);  // check version URL
-  delay(100);
-  int httpCode = http.GET();  // get data from version file
-  delay(100);
+  int httpCode = beginHttpGet(http, localClient, userConfig->getFirmwareUpdateURL() + String(FW_VERSIONFILE));
   String payload;
   if (httpCode == HTTP_CODE_OK) {  // if version received
     payload = http.getString();    // save received version
@@ -759,28 +957,35 @@ void HTTP_Server::FirmwareUpdate() {
 
   http.end();
   if (httpCode == HTTP_CODE_OK) {  // if version received
+    const String serverVersion = payload;
+    const String filesystemVersion = getNVSFilesystemVersion();
     bool updateAnyway = false;
-    if (!LittleFS.exists("/index.html")) {
+    if (!filesystemIndexExists()) {
       // force firmware update if index.html is missing
       // updateAnyway = true;
       SS2K_LOG(HTTP_SERVER_LOG_TAG, "  -index.html not found.");
     }
     Version availableVer(payload.c_str());
     Version currentVer(FIRMWARE_VERSION);
+    // Development builds append branch/commit data to the release they follow.
+    // Treat that suffix as newer when the numeric date components are equal.
+    bool firmwareIsAhead = currentVer > availableVer || (currentVer == availableVer && serverVersion != FIRMWARE_VERSION);
+    bool filesystemUpgradeAvailable = !firmwareIsAhead &&
+                                      (filesystemVersion.isEmpty() || availableVer > Version(filesystemVersion.c_str()));
+    bool filesystemNeedsUpdate = !filesystemIndexExists() || filesystemUpgradeAvailable;
+    SS2K_LOG(HTTP_SERVER_LOG_TAG, "  - Filesystem version: %s%s", filesystemVersion.isEmpty() ? "not recorded" : filesystemVersion.c_str(),
+             filesystemNeedsUpdate ? " (update required)" : "");
+    if (firmwareIsAhead && filesystemIndexExists()) {
+      SS2K_LOG(HTTP_SERVER_LOG_TAG, "  - Firmware is ahead of the server; not installing older release files");
+    }
 
-    if (((availableVer > currentVer) && (userConfig->getAutoUpdate())) || (!LittleFS.exists("/index.html"))) {
+    if (filesystemNeedsUpdate) {
       //////////////// Update LittleFS//////////////
       SS2K_LOG(HTTP_SERVER_LOG_TAG, "Updating FileSystem");
-      http.begin(DATA_UPDATEURL DATA_FILELIST, rootCACertificate);  // check version URL
-      delay(100);
-      httpCode = http.GET();  // get data from version file
-      delay(100);
+      httpCode = beginHttpGet(http, localClient, DATA_UPDATEURL DATA_FILELIST);
       JsonDocument doc;
       if (httpCode == HTTP_CODE_OK) {  // if version received
-        payload = http.getString();    // save received version
-        payload.trim();
-        // Deserialize the JSON document
-        DeserializationError error = deserializeJson(doc, payload);
+        DeserializationError error = deserializeJson(doc, http.getStream());
         if (error) {
           SS2K_LOG(HTTP_SERVER_LOG_TAG, "Failed to read file list");
           http.end();  // Make sure to end HTTP before returning
@@ -793,56 +998,84 @@ void HTTP_Server::FirmwareUpdate() {
       }
       // End HTTP connection after file list download
       http.end();
+      if (httpCode != HTTP_CODE_OK) return;
 
       JsonArray files = doc.as<JsonArray>();
+      if (files.isNull() || (!manifestContains(files, "/index.html.gz") && !manifestContains(files, "/index.html"))) {
+        SS2K_LOG(HTTP_SERVER_LOG_TAG, "Filesystem file list is invalid or has no index page");
+        return;
+      }
+      bool filesystemUpdateSucceeded = pruneFilesystem(files);
       // iterate through file list and download files individually
       for (JsonVariant v : files) {
         String fileName = "/" + v.as<String>();
-        http.begin(DATA_UPDATEURL + fileName,
-                   rootCACertificate);  // check version URL
-        delay(100);
-        httpCode = http.GET();
-        delay(100);
+        httpCode = beginHttpGet(http, localClient, DATA_UPDATEURL + fileName);
         if (httpCode == HTTP_CODE_OK) {
-          payload = http.getString();
-          payload.trim();
           LittleFS.remove(fileName);
           File file = LittleFS.open(fileName, FILE_WRITE, true);
           if (!file) {
-            SS2K_LOG(HTTP_SERVER_LOG_TAG, "Failed to create file, %s", fileName);
+            SS2K_LOG(HTTP_SERVER_LOG_TAG, "Failed to create file, %s", fileName.c_str());
+            filesystemUpdateSucceeded = false;
             http.end();  // End HTTP before returning
             return;
           }
-          file.print(payload);
+          int bytesWritten = http.writeToStream(&file);
           file.close();
-          SS2K_LOG(HTTP_SERVER_LOG_TAG, "Created: %s", fileName);
-          httpServer.internetConnection = true;
+          if (bytesWritten < 0) {
+            LittleFS.remove(fileName);
+            SS2K_LOG(HTTP_SERVER_LOG_TAG, "Error writing %s (%d)", fileName.c_str(), bytesWritten);
+            httpServer.internetConnection = false;
+            filesystemUpdateSucceeded = false;
+          } else {
+            if (fileName.endsWith(".gz")) {
+              String uncompressedName = fileName.substring(0, fileName.length() - 3);
+              LittleFS.remove(uncompressedName);
+            }
+            SS2K_LOG(HTTP_SERVER_LOG_TAG, "Created: %s (%d bytes)", fileName.c_str(), bytesWritten);
+            httpServer.internetConnection = true;
+          }
         } else {
-          SS2K_LOG(HTTP_SERVER_LOG_TAG, "Error downloading %s %d", fileName, httpCode);
+          SS2K_LOG(HTTP_SERVER_LOG_TAG, "Error downloading %s %d", fileName.c_str(), httpCode);
           httpServer.internetConnection = false;
+          filesystemUpdateSucceeded = false;
         }
         // End HTTP connection after each file download
         http.end();
       }
 
-      //////// Update Firmware /////////
-      if (((availableVer > currentVer) || updateAnyway) && (userConfig->getAutoUpdate())) {
-        SS2K_LOG(HTTP_SERVER_LOG_TAG, "New firmware detected!");
-        SS2K_LOG(HTTP_SERVER_LOG_TAG, "Upgrading from %s to %s", FIRMWARE_VERSION, payload.c_str());
-        t_httpUpdate_return ret = httpUpdate.update(localClient, userConfig->getFirmwareUpdateURL() + String(FW_BINFILE));
-        switch (ret) {
-          case HTTP_UPDATE_FAILED:
-            SS2K_LOG(HTTP_SERVER_LOG_TAG, "HTTP_UPDATE_FAILED Error %d : %s", httpUpdate.getLastError(), httpUpdate.getLastErrorString().c_str());
-            break;
-
-          case HTTP_UPDATE_NO_UPDATES:
-            SS2K_LOG(HTTP_SERVER_LOG_TAG, "HTTP_UPDATE_NO_UPDATES");
-            break;
-
-          case HTTP_UPDATE_OK:
-            SS2K_LOG(HTTP_SERVER_LOG_TAG, "HTTP_UPDATE_OK");
-            break;
+      if (filesystemUpdateSucceeded && filesystemIndexExists()) {
+        if (setNVSFilesystemVersion(serverVersion)) {
+          SS2K_LOG(HTTP_SERVER_LOG_TAG, "Filesystem updated to version %s", serverVersion.c_str());
+        } else {
+          SS2K_LOG(HTTP_SERVER_LOG_TAG, "Failed to save filesystem version %s", serverVersion.c_str());
         }
+      } else {
+        SS2K_LOG(HTTP_SERVER_LOG_TAG, "Filesystem update incomplete; version was not changed");
+      }
+    }
+
+    //////// Update Firmware /////////
+    if (((availableVer > currentVer) || updateAnyway) && (userConfig->getAutoUpdate())) {
+      SS2K_LOG(HTTP_SERVER_LOG_TAG, "New firmware detected!");
+      SS2K_LOG(HTTP_SERVER_LOG_TAG, "Upgrading from %s to %s", FIRMWARE_VERSION, serverVersion.c_str());
+      const String firmwareUrl = userConfig->getFirmwareUpdateURL() + String(FW_BINFILE);
+      if (!validateRemoteFirmwareHeader(http, localClient, firmwareUrl)) {
+        SS2K_LOGE(HTTP_SERVER_LOG_TAG, "Firmware update cancelled before flashing because image validation failed");
+        return;
+      }
+      t_httpUpdate_return ret = httpUpdate.update(localClient, firmwareUrl);
+      switch (ret) {
+        case HTTP_UPDATE_FAILED:
+          SS2K_LOG(HTTP_SERVER_LOG_TAG, "HTTP_UPDATE_FAILED Error %d : %s", httpUpdate.getLastError(), httpUpdate.getLastErrorString().c_str());
+          break;
+
+        case HTTP_UPDATE_NO_UPDATES:
+          SS2K_LOG(HTTP_SERVER_LOG_TAG, "HTTP_UPDATE_NO_UPDATES");
+          break;
+
+        case HTTP_UPDATE_OK:
+          SS2K_LOG(HTTP_SERVER_LOG_TAG, "HTTP_UPDATE_OK");
+          break;
       }
     } else {  // don't update
       SS2K_LOG(HTTP_SERVER_LOG_TAG, "  - Current Version: %s", FIRMWARE_VERSION);

@@ -10,6 +10,12 @@ Import("env")
 from pathlib import Path
 
 
+# The S3 has a much larger filesystem partition and keeps its web assets
+# separate so they can grow without increasing the classic ESP32 image.
+if env.subst("$PIOENV") in ("S3release", "S3debug"):
+    env.Replace(PROJECT_DATA_DIR=str(Path(env.subst("$PROJECT_DIR")) / "data_s3"))
+
+
 # Work around intermittent malformed x509_crt_bundle.S generation.
 # Removing stale generated files before each build avoids carrying
 # corrupted artifacts between runs.

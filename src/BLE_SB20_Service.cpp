@@ -18,7 +18,7 @@ BLE_SB20_Service::BLE_SB20_Service() : pService(nullptr), pCharacteristic(nullpt
 void BLE_SB20_Service::begin() {
   pService        = BLEDevice::createServer()->createService(SB20_SERVICE_UUID);
   pCharacteristic = pService->createCharacteristic(SB20_CHARACTERISTIC_UUID, NIMBLE_PROPERTY::READ | NIMBLE_PROPERTY::NOTIFY);
-  pService->start();
+   
   SS2K_LOG(SS2K_LOG_TAG, "SB20 Service started\n");
 }
 

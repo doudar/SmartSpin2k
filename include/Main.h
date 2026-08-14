@@ -37,6 +37,7 @@ class SS2K {
   int32_t currentPosition;
   bool ledEnabled;
   void handleShiftButtons();
+  static void finishSetup();
 
  public:
   bool stepperIsRunning;
@@ -117,6 +118,7 @@ class AuxSerialBuffer {
 };
 
 extern SS2K *ss2k;
+extern Board currentBoard;
 
 // Main program variable that stores most everything
 extern userParameters *userConfig;

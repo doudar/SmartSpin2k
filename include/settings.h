@@ -21,14 +21,23 @@ const char* const DEFAULT_PASSWORD = "password";
 // and put it in /include/cert.h
 #define FW_UPDATEURL "https://raw.githubusercontent.com/doudar/OTAUpdates/main/"
 
-// File that contains Version info
+// Target-specific OTA names prevent cross-flashing firmware or filesystems.
+#if defined(SMARTSPIN2K_S3)
+#define FW_VERSIONFILE "S3version.txt"
+#define FW_BINFILE     "S3firmware.bin"
+#define FS_BINFILE     "S3littlefs.bin"
+#else
 #define FW_VERSIONFILE "version.txt"
+#define FW_BINFILE     "firmware.bin"
+#define FS_BINFILE     "littlefs.bin"
+#endif
 
-// Path to the latest Firmware
-#define FW_BINFILE "firmware.bin"
-
-// Data directory Source
+// Web assets follow the filesystem layout for the selected firmware target.
+#if defined(SMARTSPIN2K_S3)
+#define DATA_UPDATEURL "https://raw.githubusercontent.com/doudar/SmartSpin2k/develop/data_s3"
+#else
 #define DATA_UPDATEURL "https://raw.githubusercontent.com/doudar/SmartSpin2k/develop/data"
+#endif
 
 #define DATA_FILELIST "/list.json"
 
@@ -95,8 +104,8 @@ const char* const DEFAULT_PASSWORD = "password";
 // Minimum cadence where ERG mode stops.
 #define MIN_ERG_CADENCE 30
 
-// Default Min Watts to stop stepper.
-// This is used to set the lower travel limit for the motor.
+// Default minimum ERG target while the stepper is unhomed.
+// Homed operation uses the known stepper travel limits instead.
 #define DEFAULT_MIN_WATTS 50
 
 // Default Max Watts that the brake on the spin bike can absorb from the user.
@@ -128,90 +137,6 @@ const char* const DEFAULT_PASSWORD = "password";
 
 // Default debounce delay for shifters. Increase if you have false shifts. Decrease if shifting takes too long.
 #define DEBOUNCE_DELAY 200
-
-// Hardware Revision check pin
-#define REV_PIN 34
-
-//////////// Defines for hardware Revision 1 ////////////
-
-// Board Name
-#define r1_NAME "Revision One"
-
-// ID Voltage on pin 34. Values are 0-4095 (0-3.3v)
-#define r1_VERSION_VOLTAGE 0
-
-// Hardware pin for Shift Up
-#define r1_SHIFT_UP_PIN 19
-
-// Hardware pin for Shift Down
-#define r1_SHIFT_DOWN_PIN 18
-
-// Hardware pin for stepper Enable
-#define r1_ENABLE_PIN 13
-
-// Hardware pin for stepper step
-#define r1_STEP_PIN 25
-
-// Hardware pin for stepper dir
-#define r1_DIR_PIN 33
-
-// TMC2208/TMC2224 SoftwareSerial receive pin
-#define r1_STEPPER_SERIAL_RX 14
-
-// TMC2208/TMC2224 SoftwareSerial transmit pin
-#define r1_STEPPER_SERIAL_TX 12
-
-// Reduce current setting by this divisor (0-31)
-#define r1_PWR_SCALER 31
-////////////////////////////////////////////////////////
-//////////// Defines for hardware Revision 2 ////////////
-
-// Board Name
-#define r2_NAME "Revision Two"
-
-// ID Voltage on pin 34. Values are 0-4095 (0-3.3v)
-#define r2_VERSION_VOLTAGE 4095
-
-// Hardware pin for Shift Up
-#define r2_SHIFT_UP_PIN 26
-
-// Hardware pin for Shift Down
-#define r2_SHIFT_DOWN_PIN 32
-
-// Hardware pin for stepper Enable
-#define r2_ENABLE_PIN 27
-
-// Hardware pin for stepper step
-#define r2_STEP_PIN 25
-
-// Hardware pin for stepper dir
-#define r2_DIR_PIN 33
-
-// TMC2209 SoftwareSerial receive pin
-#define r2_STEPPER_SERIAL_RX 18
-
-// TMC2209 SoftwareSerial transmit pin
-#define r2_STEPPER_SERIAL_TX 19
-
-// TMC2209 SoftwareSerial receive pin
-#define r2_AUX_SERIAL_RX 22
-
-// TMC2209 SoftwareSerial transmit pin
-#define r2_AUX_SERIAL_TX 21
-
-// Reduce current setting by this divisor (0-31)
-#define r2_PWR_SCALER 12
-////////////////////////////////////////////////////////
-
-// TMC2208/TMC2224 HardwareSerial port
-#define SERIAL_PORT stepperSerial
-
-// Match to your driver
-#define R_SENSE 0.08f
-
-// Hardware pin for indicator LED *note* internal LED on esp32 Dev board is pin
-// 2
-#define LED_PIN 2
 
 // Reconnect tries removed: connections now always instantiate a new NimBLEClient
 
@@ -349,19 +274,35 @@ constexpr const char* ANY = "any";
 // Interval for polling ble battery updates
 #define BATTERY_UPDATE_INTERVAL_MILLIS 300000
 
-// Default homing sensitivity value
+// Base homing sensitivity before applying the detected board's scaler.
 #define DEFAULT_HOMING_SENSITIVITY 50
 
+// Stepper homing behavior
+#define HOME_TIMEOUT                  30000
+#define HOMING_SG_SAMPLE_COUNT        24
+#define HOMING_SG_MIN_SAMPLE_MARGIN   10
+#define HOMING_SG_MAX_THRESHOLD_DRIFT 30
+#define HOMING_TAP_MAX_ATTEMPTS       7
+#define HOMING_TAP_REQUIRED_STABLE    3
+#define HOMING_TAP_TOLERANCE          150
+#define HOMING_RECOVERY_BACKOFF_MULT  3
+#define HOMING_MAX_SENSITIVITY        100
+
 // BLE automatic reconnect interval in milliseconds.
-#define BLE_RECONNECT_SCAN_INTERVAL 6000
+#define BLE_RECONNECT_SCAN_INTERVAL 8000
 
 // Initial and web scan duration in milliseconds
-#define DEFAULT_SCAN_DURATION 4000
+#define DEFAULT_SCAN_DURATION 5000
 
 // Task Stack Sizes
 // In theory you can subtract whatever is left in the report from DEBUG_STACK for each task
+#if defined(SMARTSPIN2K_S3)
+#define MAIN_STACK       8000
+#define BLE_CLIENT_STACK 8000  // S3 has additional internal RAM and external QSPI PSRAM.
+#else
 #define MAIN_STACK       4500
-#define BLE_CLIENT_STACK 6000 //Scans and connects to BLE devices. Holds the BLE Notify Data. 
+#define BLE_CLIENT_STACK 6000  // Scans and connects to BLE devices. Holds the BLE Notify Data.
+#endif
 
 // Uncomment to enable stack size debugging info
 // #define DEBUG_STACK

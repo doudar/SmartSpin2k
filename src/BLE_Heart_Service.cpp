@@ -17,7 +17,6 @@ void BLE_Heart_Service::setupService(NimBLEServer *pServer, MyCharacteristicCall
   byte heartRateMeasurement[2]       = {0x00, 0x00};
   heartRateMeasurementCharacteristic->setValue(heartRateMeasurement, 2);
   heartRateMeasurementCharacteristic->setCallbacks(chrCallbacks);
-  pHeartService->start();
   // Register with DirCon for service discovery
   DirConManager::registerService(pHeartService->getUUID());
 }

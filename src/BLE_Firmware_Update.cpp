@@ -8,6 +8,7 @@
 #include "Main.h"
 #include "SS2KLog.h"
 #include "BLE_Common.h"
+#include "FirmwareImageValidation.h"
 
 #include <esp_task_wdt.h>
 #include <esp_ota_ops.h>
@@ -47,6 +48,19 @@ class otaCallback : public BLECharacteristicCallbacks {
     bufferCount++;
 
     if (!downloadFlag) {
+      const FirmwareImageHeaderValidation validation =
+          validateFirmwareImageHeader(reinterpret_cast<const uint8_t*>(rxData.data()), rxData.length());
+      if (validation.result != FirmwareImageHeaderResult::Valid) {
+        SS2K_LOGE(BLE_OTA_LOG_TAG, "Rejected firmware image: %s (expected chip 0x%04x, image chip 0x%04x)",
+                  firmwareImageHeaderResultName(validation.result), CONFIG_IDF_FIRMWARE_CHIP_ID, static_cast<uint16_t>(validation.imageChipId));
+        ss2k->isUpdating = false;
+        downloadFlag     = false;
+        bufferCount      = 0;
+        const uint8_t failureStatus = 0x04;
+        pTxCharacteristic->notify(&failureStatus, sizeof(failureStatus), connInfo.getConnHandle());
+        return;
+      }
+
       ss2k->isUpdating = true;
       //-----------------------------------------------
       // First BLE bytes have arrived
@@ -186,9 +200,6 @@ void BLEFirmwareSetup(NimBLEServer *pServer) {
 
   pOtaCharacteristic = pService->createCharacteristic(FIRMWARE_CHARACTERISTIC_OTA_UUID, NIMBLE_PROPERTY::WRITE);
   pOtaCharacteristic->setCallbacks(new otaCallback());
-
-  // 5. Start the service(s)
-  pService->start();
 
   // 6. Start advertising
   // spinBLEServer.pServer->getAdvertising()->addServiceUUID(pService->getUUID());

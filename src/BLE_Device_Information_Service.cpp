@@ -73,5 +73,4 @@ void BLE_Device_Information_Service::setupService(NimBLEServer* pServer) {
   pSystemIDCharacteristic = pDeviceInformationService->createCharacteristic(SYSTEM_ID_UUID, NIMBLE_PROPERTY::READ);
   pSystemIDCharacteristic->setValue(systemId.data(), systemId.size());
 
-  pDeviceInformationService->start();
 }

@@ -54,7 +54,6 @@ void BLE_Fitness_Machine_Service::setupService(NimBLEServer *pServer, MyCharacte
   fitnessMachineInclinationRange->setValue(ftmsInclinationRange, sizeof(ftmsInclinationRange));
   fitnessMachineIndoorBikeData->setCallbacks(chrCallbacks);
   fitnessMachineControlPoint->setCallbacks(chrCallbacks);
-  pFitnessMachineService->start();
 
   // Register with DirCon for service discovery and write handling
   DirConManager::registerService(pFitnessMachineService->getUUID(), [](NimBLECharacteristic *characteristic, const uint8_t *data, size_t length, DirConWriteResult *result) -> bool {

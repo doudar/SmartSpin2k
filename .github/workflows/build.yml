@@ -54,16 +54,30 @@ jobs:
       - name: Install PlatformIO
         run: python -m pip install platformio
       - name: Pre-install PlatformIO packages (release env)
-        run: platformio pkg install -e release
+        run: |
+          platformio pkg install -e release
+          platformio pkg install -e S3release
       - name: Check pre-commit hooks
         uses: pre-commit/action@v3.0.1
       - name: Build firmware
         run: platformio run -e release
       - name: Build filesystem
         run: platformio run -e release --target buildfs
+      - name: Build S3 firmware
+        run: platformio run -e S3release
+      - name: Build S3 filesystem
+        run: platformio run -e S3release --target buildfs
       - name: Create artifacts
         run: |
-          7z a SmartSpin2kFirmware-${{ steps.date.outputs.date }}.bin.zip ./.pio/build/release/*.bin
+          cp ./.pio/build/release/firmware.bin firmware.bin
+          cp ./.pio/build/release/littlefs.bin littlefs.bin
+          cp ./.pio/build/release/partitions.bin partitions.bin
+          cp ./.pio/build/release/bootloader.bin bootloader.bin
+          cp ./.pio/build/S3release/S3firmware.bin S3firmware.bin
+          cp ./.pio/build/S3release/S3littlefs.bin S3littlefs.bin
+          cp ./.pio/build/S3release/S3partitions.bin S3partitions.bin
+          cp ./.pio/build/S3release/S3bootloader.bin S3bootloader.bin
+          7z a SmartSpin2kFirmware-${{ steps.date.outputs.date }}.bin.zip firmware.bin littlefs.bin partitions.bin bootloader.bin S3firmware.bin S3littlefs.bin S3partitions.bin S3bootloader.bin
       - name: Archive
         uses: actions/upload-artifact@v7
         with:

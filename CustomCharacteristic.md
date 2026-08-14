@@ -5,6 +5,20 @@ Custom Characteristic for userConfig Variable manipulation via BLE
 SMARTSPIN2K_SERVICE_UUID        "77776277-7877-7774-4466-896665500000"
 SMARTSPIN2K_CHARACTERISTIC_UUID "77776277-7877-7774-4466-896665500001"
 
+The same service and characteristic are published in the DirCon mDNS service.
+A DirCon client sends the protocol bytes in a characteristic-write request and receives the custom-characteristic response bytes in that write response.
+Subscribed DirCon clients also receive changed-value notifications.
+
+The primary BLE advertisement includes the current Wi-Fi IPv4 address in manufacturer-specific data.
+The device name and SmartSpin2k service UUID remain in the scan response. The payload is:
+
+| Offset | Size | Meaning |
+|--------|------|---------|
+| 0 | 2 | Reserved development company identifier `0xFFFF`, little-endian |
+| 2 | 2 | ASCII payload marker `SS` |
+| 4 | 1 | Payload format version (`0x01`) |
+| 5 | 4 | IPv4 address octets in network/display order |
+
 An example follows to read/write 26.3kph to simulatedSpeed:
 
 simulatedSpeed is a float and first needs to be converted to int by *10 for transmission, so convert 26.3kph to 263 (multiply by 10)
@@ -77,7 +91,9 @@ From BLE_common.h
 |BLE_externalControl       |0x1A   |bool |01 disables internal calculation of targetPosition.|
 |BLE_syncMode              |0x1B   |bool |01 stops motor movement for external calibration   |
 |BLE_UDPLogging            |0x2E   |bool |Enable/disable UDP log streaming                   |
+|BLE_hardwareVersion       |0x2F   |str  |Read-only detected hardware revision                |
 |BLE_BLELogging            |0x30   |bool/str|Write: enable/disable BLE log streaming. Read: returns last log message|
+|BLE_allSettings           |0x31   |JSON |Read-only chunked snapshot of all user settings         |
 
 *syncMode will disable the movement of the stepper motor by forcing stepperPosition = targetPosition prior to the motor control. While this mode is enabled, it allows the client to set parameters like incline and shifterPosition without moving the motor from it's current position. Once the parameters are set, this mode should be turned back off and SS2K will resume normal operation.
 
@@ -85,3 +101,29 @@ From BLE_common.h
 This characteristic also notifies when a shift is preformed or the button is pressed. 
 
 See code for more references/info in BLE_Server.cpp starting on line 534
+
+Hardware-version example:
+
+- Client writes: `0x01, 0x2F`
+- An ESP32-S3 board indicates: `0x80, 0x2F`, followed by the ASCII bytes for `Revision Three (ESP32-S3)`.
+- Writes to `0x2F` return `cc_error` because the detected hardware revision is read-only.
+
+All-settings snapshot (BLE or DirCon):
+
+- Client writes `0x01, 0x31`. BLE clients subscribe to indications on the custom characteristic.
+  A DirCon client receives the first chunk in the characteristic-write response and is automatically subscribed for the remaining chunks.
+- The server serializes `userConfig->returnJSON()` once.
+  Over BLE, it sends MTU-sized indications sequentially and waits for each acknowledgement before sending the next.
+- Over DirCon, chunks use the same framing and arrive as characteristic notifications after the first write-response chunk.
+- Every snapshot chunk begins with this seven-byte header:
+
+| Offset | Size | Meaning |
+|--------|------|---------|
+| 0 | 1 | `cc_success` (`0x80`) |
+| 1 | 1 | `BLE_allSettings` (`0x31`) |
+| 2 | 1 | Snapshot framing version (`0x01`) |
+| 3 | 2 | Zero-based chunk number, little-endian |
+| 5 | 2 | Total chunk count, little-endian |
+| 7 | remainder | UTF-8 JSON bytes |
+
+The client validates that it received chunks `0` through `chunk count - 1`, concatenates the bytes after each header, and parses the result as JSON. If the connection closes or a chunk is missing, discard the partial snapshot and issue the read command again. Unknown JSON properties should be ignored so newly added settings remain backward compatible. The snapshot includes sensitive settings such as the Wi-Fi password, consistent with the existing individual password read command.

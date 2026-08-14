@@ -63,14 +63,16 @@ const uint8_t BLE_hMax                  = 0x2B;  // Maximum homing value
 const uint8_t BLE_homingSensitivity     = 0x2C;  // Homing sensitivity value
 const uint8_t BLE_pTab4Pwr              = 0x2D;  // Use power values for power table
 const uint8_t BLE_UDPLogging            = 0x2E;  // Enable or disable UDP logging
+const uint8_t BLE_hardwareVersion       = 0x2F;  // Read-only string identifying the detected hardware revision
 const uint8_t BLE_BLELogging            = 0x30;  // Enable or disable BLE logging
+const uint8_t BLE_allSettings           = 0x31;  // Read all user settings as a chunked JSON snapshot
 
 class BLE_ss2kCustomCharacteristic {
  public:
   void setupService(NimBLEServer *pServer);
   void update();
   // Used internally for notify and onWrite Callback.
-  static void process(std::string rxValue);
+  static void process(std::string rxValue, uint16_t connHandle = BLE_HS_CONN_HANDLE_NONE, uint16_t mtu = 23, bool indicateResponse = true);
   // Custom Characteristic value that needs to be notified
   static void notify(char _item, int tableRow = -1);
   // Notify any changed value in userConfig

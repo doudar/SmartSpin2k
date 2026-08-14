@@ -119,11 +119,5 @@
         "VERSIONFILE",
         "WEBSERVER"
     ],
-    "idf.pythonInstallPath": "C:\\Users\\anthony\\.espressif\\tools\\idf-python\\3.11.2\\python.exe",
-    "idf.flashType": "UART",
     "liveServer.settings.port": 5501,
-    "clangd.arguments": [
-        "--compile-commands-dir=d:/git/SmartSpin2k/.cache/clangd",
-        "--query-driver=C:/Users/emadm/.platformio/packages/toolchain-*/bin/*,C:/Users/emadm/.platformio/packages/tool-*/bin/*"
-    ],
 }

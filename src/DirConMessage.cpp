@@ -186,6 +186,11 @@ size_t DirConMessage::parse(uint8_t* data, size_t len, uint8_t sequenceNumber) {
     return 0;
   }
 
+  // The complete frame is available. If its contents are invalid or its
+  // identifier is unsupported, return this length after logging the error so
+  // the caller can discard only this frame and continue parsing the stream.
+  const size_t frameLength = DIRCON_MESSAGE_HEADER_LENGTH + this->Length;
+
   size_t parsedBytes = 6;
   switch (this->Identifier) {
     case DIRCON_MSGID_DISCOVER_SERVICES:
@@ -205,7 +210,7 @@ size_t DirConMessage::parse(uint8_t* data, size_t len, uint8_t sequenceNumber) {
       } else {
         SS2K_LOG(DIRCON_LOG_TAG, "Error parsing DirCon message: Length %d isn't a multiple of 16", this->Length);
         this->Identifier = DIRCON_MSGID_ERROR;
-        return 0;
+        return frameLength;
       }
       break;
 
@@ -234,7 +239,7 @@ size_t DirConMessage::parse(uint8_t* data, size_t len, uint8_t sequenceNumber) {
       } else {
         SS2K_LOG(DIRCON_LOG_TAG, "Error parsing additional UUIDs and data: Length %d isn't a multiple of 17", (this->Length - 16));
         this->Identifier = DIRCON_MSGID_ERROR;
-        return 0;
+        return frameLength;
       }
 
       break;
@@ -256,7 +261,7 @@ size_t DirConMessage::parse(uint8_t* data, size_t len, uint8_t sequenceNumber) {
       } else {
         SS2K_LOG(DIRCON_LOG_TAG, "Error parsing DirCon message: Length %d < 16", this->Length);
         this->Identifier = DIRCON_MSGID_ERROR;
-        return 0;
+        return frameLength;
       }
       break;
 
@@ -274,7 +279,7 @@ size_t DirConMessage::parse(uint8_t* data, size_t len, uint8_t sequenceNumber) {
       } else {
         SS2K_LOG(DIRCON_LOG_TAG, "Error parsing DirCon message: Length %d < 16", this->Length);
         this->Identifier = DIRCON_MSGID_ERROR;
-        return 0;
+        return frameLength;
       }
       break;
 
@@ -300,7 +305,7 @@ size_t DirConMessage::parse(uint8_t* data, size_t len, uint8_t sequenceNumber) {
       } else {
         SS2K_LOG(DIRCON_LOG_TAG, "Error parsing DirCon message: Length %d < 16 for enable notifications", this->Length);
         this->Identifier = DIRCON_MSGID_ERROR;
-        return 0;
+        return frameLength;
       }
       break;
 
@@ -317,20 +322,20 @@ size_t DirConMessage::parse(uint8_t* data, size_t len, uint8_t sequenceNumber) {
       } else {
         SS2K_LOG(DIRCON_LOG_TAG, "Error parsing DirCon message: Length %d < 16", this->Length);
         this->Identifier = DIRCON_MSGID_ERROR;
-        return 0;
+        return frameLength;
       }
       break;
 
     default:
       char hexBuf[kDirConHexLogMaxBytes * 3 + 1];
-      const size_t bytesToLog = (len < kDirConHexLogMaxBytes) ? len : kDirConHexLogMaxBytes;
+      const size_t bytesToLog = (frameLength < kDirConHexLogMaxBytes) ? frameLength : kDirConHexLogMaxBytes;
       for (size_t i = 0; i < bytesToLog; i++) {
         snprintf(hexBuf + i * 3, 4, "%02X ", data[i]);
       }
       hexBuf[bytesToLog * 3] = '\0';
-      SS2K_LOG(DIRCON_LOG_TAG, "Error parsing DirCon message: Unknown identifier %d. Full message (%zu bytes): %s", this->Identifier, len, hexBuf);
+      SS2K_LOG(DIRCON_LOG_TAG, "Error parsing DirCon message: Unknown identifier %d. Full message (%zu bytes): %s", this->Identifier, frameLength, hexBuf);
       this->Identifier = DIRCON_MSGID_ERROR;
-      return 0;
+      return frameLength;
       break;
   }
 

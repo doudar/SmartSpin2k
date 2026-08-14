@@ -14,11 +14,110 @@
 #include <Constants.h>
 
 HardwareSerial stepperSerial(2);
-TMC2209Stepper driver(&SERIAL_PORT, R_SENSE, 0b00);  // Hardware Serial
+// Construct after hardware detection so the selected board's sense resistor is used.
+static TMC2209Stepper* driver = nullptr;
 FastAccelStepperEngine engine = FastAccelStepperEngine();
 FastAccelStepper* stepper     = NULL;
 
 extern Board currentBoard;
+
+void initializeStepperSerial(bool restart) {
+  if (restart) {
+    stepperSerial.end();
+  }
+
+  // The TMC2209 requires an idle-high interval to reset and resynchronize its
+  // UART receiver after an incomplete or invalid datagram. Drive TX manually
+  // before handing the pin to the UART peripheral so boot state is deterministic.
+  digitalWrite(currentBoard.stepperSerialTxPin, HIGH);
+  pinMode(currentBoard.stepperSerialTxPin, OUTPUT);
+  delay(20);
+
+  stepperSerial.begin(57600, SERIAL_8N1, currentBoard.stepperSerialRxPin, currentBoard.stepperSerialTxPin);
+}
+
+namespace {
+
+constexpr uint8_t TMC2209_OTP_IHOLD_SHIFT      = 21;
+constexpr uint32_t TMC2209_OTP_IHOLD_MASK      = 0x03UL << TMC2209_OTP_IHOLD_SHIFT;
+constexpr uint32_t TMC2209_OTP_IHOLD_9_PERCENT = 0x01UL << TMC2209_OTP_IHOLD_SHIFT;
+constexpr uint16_t TMC2209_OTP_PROGRAM_IHOLD_9 = 0xBD25;  // Magic 0xBD, OTP byte 2, bit 5.
+
+bool recoverTmc2209Connection(TMC2209Stepper* tmcDriver) {
+  static uint8_t lastInterfaceCounter = 0;
+  static bool interfaceCounterValid   = false;
+
+  uint8_t connectionStatus = tmcDriver->test_connection();
+  if (connectionStatus == 0) {
+    const uint8_t interfaceCounter = tmcDriver->IFCNT();
+    if (tmcDriver->CRCerror) {
+      SS2K_LOG(MAIN_LOG_TAG, "TMC IFCNT read failed CRC; forcing idle-high recovery");
+    } else if (!interfaceCounterValid) {
+      lastInterfaceCounter  = interfaceCounter;
+      interfaceCounterValid = true;
+      return true;
+    } else if (interfaceCounter != lastInterfaceCounter) {
+      lastInterfaceCounter = interfaceCounter;
+      return true;
+    } else {
+      SS2K_LOG(MAIN_LOG_TAG, "TMC IFCNT did not increment from %u; forcing idle-high recovery", static_cast<unsigned>(interfaceCounter));
+    }
+  } else {
+    SS2K_LOG(MAIN_LOG_TAG, "TMC UART test failed (%u); forcing idle-high recovery", static_cast<unsigned>(connectionStatus));
+  }
+
+  initializeStepperSerial(true);
+  connectionStatus = tmcDriver->test_connection();
+
+  if (connectionStatus != 0) {
+    SS2K_LOG(MAIN_LOG_TAG, "TMC UART recovery failed (%u)", static_cast<unsigned>(connectionStatus));
+    return false;
+  }
+
+  lastInterfaceCounter = tmcDriver->IFCNT();
+  if (tmcDriver->CRCerror) {
+    SS2K_LOG(MAIN_LOG_TAG, "TMC UART recovered, but IFCNT read failed CRC");
+    interfaceCounterValid = false;
+    return false;
+  }
+  interfaceCounterValid = true;
+  SS2K_LOG(MAIN_LOG_TAG, "TMC UART recovered");
+  return true;
+}
+
+void programTmc2209LowHoldCurrentOtp(TMC2209Stepper* tmcDriver) {
+  uint32_t otpRead        = tmcDriver->OTP_READ();
+  const uint32_t otpIhold = otpRead & TMC2209_OTP_IHOLD_MASK;
+  if (otpIhold == TMC2209_OTP_IHOLD_9_PERCENT) {
+    SS2K_LOG(MAIN_LOG_TAG, "TMC OTP hold current is already programmed to 9%%");
+    return;
+  }
+  if (otpIhold != 0) {
+    const uint8_t otpIholdSetting = static_cast<uint8_t>(otpIhold >> TMC2209_OTP_IHOLD_SHIFT);
+    SS2K_LOG(MAIN_LOG_TAG, "TMC OTP hold current is already programmed (setting %u); leaving irreversible OTP unchanged", static_cast<unsigned>(otpIholdSetting));
+    return;
+  }
+
+  SS2K_LOG(MAIN_LOG_TAG, "Programming TMC OTP hold current to 9%%");
+  tmcDriver->OTP_PROG(TMC2209_OTP_PROGRAM_IHOLD_9);
+  delay(10);
+  otpRead = tmcDriver->OTP_READ();
+
+  if ((otpRead & TMC2209_OTP_IHOLD_MASK) != TMC2209_OTP_IHOLD_9_PERCENT) {
+    // The datasheet recommends retrying a missing OTP bit with a 100 ms programming time.
+    tmcDriver->OTP_PROG(TMC2209_OTP_PROGRAM_IHOLD_9);
+    delay(100);
+    otpRead = tmcDriver->OTP_READ();
+  }
+
+  if ((otpRead & TMC2209_OTP_IHOLD_MASK) == TMC2209_OTP_IHOLD_9_PERCENT) {
+    SS2K_LOG(MAIN_LOG_TAG, "TMC OTP hold current programmed and verified at 9%%");
+  } else {
+    SS2K_LOG(MAIN_LOG_TAG, "TMC OTP hold-current programming failed verification (OTP_READ=0x%06lX)", static_cast<unsigned long>(otpRead & 0xFFFFFFUL));
+  }
+}
+
+}  // namespace
 
 void SS2K::moveStepper() {
   static bool _stepperDir = userConfig->getStepperDir();
@@ -150,8 +249,20 @@ void SS2K::_resistanceMove() {
 }
 
 void SS2K::setupTMCStepperDriver(bool reset) {
+  if (!driver) {
+    driver = new TMC2209Stepper(&stepperSerial, currentBoard.rSense, 0b00);
+  }
+  const bool initializeFastAccel = !reset || stepper == nullptr;
+
+  // Verify communication before issuing any driver configuration writes. A
+  // failed recovery leaves the existing hardware state untouched.
+  if (!recoverTmc2209Connection(driver)) {
+    SS2K_LOG(MAIN_LOG_TAG, "Skipping TMC driver setup because UART is unavailable");
+    return;
+  }
+
   // FastAccel setup
-  if (!reset) {
+  if (initializeFastAccel) {
     engine.init();
     stepper = engine.stepperConnectToPin(currentBoard.stepPin);
     stepper->setDirectionPin(currentBoard.dirPin, userConfig->getStepperDir());
@@ -161,15 +272,16 @@ void SS2K::setupTMCStepperDriver(bool reset) {
     stepper->setAcceleration(STEPPER_ACCELERATION);
     stepper->setDelayToDisable(65535);
     // TMC Driver Setup
-    driver.begin();
+    driver->begin();
+    programTmc2209LowHoldCurrentOtp(driver);
   }
 
-  driver.pdn_disable(true);       // Use PDN pin to enable UART communication instead of grounding signal
-  driver.mstep_reg_select(true);  // Use register instead of ms1&ms2 pins for microstep selection
-  driver.microsteps(4);           // Set microsteps to 1/4
-  driver.iholddelay(5);           // Controls the number of clock cycles for motor power down after standstill is detected
-  driver.TPOWERDOWN(16);          // delay until hold current (0-255). 255 = 5.6s, 2 is minimum for StealthChop.
-  driver.toff(5);                 // needs >0 for driver enable. 1-15 controls duration of slow decay phase of pwm.
+  driver->pdn_disable(true);       // Use PDN pin to enable UART communication instead of grounding signal
+  driver->mstep_reg_select(true);  // Use register instead of ms1&ms2 pins for microstep selection
+  driver->microsteps(4);           // Set microsteps to 1/4
+  driver->iholddelay(5);           // Controls the number of clock cycles for motor power down after standstill is detected
+  driver->TPOWERDOWN(16);          // delay until hold current (0-255). 255 = 5.6s, 2 is minimum for StealthChop.
+  driver->toff(5);                 // needs >0 for driver enable. 1-15 controls duration of slow decay phase of pwm.
   this->updateStealthChop();
   this->updateStepperSpeed();
   this->updateStepperPower();
@@ -178,6 +290,10 @@ void SS2K::setupTMCStepperDriver(bool reset) {
 
 static int lastHomingSgThreshold = 0;
 
+static int getScaledHomingSensitivity() {
+  return round(userConfig->getHomingSensitivity() * currentBoard.homingSensitivityScaler);
+}
+
 static HomingSgBaseline getHomingSgBaseline() {
   int samples[HOMING_SG_SAMPLE_COUNT];
   int totalSgResult  = 0;
@@ -185,10 +301,10 @@ static HomingSgBaseline getHomingSgBaseline() {
   int maxSampleIndex = 0;
 
   for (int i = 0; i < HOMING_SG_SAMPLE_COUNT; i++) {
-    samples[i] = driver.SG_RESULT();
+    samples[i] = driver->SG_RESULT();
     if (samples[i] == 0) {
       delay(30);
-      samples[i] = driver.SG_RESULT();
+      samples[i] = driver->SG_RESULT();
     }
     totalSgResult += samples[i];
     if (samples[i] < samples[minSampleIndex]) minSampleIndex = i;
@@ -207,9 +323,10 @@ static HomingSgBaseline getHomingSgBaseline() {
     if (samples[i] > trimmedMax) trimmedMax = samples[i];
   }
 
-  int threshold           = round(trimmedTotal / (float)trimmedCount);
-  int normalLowDrop       = threshold - trimmedMin;
-  int measuredSensitivity = max(userConfig->getHomingSensitivity(), normalLowDrop + max(userConfig->getHomingSensitivity() / 2, HOMING_SG_MIN_SAMPLE_MARGIN));
+  int configuredSensitivity = getScaledHomingSensitivity();
+  int threshold             = round(trimmedTotal / (float)trimmedCount);
+  int normalLowDrop         = threshold - trimmedMin;
+  int measuredSensitivity   = max(configuredSensitivity, normalLowDrop + max(configuredSensitivity / 2, HOMING_SG_MIN_SAMPLE_MARGIN));
   int maxSensitivity      = min(HOMING_MAX_SENSITIVITY, max(threshold, 1));
   measuredSensitivity     = constrain(measuredSensitivity + 10, 1, maxSensitivity);
   SS2K_LOG(MAIN_LOG_TAG, "Homing SG baseline used %d/%d trimmed samples. Dropped: %d/%d, Spread: %d-%d, measured sensitivity: %d", trimmedCount, HOMING_SG_SAMPLE_COUNT,
@@ -223,7 +340,7 @@ static HomingSgBaseline getHomingSgBaseline() {
  */
 bool SS2K::_findEndStop(bool moveForward) {
   unsigned long timeoutTimer = millis();
-  HomingSgBaseline baseline  = {0, userConfig->getHomingSensitivity()};
+  HomingSgBaseline baseline  = {0, getScaledHomingSensitivity()};
 
   // --- SETUP DRIVER FOR SENSORLESS HOMING ---
   // Use very low power for sensitive stall detection
@@ -258,11 +375,11 @@ bool SS2K::_findEndStop(bool moveForward) {
       return false;
     }
 
-    currentSgResult = driver.SG_RESULT();
+    currentSgResult = driver->SG_RESULT();
     // if zero detected, wait 10ms and sample again.
     if (currentSgResult == 0) {
       delay(10);
-      currentSgResult = driver.SG_RESULT();
+      currentSgResult = driver->SG_RESULT();
     }
 
     // Periodically log the status for tuning
@@ -394,7 +511,7 @@ void SS2K::goHome(bool bothDirections) {
     }
   }
 
-  if (!stepper || currentBoard.name == r1_NAME) {
+  if (!stepper || !currentBoard.homingSupported) {
     SS2K_LOG(MAIN_LOG_TAG, "Homing not supported or stepper not initialized.");
     fitnessMachineService.spinDown(FitnessMachineStatus::SpinDown_Error);
     return;
@@ -522,30 +639,35 @@ void SS2K::goHome(bool bothDirections) {
 
 // Applies current power to driver
 void SS2K::updateStepperPower(int pwr) {
+  if (driver == nullptr || !recoverTmc2209Connection(driver)) {
+    SS2K_LOG(MAIN_LOG_TAG, "Skipping stepper power update because TMC UART is unavailable");
+    return;
+  }
+
   uint16_t rmsPwr = (pwr == 0) ? userConfig->getStepperPower() : pwr;
-  driver.rms_current(rmsPwr, HOLD_PWR_SCALER);
-  SS2K_LOG(MAIN_LOG_TAG, "Stepper power is now %d mA (driver setpoint %d mA)", rmsPwr, driver.rms_current());
+  driver->rms_current(rmsPwr, HOLD_PWR_SCALER);
+  SS2K_LOG(MAIN_LOG_TAG, "Stepper power is now %d mA (driver setpoint %d mA)", rmsPwr, driver->rms_current());
 }
 
 // Applies current StealthChop to driver
 void SS2K::updateStealthChop(bool coolStepEnabled) {
   bool stealthChopEnabled = userConfig->getStealthChop();
-  driver.en_spreadCycle(!stealthChopEnabled);
-  driver.pwm_autoscale(stealthChopEnabled);
-  driver.pwm_autograd(stealthChopEnabled);
+  driver->en_spreadCycle(!stealthChopEnabled);
+  driver->pwm_autoscale(stealthChopEnabled);
+  driver->pwm_autograd(stealthChopEnabled);
 
   // Reuse homing sensitivity as CoolStep load tolerance when StealthChop is active.
   uint8_t coolstepTolerance = (uint8_t)constrain(userConfig->getHomingSensitivity(), 0, 255);
   if (stealthChopEnabled && coolStepEnabled) {
-    driver.SGTHRS(coolstepTolerance);
-    driver.semin(1);  // Enable CoolStep
-    driver.seup(1);
-    driver.sedn(1);
-    driver.semax((uint8_t)constrain((coolstepTolerance / 16) + 1, 1, 15));
-    driver.seimin(false);
+    driver->SGTHRS(coolstepTolerance);
+    driver->semin(1);  // Enable CoolStep
+    driver->seup(1);
+    driver->sedn(1);
+    driver->semax((uint8_t)constrain((coolstepTolerance / 16) + 1, 1, 15));
+    driver->seimin(false);
   } else {
-    driver.semin(0);  // Disable CoolStep
-    driver.SGTHRS(0);
+    driver->semin(0);  // Disable CoolStep
+    driver->SGTHRS(0);
   }
 
   SS2K_LOG(MAIN_LOG_TAG, "StealthChop:%d CoolStep:%d SGTHRS:%d", stealthChopEnabled, stealthChopEnabled && coolStepEnabled, coolstepTolerance);

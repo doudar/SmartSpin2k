@@ -151,7 +151,6 @@ void BLE_Zwift_Service::setupService(NimBLEServer* pServer) {
   NimBLECharacteristic* batteryLevelChar = pBatteryService->createCharacteristic(NimBLEUUID((uint16_t)0x2A19), NIMBLE_PROPERTY::READ | NIMBLE_PROPERTY::NOTIFY);
   uint8_t batteryLevel                   = 100;
   batteryLevelChar->setValue(&batteryLevel, 1);
-  pBatteryService->start();
 
   // Zwift Custom Service (use 0xFC82 to match advertisement)
   pZwiftService = pServer->createService(ZWIFT_RIDE_CUSTOM_SERVICE_UUID);
@@ -172,8 +171,6 @@ void BLE_Zwift_Service::setupService(NimBLEServer* pServer) {
   // Unknown characteristic 6: READ | WRITE | WRITE_NR | INDICATE
   unknownCharacteristic6 = pZwiftService->createCharacteristic(ZWIFT_UNKNOWN_CHARACTERISTIC6_UUID,
                                                                NIMBLE_PROPERTY::READ | NIMBLE_PROPERTY::WRITE | NIMBLE_PROPERTY::WRITE_NR | NIMBLE_PROPERTY::INDICATE);
-
-  pZwiftService->start();
 
   // Register with DirCon for service discovery and write handling
   DirConManager::registerService(pZwiftService->getUUID(), [](NimBLECharacteristic* characteristic, const uint8_t* data, size_t length, DirConWriteResult* result) -> bool {

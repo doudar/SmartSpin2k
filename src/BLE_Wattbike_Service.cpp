@@ -23,7 +23,6 @@ void BLE_Wattbike_Service::setupService(NimBLEServer *pServer) {
   wattbikeWriteCharacteristic = pWattbikeService->createCharacteristic(WATTBIKE_WRITE_UUID, NIMBLE_PROPERTY::WRITE);
 
   // Start the service
-  pWattbikeService->start();
   spinBLEServer.pServer->getAdvertising()->addServiceUUID(pWattbikeService->getUUID());
 }
 

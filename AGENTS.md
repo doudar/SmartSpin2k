@@ -22,7 +22,8 @@ Primary software directories:
 - `lib/SS2K/`: core sensor parsing library used by firmware and native tests.
 - `lib/ArduinoCompat/`: native-test compatibility shims.
 - `test/`: Unity tests for native PlatformIO environment.
-- `data/`: web interface assets served by the firmware.
+- `data/`: web interface assets for classic ESP32 filesystem images.
+- `data_s3/`: ESP32-S3 filesystem assets; initially mirrors `data/` but may grow independently.
 - `.github/copilot-instructions.md`: older agent/build notes that may still be useful.
 
 ## Build And Test
@@ -30,10 +31,20 @@ Primary software directories:
 PlatformIO is the expected entry point.
 
 - Build firmware: `pio run --environment release`
+- Build ESP32-S3 firmware: `pio run --environment S3release`
 - Build filesystem: `pio run --target buildfs`
 - Run native tests: `pio test --environment native`
 - Static analysis: `pio check -e debug`
 - Pre-commit checks: `pre-commit run --all-files`
+
+S3 firmware and filesystem builds use `S3firmware.bin` and `S3littlefs.bin` as their native PlatformIO output/upload names. They also create `S3partitions.bin` and `S3bootloader.bin` copies for releases; the generic partition and bootloader intermediates remain because PlatformIO's flash uploader depends on those names.
+The GitHub release archive includes firmware, LittleFS, partition-table, and bootloader binaries for both classic ESP32 and ESP32-S3 targets.
+
+Filesystem builds stage deterministic gzip copies of every HTML/CSS source file under the environment build directory. They also refresh the checked-in `.gz` companions and `list.json` in `data/` or `data_s3/`, which are consumed by repository-based automatic OTA updates.
+
+Codex environment constraint:
+
+- Do not run PlatformIO firmware or filesystem builds from the Codex environment. The Windows Xtensa toolchain can hang and leave orphaned compiler processes here. Make the requested changes, run non-build checks where useful, and clearly leave PlatformIO build validation for the user to run manually.
 
 Important timing/network notes:
 
@@ -75,7 +86,7 @@ Boot entry is `app_main()` in `src/Main.cpp`.
 Boot sequence:
 
 1. Initialize Arduino/Serial.
-2. Detect hardware revision using `REV_PIN` and `boards.rev1/rev2`.
+2. Detect hardware revision using the revision pin and ADC values in `include/boards.h`.
 3. Start stepper serial and optional aux serial for Peloton.
 4. Mount LittleFS.
 5. Load and re-save `userConfig`.
@@ -227,7 +238,7 @@ Key functions:
 
 - `SpinBLEClient::start()`: creates BLE client task and configures scanning.
 - `ScanCallbacks::onResult()`: filters supported devices, updates `foundDevices`, sets slots to connect when user config matches.
-- `SpinBLEClient::connectToServer()`: creates fresh NimBLE client, connects, sets slot state, removes duplicates.
+- `SpinBLEClient::connectToServer()`: creates fresh BLE client, connects, sets slot state, removes duplicates.
 - `subscribeToAllNotifications()`: subscribes to notify/indicate characteristics for supported services.
 - `SpinBLEClient::postConnect()`: completes service subscriptions, reads FTMS resistance range, starts FTMS training where needed, drains notification queues.
 - `SpinBLEClient::checkBLEReconnect()`: sets `doScan` when configured devices are missing.
@@ -264,7 +275,7 @@ Stateful parser caution:
 
 Primary files: `src/BLE_Server.cpp`, `src/BLE_Fitness_Machine_Service.cpp`, service-specific `src/BLE_*_Service.cpp`.
 
-`startBLEServer()` creates the NimBLE server and starts services:
+`startBLEServer()` creates the BLE server and starts services:
 
 - Cycling Speed/Cadence
 - Cycling Power
@@ -273,6 +284,9 @@ Primary files: `src/BLE_Server.cpp`, `src/BLE_Fitness_Machine_Service.cpp`, serv
 - SmartSpin2k custom characteristic
 - Device Information
 - BLE firmware update
+
+The primary BLE advertisement carries the current WiFi IPv4 address in versioned SmartSpin2k manufacturer data.
+The device name and 128-bit SmartSpin2k service UUID are kept in the scan response to stay within the legacy advertisement size limit.
 
 Zwift/OpenBikeControl services exist but are currently commented out in regular BLE advertising/setup; DirCon and the source files still matter.
 
@@ -302,6 +316,7 @@ Protocol:
 - `cc_read` reads a variable.
 - `cc_write` writes a variable.
 - Responses generally start with `cc_success` or `cc_error`, followed by the variable id and bytes/string.
+- Reading `BLE_allSettings` returns a versioned, MTU-sized sequence of indications whose payloads concatenate into the JSON from `userConfig->returnJSON()`.
 
 The giant switch in `BLE_ss2kCustomCharacteristic::process()` maps variable IDs to `userConfig`, `rtConfig`, and `ss2k` fields. Examples:
 
@@ -469,6 +484,7 @@ DirCon exposes BLE-like services over TCP:
 - Handles discover-services, discover-characteristics, read, write, enable-notifications, and unsolicited notification messages.
 - Services register with `DirConManager::registerService()`.
 - FTMS registers a write handler in `BLE_Fitness_Machine_Service::setupService()` so DirCon writes to the FTMS control point run the same control logic as BLE writes.
+- The SmartSpin2k custom service registers a write handler so its request/response protocol also works over DirCon; changed-value notifications and chunked all-settings snapshots are mirrored over TCP.
 - BLE server updates call `DirConManager::notifyCharacteristic()` so TCP clients receive corresponding updates.
 
 DirCon uses static buffers and fixed client/subscription arrays. Be cautious with dynamic allocation and payload sizes.
@@ -482,6 +498,7 @@ Responsibilities:
 - Start/stop WiFi (`startWifi()`, `stopWifi()`).
 - Serve LittleFS web assets and built-in OTA pages.
 - Firmware update flow through `HTTP_Server::FirmwareUpdate()`.
+- Automatic filesystem updates treat remote `list.json` as an allowlist, preserve config/power-table/recovery metadata, and store the installed filesystem release version in NVS.
 - Settings JSON/API behavior through `settingsProcessor()`.
 - Periodic web client update through `webClientUpdate()`.
 - BLE scanner page support.
@@ -510,10 +527,11 @@ Use `SS2K_LOG*` macros rather than raw `Serial.printf` unless matching nearby co
 - Stepper power, speed, acceleration, travel, and driver tuning.
 - ERG constants and compile-time feature flags.
 - Power-table sizes, increments, and quality constants.
-- Hardware pin assignments for board revisions.
 - BLE timing, reconnect, stack, and buffer sizes.
 - Peloton aux serial constants.
 - Homing thresholds and sensitivity defaults.
+
+Board-specific pin mappings, driver sense resistance, current scaling, revision detection values, homing capability, and homing-sensitivity scaling live in `include/boards.h`.
 
 When changing behavior, prefer adjusting named constants instead of scattering magic numbers.
 
@@ -563,11 +581,14 @@ Changing BLE server characteristics:
 - `Measurement` timestamps matter for ERG deduplication.
 - `PowerTable` stores positions divided by `TABLE_DIVISOR`; lookup returns full-scale positions.
 - `PowerTable` persistence requires homing.
+- Saved BLE device identifiers are matched case-insensitively because NimBLE address formatting has changed between lowercase and uppercase across library versions.
 - `SpinBLEAdvertisedDevice::reset()` updates global connected flags before clearing local flags.
 - BLE address randomization is handled specially in `adevName2UniqueName()`; saved names depend on this behavior.
 - `spinBLEServer.writeCache` is shared by BLE writes and DirCon writes.
 - `spinDownFlag` is a state machine trigger, not just a bool: `1` means home/startup-ish, `2+` means full spindown/homing.
 - `externalControl` bypasses normal target calculation but final state can still be affected by sync/clamping code.
+- Firmware OTA paths validate the incoming `esp_image_header_t` chip ID before starting flash writes; filesystem images are intentionally exempt from application-image validation.
+- Stepper UART initialization drives TX high for 20 ms before starting hardware UART. TMC connection checks track `IFCNT` across calls to confirm intervening writes were accepted; a failed UART test or unchanged counter restarts UART with one idle-high recovery pulse and aborts the requested setup/power update if that retry fails. Initial setup also checks `OTP_IHOLD`; if its two-bit field is unprogrammed, firmware irreversibly programs byte 2/bit 5 for the 9% standalone hold-current default, while incompatible existing OTP values are never modified.
 - Many BLE and motor changes cannot be fully validated without hardware.
 
 ## Search Tips

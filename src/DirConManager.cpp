@@ -29,6 +29,78 @@ size_t DirConManager::registeredServiceCount = 0;
 static char uuidListBuffer[128] = "";
 static size_t uuidListLength    = 0;
 
+namespace {
+
+const char* dirConMessageName(uint8_t identifier) {
+  switch (identifier) {
+    case DIRCON_MSGID_DISCOVER_SERVICES:
+      return "services";
+    case DIRCON_MSGID_DISCOVER_CHARACTERISTICS:
+      return "chars";
+    case DIRCON_MSGID_READ_CHARACTERISTIC:
+      return "read";
+    case DIRCON_MSGID_WRITE_CHARACTERISTIC:
+      return "write";
+    case DIRCON_MSGID_ENABLE_CHARACTERISTIC_NOTIFICATIONS:
+      return "subscribe";
+    default:
+      return "unknown";
+  }
+}
+
+const char* dirConResponseName(uint8_t responseCode) {
+  switch (responseCode) {
+    case DIRCON_RESPCODE_SUCCESS_REQUEST:
+      return "ok";
+    case DIRCON_RESPCODE_UNKNOWN_MESSAGE_TYPE:
+      return "bad-msg";
+    case DIRCON_RESPCODE_UNEXPECTED_ERROR:
+      return "failed";
+    case DIRCON_RESPCODE_SERVICE_NOT_FOUND:
+      return "no-svc";
+    case DIRCON_RESPCODE_CHARACTERISTIC_NOT_FOUND:
+      return "no-char";
+    case DIRCON_RESPCODE_CHARACTERISTIC_OPERATION_NOT_SUPPORTED:
+      return "unsupported";
+    case DIRCON_RESPCODE_CHARACTERISTIC_WRITE_FAILED:
+      return "write-fail";
+    case DIRCON_RESPCODE_UNKNOWN_PROTOCOL:
+      return "bad-proto";
+    default:
+      return "error";
+  }
+}
+
+std::string compactDirConUuid(const NimBLEUUID& uuid) {
+  if (uuid.equals(FITNESSMACHINECONTROLPOINT_UUID)) {
+    return "ftms-cp";
+  }
+  if (uuid.equals(SMARTSPIN2K_CHARACTERISTIC_UUID)) {
+    return "ss2k";
+  }
+
+  std::string value = uuid.toString();
+  if (value.length() <= 8) {
+    return value;
+  }
+  return value.substr(0, 4) + ".." + value.substr(value.length() - 4);
+}
+
+void formatPayloadPreview(const std::vector<uint8_t>& data, char* output, size_t outputSize) {
+  constexpr size_t kPreviewBytes = 4;
+  const size_t bytesToLog        = std::min(data.size(), kPreviewBytes);
+  size_t offset                  = 0;
+
+  for (size_t i = 0; i < bytesToLog && offset + 2 < outputSize; i++) {
+    offset += snprintf(output + offset, outputSize - offset, "%02X", data[i]);
+  }
+  if (data.size() > bytesToLog && offset + 3 < outputSize) {
+    snprintf(output + offset, outputSize - offset, "...");
+  }
+}
+
+}  // namespace
+
 bool DirConManager::start() {
   if (started) {
     return true;
@@ -297,7 +369,8 @@ void DirConManager::handleClientData() {
         size_t parsedBytes = message.parse(receiveBuffer[i] + processedBytes, receiveBufferLength[i] - processedBytes, lastSequenceNumber[i]);
 
         if (parsedBytes == 0) {
-          // Not enough data for a complete message or invalid message
+          // Keep an incomplete TCP frame buffered until the remaining bytes arrive.
+          // Complete invalid frames return their frame length so they are discarded.
           break;
         }
 
@@ -504,8 +577,6 @@ void DirConManager::sendResponse(DirConMessage* message, size_t clientIndex) {
     return;
   }
 
-  SS2K_LOG(DIRCON_LOG_TAG, "Sending response message type 0x%02X to client %d", message->Identifier, clientIndex);
-
   if (message->Identifier == DIRCON_MSGID_DISCOVER_SERVICES) {
     SS2K_LOG(DIRCON_LOG_TAG, "Discover services response contains %d UUIDs", message->AdditionalUUIDs.size());
     for (size_t i = 0; i < message->AdditionalUUIDs.size(); i++) {
@@ -515,13 +586,29 @@ void DirConManager::sendResponse(DirConMessage* message, size_t clientIndex) {
 
   std::vector<uint8_t>* encodedMessage = message->encode(lastSequenceNumber[clientIndex]);
   if (encodedMessage != nullptr && encodedMessage->size() > 0) {
+    const char* result = dirConResponseName(message->ResponseCode);
+    if (message->Identifier == DIRCON_MSGID_DISCOVER_SERVICES) {
+      SS2K_LOG(DIRCON_LOG_TAG, "TX services c%u s%u %s %uU/%uB", static_cast<unsigned>(clientIndex), static_cast<unsigned>(message->SequenceNumber), result,
+               static_cast<unsigned>(message->AdditionalUUIDs.size()), static_cast<unsigned>(encodedMessage->size()));
+    } else if (message->Identifier == DIRCON_MSGID_DISCOVER_CHARACTERISTICS) {
+      const std::string uuid = compactDirConUuid(message->UUID);
+      SS2K_LOG(DIRCON_LOG_TAG, "TX chars c%u s%u %s %s %uU/%uB", static_cast<unsigned>(clientIndex), static_cast<unsigned>(message->SequenceNumber), uuid.c_str(), result,
+               static_cast<unsigned>(message->AdditionalUUIDs.size()), static_cast<unsigned>(encodedMessage->size()));
+    } else {
+      const std::string uuid = compactDirConUuid(message->UUID);
+      char payloadPreview[12] = "";
+      formatPayloadPreview(message->AdditionalData, payloadPreview, sizeof(payloadPreview));
+      SS2K_LOG(DIRCON_LOG_TAG, "TX %s c%u s%u %s %s %uB%s%s", dirConMessageName(message->Identifier), static_cast<unsigned>(clientIndex),
+               static_cast<unsigned>(message->SequenceNumber), uuid.c_str(), result, static_cast<unsigned>(message->AdditionalData.size()),
+               message->AdditionalData.empty() ? "" : ":", payloadPreview);
+    }
     dirConClients[clientIndex].write(encodedMessage->data(), encodedMessage->size());
   } else {
     SS2K_LOG(DIRCON_LOG_TAG, "Error: No encoded message to send");
   }
 }
 
-void DirConManager::notifyCharacteristic(const NimBLEUUID& serviceUuid, const NimBLEUUID& characteristicUuid, uint8_t* data, size_t length, bool onlySubscribers) {
+void DirConManager::notifyCharacteristic(const NimBLEUUID& serviceUuid, const NimBLEUUID& characteristicUuid, const uint8_t* data, size_t length, bool onlySubscribers) {
   if (!started || !connectedClients()) {
     return;
   }
@@ -535,7 +622,7 @@ void DirConManager::notifyCharacteristic(const NimBLEUUID& serviceUuid, const Ni
 
 static SemaphoreHandle_t s_notifyMutex = xSemaphoreCreateMutex();
 
-void DirConManager::broadcastNotification(const NimBLEUUID& characteristicUuid, uint8_t* data, size_t length, bool onlySubscribers) {
+void DirConManager::broadcastNotification(const NimBLEUUID& characteristicUuid, const uint8_t* data, size_t length, bool onlySubscribers) {
   DirConMessage notification;  // stack-allocated, safe per-call
 
   notification.Request    = false;

@@ -83,19 +83,48 @@ extern "C" void app_main() {
   initArduino();
   // Serial port for debugging purposes
   Serial.begin(115200);
+
+  BaseType_t taskCreated = xTaskCreatePinnedToCore(SS2K::maintenanceLoop,     /* Task function. */
+                                                   "maintenanceLoopFunction", /* name of task. */
+                                                   MAIN_STACK,                /* Stack size of task */
+                                                   NULL,                      /* parameter of the task */
+                                                   10,                        /* priority of the task */
+                                                   &maintenanceLoopTask,      /* task handle */
+                                                   1);                        /* pin task to core */
+  if (taskCreated != pdPASS) {
+    Serial.println("Failed to create maintenance task; restarting");
+    ESP.restart();
+  }
+}
+
+void SS2K::finishSetup() {
   SS2K_LOG(MAIN_LOG_TAG, "Compiled %s%s", __DATE__, __TIME__);
-  pinMode(REV_PIN, INPUT);
-  int actualVoltage = analogRead(REV_PIN);
+#if defined(SMARTSPIN2K_S3)
+  currentBoard = boards.rev3;
+#else
+  // Revisions one and two share the same hardware-detection pin.
+  currentBoard = boards.rev1;
+#endif
+  pinMode(currentBoard.revisionPin, INPUT);
+  int actualVoltage = analogRead(currentBoard.revisionPin);
+#if defined(SMARTSPIN2K_S3)
+  SS2K_LOG(MAIN_LOG_TAG, "Board ID ADC on GPIO%d: %d (expected %d +/- %d)", currentBoard.revisionPin, actualVoltage, currentBoard.versionVoltage,
+           currentBoard.versionTolerance);
+  if (abs(actualVoltage - currentBoard.versionVoltage) > currentBoard.versionTolerance) {
+    SS2K_LOG(MAIN_LOG_TAG, "WARNING: Board ID resistor does not match the ESP32-S3 hardware revision");
+  }
+#else
   if (actualVoltage - boards.rev1.versionVoltage >= boards.rev2.versionVoltage - actualVoltage) {
     currentBoard = boards.rev2;
   } else {
     currentBoard = boards.rev1;
   }
-  SS2K_LOG(MAIN_LOG_TAG, "Current Board Revision is: %s", currentBoard.name);
+#endif
+  SS2K_LOG(MAIN_LOG_TAG, "Current Board Revision is: %s", currentBoard.name.c_str());
 
   // initialize Stepper serial port
 
-  stepperSerial.begin(57600, SERIAL_8N2, currentBoard.stepperSerialRxPin, currentBoard.stepperSerialTxPin);
+  initializeStepperSerial();
   // initialize aux serial port (Peloton)
   if (currentBoard.auxSerialTxPin) {
     auxSerial.begin(19200, SERIAL_8N1, currentBoard.auxSerialRxPin, currentBoard.auxSerialTxPin, false);
@@ -125,6 +154,12 @@ extern "C" void app_main() {
 
   // print littleFS free space and all file sizes on partition
   Serial.printf("LittleFS Total Bytes:%lu, Used Bytes:%lu\n", LittleFS.totalBytes(), LittleFS.usedBytes());
+#if defined(SMARTSPIN2K_S3)
+  SS2K_LOG(MAIN_LOG_TAG, "S3 heap: %u bytes, PSRAM: %u bytes", ESP.getHeapSize(), ESP.getPsramSize());
+  if (!psramFound()) {
+    SS2K_LOG(MAIN_LOG_TAG, "WARNING: ESP32-S3 QSPI PSRAM was not detected");
+  }
+#endif
 
   // Check for firmware update. It's important that this stays before BLE &
   // HTTP setup because otherwise they use too much traffic and the device
@@ -134,7 +169,7 @@ extern "C" void app_main() {
 
   pinMode(currentBoard.shiftUpPin, INPUT_PULLUP);    // Push-Button with input Pullup
   pinMode(currentBoard.shiftDownPin, INPUT_PULLUP);  // Push-Button with input Pullup
-  pinMode(LED_PIN, OUTPUT);
+  pinMode(currentBoard.ledPin, OUTPUT);
   pinMode(currentBoard.enablePin, OUTPUT);
   pinMode(currentBoard.dirPin, OUTPUT);   // Stepper Direction Pin
   pinMode(currentBoard.stepPin, OUTPUT);  // Stepper Step Pin
@@ -142,7 +177,7 @@ extern "C" void app_main() {
                HIGH);  // Should be called a disable Pin - High Disables FETs
   digitalWrite(currentBoard.dirPin, LOW);
   digitalWrite(currentBoard.stepPin, LOW);
-  digitalWrite(LED_PIN, LOW);
+  digitalWrite(currentBoard.ledPin, LOW);
   ss2k->setLEDEnabled(shouldStartWithLedEnabled());
 
   ss2k->setupTMCStepperDriver();
@@ -152,7 +187,7 @@ extern "C" void app_main() {
   // disableCore0WDT();  // Disable the watchdog timer on core 0 (so long stepper
   //  moves don't cause problems)
 
-  digitalWrite(LED_PIN, LOW);
+  digitalWrite(currentBoard.ledPin, LOW);
   // Configure and Initialize Logger
   logHandler.addAppender(&webSocketAppender);
   logHandler.addAppender(&udpAppender);
@@ -180,15 +215,7 @@ extern "C" void app_main() {
 #endif
 
   ss2k->resetIfShiftersHeld();
-  digitalWrite(LED_PIN, LOW);
-
-  xTaskCreatePinnedToCore(SS2K::maintenanceLoop,     /* Task function. */
-                          "maintenanceLoopFunction", /* name of task. */
-                          MAIN_STACK,                /* Stack size of task */
-                          NULL,                      /* parameter of the task */
-                          10,                        /* priority of the task */
-                          &maintenanceLoopTask,      /* Task handle to keep track of created task */
-                          1);                        /* pin task to core */
+  digitalWrite(currentBoard.ledPin, LOW);
 }
 
 void loop() {  // Delete this task so we can make one that's more memory efficient.
@@ -196,6 +223,8 @@ void loop() {  // Delete this task so we can make one that's more memory efficie
 }
 
 void SS2K::maintenanceLoop(void* pvParameters) {
+  finishSetup();
+
   static unsigned long intervalTimer2 = millis();
   static unsigned long rebootTimer    = millis();
 
@@ -307,13 +336,19 @@ void SS2K::maintenanceLoop(void* pvParameters) {
 
     // Things to do every 6 seconds
     if ((millis() - intervalTimer2) > 6007) {
-      // reboot every half hour if not in use.
-      static int _oldHR              = 0;
-      static int _oldWatts           = 0;
-      static float _oldTargetIncline = 0.0f;
-      if (_oldHR == rtConfig->hr.getValue() && _oldWatts == rtConfig->watts.getValue() && _oldTargetIncline == rtConfig->getTargetIncline()) {
-        // Inactivity detected
-        if (((millis() - rebootTimer) > 1800000)) {
+      // Reboot after half an hour without meaningful pedaling. Also treat unchanged values as inactive because disconnected servers can leave stale readings behind.
+      constexpr int inactivityThreshold             = 10;
+      constexpr unsigned long inactivityRebootDelay = 1800000;
+      static int oldHR                              = 0;
+      static int oldWatts                           = 0;
+      static int oldCadence                         = 0;
+      static float oldTargetIncline                 = 0.0f;
+      bool powerAndCadenceAreLow = rtConfig->watts.getValue() < inactivityThreshold && rtConfig->cad.getValue() < inactivityThreshold;
+      bool readingsAreUnchanged = oldHR == rtConfig->hr.getValue() && oldWatts == rtConfig->watts.getValue() && oldCadence == rtConfig->cad.getValue() &&
+                                  oldTargetIncline == rtConfig->getTargetIncline();
+      bool riderIsInactive      = powerAndCadenceAreLow || readingsAreUnchanged;
+      if (riderIsInactive) {
+        if ((millis() - rebootTimer) > inactivityRebootDelay) {
           // Timer expired
           SS2K_LOG(MAIN_LOG_TAG, "Rebooting due to inactivity.");
           keepLedOffAfterReboot();
@@ -321,19 +356,19 @@ void SS2K::maintenanceLoop(void* pvParameters) {
           logHandler.writeLogs();
           webSocketAppender.Loop();
         }
-
       } else {
-        // We have activity, update monitored values
-        _oldHR            = rtConfig->hr.getValue();
-        _oldWatts         = rtConfig->watts.getValue();
-        _oldTargetIncline = rtConfig->getTargetIncline();
-        rebootTimer       = millis();
-        ss2k->setLEDEnabled(true); 
+        // Fresh active readings restart the full inactivity window.
+        oldHR            = rtConfig->hr.getValue();
+        oldWatts         = rtConfig->watts.getValue();
+        oldCadence       = rtConfig->cad.getValue();
+        oldTargetIncline = rtConfig->getTargetIncline();
+        rebootTimer      = millis();
+        ss2k->setLEDEnabled(true);
       }
 
 #ifdef DEBUG_STACK
       if (!ss2k->isUpdating) {
-        SS2K_LOG(MAIN_LOG_TAG, "Main Task: %d", uxTaskGetStackHighWaterMark(maintenanceLoopTask));
+        SS2K_LOG(MAIN_LOG_TAG, "Maintenance Task: %d", uxTaskGetStackHighWaterMark(maintenanceLoopTask));
         SS2K_LOG(MAIN_LOG_TAG, "BLEClient: %d", uxTaskGetStackHighWaterMark(BLEClientTask));
         SS2K_LOG(MAIN_LOG_TAG, "Min Heap: %d", esp_get_minimum_free_heap_size());
         SS2K_LOG(MAIN_LOG_TAG, "Free Heap: %d", esp_get_free_heap_size());
@@ -355,20 +390,20 @@ void SS2K::maintenanceLoop(void* pvParameters) {
 void SS2K::setLEDEnabled(bool enabled) {
   ledEnabled = enabled;
   if (!enabled) {
-    digitalWrite(LED_PIN, LOW);
+    digitalWrite(currentBoard.ledPin, LOW);
   }
 }
 
 void SS2K::updateLED() {
   if (!ledEnabled) {
-    digitalWrite(LED_PIN, LOW);
+    digitalWrite(currentBoard.ledPin, LOW);
     return;
   }
 
   int currentCount = spinBLEServer.connectedClientCount();
   if (currentCount == 0) {
     // No app/client connected yet: simple idle blink.
-    digitalWrite(LED_PIN, (millis() / 500) % 2 == 0 ? LOW : HIGH);
+    digitalWrite(currentBoard.ledPin, (millis() / 500) % 2 == 0 ? LOW : HIGH);
     return;
   }
 
@@ -382,12 +417,12 @@ void SS2K::updateLED() {
 
   // After the diagnostic pulses, return to solid-on connected status.
   if (cyclePosition >= currentCount * pulsePeriod) {
-    digitalWrite(LED_PIN, HIGH);
+    digitalWrite(currentBoard.ledPin, HIGH);
     return;
   }
 
   // Each pulse starts with a short off dip, followed by on-time between dips.
-  digitalWrite(LED_PIN, (cyclePosition % pulsePeriod) < pulseOffTime ? LOW : HIGH);
+  digitalWrite(currentBoard.ledPin, (cyclePosition % pulsePeriod) < pulseOffTime ? LOW : HIGH);
 }
 
 void SS2K::FTMSModeShiftModifier() {
@@ -423,12 +458,13 @@ void SS2K::FTMSModeShiftModifier() {
       case FitnessMachineControlPointProcedure::SetTargetPower:  // ERG Mode
       {
         rtConfig->setShifterPosition(ss2k->lastShifterPosition);  // reset shifter position because we're remapping it to ERG target
-        if ((rtConfig->watts.getTarget() + (shiftDelta * ERG_PER_SHIFT) < userConfig->getMinWatts()) ||
-            (rtConfig->watts.getTarget() + (shiftDelta * ERG_PER_SHIFT) > userConfig->getMaxWatts())) {
-          SS2K_LOG(MAIN_LOG_TAG, "Shift to %dw blocked", rtConfig->watts.getTarget() + shiftDelta);
+        const int proposedTarget = rtConfig->watts.getTarget() + (shiftDelta * ERG_PER_SHIFT);
+        const int minimumTarget  = rtConfig->getHomed() ? 0 : userConfig->getMinWatts();
+        if (proposedTarget < minimumTarget || proposedTarget > userConfig->getMaxWatts()) {
+          SS2K_LOG(MAIN_LOG_TAG, "Shift to %dw blocked", proposedTarget);
           break;
         }
-        rtConfig->watts.setTarget(rtConfig->watts.getTarget() + (ERG_PER_SHIFT * shiftDelta));
+        rtConfig->watts.setTarget(proposedTarget);
         SS2K_LOG(MAIN_LOG_TAG, "ERG Shift. New Target: %dw", rtConfig->watts.getTarget());
 // Format output for FTMS passthrough
 #ifndef INTERNAL_ERG_4EXT_FTMS
@@ -535,9 +571,9 @@ void SS2K::resetIfShiftersHeld() {
   if ((digitalRead(currentBoard.shiftUpPin) == LOW) && (digitalRead(currentBoard.shiftDownPin) == LOW)) {
     SS2K_LOG(MAIN_LOG_TAG, "Resetting to defaults via shifter buttons.");
     for (int x = 0; x < 10; x++) {  // blink fast to acknowledge
-      digitalWrite(LED_PIN, HIGH);
+      digitalWrite(currentBoard.ledPin, HIGH);
       delay(200);
-      digitalWrite(LED_PIN, LOW);
+      digitalWrite(currentBoard.ledPin, LOW);
     }
     for (int i = 0; i < 20; i++) {
       LittleFS.format();
