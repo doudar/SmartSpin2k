@@ -44,12 +44,28 @@ constexpr uint32_t TMC2209_OTP_IHOLD_9_PERCENT = 0x01UL << TMC2209_OTP_IHOLD_SHI
 constexpr uint16_t TMC2209_OTP_PROGRAM_IHOLD_9 = 0xBD25;  // Magic 0xBD, OTP byte 2, bit 5.
 
 bool recoverTmc2209Connection(TMC2209Stepper* tmcDriver) {
+  static uint8_t lastInterfaceCounter = 0;
+  static bool interfaceCounterValid   = false;
+
   uint8_t connectionStatus = tmcDriver->test_connection();
   if (connectionStatus == 0) {
-    return true;
+    const uint8_t interfaceCounter = tmcDriver->IFCNT();
+    if (tmcDriver->CRCerror) {
+      SS2K_LOG(MAIN_LOG_TAG, "TMC IFCNT read failed CRC; forcing idle-high recovery");
+    } else if (!interfaceCounterValid) {
+      lastInterfaceCounter  = interfaceCounter;
+      interfaceCounterValid = true;
+      return true;
+    } else if (interfaceCounter != lastInterfaceCounter) {
+      lastInterfaceCounter = interfaceCounter;
+      return true;
+    } else {
+      SS2K_LOG(MAIN_LOG_TAG, "TMC IFCNT did not increment from %u; forcing idle-high recovery", static_cast<unsigned>(interfaceCounter));
+    }
+  } else {
+    SS2K_LOG(MAIN_LOG_TAG, "TMC UART test failed (%u); forcing idle-high recovery", static_cast<unsigned>(connectionStatus));
   }
 
-  SS2K_LOG(MAIN_LOG_TAG, "TMC UART test failed (%u); forcing idle-high recovery", static_cast<unsigned>(connectionStatus));
   initializeStepperSerial(true);
   connectionStatus = tmcDriver->test_connection();
 
@@ -58,6 +74,13 @@ bool recoverTmc2209Connection(TMC2209Stepper* tmcDriver) {
     return false;
   }
 
+  lastInterfaceCounter = tmcDriver->IFCNT();
+  if (tmcDriver->CRCerror) {
+    SS2K_LOG(MAIN_LOG_TAG, "TMC UART recovered, but IFCNT read failed CRC");
+    interfaceCounterValid = false;
+    return false;
+  }
+  interfaceCounterValid = true;
   SS2K_LOG(MAIN_LOG_TAG, "TMC UART recovered");
   return true;
 }
@@ -616,6 +639,11 @@ void SS2K::goHome(bool bothDirections) {
 
 // Applies current power to driver
 void SS2K::updateStepperPower(int pwr) {
+  if (driver == nullptr || !recoverTmc2209Connection(driver)) {
+    SS2K_LOG(MAIN_LOG_TAG, "Skipping stepper power update because TMC UART is unavailable");
+    return;
+  }
+
   uint16_t rmsPwr = (pwr == 0) ? userConfig->getStepperPower() : pwr;
   driver->rms_current(rmsPwr, HOLD_PWR_SCALER);
   SS2K_LOG(MAIN_LOG_TAG, "Stepper power is now %d mA (driver setpoint %d mA)", rmsPwr, driver->rms_current());
