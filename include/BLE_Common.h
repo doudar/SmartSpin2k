@@ -29,7 +29,7 @@
 // maxInterval – [in] The maximum connection interval in 1.25ms units.
 // latency – [in] The number of packets allowed to skip (extends max interval).
 // timeout – [in] The timeout time in 10ms units before disconnecting.
-const uint16_t connectionParams[] = {24, 48, 0, 200};
+const uint16_t connectionParams[] = {24, 48, 0, 500};
 
 // Vector of supported BLE services and their corresponding characteristic UUIDs
 struct BLEServiceInfo {

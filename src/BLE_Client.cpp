@@ -309,8 +309,8 @@ bool SpinBLEClient::connectToServer() {
   SS2K_LOG(BLE_CLIENT_LOG_TAG, " - Created new client");
   pClient->setClientCallbacks(&myClientCallback, false);
   pClient->setSelfDelete(true, true);
-  // Initial connection parameters: 15ms interval, 0 latency, 1000ms timeout (kept from previous logic)
-  pClient->setConnectionParams(connectionParams[0], connectionParams[1], connectionParams[2], 1000);
+  // Initial connection parameters: 30-60 ms interval, 0 latency, 5-second supervision timeout.
+  pClient->setConnectionParams(connectionParams[0], connectionParams[1], connectionParams[2], connectionParams[3]);
   pClient->setConnectTimeout(10000);  // 10 seconds
   if (!pClient->connect(myDevice, true, false, false)) {
     return handleFailedClientConnect();

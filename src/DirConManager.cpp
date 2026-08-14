@@ -369,7 +369,8 @@ void DirConManager::handleClientData() {
         size_t parsedBytes = message.parse(receiveBuffer[i] + processedBytes, receiveBufferLength[i] - processedBytes, lastSequenceNumber[i]);
 
         if (parsedBytes == 0) {
-          // Not enough data for a complete message or invalid message
+          // Keep an incomplete TCP frame buffered until the remaining bytes arrive.
+          // Complete invalid frames return their frame length so they are discarded.
           break;
         }
 
