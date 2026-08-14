@@ -10,6 +10,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Added
 
 ### Changed
+
+### Hardware
+
+
+## [26.8.14]
+
+### Added
+
+### Changed
 - Start the maintenance task directly from `app_main()` and finish initialization on its configurable stack, preventing HTTPS firmware checks from overflowing the ESP-IDF main task.
 - Consolidated board pin mappings, revision detection, current scaling, homing capability, and driver sense-resistor values in `boards.h`.
 - Added a board-specific homing-sensitivity scaler, making the ESP32-S3 default equivalent to 80 while revisions one and two remain at 50.
