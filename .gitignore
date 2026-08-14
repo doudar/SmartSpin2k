@@ -21,8 +21,6 @@ C/Users/
 /managed_components
 dependencies.lock
 dependencies.lock.*
-sdkconfig.S3release
-sdkconfig.S3debug
 .vscode/settings.json
 *.map
 graphify-out/

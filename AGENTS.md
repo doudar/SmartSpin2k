@@ -38,7 +38,7 @@ PlatformIO is the expected entry point.
 - Pre-commit checks: `pre-commit run --all-files`
 
 S3 firmware and filesystem builds use `S3firmware.bin` and `S3littlefs.bin` as their native PlatformIO output/upload names. They also create `S3partitions.bin` and `S3bootloader.bin` copies for releases; the generic partition and bootloader intermediates remain because PlatformIO's flash uploader depends on those names.
-The GitHub release archive includes firmware, LittleFS, partition-table, and bootloader binaries for both classic ESP32 and ESP32-S3 targets.
+The GitHub release archive includes firmware, merged factory, LittleFS, partition-table, and bootloader binaries for both classic ESP32 and ESP32-S3 targets. The two merged factory images are also published as standalone release assets.
 
 Filesystem builds stage deterministic gzip copies of every HTML/CSS source file under the environment build directory. They also refresh the checked-in `.gz` companions and `list.json` in `data/` or `data_s3/`, which are consumed by repository-based automatic OTA updates.
 

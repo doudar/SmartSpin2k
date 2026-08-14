@@ -5,6 +5,9 @@ on:
     branches:
       - develop
 
+permissions:
+  contents: write
+
 jobs:
   build:
     runs-on: ubuntu-latest
@@ -37,10 +40,6 @@ jobs:
         env:
           TAG_NAME: ${{ steps.date.outputs.date }}
           RELEASE_NAME: ${{ steps.date.outputs.date }}- 
-      - uses: rickstaa/action-create-tag@v1
-        with:
-          tag: ${{ steps.date.outputs.date }}
-          message: "Automatic release ${{ steps.date.outputs.date }}"
       - uses: dorny/paths-filter@v4
         id: changes
         with:
@@ -70,19 +69,24 @@ jobs:
       - name: Create artifacts
         run: |
           cp ./.pio/build/release/firmware.bin firmware.bin
+          cp ./.pio/build/release/firmware.factory.bin firmware.factory.bin
           cp ./.pio/build/release/littlefs.bin littlefs.bin
           cp ./.pio/build/release/partitions.bin partitions.bin
           cp ./.pio/build/release/bootloader.bin bootloader.bin
           cp ./.pio/build/S3release/S3firmware.bin S3firmware.bin
+          cp ./.pio/build/S3release/S3firmware.factory.bin S3firmware.factory.bin
           cp ./.pio/build/S3release/S3littlefs.bin S3littlefs.bin
           cp ./.pio/build/S3release/S3partitions.bin S3partitions.bin
           cp ./.pio/build/S3release/S3bootloader.bin S3bootloader.bin
-          7z a SmartSpin2kFirmware-${{ steps.date.outputs.date }}.bin.zip firmware.bin littlefs.bin partitions.bin bootloader.bin S3firmware.bin S3littlefs.bin S3partitions.bin S3bootloader.bin
+          7z a SmartSpin2kFirmware-${{ steps.date.outputs.date }}.bin.zip firmware.bin firmware.factory.bin littlefs.bin partitions.bin bootloader.bin S3firmware.bin S3firmware.factory.bin S3littlefs.bin S3partitions.bin S3bootloader.bin
       - name: Archive
         uses: actions/upload-artifact@v7
         with:
           name: all-artifacts
-          path: SmartSpin2kFirmware-${{ steps.date.outputs.date }}.bin.zip
+          path: |
+            SmartSpin2kFirmware-${{ steps.date.outputs.date }}.bin.zip
+            firmware.factory.bin
+            S3firmware.factory.bin
       - name: Download Artifacts
         uses: actions/download-artifact@v8
         with:
@@ -92,18 +96,19 @@ jobs:
         run: echo "SOURCE_TAG=${{ steps.date.outputs.date }}" >> $GITHUB_OUTPUT
       - name: Create release
         uses: softprops/action-gh-release@v3
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
           tag_name: ${{ steps.tag_info.outputs.SOURCE_TAG }}
+          target_commitish: ${{ github.sha }}
           name: SmartSpin2k ${{ steps.tag_info.outputs.SOURCE_TAG }}
           draft: false
           prerelease: false
           generate_release_notes: true
+          overwrite_files: true
           body: ${{ github.event.head_commit.message }}
           files: |
             SmartSpin2kFirmware-${{ steps.date.outputs.date }}.bin.zip
-              update-changelog:
+            firmware.factory.bin
+            S3firmware.factory.bin
       - name: Update changelog
         uses: thomaseizinger/keep-a-changelog-new-release@v3
         with:

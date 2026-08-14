@@ -939,8 +939,10 @@ void HTTP_Server::stop() {
 // 70:94:DE:DD:E6:C4:69:48:3A:92:70:A1:48:56:78:2D:18:64:E0:B7
 
 void HTTP_Server::FirmwareUpdate() {
-  HTTPClient http;
+  // HTTPClient keeps a non-owning pointer to the network client. Declare the
+  // network client first so HTTPClient is destroyed before its transport.
   WiFiClientSecure localClient;
+  HTTPClient http;
   localClient.setCACert(rootCACertificate);
   SS2K_LOG(HTTP_SERVER_LOG_TAG, "Checking for newer firmware:");
   int httpCode = beginHttpGet(http, localClient, userConfig->getFirmwareUpdateURL() + String(FW_VERSIONFILE));
