@@ -20,6 +20,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Automatic filesystem updates now remove files outside the server manifest while preserving settings and power-table data, track the installed filesystem release version, and never replace it with an older release.
 - Successful LittleFS uploads from the recovery page now reboot after acknowledging the upload so the replacement filesystem is mounted cleanly.
 - Fixed gzip web responses being labeled with duplicate content-encoding headers, which Firefox rejected.
+- Minor spelling fixes. 
 
 ### Hardware
 - Corrected the ESP32-S3 shift-up and shift-down pin assignments.

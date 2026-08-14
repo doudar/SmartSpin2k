@@ -83,10 +83,7 @@ jobs:
         uses: actions/upload-artifact@v7
         with:
           name: all-artifacts
-          path: |
-            SmartSpin2kFirmware-${{ steps.date.outputs.date }}.bin.zip
-            firmware.factory.bin
-            S3firmware.factory.bin
+          path: SmartSpin2kFirmware-${{ steps.date.outputs.date }}.bin.zip
       - name: Download Artifacts
         uses: actions/download-artifact@v8
         with:
@@ -94,6 +91,18 @@ jobs:
       - name: Get tag info
         id: tag_info
         run: echo "SOURCE_TAG=${{ steps.date.outputs.date }}" >> $GITHUB_OUTPUT
+      - name: Remove obsolete standalone factory assets
+        env:
+          GH_TOKEN: ${{ github.token }}
+          SOURCE_TAG: ${{ steps.tag_info.outputs.SOURCE_TAG }}
+        run: |
+          if gh release view "$SOURCE_TAG" > /dev/null 2>&1; then
+            for asset in firmware.factory.bin S3firmware.factory.bin; do
+              if gh release view "$SOURCE_TAG" --json assets --jq '.assets[].name' | grep -Fxq "$asset"; then
+                gh release delete-asset "$SOURCE_TAG" "$asset" --yes
+              fi
+            done
+          fi
       - name: Create release
         uses: softprops/action-gh-release@v3
         with:
@@ -107,8 +116,6 @@ jobs:
           body: ${{ github.event.head_commit.message }}
           files: |
             SmartSpin2kFirmware-${{ steps.date.outputs.date }}.bin.zip
-            firmware.factory.bin
-            S3firmware.factory.bin
       - name: Update changelog
         uses: thomaseizinger/keep-a-changelog-new-release@v3
         with:
