@@ -81,7 +81,7 @@ const BLEServiceInfo* getDeviceServiceInfo(const NimBLEAdvertisedDevice* adverti
 class MyServerCallbacks : public NimBLEServerCallbacks {
  public:
   void onConnect(NimBLEServer* pServer, NimBLEConnInfo& connInfo);
-  void onDisconnect(NimBLEServer* pServer);
+  void onDisconnect(NimBLEServer* pServer, NimBLEConnInfo& connInfo, int reason) override;
   void onMTUChange(uint16_t MTU, NimBLEConnInfo& connInfo);
   bool onConnParamsUpdateRequest(uint16_t handle, const ble_gap_upd_params* params);
 };
@@ -121,6 +121,9 @@ void calculateInstPwrFromHR();
 
 // BLE FIRMWARE UPDATER
 void BLEFirmwareSetup(NimBLEServer* pServer);
+void BLEFirmwareUpdateLoop();
+void BLEFirmwareUpdateOnDisconnect(uint16_t connectionHandle);
+void BLERequestMtuExchange(uint16_t connectionHandle);
 
 // *****************************Client*****************************
 
