@@ -230,6 +230,7 @@ void SS2K::maintenanceLoop(void* pvParameters) {
 
   while (true) {
     delay(10);
+    BLEFirmwareUpdateLoop();
 
     // be quiet while updating via BLE
     if (!ss2k->isUpdating) {

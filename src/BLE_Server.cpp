@@ -11,7 +11,9 @@
 #include <ArduinoJson.h>
 #include <Constants.h>
 #include <NimBLEDevice.h>
+#include <NimBLEUtils.h>
 #include <WiFi.h>
+#include <host/ble_gatt.h>
 #include <cmath>
 #include <limits>
 #include "BLE_Cycling_Speed_Cadence.h"
@@ -58,6 +60,15 @@ void addIpAddressToAdvertisement(NimBLEAdvertising* advertising) {
   }
 }
 }  // namespace
+
+void BLERequestMtuExchange(uint16_t connectionHandle) {
+  const int result = ble_gattc_exchange_mtu(connectionHandle, nullptr, nullptr);
+  if (result == 0) {
+    SS2K_LOG(BLE_SERVER_LOG_TAG, "Requested ATT MTU exchange for connection %u", connectionHandle);
+  } else if (result != BLE_HS_EALREADY) {
+    SS2K_LOGW(BLE_SERVER_LOG_TAG, "Unable to request ATT MTU exchange for connection %u: %d", connectionHandle, result);
+  }
+}
 
 void startBLEServer() {
   // Server Setup
@@ -172,6 +183,7 @@ void SpinBLEServer::updateWheelAndCrankRev() {
 // Creating Server Connection Callbacks
 void MyServerCallbacks::onConnect(NimBLEServer* pServer, NimBLEConnInfo& connInfo) {
   SS2K_LOG(BLE_SERVER_LOG_TAG, "Bluetooth Remote Client Connected: %s Connected Clients: %d", connInfo.getAddress().toString().c_str(), pServer->getConnectedCount());
+  BLERequestMtuExchange(connInfo.getConnHandle());
 
   if (pServer->getConnectedCount() < CONFIG_BT_NIMBLE_MAX_CONNECTIONS - NUM_BLE_DEVICES) {
     BLEDevice::startAdvertising();
@@ -181,18 +193,15 @@ void MyServerCallbacks::onConnect(NimBLEServer* pServer, NimBLEConnInfo& connInf
   }
 }
 
-void MyServerCallbacks::onDisconnect(NimBLEServer* pServer) {
-  SS2K_LOG(BLE_SERVER_LOG_TAG, "Bluetooth Remote Client Disconnected. Remaining Clients: %d", pServer->getConnectedCount());
+void MyServerCallbacks::onDisconnect(NimBLEServer* pServer, NimBLEConnInfo& connInfo, int reason) {
+  SS2K_LOG(BLE_SERVER_LOG_TAG, "Bluetooth Remote Client Disconnected. Reason: %d (%s) Remaining Clients: %d", reason, NimBLEUtils::returnCodeToString(reason),
+           pServer->getConnectedCount());
+  BLEFirmwareUpdateOnDisconnect(connInfo.getConnHandle());
   BLEDevice::startAdvertising();
-  // client disconnected while trying to write fw - reboot to clear the faulty upload.
-  if (ss2k->isUpdating) {
-    SS2K_LOG(BLE_SERVER_LOG_TAG, "Rebooting because of update interruption.", pServer->getConnectedCount());
-    ss2k->rebootFlag = true;
-  }
 }
 
 void MyServerCallbacks::onMTUChange(uint16_t MTU, NimBLEConnInfo& connInfo) {
-  // SS2K_LOG(BLE_SERVER_LOG_TAG, "MTU updated: %u for connection ID: %u", MTU, connInfo.getConnHandle());
+  SS2K_LOG(BLE_SERVER_LOG_TAG, "ATT MTU updated to %u for connection %u", MTU, connInfo.getConnHandle());
 }
 
 bool MyServerCallbacks::onConnParamsUpdateRequest(uint16_t handle, const ble_gap_upd_params* params) {

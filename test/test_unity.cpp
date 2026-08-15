@@ -85,6 +85,15 @@ void setup() {
     RUN_TEST(test.test_case_insensitive_device_matching);
   }
 
+  // BLE Firmware Update Protocol Tests
+  {
+    TestBleFirmwareUpdateProtocol test;
+    RUN_TEST(test.test_parses_start_packet);
+    RUN_TEST(test.test_rejects_invalid_start_packets);
+    RUN_TEST(test.test_encodes_status_packet);
+    RUN_TEST(test.test_transfer_timeout);
+  }
+
   UNITY_END();
 }
 

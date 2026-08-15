@@ -57,3 +57,11 @@ public:
     static void test_backward_compatibility(void);
     static void test_case_insensitive_device_matching(void);
 };
+
+class TestBleFirmwareUpdateProtocol {
+ public:
+  static void test_parses_start_packet(void);
+  static void test_rejects_invalid_start_packets(void);
+  static void test_encodes_status_packet(void);
+  static void test_transfer_timeout(void);
+};
