@@ -45,13 +45,8 @@ BLE_OpenBikeControl_Service openBikeControlService;
 
 namespace {
 constexpr uint8_t SMARTSPIN2K_IP_ADVERTISEMENT_VERSION = 1;
-constexpr size_t BLE_LEGACY_ADVERTISEMENT_MAX_SIZE      = 31;
-constexpr size_t BLE_AD_FIELD_OVERHEAD                  = 2;
-constexpr size_t BLE_UUID128_SIZE                       = 16;
-// A legacy scan response is 31 bytes. After the 128-bit service UUID and both
-// AD field headers, 11 bytes remain for the local name.
-constexpr size_t BLE_ADVERTISED_NAME_MAX_SIZE =
-    BLE_LEGACY_ADVERTISEMENT_MAX_SIZE - (BLE_UUID128_SIZE + BLE_AD_FIELD_OVERHEAD) - BLE_AD_FIELD_OVERHEAD;
+// Leaves room for the 128-bit SmartSpin2k service UUID in the 31-byte scan response.
+constexpr size_t BLE_ADVERTISED_NAME_MAX_SIZE = 11;
 
 std::string bleAdvertisementName(const char* deviceName) {
   std::string name = deviceName;
