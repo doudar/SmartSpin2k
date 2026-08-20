@@ -69,11 +69,19 @@ double clampErgGain(double gain, double sensitivity) {
 }  // namespace
 
 void ErgMode::runERG() {
-  static ErgMode ergMode;
   static PowerBuffer powerBuffer;
   static bool hasConnectedPowerMeter = false;
   static bool simulationRunning      = false;
   static int loopCounter             = 0;
+
+  if (resumeErgOnCadence && rtConfig->cad.getValue() > MIN_ERG_CADENCE) {
+    if (rtConfig->getFTMSMode() == FitnessMachineControlPointProcedure::SetIndoorBikeSimulationParameters) {
+      rtConfig->setFTMSMode(FitnessMachineControlPointProcedure::SetTargetPower);
+      SS2K_LOG(ERG_MODE_LOG_TAG, "Cadence resumed; restoring ERG mode at %dw", rtConfig->watts.getTarget());
+    }
+    resumeErgOnCadence = false;
+    ergTimer           = 0;
+  }
 
   if (mode == Mode::INCREASING) {
     if (rtConfig->watts.getValue() > rtConfig->watts.getTarget()) {  // Resume PID control
@@ -144,7 +152,7 @@ void ErgMode::runERG() {
 
       // compute ERG
       if ((rtConfig->getFTMSMode() == FitnessMachineControlPointProcedure::SetTargetPower) && (hasConnectedPowerMeter || simulationRunning)) {
-        ergMode.computeErg();
+        this->computeErg();
       }
 
       // Set Min and Max Stepper positions
@@ -357,12 +365,21 @@ void ErgMode::_updateValues(float newIncline) {
 
 bool ErgMode::_userIsSpinning(int cadence, float incline) {
   if (cadence <= MIN_ERG_CADENCE) {
+    resumeErgOnCadence = true;
+    mode               = Mode::MAINTAIN;
+    isDelayed          = false;
     rtConfig->setFTMSMode(FitnessMachineControlPointProcedure::SetIndoorBikeSimulationParameters);
     rtConfig->setTargetIncline(1.0f);
     return false;  // Cadence too low, nothing to do here
   }
-  this->engineStopped = false;
   return true;
+}
+
+void ErgMode::onFTMSCommand(uint8_t opcode) {
+  if (resumeErgOnCadence && opcode != FitnessMachineControlPointProcedure::SetTargetPower) {
+    resumeErgOnCadence = false;
+    SS2K_LOG(ERG_MODE_LOG_TAG, "ERG cadence resume cancelled by FTMS command 0x%02x", opcode);
+  }
 }
 
 void ErgMode::_writeLog(float currentIncline, float newIncline, int currentSetPoint, int newSetPoint, int currentWatts, int newWatts, int currentCadence, int newCadence) {
