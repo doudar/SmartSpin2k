@@ -15,7 +15,9 @@
 #include <WiFi.h>
 #include <host/ble_gatt.h>
 #include <cmath>
+#include <cstring>
 #include <limits>
+#include <string>
 #include "BLE_Cycling_Speed_Cadence.h"
 #include "BLE_Cycling_Power_Service.h"
 #include "BLE_Heart_Service.h"
@@ -43,6 +45,27 @@ BLE_OpenBikeControl_Service openBikeControlService;
 
 namespace {
 constexpr uint8_t SMARTSPIN2K_IP_ADVERTISEMENT_VERSION = 1;
+constexpr size_t BLE_LEGACY_ADVERTISEMENT_MAX_SIZE      = 31;
+constexpr size_t BLE_AD_FIELD_OVERHEAD                  = 2;
+constexpr size_t BLE_UUID128_SIZE                       = 16;
+// A legacy scan response is 31 bytes. After the 128-bit service UUID and both
+// AD field headers, 11 bytes remain for the local name.
+constexpr size_t BLE_ADVERTISED_NAME_MAX_SIZE =
+    BLE_LEGACY_ADVERTISEMENT_MAX_SIZE - (BLE_UUID128_SIZE + BLE_AD_FIELD_OVERHEAD) - BLE_AD_FIELD_OVERHEAD;
+
+std::string bleAdvertisementName(const char* deviceName) {
+  std::string name = deviceName;
+  if (name.size() <= BLE_ADVERTISED_NAME_MAX_SIZE) {
+    return name;
+  }
+
+  size_t length = BLE_ADVERTISED_NAME_MAX_SIZE;
+  while (length > 0 && (static_cast<uint8_t>(name[length]) & 0xc0) == 0x80) {
+    --length;
+  }
+  name.resize(length);
+  return name;
+}
 
 void addIpAddressToAdvertisement(NimBLEAdvertising* advertising) {
   IPAddress ipAddress = WiFi.status() == WL_CONNECTED ? WiFi.localIP() : WiFi.softAPIP();
@@ -103,7 +126,13 @@ void startBLEServer() {
   // Keep the name and 128-bit SmartSpin2k UUID in the scan response. The primary
   // advertisement uses the space previously occupied by the duplicate name for the IP address.
   addIpAddressToAdvertisement(pAdvertising);
-  oScanResponseData.setName(userConfig->getDeviceName());
+  const std::string advertisedName = bleAdvertisementName(userConfig->getDeviceName());
+  if (advertisedName.size() < std::strlen(userConfig->getDeviceName())) {
+    oScanResponseData.setShortName(advertisedName);
+    SS2K_LOGW(BLE_SERVER_LOG_TAG, "BLE device name shortened to '%s' to fit scan response", advertisedName.c_str());
+  } else {
+    oScanResponseData.setName(advertisedName);
+  }
   oScanResponseData.setCompleteServices(SMARTSPIN2K_SERVICE_UUID);
   pAdvertising->setScanResponseData(oScanResponseData);
 
