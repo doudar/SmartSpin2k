@@ -43,7 +43,25 @@ constexpr uint32_t TMC2209_OTP_IHOLD_MASK      = 0x03UL << TMC2209_OTP_IHOLD_SHI
 constexpr uint32_t TMC2209_OTP_IHOLD_9_PERCENT = 0x01UL << TMC2209_OTP_IHOLD_SHIFT;
 constexpr uint16_t TMC2209_OTP_PROGRAM_IHOLD_9 = 0xBD25;  // Magic 0xBD, OTP byte 2, bit 5.
 
-bool recoverTmc2209Connection(TMC2209Stepper* tmcDriver) {
+bool recoverTmc2209OperationalConnection(TMC2209Stepper* tmcDriver) {
+  uint8_t connectionStatus = tmcDriver->test_connection();
+  if (connectionStatus == 0) {
+    return true;
+  }
+
+  SS2K_LOG(MAIN_LOG_TAG, "TMC UART test failed (%u); forcing idle-high recovery", static_cast<unsigned>(connectionStatus));
+  initializeStepperSerial(true);
+  connectionStatus = tmcDriver->test_connection();
+  if (connectionStatus != 0) {
+    SS2K_LOG(MAIN_LOG_TAG, "TMC UART recovery failed (%u)", static_cast<unsigned>(connectionStatus));
+    return false;
+  }
+
+  SS2K_LOG(MAIN_LOG_TAG, "TMC UART recovered");
+  return true;
+}
+
+bool verifyTmc2209ConnectionForOtp(TMC2209Stepper* tmcDriver) {
   static uint8_t lastInterfaceCounter = 0;
   static bool interfaceCounterValid   = false;
 
@@ -254,9 +272,9 @@ void SS2K::setupTMCStepperDriver(bool reset) {
   }
   const bool initializeFastAccel = !reset || stepper == nullptr;
 
-  // Verify communication before issuing any driver configuration writes. A
-  // failed recovery leaves the existing hardware state untouched.
-  if (!recoverTmc2209Connection(driver)) {
+  // TMCStepper's connection test is sufficient for normal configuration and
+  // homing. The stricter IFCNT check is reserved for irreversible OTP writes.
+  if (!recoverTmc2209OperationalConnection(driver)) {
     SS2K_LOG(MAIN_LOG_TAG, "Skipping TMC driver setup because UART is unavailable");
     return;
   }
@@ -273,7 +291,11 @@ void SS2K::setupTMCStepperDriver(bool reset) {
     stepper->setDelayToDisable(65535);
     // TMC Driver Setup
     driver->begin();
-    programTmc2209LowHoldCurrentOtp(driver);
+    if (verifyTmc2209ConnectionForOtp(driver)) {
+      programTmc2209LowHoldCurrentOtp(driver);
+    } else {
+      SS2K_LOG(MAIN_LOG_TAG, "Skipping irreversible TMC OTP programming because IFCNT verification failed");
+    }
   }
 
   driver->pdn_disable(true);       // Use PDN pin to enable UART communication instead of grounding signal
@@ -639,7 +661,12 @@ void SS2K::goHome(bool bothDirections) {
 
 // Applies current power to driver
 void SS2K::updateStepperPower(int pwr) {
-  if (driver == nullptr || !recoverTmc2209Connection(driver)) {
+  if (driver == nullptr) {
+    SS2K_LOG(MAIN_LOG_TAG, "Skipping stepper power update because TMC UART is unavailable");
+    return;
+  }
+
+  if (!recoverTmc2209OperationalConnection(driver)) {
     SS2K_LOG(MAIN_LOG_TAG, "Skipping stepper power update because TMC UART is unavailable");
     return;
   }
