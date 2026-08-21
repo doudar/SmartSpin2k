@@ -73,15 +73,21 @@ void ErgMode::runERG() {
   static bool hasConnectedPowerMeter = false;
   static bool simulationRunning      = false;
   static int loopCounter             = 0;
+  static int lastSetPoint            = 0;
 
   if (rtConfig->getFTMSMode() == FitnessMachineControlPointProcedure::SetTargetPower && rtConfig->cad.getValue() <= MIN_ERG_CADENCE) {
     if (rtConfig->watts.getTarget() != userConfig->getMinWatts()) {
       SS2K_LOG(ERG_MODE_LOG_TAG, "Cadence below ERG minimum; lowering target to %dw", userConfig->getMinWatts());
+      lastSetPoint = rtConfig->watts.getTarget();
       rtConfig->watts.setTarget(userConfig->getMinWatts());
       mode      = Mode::MAINTAIN;
       isDelayed = false;
       ergTimer  = 0;
     }
+  } else if (lastSetPoint != 0 && rtConfig->getFTMSMode() == FitnessMachineControlPointProcedure::SetTargetPower  && rtConfig->cad.getValue() > MIN_ERG_CADENCE) {
+    SS2K_LOG(ERG_MODE_LOG_TAG, "Cadence above ERG minimum; restoring target to %dw", lastSetPoint);
+    rtConfig->watts.setTarget(lastSetPoint);
+    lastSetPoint = 0;
   }
 
   const bool reachedIncreasingTarget = mode == Mode::INCREASING && rtConfig->watts.getValue() >= rtConfig->watts.getTarget();
@@ -228,7 +234,7 @@ void ErgMode::computeErg() {
   }
 #endif
 
-//Avoid ERG Black hole
+  // Avoid ERG Black hole
   if (rtConfig->cad.getValue() < MIN_ERG_CADENCE && rtConfig->getHomed()) {
     SS2K_LOG(ERG_MODE_LOG_TAG, "Cadence below ERG minimum");
     result = userConfig->getShiftStep() * SHIFTER_MIDDLE_POSITION;
