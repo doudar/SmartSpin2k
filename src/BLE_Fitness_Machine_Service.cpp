@@ -6,7 +6,6 @@
  */
 #include "BLE_Fitness_Machine_Service.h"
 #include "DirConManager.h"
-#include "ERG_Mode.h"
 #include "Main.h"
 #include <Constants.h>
 #include <vector>
@@ -168,8 +167,6 @@ void BLE_Fitness_Machine_Service::processFTMSWrite() {
       char logBuf[kLogBufCapacity];
       int logBufLength = ss2k_log_hex_to_buffer(pData, length, logBuf, 0, kLogBufCapacity);
       int port         = 0;
-
-      ergMode->onFTMSCommand(static_cast<uint8_t>(rxValue[0]));
 
       switch ((uint8_t)rxValue[0]) {
         case FitnessMachineControlPointProcedure::RequestControl:

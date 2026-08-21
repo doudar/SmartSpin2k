@@ -404,7 +404,7 @@ Primary files: `include/ERG_Mode.h`, `src/ERG_Mode.cpp`.
 
 `computeErg()`:
 
-- Stops ERG and switches back to simulation mode if cadence is below `MIN_ERG_CADENCE`.
+- Keeps ERG active and lowers its target to `userConfig->minWatts` if cadence is below `MIN_ERG_CADENCE`.
 - Raises target to `userConfig->minWatts` when apps request too little.
 - Skips if the same watt timestamp/target was already processed or current watts are negative.
 - For large setpoint changes, tries `_setPointChangeState()` using the power table when homed.

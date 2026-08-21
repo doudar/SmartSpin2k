@@ -25,18 +25,12 @@ class ErgMode {
   // What used to be in the ERGTaskLoop(). This is the main control function for ERG Mode and the powertable operations.
   void runERG();
   void computeErg();
-  void onFTMSCommand(uint8_t opcode);
   void _writeLog(float currentIncline, float newIncline, int currentSetPoint, int newSetPoint, int currentWatts, int newWatts, int currentCadence, int newCadence);
 
  private:
-  bool resumeErgOnCadence = false;
-
   int mode = Mode::MAINTAIN;
   Measurement prevWatts;
   Measurement prevCadence;
-
-  // check if user is spinning, reset incline if user stops spinning
-  bool _userIsSpinning(int cadence, float incline);
 
   // calculate incline if setpoint (from Zwift) changes
   int32_t _setPointChangeState();
