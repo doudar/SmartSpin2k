@@ -101,8 +101,8 @@ const char* const DEFAULT_PASSWORD = "password";
 // Use internal ERG control on external FTMS Trainer.
 // #define INTERNAL_ERG_4EXT_FTMS
 
-// Minimum cadence where ERG mode stops.
-#define MIN_ERG_CADENCE 30
+// Cadence at or below which ERG lowers its target to the configured minimum brake watts.
+#define MIN_ERG_CADENCE 20
 
 // Default minimum ERG target while the stepper is unhomed.
 // Homed operation uses the known stepper travel limits instead.
@@ -160,7 +160,7 @@ const char* const DEFAULT_PASSWORD = "password";
 
 // BLE Device Generic Names
 constexpr const char* NONE = "none";
-constexpr const char* ANY = "any";
+constexpr const char* ANY  = "any";
 
 // Name of default Power Meter. any connects to anything, none connects to
 // nothing.
@@ -253,10 +253,10 @@ constexpr const char* ANY = "any";
 // Limit power table size to save memory
 #define TABLE_DIVISOR 10.0f
 
-//Max distance a failed neighbor can be horizontally from target position
+// Max distance a failed neighbor can be horizontally from target position
 #define HORIZONTAL_NEIGHBOR_RANGE 0.6f
-    
-//Max distance a failed neighbor can be vertically from target position
+
+// Max distance a failed neighbor can be vertically from target position
 #define VERTICAL_NEIGHBOR_RANGE 0.8f
 
 // Temperature of the ESP32 at which to start reducing the power output of the stepper motor driver.
@@ -287,6 +287,7 @@ constexpr const char* ANY = "any";
 #define HOMING_TAP_TOLERANCE          150
 #define HOMING_RECOVERY_BACKOFF_MULT  3
 #define HOMING_MAX_SENSITIVITY        100
+#define SHIFTER_MIDDLE_POSITION       8
 
 // BLE automatic reconnect interval in milliseconds.
 #define BLE_RECONNECT_SCAN_INTERVAL 8000
@@ -325,4 +326,3 @@ constexpr const char* ANY = "any";
 
 // uncomment to enable bench testing of ptab4pwr
 // #define TEST_PTAB4PWR
-

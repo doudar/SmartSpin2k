@@ -51,8 +51,8 @@ double scheduledErgGain(double sensitivity, int operatingWatts, int cadence, boo
 
   double gain = fallbackErgGain(sensitivity, operatingWatts);
   // Sparse linear fits are useful for lookup, but not stable enough to schedule ERG gain from their slope.
-  if (powerTable->ptHelpers.resistanceModel.getIsValid() && powerTable->ptHelpers.resistanceModel.getIsQuadratic() && lowerPosition != RETURN_ERROR && upperPosition != RETURN_ERROR &&
-      upperPosition > lowerPosition) {
+  if (powerTable->ptHelpers.resistanceModel.getIsValid() && powerTable->ptHelpers.resistanceModel.getIsQuadratic() && lowerPosition != RETURN_ERROR &&
+      upperPosition != RETURN_ERROR && upperPosition > lowerPosition) {
     const double localStepsPerWatt = static_cast<double>(upperPosition - lowerPosition) / static_cast<double>(upperWatts - lowerWatts);
     gain                           = localStepsPerWatt * sensitivity / ERG_SLOPE_CONTROL_DIVISOR;
     usedPowerTable                 = true;
@@ -69,32 +69,36 @@ double clampErgGain(double gain, double sensitivity) {
 }  // namespace
 
 void ErgMode::runERG() {
-  static ErgMode ergMode;
   static PowerBuffer powerBuffer;
   static bool hasConnectedPowerMeter = false;
   static bool simulationRunning      = false;
   static int loopCounter             = 0;
+  static int lastSetPoint            = 0;
 
-  if (mode == Mode::INCREASING) {
-    if (rtConfig->watts.getValue() > rtConfig->watts.getTarget()) {  // Resume PID control
-      ergTimer = 0;
-      mode     = Mode::MAINTAIN;
-      SS2K_LOG(ERG_MODE_LOG_TAG, "ERG increasing target reached.");
-    } else if (rtConfig->watts.getValue() >= this->prevWatts.getValue()) {
-      // power is still increasing, wait longer
-      return;
+  if (rtConfig->getFTMSMode() == FitnessMachineControlPointProcedure::SetTargetPower && rtConfig->cad.getValue() <= MIN_ERG_CADENCE) {
+    if (rtConfig->watts.getTarget() != userConfig->getMinWatts()) {
+      SS2K_LOG(ERG_MODE_LOG_TAG, "Cadence below ERG minimum; lowering target to %dw", userConfig->getMinWatts());
+      lastSetPoint = rtConfig->watts.getTarget();
+      rtConfig->watts.setTarget(userConfig->getMinWatts());
+      mode      = Mode::MAINTAIN;
+      isDelayed = false;
+      ergTimer  = 0;
     }
-  } else if (mode == Mode::DECREASING) {
-    if (rtConfig->watts.getValue() < rtConfig->watts.getTarget())  // Resume PID control
-    {
-      ergTimer = 0;
-      mode     = Mode::MAINTAIN;
-      SS2K_LOG(ERG_MODE_LOG_TAG, "ERG decreasing target reached.");
-    } else if (rtConfig->watts.getValue() <= this->prevWatts.getValue()) {
-      // power is still decreasing, wait longer
-      return;
-    }
+  } else if (lastSetPoint != 0 && rtConfig->getFTMSMode() == FitnessMachineControlPointProcedure::SetTargetPower  && rtConfig->cad.getValue() > MIN_ERG_CADENCE) {
+    SS2K_LOG(ERG_MODE_LOG_TAG, "Cadence above ERG minimum; restoring target to %dw", lastSetPoint);
+    rtConfig->watts.setTarget(lastSetPoint);
+    lastSetPoint = 0;
   }
+
+  const bool reachedIncreasingTarget = mode == Mode::INCREASING && rtConfig->watts.getValue() >= rtConfig->watts.getTarget();
+  const bool reachedDecreasingTarget = mode == Mode::DECREASING && rtConfig->watts.getValue() <= rtConfig->watts.getTarget();
+  if (reachedIncreasingTarget || reachedDecreasingTarget) {
+    SS2K_LOG(ERG_MODE_LOG_TAG, "ERG setpoint reached; resuming PID control");
+    mode      = Mode::MAINTAIN;
+    isDelayed = false;
+    ergTimer  = 0;
+  }
+
   if (isDelayed && (ss2k->getCurrentPosition() == ss2k->getTargetPosition())) {
     SS2K_LOG(ERG_MODE_LOG_TAG, "ERG delay cleared,  %dw, tgt %dw, pos %d, tgt %d", rtConfig->watts.getValue(), rtConfig->watts.getTarget(), ss2k->getCurrentPosition(),
              ss2k->getTargetPosition());
@@ -107,6 +111,11 @@ void ErgMode::runERG() {
       SS2K_LOG(ERG_MODE_LOG_TAG, "ERG wait expired, %dw, tgt %dw, pos %d, tgt %d", rtConfig->watts.getValue(), rtConfig->watts.getTarget(), ss2k->getCurrentPosition(),
                ss2k->getTargetPosition());
       isDelayed = false;
+    }
+
+    if (mode != Mode::MAINTAIN) {
+      SS2K_LOG(ERG_MODE_LOG_TAG, "ERG setpoint seek complete; resuming PID control");
+      mode = Mode::MAINTAIN;
     }
 
     // reset the timer.
@@ -130,7 +139,7 @@ void ErgMode::runERG() {
       powerTable->_manageSaveState();
     }
 
-    if (rtConfig->cad.getValue()) {
+    if (rtConfig->cad.getValue() > MIN_ERG_CADENCE / 2) {
       hasConnectedPowerMeter = spinBLEClient.connectedPM;
       simulationRunning      = rtConfig->watts.getTarget();
       if (!simulationRunning) {
@@ -144,7 +153,7 @@ void ErgMode::runERG() {
 
       // compute ERG
       if ((rtConfig->getFTMSMode() == FitnessMachineControlPointProcedure::SetTargetPower) && (hasConnectedPowerMeter || simulationRunning)) {
-        ergMode.computeErg();
+        this->computeErg();
       }
 
       // Set Min and Max Stepper positions
@@ -200,12 +209,6 @@ void ErgMode::runERG() {
 void ErgMode::computeErg() {
   int32_t result = RETURN_ERROR;
 
-  bool isUserSpinning = this->_userIsSpinning(rtConfig->cad.getValue(), ss2k->getCurrentPosition());
-  if (!isUserSpinning) {
-    SS2K_LOG(ERG_MODE_LOG_TAG, "ERG Mode but no User Spin");
-    return;
-  }
-
   // Without known travel limits, keep ERG above the configured minimum bike watts.
   // Once homed, moveStepper() clamps the commanded position to the known min/max step range instead.
   if (!rtConfig->getHomed() && rtConfig->watts.getTarget() < userConfig->getMinWatts()) {
@@ -230,6 +233,12 @@ void ErgMode::computeErg() {
     result = _inSetpointState();
   }
 #endif
+
+  // Avoid ERG Black hole
+  if (rtConfig->cad.getValue() < MIN_ERG_CADENCE && rtConfig->getHomed()) {
+    SS2K_LOG(ERG_MODE_LOG_TAG, "Cadence below ERG minimum");
+    result = userConfig->getShiftStep() * SHIFTER_MIDDLE_POSITION;
+  }
   _updateValues(result);
 }
 
@@ -353,16 +362,6 @@ void ErgMode::_updateValues(float newIncline) {
 
   this->prevWatts   = rtConfig->watts;
   this->prevCadence = rtConfig->cad;
-}
-
-bool ErgMode::_userIsSpinning(int cadence, float incline) {
-  if (cadence <= MIN_ERG_CADENCE) {
-    rtConfig->setFTMSMode(FitnessMachineControlPointProcedure::SetIndoorBikeSimulationParameters);
-    rtConfig->setTargetIncline(1.0f);
-    return false;  // Cadence too low, nothing to do here
-  }
-  this->engineStopped = false;
-  return true;
 }
 
 void ErgMode::_writeLog(float currentIncline, float newIncline, int currentSetPoint, int newSetPoint, int currentWatts, int newWatts, int currentCadence, int newCadence) {

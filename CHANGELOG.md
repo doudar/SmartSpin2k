@@ -11,6 +11,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Added new BLE firmware update protocol.
 
 ### Changed
+- Truncate only the BLE-advertised device name when needed so the SmartSpin2k service UUID remains present in the legacy scan response.
+- Keep ERG mode active and lower its target to the configured minimum brake watts when cadence falls below the ERG threshold.
+- Prevent table-assisted ERG target changes from indefinitely blocking PID control when power approaches or settles near the new target.
 
 ### Hardware
 

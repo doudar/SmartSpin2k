@@ -28,14 +28,9 @@ class ErgMode {
   void _writeLog(float currentIncline, float newIncline, int currentSetPoint, int newSetPoint, int currentWatts, int newWatts, int currentCadence, int newCadence);
 
  private:
-  bool engineStopped = false;
-
   int mode = Mode::MAINTAIN;
   Measurement prevWatts;
   Measurement prevCadence;
-
-  // check if user is spinning, reset incline if user stops spinning
-  bool _userIsSpinning(int cadence, float incline);
 
   // calculate incline if setpoint (from Zwift) changes
   int32_t _setPointChangeState();
