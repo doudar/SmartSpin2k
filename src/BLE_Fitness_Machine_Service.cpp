@@ -244,9 +244,22 @@ void BLE_Fitness_Machine_Service::processFTMSWrite() {
 
         case FitnessMachineControlPointProcedure::SetTargetPower: {
           rtConfig->setFTMSMode((uint8_t)rxValue[0]);
-          if (spinBLEClient.connectedPM || rtConfig->watts.getSimulate() || spinBLEClient.connectedCD) {
+          uint16_t requestedTargetPower = bytes_to_u16(rxValue[2], rxValue[1]);
+          if (requestedTargetPower == 0) {
+            // Default sim params: wind 0, grade 0%, rolling resistance 0x28, wind resistance 0x33.
+            const uint8_t simMode[] = {FitnessMachineControlPointProcedure::SetIndoorBikeSimulationParameters, 0x00, 0x00, 0x00, 0x00, 0x28, 0x33};
+            rtConfig->setFTMSMode(FitnessMachineControlPointProcedure::SetIndoorBikeSimulationParameters);
+            rtConfig->watts.setTarget(0);
+            rtConfig->setTargetIncline(0);
+            returnValue[2] = FitnessMachineControlPointResultCode::Success;
+            logBufLength +=
+                snprintf(logBuf + logBufLength, kLogBufCapacity - logBufLength, "-> ERG Mode Target: %dw, switching to Sim Mode", requestedTargetPower);
+            ftmsStatus = {FitnessMachineStatus::IndoorBikeSimulationParametersChanged, simMode[1], simMode[2], simMode[3], simMode[4], simMode[5], simMode[6]};
+            ftmsTrainingStatus[1] = FitnessMachineTrainingStatus::ManualMode;
+            spinBLEClient.FTMSControlPointWrite(simMode, sizeof(simMode));
+          } else if (spinBLEClient.connectedPM || rtConfig->watts.getSimulate() || spinBLEClient.connectedCD) {
             returnValue[2] = FitnessMachineControlPointResultCode::Success;  // 0x01;
-            rtConfig->watts.setTarget(bytes_to_u16(rxValue[2], rxValue[1]));
+            rtConfig->watts.setTarget(requestedTargetPower);
             logBufLength += snprintf(logBuf + logBufLength, kLogBufCapacity - logBufLength, "-> ERG Mode Target: %d Current: %d Incline: %2f", rtConfig->watts.getTarget(),
                                      rtConfig->watts.getValue(), rtConfig->getTargetIncline() / 100);
             ftmsStatus            = {FitnessMachineStatus::TargetPowerChanged, (uint8_t)rxValue[1], (uint8_t)rxValue[2]};
