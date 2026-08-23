@@ -7,13 +7,13 @@
 
 /*
  * Automatically updated CA certificate for raw.githubusercontent.com
- * Last updated: 2026-04-05 08:58:47
+ * Last updated: 2026-08-23 08:57:32
  */
 
 #pragma once
 
 // certificate for https://raw.githubusercontent.com
-// Let's Encrypt R12, valid until Thu May 07 2026, size: 1934 bytes
+// Let's Encrypt YR1, valid until Sat Oct 31 2026, size: 1934 bytes
 const char* rootCACertificate =
     "-----BEGIN CERTIFICATE-----\n"
     "MIIFazCCA1OgAwIBAgIRAIIQz7DSQONZRGPgu2OCiwAwDQYJKoZIhvcNAQELBQAwTzELMAkGA1UE\n"
