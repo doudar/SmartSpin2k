@@ -8,7 +8,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+
+### Changed
+
+### Hardware
+
+
+## [26.8.21]
+
+### Added
 - Added new BLE firmware update protocol.
+- Updated build script.
 
 ### Changed
 - Truncate only the BLE-advertised device name when needed so the SmartSpin2k service UUID remains present in the legacy scan response.
