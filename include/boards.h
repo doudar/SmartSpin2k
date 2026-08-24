@@ -7,11 +7,7 @@
 
 #pragma once
 
-#ifndef UNIT_TEST
 #include <Arduino.h>
-#else
-#include <ArduinoFake.h>
-#endif
 
 class Board {
  public:

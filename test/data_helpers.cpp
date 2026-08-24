@@ -201,26 +201,6 @@ static void createPowerTableHeatmap(const std::string& inputFilePath, const std:
         htmlFile << "</script>\n";
     }
     
-    // Function to map value to color (blue to red gradient)
-    auto valueToColor = [minValue, maxValue](int16_t value) -> std::string {
-        if (value == INT16_MIN) {
-            return std::string("white"); // White for empty cells
-        }
-        
-        // Normalize value to [0, 1]
-        float normalized = static_cast<float>(value - minValue) / (maxValue - minValue);
-        
-        // Map to blue (0) -> purple (0.5) -> red (1)
-        int r = std::min(255, static_cast<int>(255 * normalized));
-        int b = std::min(255, static_cast<int>(255 * (1.0f - normalized)));
-        int g = 0; // Keep green at 0 for more vivid colors
-        
-        char colorHex[8];
-        sprintf(colorHex, "#%02X%02X%02X", r, g, b);
-        return std::string(colorHex);
-    };
-    
-
     if (addTimeSlider && !ptabFiles.empty()) {
         // Add slider UI
         htmlFile << "<div id=\"timeSliderContainer\">\n";
@@ -465,7 +445,7 @@ static void createPowerTableHeatmap(const std::string& inputFilePath, const std:
 }
 
 // Helper function to save PTData to CSV file
-static void savePTDataToCSV(const PTData& ptData, const std::string& filePath, bool skipHeatmap = false) {
+inline void savePTDataToCSV(const PTData& ptData, const std::string& filePath, bool skipHeatmap = false) {
     std::ofstream file(filePath);
     if (!file.is_open()) {
         printf("Failed to create file: %s\n", filePath.c_str());
@@ -511,4 +491,3 @@ static void savePTDataToCSV(const PTData& ptData, const std::string& filePath, b
         printf("Heatmap visualization automatically created at: %s\n", heatmapPath.c_str());
     }
 }
-

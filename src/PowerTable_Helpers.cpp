@@ -7,27 +7,14 @@
 
 #include "PowerTable_Helpers.h"
 
+#include <cmath>
+#include <cstdint>
+
 // if building PLATFORMIO_ENV_NATIVE environment define SS2K_LOG as Serial.printf(), else include the SS2KLog.h.
 #ifdef PLATFORMIO_ENV_NATIVE
 #include <fstream>
-#include <sstream>
-#include <cmath>
-#include <stdint.h>
-#include <algorithm>
-#include <iterator>
-#include <map>
-#include <cstdint>
-#include <chrono>
 
 std::ofstream outFile("test/output/test_PowerTable_Helpers.txt", std::ios::trunc);
-
-// Stub for millis() function in native environment
-unsigned long millis() {
-  using namespace std::chrono;
-  static auto start = steady_clock::now();
-  auto now          = steady_clock::now();
-  return duration_cast<milliseconds>(now - start).count();
-}
 
 #define SS2K_LOG(tag, format, ...)                                \
   {                                                               \
@@ -39,255 +26,108 @@ unsigned long millis() {
 #include "SS2KLog.h"
 #endif
 
-/////////////////////////Resistance Model/////////////////////////
+namespace {
+constexpr int MAX_MONOTONIC_PASSES = 20;
+constexpr int MAX_PAVA_ENTRIES =
+    POWERTABLE_WATT_SIZE > POWERTABLE_CAD_SIZE ? POWERTABLE_WATT_SIZE : POWERTABLE_CAD_SIZE;
+constexpr int MAX_ESTIMATED_POWER_WATTS = 4000;
+constexpr int MIN_EXTRAPOLATION_POSITION_SPAN = 20;
 
-// Gaussian Elimination Solver for NxN matrix
-bool ResistanceModel::solveMatrix(double A[6][6], double B[6], int n) {
-  for (int i = 0; i < n; i++) {
-    // Pivot
-    int maxRow = i;
-    for (int k = i + 1; k < n; k++) {
-      // CHANGE: std::abs -> std::fabs
-      if (std::fabs(A[k][i]) > std::fabs(A[maxRow][i])) maxRow = k;
-    }
-
-    // Swap rows
-    for (int k = 0; k < n; k++) {
-      std::swap(A[i][k], A[maxRow][k]);
-    }
-    std::swap(B[i], B[maxRow]);
-
-    // Singular matrix check
-    // CHANGE: std::abs -> std::fabs
-    if (std::fabs(A[i][i]) < 1e-9) return false;
-
-    // Eliminate
-    for (int k = i + 1; k < n; k++) {
-      double c = -A[k][i] / A[i][i];
-      for (int j = i; j < n; j++) {
-        if (i == j)
-          A[k][j] = 0;
-        else
-          A[k][j] += c * A[i][j];
-      }
-      B[k] += c * B[i];
-    }
-  }
-
-  // Back substitution
-  for (int i = n - 1; i >= 0; i--) {
-    double sum = 0;
-    for (int j = i + 1; j < n; j++) sum += A[i][j] * b[j];
-    b[i] = (B[i] - sum) / A[i][i];
-  }
-  return true;
+int32_t storedPositionToSteps(float storedPosition) {
+  const double steps = static_cast<double>(storedPosition) * TABLE_DIVISOR;
+  if (!std::isfinite(steps)) return RETURN_ERROR;
+  if (steps >= INT32_MAX) return INT32_MAX;
+  // Keep INT32_MIN reserved as RETURN_ERROR.
+  if (steps <= static_cast<double>(INT32_MIN) + 1.0) return INT32_MIN + 1;
+  return static_cast<int32_t>(std::round(steps));
 }
 
-void ResistanceModel::fit(const PTData& data) {
-  long int timer = millis();
-  isValid = false;
+bool getObservedWattBounds(int cad, PTData& ptData, int& minimumWatts, int& maximumWatts) {
+  minimumWatts = MAX_ESTIMATED_POWER_WATTS;
+  maximumWatts = 0;
+  bool found   = false;
 
-  // 1. Collect Valid Points & Find Bounds
-  struct Point {
-    double w, r, z;
-  };
-  std::vector<Point> points;
-  points.reserve(240);  // Prevent heap fragmentation
+  for (int row = 0; row < POWERTABLE_CAD_SIZE; ++row) {
+    int reliableSamples = 0;
+    for (int col = 0; col < POWERTABLE_WATT_SIZE; ++col) {
+      const TableEntry& entry = ptData.tableRow[row].tableEntry[col];
+      if (entry.targetPosition != INT16_MIN && entry.readings >= 2) ++reliableSamples;
+    }
+    if (reliableSamples < 2) continue;
 
-  minW = 1e9;
-  maxW = -1e9;
-  minR = 1e9;
-  maxR = -1e9;
+    const int sampleCadence = MINIMUM_TABLE_CAD + row * POWERTABLE_CAD_INCREMENT;
+    for (int col = 0; col < POWERTABLE_WATT_SIZE; ++col) {
+      const TableEntry& entry = ptData.tableRow[row].tableEntry[col];
+      if (entry.targetPosition == INT16_MIN || entry.readings < 2) continue;
 
-  for (int r = 0; r < POWERTABLE_CAD_SIZE; r++) {
-    for (int c = 0; c < POWERTABLE_WATT_SIZE; c++) {
-      int16_t val = data.tableRow[r].tableEntry[c].targetPosition;
-      if (val == INT16_MIN || data.tableRow[r].tableEntry[c].readings < 2) continue;
-
-      double w   = 0 + (c * POWERTABLE_WATT_INCREMENT);
-      double rpm = MINIMUM_TABLE_CAD + (r * POWERTABLE_CAD_INCREMENT);
-
-      points.push_back({w, rpm, (double)val});
-
-      if (w < minW) minW = w;
-      if (w > maxW) maxW = w;
-      if (rpm < minR) minR = rpm;
-      if (rpm > maxR) maxR = rpm;
+      const double normalizedWatts = static_cast<double>(col * POWERTABLE_WATT_INCREMENT) * cad / sampleCadence;
+      const int boundedWatts = normalizedWatts >= MAX_ESTIMATED_POWER_WATTS
+                                   ? MAX_ESTIMATED_POWER_WATTS
+                                   : static_cast<int>(std::round(normalizedWatts));
+      if (boundedWatts < minimumWatts) minimumWatts = boundedWatts;
+      if (boundedWatts > maximumWatts) maximumWatts = boundedWatts;
+      found = true;
     }
   }
-
-  int N = points.size();
-  if (N < 4) return;
-
-  // CHANGE: std::abs -> std::fabs
-  if (std::fabs(maxW - minW) < 1.0) maxW += 1.0;
-  if (std::fabs(maxR - minR) < 1.0) maxR += 1.0;
-
-  // 2. Decide Model Complexity
-  // Require 10 points for the complex curve to ensure stability
-  isQuadratic   = (N >= 10) ? true : false;
-  int numCoeffs = isQuadratic ? 6 : 3;
-
-  // 3. Build Matrices (Stack Allocated)
-  double A[6][6] = {0};
-  double B[6]    = {0};
-
-  for (const auto& p : points) {
-    double x = normW(p.w);
-    double y = normR(p.r);
-    double z = p.z;
-
-    double terms[6];
-    terms[0] = 1.0;
-    terms[1] = x;
-    terms[2] = y;
-    if (isQuadratic) {
-      terms[3] = x * x;
-      terms[4] = y * y;
-      terms[5] = x * y;
-    }
-
-    for (int i = 0; i < numCoeffs; i++) {
-      for (int j = 0; j < numCoeffs; j++) {
-        A[i][j] += terms[i] * terms[j];
-      }
-      B[i] += terms[i] * z;
-    }
-  }
-
-  // 4. Solve
-  isValid = solveMatrix(A, B, numCoeffs);
-
-  SS2K_LOG(PTDATA_LOG_TAG, "Fit Valid: %d, N: %d, Quad: %d, Time: %ld ms", isValid, N, isQuadratic, millis() - timer);
+  return found;
 }
 
-int16_t ResistanceModel::predict(double watts, double rpm) {
-  if (!isValid) return INT16_MIN;
-  // SS2K_LOG(PTDATA_LOG_TAG, "Predicting for Watts: %.2f, RPM: %.2f", watts, rpm);
+// Apply weighted pool-adjacent-violators to only the measured entries in a
+// row or column. Empty grid cells are deliberately left empty: lookup owns
+// interpolation and extrapolation between the measured calibration points.
+bool enforceMonotonicEntries(TableEntry* const entries[], int entryCount, bool increasing) {
+  if (entryCount < 2) return false;
 
-  // Normalize inputs using the bounds found during training
-  double x = normW(watts);
-  double y = normR(rpm);
-  double overPeakDelta = 0.0;  // Preserve how far past the peak we are
+  float blockPosition[MAX_PAVA_ENTRIES];
+  float blockWeight[MAX_PAVA_ENTRIES];
+  int blockStart[MAX_PAVA_ENTRIES];
+  int blockEnd[MAX_PAVA_ENTRIES];
+  int blockCount = 0;
 
-  // If the model is quadratic and 'b[3]' (the x^2 term) is negative,
-  // the curve is a downward-facing parabola (concave down).
-  // We must ensure we don't predict on the "falling" side of the peak.
-  if (isQuadratic && b[3] < -1e-9) {
-    // The slope with respect to x is: dZ/dx = b1 + 2*b3*x + b5*y
-    // The peak (slope = 0) occurs at: x_vertex = -(b1 + b5*y) / (2*b3)
-    double numerator   = -(b[1] + b[5] * y);
-    double denominator = 2.0 * b[3];
+  for (int i = 0; i < entryCount; ++i) {
+    blockPosition[blockCount] = entries[i]->targetPosition;
+    blockWeight[blockCount]   = entries[i]->readings;
+    blockStart[blockCount]    = i;
+    blockEnd[blockCount]      = i;
+    ++blockCount;
 
-    // Safety check for div/0 (though b[3] < -1e-9 ensures it's non-zero)
-    double x_vertex = numerator / denominator;
+    while (blockCount >= 2) {
+      const int previous = blockCount - 2;
+      const int current  = blockCount - 1;
+      const bool violation = increasing ? blockPosition[previous] > blockPosition[current]
+                                        : blockPosition[previous] < blockPosition[current];
+      if (!violation) break;
 
-    // If the requested x is to the right of the peak, clamp it to the peak.
-    if (x > x_vertex) {
-      overPeakDelta = x - x_vertex;
-      overPeakDelta = (overPeakDelta * TABLE_DIVISOR) * (watts/rpm);
-      x             = x_vertex;
+      const float totalWeight = blockWeight[previous] + blockWeight[current];
+      blockPosition[previous] = ((blockPosition[previous] * blockWeight[previous]) +
+                                 (blockPosition[current] * blockWeight[current])) /
+                                totalWeight;
+      blockWeight[previous] = totalWeight;
+      blockEnd[previous]    = blockEnd[current];
+      --blockCount;
     }
   }
 
-  double res = b[0] + b[1] * x + b[2] * y;
-
-  if (isQuadratic) {
-    res += b[3] * x * x + b[4] * y * y + b[5] * x * y;
-  }
-
-  // Allow a gentle linear rise past the peak instead of flattening
-  res += overPeakDelta;
-
-  // Clamp to int16 range
-  if (res > 32767.0) return 32767;
-  if (res < -32768.0) return -32768;
-  return (int16_t)round(res);
-}
-
-/**
- * Inverse prediction: Given a Resistance (TargetPosition) and Cadence,
- * calculate the required Watts.
- */
-int ResistanceModel::predictWatts(int32_t resistance, float cadence) {
-  if (!isValid) return 0;  // Or appropriate error code
-
-  // 1. Normalize the inputs (Cadence only, we solve for X)
-  double y = normR(cadence);
-  double Z = (double)resistance;
-
-  double predictedNormWatts = 0.0;
-
-  // 2. Setup Quadratic Equation Coefficients: A*x^2 + B*x + C = 0
-  double QA = isQuadratic ? b[3] : 0.0;
-  double QB = b[1];
-  double QC = b[0] + (b[2] * y) - Z;
-
-  if (isQuadratic) {
-    QB += b[5] * y;
-    QC += b[4] * y * y;
-  }
-
-  // 3. Solve
-  if (std::fabs(QA) < 1e-9) {
-    // --- Linear Solve ---
-    if (std::fabs(QB) < 1e-9) return 0;
-    predictedNormWatts = -QC / QB;
-  } else {
-    // --- Quadratic Solve ---
-    double delta = (QB * QB) - (4 * QA * QC);
-
-    if (delta < 0) {
-      // No real solution (Resistance likely higher than the peak)
-      // Return the vertex (max possible watts before drop-off)
-      predictedNormWatts = -QB / (2 * QA);
-    } else {
-      double sqrtDelta = std::sqrt(delta);
-      double x1        = (-QB + sqrtDelta) / (2 * QA);
-      double x2        = (-QB - sqrtDelta) / (2 * QA);
-
-      // We have two Watt answers.
-      // Physical logic: Resistance increases with Watts.
-      // If the curve is concave down (QA < 0), the "rising" edge is the smaller x.
-      // If the curve is concave up (QA > 0), the "rising" edge is the larger x.
-
-      bool x1In = (x1 >= 0.0 && x1 <= 1.0);
-      bool x2In = (x2 >= 0.0 && x2 <= 1.0);
-
-      if (x1In && !x2In)
-        predictedNormWatts = x1;
-      else if (!x1In && x2In)
-        predictedNormWatts = x2;
-      else {
-        // Both valid (or both invalid).
-        // Use slope logic to break the tie.
-        if (QA < 0) {
-          // Downward parabola: Rising edge is the Left side (Smaller X)
-          predictedNormWatts = (x1 < x2) ? x1 : x2;
-        } else {
-          // Upward parabola: Rising edge is the Right side (Larger X)
-          predictedNormWatts = (x1 > x2) ? x1 : x2;
-        }
+  bool changed = false;
+  for (int block = 0; block < blockCount; ++block) {
+    const int16_t correctedPosition = static_cast<int16_t>(round(blockPosition[block]));
+    for (int i = blockStart[block]; i <= blockEnd[block]; ++i) {
+      if (entries[i]->targetPosition != correctedPosition) {
+        entries[i]->targetPosition = correctedPosition;
+        changed                    = true;
       }
     }
   }
-
-  // 4. Denormalize
-  double finalWatts = predictedNormWatts * (maxW - minW) + minW;
-
-  // 5. Clamp to logical limits
-  if (finalWatts < 0) finalWatts = 0;
-
-  return (int)round(finalWatts);
+  return changed;
 }
-///////////////////////////////////////////////Resistance Model///////////////////////////////////////////////
+}  // namespace
 
 
 /**
  * @brief Enters a new data point and then enforces monotonicity on the whole table.
  * * This function first calculates the running average for the given data point.
- * Then, it calls the PAVA helper functions to ensure the entire table remains
- * monotonically increasing across both watts and cadence.
+ * Then, it calls the PAVA helper functions to ensure resistance does not fall
+ * as power rises or rise as cadence increases.
  * * @param ptData The main power table data structure.
  * @param index The watt and cadence index for the new data point.
  * @param pos The measured targetPosition for this data point.
@@ -296,15 +136,13 @@ void PTHelpers::enterData(PTData& ptData, ptIndex index, int pos) {
   // Reference to the specific table entry for cleaner code
   TableEntry& entry = ptData.tableRow[index.cadIndex].tableEntry[index.wattIndex];
 
-  int left       = INT16_MIN;
-  int down       = INT16_MIN;
   bool moveTable = false;
   clean(ptData);
 
   // Get the topmost value in the column
 
   if (entry.readings == 0) {  // if first reading in this entry
-    entry.readings = 1; // Initialize readings to 1 (total will be 2 after this loop) 1 alone is used for automatic computations.
+    entry.readings = 1;  // The common increment below marks this first measured entry as reliable (2).
     SS2K_LOG(PTDATA_LOG_TAG, "New entry recorded (%d)(%d)(%d)", index.cadIndex, index.wattIndex, pos);
   } else {  // Average and update the readings.
     // Use floating point for accuracy in averaging
@@ -318,7 +156,6 @@ void PTHelpers::enterData(PTData& ptData, ptIndex index, int pos) {
   // Get the value to the left of the new entry
   for (int i = index.wattIndex - 1; i > 0; i--) {
     if (ptData.tableRow[index.cadIndex].tableEntry[i].targetPosition > pos) {
-      left = ptData.tableRow[index.cadIndex].tableEntry[i].targetPosition;
       SS2K_LOG(PTDATA_LOG_TAG, "Greater Left Found %d, %d, tp%d", index.cadIndex, i, ptData.tableRow[index.cadIndex].tableEntry[i].targetPosition);
       ptData.tableRow[index.cadIndex].tableEntry[i].readings--;
       moveTable = true;
@@ -330,7 +167,6 @@ void PTHelpers::enterData(PTData& ptData, ptIndex index, int pos) {
   for (int j = index.cadIndex + 1; j < POWERTABLE_CAD_SIZE - 1; j++) {
     if (ptData.tableRow[j].tableEntry[index.wattIndex].targetPosition > pos) {
       SS2K_LOG(PTDATA_LOG_TAG, "Greater Down Found %d, %d, tp%d", j, index.wattIndex, ptData.tableRow[j].tableEntry[index.wattIndex].targetPosition);
-      down = ptData.tableRow[j].tableEntry[index.wattIndex].targetPosition;
       ptData.tableRow[j].tableEntry[index.wattIndex].readings--;
       moveTable = true;
       break;
@@ -358,7 +194,6 @@ void PTHelpers::enterData(PTData& ptData, ptIndex index, int pos) {
   }
 
   if (moveTable) {
-    // clean(ptData);
     return;
   }
 
@@ -368,29 +203,21 @@ void PTHelpers::enterData(PTData& ptData, ptIndex index, int pos) {
     entry.readings++;
   }
 
-  // // After updating a point, re-process the entire table to enforce global monotonicity.
-  this->fillGaps(ptData);
-  // for (int i = 0; i < 10; i++) {  // Run the PAVA functions multiple times to ensure convergence
-  bool caddone  = false;
-  bool wattdone = false;
-  int loop      = 0;
-  while ((!caddone || !wattdone) && loop < 2) {
-    loop++;
-    if (!caddone) {
-      caddone = fillAllCadenceLines(ptData);
-    }
-    if (!wattdone) {
-      wattdone = fillAllWattColumns(ptData);
-    }
-    SS2K_LOG(PTDATA_LOG_TAG, "PAVA iteration done, still converging: cad %d, watt %d, Loop %d", caddone, wattdone, loop);
-  }
-  // Remove zig-zags in data.
-  //this->safeSmooth(ptData);
-  // After updating a point, re-process the entire table to enforce global monotonicity.
-  resistanceModel.fit(ptData);
+  // Row and column constraints can disturb one another, so alternate them
+  // until neither changes. The cap protects the firmware from pathological
+  // input while being comfortably larger than this 10x30 table requires.
+  bool changed = false;
+  int pass      = 0;
+  do {
+    const bool powerChanged   = enforceMonotonicAcrossPower(ptData);
+    const bool cadenceChanged = enforceMonotonicAcrossCadence(ptData);
+    changed = powerChanged || cadenceChanged;
+    ++pass;
+    SS2K_LOG(PTDATA_LOG_TAG, "Monotonic pass %d: power %d, cadence %d", pass, powerChanged, cadenceChanged);
+  } while (changed && pass < MAX_MONOTONIC_PASSES);
 
-  if (resistanceModel.getIsValid()) {
-    this->fill(ptData);
+  if (changed) {
+    SS2K_LOG(PTDATA_LOG_TAG, "Monotonic constraints reached the %d-pass safety limit", MAX_MONOTONIC_PASSES);
   }
 }
 
@@ -406,10 +233,122 @@ ptIndex PTHelpers::calculateIndex(int watts, int cad) {
 
 
 int32_t PTHelpers::lookup(int watts, int cad, PTData& ptData) {
-  if (!resistanceModel.getIsValid()) {
-    resistanceModel.fit(ptData);
+  if (cad <= 0 || watts < 0) return RETURN_ERROR;
+
+  float rowPosition[POWERTABLE_CAD_SIZE];
+  int rowCadence[POWERTABLE_CAD_SIZE];
+  int validRows = 0;
+
+  // Determine the requested position independently in each cadence row. Use
+  // the surrounding reliable watt samples for interpolation, or the nearest
+  // two reliable samples for extrapolation beyond a row's measured range.
+  for (int row = 0; row < POWERTABLE_CAD_SIZE; row++) {
+    int reliableSamples = 0;
+    for (int col = 0; col < POWERTABLE_WATT_SIZE; col++) {
+      const TableEntry& entry = ptData.tableRow[row].tableEntry[col];
+      if (entry.targetPosition != INT16_MIN && entry.readings >= 2) reliableSamples++;
+    }
+    // A lone point establishes no watt-to-position slope and can introduce a
+    // discontinuity when mixed with complete neighboring rows.
+    if (reliableSamples < 2) continue;
+
+    const int sampleCadence = MINIMUM_TABLE_CAD + row * POWERTABLE_CAD_INCREMENT;
+    // Compare equal torque operating points between cadence rows. At a fixed
+    // resistance, power changes approximately in proportion to cadence.
+    const float rowTargetWatts = static_cast<float>(watts) * sampleCadence / cad;
+    int below = -1;
+    int above = -1;
+    int first = -1;
+    int second = -1;
+    int penultimate = -1;
+    int last = -1;
+
+    for (int col = 0; col < POWERTABLE_WATT_SIZE; col++) {
+      const TableEntry& entry = ptData.tableRow[row].tableEntry[col];
+      if (entry.targetPosition == INT16_MIN || entry.readings < 2) continue;
+
+      if (first < 0) {
+        first = col;
+      } else if (second < 0) {
+        second = col;
+      }
+      penultimate = last;
+      last = col;
+
+      const int sampleWatts = col * POWERTABLE_WATT_INCREMENT;
+      if (sampleWatts <= rowTargetWatts) below = col;
+      if (sampleWatts >= rowTargetWatts && above < 0) above = col;
+    }
+
+    int lowerCol;
+    int upperCol;
+    if (below >= 0 && above >= 0 && below != above) {
+      lowerCol = below;
+      upperCol = above;
+    } else if (below >= 0 && above >= 0) {
+      rowCadence[validRows] = sampleCadence;
+      rowPosition[validRows++] = ptData.tableRow[row].tableEntry[below].targetPosition;
+      continue;
+    } else if (below < 0 && first >= 0 && second >= 0) {
+      lowerCol = first;
+      upperCol = second;
+      // Avoid extrapolating a long distance from an almost-flat segment. Use
+      // the nearest sample that establishes a meaningful position span, or
+      // the farthest available sample when the whole end of the row is flat.
+      const int16_t firstPosition = ptData.tableRow[row].tableEntry[first].targetPosition;
+      for (int col = second; col < POWERTABLE_WATT_SIZE; ++col) {
+        const TableEntry& candidate = ptData.tableRow[row].tableEntry[col];
+        if (candidate.targetPosition == INT16_MIN || candidate.readings < 2) continue;
+        upperCol = col;
+        if (candidate.targetPosition - firstPosition >= MIN_EXTRAPOLATION_POSITION_SPAN) break;
+      }
+    } else if (above < 0 && penultimate >= 0 && last >= 0) {
+      lowerCol = penultimate;
+      upperCol = last;
+      const int16_t lastPosition = ptData.tableRow[row].tableEntry[last].targetPosition;
+      for (int col = penultimate; col >= 0; --col) {
+        const TableEntry& candidate = ptData.tableRow[row].tableEntry[col];
+        if (candidate.targetPosition == INT16_MIN || candidate.readings < 2) continue;
+        lowerCol = col;
+        if (lastPosition - candidate.targetPosition >= MIN_EXTRAPOLATION_POSITION_SPAN) break;
+      }
+    } else {
+      continue;
+    }
+
+    const float lowerWatts = lowerCol * POWERTABLE_WATT_INCREMENT;
+    const float upperWatts = upperCol * POWERTABLE_WATT_INCREMENT;
+    const float lowerPosition = ptData.tableRow[row].tableEntry[lowerCol].targetPosition;
+    const float upperPosition = ptData.tableRow[row].tableEntry[upperCol].targetPosition;
+    rowCadence[validRows] = sampleCadence;
+    rowPosition[validRows++] = lowerPosition + (rowTargetWatts - lowerWatts) * (upperPosition - lowerPosition) / (upperWatts - lowerWatts);
   }
-  return (resistanceModel.predict(watts, cad)) == INT16_MIN ? INT32_MIN : resistanceModel.predict(watts, cad) * TABLE_DIVISOR;
+
+  if (validRows == 0) return RETURN_ERROR;
+  if (validRows == 1) return storedPositionToSteps(rowPosition[0]);
+
+  // Beyond the measured cadence range, torque scaling above already maps the
+  // request onto the nearest real row. Do not amplify row-to-row calibration
+  // noise by extrapolating position across cadence as well.
+  if (cad <= rowCadence[0]) return storedPositionToSteps(rowPosition[0]);
+  if (cad >= rowCadence[validRows - 1]) return storedPositionToSteps(rowPosition[validRows - 1]);
+
+  int lowerRow = 0;
+  int upperRow = 1;
+  if (cad > rowCadence[0]) {
+    for (int i = 1; i < validRows; i++) {
+      if (cad <= rowCadence[i]) {
+        lowerRow = i - 1;
+        upperRow = i;
+        break;
+      }
+    }
+  }
+
+  // Blend the two estimates at equal torque for an in-range cadence.
+  const float cadenceFraction = static_cast<float>(cad - rowCadence[lowerRow]) / (rowCadence[upperRow] - rowCadence[lowerRow]);
+  const float position = rowPosition[lowerRow] + cadenceFraction * (rowPosition[upperRow] - rowPosition[lowerRow]);
+  return storedPositionToSteps(position);
 }
 
 // returns the total number of readings in the power table
@@ -423,172 +362,213 @@ int PTHelpers::getTotalReadings(PTData& ptData) {
   return totalReadings;
 }
 
-// Use the powertable to preform a reverse lookup of the target position to find the watts at a given cadence.
-int PTHelpers::lookupWatts(int cad, int32_t targetPosition, PTData& ptData) {
-  if (!resistanceModel.getIsValid()) {
-    resistanceModel.fit(ptData);
+// Invert the cadence-blended forward surface. Inverting each cadence row
+// independently makes nearly-flat row segments explode during extrapolation
+// and creates discontinuities as cadence crosses a row boundary.
+int32_t PTHelpers::invertForwardSurface(int cad, int32_t targetPosition, PTData& ptData) {
+  if (cad <= 0) return 0;
+
+  int observedMinimumWatts;
+  int observedMaximumWatts;
+  if (!getObservedWattBounds(cad, ptData, observedMinimumWatts, observedMaximumWatts)) return 0;
+
+  const int32_t zeroPosition = lookup(0, cad, ptData);
+  if (zeroPosition == RETURN_ERROR) return 0;
+
+  int searchHigh = observedMaximumWatts > 0 ? observedMaximumWatts : POWERTABLE_WATT_INCREMENT;
+  int32_t highPosition = lookup(searchHigh, cad, ptData);
+  if (highPosition == RETURN_ERROR || highPosition < zeroPosition) return 0;
+
+  // A completely flat measured surface has no unique inverse. Return the
+  // midpoint of its observed watt interval only when the position matches;
+  // otherwise choose the nearest safe edge.
+  if (highPosition == zeroPosition) {
+    if (targetPosition < zeroPosition) return 0;
+    if (targetPosition > zeroPosition) return observedMaximumWatts;
+    return observedMinimumWatts + (observedMaximumWatts - observedMinimumWatts) / 2;
   }
-  int wattsOut = resistanceModel.predictWatts(targetPosition / TABLE_DIVISOR, static_cast<float>(cad));
-  if (wattsOut < cad / 2) {
-    wattsOut = cad / 2;  // enforce a minimum wattage based on cadence to avoid absurdly low wattage outputs
+
+  if (targetPosition < zeroPosition) return 0;
+
+  while (highPosition < targetPosition && searchHigh < MAX_ESTIMATED_POWER_WATTS) {
+    const int expandedHigh = searchHigh > MAX_ESTIMATED_POWER_WATTS / 2 ? MAX_ESTIMATED_POWER_WATTS : searchHigh * 2;
+    if (expandedHigh == searchHigh) break;
+    searchHigh  = expandedHigh;
+    highPosition = lookup(searchHigh, cad, ptData);
+    if (highPosition == RETURN_ERROR) return 0;
   }
-  return wattsOut;
+  if (highPosition < targetPosition) return MAX_ESTIMATED_POWER_WATTS;
+
+  // Find the first watt whose predicted position reaches the target.
+  int lowerBound = 0;
+  int upperBound = searchHigh;
+  while (lowerBound < upperBound) {
+    const int middle = lowerBound + (upperBound - lowerBound) / 2;
+    const int32_t middlePosition = lookup(middle, cad, ptData);
+    if (middlePosition == RETURN_ERROR) return 0;
+    if (middlePosition < targetPosition) {
+      lowerBound = middle + 1;
+    } else {
+      upperBound = middle;
+    }
+  }
+
+  const int firstWatt = lowerBound;
+  const int32_t firstPosition = lookup(firstWatt, cad, ptData);
+  if (firstPosition == RETURN_ERROR) return 0;
+
+  if (firstPosition == targetPosition) {
+    // Resolve a non-unique inverse deterministically at the middle of the
+    // plateau, but do not extend an observed plateau into extrapolated space.
+    int plateauLower = firstWatt;
+    int plateauUpper = firstWatt <= observedMaximumWatts ? observedMaximumWatts : searchHigh;
+    while (plateauLower < plateauUpper) {
+      const int middle = plateauLower + (plateauUpper - plateauLower + 1) / 2;
+      const int32_t middlePosition = lookup(middle, cad, ptData);
+      if (middlePosition == RETURN_ERROR) return 0;
+      if (middlePosition <= targetPosition) {
+        plateauLower = middle;
+      } else {
+        plateauUpper = middle - 1;
+      }
+    }
+    return firstWatt + (plateauLower - firstWatt) / 2;
+  }
+
+  if (firstWatt == 0) return 0;
+  const int previousWatt = firstWatt - 1;
+  const int32_t previousPosition = lookup(previousWatt, cad, ptData);
+  if (previousPosition == RETURN_ERROR || firstPosition <= previousPosition) return previousWatt;
+
+  const double fraction = static_cast<double>(targetPosition - previousPosition) / (firstPosition - previousPosition);
+  const double watts = previousWatt + fraction;
+  if (!std::isfinite(watts) || watts <= 0.0) return 0;
+  if (watts >= MAX_ESTIMATED_POWER_WATTS) return MAX_ESTIMATED_POWER_WATTS;
+  return static_cast<int32_t>(std::round(watts));
+}
+
+int32_t PTHelpers::lookupWatts(int cad, int32_t targetPosition, PTData& ptData) {
+  if (cad <= 0) return 0;
+
+  // Invert at the table cadence knots, then apply a cumulative monotonic
+  // envelope before interpolating. Sparse rows can otherwise imply that the
+  // same resistance produces less power at a slightly higher cadence.
+  int32_t knotWatts[POWERTABLE_CAD_SIZE];
+  bool measuredAnchor[POWERTABLE_CAD_SIZE] = {};
+  for (int row = 0; row < POWERTABLE_CAD_SIZE; ++row) {
+    const int knotCadence = MINIMUM_TABLE_CAD + row * POWERTABLE_CAD_INCREMENT;
+    knotWatts[row] = invertForwardSurface(knotCadence, targetPosition, ptData);
+
+    int firstMatchingWatts = -1;
+    int lastMatchingWatts  = -1;
+    for (int col = 0; col < POWERTABLE_WATT_SIZE; ++col) {
+      const TableEntry& entry = ptData.tableRow[row].tableEntry[col];
+      if (entry.targetPosition == INT16_MIN || entry.readings < 2 || storedPositionToSteps(entry.targetPosition) != targetPosition) continue;
+      const int sampleWatts = col * POWERTABLE_WATT_INCREMENT;
+      if (firstMatchingWatts < 0) firstMatchingWatts = sampleWatts;
+      lastMatchingWatts = sampleWatts;
+    }
+    if (firstMatchingWatts >= 0) {
+      knotWatts[row]      = firstMatchingWatts + (lastMatchingWatts - firstMatchingWatts) / 2;
+      measuredAnchor[row] = true;
+    }
+  }
+
+  // Preserve exact calibration anchors. Only adjust extrapolated/interpolated
+  // knots between them to make the cadence curve non-decreasing.
+  int previousAnchor = -1;
+  for (int row = 0; row < POWERTABLE_CAD_SIZE; ++row) {
+    if (!measuredAnchor[row]) continue;
+
+    if (previousAnchor < 0) {
+      for (int i = row - 1; i >= 0; --i) {
+        if (knotWatts[i] > knotWatts[i + 1]) knotWatts[i] = knotWatts[i + 1];
+      }
+    } else {
+      // Contradictory measured anchors cannot both be preserved. This should
+      // be prevented by table monotonicity; favor the higher-cadence anchor.
+      if (knotWatts[previousAnchor] > knotWatts[row]) knotWatts[previousAnchor] = knotWatts[row];
+      for (int i = previousAnchor + 1; i < row; ++i) {
+        if (knotWatts[i] < knotWatts[i - 1]) knotWatts[i] = knotWatts[i - 1];
+        if (knotWatts[i] > knotWatts[row]) knotWatts[i] = knotWatts[row];
+      }
+    }
+    previousAnchor = row;
+  }
+
+  if (previousAnchor < 0) {
+    for (int row = 1; row < POWERTABLE_CAD_SIZE; ++row) {
+      if (knotWatts[row] < knotWatts[row - 1]) knotWatts[row] = knotWatts[row - 1];
+    }
+  } else {
+    for (int row = previousAnchor + 1; row < POWERTABLE_CAD_SIZE; ++row) {
+      if (knotWatts[row] < knotWatts[row - 1]) knotWatts[row] = knotWatts[row - 1];
+    }
+  }
+
+  if (cad <= MINIMUM_TABLE_CAD) {
+    const double watts = static_cast<double>(knotWatts[0]) * cad / MINIMUM_TABLE_CAD;
+    return watts > 0.0 ? static_cast<int32_t>(std::round(watts)) : 0;
+  }
+
+  const int maximumTableCadence = MINIMUM_TABLE_CAD + (POWERTABLE_CAD_SIZE - 1) * POWERTABLE_CAD_INCREMENT;
+  if (cad >= maximumTableCadence) {
+    const double watts = static_cast<double>(knotWatts[POWERTABLE_CAD_SIZE - 1]) * cad / maximumTableCadence;
+    if (!std::isfinite(watts) || watts >= MAX_ESTIMATED_POWER_WATTS) return MAX_ESTIMATED_POWER_WATTS;
+    return watts > 0.0 ? static_cast<int32_t>(std::round(watts)) : 0;
+  }
+
+  const int lowerRow = (cad - MINIMUM_TABLE_CAD) / POWERTABLE_CAD_INCREMENT;
+  const int upperRow = lowerRow + 1;
+  const int lowerCadence = MINIMUM_TABLE_CAD + lowerRow * POWERTABLE_CAD_INCREMENT;
+  const double fraction = static_cast<double>(cad - lowerCadence) / POWERTABLE_CAD_INCREMENT;
+  const double watts = knotWatts[lowerRow] + fraction * (knotWatts[upperRow] - knotWatts[lowerRow]);
+  if (!std::isfinite(watts) || watts >= MAX_ESTIMATED_POWER_WATTS) return MAX_ESTIMATED_POWER_WATTS;
+  return watts > 0.0 ? static_cast<int32_t>(std::round(watts)) : 0;
 }
 
 /**
- * @brief Fills empty cells in each row by using the regression model to predict missing values.
- * @param ptData The main power table data structure.
+ * @brief Enforces non-increasing resistance as cadence rises at fixed power.
  */
-void PTHelpers::fill(PTData& ptData) {
-  for (int i = 0; i < POWERTABLE_CAD_SIZE; i++) {
-    for (int j = 0; j < POWERTABLE_WATT_SIZE; j++) {
-      if (ptData.tableRow[i].tableEntry[j].readings <= 1) {
-        int cadence                                     = MINIMUM_TABLE_CAD + (i * POWERTABLE_CAD_INCREMENT);
-        int watts                                       = j * POWERTABLE_WATT_INCREMENT;
-        int16_t predictedPosition                       = resistanceModel.predict(watts, cadence);
-        ptData.tableRow[i].tableEntry[j].targetPosition = ptData.tableRow[i].tableEntry[j].targetPosition == INT16_MIN ? predictedPosition : (predictedPosition + ptData.tableRow[i].tableEntry[j].targetPosition) / 2;  // Blend predicted with existing low-confidence value
-        ptData.tableRow[i].tableEntry[j].readings       = 1;  // Mark as inferred with low confidence
-      }
-    }
-  }
-}
-
-void PTHelpers::fillGaps(PTData& ptData) {
-  for (int i = 0; i < POWERTABLE_CAD_SIZE; ++i) {     // For each row
-    for (int j = 0; j < POWERTABLE_WATT_SIZE; ++j) {  // For each cell
-      if (ptData.tableRow[i].tableEntry[j].targetPosition == INT16_MIN) {
-        // This cell is empty. Try to fill it by finding its neighbors.
-        int left_idx  = -1;
-        int right_idx = -1;
-
-        // Find nearest neighbor to the left
-        for (int k = j - 1; k >= 0; --k) {
-          if (ptData.tableRow[i].tableEntry[k].targetPosition != INT16_MIN) {
-            left_idx = k;
-            break;
-          }
-        }
-
-        // Find nearest neighbor to the right
-        for (int k = j + 1; k < POWERTABLE_WATT_SIZE; ++k) {
-          if (ptData.tableRow[i].tableEntry[k].targetPosition != INT16_MIN) {
-            right_idx = k;
-            break;
-          }
-        }
-
-        // If we found neighbors on both sides, we can interpolate.
-        if (left_idx != -1 && right_idx != -1) {
-          const TableEntry& left_entry  = ptData.tableRow[i].tableEntry[left_idx];
-          const TableEntry& right_entry = ptData.tableRow[i].tableEntry[right_idx];
-
-          float x1 = left_idx;
-          float y1 = left_entry.targetPosition;
-          float x2 = right_idx;
-          float y2 = right_entry.targetPosition;
-
-          // Standard linear interpolation formula: y = y1 + (x - x1) * (y2 - y1) / (x2 - x1)
-          float interpolated_pos = y1 + (j - x1) * (y2 - y1) / (x2 - x1);
-
-          ptData.tableRow[i].tableEntry[j].targetPosition = static_cast<int16_t>(interpolated_pos);
-          ptData.tableRow[i].tableEntry[j].readings       = 1;  // Mark as inferred with low confidence
-        }
-      }
-    }
-  }
-}
-
-bool PTHelpers::fillAllWattColumns(PTData& ptData) {
-  bool converged = true;
-  struct PAVAEntry {
-    float position;
-    float readings;
-  };
+bool PTHelpers::enforceMonotonicAcrossCadence(PTData& ptData) {
+  bool changed = false;
   for (int watt_idx = 0; watt_idx < POWERTABLE_WATT_SIZE; ++watt_idx) {
-    PAVAEntry correctedCol[POWERTABLE_CAD_SIZE];
-    for (int i = 0; i < POWERTABLE_CAD_SIZE; ++i) {
-      correctedCol[i] = {(float)ptData.tableRow[i].tableEntry[watt_idx].targetPosition, (float)ptData.tableRow[i].tableEntry[watt_idx].readings};
-    }
-    for (int i = 1; i < POWERTABLE_CAD_SIZE; ++i) {
-      if (correctedCol[i].readings == 0) continue;
-      for (int j = i; j > 0; --j) {
-        if (correctedCol[j - 1].readings == 0) continue;
-        if (correctedCol[j].position > correctedCol[j - 1].position) {
-          converged           = false;
-          float weightedSum   = (correctedCol[j].position * correctedCol[j].readings) + (correctedCol[j - 1].position * correctedCol[j - 1].readings);
-          float totalReadings = correctedCol[j].readings + correctedCol[j - 1].readings;
-          if (totalReadings > 0.0f) {
-            float newPosition            = weightedSum / totalReadings;
-            correctedCol[j].position     = newPosition;
-            correctedCol[j].readings     = totalReadings;
-            correctedCol[j - 1].position = newPosition;
-            correctedCol[j - 1].readings = totalReadings;
-          }
-        } else {
-          break;
-        }
+    TableEntry* measuredEntries[POWERTABLE_CAD_SIZE];
+    int measuredCount = 0;
+    for (int cad_idx = 0; cad_idx < POWERTABLE_CAD_SIZE; ++cad_idx) {
+      TableEntry& entry = ptData.tableRow[cad_idx].tableEntry[watt_idx];
+      if (entry.targetPosition != INT16_MIN && entry.readings >= 2) {
+        measuredEntries[measuredCount++] = &entry;
       }
     }
-    for (int i = 0; i < POWERTABLE_CAD_SIZE; ++i) {
-      if (ptData.tableRow[i].tableEntry[watt_idx].readings > 0) {
-        ptData.tableRow[i].tableEntry[watt_idx].targetPosition = (int16_t)correctedCol[i].position;
-      }
-    }
+    changed = enforceMonotonicEntries(measuredEntries, measuredCount, false) || changed;
   }
-  return converged;
+  return changed;
 }
 
 /**
- * @brief Enforces monotonicity across all watt rows using a weighted PAVA.
- * This function iterates through each cadence row and ensures that for any given
- * cadence, the targetPosition strictly INCREASES as wattage increases.
- * @param ptData The main power table data structure.
+ * @brief Enforces non-decreasing resistance as power rises at fixed cadence.
  */
-bool PTHelpers::fillAllCadenceLines(PTData& ptData) {
-  bool converged = true;
-  struct PAVAEntry {
-    float position;
-    float readings;
-  };
+bool PTHelpers::enforceMonotonicAcrossPower(PTData& ptData) {
+  bool changed = false;
   for (int cad_idx = 0; cad_idx < POWERTABLE_CAD_SIZE; ++cad_idx) {
-    PAVAEntry correctedRow[POWERTABLE_WATT_SIZE];
-    for (int i = 0; i < POWERTABLE_WATT_SIZE; ++i) {
-      correctedRow[i] = {(float)ptData.tableRow[cad_idx].tableEntry[i].targetPosition, (float)ptData.tableRow[cad_idx].tableEntry[i].readings};
-    }
-    for (int i = 1; i < POWERTABLE_WATT_SIZE; ++i) {
-      if (correctedRow[i].readings == 0) continue;
-      for (int j = i; j > 0; --j) {
-        if (correctedRow[j - 1].readings == 0) continue;
-        // Check for a violation: current position is LESS than the previous one (enforcing increasing trend).
-        if (correctedRow[j].position < correctedRow[j - 1].position) {
-          converged           = false;
-          float weightedSum   = (correctedRow[j].position * correctedRow[j].readings) + (correctedRow[j - 1].position * correctedRow[j - 1].readings);
-          float totalReadings = correctedRow[j].readings + correctedRow[j - 1].readings;
-          if (totalReadings > 0.0f) {
-            float newPosition            = weightedSum / totalReadings;
-            correctedRow[j].position     = newPosition;
-            correctedRow[j].readings     = totalReadings;
-            correctedRow[j - 1].position = newPosition;
-            correctedRow[j - 1].readings = totalReadings;
-          }
-        } else {
-          break;
-        }
+    TableEntry* measuredEntries[POWERTABLE_WATT_SIZE];
+    int measuredCount = 0;
+    for (int watt_idx = 0; watt_idx < POWERTABLE_WATT_SIZE; ++watt_idx) {
+      TableEntry& entry = ptData.tableRow[cad_idx].tableEntry[watt_idx];
+      if (entry.targetPosition != INT16_MIN && entry.readings >= 2) {
+        measuredEntries[measuredCount++] = &entry;
       }
     }
-    for (int i = 0; i < POWERTABLE_WATT_SIZE; ++i) {
-      if (ptData.tableRow[cad_idx].tableEntry[i].readings > 0) {
-        ptData.tableRow[cad_idx].tableEntry[i].targetPosition = (int16_t)correctedRow[i].position;
-      }
-    }
+    changed = enforceMonotonicEntries(measuredEntries, measuredCount, true) || changed;
   }
-  return converged;
+  return changed;
 }
 
 void PTHelpers::clean(PTData& ptData) {
   int removed = 0;
 
-  // First pass: remove entries with readings < 1 or negative positions
+  // Remove inferred/invalid entries and negative positions.
   for (int i = 0; i < POWERTABLE_CAD_SIZE; i++) {
     for (int j = 0; j < POWERTABLE_WATT_SIZE; j++) {
       //human readings are 2+
@@ -601,42 +581,6 @@ void PTHelpers::clean(PTData& ptData) {
       }
     }
   }
-
-  /*
-  // Second pass: remove duplicate values in columns (same resistance for multiple cadences)
-  // For each column, track all unique values and remove duplicates
-  for (int j = 0; j < POWERTABLE_WATT_SIZE; j++) {
-    for (int i = 0; i < POWERTABLE_CAD_SIZE; i++) {
-      if (ptData.tableRow[i].tableEntry[j].targetPosition == INT16_MIN) continue;
-
-      int16_t currentValue = ptData.tableRow[i].tableEntry[j].targetPosition;
-
-      // Check all other entries in this column for the same value
-      for (int k = i + 1; k < POWERTABLE_CAD_SIZE; k++) {
-        if (ptData.tableRow[k].tableEntry[j].targetPosition == currentValue) {
-          // Found duplicate - remove the one with fewer readings
-          // If readings are equal, keep the one at higher cadence (higher index)
-          if (ptData.tableRow[k].tableEntry[j].readings < ptData.tableRow[i].tableEntry[j].readings) {
-            ptData.tableRow[k].tableEntry[j].targetPosition = INT16_MIN;
-            ptData.tableRow[k].tableEntry[j].readings       = 0;
-            removed++;
-          } else if (ptData.tableRow[k].tableEntry[j].readings > ptData.tableRow[i].tableEntry[j].readings) {
-            // Current entry has fewer readings, mark it for removal and update current to the better one
-            ptData.tableRow[i].tableEntry[j].targetPosition = INT16_MIN;
-            ptData.tableRow[i].tableEntry[j].readings       = 0;
-            removed++;
-            break;  // Move to next i since current is removed
-          } else {
-            // Readings are equal - keep the one at higher cadence (k), remove the one at i
-            ptData.tableRow[i].tableEntry[j].targetPosition = INT16_MIN;
-            ptData.tableRow[i].tableEntry[j].readings       = 0;
-            removed++;
-            break;  // Move to next i since current is removed
-          }
-        }
-      }
-    }
-  }*/
 
   if (removed > 0) {
     SS2K_LOG(PTDATA_LOG_TAG, "Cleaned %d readings", removed);

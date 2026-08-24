@@ -9,10 +9,14 @@
 #include "test.h"
 
 #ifndef ARDUINO
-#include <sys/stat.h>   // For mkdir
-#include <sys/types.h>  // For mode_t, often required with sys/stat.h
 #include <errno.h>      // For errno and EEXIST
 #include <stdio.h>      // For perror
+#ifdef _WIN32
+#include <direct.h>
+#else
+#include <sys/stat.h>
+#include <sys/types.h>
+#endif
 #endif
 
 // Basic test functions
@@ -110,18 +114,14 @@ int main(int argc, char** argv) {
 // On POSIX systems, mkdir requires <sys/stat.h> and <sys/types.h>.
 // Mode 0777 gives read, write, execute permissions for owner, group, and others.
 #ifdef _WIN32
-  int result = mkdir(dir_path);  // Use _mkdir on Windows
+  int result = _mkdir(dir_path);
 #else
-  int result = mkdir(dir_path, 0777);  // Use mkdir on POSIX systems
+  int result = mkdir(dir_path, 0777);
 #endif
 
   if (result == -1) {
     // If mkdir failed, check why
-#ifdef _WIN32
     if (errno != EEXIST) {
-#else
-    if (errno != EEXIST) {
-#endif
       // EEXIST means the directory already exists, which is not an error for our purpose.
       // For any other error, print it.
       perror("Error creating directory test/output");

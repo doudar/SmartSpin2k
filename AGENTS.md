@@ -43,17 +43,17 @@ GitHub Actions exports `SS2K_FIRMWARE_VERSION` from the date-based release tag b
 
 Filesystem builds stage deterministic gzip copies of every HTML/CSS source file under the environment build directory. They also refresh the checked-in `.gz` companions and `list.json` in `data/` or `data_s3/`, which are consumed by repository-based automatic OTA updates.
 
-Codex environment constraint:
-
-- Do not run PlatformIO firmware or filesystem builds from the Codex environment. The Windows Xtensa toolchain can hang and leave orphaned compiler processes here. Make the requested changes, run non-build checks where useful, and clearly leave PlatformIO build validation for the user to run manually.
-
 Important timing/network notes:
 
-- First PlatformIO builds/tests may download ESP32 platforms and toolchains. They can take 15-45 minutes for firmware builds and 5-15 minutes for native tests.
+- PlatformIO firmware/filesystem builds and USB flashing are supported from the Codex environment. Local builds normally finish in under five minutes.
+- When testing attached hardware, do not switch the development machine's WiFi connection to the SmartSpin2k access point: that network has no internet access, while builds and tooling may require internet service. Communicate with the device over USB unless the user explicitly directs otherwise. Preserve the device's stored WiFi/LittleFS/NVS settings by preferring application-partition-only flashing (S3 app offset `0x60000`).
+- First PlatformIO builds/tests may download missing ESP32 platforms and toolchains and therefore take longer than normal.
 - In restricted environments, PlatformIO can fail on network downloads. If that happens, report it rather than trying to fake validation.
 - The firmware itself cannot be fully run without ESP32 hardware, BLE devices, and a stepper driver.
 
 Native tests cover sensor parsing, BLE device-name stability logic, power-buffer behavior, and power-table lookup/fill/save flows. When changing:
+
+- Native Arduino types/timing come from the repository-owned `lib/ArduinoCompat`; the suite does not use ArduinoFake. Keep this shim and test filesystem setup portable across Apple Clang/POSIX and Windows native toolchains.
 
 - `src/Power_Table.cpp` or `src/PowerTable_Helpers.cpp`, run `pio test -e native`.
 - `lib/SS2K/src/sensors/*`, run the native tests for sensor parsing.
@@ -440,8 +440,7 @@ Data structures:
 - `PowerBuffer`: fixed `POWER_SAMPLES` sample buffer used before committing a table entry.
 - `TableEntry`: compact stored table cell: `int16_t targetPosition`, `int8_t readings`.
 - `PTData`: `POWERTABLE_CAD_SIZE` x `POWERTABLE_WATT_SIZE` table.
-- `ResistanceModel`: regression model predicting position from watts/cadence and inverse watts from position/cadence.
-- `PTHelpers`: indexing, lookup, cleaning, interpolation, monotonic enforcement, and model fitting.
+- `PTHelpers`: indexing, measured-point interpolation/extrapolation, cleaning, and monotonic enforcement.
 
 Table dimensions/constants are in `include/settings.h`:
 
@@ -456,9 +455,9 @@ Flow:
 1. `PowerTable::processPowerValue()` accepts sane cadence/watts and stable position samples.
 2. A full `PowerBuffer` is averaged in `PowerTable::newEntry()`.
 3. `PTHelpers::calculateIndex()` maps watts/cadence to table indexes.
-4. `PTHelpers::enterData()` averages the cell, rejects monotonic violations, fills gaps, runs PAVA-style monotonic correction, fits `ResistanceModel`, and fills inferred cells.
-5. `lookup()` uses the model to predict a target position and multiplies by `TABLE_DIVISOR`.
-6. `lookupWatts()` inverses the model for `pTab4Pwr`.
+4. `PTHelpers::enterData()` averages the cell, rejects monotonic violations, and runs PAVA-style monotonic correction across measured entries.
+5. `lookup()` locally interpolates or extrapolates measured watt/position pairs, using equal-torque cadence scaling, and returns a full-scale position.
+6. `lookupWatts()` numerically inverts the cadence-blended forward `lookup()` surface, preserves exact measured anchors/plateau midpoints, and applies a monotonic cadence envelope for `pTab4Pwr`. Estimated power is bounded to the FTMS 4000 W maximum.
 
 Persistence:
 
@@ -470,8 +469,7 @@ Persistence:
 
 Caution:
 
-- `ResistanceModel::fit()` uses only entries with `readings >= 2`.
-- Inferred cells can improve lookup smoothness but should not be treated as real measurements.
+- Runtime lookup uses only entries with `readings >= 2`; legacy inferred cells with `readings == 1` are ignored.
 - Power-table and homing logic are tightly linked now. Loading/saving without homing is intentionally blocked.
 
 ## DirCon

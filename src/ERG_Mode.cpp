@@ -50,9 +50,8 @@ double scheduledErgGain(double sensitivity, int operatingWatts, int cadence, boo
   const int32_t upperPosition = powerTable->lookup(upperWatts, cadence);
 
   double gain = fallbackErgGain(sensitivity, operatingWatts);
-  // Sparse linear fits are useful for lookup, but not stable enough to schedule ERG gain from their slope.
-  if (powerTable->ptHelpers.resistanceModel.getIsValid() && powerTable->ptHelpers.resistanceModel.getIsQuadratic() && lowerPosition != RETURN_ERROR &&
-      upperPosition != RETURN_ERROR && upperPosition > lowerPosition) {
+  // The direct table lookup supplies a local, monotonic slope.
+  if (lowerPosition != RETURN_ERROR && upperPosition != RETURN_ERROR && upperPosition > lowerPosition) {
     const double localStepsPerWatt = static_cast<double>(upperPosition - lowerPosition) / static_cast<double>(upperWatts - lowerWatts);
     gain                           = localStepsPerWatt * sensitivity / ERG_SLOPE_CONTROL_DIVISOR;
     usedPowerTable                 = true;
@@ -186,7 +185,15 @@ void ErgMode::runERG() {
       // Lookup watts using the Power Table.
       if (powerTable->_hasBeenLoadedThisSession) {
         // Instead of directly outputting this, we should smooth the output by averaging it with the last value.
-        _smoothPWR = ((previousPower + powerTable->lookupWatts(rtConfig->cad.getValue(), ss2k->getCurrentPosition())) / 2);
+        const int tablePower = powerTable->lookupWatts(rtConfig->cad.getValue(), ss2k->getCurrentPosition());
+        // A zero lookup only occurs with zero cadence or an invalid table, so
+        // do not carry a previous power value after the rider has stopped.
+        if (tablePower > 0) {
+          _smoothPWR = (previousPower + tablePower) / 2;
+        } else {
+          _smoothPWR   = 0;
+          previousPower = 0;
+        }
       } else {
         // only run _manageSaveState every 5 seconds
         static unsigned long int saveStateTimer = millis();
@@ -196,9 +203,6 @@ void ErgMode::runERG() {
           saveStateTimer = millis();
         }
       }
-      // So the user knows pTab4PWR is enabled, provide some cadence feedback even if the value returned by the table is 0.
-      int minimumPower = rtConfig->cad.getValue() / 2;  // 50% of the cadence value
-      _smoothPWR       = _smoothPWR < minimumPower ? round((minimumPower + previousPower) / 2.0f) : _smoothPWR;
       rtConfig->watts.setValue(_smoothPWR);
       previousPower = (rtConfig->watts.getValue() + previousPower) / 2;
     }

@@ -7,11 +7,7 @@
 
 #pragma once
 
-#ifndef PLATFORMIO_ENV_NATIVE
 #include <Arduino.h>
-#else
-#include <ArduinoFake.h>
-#endif
 
 #include "settings.h"
 
