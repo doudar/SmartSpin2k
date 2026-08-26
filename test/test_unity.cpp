@@ -19,14 +19,6 @@
 #endif
 #endif
 
-// Basic test functions
-void test_dummy_function(void) { TEST_ASSERT_EQUAL(1, 1); }
-
-void test_basic_math(void) {
-  TEST_ASSERT_EQUAL(4, 2 + 2);
-  TEST_ASSERT_EQUAL(6, 2 * 3);
-}
-
 void setUp(void) {
   // set stuff up here
 }
@@ -43,10 +35,6 @@ void setup() {
 
   // Start Unity
   UNITY_BEGIN();
-
-  // Run simple tests
-  RUN_TEST(test_dummy_function);
-  RUN_TEST(test_basic_math);
 
   // FitnessMachineIndoorBike Tests
   {
@@ -67,14 +55,25 @@ void setup() {
 
   // Power Table Lookup Tests
   {
-    TestPTLookupResistance test;
-    RUN_TEST(test.test_pt_lookup_resistance);
-    TestPTLookupWatts test2;
-    RUN_TEST(test2.test_pt_lookup_watts);
-    TestWritePowerTable test4;
-    RUN_TEST(test4.test_save_and_load);
-    TestTableFill test5;
-    RUN_TEST(test5.test_fill_incomplete_table);
+    TestPTLookupResistance forwardLookupTests;
+    RUN_TEST(forwardLookupTests.test_cadence_collection_boundaries);
+    RUN_TEST(forwardLookupTests.test_active_ride_forward_lookup);
+    RUN_TEST(forwardLookupTests.test_erg_slope_quality);
+    TestPTLookupWatts reverseLookupTests;
+    RUN_TEST(reverseLookupTests.test_active_ride_reverse_lookup);
+    RUN_TEST(reverseLookupTests.test_reverse_lookup_pathological_tables);
+    TestPowerTableCsv csvTests;
+    RUN_TEST(csvTests.test_active_table_round_trip);
+    TestActiveRideTable replayTests;
+    RUN_TEST(replayTests.test_active_ride_table_generation);
+    RUN_TEST(replayTests.test_status_ride_table_generation);
+    RUN_TEST(replayTests.test_active_table_status_prediction_accuracy);
+  }
+
+  // ERG ride-log replay and gain scheduling tests
+  {
+    TestErgLogReplay ergReplayTests;
+    RUN_TEST(ergReplayTests.test_active_ride_log_and_gain_limits);
   }
 
   // BLE Device Unique Name Tests

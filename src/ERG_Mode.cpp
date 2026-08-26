@@ -6,6 +6,7 @@
  */
 
 #include "ERG_Mode.h"
+#include "ERG_Mode_Utils.h"
 #include "SS2KLog.h"
 #include "Main.h"
 #include "BLE_Custom_Characteristic.h"
@@ -22,49 +23,20 @@ static unsigned long ergTimer = millis() + ERG_MODE_DELAY;
 static bool isDelayed         = false;
 
 namespace {
-constexpr int ERG_SLOPE_SAMPLE_WATTS       = POWERTABLE_WATT_INCREMENT;
-constexpr int ERG_LOW_GAIN_WATTS           = 120;
-constexpr int ERG_HIGH_GAIN_WATTS          = 400;
-constexpr int ERG_MIN_SCHEDULE_WATTS       = 30;
-constexpr double ERG_SLOPE_CONTROL_DIVISOR = 10.0;
-constexpr double ERG_GAIN_MIN_DIVISOR      = 4.0;
-constexpr double ERG_GAIN_MAX_MULTIPLIER   = 4.0;
-constexpr int ERG_LOG_INTERVAL_MS          = 2000;
-
-double fallbackErgGain(double sensitivity, int operatingWatts) {
-  if (operatingWatts < ERG_LOW_GAIN_WATTS) {
-    return sensitivity * ERG_LOW_GAIN_WATTS / std::max(operatingWatts, ERG_MIN_SCHEDULE_WATTS);
-  }
-  if (operatingWatts > ERG_HIGH_GAIN_WATTS) {
-    return sensitivity * ERG_HIGH_GAIN_WATTS / operatingWatts;
-  }
-  return sensitivity;
-}
-
 double scheduledErgGain(double sensitivity, int operatingWatts, int cadence, bool& usedPowerTable) {
   usedPowerTable = false;
 
-  const int lowerWatts        = std::max(0, operatingWatts - ERG_SLOPE_SAMPLE_WATTS);
-  const int upperWatts        = operatingWatts + ERG_SLOPE_SAMPLE_WATTS;
-  const int32_t lowerPosition = powerTable->lookup(lowerWatts, cadence);
-  const int32_t upperPosition = powerTable->lookup(upperWatts, cadence);
-
-  double gain = fallbackErgGain(sensitivity, operatingWatts);
-  // The direct table lookup supplies a local, monotonic slope.
-  if (lowerPosition != RETURN_ERROR && upperPosition != RETURN_ERROR && upperPosition > lowerPosition) {
-    const double localStepsPerWatt = static_cast<double>(upperPosition - lowerPosition) / static_cast<double>(upperWatts - lowerWatts);
-    gain                           = localStepsPerWatt * sensitivity / ERG_SLOPE_CONTROL_DIVISOR;
-    usedPowerTable                 = true;
+  sensitivity     = ErgControl::sanitizeSensitivity(sensitivity);
+  const double fallback = ErgControl::fallbackGain(sensitivity, operatingWatts);
+  double localStepsPerWatt;
+  if (powerTable->lookupSlope(operatingWatts, cadence, localStepsPerWatt)) {
+    const double gain = localStepsPerWatt * sensitivity / ErgControl::SLOPE_CONTROL_DIVISOR;
+    usedPowerTable = true;
+    return ErgControl::boundedTableGain(gain, fallback);
   }
-
-  return gain;
+  return fallback;
 }
 
-double clampErgGain(double gain, double sensitivity) {
-  const double minimumGain = sensitivity / ERG_GAIN_MIN_DIVISOR;
-  const double maximumGain = sensitivity * ERG_GAIN_MAX_MULTIPLIER;
-  return std::max(minimumGain, std::min(gain, maximumGain));
-}
 }  // namespace
 
 void ErgMode::runERG() {
@@ -311,23 +283,17 @@ int32_t ErgMode::_inSetpointState() {
 
   // Scale the proportional gain to the local power-table slope. This compensates for the eddy-current brake producing fewer watts per step at low resistance
   // and more watts per step at high resistance. ERG sensitivity controls how much of the predicted correction is applied and bounds bad model slopes.
-  const double sensitivity = userConfig->getERGSensitivity();
-  bool usedPowerTable      = false;
-  double Kp                = scheduledErgGain(sensitivity, target, rtConfig->cad.getValue(), usedPowerTable);
+  const double configuredSensitivity = userConfig->getERGSensitivity();
+  bool usedPowerTable                = false;
+  double Kp                          = scheduledErgGain(configuredSensitivity, target, rtConfig->cad.getValue(), usedPowerTable);
+  const double controlSensitivity    = ErgControl::sanitizeSensitivity(configuredSensitivity);
 
-  // modifying gains based on error
-  if (abs(error) < 10 || (mode != Mode::MAINTAIN)) {
-    Kp = Kp * 0.25;  // decrease further for tiny errors
-  } else if (abs(error) < 50) {
-    Kp = Kp * 0.75;  // Moderate for medium errors
-  } else if (abs(error) > 100) {
-    Kp = Kp * 1.25;  // Aggressive for large errors
-  }
+  Kp = ErgControl::errorScheduledGain(Kp, error, mode == Mode::MAINTAIN);
 
   if (watts < userConfig->getMinWatts()) {
-    Kp = Kp * sensitivity;  // Increase gain at very low watts to prevent Zwift from timing out on an initial interval.
+    Kp = Kp * controlSensitivity;  // Increase gain at very low watts to prevent Zwift from timing out on an initial interval.
   }
-  Kp = clampErgGain(Kp, sensitivity);
+  Kp = ErgControl::clampGain(Kp, controlSensitivity);
 
   mode = Mode::MAINTAIN;
 
@@ -348,9 +314,9 @@ int32_t ErgMode::_inSetpointState() {
   // Calculate new incline
   float newIncline = ss2k->getCurrentPosition() + PID_output;
 
-  // log output every five seconds
+  // Log output at the configured ERG interval.
   static unsigned long lastTime = 0;
-  if (millis() - lastTime > ERG_LOG_INTERVAL_MS) {
+  if (millis() - lastTime > ERG_MODE_LOG_INTERVAL_MS) {
     lastTime = millis();
     SS2K_LOG(ERG_MODE_LOG_TAG, "%dw, Target %dw, Kp: %.3f (%s), PID Output: %f, Moving to: %f", rtConfig->watts.getValue(), rtConfig->watts.getTarget(), Kp,
              usedPowerTable ? "table" : "fallback", PID_output, newIncline);

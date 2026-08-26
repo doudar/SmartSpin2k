@@ -51,9 +51,10 @@ Important timing/network notes:
 - In restricted environments, PlatformIO can fail on network downloads. If that happens, report it rather than trying to fake validation.
 - The firmware itself cannot be fully run without ESP32 hardware, BLE devices, and a stepper driver.
 
-Native tests cover sensor parsing, BLE device-name stability logic, power-buffer behavior, and power-table lookup/fill/save flows. When changing:
+Native tests cover sensor parsing, BLE device-name stability logic, firmware-update protocol handling, and power-table/ERG replay flows. When changing:
 
 - Native Arduino types/timing come from the repository-owned `lib/ArduinoCompat`; the suite does not use ArduinoFake. Keep this shim and test filesystem setup portable across Apple Clang/POSIX and Windows native toolchains.
+- `test/data/active_ride_log.txt` is the single real-world fixture for power-table and ERG tests. Each test replays it independently through `test/test_data_helpers.h`; generated tables and audit reports belong under ignored `test/output/`.
 
 - `src/Power_Table.cpp` or `src/PowerTable_Helpers.cpp`, run `pio test -e native`.
 - `lib/SS2K/src/sensors/*`, run the native tests for sensor parsing.
@@ -421,6 +422,7 @@ Primary files: `include/ERG_Mode.h`, `src/ERG_Mode.cpp`.
 `_inSetpointState()`:
 
 - Uses proportional-only control with `ERGSensitivity`.
+- Caps table-scheduled sensitivity at 3 (so legacy/default 5 behaves like the stable setting 3) and bounds sparse local table slopes to 0.5-2x the watt-scheduled fallback gain. The configured sensitivity remains unchanged and is still used when no useful table slope exists.
 - Scales gain by watt error size.
 - Caps movement by stepper speed and `ERG_MODE_DELAY`.
 

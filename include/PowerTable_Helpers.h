@@ -82,8 +82,10 @@ class PTHelpers {
 
  public:
   int32_t lookup(int watts, int cad, PTData& ptData);
+  bool lookupSlope(int watts, int cad, double& stepsPerWatt, PTData& ptData);
   int32_t lookupWatts(int cad, int32_t targetPosition, PTData& ptData);
   int getTotalReadings(PTData& ptData);
   ptIndex calculateIndex(int watts, int cad);
+  bool cadenceIsWithinTable(int cad);
   void enterData(PTData& ptData, ptIndex index, int pos);
 };

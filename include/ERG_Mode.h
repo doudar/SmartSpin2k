@@ -14,6 +14,8 @@
 #define ERG_MODE_LOG_TAG     "ERG_Mode"
 #define ERG_MODE_DELAY       700
 
+constexpr int ERG_MODE_LOG_INTERVAL_MS = 2000;
+
 struct Mode {
   static const int MAINTAIN   = 0;
   static const int DECREASING = 1;

@@ -22,29 +22,34 @@ class test_cyclePowerData {
   static void test_parses_speed(void);
 };
 
-class TestPowerBuffer {
+class TestErgLogReplay {
  public:
-  static void set__should_set_values__expect_values_added_to_correct_index(void);
+  static void test_active_ride_log_and_gain_limits(void);
 };
 
 class TestPTLookupResistance {
  public:
-  static void test_pt_lookup_resistance(void);
+  static void test_cadence_collection_boundaries(void);
+  static void test_active_ride_forward_lookup(void);
+  static void test_erg_slope_quality(void);
 };
 
 class TestPTLookupWatts {
   public:
-   static void test_pt_lookup_watts(void);
+   static void test_active_ride_reverse_lookup(void);
+   static void test_reverse_lookup_pathological_tables(void);
  };
 
-class TestWritePowerTable {
+class TestPowerTableCsv {
   public:
-    static void test_save_and_load(void);
+    static void test_active_table_round_trip(void);
 };
 
-class TestTableFill {
+class TestActiveRideTable {
   public:
-    static void test_fill_incomplete_table(void);
+    static void test_active_ride_table_generation(void);
+    static void test_status_ride_table_generation(void);
+    static void test_active_table_status_prediction_accuracy(void);
 };
 
 class TestAdevName2UniqueName {

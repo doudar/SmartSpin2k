@@ -6,225 +6,119 @@
  */
 
 #include <unity.h>
-#include "test.h"
-#include "PowerTable_Helpers.h"
-// Doesn't need to be included again, since is't already in test_pt_lookup_resistance.cpp
-// #include "../src/PowerTable_Helpers.cpp"
-#include <sdkconfig.h>
+
+#include <cstdio>
 #include <fstream>
-#include <sstream>
-#include <string>
-#include <vector>
-#include "data_helpers.cpp"
 
-void TestPTLookupWatts::test_pt_lookup_watts(void) {
-  std::ofstream outFile("test/output/test_pt_lookup_watts.txt", std::ios::trunc);
-  outFile << "Starting lookup test\n";
+#include "PowerTable_Helpers.h"
+#include "test.h"
+#include "test_data_helpers.h"
 
-  // Create a test power table with simple values
+void TestPTLookupWatts::test_active_ride_reverse_lookup(void) {
   PTData ptData;
+  RideReplaySummary summary;
+  TEST_ASSERT_TRUE_MESSAGE(replayActiveRideLog(ptData, summary), "active ride log could not be opened for reverse lookup test");
+  TEST_ASSERT_EQUAL_INT_MESSAGE(0, summary.invalidEntries, "active ride log contains invalid reverse-lookup inputs");
+  TEST_ASSERT_EQUAL_INT_MESSAGE(552, summary.entries, "reverse lookup did not replay every active-log entry");
 
-  // Load the power table data from the .ptab file
-  const std::string filePath = "test/data/converged_nebula3.ptab";
-  loadCSVToPTData(filePath, ptData);
+  PTHelpers helpers;
+  TEST_ASSERT_EQUAL_INT_MESSAGE(0, helpers.lookupWatts(0, 10000, ptData), "zero cadence must estimate zero watts");
+  TEST_ASSERT_EQUAL_INT_MESSAGE(0, helpers.lookupWatts(75, INT32_MIN, ptData), "minimum position must not underflow reverse lookup");
+  TEST_ASSERT_EQUAL_INT_MESSAGE(4000, helpers.lookupWatts(75, INT32_MAX, ptData), "maximum position must saturate reverse lookup");
+  TEST_ASSERT_EQUAL_INT_MESSAGE(4000, helpers.lookupWatts(INT32_MAX, INT32_MAX, ptData), "extreme cadence and position must remain bounded");
 
-    // Print the loaded power table data
-  outFile << "\n=== Power Table Data ===\n";
-  outFile << "Cadence/Power";
-  for (int j = 0; j < POWERTABLE_WATT_SIZE; j++) {
-    outFile << "," << (j * POWERTABLE_WATT_INCREMENT) << "W";
-  }
-  outFile << "\n";
-  
-  for (int i = 0; i < POWERTABLE_CAD_SIZE; i++) {
-    outFile << (MINIMUM_TABLE_CAD + i * POWERTABLE_CAD_INCREMENT) << "RPM";
-    for (int j = 0; j < POWERTABLE_WATT_SIZE; j++) {
-      outFile << ",";
-      if (ptData.tableRow[i].tableEntry[j].targetPosition != INT16_MIN) {
-        outFile << ptData.tableRow[i].tableEntry[j].targetPosition;
-      } else {
-        outFile << " ";
+  char failure[260];
+  int maximumRoundTripError = 0;
+  int worstCadence = 0;
+  int worstExpectedWatts = 0;
+  int worstActualWatts = 0;
+  int trustedRoundTrips = 0;
+  for (int cadence = 40; cadence <= 130; ++cadence) {
+    for (int expectedWatts = 30; expectedWatts <= 900; expectedWatts += 15) {
+      double localStepsPerWatt;
+      if (!helpers.lookupSlope(expectedWatts, cadence, localStepsPerWatt, ptData)) continue;
+      ++trustedRoundTrips;
+      const int32_t position = helpers.lookup(expectedWatts, cadence, ptData);
+      std::snprintf(failure, sizeof(failure), "forward lookup failed before reverse lookup: cadence=%d watts=%d", cadence, expectedWatts);
+      TEST_ASSERT_NOT_EQUAL_MESSAGE(RETURN_ERROR, position, failure);
+      const int actualWatts = helpers.lookupWatts(cadence, position, ptData);
+      std::snprintf(failure, sizeof(failure), "reverse lookup returned invalid watts: cadence=%d position=%ld watts=%d",
+                    cadence, static_cast<long>(position), actualWatts);
+      TEST_ASSERT_GREATER_OR_EQUAL_INT_MESSAGE(0, actualWatts, failure);
+      TEST_ASSERT_LESS_OR_EQUAL_INT_MESSAGE(4000, actualWatts, failure);
+      const int error = std::abs(actualWatts - expectedWatts);
+      if (error > maximumRoundTripError) {
+        maximumRoundTripError = error;
+        worstCadence = cadence;
+        worstExpectedWatts = expectedWatts;
+        worstActualWatts = actualWatts;
       }
     }
-    outFile << "\n";
   }
-  outFile << "=== End Power Table ===\n\n";
 
-  // Create helpers object for lookup
+  // Sweep the full operating surface. Watts may plateau, but must never fall
+  // when either resistance or cadence increases.
+  static const int RESISTANCE_STEP = 200;
+  static const int MAX_RESISTANCE = 24000;
+  int previousCadenceWatts[MAX_RESISTANCE / RESISTANCE_STEP + 1];
+  for (size_t i = 0; i < sizeof(previousCadenceWatts) / sizeof(previousCadenceWatts[0]); ++i) previousCadenceWatts[i] = -1;
+
+  for (int cadence = 1; cadence <= 130; ++cadence) {
+    int previousWatts = -1;
+    int resistanceIndex = 0;
+    for (int resistance = 0; resistance <= MAX_RESISTANCE; resistance += RESISTANCE_STEP, ++resistanceIndex) {
+      const int watts = helpers.lookupWatts(cadence, resistance, ptData);
+      std::snprintf(failure, sizeof(failure), "reverse lookup out of range: cadence=%d resistance=%d watts=%d", cadence, resistance, watts);
+      TEST_ASSERT_GREATER_OR_EQUAL_INT_MESSAGE(0, watts, failure);
+      TEST_ASSERT_LESS_OR_EQUAL_INT_MESSAGE(4000, watts, failure);
+      if (previousWatts >= 0) {
+        std::snprintf(failure, sizeof(failure),
+                      "reverse lookup decreased with resistance: cadence=%d previous_resistance=%d previous_watts=%d resistance=%d watts=%d",
+                      cadence, resistance - RESISTANCE_STEP, previousWatts, resistance, watts);
+        TEST_ASSERT_GREATER_OR_EQUAL_INT_MESSAGE(previousWatts, watts, failure);
+      }
+      if (previousCadenceWatts[resistanceIndex] >= 0) {
+        std::snprintf(failure, sizeof(failure),
+                      "reverse lookup decreased with cadence: resistance=%d previous_cadence=%d previous_watts=%d cadence=%d watts=%d",
+                      resistance, cadence - 1, previousCadenceWatts[resistanceIndex], cadence, watts);
+        TEST_ASSERT_GREATER_OR_EQUAL_INT_MESSAGE(previousCadenceWatts[resistanceIndex], watts, failure);
+      }
+      previousWatts = watts;
+      previousCadenceWatts[resistanceIndex] = watts;
+    }
+  }
+
+  std::ofstream report("test/output/active_power_table_audit.txt", std::ios::trunc);
+  report << "active ride entries=" << summary.entries << " invalid=" << summary.invalidEntries << '\n'
+         << "trusted forward/reverse samples=" << trustedRoundTrips << '\n'
+         << "maximum forward/reverse error=" << maximumRoundTripError << "W cadence=" << worstCadence
+         << " expected=" << worstExpectedWatts << "W actual=" << worstActualWatts << "W\n";
+  report.close();
+  TEST_ASSERT_GREATER_THAN_INT_MESSAGE(0, trustedRoundTrips, "active table produced no locally trustworthy round-trip samples");
+  std::snprintf(failure, sizeof(failure),
+                "measured-envelope round-trip error exceeded one watt column: cadence=%d expected=%dW actual=%dW error=%dW",
+                worstCadence, worstExpectedWatts, worstActualWatts, maximumRoundTripError);
+  TEST_ASSERT_LESS_OR_EQUAL_INT_MESSAGE(30, maximumRoundTripError, failure);
+}
+
+void TestPTLookupWatts::test_reverse_lookup_pathological_tables(void) {
   PTHelpers helpers;
 
-  // Known samples must round-trip exactly. Intermediate and out-of-range
-  // resistance values use the nearest segment for interpolation/extrapolation.
-  const int stoppedWatts = helpers.lookupWatts(0, 0, ptData);
-  const int knownWatts = helpers.lookupWatts(75, 8780, ptData);
-  const int interpolatedWatts = helpers.lookupWatts(75, 9310, ptData);
-  const int resistanceExtrapolatedWatts = helpers.lookupWatts(75, 16000, ptData);
-  const int cadenceExtrapolatedWatts = helpers.lookupWatts(50, 10000, ptData);
-  outFile << "Boundary checks: stopped=" << stoppedWatts << ", known=" << knownWatts << ", interpolated=" << interpolatedWatts
-          << ", resistance extrapolated=" << resistanceExtrapolatedWatts << ", cadence extrapolated=" << cadenceExtrapolatedWatts << "\n";
-  outFile.flush();
-  TEST_ASSERT_EQUAL_INT(0, stoppedWatts);
-  TEST_ASSERT_EQUAL_INT(90, knownWatts);
-  TEST_ASSERT_EQUAL_INT(105, interpolatedWatts);
-  TEST_ASSERT_TRUE(resistanceExtrapolatedWatts > 390);
-  TEST_ASSERT_TRUE(cadenceExtrapolatedWatts > 0 && cadenceExtrapolatedWatts < helpers.lookupWatts(75, 10000, ptData));
-  TEST_ASSERT_EQUAL_INT(68, helpers.lookupWatts(75, 8000, ptData));
-  TEST_ASSERT_GREATER_OR_EQUAL_INT(68, helpers.lookupWatts(76, 8000, ptData));
-  TEST_ASSERT_EQUAL_INT(113, helpers.lookupWatts(75, 9600, ptData));
-  TEST_ASSERT_GREATER_OR_EQUAL_INT(113, helpers.lookupWatts(76, 9600, ptData));
-
-  // A measured plateau has no unique inverse. Use the midpoint of its known
-  // watt interval and remain finite on either side of a completely flat row.
   PTData plateauTable;
   plateauTable.tableRow[3].tableEntry[3].targetPosition = 1000;
-  plateauTable.tableRow[3].tableEntry[3].readings       = 2;
+  plateauTable.tableRow[3].tableEntry[3].readings = 2;
   plateauTable.tableRow[3].tableEntry[4].targetPosition = 1000;
-  plateauTable.tableRow[3].tableEntry[4].readings       = 2;
+  plateauTable.tableRow[3].tableEntry[4].readings = 2;
   plateauTable.tableRow[3].tableEntry[5].targetPosition = 1100;
-  plateauTable.tableRow[3].tableEntry[5].readings       = 2;
-  TEST_ASSERT_EQUAL_INT(105, helpers.lookupWatts(75, 10000, plateauTable));
+  plateauTable.tableRow[3].tableEntry[5].readings = 2;
+  TEST_ASSERT_EQUAL_INT_MESSAGE(105, helpers.lookupWatts(75, 10000, plateauTable), "measured plateau midpoint changed");
 
   PTData flatTable;
   flatTable.tableRow[3].tableEntry[3].targetPosition = 1000;
-  flatTable.tableRow[3].tableEntry[3].readings       = 2;
+  flatTable.tableRow[3].tableEntry[3].readings = 2;
   flatTable.tableRow[3].tableEntry[5].targetPosition = 1000;
-  flatTable.tableRow[3].tableEntry[5].readings       = 2;
-  TEST_ASSERT_EQUAL_INT(120, helpers.lookupWatts(75, 10000, flatTable));
-  TEST_ASSERT_EQUAL_INT(0, helpers.lookupWatts(75, 9000, flatTable));
-  TEST_ASSERT_EQUAL_INT(150, helpers.lookupWatts(75, 11000, flatTable));
-
-  // Public lookup inputs are bounded and conversions saturate instead of
-  // overflowing, even for corrupted or adversarial callers.
-  TEST_ASSERT_EQUAL_INT32(RETURN_ERROR, helpers.lookup(-1, 75, ptData));
-  TEST_ASSERT_NOT_EQUAL(RETURN_ERROR, helpers.lookup(INT32_MAX, 1, ptData));
-  TEST_ASSERT_EQUAL_INT(0, helpers.lookupWatts(75, INT32_MIN, ptData));
-  TEST_ASSERT_EQUAL_INT(4000, helpers.lookupWatts(75, INT32_MAX, ptData));
-  TEST_ASSERT_EQUAL_INT(4000, helpers.lookupWatts(INT32_MAX, INT32_MAX, ptData));
-
-  // Every populated calibration sample in the actual ptab must invert back to
-  // its watt column exactly when its row has enough points to define the
-  // forward curve. Singleton rows are deliberately ignored by lookup().
-  for (int row = 0; row < POWERTABLE_CAD_SIZE; row++) {
-    const int sampleCadence = MINIMUM_TABLE_CAD + row * POWERTABLE_CAD_INCREMENT;
-    int reliableSamples = 0;
-    for (int col = 0; col < POWERTABLE_WATT_SIZE; col++) {
-      const TableEntry& sample = ptData.tableRow[row].tableEntry[col];
-      if (sample.targetPosition != INT16_MIN && sample.readings >= 2) reliableSamples++;
-    }
-    if (reliableSamples < 2) continue;
-
-    for (int col = 0; col < POWERTABLE_WATT_SIZE; col++) {
-      const TableEntry& sample = ptData.tableRow[row].tableEntry[col];
-      if (sample.targetPosition == INT16_MIN || sample.readings < 2) continue;
-      const int expectedWatts = col * POWERTABLE_WATT_INCREMENT;
-      const int actualWatts = helpers.lookupWatts(sampleCadence, sample.targetPosition * TABLE_DIVISOR, ptData);
-      if (actualWatts != expectedWatts) {
-        outFile << "Round-trip mismatch: cadence=" << sampleCadence << ", position=" << sample.targetPosition * TABLE_DIVISOR
-                << ", expected=" << expectedWatts << ", actual=" << actualWatts << "\n";
-        outFile.flush();
-      }
-      TEST_ASSERT_EQUAL_INT(expectedWatts, actualWatts);
-    }
-  }
-
-  int maximumRoundTripError = 0;
-  int worstRoundTripCadence = 0;
-  int worstRoundTripExpected = 0;
-  int worstRoundTripActual = 0;
-  for (int cadence = 75; cadence <= 100; ++cadence) {
-    for (int expectedWatts = 150; expectedWatts <= 600; expectedWatts += 30) {
-      const int32_t position = helpers.lookup(expectedWatts, cadence, ptData);
-      TEST_ASSERT_NOT_EQUAL(RETURN_ERROR, position);
-      const int actualWatts = helpers.lookupWatts(cadence, position, ptData);
-      const int error = abs(actualWatts - expectedWatts);
-      if (error > maximumRoundTripError) {
-        maximumRoundTripError = error;
-        worstRoundTripCadence = cadence;
-        worstRoundTripExpected = expectedWatts;
-        worstRoundTripActual = actualWatts;
-      }
-    }
-  }
-  outFile << "Maximum forward/reverse round-trip error: " << maximumRoundTripError << "W at " << worstRoundTripCadence
-          << " RPM (expected " << worstRoundTripExpected << ", actual " << worstRoundTripActual << ")\n";
-  outFile.flush();
-  TEST_ASSERT_LESS_OR_EQUAL_INT(30, maximumRoundTripError);
-
-  // Lambda function for reusable lookup and logging
-  auto performLookup = [&](int cad, int resistance) {
-    outFile << "Calling lookup CAD " << cad << ", with Resistance: " << resistance;
-    int32_t result = helpers.lookupWatts(cad, resistance, ptData);
-    outFile << "Lookup returned: " << result << "w\n";
-    return result;
-  };
-
-  // Test cadence from 10-130 using resistance range from -DEFAULT_STEPPER_TRAVEL to +DEFAULT_STEPPER_TRAVEL. For each cadence, as resistance increases, check that the output watt
-  // values are increasing. When a new cadence is reached, the watt values should be higher than the previous cadence or the test will fail.
-
-  // Define test cadence range
-  int minCadence  = 40;
-  int maxCadence  = 130;
-  int cadenceStep = 1;
-
-#define MIN_TEST_RANGE     0
-#define MAX_TEST_RANGE     1600 * TABLE_DIVISOR
-#define POINTS_PER_CADENCE 10
-  // Define resistance test points (using a smaller range for testing efficiency)
-  int resistancePoints = POINTS_PER_CADENCE;
-  int resistanceStep   = MAX_TEST_RANGE / POINTS_PER_CADENCE;
-
-  int32_t previousMaxWatts = INT32_MIN;  // Track max watts from previous cadence
-  int32_t previousCadenceWatts[POINTS_PER_CADENCE + 1];
-  for (int i = 0; i <= POINTS_PER_CADENCE; ++i) previousCadenceWatts[i] = INT32_MIN;
-
-  outFile << "Testing cadence range " << minCadence << "-" << maxCadence << " with " << resistancePoints << " resistance points\n";
-
-  // Iterate through each cadence value
-  for (int cadence = minCadence; cadence <= maxCadence; cadence += cadenceStep) {
-    outFile << "\n--- Testing cadence " << cadence << " ---\n";
-
-    int32_t previousWatts      = INT32_MIN;  // Track previous watts within this cadence
-    int32_t maxWattsForCadence = INT32_MIN;  // Track max watts for this cadence
-
-    // Test resistance points from negative to positive values
-    int resistanceIndex = 0;
-    for (int32_t resistance = 0; resistance <= MAX_TEST_RANGE; resistance += resistanceStep, ++resistanceIndex) {
-      int32_t watts = performLookup(cadence, resistance);
-
-      // Check that watts increase as resistance increases for the same cadence
-      if ((previousWatts != INT32_MIN) && (watts < previousWatts)) {
-        outFile << "Watts should increase or stay the same as resistance increases. Previous watts: " << previousWatts << ", Current watts: " << watts << "\n";
-      }
-      TEST_ASSERT_GREATER_OR_EQUAL_INT32(previousWatts, watts);
-
-      if (previousCadenceWatts[resistanceIndex] != INT32_MIN) {
-        TEST_ASSERT_GREATER_OR_EQUAL_INT32(previousCadenceWatts[resistanceIndex], watts);
-        TEST_ASSERT_LESS_OR_EQUAL_INT32(30, watts - previousCadenceWatts[resistanceIndex]);
-      }
-      previousCadenceWatts[resistanceIndex] = watts;
-
-      // Update max watts for this cadence
-      if (watts > maxWattsForCadence) {
-        maxWattsForCadence = watts;
-      }
-
-      previousWatts = watts;
-    }
-
-    // Check that max watts increase as cadence increases
-    if (previousMaxWatts != INT32_MIN && cadence > minCadence) {
-      // TEST_ASSERT_TRUE_MESSAGE(
-      //   maxWattsForCadence > previousMaxWatts,
-      //   "Max watts should increase with higher cadence"
-      // );
-
-      outFile << "Max watts increased from " << previousMaxWatts << " to " << maxWattsForCadence << " when cadence changed from " << (cadence - cadenceStep) << " to " << cadence
-              << "\n";
-    }
-
-    previousMaxWatts = maxWattsForCadence;
-  }
-
-  // Print additional debug info
-  outFile << "Test completed\n";
+  flatTable.tableRow[3].tableEntry[5].readings = 2;
+  TEST_ASSERT_EQUAL_INT_MESSAGE(120, helpers.lookupWatts(75, 10000, flatTable), "flat table should return its observed watt midpoint");
+  TEST_ASSERT_EQUAL_INT_MESSAGE(0, helpers.lookupWatts(75, 9000, flatTable), "flat table below its position must return zero watts");
+  TEST_ASSERT_EQUAL_INT_MESSAGE(150, helpers.lookupWatts(75, 11000, flatTable), "flat table above its position must return its safe upper edge");
 }

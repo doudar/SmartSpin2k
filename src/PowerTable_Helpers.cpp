@@ -12,16 +12,7 @@
 
 // if building PLATFORMIO_ENV_NATIVE environment define SS2K_LOG as Serial.printf(), else include the SS2KLog.h.
 #ifdef PLATFORMIO_ENV_NATIVE
-#include <fstream>
-
-std::ofstream outFile("test/output/test_PowerTable_Helpers.txt", std::ios::trunc);
-
-#define SS2K_LOG(tag, format, ...)                                \
-  {                                                               \
-    char buffer[1024];                                            \
-    std::snprintf(buffer, sizeof(buffer), format, ##__VA_ARGS__); \
-    outFile << "[" << tag << "] " << buffer << std::endl;         \
-  }
+#define SS2K_LOG(tag, format, ...) do { } while (0)
 #else
 #include "SS2KLog.h"
 #endif
@@ -32,6 +23,7 @@ constexpr int MAX_PAVA_ENTRIES =
     POWERTABLE_WATT_SIZE > POWERTABLE_CAD_SIZE ? POWERTABLE_WATT_SIZE : POWERTABLE_CAD_SIZE;
 constexpr int MAX_ESTIMATED_POWER_WATTS = 4000;
 constexpr int MIN_EXTRAPOLATION_POSITION_SPAN = 20;
+constexpr double MAX_LOCAL_SLOPE_RATIO = 2.0;
 
 int32_t storedPositionToSteps(float storedPosition) {
   const double steps = static_cast<double>(storedPosition) * TABLE_DIVISOR;
@@ -40,6 +32,36 @@ int32_t storedPositionToSteps(float storedPosition) {
   // Keep INT32_MIN reserved as RETURN_ERROR.
   if (steps <= static_cast<double>(INT32_MIN) + 1.0) return INT32_MIN + 1;
   return static_cast<int32_t>(std::round(steps));
+}
+
+bool measuredRowPosition(const TableRow& row, double watts, double& position) {
+  int lower = -1;
+  int upper = -1;
+  for (int col = 0; col < POWERTABLE_WATT_SIZE; ++col) {
+    const TableEntry& entry = row.tableEntry[col];
+    if (entry.targetPosition == INT16_MIN || entry.readings < 2) continue;
+    const int sampleWatts = col * POWERTABLE_WATT_INCREMENT;
+    if (sampleWatts <= watts) lower = col;
+    if (sampleWatts >= watts && upper < 0) upper = col;
+  }
+  // Deliberately refuse extrapolation: end segments are where sparse table
+  // rows most often stop paralleling their cadence neighbors.
+  if (lower < 0 || upper < 0) return false;
+  if (lower == upper) {
+    position = row.tableEntry[lower].targetPosition;
+    return true;
+  }
+  const double lowerWatts = lower * POWERTABLE_WATT_INCREMENT;
+  const double upperWatts = upper * POWERTABLE_WATT_INCREMENT;
+  const double fraction   = (watts - lowerWatts) / (upperWatts - lowerWatts);
+  position = row.tableEntry[lower].targetPosition +
+             fraction * (row.tableEntry[upper].targetPosition - row.tableEntry[lower].targetPosition);
+  return std::isfinite(position);
+}
+
+bool slopesAgree(double first, double second) {
+  if (!std::isfinite(first) || !std::isfinite(second) || first <= 0.0 || second <= 0.0) return false;
+  return std::max(first, second) <= std::min(first, second) * MAX_LOCAL_SLOPE_RATIO;
 }
 
 bool getObservedWattBounds(int cad, PTData& ptData, int& minimumWatts, int& maximumWatts) {
@@ -231,6 +253,11 @@ ptIndex PTHelpers::calculateIndex(int watts, int cad) {
   return index;
 }
 
+bool PTHelpers::cadenceIsWithinTable(int cad) {
+  const ptIndex index = calculateIndex(0, cad);
+  return index.cadIndex >= 0 && index.cadIndex < POWERTABLE_CAD_SIZE;
+}
+
 
 int32_t PTHelpers::lookup(int watts, int cad, PTData& ptData) {
   if (cad <= 0 || watts < 0) return RETURN_ERROR;
@@ -351,6 +378,76 @@ int32_t PTHelpers::lookup(int watts, int cad, PTData& ptData) {
   return storedPositionToSteps(position);
 }
 
+bool PTHelpers::lookupSlope(int watts, int cad, double& stepsPerWatt, PTData& ptData) {
+  stepsPerWatt = 0.0;
+  const int sampleSpan = POWERTABLE_WATT_INCREMENT;
+  if (cad <= 0 || watts < sampleSpan) return false;
+
+  int validRow[POWERTABLE_CAD_SIZE];
+  int validCadence[POWERTABLE_CAD_SIZE];
+  int validRows = 0;
+  for (int row = 0; row < POWERTABLE_CAD_SIZE; ++row) {
+    int reliableSamples = 0;
+    for (int col = 0; col < POWERTABLE_WATT_SIZE; ++col) {
+      const TableEntry& entry = ptData.tableRow[row].tableEntry[col];
+      if (entry.targetPosition != INT16_MIN && entry.readings >= 2) ++reliableSamples;
+    }
+    if (reliableSamples < 2) continue;
+    validRow[validRows]     = row;
+    validCadence[validRows] = MINIMUM_TABLE_CAD + row * POWERTABLE_CAD_INCREMENT;
+    ++validRows;
+  }
+
+  // One row can define a lookup, but cannot prove that its end segment agrees
+  // with the surface at a neighboring cadence.
+  if (validRows < 2) return false;
+
+  int lowerRow = 0;
+  int upperRow = 1;
+  if (cad >= validCadence[validRows - 1]) {
+    lowerRow = validRows - 2;
+    upperRow = validRows - 1;
+  } else if (cad > validCadence[0]) {
+    for (int row = 1; row < validRows; ++row) {
+      if (cad <= validCadence[row]) {
+        lowerRow = row - 1;
+        upperRow = row;
+        break;
+      }
+    }
+  }
+
+  double rowSlope[2];
+  const int supportRows[2] = {lowerRow, upperRow};
+  for (int i = 0; i < 2; ++i) {
+    const int rowCadence = validCadence[supportRows[i]];
+    const double rowLowerWatts = static_cast<double>(watts - sampleSpan) * rowCadence / cad;
+    const double rowUpperWatts = static_cast<double>(watts + sampleSpan) * rowCadence / cad;
+    double lowerPosition;
+    double upperPosition;
+    if (!measuredRowPosition(ptData.tableRow[validRow[supportRows[i]]], rowLowerWatts, lowerPosition) ||
+        !measuredRowPosition(ptData.tableRow[validRow[supportRows[i]]], rowUpperWatts, upperPosition)) {
+      return false;
+    }
+    rowSlope[i] = (upperPosition - lowerPosition) * TABLE_DIVISOR / (2.0 * sampleSpan);
+  }
+  if (!slopesAgree(rowSlope[0], rowSlope[1])) return false;
+
+  // Also reject sharp curvature within the cadence-blended surface. A
+  // monotonic table can still contain a locally abrupt, noisy change in gain.
+  const int32_t lowerPosition = lookup(watts - sampleSpan, cad, ptData);
+  const int32_t centerPosition = lookup(watts, cad, ptData);
+  const int32_t upperPosition = lookup(watts + sampleSpan, cad, ptData);
+  if (lowerPosition == RETURN_ERROR || centerPosition == RETURN_ERROR || upperPosition == RETURN_ERROR) return false;
+
+  const double leftSlope  = static_cast<double>(centerPosition - lowerPosition) / sampleSpan;
+  const double rightSlope = static_cast<double>(upperPosition - centerPosition) / sampleSpan;
+  if (!slopesAgree(leftSlope, rightSlope)) return false;
+
+  stepsPerWatt = static_cast<double>(upperPosition - lowerPosition) / (2.0 * sampleSpan);
+  return std::isfinite(stepsPerWatt) && stepsPerWatt > 0.0;
+}
+
 // returns the total number of readings in the power table
 int PTHelpers::getTotalReadings(PTData& ptData) {
   int totalReadings = 0;
@@ -454,56 +551,19 @@ int32_t PTHelpers::lookupWatts(int cad, int32_t targetPosition, PTData& ptData) 
   // envelope before interpolating. Sparse rows can otherwise imply that the
   // same resistance produces less power at a slightly higher cadence.
   int32_t knotWatts[POWERTABLE_CAD_SIZE];
-  bool measuredAnchor[POWERTABLE_CAD_SIZE] = {};
   for (int row = 0; row < POWERTABLE_CAD_SIZE; ++row) {
     const int knotCadence = MINIMUM_TABLE_CAD + row * POWERTABLE_CAD_INCREMENT;
     knotWatts[row] = invertForwardSurface(knotCadence, targetPosition, ptData);
-
-    int firstMatchingWatts = -1;
-    int lastMatchingWatts  = -1;
-    for (int col = 0; col < POWERTABLE_WATT_SIZE; ++col) {
-      const TableEntry& entry = ptData.tableRow[row].tableEntry[col];
-      if (entry.targetPosition == INT16_MIN || entry.readings < 2 || storedPositionToSteps(entry.targetPosition) != targetPosition) continue;
-      const int sampleWatts = col * POWERTABLE_WATT_INCREMENT;
-      if (firstMatchingWatts < 0) firstMatchingWatts = sampleWatts;
-      lastMatchingWatts = sampleWatts;
-    }
-    if (firstMatchingWatts >= 0) {
-      knotWatts[row]      = firstMatchingWatts + (lastMatchingWatts - firstMatchingWatts) / 2;
-      measuredAnchor[row] = true;
-    }
   }
 
-  // Preserve exact calibration anchors. Only adjust extrapolated/interpolated
-  // knots between them to make the cadence curve non-decreasing.
-  int previousAnchor = -1;
-  for (int row = 0; row < POWERTABLE_CAD_SIZE; ++row) {
-    if (!measuredAnchor[row]) continue;
-
-    if (previousAnchor < 0) {
-      for (int i = row - 1; i >= 0; --i) {
-        if (knotWatts[i] > knotWatts[i + 1]) knotWatts[i] = knotWatts[i + 1];
-      }
-    } else {
-      // Contradictory measured anchors cannot both be preserved. This should
-      // be prevented by table monotonicity; favor the higher-cadence anchor.
-      if (knotWatts[previousAnchor] > knotWatts[row]) knotWatts[previousAnchor] = knotWatts[row];
-      for (int i = previousAnchor + 1; i < row; ++i) {
-        if (knotWatts[i] < knotWatts[i - 1]) knotWatts[i] = knotWatts[i - 1];
-        if (knotWatts[i] > knotWatts[row]) knotWatts[i] = knotWatts[row];
-      }
-    }
-    previousAnchor = row;
-  }
-
-  if (previousAnchor < 0) {
-    for (int row = 1; row < POWERTABLE_CAD_SIZE; ++row) {
-      if (knotWatts[row] < knotWatts[row - 1]) knotWatts[row] = knotWatts[row - 1];
-    }
-  } else {
-    for (int row = previousAnchor + 1; row < POWERTABLE_CAD_SIZE; ++row) {
-      if (knotWatts[row] < knotWatts[row - 1]) knotWatts[row] = knotWatts[row - 1];
-    }
+  // Apply the same cumulative cadence envelope at every resistance. Switching
+  // to a separate path only when targetPosition exactly matched a measured
+  // cell made watts discontinuous across resistance at those cell boundaries.
+  // Each inverted knot is already monotonic in resistance; cumulative maxima
+  // preserve that property while also preventing watts from falling as
+  // cadence rises.
+  for (int row = 1; row < POWERTABLE_CAD_SIZE; ++row) {
+    if (knotWatts[row] < knotWatts[row - 1]) knotWatts[row] = knotWatts[row - 1];
   }
 
   if (cad <= MINIMUM_TABLE_CAD) {
