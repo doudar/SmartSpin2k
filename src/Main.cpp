@@ -617,6 +617,13 @@ void SS2K::txSerial() {  // Serial.printf(" Before TX ");
       txCheck = 1;
     }
     pelotonIsConnected = false;
+    // Peloton serial shares the global power/cadence connection flags with BLE sensors.
+    // Only release them when no specific BLE power meter is configured, matching the
+    // Peloton coexistence checks in collectAndSet().
+    if (strcmp(userConfig->getConnectedPowerMeter(), NONE) == 0 || strcmp(userConfig->getConnectedPowerMeter(), ANY) == 0) {
+      spinBLEClient.connectedPM = false;
+      spinBLEClient.connectedCD = false;
+    }
     rtConfig->setMinResistance(-DEFAULT_RESISTANCE_RANGE);
     rtConfig->setMaxResistance(DEFAULT_RESISTANCE_RANGE);
     txCheck++;
