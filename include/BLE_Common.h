@@ -59,12 +59,11 @@ using BLEServices::SUPPORTED_SERVICES;
 #define FMTS_SERVER_LOG_TAG "FTMS_SERVER"
 #define CUSTOM_CHAR_LOG_TAG "Custom_C"
 
-// macros to convert different types of bytes into int The naming here sucks and
-// should be fixed.
-#define bytes_to_s16(MSB, LSB) (((signed int)((signed char)MSB))) << 8 | (((signed char)LSB))
-#define bytes_to_u16(MSB, LSB) (((signed int)((signed char)MSB))) << 8 | (((unsigned char)LSB))
-#define bytes_to_int(MSB, LSB) ((static_cast<int>((unsigned char)MSB))) << 8 | (((unsigned char)LSB))
-// Potentially, something like this is a better way of doing this ^^
+// Convert big-endian bytes without signed-char promotion or operator-precedence
+// surprises when a caller immediately scales the result.
+#define bytes_to_s16(MSB, LSB) (static_cast<int16_t>((static_cast<uint16_t>(static_cast<uint8_t>(MSB)) << 8) | static_cast<uint8_t>(LSB)))
+#define bytes_to_u16(MSB, LSB) (static_cast<uint16_t>((static_cast<uint16_t>(static_cast<uint8_t>(MSB)) << 8) | static_cast<uint8_t>(LSB)))
+#define bytes_to_int(MSB, LSB) (static_cast<int>((static_cast<uint16_t>(static_cast<uint8_t>(MSB)) << 8) | static_cast<uint8_t>(LSB)))
 
 // Setup
 void setupBLE();

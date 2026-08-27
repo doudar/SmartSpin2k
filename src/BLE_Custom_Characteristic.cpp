@@ -354,6 +354,56 @@ void BLE_ss2kCustomCharacteristic::process(std::string rxValue, uint16_t connHan
     returnValue[i] = rxValue[i];
   }
 
+  size_t requiredLength = 2;
+  if (rxValue[0] == cc_write) {
+    switch (static_cast<uint8_t>(rxValue[1])) {
+      case BLE_incline:
+      case BLE_simulatedWatts:
+      case BLE_simulatedHr:
+      case BLE_simulatedCad:
+      case BLE_simulatedSpeed:
+      case BLE_shiftStep:
+      case BLE_stepperPower:
+      case BLE_inclineMultiplier:
+      case BLE_powerCorrectionFactor:
+      case BLE_FTMSMode:
+      case BLE_shifterPosition:
+      case BLE_stepperSpeed:
+      case BLE_ERGSensitivity:
+      case BLE_minBrakeWatts:
+      case BLE_maxBrakeWatts:
+      case BLE_simulatedTargetWatts:
+      case BLE_homingSensitivity: requiredLength = 4; break;
+
+      case BLE_targetPosition:
+      case BLE_hMin:
+      case BLE_hMax: requiredLength = 6; break;
+
+      case BLE_powerTableData: requiredLength = 3 + (2 * POWERTABLE_WATT_SIZE); break;
+
+      case BLE_stealthChop:
+      case BLE_simulateHr:
+      case BLE_simulateWatts:
+      case BLE_simulateCad:
+      case BLE_autoUpdate:
+      case BLE_externalControl:
+      case BLE_syncMode:
+      case BLE_shiftDir:
+      case BLE_simulateTargetWatts:
+      case BLE_pTab4Pwr:
+      case BLE_UDPLogging:
+      case BLE_BLELogging: requiredLength = 3; break;
+    }
+  } else if (rxValue[0] == cc_read && static_cast<uint8_t>(rxValue[1]) == BLE_powerTableData) {
+    requiredLength = 3;
+  }
+
+  if (rxValue.length() < requiredLength) {
+    pCharacteristic->setValue(returnValue.data(), 2);
+    if (indicateResponse) pCharacteristic->indicate(connHandle);
+    return;
+  }
+
   switch (rxValue[1]) {
     case BLE_firmwareUpdateURL:  // 0x01
       LOG_BUF_APPEND("<-Firmware Update URL");
@@ -719,7 +769,10 @@ void BLE_ss2kCustomCharacteristic::process(std::string rxValue, uint16_t connHan
       }
       if (rxValue[0] == cc_write) {
         returnValue[0] = cc_success;
-        ss2k->setTargetPosition(int32_t((uint8_t)(rxValue[2]) << 0 | (uint8_t)(rxValue[3]) << 8 | (uint8_t)(rxValue[4]) << 16 | (uint8_t)(rxValue[5]) << 24));
+        ss2k->setTargetPosition(static_cast<int32_t>(static_cast<uint32_t>(static_cast<uint8_t>(rxValue[2])) |
+                                                      (static_cast<uint32_t>(static_cast<uint8_t>(rxValue[3])) << 8) |
+                                                      (static_cast<uint32_t>(static_cast<uint8_t>(rxValue[4])) << 16) |
+                                                      (static_cast<uint32_t>(static_cast<uint8_t>(rxValue[5])) << 24)));
         LOG_BUF_APPEND(" (%f)", ss2k->getTargetPosition());
       }
       break;
@@ -883,7 +936,7 @@ void BLE_ss2kCustomCharacteristic::process(std::string rxValue, uint16_t connHan
       LOG_BUF_APPEND("<-Power Tab Data");
       if (rxValue[0] == cc_read) {
         int row = 6;  // 90rpm
-        if (rxValue[2] >= 0 || rxValue[2] < POWERTABLE_CAD_SIZE) {
+        if (rxValue[2] >= 0 && rxValue[2] < POWERTABLE_CAD_SIZE) {
           row = rxValue[2];
         }
         returnString += (uint8_t)row;
@@ -898,7 +951,8 @@ void BLE_ss2kCustomCharacteristic::process(std::string rxValue, uint16_t connHan
         returnValue[0] = cc_success;
         if (rxValue[2] >= 0 && rxValue[2] < POWERTABLE_CAD_SIZE) {
           for (int i = 0; i < POWERTABLE_WATT_SIZE; i++) {
-            powerTable->ptData.tableRow[rxValue[2]].tableEntry[i].targetPosition = (int16_t((uint8_t)(rxValue[i * 2 + 3]) << 0 | (uint8_t)(rxValue[i * 2 + 4]) << 8));
+            powerTable->ptData.tableRow[rxValue[2]].tableEntry[i].targetPosition = static_cast<int16_t>(static_cast<uint16_t>(static_cast<uint8_t>(rxValue[i * 2 + 3])) |
+                                                                                                            (static_cast<uint16_t>(static_cast<uint8_t>(rxValue[i * 2 + 4])) << 8));
             // Ensure each entry has a valid reading count to be considered during loading
             if (powerTable->ptData.tableRow[rxValue[2]].tableEntry[i].targetPosition != INT16_MIN) {
               powerTable->ptData.tableRow[rxValue[2]].tableEntry[i].readings = MINIMUM_RELIABLE_POSITIONS + 1;
@@ -925,7 +979,7 @@ void BLE_ss2kCustomCharacteristic::process(std::string rxValue, uint16_t connHan
       }
       if (rxValue[0] == cc_write) {
         returnValue[0] = cc_success;
-        rtConfig->watts.setValue(bytes_to_u16(rxValue[3], rxValue[2]));
+        rtConfig->watts.setTarget(bytes_to_u16(rxValue[3], rxValue[2]));
         LOG_BUF_APPEND("(%d)", rtConfig->watts.getTarget());
       }
       break;
@@ -954,7 +1008,10 @@ void BLE_ss2kCustomCharacteristic::process(std::string rxValue, uint16_t connHan
       }
       if (rxValue[0] == cc_write) {
         returnValue[0] = cc_success;
-        int32_t hMin = int32_t((uint8_t)(rxValue[2]) << 0 | (uint8_t)(rxValue[3]) << 8 | (uint8_t)(rxValue[4]) << 16 | (uint8_t)(rxValue[5]) << 24);
+        int32_t hMin = static_cast<int32_t>(static_cast<uint32_t>(static_cast<uint8_t>(rxValue[2])) |
+                                             (static_cast<uint32_t>(static_cast<uint8_t>(rxValue[3])) << 8) |
+                                             (static_cast<uint32_t>(static_cast<uint8_t>(rxValue[4])) << 16) |
+                                             (static_cast<uint32_t>(static_cast<uint8_t>(rxValue[5])) << 24));
         userConfig->setHMin(hMin);
         rtConfig->setMinStep(hMin);
         LOG_BUF_APPEND(" (%d)", hMin);
@@ -973,7 +1030,10 @@ void BLE_ss2kCustomCharacteristic::process(std::string rxValue, uint16_t connHan
       }
       if (rxValue[0] == cc_write) {
         returnValue[0] = cc_success;
-        int32_t hMax   = int32_t((uint8_t)(rxValue[2]) << 0 | (uint8_t)(rxValue[3]) << 8 | (uint8_t)(rxValue[4]) << 16 | (uint8_t)(rxValue[5]) << 24);
+        int32_t hMax   = static_cast<int32_t>(static_cast<uint32_t>(static_cast<uint8_t>(rxValue[2])) |
+                                               (static_cast<uint32_t>(static_cast<uint8_t>(rxValue[3])) << 8) |
+                                               (static_cast<uint32_t>(static_cast<uint8_t>(rxValue[4])) << 16) |
+                                               (static_cast<uint32_t>(static_cast<uint8_t>(rxValue[5])) << 24));
         Serial.printf("hMax: %d\n <--------------------------------------------", hMax);
         userConfig->setHMax(hMax);
         rtConfig->setMaxStep(hMax);

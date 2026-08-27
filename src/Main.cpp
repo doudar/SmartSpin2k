@@ -9,6 +9,8 @@
 #include "Stepper.h"
 #include "SS2KLog.h"
 #include <Arduino.h>
+#include <cctype>
+#include <cstdlib>
 #include <LittleFS.h>
 #include <HardwareSerial.h>
 #include "ERG_Mode.h"
@@ -45,6 +47,82 @@ RuntimeParameters* rtConfig = new RuntimeParameters;
 #ifndef UNIT_TEST
 namespace {
 RTC_NOINIT_ATTR bool inhibitLedOnBoot = false;
+
+#ifdef SERIAL_CUSTOM_CHARACTERISTIC
+constexpr size_t SERIAL_CUSTOM_CHARACTERISTIC_MAX_REQUEST = 128;
+
+// Debug-only USB serial protocol:
+//   cc 01 1e              read BLE_stepperSpeed
+//   cc 02 1e b8 0b 00 00  write BLE_stepperSpeed (3000, little-endian)
+// Each complete command is newline-delimited and replies as `cc_response` followed
+// by the characteristic's raw response bytes in hexadecimal.
+void processSerialCustomCharacteristic() {
+  static char line[SERIAL_CUSTOM_CHARACTERISTIC_MAX_REQUEST * 3 + 1];
+  static size_t lineLength = 0;
+
+  while (Serial.available()) {
+    const int received = Serial.read();
+    if (received < 0) return;
+
+    if (received == '\r') continue;
+    if (received == '\n') {
+      line[lineLength] = '\0';
+
+      if (lineLength >= 2 && line[0] == 'c' && line[1] == 'c') {
+        uint8_t request[SERIAL_CUSTOM_CHARACTERISTIC_MAX_REQUEST];
+        size_t requestLength = 0;
+        char* cursor = line + 2;
+        bool valid = true;
+
+        while (*cursor != '\0') {
+          while (*cursor == ' ' || *cursor == '\t') cursor++;
+          if (*cursor == '\0') break;
+          if (requestLength == sizeof(request) || !isxdigit(static_cast<unsigned char>(cursor[0])) || !isxdigit(static_cast<unsigned char>(cursor[1]))) {
+            valid = false;
+            break;
+          }
+
+          char byteText[] = {cursor[0], cursor[1], '\0'};
+          request[requestLength++] = static_cast<uint8_t>(strtoul(byteText, nullptr, 16));
+          cursor += 2;
+          if (*cursor != '\0' && *cursor != ' ' && *cursor != '\t') {
+            valid = false;
+            break;
+          }
+        }
+
+        if (valid && requestLength >= 2 && request[1] != BLE_allSettings) {
+          BLE_ss2kCustomCharacteristic::process(std::string(reinterpret_cast<const char*>(request), requestLength), BLE_HS_CONN_HANDLE_NONE, 23, false);
+          NimBLEService* service = NimBLEDevice::getServer()->getServiceByUUID(SMARTSPIN2K_SERVICE_UUID);
+          NimBLECharacteristic* characteristic = service == nullptr ? nullptr : service->getCharacteristic(SMARTSPIN2K_CHARACTERISTIC_UUID);
+          if (characteristic != nullptr) {
+            NimBLEAttValue response = characteristic->getValue();
+            Serial.print("cc_response");
+            for (size_t i = 0; i < response.size(); ++i) {
+              Serial.printf(" %02x", response[i]);
+            }
+            Serial.println();
+          } else {
+            Serial.println("cc_error unavailable");
+          }
+        } else {
+          Serial.println("cc_error invalid_request");
+        }
+      }
+
+      lineLength = 0;
+      continue;
+    }
+
+    if (lineLength < sizeof(line) - 1) {
+      line[lineLength++] = static_cast<char>(received);
+    } else {
+      lineLength = 0;
+      Serial.println("cc_error request_too_long");
+    }
+  }
+}
+#endif
 
   // RTC memory survives commanded ESP.restart() calls but not power loss. A set
   // flag means the previous reboot was intentional, so consume it and keep the
@@ -232,6 +310,10 @@ void SS2K::maintenanceLoop(void* pvParameters) {
   while (true) {
     delay(10);
     BLEFirmwareUpdateLoop();
+
+#ifdef SERIAL_CUSTOM_CHARACTERISTIC
+    processSerialCustomCharacteristic();
+#endif
 
     // be quiet while updating via BLE
     if (!ss2k->isUpdating) {
