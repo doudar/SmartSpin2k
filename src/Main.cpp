@@ -225,8 +225,9 @@ void loop() {  // Delete this task so we can make one that's more memory efficie
 void SS2K::maintenanceLoop(void* pvParameters) {
   finishSetup();
 
-  static unsigned long intervalTimer2 = millis();
-  static unsigned long rebootTimer    = millis();
+  static unsigned long maintenanceTimer    = millis();
+  static unsigned long riderStatusLogTimer = millis();
+  static unsigned long rebootTimer         = millis();
 
   while (true) {
     delay(10);
@@ -335,8 +336,8 @@ void SS2K::maintenanceLoop(void* pvParameters) {
       userConfig->saveToLittleFS();
     }
 
-    // Things to do every 6 seconds
-    if ((millis() - intervalTimer2) > 6007) {
+    // Periodic maintenance.
+    if ((millis() - maintenanceTimer) > MAIN_MAINTENANCE_INTERVAL_MS) {
       // Reboot after half an hour without meaningful pedaling. Also treat unchanged values as inactive because disconnected servers can leave stale readings behind.
       constexpr int inactivityThreshold             = 10;
       constexpr unsigned long inactivityRebootDelay = 1800000;
@@ -376,12 +377,16 @@ void SS2K::maintenanceLoop(void* pvParameters) {
         SS2K_LOG(MAIN_LOG_TAG, "Best Block: %d", heap_caps_get_largest_free_block(MALLOC_CAP_8BIT));
       }
 #endif  // DEBUG_STACK
-      // Log userParameters
+      maintenanceTimer = millis();
+    }
+
+    if ((millis() - riderStatusLogTimer) >= RIDER_STATUS_LOG_INTERVAL_MS) {
+      // Log rider status for diagnostics and ride analysis.
       SS2K_LOG(MAIN_LOG_TAG, "PM Con %d, CAD con %d, HRM Con %d, W %d, Cad %d, HR %d, Gear %d, Res %d, Current Pos %d, Target Pos %d", spinBLEClient.connectedPM,
                spinBLEClient.connectedCD, spinBLEClient.connectedHRM, rtConfig->watts.getValue(), rtConfig->cad.getValue(), rtConfig->hr.getValue(), rtConfig->getShifterPosition(),
                rtConfig->resistance.getValue(), ss2k->getCurrentPosition(), ss2k->getTargetPosition());
 
-      intervalTimer2 = millis();
+      riderStatusLogTimer = millis();
     }
   }
 }

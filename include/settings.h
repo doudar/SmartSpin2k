@@ -189,6 +189,12 @@ constexpr const char* ANY  = "any";
 // The client will be disconnected.
 #define BLE_CLIENT_DISCONNECT_TIMEOUT 5000
 
+// Interval for periodic main-task maintenance.
+#define MAIN_MAINTENANCE_INTERVAL_MS 6007
+
+// Interval for rider status logging used by ride analysis and power-table tests.
+#define RIDER_STATUS_LOG_INTERVAL_MS 1000
+
 #ifndef DEBUG_LOG_BUFFER_SIZE
 #define DEBUG_LOG_BUFFER_SIZE 600
 #endif
