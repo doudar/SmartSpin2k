@@ -48,6 +48,7 @@ class TestPowerTableCsv {
 class TestActiveRideTable {
   public:
     static void test_active_ride_table_generation(void);
+    static void test_compact_status_log_replay(void);
     static void test_status_ride_table_generation(void);
     static void test_active_table_status_prediction_accuracy(void);
 };

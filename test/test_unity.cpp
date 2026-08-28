@@ -66,6 +66,7 @@ void setup() {
     RUN_TEST(csvTests.test_active_table_round_trip);
     TestActiveRideTable replayTests;
     RUN_TEST(replayTests.test_active_ride_table_generation);
+    RUN_TEST(replayTests.test_compact_status_log_replay);
     RUN_TEST(replayTests.test_status_ride_table_generation);
     RUN_TEST(replayTests.test_active_table_status_prediction_accuracy);
   }

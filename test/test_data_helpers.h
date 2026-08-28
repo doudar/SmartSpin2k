@@ -109,26 +109,50 @@ inline bool replayStatusLog(const std::string& filePath, PTData& ptData, StatusR
   std::ifstream rideLog(filePath);
   if (!rideLog.is_open()) return false;
 
-  const std::regex statusPattern(
+  const std::regex compactStatusPattern(
+      R"(\[([0-9]+)\]\[E\]\(Main\): W=(-?[0-9]+) C=(-?[0-9]+) H=-?[0-9]+ G=-?[0-9]+ R=-?[0-9]+ P=(-?[0-9]+)->(-?[0-9]+))");
+  const std::regex devicePattern(R"(\[[0-9]+\]\[E\]\(Main\): DEV PM=([0-9]+) CAD=([0-9]+) HRM=[0-9]+)");
+  const std::regex legacyStatusPattern(
       R"(\[([0-9]+)\]\[E\]\(Main\): PM Con ([0-9]+), CAD con ([0-9]+), HRM Con [0-9]+, W (-?[0-9]+), Cad (-?[0-9]+), HR -?[0-9]+, Gear -?[0-9]+, Res -?[0-9]+, Current Pos (-?[0-9]+), Target Pos (-?[0-9]+))");
   PTHelpers helpers;
   std::string line;
   std::smatch match;
+  bool powerConnected = false;
+  bool cadenceConnected = false;
   while (std::getline(rideLog, line)) {
     ++summary.lines;
-    if (!std::regex_search(line, match, statusPattern)) {
-      if (line.find("(Main): PM Con ") != std::string::npos) ++summary.invalidSamples;
+    if (std::regex_search(line, match, devicePattern)) {
+      powerConnected = std::stoi(match[1].str()) != 0;
+      cadenceConnected = std::stoi(match[2].str()) != 0;
+      continue;
+    }
+
+    int timestamp;
+    int watts;
+    int cadence;
+    int currentPosition;
+    int targetPosition;
+    if (std::regex_search(line, match, compactStatusPattern)) {
+      timestamp = std::stoi(match[1].str());
+      watts = std::stoi(match[2].str());
+      cadence = std::stoi(match[3].str());
+      currentPosition = std::stoi(match[4].str());
+      targetPosition = std::stoi(match[5].str());
+    } else if (std::regex_search(line, match, legacyStatusPattern)) {
+      // Preserve replay support for logs captured before DEV became a separate periodic record.
+      timestamp = std::stoi(match[1].str());
+      powerConnected = std::stoi(match[2].str()) != 0;
+      cadenceConnected = std::stoi(match[3].str()) != 0;
+      watts = std::stoi(match[4].str());
+      cadence = std::stoi(match[5].str());
+      currentPosition = std::stoi(match[6].str());
+      targetPosition = std::stoi(match[7].str());
+    } else {
+      if (line.find("(Main): W=") != std::string::npos || line.find("(Main): PM Con ") != std::string::npos) ++summary.invalidSamples;
       continue;
     }
 
     ++summary.statusSamples;
-    const int timestamp = std::stoi(match[1].str());
-    const bool powerConnected = std::stoi(match[2].str()) != 0;
-    const bool cadenceConnected = std::stoi(match[3].str()) != 0;
-    const int watts = std::stoi(match[4].str());
-    const int cadence = std::stoi(match[5].str());
-    const int currentPosition = std::stoi(match[6].str());
-    const int targetPosition = std::stoi(match[7].str());
 
     if (!powerConnected || !cadenceConnected) {
       ++summary.rejectedDisconnected;

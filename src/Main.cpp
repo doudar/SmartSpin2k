@@ -459,14 +459,15 @@ void SS2K::maintenanceLoop(void* pvParameters) {
         SS2K_LOG(MAIN_LOG_TAG, "Best Block: %d", heap_caps_get_largest_free_block(MALLOC_CAP_8BIT));
       }
 #endif  // DEBUG_STACK
+      // Connection state changes infrequently, so keep it out of the one-second rider status record.
+      SS2K_LOG(MAIN_LOG_TAG, "DEV PM=%d CAD=%d HRM=%d", spinBLEClient.connectedPM, spinBLEClient.connectedCD, spinBLEClient.connectedHRM);
       maintenanceTimer = millis();
     }
 
     if ((millis() - riderStatusLogTimer) >= RIDER_STATUS_LOG_INTERVAL_MS) {
       // Log rider status for diagnostics and ride analysis.
-      SS2K_LOG(MAIN_LOG_TAG, "PM Con %d, CAD con %d, HRM Con %d, W %d, Cad %d, HR %d, Gear %d, Res %d, Current Pos %d, Target Pos %d", spinBLEClient.connectedPM,
-               spinBLEClient.connectedCD, spinBLEClient.connectedHRM, rtConfig->watts.getValue(), rtConfig->cad.getValue(), rtConfig->hr.getValue(), rtConfig->getShifterPosition(),
-               rtConfig->resistance.getValue(), ss2k->getCurrentPosition(), ss2k->getTargetPosition());
+      SS2K_LOG(MAIN_LOG_TAG, "W=%d C=%d H=%d G=%d R=%d P=%d->%d", rtConfig->watts.getValue(), rtConfig->cad.getValue(), rtConfig->hr.getValue(),
+               rtConfig->getShifterPosition(), rtConfig->resistance.getValue(), ss2k->getCurrentPosition(), ss2k->getTargetPosition());
 
       riderStatusLogTimer = millis();
     }

@@ -32,6 +32,35 @@ void TestActiveRideTable::test_active_ride_table_generation(void) {
   TEST_ASSERT_TRUE_MESSAGE(powerTablePositionsMatch(ptData, reloaded, failure), failure.c_str());
 }
 
+void TestActiveRideTable::test_compact_status_log_replay(void) {
+  const char compactLogPath[] = "test/output/compact_status_replay.txt";
+  std::ofstream compactLog(compactLogPath, std::ios::trunc);
+  TEST_ASSERT_TRUE_MESSAGE(compactLog.is_open(), "compact status replay fixture could not be created");
+  compactLog << "[1000][E](Main): W=150 C=90 H=120 G=3 R=20 P=1000->1000\n"
+             << "[2000][E](Main): DEV PM=1 CAD=1 HRM=0\n"
+             << "[2001][E](Main): W=150 C=90 H=120 G=3 R=20 P=1000->1005\n"
+             << "[3001][E](Main): W=155 C=91 H=121 G=3 R=21 P=1000->1100\n"
+             << "[4000][E](Main): DEV PM=0 CAD=1 HRM=0\n"
+             << "[4001][E](Main): W=160 C=92 H=122 G=3 R=22 P=1010->1010\n"
+             << "[5001][E](Main): W=bad C=92 H=122 G=3 R=22 P=1010->1010\n";
+  compactLog.close();
+
+  PTData ptData;
+  StatusReplaySummary summary;
+  std::vector<StatusPowerSample> acceptedSamples;
+  TEST_ASSERT_TRUE_MESSAGE(replayStatusLog(compactLogPath, ptData, summary, &acceptedSamples), "compact status log could not be replayed");
+  TEST_ASSERT_EQUAL_INT(4, summary.statusSamples);
+  TEST_ASSERT_EQUAL_INT(1, summary.invalidSamples);
+  TEST_ASSERT_EQUAL_INT(1, summary.acceptedSamples);
+  TEST_ASSERT_EQUAL_INT(2, summary.rejectedDisconnected);
+  TEST_ASSERT_EQUAL_INT(1, summary.rejectedMoving);
+  TEST_ASSERT_EQUAL_INT(1, acceptedSamples.size());
+  TEST_ASSERT_EQUAL_INT(150, acceptedSamples[0].watts);
+  TEST_ASSERT_EQUAL_INT(90, acceptedSamples[0].cadence);
+  TEST_ASSERT_EQUAL_INT(1000, acceptedSamples[0].currentPosition);
+  TEST_ASSERT_EQUAL_INT(1005, acceptedSamples[0].targetPosition);
+}
+
 void TestActiveRideTable::test_status_ride_table_generation(void) {
   PTData statusTable;
   StatusReplaySummary statusSummary;

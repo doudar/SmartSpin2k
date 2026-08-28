@@ -1292,14 +1292,8 @@ CONFIG_SR_VADN_WEBRTC=y
 # end of Load Multiple Wake Words (WakeNet9s)
 
 #
-# Load Multiple Wake Words (WakeNet9 or WakeNet10)
+# Load Multiple Wake Words (WakeNet9)
 #
-# default:
-# CONFIG_SR_WN_WN10_HILEXIN is not set
-# default:
-# CONFIG_SR_WN_WN10_XIAOAITONGXUE is not set
-# default:
-# CONFIG_SR_WN_WN10_NIHAOXIAOZHI is not set
 # default:
 # CONFIG_SR_WN_WN9_HILEXIN is not set
 # default:
@@ -1420,7 +1414,7 @@ CONFIG_SR_VADN_WEBRTC=y
 # CONFIG_SR_WN_WN9_HAI1XIAO3XIANG4_TTS3 is not set
 # default:
 # CONFIG_SR_WN_WN9L_NI3HAO3XING1BAO3_TTS3 is not set
-# end of Load Multiple Wake Words (WakeNet9 or WakeNet10)
+# end of Load Multiple Wake Words (WakeNet9)
 
 # default:
 CONFIG_SR_MN_CN_NONE=y
