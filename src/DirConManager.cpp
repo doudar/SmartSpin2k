@@ -9,6 +9,8 @@
 #include "SS2KLog.h"
 #include <algorithm>
 #include <Constants.h>
+#include <errno.h>
+#include <lwip/sockets.h>
 
 #define DIRCON_LOG_TAG "DirConManager"
 
@@ -16,10 +18,10 @@
 bool DirConManager::started         = false;
 String DirConManager::statusMessage = "";
 WiFiClient DirConManager::dirConClients[DIRCON_MAX_CLIENTS];
+bool DirConManager::clientActive[DIRCON_MAX_CLIENTS] = {false};
 WiFiServer* DirConManager::tcpServer = nullptr;
 uint8_t DirConManager::receiveBuffer[DIRCON_MAX_CLIENTS][DIRCON_RECEIVE_BUFFER_SIZE];
 size_t DirConManager::receiveBufferLength[DIRCON_MAX_CLIENTS] = {0};
-uint8_t DirConManager::sendBuffer[DIRCON_SEND_BUFFER_SIZE];
 uint8_t DirConManager::lastSequenceNumber[DIRCON_MAX_CLIENTS] = {0};
 Subscription DirConManager::clientSubscriptions[DIRCON_MAX_CLIENTS][DIRCON_MAX_CHARACTERISTICS];
 DirConManager::ServiceRegistration DirConManager::registeredServices[DIRCON_MAX_SERVICES] = {};
@@ -30,6 +32,31 @@ static char uuidListBuffer[128] = "";
 static size_t uuidListLength    = 0;
 
 namespace {
+
+struct DirConOutboundFrame {
+  size_t length     = 0;
+  size_t offset     = 0;
+  bool notification = false;
+  uint8_t data[DIRCON_SEND_BUFFER_SIZE];
+};
+
+struct DirConOutboundQueue {
+  DirConOutboundFrame frames[DIRCON_OUTBOUND_QUEUE_DEPTH];
+  size_t count                   = 0;
+  unsigned long lastProgressMs  = 0;
+  uint32_t droppedNotifications = 0;
+  bool closeRequested           = false;
+};
+
+DirConOutboundQueue s_outboundQueues[DIRCON_MAX_CLIENTS];
+SemaphoreHandle_t s_outboundMutex = xSemaphoreCreateMutex();
+
+void resetOutboundQueue(size_t clientIndex) {
+  s_outboundQueues[clientIndex].count                = 0;
+  s_outboundQueues[clientIndex].lastProgressMs       = millis();
+  s_outboundQueues[clientIndex].droppedNotifications = 0;
+  s_outboundQueues[clientIndex].closeRequested       = false;
+}
 
 const char* dirConMessageName(uint8_t identifier) {
   switch (identifier) {
@@ -107,13 +134,22 @@ bool DirConManager::start() {
   }
 
   // Initialize buffers
+  if (s_outboundMutex == nullptr) {
+    SS2K_LOG(DIRCON_LOG_TAG, "Failed to create outbound queue mutex");
+    return false;
+  }
+
+  xSemaphoreTake(s_outboundMutex, portMAX_DELAY);
   for (int i = 0; i < DIRCON_MAX_CLIENTS; i++) {
+    clientActive[i]        = false;
     receiveBufferLength[i] = 0;
     lastSequenceNumber[i]  = 0;
+    resetOutboundQueue(i);
     for (int j = 0; j < DIRCON_MAX_CHARACTERISTICS; j++) {
       clientSubscriptions[i][j].active = false;
     }
   }
+  xSemaphoreGive(s_outboundMutex);
 
   // Setup MDNS service
   setupMDNS();
@@ -142,6 +178,9 @@ bool DirConManager::start() {
 
 void DirConManager::stop() {
   if (started) {
+    // Prevent other tasks from queuing more notifications while clients close.
+    started = false;
+
     // Stop TCP server and disconnect clients
     if (tcpServer != nullptr) {
       tcpServer->close();
@@ -149,13 +188,18 @@ void DirConManager::stop() {
       tcpServer = nullptr;
     }
 
+    xSemaphoreTake(s_outboundMutex, portMAX_DELAY);
     for (int i = 0; i < DIRCON_MAX_CLIENTS; i++) {
-      if (dirConClients[i].connected()) {
-        dirConClients[i].stop();
+      dirConClients[i].stop();
+      clientActive[i]        = false;
+      receiveBufferLength[i] = 0;
+      resetOutboundQueue(i);
+      for (int j = 0; j < DIRCON_MAX_CHARACTERISTICS; j++) {
+        clientSubscriptions[i][j].active = false;
       }
     }
+    xSemaphoreGive(s_outboundMutex);
 
-    started = false;
     updateStatusMessage();
     SS2K_LOG(DIRCON_LOG_TAG, "%s", statusMessage.c_str());
   }
@@ -178,13 +222,16 @@ void DirConManager::update() {
 
   // Handle data from connected clients
   handleClientData();
+
+  // Socket writes happen only here and are explicitly non-blocking.
+  drainOutboundQueues();
 }
 
 // returns the number of connected clients
 int DirConManager::connectedClients() {
   int connectedClients = 0;
   for (int i = 0; i < DIRCON_MAX_CLIENTS; i++) {
-    if (dirConClients[i].connected()) {
+    if (clientActive[i]) {
       connectedClients++;
     }
   }
@@ -311,8 +358,11 @@ void DirConManager::checkForNewClients() {
   bool clientAccepted = false;
   int clientIndex     = -1;
 
+  configureClientSocket(newClient);
+
+  xSemaphoreTake(s_outboundMutex, portMAX_DELAY);
   for (int i = 0; i < DIRCON_MAX_CLIENTS; i++) {
-    if (!dirConClients[i].connected()) {
+    if (!clientActive[i]) {
       dirConClients[i] = newClient;
       clientAccepted   = true;
       clientIndex      = i;
@@ -320,13 +370,16 @@ void DirConManager::checkForNewClients() {
       // Clear receive buffer and subscription state
       receiveBufferLength[i] = 0;
       lastSequenceNumber[i]  = 0;
+      resetOutboundQueue(i);
       for (int j = 0; j < DIRCON_MAX_CHARACTERISTICS; j++) {
         clientSubscriptions[i][j].active = false;
       }
+      clientActive[i] = true;
 
       break;
     }
   }
+  xSemaphoreGive(s_outboundMutex);
 
   if (clientAccepted) {
     String clientIP = dirConClients[clientIndex].remoteIP().toString();
@@ -338,19 +391,47 @@ void DirConManager::checkForNewClients() {
   }
 }
 
+void DirConManager::configureClientSocket(WiFiClient& client) {
+  int keepAliveIdle     = DIRCON_TCP_KEEPIDLE_SECONDS;
+  int keepAliveInterval = DIRCON_TCP_KEEPINTVL_SECONDS;
+  int keepAliveCount    = DIRCON_TCP_KEEPCNT;
+
+  if (client.setSocketOption(IPPROTO_TCP, TCP_KEEPIDLE, &keepAliveIdle, sizeof(keepAliveIdle)) < 0 ||
+      client.setSocketOption(IPPROTO_TCP, TCP_KEEPINTVL, &keepAliveInterval, sizeof(keepAliveInterval)) < 0 ||
+      client.setSocketOption(IPPROTO_TCP, TCP_KEEPCNT, &keepAliveCount, sizeof(keepAliveCount)) < 0) {
+    SS2K_LOG(DIRCON_LOG_TAG, "Warning: failed to configure DirCon TCP keepalive");
+  }
+}
+
+void DirConManager::closeClient(size_t clientIndex, const char* reason) {
+  if (clientIndex >= DIRCON_MAX_CLIENTS) {
+    return;
+  }
+
+  String clientIP = dirConClients[clientIndex].remoteIP().toString();
+
+  xSemaphoreTake(s_outboundMutex, portMAX_DELAY);
+  dirConClients[clientIndex].stop();
+  clientActive[clientIndex]        = false;
+  receiveBufferLength[clientIndex] = 0;
+  resetOutboundQueue(clientIndex);
+  for (int j = 0; j < DIRCON_MAX_CHARACTERISTICS; j++) {
+    clientSubscriptions[clientIndex][j].active = false;
+  }
+  xSemaphoreGive(s_outboundMutex);
+
+  SS2K_LOG(DIRCON_LOG_TAG, "DirCon client %s disconnected: %s", clientIP.c_str(), reason);
+  updateStatusMessage();
+}
+
 void DirConManager::handleClientData() {
   for (int i = 0; i < DIRCON_MAX_CLIENTS; i++) {
-    if (!dirConClients[i].connected()) {
+    if (!clientActive[i]) {
       continue;
     }
 
-    // Check if client disconnected
     if (!dirConClients[i].connected()) {
-      String clientIP = dirConClients[i].remoteIP().toString();
-      SS2K_LOG(DIRCON_LOG_TAG, "DirCon client %s disconnected", clientIP.c_str());
-      dirConClients[i].stop();
-      removeAllSubscriptions(i);
-      updateStatusMessage();
+      closeClient(i, "socket no longer connected");
       continue;
     }
 
@@ -394,6 +475,125 @@ void DirConManager::handleClientData() {
           receiveBufferLength[i] = 0;
         }
       }
+    }
+  }
+}
+
+bool DirConManager::queueOutboundFrame(size_t clientIndex, const uint8_t* data, size_t length, bool notification, const NimBLEUUID* requiredSubscription) {
+  if (clientIndex >= DIRCON_MAX_CLIENTS || data == nullptr || length == 0) {
+    return false;
+  }
+  if (length > DIRCON_SEND_BUFFER_SIZE) {
+    SS2K_LOG(DIRCON_LOG_TAG, "Cannot queue %u-byte frame for client %u; maximum is %u", static_cast<unsigned>(length), static_cast<unsigned>(clientIndex),
+             DIRCON_SEND_BUFFER_SIZE);
+    return false;
+  }
+  if (xSemaphoreTake(s_outboundMutex, pdMS_TO_TICKS(10)) != pdTRUE) {
+    SS2K_LOG(DIRCON_LOG_TAG, "Failed to acquire outbound queue mutex, dropping %s", notification ? "notification" : "response");
+    return false;
+  }
+
+  bool queued                   = false;
+  DirConOutboundQueue& outbound = s_outboundQueues[clientIndex];
+  bool subscriptionMatches     = requiredSubscription == nullptr;
+  if (!subscriptionMatches) {
+    for (int i = 0; i < DIRCON_MAX_CHARACTERISTICS; i++) {
+      if (clientSubscriptions[clientIndex][i].active && clientSubscriptions[clientIndex][i].uuid == *requiredSubscription) {
+        subscriptionMatches = true;
+        break;
+      }
+    }
+  }
+
+  if (clientActive[clientIndex] && subscriptionMatches) {
+    if (outbound.count >= DIRCON_OUTBOUND_QUEUE_DEPTH && !notification) {
+      // Preserve command responses by evicting the newest notification that has not begun sending.
+      for (size_t i = outbound.count; i > 0; i--) {
+        size_t candidate = i - 1;
+        if (outbound.frames[candidate].notification && outbound.frames[candidate].offset == 0) {
+          for (size_t j = candidate; j + 1 < outbound.count; j++) {
+            outbound.frames[j] = outbound.frames[j + 1];
+          }
+          outbound.count--;
+          outbound.droppedNotifications++;
+          break;
+        }
+      }
+    }
+
+    if (outbound.count < DIRCON_OUTBOUND_QUEUE_DEPTH) {
+      if (outbound.count == 0) {
+        outbound.lastProgressMs = millis();
+      }
+      DirConOutboundFrame& frame = outbound.frames[outbound.count++];
+      memcpy(frame.data, data, length);
+      frame.length       = length;
+      frame.offset       = 0;
+      frame.notification = notification;
+      queued             = true;
+    } else if (notification) {
+      outbound.droppedNotifications++;
+      uint32_t dropped = outbound.droppedNotifications;
+      if (dropped == 1 || (dropped & (dropped - 1)) == 0) {
+        SS2K_LOG(DIRCON_LOG_TAG, "Client %u outbound queue full; dropped %u notification(s)", static_cast<unsigned>(clientIndex), static_cast<unsigned>(dropped));
+      }
+    } else {
+      outbound.closeRequested = true;
+      SS2K_LOG(DIRCON_LOG_TAG, "Client %u outbound queue full with responses; scheduling disconnect", static_cast<unsigned>(clientIndex));
+    }
+  }
+
+  xSemaphoreGive(s_outboundMutex);
+  return queued;
+}
+
+void DirConManager::drainOutboundQueues() {
+  for (size_t clientIndex = 0; clientIndex < DIRCON_MAX_CLIENTS; clientIndex++) {
+    bool shouldClose        = false;
+    const char* closeReason = "outbound send failed";
+
+    xSemaphoreTake(s_outboundMutex, portMAX_DELAY);
+    DirConOutboundQueue& outbound = s_outboundQueues[clientIndex];
+    if (!clientActive[clientIndex]) {
+      xSemaphoreGive(s_outboundMutex);
+      continue;
+    }
+
+    if (outbound.closeRequested) {
+      shouldClose = true;
+      closeReason = "outbound queue exhausted";
+    } else if (outbound.count > 0) {
+      DirConOutboundFrame& frame = outbound.frames[0];
+      int socketFd                = dirConClients[clientIndex].fd();
+      ssize_t sent                = 0;
+
+      if (socketFd < 0) {
+        shouldClose = true;
+        closeReason = "invalid socket during send";
+      } else if ((sent = ::send(socketFd, frame.data + frame.offset, frame.length - frame.offset, MSG_DONTWAIT)) > 0) {
+        frame.offset += static_cast<size_t>(sent);
+        outbound.lastProgressMs = millis();
+        if (frame.offset == frame.length) {
+          for (size_t i = 0; i + 1 < outbound.count; i++) {
+            outbound.frames[i] = outbound.frames[i + 1];
+          }
+          outbound.count--;
+        }
+      } else if (sent == 0) {
+        shouldClose = true;
+        closeReason = "peer closed during send";
+      } else if (errno != EAGAIN && errno != EWOULDBLOCK && errno != ENOMEM) {
+        SS2K_LOG(DIRCON_LOG_TAG, "Non-blocking send failed for client %u: errno %d", static_cast<unsigned>(clientIndex), errno);
+        shouldClose = true;
+      } else if (millis() - outbound.lastProgressMs >= DIRCON_SEND_STALL_TIMEOUT_MS) {
+        shouldClose = true;
+        closeReason = "outbound send stalled";
+      }
+    }
+    xSemaphoreGive(s_outboundMutex);
+
+    if (shouldClose) {
+      closeClient(clientIndex, closeReason);
     }
   }
 }
@@ -572,7 +772,7 @@ void DirConManager::sendErrorResponse(uint8_t messageId, uint8_t sequenceNumber,
 }
 
 void DirConManager::sendResponse(DirConMessage* message, size_t clientIndex) {
-  if (clientIndex >= DIRCON_MAX_CLIENTS || !dirConClients[clientIndex].connected()) {
+  if (clientIndex >= DIRCON_MAX_CLIENTS || !clientActive[clientIndex]) {
     SS2K_LOG(DIRCON_LOG_TAG, "Cannot send response - client %d is not connected", clientIndex);
     return;
   }
@@ -602,14 +802,16 @@ void DirConManager::sendResponse(DirConMessage* message, size_t clientIndex) {
                static_cast<unsigned>(message->SequenceNumber), uuid.c_str(), result, static_cast<unsigned>(message->AdditionalData.size()),
                message->AdditionalData.empty() ? "" : ":", payloadPreview);
     }
-    dirConClients[clientIndex].write(encodedMessage->data(), encodedMessage->size());
+    if (!queueOutboundFrame(clientIndex, encodedMessage->data(), encodedMessage->size(), false)) {
+      SS2K_LOG(DIRCON_LOG_TAG, "Failed to queue response for client %u", static_cast<unsigned>(clientIndex));
+    }
   } else {
     SS2K_LOG(DIRCON_LOG_TAG, "Error: No encoded message to send");
   }
 }
 
 void DirConManager::notifyCharacteristic(const NimBLEUUID& serviceUuid, const NimBLEUUID& characteristicUuid, const uint8_t* data, size_t length, bool onlySubscribers) {
-  if (!started || !connectedClients()) {
+  if (!started) {
     return;
   }
 
@@ -619,8 +821,6 @@ void DirConManager::notifyCharacteristic(const NimBLEUUID& serviceUuid, const Ni
 
   broadcastNotification(characteristicUuid, data, length, onlySubscribers);
 }
-
-static SemaphoreHandle_t s_notifyMutex = xSemaphoreCreateMutex();
 
 void DirConManager::broadcastNotification(const NimBLEUUID& characteristicUuid, const uint8_t* data, size_t length, bool onlySubscribers) {
   DirConMessage notification;  // stack-allocated, safe per-call
@@ -640,23 +840,14 @@ void DirConManager::broadcastNotification(const NimBLEUUID& characteristicUuid, 
     return;
   }
 
-  // Grab mutex before touching the TCP client
-  if (xSemaphoreTake(s_notifyMutex, pdMS_TO_TICKS(10)) != pdTRUE) {
-    SS2K_LOG(DIRCON_LOG_TAG, "broadcastNotification: failed to acquire mutex, dropping notification");
-    return;
-  }
-
   for (int i = 0; i < DIRCON_MAX_CLIENTS; i++) {
-    if (!dirConClients[i].connected() || (onlySubscribers && !hasSubscription(i, characteristicUuid))) {
-      continue;
-    }
 #ifdef DEBUG_DIRCON_MESSAGES
-    DirConMessage::printVectorBytesToSerial(*encodedMessage, false);
+    if (!onlySubscribers || hasSubscription(i, characteristicUuid)) {
+      DirConMessage::printVectorBytesToSerial(*encodedMessage, false);
+    }
 #endif
-    dirConClients[i].write(encodedMessage->data(), encodedMessage->size());
+    queueOutboundFrame(i, encodedMessage->data(), encodedMessage->size(), true, onlySubscribers ? &characteristicUuid : nullptr);
   }
-
-  xSemaphoreGive(s_notifyMutex);
 }
 
 std::vector<NimBLECharacteristic*> DirConManager::getCharacteristics(const NimBLEUUID& serviceUuid) {
@@ -713,45 +904,69 @@ uint8_t DirConManager::getDirConProperties(uint32_t characteristicProperties) {
 }
 
 void DirConManager::addSubscription(size_t clientIndex, const NimBLEUUID& characteristicUuid) {
+  if (clientIndex >= DIRCON_MAX_CLIENTS) {
+    return;
+  }
+  xSemaphoreTake(s_outboundMutex, portMAX_DELAY);
   for (int j = 0; j < DIRCON_MAX_CHARACTERISTICS; j++) {
     if (clientSubscriptions[clientIndex][j].active &&
         clientSubscriptions[clientIndex][j].uuid == characteristicUuid) {
+      xSemaphoreGive(s_outboundMutex);
       return;  // already subscribed
     }
     if (!clientSubscriptions[clientIndex][j].active) {
       clientSubscriptions[clientIndex][j].uuid   = characteristicUuid;
       clientSubscriptions[clientIndex][j].active = true;
+      xSemaphoreGive(s_outboundMutex);
       SS2K_LOG(DIRCON_LOG_TAG, "Client %d subscribed to characteristic %s", clientIndex, characteristicUuid.toString().c_str());
       return;
     }
   }
+  xSemaphoreGive(s_outboundMutex);
   SS2K_LOG(DIRCON_LOG_TAG, "Warning: no free subscription slot for client %d", clientIndex);
 }
 
 void DirConManager::removeSubscription(size_t clientIndex, const NimBLEUUID& characteristicUuid) {
+  if (clientIndex >= DIRCON_MAX_CLIENTS) {
+    return;
+  }
+  xSemaphoreTake(s_outboundMutex, portMAX_DELAY);
   for (int j = 0; j < DIRCON_MAX_CHARACTERISTICS; j++) {
     if (clientSubscriptions[clientIndex][j].active &&
         clientSubscriptions[clientIndex][j].uuid == characteristicUuid) {
       clientSubscriptions[clientIndex][j].active = false;
+      xSemaphoreGive(s_outboundMutex);
       SS2K_LOG(DIRCON_LOG_TAG, "Client %d unsubscribed from characteristic %s", clientIndex, characteristicUuid.toString().c_str());
       return;
     }
   }
+  xSemaphoreGive(s_outboundMutex);
 }
 
 void DirConManager::removeAllSubscriptions(size_t clientIndex) {
+  if (clientIndex >= DIRCON_MAX_CLIENTS) {
+    return;
+  }
+  xSemaphoreTake(s_outboundMutex, portMAX_DELAY);
   for (int j = 0; j < DIRCON_MAX_CHARACTERISTICS; j++) {
     clientSubscriptions[clientIndex][j].active = false;
   }
+  xSemaphoreGive(s_outboundMutex);
   SS2K_LOG(DIRCON_LOG_TAG, "Removed all subscriptions for client %d", clientIndex);
 }
 
 bool DirConManager::hasSubscription(size_t clientIndex, const NimBLEUUID& characteristicUuid) {
+  if (clientIndex >= DIRCON_MAX_CLIENTS) {
+    return false;
+  }
+  xSemaphoreTake(s_outboundMutex, portMAX_DELAY);
   for (int j = 0; j < DIRCON_MAX_CHARACTERISTICS; j++) {
     if (clientSubscriptions[clientIndex][j].active &&
         clientSubscriptions[clientIndex][j].uuid == characteristicUuid) {
+      xSemaphoreGive(s_outboundMutex);
       return true;
     }
   }
+  xSemaphoreGive(s_outboundMutex);
   return false;
 }

@@ -494,6 +494,7 @@ DirCon exposes BLE-like services over TCP:
 - BLE server updates call `DirConManager::notifyCharacteristic()` so TCP clients receive corresponding updates.
 
 DirCon uses static buffers and fixed client/subscription arrays. Be cautious with dynamic allocation and payload sizes.
+Outbound DirCon frames use bounded per-client queues and are drained with non-blocking socket sends only from `DirConManager::update()`. Keep responses and notifications on that path so slow or vanished TCP peers cannot block firmware tasks or interleave frames.
 
 ## HTTP/Web UI
 
