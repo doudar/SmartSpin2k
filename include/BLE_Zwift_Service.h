@@ -70,17 +70,6 @@ class BLE_Zwift_Service {
   // Encode a button mask into a protobuf varint message and send as notification
   void sendButtonNotification(ZwiftProtocol::RideButtonMask buttonMask);
 
-  // Encode uint32 as protobuf varint, returns number of bytes written
-  static size_t encodeVarint32(uint32_t value, uint8_t *buffer);
-
-  // Encode uint64 as ULEB128 varint, returns number of bytes written
-  static size_t encodeUleb128(uint64_t value, uint8_t *buffer);
-  // Returns the number of bytes a ULEB128-encoded value would occupy
-  static size_t encodeUleb128Len(uint64_t value);
-
-  // Decode ULEB128 varint from buffer, returns number of bytes consumed
-  static size_t decodeUleb128(const uint8_t *buf, size_t bufLen, uint64_t *result);
-
   // Send the "all buttons released" state
   void sendAllButtonsReleased();
 

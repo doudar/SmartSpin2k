@@ -98,6 +98,22 @@ void setup() {
     RUN_TEST(test.test_transfer_timeout);
   }
 
+  // Shared endian helper tests
+  {
+    TestEndian test;
+    RUN_TEST(test.test_little_endian_signed_decode_and_round_trip);
+  }
+
+  // BLE protocol encode/decode round-trip tests
+  {
+    TestBleWireRoundTrip test;
+    RUN_TEST(test.test_all_custom_characteristic_formats);
+    RUN_TEST(test.test_ftms_round_trip);
+    RUN_TEST(test.test_csc_round_trip);
+    RUN_TEST(test.test_heart_rate_round_trip);
+    RUN_TEST(test.test_zwift_round_trip);
+  }
+
   UNITY_END();
 }
 

@@ -10,6 +10,7 @@
 #include "BLE_Device_Identity.h"
 #include "BLE_Fitness_Machine_Service.h"
 #include "SS2KLog.h"
+#include "ByteUtils.h"
 
 #include <ArduinoJson.h>
 #include <Constants.h>
@@ -620,8 +621,7 @@ void SpinBLEClient::FTMSControlPointWrite(const uint8_t* pData, int length) {
         char logBuf[kLogBufCapacity];
         if (modData[0] == FitnessMachineControlPointProcedure::SetIndoorBikeSimulationParameters) {  // use virtual Shifting
           int incline = ss2k->getTargetPosition() / userConfig->getInclineMultiplier();
-          modData[3]  = (uint8_t)(incline & 0xff);
-          modData[4]  = (uint8_t)(incline >> 8);
+          put_le16s(&modData[3], static_cast<int16_t>(incline));
           writeCharacteristic->writeValue(modData, length);
           logBufLength = ss2k_log_hex_to_buffer(modData, length, logBuf, 0, kLogBufCapacity);
           logBufLength += snprintf(logBuf + logBufLength, kLogBufCapacity - logBufLength, "-> Shifted Sim Data: %d", rtConfig->getShifterPosition());
@@ -718,9 +718,9 @@ void SpinBLEClient::postConnect() {
             auto rr = resistanceRangeCharacteristic->readValue();
             if (rr.size() >= 6) {
               const uint8_t* b = reinterpret_cast<const uint8_t*>(rr.data());
-              int16_t minRaw   = static_cast<int16_t>(b[0] | (static_cast<uint16_t>(b[1]) << 8));
-              int16_t maxRaw   = static_cast<int16_t>(b[2] | (static_cast<uint16_t>(b[3]) << 8));
-              uint16_t incRaw  = static_cast<uint16_t>(b[4] | (static_cast<uint16_t>(b[5]) << 8));
+              int16_t minRaw  = get_le16s(&b[0]);
+              int16_t maxRaw  = get_le16s(&b[2]);
+              uint16_t incRaw = get_le16(&b[4]);
 
               float incF = static_cast<float>(incRaw) / 10.0f;           // FTMS resolution 0.1, convert to actual increment value
               float minF = (static_cast<float>(minRaw) / 10.0f) / incF;  // Convert FTMS 0.1 units to normalized scale

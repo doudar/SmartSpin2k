@@ -95,27 +95,27 @@ void TestErgLogReplay::test_active_ride_log_and_gain_limits(void) {
     }
   }
 
-  std::vector<const ErgInterval*> hardIntervals;
+  std::vector<const ErgInterval*> repeatedTargetIntervals;
   for (const ErgInterval& interval : intervals) {
-    if (interval.target >= 350 && interval.samples.size() >= 5) hardIntervals.push_back(&interval);
+    if (interval.target == 155 && interval.samples.size() >= 5) repeatedTargetIntervals.push_back(&interval);
   }
 
-  TEST_ASSERT_GREATER_OR_EQUAL_INT_MESSAGE(3, hardIntervals.size(), "ride log should contain the three early hard intervals");
-  const ErgInterval& unstable = *hardIntervals[1];
-  const ErgInterval& stable   = *hardIntervals[2];
+  TEST_ASSERT_GREATER_OR_EQUAL_INT_MESSAGE(2, repeatedTargetIntervals.size(), "ride log should contain the early and late table-controlled 155 W intervals");
+  const ErgInterval& unstable = *repeatedTargetIntervals.front();
+  const ErgInterval& stable   = *repeatedTargetIntervals.back();
 
-  TEST_ASSERT_EQUAL_INT(385, unstable.target);
+  TEST_ASSERT_EQUAL_INT(155, unstable.target);
   TEST_ASSERT_FLOAT_WITHIN(0.01, 5.0, unstable.sensitivity);
-  TEST_ASSERT_GREATER_OR_EQUAL_INT(8, unstable.samples.size());
-  TEST_ASSERT_GREATER_OR_EQUAL_INT(50, maxAbsoluteError(unstable));
-  TEST_ASSERT_GREATER_OR_EQUAL_INT(5, signChanges(unstable));
-  TEST_ASSERT_FLOAT_WITHIN(0.001f, 20.0f, static_cast<float>(maxGain(unstable)));
+  TEST_ASSERT_GREATER_OR_EQUAL_INT(18, unstable.samples.size());
+  TEST_ASSERT_GREATER_OR_EQUAL_INT(100, maxAbsoluteError(unstable));
+  TEST_ASSERT_GREATER_OR_EQUAL_INT(3, signChanges(unstable));
+  TEST_ASSERT_FLOAT_WITHIN(0.001f, 12.5f, static_cast<float>(maxGain(unstable)));
 
-  TEST_ASSERT_EQUAL_INT(390, stable.target);
-  TEST_ASSERT_FLOAT_WITHIN(0.01, 3.0, stable.sensitivity);
-  TEST_ASSERT_GREATER_OR_EQUAL_INT(8, stable.samples.size());
-  TEST_ASSERT_LESS_OR_EQUAL_INT(30, maxAbsoluteError(stable));
-  TEST_ASSERT_LESS_THAN_FLOAT(8.0f, static_cast<float>(maxGain(stable)));
+  TEST_ASSERT_EQUAL_INT(155, stable.target);
+  TEST_ASSERT_FLOAT_WITHIN(0.01, 5.0, stable.sensitivity);
+  TEST_ASSERT_GREATER_OR_EQUAL_INT(20, stable.samples.size());
+  TEST_ASSERT_LESS_OR_EQUAL_INT(20, maxAbsoluteError(stable));
+  TEST_ASSERT_FLOAT_WITHIN(0.001f, 7.5f, static_cast<float>(maxGain(stable)));
 
   // Sensitivity remains a user-controlled multiplier. When table geometry is
   // rejected, sensitivity 5 follows the historical sensitivity-5 gain path.
@@ -145,7 +145,7 @@ void TestErgLogReplay::test_active_ride_log_and_gain_limits(void) {
          << "stable interval: target=" << stable.target << " sensitivity=" << stable.sensitivity << " samples=" << stable.samples.size()
          << " max_error=" << maxAbsoluteError(stable) << " sign_changes=" << signChanges(stable) << " max_gain=" << maxGain(stable) << "\n"
          << "uncapped configured sensitivity: " << ErgControl::sanitizeSensitivity(5.0) << "\n"
-         << "trusted-table base-gain bounds at 385 W: " << fallback * ErgControl::TABLE_GAIN_MIN_FALLBACK_RATIO << ".."
+         << "trusted-table base-gain bounds at 155 W: " << fallback * ErgControl::TABLE_GAIN_MIN_FALLBACK_RATIO << ".."
          << fallback * ErgControl::TABLE_GAIN_MAX_FALLBACK_RATIO << "\n"
          << "worst historical-fallback correction replayed over unstable samples: " << worstReplayedMove << " steps\n";
 }

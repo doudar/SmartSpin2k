@@ -90,6 +90,7 @@ This characteristic allows for reading and writing various user configuration pa
 #include <Constants.h>
 #include "BleAppender.h"
 #include "DirConManager.h"
+#include "ByteUtils.h"
 #include <algorithm>
 #include <vector>
 
@@ -126,10 +127,8 @@ std::vector<uint8_t> makeSettingsSnapshotChunk(SettingsSnapshotTransfer& snapsho
   packet[0] = cc_success;
   packet[1] = BLE_allSettings;
   packet[2] = SETTINGS_SNAPSHOT_VERSION;
-  packet[3] = static_cast<uint8_t>(snapshot.chunk & 0xff);
-  packet[4] = static_cast<uint8_t>(snapshot.chunk >> 8);
-  packet[5] = static_cast<uint8_t>(snapshot.chunkCount & 0xff);
-  packet[6] = static_cast<uint8_t>(snapshot.chunkCount >> 8);
+  put_le16(&packet[3], snapshot.chunk);
+  put_le16(&packet[5], snapshot.chunkCount);
   std::copy_n(snapshot.json.data() + snapshot.offset, payloadSize, packet.begin() + SETTINGS_SNAPSHOT_HEADER_LENGTH);
 
   snapshot.offset += payloadSize;
@@ -356,43 +355,14 @@ void BLE_ss2kCustomCharacteristic::process(std::string rxValue, uint16_t connHan
 
   size_t requiredLength = 2;
   if (rxValue[0] == cc_write) {
-    switch (static_cast<uint8_t>(rxValue[1])) {
-      case BLE_incline:
-      case BLE_simulatedWatts:
-      case BLE_simulatedHr:
-      case BLE_simulatedCad:
-      case BLE_simulatedSpeed:
-      case BLE_shiftStep:
-      case BLE_stepperPower:
-      case BLE_inclineMultiplier:
-      case BLE_powerCorrectionFactor:
-      case BLE_FTMSMode:
-      case BLE_shifterPosition:
-      case BLE_stepperSpeed:
-      case BLE_ERGSensitivity:
-      case BLE_minBrakeWatts:
-      case BLE_maxBrakeWatts:
-      case BLE_simulatedTargetWatts:
-      case BLE_homingSensitivity: requiredLength = 4; break;
-
-      case BLE_targetPosition:
-      case BLE_hMin:
-      case BLE_hMax: requiredLength = 6; break;
-
-      case BLE_powerTableData: requiredLength = 3 + (2 * POWERTABLE_WATT_SIZE); break;
-
-      case BLE_stealthChop:
-      case BLE_simulateHr:
-      case BLE_simulateWatts:
-      case BLE_simulateCad:
-      case BLE_autoUpdate:
-      case BLE_externalControl:
-      case BLE_syncMode:
-      case BLE_shiftDir:
-      case BLE_simulateTargetWatts:
-      case BLE_pTab4Pwr:
-      case BLE_UDPLogging:
-      case BLE_BLELogging: requiredLength = 3; break;
+    switch (customCharacteristicValueFormat(static_cast<uint8_t>(rxValue[1]))) {
+      case CustomUnsigned16:
+      case CustomSigned16: requiredLength = 4; break;
+      case CustomSigned32: requiredLength = 6; break;
+      case CustomBoolean:
+      case CustomBooleanWriteStringRead: requiredLength = 3; break;
+      case CustomPowerTableRow: requiredLength = 3 + (2 * POWERTABLE_WATT_SIZE); break;
+      default: break;
     }
   } else if (rxValue[0] == cc_read && static_cast<uint8_t>(rxValue[1]) == BLE_powerTableData) {
     requiredLength = 3;
@@ -424,13 +394,12 @@ void BLE_ss2kCustomCharacteristic::process(std::string rxValue, uint16_t connHan
       if (rxValue[0] == cc_read) {
         returnValue[0] = cc_success;
         int inc        = rtConfig->getTargetIncline() * 10;
-        returnValue[2] = (uint8_t)(inc & 0xff);
-        returnValue[3] = (uint8_t)(inc >> 8);
+        put_le16s(&returnValue[2], static_cast<int16_t>(inc));
         returnLength += 2;
       }
       if (rxValue[0] == cc_write) {
         returnValue[0] = cc_success;
-        rtConfig->setTargetIncline(bytes_to_u16(rxValue[3], rxValue[2]) / 10);
+        rtConfig->setTargetIncline(get_le16s(&pData[2]) / 10.0f);
         LOG_BUF_APPEND("(%f)", rtConfig->getTargetIncline());
       }
     } break;
@@ -439,13 +408,12 @@ void BLE_ss2kCustomCharacteristic::process(std::string rxValue, uint16_t connHan
       LOG_BUF_APPEND("<-simulatedWatts");
       if (rxValue[0] == cc_read) {
         returnValue[0] = cc_success;
-        returnValue[2] = (uint8_t)(rtConfig->watts.getValue() & 0xff);
-        returnValue[3] = (uint8_t)(rtConfig->watts.getValue() >> 8);
+        put_le16(&returnValue[2], static_cast<uint16_t>(rtConfig->watts.getValue()));
         returnLength += 2;
       }
       if (rxValue[0] == cc_write) {
         returnValue[0] = cc_success;
-        rtConfig->watts.setValue(bytes_to_u16(rxValue[3], rxValue[2]));
+        rtConfig->watts.setValue(get_le16(&pData[2]));
         LOG_BUF_APPEND("(%d)", rtConfig->watts.getValue());
       }
       break;
@@ -454,13 +422,12 @@ void BLE_ss2kCustomCharacteristic::process(std::string rxValue, uint16_t connHan
       LOG_BUF_APPEND("<-simulatedHr");
       if (rxValue[0] == cc_read) {
         returnValue[0] = cc_success;
-        returnValue[2] = (uint8_t)(rtConfig->hr.getValue() & 0xff);
-        returnValue[3] = (uint8_t)(rtConfig->hr.getValue() >> 8);
+        put_le16(&returnValue[2], static_cast<uint16_t>(rtConfig->hr.getValue()));
         returnLength += 2;
       }
       if (rxValue[0] == cc_write) {
         returnValue[0] = cc_success;
-        rtConfig->hr.setValue(bytes_to_u16(rxValue[3], rxValue[2]));
+        rtConfig->hr.setValue(get_le16(&pData[2]));
         LOG_BUF_APPEND("(%d)", rtConfig->hr.getValue());
       }
       break;
@@ -469,13 +436,12 @@ void BLE_ss2kCustomCharacteristic::process(std::string rxValue, uint16_t connHan
       LOG_BUF_APPEND("<-simulatedCad");
       if (rxValue[0] == cc_read) {
         returnValue[0] = cc_success;
-        returnValue[2] = (uint8_t)(rtConfig->cad.getValue() & 0xff);
-        returnValue[3] = (uint8_t)(rtConfig->cad.getValue() >> 8);
+        put_le16(&returnValue[2], static_cast<uint16_t>(rtConfig->cad.getValue()));
         returnLength += 2;
       }
       if (rxValue[0] == cc_write) {
         returnValue[0] = cc_success;
-        rtConfig->cad.setValue(bytes_to_u16(rxValue[3], rxValue[2]));
+        rtConfig->cad.setValue(get_le16(&pData[2]));
         LOG_BUF_APPEND("(%d)", rtConfig->cad.getValue());
       }
       break;
@@ -485,13 +451,12 @@ void BLE_ss2kCustomCharacteristic::process(std::string rxValue, uint16_t connHan
       int spd = rtConfig->getSimulatedSpeed() * 10;
       if (rxValue[0] == cc_read) {
         returnValue[0] = cc_success;
-        returnValue[2] = (uint8_t)(spd & 0xff);
-        returnValue[3] = (uint8_t)(spd >> 8);
+        put_le16(&returnValue[2], static_cast<uint16_t>(spd));
         returnLength += 2;
       }
       if (rxValue[0] == cc_write) {
         returnValue[0] = cc_success;
-        rtConfig->setSimulatedSpeed(bytes_to_u16(rxValue[3], rxValue[2]) / 10);
+        rtConfig->setSimulatedSpeed(get_le16(&pData[2]) / 10.0f);
         LOG_BUF_APPEND("(%d)", rtConfig->getSimulatedSpeed());
       }
     } break;
@@ -514,13 +479,12 @@ void BLE_ss2kCustomCharacteristic::process(std::string rxValue, uint16_t connHan
       LOG_BUF_APPEND("<-shiftStep");
       if (rxValue[0] == cc_read) {
         returnValue[0] = cc_success;
-        returnValue[2] = (uint8_t)(userConfig->getShiftStep() & 0xff);
-        returnValue[3] = (uint8_t)(userConfig->getShiftStep() >> 8);
+        put_le16(&returnValue[2], static_cast<uint16_t>(userConfig->getShiftStep()));
         returnLength += 2;
       }
       if (rxValue[0] == cc_write) {
         returnValue[0] = cc_success;
-        userConfig->setShiftStep(bytes_to_u16(rxValue[3], rxValue[2]));
+        userConfig->setShiftStep(get_le16(&pData[2]));
         LOG_BUF_APPEND("(%d)", userConfig->getShiftStep());
       }
       break;
@@ -529,13 +493,12 @@ void BLE_ss2kCustomCharacteristic::process(std::string rxValue, uint16_t connHan
       LOG_BUF_APPEND("<-stepperPower");
       if (rxValue[0] == cc_read) {
         returnValue[0] = cc_success;
-        returnValue[2] = (uint8_t)(userConfig->getStepperPower() & 0xff);
-        returnValue[3] = (uint8_t)(userConfig->getStepperPower() >> 8);
+        put_le16(&returnValue[2], static_cast<uint16_t>(userConfig->getStepperPower()));
         returnLength += 2;
       }
       if (rxValue[0] == cc_write) {
         returnValue[0] = cc_success;
-        userConfig->setStepperPower(bytes_to_u16(rxValue[3], rxValue[2]));
+        userConfig->setStepperPower(get_le16(&pData[2]));
         ss2k->updateStepperPower();
         LOG_BUF_APPEND("(%d)", userConfig->getStepperPower());
       }
@@ -561,13 +524,12 @@ void BLE_ss2kCustomCharacteristic::process(std::string rxValue, uint16_t connHan
       int inc = userConfig->getInclineMultiplier() * 10;
       if (rxValue[0] == cc_read) {
         returnValue[0] = cc_success;
-        returnValue[2] = (uint8_t)(inc & 0xff);
-        returnValue[3] = (uint8_t)(inc >> 8);
+        put_le16s(&returnValue[2], static_cast<int16_t>(inc));
         returnLength += 2;
       }
       if (rxValue[0] == cc_write) {
         returnValue[0] = cc_success;
-        userConfig->setInclineMultiplier((bytes_to_u16(rxValue[3], rxValue[2])) / 10.0);
+        userConfig->setInclineMultiplier(get_le16s(&pData[2]) / 10.0f);
         LOG_BUF_APPEND("(%f)", userConfig->getInclineMultiplier());
       }
     } break;
@@ -577,13 +539,12 @@ void BLE_ss2kCustomCharacteristic::process(std::string rxValue, uint16_t connHan
       int pcf = userConfig->getPowerCorrectionFactor() * 10;
       if (rxValue[0] == cc_read) {
         returnValue[0] = cc_success;
-        returnValue[2] = (uint8_t)(pcf & 0xff);
-        returnValue[3] = (uint8_t)(pcf >> 8);
+        put_le16(&returnValue[2], static_cast<uint16_t>(pcf));
         returnLength += 2;
       }
       if (rxValue[0] == cc_write) {
         returnValue[0] = cc_success;
-        userConfig->setPowerCorrectionFactor((bytes_to_u16(rxValue[3], rxValue[2])) / 10.0);
+        userConfig->setPowerCorrectionFactor(get_le16(&pData[2]) / 10.0f);
         LOG_BUF_APPEND("(%f)", userConfig->getPowerCorrectionFactor());
       }
     } break;
@@ -634,13 +595,12 @@ void BLE_ss2kCustomCharacteristic::process(std::string rxValue, uint16_t connHan
       LOG_BUF_APPEND("<-FTMSMode");
       if (rxValue[0] == cc_read) {
         returnValue[0] = cc_success;
-        returnValue[2] = (uint8_t)(rtConfig->getFTMSMode() & 0xff);
-        returnValue[3] = (uint8_t)(rtConfig->getFTMSMode() >> 8);
+        put_le16(&returnValue[2], rtConfig->getFTMSMode());
         returnLength += 2;
       }
       if (rxValue[0] == cc_write) {
         returnValue[0] = cc_success;
-        rtConfig->setFTMSMode(bytes_to_u16(rxValue[3], rxValue[2]));
+        rtConfig->setFTMSMode(get_le16(&pData[2]));
         LOG_BUF_APPEND("(%hhu)", rtConfig->getFTMSMode());
       }
       break;
@@ -733,13 +693,12 @@ void BLE_ss2kCustomCharacteristic::process(std::string rxValue, uint16_t connHan
       LOG_BUF_APPEND("<-shifterPosition");
       if (rxValue[0] == cc_read) {
         returnValue[0] = cc_success;
-        returnValue[2] = (uint8_t)(rtConfig->getShifterPosition() & 0xff);
-        returnValue[3] = (uint8_t)(rtConfig->getShifterPosition() >> 8);
+        put_le16s(&returnValue[2], static_cast<int16_t>(rtConfig->getShifterPosition()));
         returnLength += 2;
       }
       if (rxValue[0] == cc_write) {
         returnValue[0] = cc_success;
-        rtConfig->setShifterPosition(bytes_to_u16(rxValue[3], rxValue[2]));
+        rtConfig->setShifterPosition(get_le16s(&pData[2]));
         LOG_BUF_APPEND("(%d)", rtConfig->getShifterPosition());
 #ifdef CUSTOM_CHAR_DEBUG
         SS2K_LOG(CUSTOM_CHAR_LOG_TAG, "%s", logBuf);
@@ -761,18 +720,12 @@ void BLE_ss2kCustomCharacteristic::process(std::string rxValue, uint16_t connHan
       LOG_BUF_APPEND("<-targetPosition");
       if (rxValue[0] == cc_read) {
         returnValue[0] = cc_success;
-        returnValue[2] = (uint8_t)(ss2k->getTargetPosition() & 0xff);
-        returnValue[3] = (uint8_t)(ss2k->getTargetPosition() >> 8);
-        returnValue[4] = (uint8_t)(ss2k->getTargetPosition() >> 16);
-        returnValue[5] = (uint8_t)(ss2k->getTargetPosition() >> 24);
+        put_le32s(&returnValue[2], ss2k->getTargetPosition());
         returnLength += 4;
       }
       if (rxValue[0] == cc_write) {
         returnValue[0] = cc_success;
-        ss2k->setTargetPosition(static_cast<int32_t>(static_cast<uint32_t>(static_cast<uint8_t>(rxValue[2])) |
-                                                      (static_cast<uint32_t>(static_cast<uint8_t>(rxValue[3])) << 8) |
-                                                      (static_cast<uint32_t>(static_cast<uint8_t>(rxValue[4])) << 16) |
-                                                      (static_cast<uint32_t>(static_cast<uint8_t>(rxValue[5])) << 24)));
+        ss2k->setTargetPosition(get_le32s(&pData[2]));
         LOG_BUF_APPEND(" (%f)", ss2k->getTargetPosition());
       }
       break;
@@ -825,13 +778,12 @@ void BLE_ss2kCustomCharacteristic::process(std::string rxValue, uint16_t connHan
       LOG_BUF_APPEND("<-stepperSpeed");
       if (rxValue[0] == cc_read) {
         returnValue[0] = cc_success;
-        returnValue[2] = (uint8_t)(userConfig->getStepperSpeed() & 0xff);
-        returnValue[3] = (uint8_t)(userConfig->getStepperSpeed() >> 8);
+        put_le16(&returnValue[2], static_cast<uint16_t>(userConfig->getStepperSpeed()));
         returnLength += 2;
       }
       if (rxValue[0] == cc_write) {
         returnValue[0] = cc_success;
-        userConfig->setStepperSpeed(bytes_to_u16(rxValue[3], rxValue[2]));
+        userConfig->setStepperSpeed(get_le16(&pData[2]));
         LOG_BUF_APPEND("(%d)", userConfig->getStepperSpeed());
         ss2k->updateStepperSpeed();
 #ifdef CUSTOM_CHAR_DEBUG
@@ -845,13 +797,12 @@ void BLE_ss2kCustomCharacteristic::process(std::string rxValue, uint16_t connHan
       int pcf = userConfig->getERGSensitivity() * 10;
       if (rxValue[0] == cc_read) {
         returnValue[0] = cc_success;
-        returnValue[2] = (uint8_t)(pcf & 0xff);
-        returnValue[3] = (uint8_t)(pcf >> 8);
+        put_le16(&returnValue[2], static_cast<uint16_t>(pcf));
         returnLength += 2;
       }
       if (rxValue[0] == cc_write) {
         returnValue[0] = cc_success;
-        userConfig->setERGSensitivity((bytes_to_u16(rxValue[3], rxValue[2])) / 10.0);
+        userConfig->setERGSensitivity(get_le16(&pData[2]) / 10.0f);
         LOG_BUF_APPEND("(%f)", userConfig->getERGSensitivity());
       }
     } break;
@@ -874,13 +825,12 @@ void BLE_ss2kCustomCharacteristic::process(std::string rxValue, uint16_t connHan
       LOG_BUF_APPEND("<-MinWatts");
       if (rxValue[0] == cc_read) {
         returnValue[0] = cc_success;
-        returnValue[2] = (uint8_t)(userConfig->getMinWatts() & 0xff);
-        returnValue[3] = (uint8_t)(userConfig->getMinWatts() >> 8);
+        put_le16(&returnValue[2], static_cast<uint16_t>(userConfig->getMinWatts()));
         returnLength += 2;
       }
       if (rxValue[0] == cc_write) {
         returnValue[0] = cc_success;
-        userConfig->setMinWatts(bytes_to_u16(rxValue[3], rxValue[2]));
+        userConfig->setMinWatts(get_le16(&pData[2]));
         LOG_BUF_APPEND("(%d)", userConfig->getMinWatts());
 #ifdef CUSTOM_CHAR_DEBUG
         SS2K_LOG(CUSTOM_CHAR_LOG_TAG, "%s", logBuf);
@@ -891,13 +841,12 @@ void BLE_ss2kCustomCharacteristic::process(std::string rxValue, uint16_t connHan
       LOG_BUF_APPEND("<-MaxWatts");
       if (rxValue[0] == cc_read) {
         returnValue[0] = cc_success;
-        returnValue[2] = (uint8_t)(userConfig->getMaxWatts() & 0xff);
-        returnValue[3] = (uint8_t)(userConfig->getMaxWatts() >> 8);
+        put_le16(&returnValue[2], static_cast<uint16_t>(userConfig->getMaxWatts()));
         returnLength += 2;
       }
       if (rxValue[0] == cc_write) {
         returnValue[0] = cc_success;
-        userConfig->setMaxWatts(bytes_to_u16(rxValue[3], rxValue[2]));
+        userConfig->setMaxWatts(get_le16(&pData[2]));
         LOG_BUF_APPEND("(%d)", userConfig->getMaxWatts());
 #ifdef CUSTOM_CHAR_DEBUG
         SS2K_LOG(CUSTOM_CHAR_LOG_TAG, "%s", logBuf);
@@ -941,18 +890,16 @@ void BLE_ss2kCustomCharacteristic::process(std::string rxValue, uint16_t connHan
         }
         returnString += (uint8_t)row;
         for (int i = 0; i < POWERTABLE_WATT_SIZE; i++) {
-          returnString += (uint8_t)(powerTable->ptData.tableRow[row].tableEntry[i].targetPosition & 0xff);
-          returnString += (uint8_t)(powerTable->ptData.tableRow[row].tableEntry[i].targetPosition >> 8);
-          //  Serial.printf("%02x%02x ", (uint8_t)(powerTable->ptData.tableRow[row].tableEntry[i].targetPosition & 0xff),
-          //               (uint8_t)(powerTable->ptData.tableRow[row].tableEntry[i].targetPosition >> 8));
+          uint8_t encodedPosition[2];
+          put_le16s(encodedPosition, powerTable->ptData.tableRow[row].tableEntry[i].targetPosition);
+          returnString.append(reinterpret_cast<const char *>(encodedPosition), sizeof(encodedPosition));
         }
       }
       if (rxValue[0] == cc_write) {
         returnValue[0] = cc_success;
         if (rxValue[2] >= 0 && rxValue[2] < POWERTABLE_CAD_SIZE) {
           for (int i = 0; i < POWERTABLE_WATT_SIZE; i++) {
-            powerTable->ptData.tableRow[rxValue[2]].tableEntry[i].targetPosition = static_cast<int16_t>(static_cast<uint16_t>(static_cast<uint8_t>(rxValue[i * 2 + 3])) |
-                                                                                                            (static_cast<uint16_t>(static_cast<uint8_t>(rxValue[i * 2 + 4])) << 8));
+            powerTable->ptData.tableRow[rxValue[2]].tableEntry[i].targetPosition = get_le16s(&pData[i * 2 + 3]);
             // Ensure each entry has a valid reading count to be considered during loading
             if (powerTable->ptData.tableRow[rxValue[2]].tableEntry[i].targetPosition != INT16_MIN) {
               powerTable->ptData.tableRow[rxValue[2]].tableEntry[i].readings = MINIMUM_RELIABLE_POSITIONS + 1;
@@ -973,13 +920,12 @@ void BLE_ss2kCustomCharacteristic::process(std::string rxValue, uint16_t connHan
       LOG_BUF_APPEND("<-targetWatts");
       if (rxValue[0] == cc_read) {
         returnValue[0] = cc_success;
-        returnValue[2] = (uint8_t)(rtConfig->watts.getTarget() & 0xff);
-        returnValue[3] = (uint8_t)(rtConfig->watts.getTarget() >> 8);
+        put_le16(&returnValue[2], static_cast<uint16_t>(rtConfig->watts.getTarget()));
         returnLength += 2;
       }
       if (rxValue[0] == cc_write) {
         returnValue[0] = cc_success;
-        rtConfig->watts.setTarget(bytes_to_u16(rxValue[3], rxValue[2]));
+        rtConfig->watts.setTarget(get_le16(&pData[2]));
         LOG_BUF_APPEND("(%d)", rtConfig->watts.getTarget());
       }
       break;
@@ -1000,18 +946,12 @@ void BLE_ss2kCustomCharacteristic::process(std::string rxValue, uint16_t connHan
       LOG_BUF_APPEND("<-hMin");
       if (rxValue[0] == cc_read) {
         returnValue[0] = cc_success;
-        returnValue[2] = (uint8_t)(userConfig->getHMin() & 0xff);
-        returnValue[3] = (uint8_t)(userConfig->getHMin() >> 8);
-        returnValue[4] = (uint8_t)(userConfig->getHMin() >> 16);
-        returnValue[5] = (uint8_t)(userConfig->getHMin() >> 24);
+        put_le32s(&returnValue[2], userConfig->getHMin());
         returnLength += 4;
       }
       if (rxValue[0] == cc_write) {
         returnValue[0] = cc_success;
-        int32_t hMin = static_cast<int32_t>(static_cast<uint32_t>(static_cast<uint8_t>(rxValue[2])) |
-                                             (static_cast<uint32_t>(static_cast<uint8_t>(rxValue[3])) << 8) |
-                                             (static_cast<uint32_t>(static_cast<uint8_t>(rxValue[4])) << 16) |
-                                             (static_cast<uint32_t>(static_cast<uint8_t>(rxValue[5])) << 24));
+        int32_t hMin = get_le32s(&pData[2]);
         userConfig->setHMin(hMin);
         rtConfig->setMinStep(hMin);
         LOG_BUF_APPEND(" (%d)", hMin);
@@ -1022,18 +962,12 @@ void BLE_ss2kCustomCharacteristic::process(std::string rxValue, uint16_t connHan
       LOG_BUF_APPEND("<-hMax");
       if (rxValue[0] == cc_read) {
         returnValue[0] = cc_success;
-        returnValue[2] = (uint8_t)(userConfig->getHMax() & 0xff);
-        returnValue[3] = (uint8_t)(userConfig->getHMax() >> 8);
-        returnValue[4] = (uint8_t)(userConfig->getHMax() >> 16);
-        returnValue[5] = (uint8_t)(userConfig->getHMax() >> 24);
+        put_le32s(&returnValue[2], userConfig->getHMax());
         returnLength += 4;
       }
       if (rxValue[0] == cc_write) {
         returnValue[0] = cc_success;
-        int32_t hMax   = static_cast<int32_t>(static_cast<uint32_t>(static_cast<uint8_t>(rxValue[2])) |
-                                               (static_cast<uint32_t>(static_cast<uint8_t>(rxValue[3])) << 8) |
-                                               (static_cast<uint32_t>(static_cast<uint8_t>(rxValue[4])) << 16) |
-                                               (static_cast<uint32_t>(static_cast<uint8_t>(rxValue[5])) << 24));
+        int32_t hMax   = get_le32s(&pData[2]);
         Serial.printf("hMax: %d\n <--------------------------------------------", hMax);
         userConfig->setHMax(hMax);
         rtConfig->setMaxStep(hMax);
@@ -1045,13 +979,12 @@ void BLE_ss2kCustomCharacteristic::process(std::string rxValue, uint16_t connHan
       LOG_BUF_APPEND("<-homingSensitivity");
       if (rxValue[0] == cc_read) {
         returnValue[0] = cc_success;
-        returnValue[2] = (uint8_t)(userConfig->getHomingSensitivity() & 0xff);
-        returnValue[3] = (uint8_t)(userConfig->getHomingSensitivity() >> 8);
+        put_le16(&returnValue[2], static_cast<uint16_t>(userConfig->getHomingSensitivity()));
         returnLength += 2;
       }
       if (rxValue[0] == cc_write) {
         returnValue[0] = cc_success;
-        userConfig->setHomingSensitivity(bytes_to_u16(rxValue[3], rxValue[2]));
+        userConfig->setHomingSensitivity(get_le16(&pData[2]));
         LOG_BUF_APPEND("(%d)", userConfig->getHomingSensitivity());
       }
       break;

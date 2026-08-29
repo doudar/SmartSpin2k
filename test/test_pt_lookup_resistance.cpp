@@ -36,7 +36,7 @@ void TestPTLookupResistance::test_active_ride_forward_lookup(void) {
   RideReplaySummary summary;
   TEST_ASSERT_TRUE_MESSAGE(replayActiveRideLog(ptData, summary), "active ride log could not be opened for forward lookup test");
   TEST_ASSERT_EQUAL_INT_MESSAGE(0, summary.invalidEntries, "active ride log contains invalid table entries");
-  TEST_ASSERT_EQUAL_INT_MESSAGE(552, summary.entries, "forward lookup did not replay every active-log entry");
+  TEST_ASSERT_EQUAL_INT_MESSAGE(594, summary.entries, "forward lookup did not replay every active-log entry");
 
   PTHelpers helpers;
   TEST_ASSERT_EQUAL_INT32_MESSAGE(RETURN_ERROR, helpers.lookup(200, 0, ptData), "zero cadence must be rejected by forward lookup");

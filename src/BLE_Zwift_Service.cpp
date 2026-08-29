@@ -12,10 +12,14 @@
 #include <Constants.h>
 
 using ZwiftProtocol::CommandCode;
+using ZwiftProtocol::decodeUleb128;
+using ZwiftProtocol::decodeZigZag64;
+using ZwiftProtocol::encodeUleb128;
 using ZwiftProtocol::makeTag;
 using ZwiftProtocol::RideButtonMask;
 using ZwiftProtocol::toUnderlying;
 using ZwiftProtocol::WireType;
+using ZwiftProtocol::uleb128Length;
 
 namespace {
 constexpr uint8_t kRideAnalogButtonsPayloadSize = 0x18;
@@ -340,7 +344,7 @@ void BLE_Zwift_Service::sendGeneralInfoSyncTx() {
   cpos += nameLen;
 
   size_t contentLen    = cpos;
-  size_t subContentLen = 1 + encodeUleb128Len(contentLen) + contentLen;
+  size_t subContentLen = 1 + uleb128Length(contentLen) + contentLen;
 
   uint8_t resp[60];
   size_t pos  = 0;
@@ -428,7 +432,7 @@ void BLE_Zwift_Service::sendButtonNotification(RideButtonMask buttonMask) {
   uint8_t buf[33];
   buf[0]           = toUnderlying(CommandCode::RideKeyPadStatus);
   buf[1]           = kRideKeypadButtonMapTag;
-  size_t varintLen = encodeVarint32(buttonMap, &buf[2]);
+  size_t varintLen = encodeUleb128(buttonMap, &buf[2]);
   size_t pos       = 2 + varintLen;
   memcpy(&buf[pos], analogData, sizeof(analogData));
   pos += sizeof(analogData);
@@ -436,16 +440,6 @@ void BLE_Zwift_Service::sendButtonNotification(RideButtonMask buttonMask) {
   asyncCharacteristic->setValue(buf, pos);
   asyncCharacteristic->notify();
   DirConManager::notifyCharacteristic(NimBLEUUID(ZWIFT_RIDE_CUSTOM_SERVICE_UUID), asyncCharacteristic->getUUID(), buf, pos);
-}
-
-size_t BLE_Zwift_Service::encodeVarint32(uint32_t value, uint8_t* buffer) {
-  size_t i = 0;
-  while (value > 0x7F) {
-    buffer[i++] = static_cast<uint8_t>((value & 0x7F) | 0x80);
-    value >>= 7;
-  }
-  buffer[i++] = static_cast<uint8_t>(value);
-  return i;
 }
 
 void BLE_Zwift_Service::sendAllButtonsReleased() {
@@ -561,7 +555,7 @@ void BLE_Zwift_Service::handleZwiftCommand(const uint8_t* data, size_t length) {
               pos += decoded;
 
               if (fieldTag == makeTag(ZwiftProtocol::SimulationParam::Field::InclineX100, WireType::Varint)) {
-                int64_t grade = static_cast<int64_t>((fieldValue >> 1) ^ -(fieldValue & 1));
+                int64_t grade = decodeZigZag64(fieldValue);
                 SS2K_LOG(getLogTag(), "SIM grade: %.2f%%", grade / 100.0);
                 rtConfig->setFTMSMode(FitnessMachineControlPointProcedure::SetIndoorBikeSimulationParameters);
                 rtConfig->setTargetIncline(static_cast<int>(grade));
@@ -656,41 +650,6 @@ void BLE_Zwift_Service::applyGearRatio() {
   // see this Zwift-driven change as a user shift and echo it back.
   ss2k->setLastShifterPosition(newShifterPos);
   SS2K_LOG(getLogTag(), "Gear %d -> shifter position %d", closestIndex, newShifterPos);
-}
-
-size_t BLE_Zwift_Service::decodeUleb128(const uint8_t* buf, size_t bufLen, uint64_t* result) {
-  *result        = 0;
-  size_t i       = 0;
-  unsigned shift = 0;
-  while (i < bufLen) {
-    uint8_t byte = buf[i];
-    *result |= static_cast<uint64_t>(byte & 0x7F) << shift;
-    i++;
-    if ((byte & 0x80) == 0) break;
-    shift += 7;
-    if (shift >= 64) break;  // overflow protection
-  }
-  return i;
-}
-
-size_t BLE_Zwift_Service::encodeUleb128(uint64_t value, uint8_t* buffer) {
-  size_t i = 0;
-  do {
-    uint8_t byte = static_cast<uint8_t>(value & 0x7F);
-    value >>= 7;
-    if (value) byte |= 0x80;
-    buffer[i++] = byte;
-  } while (value);
-  return i;
-}
-
-size_t BLE_Zwift_Service::encodeUleb128Len(uint64_t value) {
-  size_t len = 0;
-  do {
-    value >>= 7;
-    len++;
-  } while (value);
-  return len;
 }
 
 // ---- Callbacks ----

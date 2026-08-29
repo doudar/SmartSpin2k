@@ -5,6 +5,7 @@
  * SPDX-License-Identifier: GPL-2.0-only
  */
 #include "DirConMessage.h"
+#include "ByteUtils.h"
 #include "SS2KLog.h"
 #include "settings.h"
 #include "BLE_Common.h"
@@ -12,6 +13,16 @@
 #define DIRCON_LOG_TAG "DirConMessage"
 
 static constexpr size_t kDirConHexLogMaxBytes = 256;
+
+namespace {
+
+void appendBigEndian16(std::vector<uint8_t>& output, uint16_t value) {
+  uint8_t bytes[2];
+  put_be16(bytes, value);
+  output.insert(output.end(), bytes, bytes + sizeof(bytes));
+}
+
+}  // namespace
 
 // Helper functions to print raw bytes to serial monitor
 #ifdef DEBUG_DIRCON_MESSAGES
@@ -47,8 +58,8 @@ void uuidToBytes(NimBLEUUID& uuid, std::vector<uint8_t>& message) {
   uint8_t *uuidBytes = (uint8_t*)uuid.to128().getBase();
 
   // Add the bytes to the message
-  for(size_t i = 16; i > 0; i--) {
-    message.push_back(uuidBytes[i]);
+  for (size_t i = 16; i > 0; i--) {
+    message.push_back(uuidBytes[i - 1]);
   }
 }
 
@@ -92,20 +103,17 @@ std::vector<uint8_t>* DirConMessage::encode(uint8_t sequenceNumber) {
     // Handle error responses
     if (!this->Request && this->ResponseCode != DIRCON_RESPCODE_SUCCESS_REQUEST) {
       this->Length = 0;
-      this->encodedMessage.push_back((uint8_t)(this->Length >> 8));
-      this->encodedMessage.push_back((uint8_t)(this->Length));
+      appendBigEndian16(this->encodedMessage, this->Length);
     }
     // Handle discover services request/response
     else if (this->Identifier == DIRCON_MSGID_DISCOVER_SERVICES) {
       if (this->Request) {
         this->Length = 0;
-        this->encodedMessage.push_back((uint8_t)(this->Length >> 8));
-        this->encodedMessage.push_back((uint8_t)(this->Length));
+        appendBigEndian16(this->encodedMessage, this->Length);
       } else {
         // Calculate length - each UUID is 16 bytes
         this->Length = this->AdditionalUUIDs.size() * 16;
-        this->encodedMessage.push_back((uint8_t)(this->Length >> 8));
-        this->encodedMessage.push_back((uint8_t)(this->Length));
+        appendBigEndian16(this->encodedMessage, this->Length);
 
         // Debug log to show number of UUIDs being added
         SS2K_LOG(DIRCON_LOG_TAG, "Adding %d service UUIDs to discovery response", this->AdditionalUUIDs.size());
@@ -123,8 +131,7 @@ std::vector<uint8_t>* DirConMessage::encode(uint8_t sequenceNumber) {
     // Handle discover characteristics response
     else if (this->Identifier == DIRCON_MSGID_DISCOVER_CHARACTERISTICS && !this->Request) {
       this->Length = 16 + this->AdditionalUUIDs.size() * 17;
-      this->encodedMessage.push_back((uint8_t)(this->Length >> 8));
-      this->encodedMessage.push_back((uint8_t)(this->Length));
+      appendBigEndian16(this->encodedMessage, this->Length);
       uuidToBytes(this->UUID, this->encodedMessage);
 
       size_t dataIndex = 0;
@@ -138,16 +145,14 @@ std::vector<uint8_t>* DirConMessage::encode(uint8_t sequenceNumber) {
     else if (((this->Identifier == DIRCON_MSGID_READ_CHARACTERISTIC || this->Identifier == DIRCON_MSGID_DISCOVER_CHARACTERISTICS) && this->Request) ||
              (this->Identifier == DIRCON_MSGID_ENABLE_CHARACTERISTIC_NOTIFICATIONS && !this->Request)) {
       this->Length = 16;
-      this->encodedMessage.push_back((uint8_t)(this->Length >> 8));
-      this->encodedMessage.push_back((uint8_t)(this->Length));
+      appendBigEndian16(this->encodedMessage, this->Length);
       uuidToBytes(this->UUID, this->encodedMessage);
     }
     // Handle write characteristic, unsolicited notification, read response, or notification enabling
     else if (this->Identifier == DIRCON_MSGID_WRITE_CHARACTERISTIC || this->Identifier == DIRCON_MSGID_UNSOLICITED_CHARACTERISTIC_NOTIFICATION ||
              (this->Identifier == DIRCON_MSGID_READ_CHARACTERISTIC && !this->Request) || (this->Identifier == DIRCON_MSGID_ENABLE_CHARACTERISTIC_NOTIFICATIONS && this->Request)) {
       this->Length = 16 + this->AdditionalData.size();
-      this->encodedMessage.push_back((uint8_t)(this->Length >> 8));
-      this->encodedMessage.push_back((uint8_t)(this->Length));
+      appendBigEndian16(this->encodedMessage, this->Length);
       uuidToBytes(this->UUID, this->encodedMessage);
 
       for (size_t counter = 0; counter < this->AdditionalData.size(); counter++) {
@@ -174,7 +179,7 @@ size_t DirConMessage::parse(uint8_t* data, size_t len, uint8_t sequenceNumber) {
   this->Identifier     = data[1];
   this->SequenceNumber = data[2];
   this->ResponseCode   = data[3];
-  this->Length         = (data[4] << 8) | data[5];
+  this->Length         = get_be16(&data[4]);
   this->Request        = false;
   this->UUID           = NimBLEUUID();
   this->AdditionalData.clear();

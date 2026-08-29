@@ -19,7 +19,7 @@ void TestPTLookupWatts::test_active_ride_reverse_lookup(void) {
   RideReplaySummary summary;
   TEST_ASSERT_TRUE_MESSAGE(replayActiveRideLog(ptData, summary), "active ride log could not be opened for reverse lookup test");
   TEST_ASSERT_EQUAL_INT_MESSAGE(0, summary.invalidEntries, "active ride log contains invalid reverse-lookup inputs");
-  TEST_ASSERT_EQUAL_INT_MESSAGE(552, summary.entries, "reverse lookup did not replay every active-log entry");
+  TEST_ASSERT_EQUAL_INT_MESSAGE(594, summary.entries, "reverse lookup did not replay every active-log entry");
 
   PTHelpers helpers;
   TEST_ASSERT_EQUAL_INT_MESSAGE(0, helpers.lookupWatts(0, 10000, ptData), "zero cadence must estimate zero watts");

@@ -7,7 +7,7 @@
 
 #include <chrono>
 #include "Data.h"
-#include "endian.h"
+#include "ByteUtils.h"
 #include "sensors/CyclePowerData.h"
 
 #ifdef PLATFORMIO_ENV_NATIVE

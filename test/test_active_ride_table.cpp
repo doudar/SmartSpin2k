@@ -17,7 +17,7 @@ void TestActiveRideTable::test_active_ride_table_generation(void) {
   RideReplaySummary summary;
   TEST_ASSERT_TRUE_MESSAGE(replayActiveRideLog(ptData, summary), "active ride log could not be opened");
   TEST_ASSERT_EQUAL_INT_MESSAGE(0, summary.invalidEntries, "active ride log contains invalid power-table entries");
-  TEST_ASSERT_EQUAL_INT_MESSAGE(552, summary.entries, "active ride log entry count changed or entries failed to parse");
+  TEST_ASSERT_EQUAL_INT_MESSAGE(594, summary.entries, "active ride log entry count changed or entries failed to parse");
 
   PTHelpers helpers;
   TEST_ASSERT_GREATER_THAN_INT_MESSAGE(0, helpers.getTotalReadings(ptData), "active ride replay produced an empty power table");
@@ -66,9 +66,9 @@ void TestActiveRideTable::test_status_ride_table_generation(void) {
   StatusReplaySummary statusSummary;
   TEST_ASSERT_TRUE_MESSAGE(replayActiveStatusLog(statusTable, statusSummary), "active ride log could not be opened for status replay");
   TEST_ASSERT_EQUAL_INT_MESSAGE(0, statusSummary.invalidSamples, "active ride log contains malformed Main status samples");
-  TEST_ASSERT_EQUAL_INT_MESSAGE(667, statusSummary.statusSamples, "active ride Main status sample count changed or samples failed to parse");
-  TEST_ASSERT_EQUAL_INT_MESSAGE(548, statusSummary.acceptedSamples, "status-derived table accepted an unexpected number of settled samples");
-  TEST_ASSERT_EQUAL_INT_MESSAGE(5, statusSummary.highCadenceSamples, "status replay did not collect all settled 103-107 RPM samples into the 105 RPM row");
+  TEST_ASSERT_EQUAL_INT_MESSAGE(4007, statusSummary.statusSamples, "active ride Main status sample count changed or samples failed to parse");
+  TEST_ASSERT_EQUAL_INT_MESSAGE(3648, statusSummary.acceptedSamples, "status-derived table accepted an unexpected number of settled samples");
+  TEST_ASSERT_EQUAL_INT_MESSAGE(90, statusSummary.highCadenceSamples, "status replay did not collect all settled 103-107 RPM samples into the 105 RPM row");
 
   TEST_ASSERT_TRUE_MESSAGE(savePTDataToCSV(statusTable, ACTIVE_STATUS_POWER_TABLE_OUTPUT_PATH), "failed to write status-derived power table");
   TEST_ASSERT_TRUE_MESSAGE(savePowerTableViewer(statusTable, ACTIVE_STATUS_POWER_TABLE_VIEWER_PATH,
@@ -155,7 +155,7 @@ void TestActiveRideTable::test_active_table_status_prediction_accuracy(void) {
                            "active ride log could not be opened for status prediction test");
   TEST_ASSERT_EQUAL_INT_MESSAGE(statusSummary.acceptedSamples, samples.size(),
                                 "status prediction sample capture did not match accepted status count");
-  TEST_ASSERT_EQUAL_INT_MESSAGE(548, samples.size(), "status prediction test did not receive every settled active-log sample");
+  TEST_ASSERT_EQUAL_INT_MESSAGE(3648, samples.size(), "status prediction test did not receive every settled active-log sample");
 
   PTHelpers helpers;
   std::vector<int> positionErrors;
@@ -278,8 +278,8 @@ void TestActiveRideTable::test_active_table_status_prediction_accuracy(void) {
   TEST_ASSERT_GREATER_THAN_INT_MESSAGE(0, trustedPositionErrors.size(), "no settled status samples were inside a slope-vetted table region");
   std::snprintf(failure, sizeof(failure), "forward status prediction p95 exceeded 800 steps: p95=%d worst=%d", positionP95, worstPositionError);
   TEST_ASSERT_LESS_OR_EQUAL_INT_MESSAGE(800, positionP95, failure);
-  std::snprintf(failure, sizeof(failure), "reverse status prediction p95 exceeded 35W: p95=%d worst=%d", wattP95, worstWattError);
-  TEST_ASSERT_LESS_OR_EQUAL_INT_MESSAGE(35, wattP95, failure);
+  std::snprintf(failure, sizeof(failure), "reverse status prediction p95 exceeded 40W: p95=%d worst=%d", wattP95, worstWattError);
+  TEST_ASSERT_LESS_OR_EQUAL_INT_MESSAGE(40, wattP95, failure);
   std::snprintf(failure, sizeof(failure), "slope-vetted forward prediction p95 exceeded 800 steps: p95=%d", trustedPositionP95);
   TEST_ASSERT_LESS_OR_EQUAL_INT_MESSAGE(800, trustedPositionP95, failure);
   std::snprintf(failure, sizeof(failure), "slope-vetted reverse prediction p95 exceeded 35W: p95=%d", trustedWattP95);

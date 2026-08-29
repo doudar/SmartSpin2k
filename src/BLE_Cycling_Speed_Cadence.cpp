@@ -6,6 +6,7 @@
  */
 #include "BLE_Cycling_Speed_Cadence.h"
 #include "DirConManager.h"
+#include "ByteUtils.h"
 #include <Constants.h>
 
 BLE_Cycling_Speed_Cadence::BLE_Cycling_Speed_Cadence() : pCyclingSpeedCadenceService(nullptr), cscMeasurement(nullptr), cscFeature(nullptr) {}
@@ -18,8 +19,7 @@ void BLE_Cycling_Speed_Cadence::setupService(NimBLEServer *pServer, MyCharacteri
   CyclingSpeedCadenceFeatureFlags::Types cscFeatureFlags =
       CyclingSpeedCadenceFeatureFlags::WheelRevolutionDataSupported | CyclingSpeedCadenceFeatureFlags::CrankRevolutionDataSupported;
 
-  cscFeatureBytes[0] = static_cast<uint8_t>(cscFeatureFlags & 0xFF);
-  cscFeatureBytes[1] = static_cast<uint8_t>((cscFeatureFlags >> 8) & 0xFF);
+  put_le16(cscFeatureBytes, static_cast<uint16_t>(cscFeatureFlags));
 
   cscFeature->setValue(cscFeatureBytes, sizeof(cscFeatureBytes));
   cscMeasurement->setCallbacks(chrCallbacks);

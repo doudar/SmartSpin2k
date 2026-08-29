@@ -71,3 +71,17 @@ class TestBleFirmwareUpdateProtocol {
   static void test_encodes_status_packet(void);
   static void test_transfer_timeout(void);
 };
+
+class TestEndian {
+ public:
+  static void test_little_endian_signed_decode_and_round_trip(void);
+};
+
+class TestBleWireRoundTrip {
+ public:
+  static void test_all_custom_characteristic_formats(void);
+  static void test_ftms_round_trip(void);
+  static void test_csc_round_trip(void);
+  static void test_heart_rate_round_trip(void);
+  static void test_zwift_round_trip(void);
+};
