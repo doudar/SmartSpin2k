@@ -34,7 +34,10 @@ int32_t storedPositionToSteps(float storedPosition) {
   return static_cast<int32_t>(std::round(steps));
 }
 
-bool measuredRowPosition(const TableRow& row, double watts, double& position) {
+// Return the slope of the closest fully measured segment containing watts.
+// Unlike a centered +/- one-bin probe, this permits a target close to a
+// measured row edge while still refusing extrapolation beyond the table.
+bool measuredRowSlope(const TableRow& row, double watts, double& slope) {
   int lower = -1;
   int upper = -1;
   for (int col = 0; col < POWERTABLE_WATT_SIZE; ++col) {
@@ -44,19 +47,54 @@ bool measuredRowPosition(const TableRow& row, double watts, double& position) {
     if (sampleWatts <= watts) lower = col;
     if (sampleWatts >= watts && upper < 0) upper = col;
   }
-  // Deliberately refuse extrapolation: end segments are where sparse table
-  // rows most often stop paralleling their cadence neighbors.
   if (lower < 0 || upper < 0) return false;
+
+  // At an interior measured point use its two adjacent anchors, which gives a
+  // centered estimate. At a true table endpoint we retain the one available
+  // segment, but the headroom check below rejects it as unsafe for ERG gain.
   if (lower == upper) {
-    position = row.tableEntry[lower].targetPosition;
-    return true;
+    int previous = -1;
+    int next     = -1;
+    for (int col = lower - 1; col >= 0; --col) {
+      const TableEntry& entry = row.tableEntry[col];
+      if (entry.targetPosition != INT16_MIN && entry.readings >= 2) {
+        previous = col;
+        break;
+      }
+    }
+    for (int col = upper + 1; col < POWERTABLE_WATT_SIZE; ++col) {
+      const TableEntry& entry = row.tableEntry[col];
+      if (entry.targetPosition != INT16_MIN && entry.readings >= 2) {
+        next = col;
+        break;
+      }
+    }
+    if (previous >= 0 && next >= 0) {
+      lower = previous;
+      upper = next;
+    } else if (previous >= 0) {
+      upper = lower;
+      lower = previous;
+    } else if (next >= 0) {
+      lower = upper;
+      upper = next;
+    } else {
+      return false;
+    }
   }
+
+  const double wattSpan = (upper - lower) * POWERTABLE_WATT_INCREMENT;
+  if (wattSpan <= 0.0) return false;
   const double lowerWatts = lower * POWERTABLE_WATT_INCREMENT;
   const double upperWatts = upper * POWERTABLE_WATT_INCREMENT;
-  const double fraction   = (watts - lowerWatts) / (upperWatts - lowerWatts);
-  position = row.tableEntry[lower].targetPosition +
-             fraction * (row.tableEntry[upper].targetPosition - row.tableEntry[lower].targetPosition);
-  return std::isfinite(position);
+  // Do not calculate a gain from the final quarter-bin at either end of a
+  // segment. This retains the old rejection of sparse-table edge estimates
+  // while allowing a well-supported near-edge point such as 340 W in a
+  // 330--360 W segment.
+  const double requiredHeadroom = std::min(5.0, wattSpan / 4.0);
+  if (watts - lowerWatts < requiredHeadroom || upperWatts - watts < requiredHeadroom) return false;
+  slope = static_cast<double>(row.tableEntry[upper].targetPosition - row.tableEntry[lower].targetPosition) * TABLE_DIVISOR / wattSpan;
+  return std::isfinite(slope) && slope > 0.0;
 }
 
 bool slopesAgree(double first, double second) {
@@ -378,14 +416,40 @@ int32_t PTHelpers::lookup(int watts, int cad, PTData& ptData) {
   return storedPositionToSteps(position);
 }
 
-bool PTHelpers::lookupSlope(int watts, int cad, double& stepsPerWatt, PTData& ptData) {
+bool PTHelpers::lookupSlope(int watts, int cad, double& stepsPerWatt, PTData& ptData, PowerTableSlopeStatus::Value* status) {
   stepsPerWatt = 0.0;
+  const auto setStatus = [status](PowerTableSlopeStatus::Value value) {
+    if (status != nullptr) *status = value;
+  };
   const int sampleSpan = POWERTABLE_WATT_INCREMENT;
-  if (cad <= 0 || watts < sampleSpan) return false;
+  if (cad <= 0 || watts < sampleSpan) {
+    setStatus(PowerTableSlopeStatus::InvalidRequest);
+    return false;
+  }
 
-  int validRow[POWERTABLE_CAD_SIZE];
-  int validCadence[POWERTABLE_CAD_SIZE];
-  int validRows = 0;
+  const auto positionAt = [](const TableRow& row, double requestedWatts, double& position) {
+    int lower = -1;
+    int upper = -1;
+    for (int col = 0; col < POWERTABLE_WATT_SIZE; ++col) {
+      const TableEntry& entry = row.tableEntry[col];
+      if (entry.targetPosition == INT16_MIN || entry.readings < 2) continue;
+      const int sampleWatts = col * POWERTABLE_WATT_INCREMENT;
+      if (sampleWatts <= requestedWatts) lower = col;
+      if (sampleWatts >= requestedWatts && upper < 0) upper = col;
+    }
+    if (lower < 0 || upper < 0) return false;
+    if (lower == upper) {
+      position = row.tableEntry[lower].targetPosition;
+      return true;
+    }
+    const double fraction = (requestedWatts - lower * POWERTABLE_WATT_INCREMENT) / ((upper - lower) * POWERTABLE_WATT_INCREMENT);
+    position = row.tableEntry[lower].targetPosition + fraction * (row.tableEntry[upper].targetPosition - row.tableEntry[lower].targetPosition);
+    return std::isfinite(position);
+  };
+
+  int validRows[POWERTABLE_CAD_SIZE];
+  int validCadences[POWERTABLE_CAD_SIZE];
+  int validRowCount = 0;
   for (int row = 0; row < POWERTABLE_CAD_SIZE; ++row) {
     int reliableSamples = 0;
     for (int col = 0; col < POWERTABLE_WATT_SIZE; ++col) {
@@ -393,23 +457,22 @@ bool PTHelpers::lookupSlope(int watts, int cad, double& stepsPerWatt, PTData& pt
       if (entry.targetPosition != INT16_MIN && entry.readings >= 2) ++reliableSamples;
     }
     if (reliableSamples < 2) continue;
-    validRow[validRows]     = row;
-    validCadence[validRows] = MINIMUM_TABLE_CAD + row * POWERTABLE_CAD_INCREMENT;
-    ++validRows;
+    validRows[validRowCount] = row;
+    validCadences[validRowCount++] = MINIMUM_TABLE_CAD + row * POWERTABLE_CAD_INCREMENT;
   }
-
-  // One row can define a lookup, but cannot prove that its end segment agrees
-  // with the surface at a neighboring cadence.
-  if (validRows < 2) return false;
+  if (validRowCount < 2) {
+    setStatus(PowerTableSlopeStatus::InsufficientRows);
+    return false;
+  }
 
   int lowerRow = 0;
   int upperRow = 1;
-  if (cad >= validCadence[validRows - 1]) {
-    lowerRow = validRows - 2;
-    upperRow = validRows - 1;
-  } else if (cad > validCadence[0]) {
-    for (int row = 1; row < validRows; ++row) {
-      if (cad <= validCadence[row]) {
+  if (cad >= validCadences[validRowCount - 1]) {
+    lowerRow = validRowCount - 2;
+    upperRow = validRowCount - 1;
+  } else if (cad > validCadences[0]) {
+    for (int row = 1; row < validRowCount; ++row) {
+      if (cad <= validCadences[row]) {
         lowerRow = row - 1;
         upperRow = row;
         break;
@@ -417,35 +480,111 @@ bool PTHelpers::lookupSlope(int watts, int cad, double& stepsPerWatt, PTData& pt
     }
   }
 
-  double rowSlope[2];
+  double slopes[2];
   const int supportRows[2] = {lowerRow, upperRow};
   for (int i = 0; i < 2; ++i) {
-    const int rowCadence = validCadence[supportRows[i]];
-    const double rowLowerWatts = static_cast<double>(watts - sampleSpan) * rowCadence / cad;
-    const double rowUpperWatts = static_cast<double>(watts + sampleSpan) * rowCadence / cad;
+    const int rowCadence = validCadences[supportRows[i]];
     double lowerPosition;
     double upperPosition;
-    if (!measuredRowPosition(ptData.tableRow[validRow[supportRows[i]]], rowLowerWatts, lowerPosition) ||
-        !measuredRowPosition(ptData.tableRow[validRow[supportRows[i]]], rowUpperWatts, upperPosition)) {
+    if (!positionAt(ptData.tableRow[validRows[supportRows[i]]], static_cast<double>(watts - sampleSpan) * rowCadence / cad, lowerPosition) ||
+        !positionAt(ptData.tableRow[validRows[supportRows[i]]], static_cast<double>(watts + sampleSpan) * rowCadence / cad, upperPosition)) {
+      setStatus(PowerTableSlopeStatus::MissingLocalSupport);
       return false;
     }
-    rowSlope[i] = (upperPosition - lowerPosition) * TABLE_DIVISOR / (2.0 * sampleSpan);
+    slopes[i] = (upperPosition - lowerPosition) * TABLE_DIVISOR / (2.0 * sampleSpan);
   }
-  if (!slopesAgree(rowSlope[0], rowSlope[1])) return false;
-
-  // Also reject sharp curvature within the cadence-blended surface. A
-  // monotonic table can still contain a locally abrupt, noisy change in gain.
+  if (!slopesAgree(slopes[0], slopes[1])) {
+    setStatus(PowerTableSlopeStatus::InconsistentRows);
+    return false;
+  }
   const int32_t lowerPosition = lookup(watts - sampleSpan, cad, ptData);
   const int32_t centerPosition = lookup(watts, cad, ptData);
   const int32_t upperPosition = lookup(watts + sampleSpan, cad, ptData);
-  if (lowerPosition == RETURN_ERROR || centerPosition == RETURN_ERROR || upperPosition == RETURN_ERROR) return false;
-
-  const double leftSlope  = static_cast<double>(centerPosition - lowerPosition) / sampleSpan;
-  const double rightSlope = static_cast<double>(upperPosition - centerPosition) / sampleSpan;
-  if (!slopesAgree(leftSlope, rightSlope)) return false;
-
+  if (lowerPosition == RETURN_ERROR || centerPosition == RETURN_ERROR || upperPosition == RETURN_ERROR ||
+      !slopesAgree(static_cast<double>(centerPosition - lowerPosition) / sampleSpan, static_cast<double>(upperPosition - centerPosition) / sampleSpan)) {
+    setStatus(PowerTableSlopeStatus::InconsistentRows);
+    return false;
+  }
   stepsPerWatt = static_cast<double>(upperPosition - lowerPosition) / (2.0 * sampleSpan);
-  return std::isfinite(stepsPerWatt) && stepsPerWatt > 0.0;
+  const bool trusted = std::isfinite(stepsPerWatt) && stepsPerWatt > 0.0;
+  setStatus(trusted ? PowerTableSlopeStatus::Trusted : PowerTableSlopeStatus::InconsistentRows);
+  return trusted;
+}
+
+bool PTHelpers::lookupErgSlope(int watts, int cad, double& stepsPerWatt, PTData& ptData, PowerTableSlopeStatus::Value* status) {
+  stepsPerWatt = 0.0;
+  const auto setStatus = [status](PowerTableSlopeStatus::Value value) {
+    if (status != nullptr) *status = value;
+  };
+  if (cad <= 0 || watts < 0) {
+    setStatus(PowerTableSlopeStatus::InvalidRequest);
+    return false;
+  }
+
+  struct SlopeCandidate {
+    int cadence;
+    double slope;
+  };
+  SlopeCandidate candidates[POWERTABLE_CAD_SIZE];
+  int candidateCount = 0;
+  for (int row = 0; row < POWERTABLE_CAD_SIZE; ++row) {
+    int reliableSamples = 0;
+    for (int col = 0; col < POWERTABLE_WATT_SIZE; ++col) {
+      const TableEntry& entry = ptData.tableRow[row].tableEntry[col];
+      if (entry.targetPosition != INT16_MIN && entry.readings >= 2) ++reliableSamples;
+    }
+    if (reliableSamples < 2) continue;
+    const int rowCadence = MINIMUM_TABLE_CAD + row * POWERTABLE_CAD_INCREMENT;
+    double rowSlope = 0.0;
+    const double rowWatts = static_cast<double>(watts) * rowCadence / cad;
+    if (!measuredRowSlope(ptData.tableRow[row], rowWatts, rowSlope)) continue;
+    candidates[candidateCount++] = {rowCadence, rowSlope};
+  }
+  if (candidateCount < 2) {
+    setStatus(candidateCount == 0 ? PowerTableSlopeStatus::MissingLocalSupport : PowerTableSlopeStatus::InsufficientRows);
+    return false;
+  }
+
+  // Compare the two rows that bound the live cadence. This prevents two rows
+  // on the same side of cadence from certifying a surface where the requested
+  // cadence interpolation is actually unknown.
+  int lowerCandidate = -1;
+  int upperCandidate = -1;
+  for (int i = 0; i < candidateCount; ++i) {
+    if (candidates[i].cadence <= cad && (lowerCandidate < 0 || candidates[i].cadence > candidates[lowerCandidate].cadence)) lowerCandidate = i;
+    if (candidates[i].cadence >= cad && (upperCandidate < 0 || candidates[i].cadence < candidates[upperCandidate].cadence)) upperCandidate = i;
+  }
+  if (lowerCandidate < 0 || upperCandidate < 0) {
+    setStatus(PowerTableSlopeStatus::InsufficientRows);
+    return false;
+  }
+  if (lowerCandidate == upperCandidate) {
+    int neighbor = -1;
+    for (int i = 0; i < candidateCount; ++i) {
+      if (i == lowerCandidate) continue;
+      if (neighbor < 0 || std::abs(candidates[i].cadence - cad) < std::abs(candidates[neighbor].cadence - cad)) neighbor = i;
+    }
+    if (neighbor < 0) {
+      setStatus(PowerTableSlopeStatus::InsufficientRows);
+      return false;
+    }
+    if (candidates[neighbor].cadence < cad) {
+      lowerCandidate = neighbor;
+    } else {
+      upperCandidate = neighbor;
+    }
+  }
+  if (!slopesAgree(candidates[lowerCandidate].slope, candidates[upperCandidate].slope)) {
+    setStatus(PowerTableSlopeStatus::InconsistentRows);
+    return false;
+  }
+
+  const double lowerWeight = 1.0 / std::max(1, std::abs(candidates[lowerCandidate].cadence - cad));
+  const double upperWeight = 1.0 / std::max(1, std::abs(candidates[upperCandidate].cadence - cad));
+  stepsPerWatt = (candidates[lowerCandidate].slope * lowerWeight + candidates[upperCandidate].slope * upperWeight) / (lowerWeight + upperWeight);
+  const bool trusted = std::isfinite(stepsPerWatt) && stepsPerWatt > 0.0;
+  setStatus(trusted ? PowerTableSlopeStatus::Trusted : PowerTableSlopeStatus::InconsistentRows);
+  return trusted;
 }
 
 // returns the total number of readings in the power table

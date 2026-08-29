@@ -37,6 +37,8 @@ PlatformIO is the expected entry point.
 - Static analysis: `pio check -e debug`
 - Pre-commit checks: `pre-commit run --all-files`
 
+`pio` is installed at `/Users/anthonydoud/.platformio/penv/bin/pio` when it is not on `PATH`; use that absolute command rather than treating a missing shell alias as an unavailable test environment. Native tests are expected to run locally.
+
 S3 firmware and filesystem builds use `S3firmware.bin` and `S3littlefs.bin` as their native PlatformIO output/upload names. They also create `S3partitions.bin` and `S3bootloader.bin` copies for releases; the generic partition and bootloader intermediates remain because PlatformIO's flash uploader depends on those names.
 The GitHub release archive includes firmware, merged factory, LittleFS, partition-table, and bootloader binaries for both classic ESP32 and ESP32-S3 targets.
 GitHub Actions exports `SS2K_FIRMWARE_VERSION` from the date-based release tag before invoking PlatformIO. `git_tag_macro.py` requires that override in Actions so published firmware never receives a `git describe` commit suffix; local builds retain branch/commit version details.
@@ -46,6 +48,7 @@ Filesystem builds stage deterministic gzip copies of every HTML/CSS source file 
 Important timing/network notes:
 
 - PlatformIO firmware/filesystem builds and USB flashing are supported from the Codex environment. Local builds normally finish in under five minutes.
+- A directly attached ESP32-S3 exposes its USB CDC serial port as `/dev/cu.usbmodem*` (currently `/dev/cu.usbmodem21101`). A debug build (`S3debug`, with `__DEBUG__` and `SERIAL_CUSTOM_CHARACTERISTIC`) can be observed directly with `/Users/anthonydoud/.platformio/penv/bin/pio device monitor -p /dev/cu.usbmodem21101`; confirm the present port with `ls /dev/cu.usb*` first. Serial monitoring is read-only, while uploading a debug build is an explicit device mutation and should only be done when the task authorizes it.
 - When testing attached hardware, do not switch the development machine's WiFi connection to the SmartSpin2k access point: that network has no internet access, while builds and tooling may require internet service. Communicate with the device over USB unless the user explicitly directs otherwise. Preserve the device's stored WiFi/LittleFS/NVS settings by preferring application-partition-only flashing (S3 app offset `0x60000`).
 - First PlatformIO builds/tests may download missing ESP32 platforms and toolchains and therefore take longer than normal.
 - In restricted environments, PlatformIO can fail on network downloads. If that happens, report it rather than trying to fake validation.
@@ -423,7 +426,8 @@ Primary files: `include/ERG_Mode.h`, `src/ERG_Mode.cpp`.
 `_inSetpointState()`:
 
 - Uses proportional-only control with `ERGSensitivity`.
-- Caps table-scheduled sensitivity at 3 (so legacy/default 5 behaves like the stable setting 3) and bounds sparse local table slopes to 0.5-2x the watt-scheduled fallback gain. The configured sensitivity remains unchanged and is still used when no useful table slope exists.
+- Keeps the original strict `lookupSlope()` for table validation. ERG uses `lookupErgSlope()`, which may use a near-edge measured segment only when the cadence-bounding rows agree and each segment has endpoint headroom; it never extrapolates beyond measured data.
+- Blends a trusted ERG table gain 50/50 with the watt-scheduled fallback gain and bounds raw table gain to 0.5-1.25x fallback before blending. This deliberately favors stable convergence over aggressive corrections. Fallback log lines include the rejected-slope reason.
 - Scales gain by watt error size.
 - Caps movement by stepper speed and `ERG_MODE_DELAY`.
 

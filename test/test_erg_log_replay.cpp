@@ -15,6 +15,7 @@
 #include <vector>
 
 #include "ERG_Mode_Utils.h"
+#include "PowerTable_Helpers.h"
 #include "test.h"
 #include "test_data_helpers.h"
 
@@ -124,8 +125,10 @@ void TestErgLogReplay::test_active_ride_log_and_gain_limits(void) {
 
   const double fallback = ErgControl::fallbackGain(5.0, unstable.target);
   TEST_ASSERT_FLOAT_WITHIN(0.0001f, 5.0f, static_cast<float>(fallback));
-  TEST_ASSERT_FLOAT_WITHIN(0.0001f, 10.0f, static_cast<float>(ErgControl::boundedTableGain(1000.0, fallback)));
+  TEST_ASSERT_FLOAT_WITHIN(0.0001f, 6.25f, static_cast<float>(ErgControl::boundedTableGain(1000.0, fallback)));
   TEST_ASSERT_FLOAT_WITHIN(0.0001f, 2.5f, static_cast<float>(ErgControl::boundedTableGain(0.01, fallback)));
+  TEST_ASSERT_FLOAT_WITHIN(0.0001f, 5.625f, static_cast<float>(ErgControl::blendedTableGain(1000.0, fallback)));
+  TEST_ASSERT_FLOAT_WITHIN(0.0001f, 3.75f, static_cast<float>(ErgControl::blendedTableGain(0.01, fallback)));
   TEST_ASSERT_FLOAT_WITHIN(0.0001f, static_cast<float>(fallback),
                            static_cast<float>(ErgControl::boundedTableGain(std::numeric_limits<double>::quiet_NaN(), fallback)));
 
@@ -148,4 +151,89 @@ void TestErgLogReplay::test_active_ride_log_and_gain_limits(void) {
          << "trusted-table base-gain bounds at 155 W: " << fallback * ErgControl::TABLE_GAIN_MIN_FALLBACK_RATIO << ".."
          << fallback * ErgControl::TABLE_GAIN_MAX_FALLBACK_RATIO << "\n"
          << "worst historical-fallback correction replayed over unstable samples: " << worstReplayedMove << " steps\n";
+}
+
+void TestErgLogReplay::test_active_ride_new_gain_replay(void) {
+  std::ifstream input(ACTIVE_RIDE_LOG_PATH);
+  TEST_ASSERT_TRUE_MESSAGE(input.is_open(), "active ride log must be available to the ERG replay test");
+
+  const std::regex statusPattern(R"(\[([0-9]+)\].*\(Main\): W=(-?[0-9]+) C=(-?[0-9]+))");
+  const std::regex entryPattern(
+      R"(\[([0-9]+)\].*\(PTable\): Averaged Entry: watts=([0-9.\-]+), cad=([0-9.\-]+), targetPosition=([0-9.\-]+), \(([0-9]+)\)\(([0-9]+)\))");
+  const std::regex samplePattern(R"(\[([0-9]+)\].*ERG_Mode\): ([0-9]+)w, Target ([0-9]+)w, Kp: ([0-9.]+) \((table|fallback)\))");
+  const std::regex sensitivityPattern("\\[([0-9]+)\\].*4B:801F([0-9A-Fa-f]{2})00");
+
+  PTData table;
+  PTHelpers helpers;
+  int cadence = 0;
+  double sensitivity = 5.0;
+  int samples = 0;
+  int historicalFallbacks = 0;
+  int newlyTrusted = 0;
+  int newTableSamples = 0;
+  int rejectedAtEdge = 0;
+  double maximumHistoricalMove = 0.0;
+  double maximumNewGain = 0.0;
+  double maximumNewMove = 0.0;
+  double maximumNewlyTrustedMove = 0.0;
+  std::string line;
+  std::smatch match;
+
+  while (std::getline(input, line)) {
+    if (std::regex_search(line, match, sensitivityPattern)) {
+      sensitivity = static_cast<double>(std::stoi(match[2].str(), nullptr, 16)) / 10.0;
+      continue;
+    }
+    if (std::regex_search(line, match, statusPattern)) {
+      cadence = std::stoi(match[3].str());
+      continue;
+    }
+    if (std::regex_search(line, match, entryPattern)) {
+      ptIndex index;
+      index.cadIndex = static_cast<int8_t>(std::stoi(match[5].str()));
+      index.wattIndex = static_cast<int8_t>(std::stoi(match[6].str()));
+      helpers.enterData(table, index, static_cast<int>(std::stod(match[4].str())));
+      continue;
+    }
+    if (!std::regex_search(line, match, samplePattern) || cadence <= 0) continue;
+
+    const int watts = std::stoi(match[2].str());
+    const int target = std::stoi(match[3].str());
+    const double historicalGain = std::stod(match[4].str());
+    const bool oldTable = match[5].str() == "table";
+    const int error = target - watts;
+    const double fallback = ErgControl::fallbackGain(sensitivity, target);
+    double localStepsPerWatt = 0.0;
+    PowerTableSlopeStatus::Value slopeStatus = PowerTableSlopeStatus::InvalidRequest;
+    const bool useTable = helpers.lookupErgSlope(target, cadence, localStepsPerWatt, table, &slopeStatus);
+    double gain = useTable ? ErgControl::blendedTableGain(localStepsPerWatt * sensitivity / ErgControl::SLOPE_CONTROL_DIVISOR, fallback) : fallback;
+    gain = ErgControl::errorScheduledGain(gain, error, true);
+    gain = ErgControl::clampGain(gain, sensitivity);
+
+    ++samples;
+    if (!oldTable) ++historicalFallbacks;
+    if (!oldTable && useTable) ++newlyTrusted;
+    if (useTable) ++newTableSamples;
+    if (slopeStatus == PowerTableSlopeStatus::MissingLocalSupport) ++rejectedAtEdge;
+    maximumNewGain = std::max(maximumNewGain, gain);
+    maximumNewMove = std::max(maximumNewMove, std::abs(gain * error));
+    maximumHistoricalMove = std::max(maximumHistoricalMove, std::abs(historicalGain * error));
+    if (!oldTable && useTable) maximumNewlyTrustedMove = std::max(maximumNewlyTrustedMove, std::abs(gain * error));
+  }
+
+  TEST_ASSERT_GREATER_THAN_INT_MESSAGE(300, samples, "ride log did not yield enough ERG samples for replay");
+  TEST_ASSERT_GREATER_THAN_INT_MESSAGE(0, newlyTrusted, "new ERG slope selection did not recover any historical fallback samples");
+  // The blended 5.625 base-gain ceiling is intentionally allowed one 1.25x
+  // error-scheduling multiplier for errors above 100 W.
+  TEST_ASSERT_LESS_OR_EQUAL_FLOAT_MESSAGE(7.03125f, static_cast<float>(maximumNewGain), "new ERG gain exceeded the conservative scheduled cap at sensitivity 5");
+
+  std::ofstream report("test/output/active_erg_new_gain_replay.txt", std::ios::trunc);
+  TEST_ASSERT_TRUE_MESSAGE(report.is_open(), "failed to write new ERG replay audit");
+  report << "Chronological active-ride ERG replay\n"
+         << "samples=" << samples << " historical_fallbacks=" << historicalFallbacks << " newly_trusted=" << newlyTrusted
+         << " new_table_samples=" << newTableSamples << " edge_or_missing_segment_rejections=" << rejectedAtEdge << '\n'
+         << "maximum_logged_correction_steps=" << maximumHistoricalMove << " maximum_new_gain=" << maximumNewGain
+         << " maximum_new_correction_steps=" << maximumNewMove << " maximum_newly_trusted_correction_steps=" << maximumNewlyTrustedMove << '\n'
+         << "Table state is rebuilt in log order; each ERG sample uses the last logged Main cadence and only PTable entries already seen.\n";
+  TEST_ASSERT_TRUE_MESSAGE(report.good(), "failed while writing new ERG replay audit");
 }

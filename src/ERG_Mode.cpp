@@ -23,16 +23,16 @@ static unsigned long ergTimer = millis() + ERG_MODE_DELAY;
 static bool isDelayed         = false;
 
 namespace {
-double scheduledErgGain(double sensitivity, int operatingWatts, int cadence, bool& usedPowerTable) {
+double scheduledErgGain(double sensitivity, int operatingWatts, int cadence, bool& usedPowerTable, PowerTableSlopeStatus::Value& slopeStatus) {
   usedPowerTable = false;
 
   sensitivity     = ErgControl::sanitizeSensitivity(sensitivity);
   const double fallback = ErgControl::fallbackGain(sensitivity, operatingWatts);
   double localStepsPerWatt;
-  if (powerTable->lookupSlope(operatingWatts, cadence, localStepsPerWatt)) {
+  if (powerTable->lookupErgSlope(operatingWatts, cadence, localStepsPerWatt, &slopeStatus)) {
     const double gain = localStepsPerWatt * sensitivity / ErgControl::SLOPE_CONTROL_DIVISOR;
     usedPowerTable = true;
-    return ErgControl::boundedTableGain(gain, fallback);
+    return ErgControl::blendedTableGain(gain, fallback);
   }
   return fallback;
 }
@@ -285,7 +285,8 @@ int32_t ErgMode::_inSetpointState() {
   // and more watts per step at high resistance. ERG sensitivity controls how much of the predicted correction is applied and bounds bad model slopes.
   const double configuredSensitivity = userConfig->getERGSensitivity();
   bool usedPowerTable                = false;
-  double Kp                          = scheduledErgGain(configuredSensitivity, target, rtConfig->cad.getValue(), usedPowerTable);
+  PowerTableSlopeStatus::Value slopeStatus = PowerTableSlopeStatus::InvalidRequest;
+  double Kp                          = scheduledErgGain(configuredSensitivity, target, rtConfig->cad.getValue(), usedPowerTable, slopeStatus);
   const double controlSensitivity    = ErgControl::sanitizeSensitivity(configuredSensitivity);
 
   Kp = ErgControl::errorScheduledGain(Kp, error, mode == Mode::MAINTAIN);
@@ -318,8 +319,8 @@ int32_t ErgMode::_inSetpointState() {
   static unsigned long lastTime = 0;
   if (millis() - lastTime > ERG_MODE_LOG_INTERVAL_MS) {
     lastTime = millis();
-    SS2K_LOG(ERG_MODE_LOG_TAG, "%dw, Target %dw, Kp: %.3f (%s), PID Output: %f, Moving to: %f", rtConfig->watts.getValue(), rtConfig->watts.getTarget(), Kp,
-             usedPowerTable ? "table" : "fallback", PID_output, newIncline);
+    SS2K_LOG(ERG_MODE_LOG_TAG, "%dw, Target %dw, Kp: %.3f (%s%s%s), PID Output: %f, Moving to: %f", rtConfig->watts.getValue(), rtConfig->watts.getTarget(), Kp,
+             usedPowerTable ? "table" : "fallback", usedPowerTable ? "" : ": ", usedPowerTable ? "" : PowerTableSlopeStatus::name(slopeStatus), PID_output, newIncline);
   }
 
   return newIncline;

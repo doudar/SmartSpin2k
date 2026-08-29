@@ -285,3 +285,126 @@ void TestActiveRideTable::test_active_table_status_prediction_accuracy(void) {
   std::snprintf(failure, sizeof(failure), "slope-vetted reverse prediction p95 exceeded 35W: p95=%d", trustedWattP95);
   TEST_ASSERT_LESS_OR_EQUAL_INT_MESSAGE(35, trustedWattP95, failure);
 }
+
+void TestActiveRideTable::test_active_table_transient_power_estimation(void) {
+  PTData table;
+  RideReplaySummary tableSummary;
+  TEST_ASSERT_TRUE_MESSAGE(replayActiveRideLog(table, tableSummary), "active ride log could not be replayed for transient power analysis");
+
+  std::ifstream input(ACTIVE_RIDE_LOG_PATH);
+  TEST_ASSERT_TRUE_MESSAGE(input.is_open(), "active ride log must be available for transient power analysis");
+  const std::regex statusPattern(
+      R"(\[([0-9]+)\]\[E\]\(Main\): W=(-?[0-9]+) C=(-?[0-9]+) H=-?[0-9]+ G=-?[0-9]+ R=-?[0-9]+ P=(-?[0-9]+)->(-?[0-9]+))");
+  const std::regex devicePattern(R"(\[[0-9]+\]\[E\]\(Main\): DEV PM=([0-9]+) CAD=([0-9]+) HRM=[0-9]+)");
+
+  struct Sample {
+    int timestamp;
+    int cadence;
+    int watts;
+    int position;
+    int estimate;
+  };
+  struct Bucket {
+    int samples = 0;
+    long long signedError = 0;
+    long long absoluteError = 0;
+    long long positionDelta = 0;
+  };
+  Bucket steady;
+  Bucket increasing;
+  Bucket decreasing;
+  Bucket cadenceSteady;
+  Bucket cadenceIncreasing;
+  Bucket cadenceDecreasing;
+  Sample previous = {};
+  bool hasPrevious = false;
+  bool powerConnected = false;
+  bool cadenceConnected = false;
+  PTHelpers helpers;
+  std::string line;
+  std::smatch match;
+
+  while (std::getline(input, line)) {
+    if (std::regex_search(line, match, devicePattern)) {
+      powerConnected = std::stoi(match[1].str()) != 0;
+      cadenceConnected = std::stoi(match[2].str()) != 0;
+      continue;
+    }
+    if (!std::regex_search(line, match, statusPattern) || !powerConnected || !cadenceConnected) continue;
+
+    Sample current = {std::stoi(match[1].str()), std::stoi(match[3].str()), std::stoi(match[2].str()), std::stoi(match[4].str()), 0};
+    if (!helpers.cadenceIsWithinTable(current.cadence) || current.watts <= 10) continue;
+    current.estimate = helpers.lookupWatts(current.cadence, current.position, table);
+    if (current.estimate < 0 || current.estimate > 4000) continue;
+
+    if (hasPrevious) {
+      const int elapsed = current.timestamp - previous.timestamp;
+      const int cadenceDelta = current.cadence - previous.cadence;
+      const int positionDelta = current.position - previous.position;
+      if (elapsed > 0 && elapsed <= 1200 && std::abs(cadenceDelta) <= 2) {
+        Bucket* bucket = nullptr;
+        if (positionDelta >= 75) {
+          bucket = &increasing;
+        } else if (positionDelta <= -75) {
+          bucket = &decreasing;
+        } else if (std::abs(positionDelta) <= 25) {
+          bucket = &steady;
+        }
+        if (bucket != nullptr) {
+          const int error = current.estimate - current.watts;
+          ++bucket->samples;
+          bucket->signedError += error;
+          bucket->absoluteError += std::abs(error);
+          bucket->positionDelta += positionDelta;
+        }
+      }
+      if (elapsed > 0 && elapsed <= 1200 && std::abs(positionDelta) <= 25) {
+        Bucket* cadenceBucket = nullptr;
+        if (cadenceDelta >= 2) {
+          cadenceBucket = &cadenceIncreasing;
+        } else if (cadenceDelta <= -2) {
+          cadenceBucket = &cadenceDecreasing;
+        } else if (std::abs(cadenceDelta) <= 1) {
+          cadenceBucket = &cadenceSteady;
+        }
+        if (cadenceBucket != nullptr) {
+          const int error = current.estimate - current.watts;
+          ++cadenceBucket->samples;
+          cadenceBucket->signedError += error;
+          cadenceBucket->absoluteError += std::abs(error);
+          cadenceBucket->positionDelta += positionDelta;
+        }
+      }
+    }
+    previous = current;
+    hasPrevious = true;
+  }
+
+  const auto mean = [](long long total, int count) { return count == 0 ? 0.0 : static_cast<double>(total) / count; };
+  TEST_ASSERT_GREATER_THAN_INT_MESSAGE(500, steady.samples, "transient audit did not retain enough steady power samples");
+  TEST_ASSERT_GREATER_THAN_INT_MESSAGE(20, increasing.samples, "transient audit did not retain enough increasing-resistance samples");
+  TEST_ASSERT_GREATER_THAN_INT_MESSAGE(20, decreasing.samples, "transient audit did not retain enough decreasing-resistance samples");
+  TEST_ASSERT_GREATER_THAN_INT_MESSAGE(100, cadenceSteady.samples, "transient audit did not retain enough steady-cadence samples");
+  TEST_ASSERT_GREATER_THAN_INT_MESSAGE(20, cadenceIncreasing.samples, "transient audit did not retain enough cadence-acceleration samples");
+  TEST_ASSERT_GREATER_THAN_INT_MESSAGE(20, cadenceDecreasing.samples, "transient audit did not retain enough cadence-deceleration samples");
+
+  std::ofstream report("test/output/active_power_transient_audit.txt", std::ios::trunc);
+  TEST_ASSERT_TRUE_MESSAGE(report.is_open(), "failed to open transient power-estimation audit");
+  report << std::fixed << std::setprecision(2)
+         << "Raw-status power-estimation transient audit\n"
+         << "Samples use the final ride-derived table, actual stepper position, and consecutive status records <=1.2 s apart with cadence change <=2 RPM.\n"
+         << "bucket,samples,mean_estimate_minus_actual_watts,mean_absolute_error_watts,mean_position_delta_steps\n";
+  const auto emit = [&report, &mean](const char* name, const Bucket& bucket) {
+    report << name << ',' << bucket.samples << ',' << mean(bucket.signedError, bucket.samples) << ',' << mean(bucket.absoluteError, bucket.samples) << ','
+           << mean(bucket.positionDelta, bucket.samples) << '\n';
+  };
+  emit("steady", steady);
+  emit("increasing_resistance", increasing);
+  emit("decreasing_resistance", decreasing);
+  report << "\nCadence transient buckets (stepper position change limited to +/-25 steps)\n";
+  report << "bucket,samples,mean_estimate_minus_actual_watts,mean_absolute_error_watts,mean_position_delta_steps\n";
+  emit("stable_cadence", cadenceSteady);
+  emit("increasing_cadence_2_or_more_rpm_per_sample", cadenceIncreasing);
+  emit("decreasing_cadence_2_or_more_rpm_per_sample", cadenceDecreasing);
+  TEST_ASSERT_TRUE_MESSAGE(report.good(), "failed while writing transient power-estimation audit");
+}

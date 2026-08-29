@@ -138,6 +138,7 @@ void TestPTLookupResistance::test_erg_slope_quality(void) {
   TEST_ASSERT_TRUE_MESSAGE(helpers.lookupSlope(60, 60, stepsPerWatt, slopeTable), "consistent interior cadence rows should provide an ERG slope");
   TEST_ASSERT_GREATER_THAN_FLOAT_MESSAGE(0.0f, static_cast<float>(stepsPerWatt), "accepted ERG slope must be positive and finite");
   TEST_ASSERT_FALSE_MESSAGE(helpers.lookupSlope(120, 60, stepsPerWatt, slopeTable), "right-edge extrapolation must not provide an ERG slope");
+  TEST_ASSERT_FALSE_MESSAGE(helpers.lookupErgSlope(4, 60, stepsPerWatt, slopeTable), "a near-edge segment estimate must not provide an ERG slope");
 
   slopeTable.tableRow[1].tableEntry[3].targetPosition = 700;
   slopeTable.tableRow[1].tableEntry[4].targetPosition = 1000;
@@ -148,4 +149,6 @@ void TestPTLookupResistance::test_erg_slope_quality(void) {
   TEST_ASSERT_TRUE_MESSAGE(replayActiveRideLog(activeTable, summary), "active ride log could not be opened for slope-quality test");
   TEST_ASSERT_FALSE_MESSAGE(helpers.lookupSlope(385, 93, stepsPerWatt, activeTable), "385 W at 93 RPM must reject extrapolated active-log edge data");
   TEST_ASSERT_FALSE_MESSAGE(helpers.lookupSlope(385, 94, stepsPerWatt, activeTable), "385 W at 94 RPM must reject extrapolated active-log edge data");
+  TEST_ASSERT_TRUE_MESSAGE(helpers.lookupErgSlope(340, 101, stepsPerWatt, activeTable),
+                           "340 W at 101 RPM should use its two nearby measured 330--360 W segments");
 }

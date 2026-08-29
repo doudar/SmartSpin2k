@@ -13,6 +13,28 @@
 
 #define RETURN_ERROR               INT32_MIN
 
+class PowerTableSlopeStatus {
+ public:
+  enum Value : uint8_t {
+    Trusted,
+    InvalidRequest,
+    InsufficientRows,
+    MissingLocalSupport,
+    InconsistentRows,
+  };
+
+  static const char* name(Value status) {
+    switch (status) {
+      case Trusted: return "trusted";
+      case InvalidRequest: return "invalid request";
+      case InsufficientRows: return "one supporting row";
+      case MissingLocalSupport: return "missing local segment";
+      case InconsistentRows: return "inconsistent rows";
+    }
+    return "unknown";
+  }
+};
+
 class PowerEntry {
  public:
   int watts;
@@ -82,7 +104,8 @@ class PTHelpers {
 
  public:
   int32_t lookup(int watts, int cad, PTData& ptData);
-  bool lookupSlope(int watts, int cad, double& stepsPerWatt, PTData& ptData);
+  bool lookupSlope(int watts, int cad, double& stepsPerWatt, PTData& ptData, PowerTableSlopeStatus::Value* status = nullptr);
+  bool lookupErgSlope(int watts, int cad, double& stepsPerWatt, PTData& ptData, PowerTableSlopeStatus::Value* status = nullptr);
   int32_t lookupWatts(int cad, int32_t targetPosition, PTData& ptData);
   int getTotalReadings(PTData& ptData);
   ptIndex calculateIndex(int watts, int cad);

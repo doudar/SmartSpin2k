@@ -16,7 +16,8 @@ constexpr int LOW_GAIN_WATTS                   = 120;
 constexpr int HIGH_GAIN_WATTS                  = 400;
 constexpr int MIN_SCHEDULE_WATTS               = 30;
 constexpr double TABLE_GAIN_MIN_FALLBACK_RATIO = 0.5;
-constexpr double TABLE_GAIN_MAX_FALLBACK_RATIO = 2.0;
+constexpr double TABLE_GAIN_MAX_FALLBACK_RATIO = 1.25;
+constexpr double TABLE_GAIN_BLEND              = 0.5;
 constexpr double GAIN_MIN_SENSITIVITY_RATIO     = 0.25;
 constexpr double GAIN_MAX_SENSITIVITY_RATIO     = 4.0;
 constexpr double SLOPE_CONTROL_DIVISOR          = 10.0;
@@ -41,6 +42,11 @@ inline double boundedTableGain(double localGain, double fallback) {
   const double minimumGain = fallback * TABLE_GAIN_MIN_FALLBACK_RATIO;
   const double maximumGain = fallback * TABLE_GAIN_MAX_FALLBACK_RATIO;
   return std::max(minimumGain, std::min(localGain, maximumGain));
+}
+
+inline double blendedTableGain(double localGain, double fallback) {
+  const double bounded = boundedTableGain(localGain, fallback);
+  return fallback + (bounded - fallback) * TABLE_GAIN_BLEND;
 }
 
 inline double errorScheduledGain(double gain, int error, bool maintaining) {

@@ -69,12 +69,14 @@ void setup() {
     RUN_TEST(replayTests.test_compact_status_log_replay);
     RUN_TEST(replayTests.test_status_ride_table_generation);
     RUN_TEST(replayTests.test_active_table_status_prediction_accuracy);
+    RUN_TEST(replayTests.test_active_table_transient_power_estimation);
   }
 
   // ERG ride-log replay and gain scheduling tests
   {
     TestErgLogReplay ergReplayTests;
     RUN_TEST(ergReplayTests.test_active_ride_log_and_gain_limits);
+    RUN_TEST(ergReplayTests.test_active_ride_new_gain_replay);
   }
 
   // BLE Device Unique Name Tests
