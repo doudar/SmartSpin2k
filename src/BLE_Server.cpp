@@ -160,23 +160,35 @@ void SpinBLEServer::update() {
 }
 
 double SpinBLEServer::calculateSpeed() {
-  // Constants for the formula: adjusted for calibration
-  const double dragCoefficient   = 1.95;
-  const double frontalArea       = 0.9;    // m^2
-  const double airDensity        = 1.225;  // kg/m^3
-  const double rollingResistance = 0.004;
-  const double combinedConstant  = 0.5 * airDensity * dragCoefficient * frontalArea + rollingResistance;
-  double power                   = rtConfig->watts.getValue();           // Power in watts
-  double speedInMetersPerSecond  = std::cbrt(power / combinedConstant);  // Speed in m/s
+  // Estimate flat-road speed from P = 0.5 * rho * CdA * v^3 + Crr * m * g * v.
+  // These conservative defaults model an upright rider plus bike. This is only
+  // used when no real or simulated speed source is available.
+  constexpr double airDensity          = 1.225;    // kg/m^3
+  constexpr double dragArea            = 0.50;     // CdA, m^2
+  constexpr double rollingResistance   = 0.004;
+  constexpr double totalMass           = 90.0;     // rider and bike, kg
+  constexpr double gravity             = 9.80665;  // m/s^2
+  constexpr double aerodynamicCoefficient = 0.5 * airDensity * dragArea;
+  constexpr double rollingCoefficient     = rollingResistance * totalMass * gravity;
 
-  // Convert speed from m/s to km/h
-  double speedKmH = speedInMetersPerSecond * 3.6;
+  const double power = rtConfig->watts.getValue();
+  if (power <= 0.0) return 0.0;
 
-  // Apply a calibration factor based on empirical data to adjust the speed into a realistic range
-  double calibrationFactor = 1;  // This is an example value; adjust based on calibration
-  speedKmH *= calibrationFactor;
+  // Solve the monotonic equation with a bounded binary search. 30 m/s is well
+  // above any expected indoor-bike estimate and keeps the calculation stable.
+  double low  = 0.0;
+  double high = 30.0;
+  for (int i = 0; i < 24; ++i) {
+    const double speed = (low + high) / 2.0;
+    const double requiredPower = aerodynamicCoefficient * speed * speed * speed + rollingCoefficient * speed;
+    if (requiredPower < power) {
+      low = speed;
+    } else {
+      high = speed;
+    }
+  }
 
-  return speedKmH;
+  return ((low + high) / 2.0) * 3.6;  // m/s to km/h
 }
 
 void SpinBLEServer::updateWheelAndCrankRev() {
