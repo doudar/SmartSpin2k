@@ -109,6 +109,7 @@ void setup() {
   // BLE protocol encode/decode round-trip tests
   {
     TestBleWireRoundTrip test;
+    RUN_TEST(test.test_dircon_uuid_round_trip);
     RUN_TEST(test.test_all_custom_characteristic_formats);
     RUN_TEST(test.test_ftms_round_trip);
     RUN_TEST(test.test_csc_round_trip);

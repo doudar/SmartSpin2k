@@ -6,6 +6,7 @@
  */
 #include "DirConMessage.h"
 #include "ByteUtils.h"
+#include "DirConUUIDCodec.h"
 #include "SS2KLog.h"
 #include "settings.h"
 #include "BLE_Common.h"
@@ -49,30 +50,6 @@ void DirConMessage::printVectorBytesToSerial(const std::vector<uint8_t>& data, b
   }
 }
 #endif
-
-// Helper functions for UUID conversion - matching the expected DirCon protocol format
-void uuidToBytes(NimBLEUUID& uuid, std::vector<uint8_t>& message) {
-  // Log the UUID being processed for debugging
-  //SS2K_LOG(DIRCON_LOG_TAG, "Processing UUID: %s", uuid.toString().c_str());
-
-  uint8_t *uuidBytes = (uint8_t*)uuid.to128().getBase();
-
-  // Add the bytes to the message
-  for (size_t i = 16; i > 0; i--) {
-    message.push_back(uuidBytes[i - 1]);
-  }
-}
-
-NimBLEUUID bytesToUuid(uint8_t* data, size_t offset) {
-  uint8_t* ptr = data + offset;
-
-  NimBLEUUID uUidOut(ptr, 16);
-  NimBLEUUID reversed = uUidOut.reverseByteOrder();
-
-  //SS2K_LOG(DIRCON_LOG_TAG, "Derived UUID: %s", reversed.toString().c_str());
-
-  return reversed;
-}
 
 DirConMessage::DirConMessage() {}
 
@@ -124,7 +101,7 @@ std::vector<uint8_t>* DirConMessage::encode(uint8_t sequenceNumber) {
           SS2K_LOG(DIRCON_LOG_TAG, "Adding service %d UUID: %s", counter, uuidToAdd.toString().c_str());
 
           // Add the UUID bytes to the message
-          uuidToBytes(uuidToAdd, this->encodedMessage);
+          DirConUUIDCodec::appendBytes(uuidToAdd, this->encodedMessage);
         }
       }
     }
@@ -132,11 +109,11 @@ std::vector<uint8_t>* DirConMessage::encode(uint8_t sequenceNumber) {
     else if (this->Identifier == DIRCON_MSGID_DISCOVER_CHARACTERISTICS && !this->Request) {
       this->Length = 16 + this->AdditionalUUIDs.size() * 17;
       appendBigEndian16(this->encodedMessage, this->Length);
-      uuidToBytes(this->UUID, this->encodedMessage);
+      DirConUUIDCodec::appendBytes(this->UUID, this->encodedMessage);
 
       size_t dataIndex = 0;
       for (size_t counter = 0; counter < this->AdditionalUUIDs.size(); counter++) {
-        uuidToBytes(this->AdditionalUUIDs[counter], this->encodedMessage);
+        DirConUUIDCodec::appendBytes(this->AdditionalUUIDs[counter], this->encodedMessage);
         this->encodedMessage.push_back(this->AdditionalData[dataIndex]);
         dataIndex++;
       }
@@ -146,14 +123,14 @@ std::vector<uint8_t>* DirConMessage::encode(uint8_t sequenceNumber) {
              (this->Identifier == DIRCON_MSGID_ENABLE_CHARACTERISTIC_NOTIFICATIONS && !this->Request)) {
       this->Length = 16;
       appendBigEndian16(this->encodedMessage, this->Length);
-      uuidToBytes(this->UUID, this->encodedMessage);
+      DirConUUIDCodec::appendBytes(this->UUID, this->encodedMessage);
     }
     // Handle write characteristic, unsolicited notification, read response, or notification enabling
     else if (this->Identifier == DIRCON_MSGID_WRITE_CHARACTERISTIC || this->Identifier == DIRCON_MSGID_UNSOLICITED_CHARACTERISTIC_NOTIFICATION ||
              (this->Identifier == DIRCON_MSGID_READ_CHARACTERISTIC && !this->Request) || (this->Identifier == DIRCON_MSGID_ENABLE_CHARACTERISTIC_NOTIFICATIONS && this->Request)) {
       this->Length = 16 + this->AdditionalData.size();
       appendBigEndian16(this->encodedMessage, this->Length);
-      uuidToBytes(this->UUID, this->encodedMessage);
+      DirConUUIDCodec::appendBytes(this->UUID, this->encodedMessage);
 
       for (size_t counter = 0; counter < this->AdditionalData.size(); counter++) {
         this->encodedMessage.push_back(this->AdditionalData[counter]);
@@ -207,7 +184,7 @@ size_t DirConMessage::parse(uint8_t* data, size_t len, uint8_t sequenceNumber) {
         size_t index = 0;
         while (this->Length >= index + 16) {
           // Parse UUID with consistent byte order
-          NimBLEUUID uuid = bytesToUuid(data + DIRCON_MESSAGE_HEADER_LENGTH, index);
+          NimBLEUUID uuid = DirConUUIDCodec::fromBytes(data + DIRCON_MESSAGE_HEADER_LENGTH + index);
           this->AdditionalUUIDs.push_back(uuid);
           index += 16;
           parsedBytes += 16;
@@ -222,7 +199,7 @@ size_t DirConMessage::parse(uint8_t* data, size_t len, uint8_t sequenceNumber) {
     case DIRCON_MSGID_DISCOVER_CHARACTERISTICS:
       if (this->Length >= 16) {
         // Parse the UUID in the same reversed byte format
-        this->UUID = bytesToUuid(data + DIRCON_MESSAGE_HEADER_LENGTH, 0);
+        this->UUID = DirConUUIDCodec::fromBytes(data + DIRCON_MESSAGE_HEADER_LENGTH);
         parsedBytes += 16;
         if (this->Length == 16) {
           this->Request = this->isRequest(sequenceNumber);
@@ -252,7 +229,7 @@ size_t DirConMessage::parse(uint8_t* data, size_t len, uint8_t sequenceNumber) {
     case DIRCON_MSGID_READ_CHARACTERISTIC:
       if (this->Length >= 16) {
         // Update READ_CHARACTERISTIC to use consistent byte ordering
-        this->UUID = bytesToUuid(data + DIRCON_MESSAGE_HEADER_LENGTH, 0);
+        this->UUID = DirConUUIDCodec::fromBytes(data + DIRCON_MESSAGE_HEADER_LENGTH);
         parsedBytes += 16;
         if (this->Length == 16) {
           this->Request = this->isRequest(sequenceNumber);
@@ -273,7 +250,7 @@ size_t DirConMessage::parse(uint8_t* data, size_t len, uint8_t sequenceNumber) {
     case DIRCON_MSGID_WRITE_CHARACTERISTIC:
       if (this->Length > 16) {
         // Update WRITE_CHARACTERISTIC UUID parsing
-        this->UUID = bytesToUuid(data + DIRCON_MESSAGE_HEADER_LENGTH, 0);
+        this->UUID = DirConUUIDCodec::fromBytes(data + DIRCON_MESSAGE_HEADER_LENGTH);
         parsedBytes += 16;
         this->Request = this->isRequest(sequenceNumber);
         this->AdditionalData.clear();
@@ -291,7 +268,7 @@ size_t DirConMessage::parse(uint8_t* data, size_t len, uint8_t sequenceNumber) {
     case DIRCON_MSGID_ENABLE_CHARACTERISTIC_NOTIFICATIONS:
       if (this->Length >= 16) {
         // Parse UUID
-        this->UUID = bytesToUuid(data + DIRCON_MESSAGE_HEADER_LENGTH, 0);
+        this->UUID = DirConUUIDCodec::fromBytes(data + DIRCON_MESSAGE_HEADER_LENGTH);
         parsedBytes += 16;
 
         // Payload (if any) follows the UUID; typical CCCD is 1-2 bytes
@@ -317,7 +294,7 @@ size_t DirConMessage::parse(uint8_t* data, size_t len, uint8_t sequenceNumber) {
     case DIRCON_MSGID_UNSOLICITED_CHARACTERISTIC_NOTIFICATION:
       if (this->Length > 16) {
         // Update UNSOLICITED_CHARACTERISTIC_NOTIFICATION UUID parsing
-        this->UUID = bytesToUuid(data + DIRCON_MESSAGE_HEADER_LENGTH, 0);
+        this->UUID = DirConUUIDCodec::fromBytes(data + DIRCON_MESSAGE_HEADER_LENGTH);
         parsedBytes += 16;
         this->AdditionalData.clear();
         for (size_t dataIndex = 0; dataIndex < (this->Length - 16); dataIndex++) {

@@ -12,6 +12,7 @@
 
 #include "BLE_Definitions.h"
 #include "CustomCharacteristicProtocol.h"
+#include "DirConUUIDCodec.h"
 #include "Zwift_Protocol_Messages.h"
 #include "sensors/CscSensorData.h"
 #include "sensors/FitnessMachineIndoorBikeData.h"
@@ -52,6 +53,30 @@ size_t makeIndoorBikeData(int16_t resistance, int16_t power, uint8_t* bytes) {
 }
 
 }  // namespace
+
+void TestBleWireRoundTrip::test_dircon_uuid_round_trip(void) {
+  const uint8_t expectedFtmsBytes[] = {0x00, 0x00, 0x18, 0x26, 0x00, 0x00, 0x10, 0x00, 0x80, 0x00, 0x00, 0x80, 0x5f, 0x9b, 0x34, 0xfb};
+  const uint8_t expectedHeartRateBytes[] = {0x00, 0x00, 0x18, 0x0d, 0x00, 0x00, 0x10, 0x00, 0x80, 0x00, 0x00, 0x80, 0x5f, 0x9b, 0x34, 0xfb};
+  const uint8_t ftmsValueBytes[] = {0xfb, 0x34, 0x9b, 0x5f, 0x80, 0x00, 0x00, 0x80, 0x00, 0x10, 0x00, 0x00, 0x26, 0x18, 0x00, 0x00};
+  const uint8_t heartRateValueBytes[] = {0xfb, 0x34, 0x9b, 0x5f, 0x80, 0x00, 0x00, 0x80, 0x00, 0x10, 0x00, 0x00, 0x0d, 0x18, 0x00, 0x00};
+
+  std::vector<uint8_t> encoded;
+  DirConUUIDCodec::appendValueBytes(ftmsValueBytes, encoded);
+  TEST_ASSERT_EQUAL_UINT(sizeof(expectedFtmsBytes), encoded.size());
+  TEST_ASSERT_EQUAL_UINT8_ARRAY(expectedFtmsBytes, encoded.data(), sizeof(expectedFtmsBytes));
+
+  encoded.clear();
+  DirConUUIDCodec::appendValueBytes(heartRateValueBytes, encoded);
+  TEST_ASSERT_EQUAL_UINT(sizeof(expectedHeartRateBytes), encoded.size());
+  TEST_ASSERT_EQUAL_UINT8_ARRAY(expectedHeartRateBytes, encoded.data(), sizeof(expectedHeartRateBytes));
+
+  const uint8_t expectedCustomBytes[] = {0x77, 0x77, 0x62, 0x77, 0x78, 0x77, 0x77, 0x74, 0x44, 0x66, 0x89, 0x66, 0x65, 0x50, 0x00, 0x00};
+  const uint8_t customValueBytes[] = {0x00, 0x00, 0x50, 0x65, 0x66, 0x89, 0x66, 0x44, 0x74, 0x77, 0x77, 0x78, 0x77, 0x62, 0x77, 0x77};
+  encoded.clear();
+  DirConUUIDCodec::appendValueBytes(customValueBytes, encoded);
+  TEST_ASSERT_EQUAL_UINT(sizeof(expectedCustomBytes), encoded.size());
+  TEST_ASSERT_EQUAL_UINT8_ARRAY(expectedCustomBytes, encoded.data(), sizeof(expectedCustomBytes));
+}
 
 void TestBleWireRoundTrip::test_all_custom_characteristic_formats(void) {
   unsigned formatCounts[CustomUnknown + 1] = {0};

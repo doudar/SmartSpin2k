@@ -81,6 +81,7 @@ class TestEndian {
 
 class TestBleWireRoundTrip {
  public:
+  static void test_dircon_uuid_round_trip(void);
   static void test_all_custom_characteristic_formats(void);
   static void test_ftms_round_trip(void);
   static void test_csc_round_trip(void);
