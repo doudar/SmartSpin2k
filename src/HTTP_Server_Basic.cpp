@@ -19,15 +19,13 @@
 #include <ESPmDNS.h>
 #include <WiFi.h>
 #include <WiFiClientSecure.h>
-#include <Update.h>
 #include <DNSServer.h>
 #include <ArduinoJson.h>
 #include <BLE_Custom_Characteristic.h>
 #include <Preferences.h>
 #include <esp_err.h>
 #include <esp_ota_ops.h>
-
-File fsUploadFile;
+#include <esp_partition.h>
 
 IPAddress myIP;
 
@@ -70,9 +68,16 @@ bool otaFilesystemUpload    = false;
 bool otaFirmwareUpdateBegun = false;
 esp_ota_handle_t otaFirmwareHandle = 0;
 const esp_partition_t* otaFirmwarePartition = nullptr;
+const esp_partition_t* otaFilesystemPartition = nullptr;
+size_t otaFilesystemBytesWritten = 0;
+size_t otaFilesystemBytesErased  = 0;
+bool otaFilesystemUnmounted      = false;
 uint8_t otaFirmwareHeader[sizeof(esp_image_header_t)];
 size_t otaFirmwareHeaderLength = 0;
 String otaUploadError;
+
+constexpr unsigned long NTP_SYNC_TIMEOUT_MS = 10000;
+constexpr char LITTLEFS_PARTITION_LABEL[]    = "spiffs";
 
 void abortFirmwareUpload() {
   if (otaFirmwareUpdateBegun) {
@@ -88,6 +93,22 @@ void resetFirmwareUploadValidation() {
   otaFirmwareUpdateBegun  = false;
   otaFirmwareHeaderLength = 0;
   otaUploadError           = "";
+}
+
+void resetFilesystemUpload() {
+  otaFilesystemPartition    = nullptr;
+  otaFilesystemBytesWritten = 0;
+  otaFilesystemBytesErased  = 0;
+}
+
+bool remountFilesystem() {
+  if (!otaFilesystemUnmounted) return true;
+
+  otaFilesystemUnmounted = false;
+  if (LittleFS.begin(false)) return true;
+
+  SS2K_LOGE(HTTP_SERVER_LOG_TAG, "Failed to remount LittleFS after filesystem upload");
+  return false;
 }
 
 void rejectFirmwareUpload(const char* message, esp_err_t error = ESP_OK) {
@@ -149,6 +170,76 @@ bool finishFirmwareUpload() {
     return false;
   }
 
+  return true;
+}
+
+void rejectFilesystemUpload(const char* message, esp_err_t error = ESP_OK) {
+  otaUploadRejected = true;
+  otaUploadError    = message;
+  resetFilesystemUpload();
+  ss2k->isUpdating = false;
+  if (error == ESP_OK) {
+    SS2K_LOGE(HTTP_SERVER_LOG_TAG, "%s", message);
+  } else {
+    SS2K_LOGE(HTTP_SERVER_LOG_TAG, "%s: %s (%d)", message, esp_err_to_name(error), error);
+  }
+}
+
+bool beginFilesystemUpload() {
+  otaFilesystemPartition =
+      esp_partition_find_first(ESP_PARTITION_TYPE_DATA, ESP_PARTITION_SUBTYPE_DATA_SPIFFS, LITTLEFS_PARTITION_LABEL);
+  if (otaFilesystemPartition == nullptr) {
+    rejectFilesystemUpload("No LittleFS partition is available.");
+    return false;
+  }
+
+  // The filesystem must not remain mounted while its backing partition is
+  // erased and rewritten. Configuration remains available in userConfig and
+  // is restored to the uploaded image after it is mounted.
+  LittleFS.end();
+  otaFilesystemUnmounted = true;
+  ss2k->isUpdating       = true;
+  return true;
+}
+
+bool writeFilesystemUpload(const uint8_t* data, size_t length) {
+  if (otaFilesystemPartition == nullptr || otaUploadRejected) return false;
+  if (length > otaFilesystemPartition->size - otaFilesystemBytesWritten) {
+    rejectFilesystemUpload("Filesystem image is larger than the LittleFS partition.");
+    return false;
+  }
+
+  const size_t writeEnd  = otaFilesystemBytesWritten + length;
+  const size_t eraseSize = otaFilesystemPartition->erase_size;
+  const size_t eraseEnd  = ((writeEnd + eraseSize - 1) / eraseSize) * eraseSize;
+  if (eraseEnd > otaFilesystemBytesErased) {
+    const esp_err_t result =
+        esp_partition_erase_range(otaFilesystemPartition, otaFilesystemBytesErased, eraseEnd - otaFilesystemBytesErased);
+    if (result != ESP_OK) {
+      rejectFilesystemUpload("Unable to erase the LittleFS partition.", result);
+      return false;
+    }
+    otaFilesystemBytesErased = eraseEnd;
+  }
+
+  const esp_err_t result = esp_partition_write(otaFilesystemPartition, otaFilesystemBytesWritten, data, length);
+  if (result != ESP_OK) {
+    rejectFilesystemUpload("Filesystem upload write failed.", result);
+    return false;
+  }
+
+  otaFilesystemBytesWritten = writeEnd;
+  return true;
+}
+
+bool finishFilesystemUpload(size_t uploadedSize) {
+  if (otaFilesystemPartition == nullptr || otaUploadRejected) return false;
+  if (uploadedSize != otaFilesystemBytesWritten || uploadedSize != otaFilesystemPartition->size) {
+    rejectFilesystemUpload("Filesystem image size does not match the LittleFS partition.");
+    return false;
+  }
+
+  resetFilesystemUpload();
   return true;
 }
 
@@ -392,12 +483,17 @@ void startWifi() {
     configTime(0, 0, "pool.ntp.org");  // get UTC time via NTP
     time_t now = time(nullptr);
     SS2K_LOG(HTTP_SERVER_LOG_TAG, "Waiting for clock sync");
-    while (now < 10) {  // wait 10 seconds
+    const unsigned long syncStarted = millis();
+    while (now < 10 && millis() - syncStarted < NTP_SYNC_TIMEOUT_MS) {
       SS2K_LOG(".", ".");
       delay(100);
       now = time(nullptr);
     }
-    SS2K_LOG(HTTP_SERVER_LOG_TAG, "Clock synced to: %.f", difftime(now, (time_t)0));
+    if (now < 10) {
+      SS2K_LOGE(HTTP_SERVER_LOG_TAG, "Clock sync timed out; continuing startup");
+    } else {
+      SS2K_LOG(HTTP_SERVER_LOG_TAG, "Clock synced to: %.f", difftime(now, (time_t)0));
+    }
   }
 }
 
@@ -584,38 +680,29 @@ void HTTP_Server::start() {
       []() {
         server.sendHeader("Connection", "close");
         if (otaUploadRejected) {
+          if (otaFilesystemUpload) remountFilesystem();
           server.send(400, "text/plain", otaUploadError.isEmpty() ? String("Wrong image filename. Expected ") + FW_BINFILE + " or " + FS_BINFILE + "."
                                                                    : otaUploadError);
           return;
         }
-        // Check if the Update process reported an error and send the final status.
-        if (otaFilesystemUpload && Update.hasError()) {
-          // You can get more specific error information if you want
-          // size_t len = Update.getErrorString(error_string_buffer, 128);
-          // server.send(500, "text/plain", error_string_buffer);
-          server.send(500, "text/plain", "FAIL");
+        if (otaFilesystemUpload) {
+          if (!remountFilesystem()) {
+            ss2k->isUpdating = false;
+            server.send(500, "text/plain", "Uploaded filesystem could not be mounted.");
+            return;
+          }
+          userConfig->saveToLittleFS();
+          SS2K_LOG(HTTP_SERVER_LOG_TAG, "Settings saved to the uploaded LittleFS image");
+        }
+        server.send(200, "text/plain", "OK");
+        if (otaFilesystemUpload) {
+          // Reboot directly because active HTTP handlers and assets came from the
+          // filesystem that was just replaced.
+          delay(500);
+          ESP.restart();
         } else {
-          if (otaFilesystemUpload) {
-            // Update replaced the mounted partition underneath LittleFS. Remount
-            // the new image before restoring the in-memory user configuration.
-            LittleFS.end();
-            if (LittleFS.begin(false)) {
-              userConfig->saveToLittleFS();
-              SS2K_LOG(HTTP_SERVER_LOG_TAG, "Settings saved to the uploaded LittleFS image");
-            } else {
-              SS2K_LOGE(HTTP_SERVER_LOG_TAG, "Failed to remount LittleFS before saving settings");
-            }
-          }
-          server.send(200, "text/plain", "OK");
-          if (otaFilesystemUpload) {
-            // The filesystem was replaced underneath the running web server. Reboot
-            // directly after allowing the response to reach the browser.
-            delay(500);
-            ESP.restart();
-          } else {
-            // Firmware uploads can use the normal cooperative reboot path.
-            ss2k->rebootFlag = true;
-          }
+          // Firmware uploads can use the normal cooperative reboot path.
+          ss2k->rebootFlag = true;
         }
       },
       // This is the onUpload callback. It handles the file data as it arrives.
@@ -626,6 +713,7 @@ void HTTP_Server::start() {
           otaUploadRejected    = false;
           otaFilesystemUpload = upload.filename == FS_BINFILE;
           resetFirmwareUploadValidation();
+          resetFilesystemUpload();
         }
         if (upload.filename == FW_BINFILE) {
           if (upload.status == UPLOAD_FILE_START) {
@@ -680,51 +768,22 @@ void HTTP_Server::start() {
         } else if (upload.filename == FS_BINFILE) {
           if (upload.status == UPLOAD_FILE_START) {
             SS2K_LOG(HTTP_SERVER_LOG_TAG, "Update Start: %s", upload.filename.c_str());
-            if (!Update.begin(UPDATE_SIZE_UNKNOWN, U_SPIFFS)) {
-              Update.printError(Serial);
-            }
+            beginFilesystemUpload();
           } else if (upload.status == UPLOAD_FILE_WRITE) {
-            if (Update.write(upload.buf, upload.currentSize) != upload.currentSize) {
-              Update.printError(Serial);
-            }
+            writeFilesystemUpload(upload.buf, upload.currentSize);
           } else if (upload.status == UPLOAD_FILE_END) {
-            // Finalize the update.
             // DO NOT send a response here.
-            if (Update.end(true)) {
+            if (finishFilesystemUpload(upload.totalSize)) {
               SS2K_LOG(HTTP_SERVER_LOG_TAG, "Littlefs Upload Finished Successfully.");
-            } else {
-              Update.printError(Serial);
             }
+          } else if (upload.status == UPLOAD_FILE_ABORTED) {
+            rejectFilesystemUpload("Filesystem upload was aborted.");
+            remountFilesystem();
           }
-        } else if (upload.filename.endsWith(".bin")) {
-          if (upload.status == UPLOAD_FILE_START) {
-            otaUploadRejected = true;
-            otaUploadError    = String("Wrong image filename. Expected ") + FW_BINFILE + " or " + FS_BINFILE + ".";
-            SS2K_LOG(HTTP_SERVER_LOG_TAG, "Rejected image %s; expected %s or %s", upload.filename.c_str(), FW_BINFILE, FS_BINFILE);
-          }
-        } else {  // Handles other file uploads to LittleFS
-          if (upload.status == UPLOAD_FILE_START) {
-            String filename = upload.filename;
-            if (!filename.startsWith("/")) {
-              filename = "/" + filename;
-            }
-            SS2K_LOG(HTTP_SERVER_LOG_TAG, "handleFileUpload Name: %s", filename.c_str());
-            fsUploadFile = LittleFS.open(filename, "w");
-            filename     = String();
-          } else if (upload.status == UPLOAD_FILE_WRITE) {
-            if (fsUploadFile) {
-              fsUploadFile.write(upload.buf, upload.currentSize);
-            }
-          } else if (upload.status == UPLOAD_FILE_END) {
-            if (fsUploadFile) {
-              fsUploadFile.close();
-            }
-            SS2K_LOG(HTTP_SERVER_LOG_TAG, "handleFileUpload Size: %zu", upload.totalSize);
-            // For non-firmware files, it's okay to send a response here,
-            // but for consistency, it's better to let the onComplete handler do it.
-            // For this example, we assume the main onComplete handler is for firmware.
-            // A more robust solution would check which type of file was uploaded.
-          }
+        } else if (upload.status == UPLOAD_FILE_START) {
+          otaUploadRejected = true;
+          otaUploadError    = String("Wrong upload filename. Expected ") + FW_BINFILE + " or " + FS_BINFILE + ".";
+          SS2K_LOG(HTTP_SERVER_LOG_TAG, "Rejected upload %s; expected %s or %s", upload.filename.c_str(), FW_BINFILE, FS_BINFILE);
         }
       });
 
@@ -742,9 +801,9 @@ void HTTP_Server::webClientUpdate() {
     _webClientTimer                = millis();
     static unsigned long mDnsTimer = millis();  // NOLINT: There is no overload in String for uint64_t
     server.handleClient();
-    // if (WiFi.getMode() != WIFI_MODE_STA) {
-    //   dnsServer.processNextRequest();
-    // }
+    if (WiFi.getMode() != WIFI_MODE_STA) {
+      dnsServer.processNextRequest();
+    }
     //  Keep MDNS alive
     if ((millis() - mDnsTimer) > 30000) {
       MDNS.addServiceTxt("http", "_tcp", "lf", String(mDnsTimer));

@@ -356,7 +356,7 @@ void SS2K::maintenanceLoop(void* pvParameters) {
     // If we're in ERG mode, modify shift commands to inc/dec the target watts instead.
 
     // If we have a resistance bike attached, slow down when we're close to the limits.
-    if (ss2k->pelotonIsConnected && !rtConfig->getHomed() && !spinBLEServer.spinDownFlag) {
+    if (stepper && ss2k->pelotonIsConnected && !rtConfig->getHomed() && !spinBLEServer.spinDownFlag) {
       int speed           = userConfig->getStepperSpeed();
       float resistance    = rtConfig->resistance.getValue();
       float maxResistance = rtConfig->getMaxResistance();

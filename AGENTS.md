@@ -390,6 +390,7 @@ Stepper safety:
 
 - Homed devices clamp to `rtConfig->minStep/maxStep`.
 - Unhomed devices use provisional defaults unless power-table/resistance updates refine limits.
+- FastAccelStepper pulse generation is initialized independently of TMC UART detection, so the firmware remains safe when the physical driver is absent. Runtime stepper-setting methods must still tolerate null driver/stepper pointers in case peripheral allocation fails.
 - Do not bypass `moveStepper()` target clamping for ordinary control paths.
 
 ## ERG Mode
@@ -505,7 +506,7 @@ Responsibilities:
 - Start/stop WiFi (`startWifi()`, `stopWifi()`).
 - Serve LittleFS web assets and built-in OTA pages.
 - Boot-time `HTTP_Server::syncWebServerFiles()` refreshes outdated web assets and restores individual missing manifest files; it does not update firmware.
-- Browser-uploaded firmware uses the low-level ESP-IDF OTA API rather than Arduino `Update`, avoiding its 4 KiB heap allocation on memory-constrained classic ESP32 builds; browser-uploaded filesystem images still use `Update`.
+- Browser-uploaded firmware uses the low-level ESP-IDF OTA API, and filesystem images stream directly to the LittleFS partition with sector-at-a-time erases. Neither path uses Arduino `Update` or its 4 KiB heap allocation on memory-constrained classic ESP32 builds. Filesystem uploads must exactly match the partition size; arbitrary file uploads are rejected.
 - Automatic filesystem updates treat remote `list.json` as an allowlist, preserve config/power-table/recovery metadata, and store the installed filesystem release version in NVS.
 - Settings JSON/API behavior through `settingsProcessor()`.
 - Periodic web client update through `webClientUpdate()`.

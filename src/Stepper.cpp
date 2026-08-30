@@ -272,6 +272,24 @@ void SS2K::setupTMCStepperDriver(bool reset) {
   }
   const bool initializeFastAccel = !reset || stepper == nullptr;
 
+  // FastAccelStepper only owns the ESP32 pulse-generation peripheral; it does
+  // not require a responding TMC UART. Initialize it even when the physical
+  // driver is absent so runtime setting writes cannot encounter a null object.
+  if (initializeFastAccel) {
+    engine.init();
+    stepper = engine.stepperConnectToPin(currentBoard.stepPin);
+    if (stepper == nullptr) {
+      SS2K_LOGE(MAIN_LOG_TAG, "Unable to initialize FastAccelStepper on pin %u", static_cast<unsigned>(currentBoard.stepPin));
+      return;
+    }
+    stepper->setDirectionPin(currentBoard.dirPin, userConfig->getStepperDir());
+    stepper->setEnablePin(currentBoard.enablePin);
+    stepper->setAutoEnable(true);
+    stepper->setSpeedInHz(DEFAULT_STEPPER_SPEED);
+    stepper->setAcceleration(STEPPER_ACCELERATION);
+    stepper->setDelayToDisable(65535);
+  }
+
   // TMCStepper's connection test is sufficient for normal configuration and
   // homing. The stricter IFCNT check is reserved for irreversible OTP writes.
   if (!recoverTmc2209OperationalConnection(driver)) {
@@ -279,16 +297,7 @@ void SS2K::setupTMCStepperDriver(bool reset) {
     return;
   }
 
-  // FastAccel setup
   if (initializeFastAccel) {
-    engine.init();
-    stepper = engine.stepperConnectToPin(currentBoard.stepPin);
-    stepper->setDirectionPin(currentBoard.dirPin, userConfig->getStepperDir());
-    stepper->setEnablePin(currentBoard.enablePin);
-    stepper->setAutoEnable(true);
-    stepper->setSpeedInHz(DEFAULT_STEPPER_SPEED);
-    stepper->setAcceleration(STEPPER_ACCELERATION);
-    stepper->setDelayToDisable(65535);
     // TMC Driver Setup
     driver->begin();
     if (verifyTmc2209ConnectionForOtp(driver)) {
@@ -524,6 +533,12 @@ void SS2K::goHome(bool bothDirections) {
     }
   }
 
+  if (!stepper) {
+    SS2K_LOG(MAIN_LOG_TAG, "Homing unavailable because the stepper pulse generator is not initialized.");
+    fitnessMachineService.spinDown(FitnessMachineStatus::SpinDown_Error);
+    return;
+  }
+
   // if we're using real resistance from a FTMS bike, find those values for the reported min and max resistance instead of using hard stops.
   if (!rtConfig->resistance.getSimulate() && userConfig->getConnectedPowerMeter() != NONE && rtConfig->resistance.getMax() > 0) {
     ss2k->_findFTMSHome(bothDirections);
@@ -533,8 +548,8 @@ void SS2K::goHome(bool bothDirections) {
     }
   }
 
-  if (!stepper || !currentBoard.homingSupported) {
-    SS2K_LOG(MAIN_LOG_TAG, "Homing not supported or stepper not initialized.");
+  if (!currentBoard.homingSupported) {
+    SS2K_LOG(MAIN_LOG_TAG, "Homing is not supported by this board.");
     fitnessMachineService.spinDown(FitnessMachineStatus::SpinDown_Error);
     return;
   }
@@ -678,6 +693,11 @@ void SS2K::updateStepperPower(int pwr) {
 
 // Applies current StealthChop to driver
 void SS2K::updateStealthChop(bool coolStepEnabled) {
+  if (driver == nullptr) {
+    SS2K_LOG(MAIN_LOG_TAG, "Skipping StealthChop update because the TMC driver is not initialized");
+    return;
+  }
+
   bool stealthChopEnabled = userConfig->getStealthChop();
   driver->en_spreadCycle(!stealthChopEnabled);
   driver->pwm_autoscale(stealthChopEnabled);
@@ -712,6 +732,11 @@ void SS2K::updateStealthChop(bool coolStepEnabled) {
  * @param speed The desired speed for the stepper motor. If 0, the speed is retrieved from user configuration.
  */
 void SS2K::updateStepperSpeed(int speed) {
+  if (stepper == nullptr) {
+    SS2K_LOG(MAIN_LOG_TAG, "Skipping stepper speed update because FastAccelStepper is unavailable");
+    return;
+  }
+
   if (speed == 0) {
     speed = userConfig->getStepperSpeed();
   }
