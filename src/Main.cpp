@@ -239,11 +239,9 @@ void SS2K::finishSetup() {
   }
 #endif
 
-  // Check for firmware update. It's important that this stays before BLE &
-  // HTTP setup because otherwise they use too much traffic and the device
-  // fails to update which really sucks when it corrupts your settings.
+  // Refresh or repair the web filesystem before BLE and HTTP setup add network traffic.
   startWifi();
-  httpServer.FirmwareUpdate();
+  httpServer.syncWebServerFiles();
 
   pinMode(currentBoard.shiftUpPin, INPUT_PULLUP);    // Push-Button with input Pullup
   pinMode(currentBoard.shiftDownPin, INPUT_PULLUP);  // Push-Button with input Pullup

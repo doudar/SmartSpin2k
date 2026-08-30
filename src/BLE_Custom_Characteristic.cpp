@@ -1069,12 +1069,6 @@ void BLE_ss2kCustomCharacteristic::parseNemit() {
   static userParameters _oldParams;
   static RuntimeParameters _oldRTParams;
 
-  if (userConfig->getAutoUpdate() != _oldParams.getAutoUpdate()) {
-    _oldParams.setAutoUpdate(userConfig->getAutoUpdate());
-    BLE_ss2kCustomCharacteristic::notify(BLE_autoUpdate);
-    return;  // only do one at a time because immediate update isn't super important for these values
-  }
-
   if (strcmp(userConfig->getFirmwareUpdateURL(), _oldParams.getFirmwareUpdateURL()) != 0) {
     _oldParams.setFirmwareUpdateURL(userConfig->getFirmwareUpdateURL());
     BLE_ss2kCustomCharacteristic::notify(BLE_firmwareUpdateURL);

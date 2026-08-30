@@ -7,9 +7,6 @@
 
 #pragma once
 
-// Update firmware on boot?
-#define AUTO_FIRMWARE_UPDATE true
-
 // Default Bluetooth WiFi and MDNS Name
 const char* const DEVICE_NAME = "SmartSpin2k";
 
