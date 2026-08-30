@@ -13,6 +13,7 @@
 #include "BLE_Definitions.h"
 #include "CustomCharacteristicProtocol.h"
 #include "DirConUUIDCodec.h"
+#include "ScanResultProtocol.h"
 #include "Zwift_Protocol_Messages.h"
 #include "sensors/CscSensorData.h"
 #include "sensors/FitnessMachineIndoorBikeData.h"
@@ -81,7 +82,7 @@ void TestBleWireRoundTrip::test_dircon_uuid_round_trip(void) {
 void TestBleWireRoundTrip::test_all_custom_characteristic_formats(void) {
   unsigned formatCounts[CustomUnknown + 1] = {0};
 
-  for (uint8_t id = BLE_firmwareUpdateURL; id <= BLE_allSettings; ++id) {
+  for (uint8_t id = BLE_firmwareUpdateURL; id <= BLE_scanResults; ++id) {
     const CustomCharacteristicValueFormat format = customCharacteristicValueFormat(id);
     TEST_ASSERT_NOT_EQUAL_MESSAGE(CustomUnknown, format, "custom characteristic is missing a wire format");
     ++formatCounts[format];
@@ -127,6 +128,17 @@ void TestBleWireRoundTrip::test_all_custom_characteristic_formats(void) {
         TEST_ASSERT_EQUAL_UINT16(513, get_le16(&header[5]));
         break;
       }
+      case CustomScanResultStream: {
+        const std::vector<uint8_t> body = ScanResultProtocol::makeDeviceBody("0x1818", "Power Meter");
+        const std::vector<uint8_t> packet = ScanResultProtocol::makePacket(ScanResultProtocol::Event::Device, 0x1234, 0x5678, 0, 1, body.data(), body.size());
+        TEST_ASSERT_EQUAL_UINT8(BLE_scanResults, packet[1]);
+        TEST_ASSERT_EQUAL_UINT8(ScanResultProtocol::VERSION, packet[2]);
+        TEST_ASSERT_EQUAL_UINT8(static_cast<uint8_t>(ScanResultProtocol::Event::Device), packet[3]);
+        TEST_ASSERT_EQUAL_UINT16(0x1234, get_le16(&packet[4]));
+        TEST_ASSERT_EQUAL_UINT16(0x5678, get_le16(&packet[6]));
+        TEST_ASSERT_EQUAL_UINT8(6, packet[ScanResultProtocol::HEADER_LENGTH]);
+        break;
+      }
       case CustomBooleanWriteStringRead: {
         const uint8_t enabled = 1;
         const char logMessage[] = "log payload";
@@ -151,6 +163,7 @@ void TestBleWireRoundTrip::test_all_custom_characteristic_formats(void) {
   TEST_ASSERT_EQUAL_UINT(9, formatCounts[CustomString]);
   TEST_ASSERT_EQUAL_UINT(1, formatCounts[CustomPowerTableRow]);
   TEST_ASSERT_EQUAL_UINT(1, formatCounts[CustomSettingsSnapshot]);
+  TEST_ASSERT_EQUAL_UINT(1, formatCounts[CustomScanResultStream]);
   TEST_ASSERT_EQUAL_UINT(1, formatCounts[CustomBooleanWriteStringRead]);
 }
 

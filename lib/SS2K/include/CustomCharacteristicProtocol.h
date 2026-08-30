@@ -66,6 +66,7 @@ static const uint8_t BLE_UDPLogging            = 0x2E;
 static const uint8_t BLE_hardwareVersion       = 0x2F;
 static const uint8_t BLE_BLELogging            = 0x30;
 static const uint8_t BLE_allSettings           = 0x31;
+static const uint8_t BLE_scanResults           = 0x32;
 
 enum CustomCharacteristicValueFormat : uint8_t {
   CustomAction,
@@ -76,6 +77,7 @@ enum CustomCharacteristicValueFormat : uint8_t {
   CustomString,
   CustomPowerTableRow,
   CustomSettingsSnapshot,
+  CustomScanResultStream,
   CustomBooleanWriteStringRead,
   CustomUnknown
 };
@@ -137,7 +139,7 @@ inline CustomCharacteristicValueFormat customCharacteristicValueFormat(uint8_t i
     case BLE_powerTableData: return CustomPowerTableRow;
     case BLE_BLELogging: return CustomBooleanWriteStringRead;
     case BLE_allSettings: return CustomSettingsSnapshot;
+    case BLE_scanResults: return CustomScanResultStream;
     default: return CustomUnknown;
   }
 }
-

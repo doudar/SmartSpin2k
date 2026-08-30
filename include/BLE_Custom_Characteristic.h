@@ -19,6 +19,9 @@ class BLE_ss2kCustomCharacteristic {
   static void process(std::string rxValue, uint16_t connHandle = BLE_HS_CONN_HANDLE_NONE, uint16_t mtu = 23, bool indicateResponse = true);
   // Custom Characteristic value that needs to be notified
   static void notify(char _item, int tableRow = -1);
+  static void beginScanResults();
+  static void notifyScanResult(const String& name, const NimBLEUUID& serviceUuid);
+  static void endScanResults();
   // Notify any changed value in userConfig
   static void parseNemit();
 

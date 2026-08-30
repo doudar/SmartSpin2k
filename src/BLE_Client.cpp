@@ -14,6 +14,7 @@
 
 #include <ArduinoJson.h>
 #include <Constants.h>
+#include <BLE_Custom_Characteristic.h>
 #include <memory>
 #include <NimBLEDevice.h>
 
@@ -23,6 +24,13 @@ SpinBLEClient spinBLEClient;
 
 static MyClientCallback myClientCallback;
 static ScanCallbacks myScanCallbacks;
+
+namespace {
+// The legacy characteristic is a single ATT value and can never carry an
+// unbounded scan. Keep a small snapshot for old config-app releases while the
+// versioned scan-result stream carries every device to current releases.
+constexpr size_t LEGACY_FOUND_DEVICES_MAX_LENGTH = 480;
+}
 
 void SpinBLEClient::start() {
   // Create the task for the BLE Client loop
@@ -419,6 +427,9 @@ void ScanCallbacks::onResult(const NimBLEAdvertisedDevice* advertisedDevice) {
     }
     SS2K_LOG(BLE_CLIENT_LOG_TAG, "Found device %s with %s", aDevName.c_str(), servicesStr.c_str());
     if (serviceInfo) {
+      const NimBLEUUID& primaryServiceUUID = advertisedDevice->isAdvertisingService(FITNESSMACHINESERVICE_UUID) ? FITNESSMACHINESERVICE_UUID : serviceInfo->serviceUUID;
+      BLE_ss2kCustomCharacteristic::notifyScanResult(aDevName, primaryServiceUUID);
+
       // Add device to foundDevices list
       JsonDocument devices;
       const char* foundDevicesJson = userConfig->getFoundDevices();
@@ -446,11 +457,12 @@ void ScanCallbacks::onResult(const NimBLEAdvertisedDevice* advertisedDevice) {
         }
         String output;
         serializeJson(devices, output);
-        userConfig->setFoundDevices(output);
+        if (output.length() <= LEGACY_FOUND_DEVICES_MAX_LENGTH) {
+          userConfig->setFoundDevices(output);
+        }
       }
 
       SS2K_LOG(BLE_CLIENT_LOG_TAG, "Supported Device: %s with service %s", aDevName.c_str(), serviceInfo->name.c_str());
-      const NimBLEUUID& primaryServiceUUID = serviceInfo->serviceUUID;
       // check to see if we're already connected to this device
       for (size_t i = 0; i < NUM_BLE_DEVICES; i++) {
         if (spinBLEClient.myBLEDevices[i].advertisedDevice != nullptr) {
@@ -563,7 +575,10 @@ void SpinBLEClient::scanProcess(int duration) {
   this->doScan = false;  // Confirming we started the requested scan.
 
   SS2K_LOG(BLE_CLIENT_LOG_TAG, "Scanning for BLE servers and putting them into a list...");
+  userConfig->setFoundDevices("{}");
+  BLE_ss2kCustomCharacteristic::beginScanResults();
   if (!pBLEScan->start(duration, false, true)) {
+    BLE_ss2kCustomCharacteristic::endScanResults();
     this->doScan = true;
     SS2K_LOGE(BLE_CLIENT_LOG_TAG, "Unable to start BLE scan");
   }
@@ -571,6 +586,7 @@ void SpinBLEClient::scanProcess(int duration) {
 
 void ScanCallbacks::onScanEnd(const NimBLEScanResults& results, int reason) {
   SS2K_LOG(BLE_CLIENT_LOG_TAG, "Scan Ended");
+  BLE_ss2kCustomCharacteristic::endScanResults();
 }
 
 // remove the last connected BLE Power Meter

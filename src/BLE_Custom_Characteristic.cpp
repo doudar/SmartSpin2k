@@ -91,6 +91,7 @@ This characteristic allows for reading and writing various user configuration pa
 #include "BleAppender.h"
 #include "DirConManager.h"
 #include "ByteUtils.h"
+#include "ScanResultProtocol.h"
 #include <algorithm>
 #include <vector>
 
@@ -115,9 +116,53 @@ struct SettingsSnapshotTransfer {
 
 SettingsSnapshotTransfer settingsSnapshot;
 SettingsSnapshotTransfer dirConSettingsSnapshot;
+uint16_t scanResultId       = 0;
+uint16_t scanResultSequence = 0;
 
 void resetSettingsSnapshot() {
   settingsSnapshot = SettingsSnapshotTransfer();
+}
+
+void sendScanResultPayload(ScanResultProtocol::Event event, uint16_t sequence, const std::vector<uint8_t>& payload = {}) {
+  NimBLEServer* server = NimBLEDevice::getServer();
+  if (server == nullptr) return;
+  NimBLEService* service = server->getServiceByUUID(SMARTSPIN2K_SERVICE_UUID);
+  if (service == nullptr) return;
+  NimBLECharacteristic* characteristic = service->getCharacteristic(SMARTSPIN2K_CHARACTERISTIC_UUID);
+  if (characteristic == nullptr) return;
+
+  // Fragment independently for every BLE peer because negotiated MTUs can
+  // differ. This keeps even the 23-byte minimum MTU valid without retaining a
+  // scan-wide JSON document in firmware memory.
+  for (const uint16_t connHandle : server->getPeerDevices()) {
+    const uint16_t mtu       = server->getPeerMTU(connHandle);
+    const size_t attPayload  = mtu > 3 ? mtu - 3 : 20;
+    const size_t fragmentMax = attPayload > ScanResultProtocol::HEADER_LENGTH ? attPayload - ScanResultProtocol::HEADER_LENGTH : 1;
+    const size_t fragmentCountSize = payload.empty() ? 1 : (payload.size() + fragmentMax - 1) / fragmentMax;
+    if (fragmentCountSize > UINT8_MAX) {
+      SS2K_LOGE(CUSTOM_CHAR_LOG_TAG, "Scan result %u requires too many fragments", static_cast<unsigned>(sequence));
+      continue;
+    }
+
+    const uint8_t fragmentCount = static_cast<uint8_t>(fragmentCountSize);
+    for (uint8_t fragment = 0; fragment < fragmentCount; ++fragment) {
+      const size_t offset = fragment * fragmentMax;
+      const size_t length = payload.empty() ? 0 : std::min(fragmentMax, payload.size() - offset);
+      std::vector<uint8_t> packet = ScanResultProtocol::makePacket(event, scanResultId, sequence, fragment, fragmentCount,
+                                                                   length == 0 ? nullptr : payload.data() + offset, length);
+      if (!characteristic->notify(packet.data(), packet.size(), connHandle)) {
+        SS2K_LOGW(CUSTOM_CHAR_LOG_TAG, "Failed to send scan result %u fragment %u/%u", static_cast<unsigned>(sequence),
+                  static_cast<unsigned>(fragment + 1), static_cast<unsigned>(fragmentCount));
+        break;
+      }
+    }
+  }
+
+  // DirCon is a framed TCP transport and does not need ATT fragmentation.
+  if (payload.size() <= UINT8_MAX) {
+    std::vector<uint8_t> packet = ScanResultProtocol::makePacket(event, scanResultId, sequence, 0, 1, payload.data(), payload.size());
+    DirConManager::notifyCharacteristic(service->getUUID(), characteristic->getUUID(), packet.data(), packet.size());
+  }
 }
 
 std::vector<uint8_t> makeSettingsSnapshotChunk(SettingsSnapshotTransfer& snapshot) {
@@ -313,6 +358,22 @@ void BLE_ss2kCustomCharacteristic::notify(char _item, int tableRow) {
   NimBLEAttValue value = characteristic->getValue();
   DirConManager::notifyCharacteristic(service->getUUID(), characteristic->getUUID(), value.data(), value.size());
 }
+
+void BLE_ss2kCustomCharacteristic::beginScanResults() {
+  ++scanResultId;
+  if (scanResultId == 0) ++scanResultId;
+  scanResultSequence = 0;
+  sendScanResultPayload(ScanResultProtocol::Event::Begin, 0);
+}
+
+void BLE_ss2kCustomCharacteristic::notifyScanResult(const String& name, const NimBLEUUID& serviceUuid) {
+  const std::string uuid = serviceUuid.toString();
+  const std::vector<uint8_t> body = ScanResultProtocol::makeDeviceBody(uuid, std::string(name.c_str(), name.length()));
+  sendScanResultPayload(ScanResultProtocol::Event::Device, scanResultSequence, body);
+  ++scanResultSequence;
+}
+
+void BLE_ss2kCustomCharacteristic::endScanResults() { sendScanResultPayload(ScanResultProtocol::Event::End, scanResultSequence); }
 
 void BLE_ss2kCustomCharacteristic::process(std::string rxValue, uint16_t connHandle, uint16_t mtu, bool indicateResponse) {
   // Find the Characteristic

@@ -245,6 +245,7 @@ Key functions:
 
 - `SpinBLEClient::start()`: creates BLE client task and configures scanning.
 - `ScanCallbacks::onResult()`: filters supported devices, updates `foundDevices`, sets slots to connect when user config matches.
+- Scan results for current config apps are streamed one device at a time on custom-characteristic ID `0x32`, with begin/device/end records and per-peer MTU fragmentation. The legacy `foundDevices` JSON remains capped at 480 bytes for older apps; do not make it unbounded again.
 - `SpinBLEClient::connectToServer()`: creates fresh BLE client, connects, sets slot state, removes duplicates.
 - `subscribeToAllNotifications()`: subscribes to notify/indicate characteristics for supported services.
 - `SpinBLEClient::postConnect()`: completes service subscriptions, reads FTMS resistance range, starts FTMS training where needed, drains notification queues. Notification setup discovers only the characteristics the firmware consumes so large remote GATT tables do not exhaust the classic ESP32 heap. HID is the exception because remotes can expose multiple Report characteristics with the same UUID.
