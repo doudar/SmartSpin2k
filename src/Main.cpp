@@ -239,7 +239,8 @@ void SS2K::finishSetup() {
   }
 #endif
 
-  // Refresh or repair the web filesystem before BLE and HTTP setup add network traffic.
+  // Finish WiFi and web filesystem repair before BLE and network services add
+  // their runtime memory and traffic load.
   startWifi();
   httpServer.syncWebServerFiles();
 
@@ -272,12 +273,11 @@ void SS2K::finishSetup() {
   ss2k->startTasks();
   httpServer.start();
 
-  // Start DirCon TCP server for direct control over the bike trainer
   SS2K_LOG(MAIN_LOG_TAG, "Starting DirCon TCP service");
   if (DirConManager::start()) {
     SS2K_LOG(MAIN_LOG_TAG, "DirCon TCP service started successfully");
   } else {
-    SS2K_LOG(MAIN_LOG_TAG, "Failed to start DirCon TCP service");
+    SS2K_LOGE(MAIN_LOG_TAG, "Failed to start DirCon TCP service");
   }
 
 #ifdef TEST_PTAB4PWR
@@ -620,7 +620,11 @@ void SS2K::restartWifi() {
   stopWifi();
   delay(100);
   startWifi();
+  refreshBLEAdvertisementIp();
   httpServer.start();
+  if (!DirConManager::start()) {
+    SS2K_LOGE(MAIN_LOG_TAG, "Failed to restart DirCon TCP service");
+  }
 }
 
 void SS2K::handleShiftButtons() {

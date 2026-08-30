@@ -108,6 +108,7 @@ extern SpinBLEServer spinBLEServer;
 // extern BLE_Wattbike_Service wattbikeService;
 
 void startBLEServer();
+void refreshBLEAdvertisementIp();
 void logCharacteristic(char* buffer, const size_t bufferCapacity, const byte* data, const size_t dataLength, const NimBLEUUID serviceUUID, const NimBLEUUID charUUID,
                        const char* format, ...);
 void calculateInstPwrFromHR();

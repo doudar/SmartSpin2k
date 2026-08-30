@@ -42,6 +42,7 @@ PlatformIO is the expected entry point.
 S3 firmware and filesystem builds use `S3firmware.bin` and `S3littlefs.bin` as their native PlatformIO output/upload names. They also create `S3partitions.bin` and `S3bootloader.bin` copies for releases; the generic partition and bootloader intermediates remain because PlatformIO's flash uploader depends on those names.
 The GitHub release archive includes firmware, merged factory, LittleFS, partition-table, and bootloader binaries for both classic ESP32 and ESP32-S3 targets.
 GitHub Actions exports `SS2K_FIRMWARE_VERSION` from the date-based release tag before invoking PlatformIO. `git_tag_macro.py` requires that override in Actions so published firmware never receives a `git describe` commit suffix; local builds retain branch/commit version details.
+The release workflow runs `cert_updater.py` once before firmware builds. Local PlatformIO builds use the checked-in `include/cert.h` and do not perform network-dependent certificate updates.
 
 Filesystem builds stage deterministic gzip copies of every HTML/CSS source file under the environment build directory. They also refresh the checked-in `.gz` companions and `list.json` in `data/` or `data_s3/`, which are consumed by repository-based automatic OTA updates.
 
@@ -96,7 +97,7 @@ Boot sequence:
 3. Start stepper serial and optional aux serial for Peloton.
 4. Mount LittleFS.
 5. Load and re-save `userConfig`.
-6. Start WiFi and run firmware update check.
+6. Complete WiFi station connection or AP fallback, synchronize the clock when online, and repair missing web files before starting BLE.
 7. Configure GPIO pins.
 8. Initialize LED state; commanded-reboot quiet mode uses RTC memory so true power cycles still show startup blink behavior.
 9. Configure TMC/FastAccelStepper via `SS2K::setupTMCStepperDriver()`.
@@ -246,7 +247,7 @@ Key functions:
 - `ScanCallbacks::onResult()`: filters supported devices, updates `foundDevices`, sets slots to connect when user config matches.
 - `SpinBLEClient::connectToServer()`: creates fresh BLE client, connects, sets slot state, removes duplicates.
 - `subscribeToAllNotifications()`: subscribes to notify/indicate characteristics for supported services.
-- `SpinBLEClient::postConnect()`: completes service subscriptions, reads FTMS resistance range, starts FTMS training where needed, drains notification queues.
+- `SpinBLEClient::postConnect()`: completes service subscriptions, reads FTMS resistance range, starts FTMS training where needed, drains notification queues. Notification setup discovers only the characteristics the firmware consumes so large remote GATT tables do not exhaust the classic ESP32 heap. HID is the exception because remotes can expose multiple Report characteristics with the same UUID.
 - `SpinBLEClient::checkBLEReconnect()`: sets `doScan` when configured devices are missing.
 - `SpinBLEClient::adevName2UniqueName()`: stable names for saved device preferences. Public/static random addresses get address suffix; private random addresses prefer manufacturer-data suffix or base name.
 
@@ -293,6 +294,7 @@ Primary files: `src/BLE_Server.cpp`, `src/BLE_Fitness_Machine_Service.cpp`, serv
 
 The primary BLE advertisement carries the current WiFi IPv4 address in versioned SmartSpin2k manufacturer data.
 The device name and 128-bit SmartSpin2k service UUID are kept in the scan response to stay within the legacy advertisement size limit.
+IP changes rebuild the complete advertisement and scan-response payloads before advertising restarts; NimBLE's manufacturer-data setter appends fields and must not be used alone to replace the previous IP.
 
 Zwift/OpenBikeControl services exist but are currently commented out in regular BLE advertising/setup; DirCon and the source files still matter.
 
@@ -496,6 +498,7 @@ DirCon exposes BLE-like services over TCP:
 
 DirCon uses static buffers and fixed client/subscription arrays. Be cautious with dynamic allocation and payload sizes.
 Outbound DirCon frames use bounded per-client queues and are drained with non-blocking socket sends only from `DirConManager::update()`. Keep responses and notifications on that path so slow or vanished TCP peers cannot block firmware tasks or interleave frames.
+DirCon notification broadcasts check for an active subscribed recipient before encoding, avoiding unnecessary dynamic allocations during BLE scans.
 
 ## HTTP/Web UI
 
@@ -504,10 +507,12 @@ Primary files: `src/HTTP_Server_Basic.cpp`, `include/HTTP_Server_Basic.h`, `data
 Responsibilities:
 
 - Start/stop WiFi (`startWifi()`, `stopWifi()`).
+- WiFi startup is deliberately linear: wait for the configured station up to the connection timeout, fall back to AP mode if needed, and only then continue firmware initialization.
 - Serve LittleFS web assets and built-in OTA pages.
-- Boot-time `HTTP_Server::syncWebServerFiles()` refreshes outdated web assets and restores individual missing manifest files; it does not update firmware.
+- Before BLE starts, boot checks the local `list.json`. If every listed asset exists, no TLS connection is created. `HTTP_Server::syncWebServerFiles()` is repair-only and runs synchronously when the local manifest is missing/invalid or a listed asset is absent and station internet is available.
 - Browser-uploaded firmware uses the low-level ESP-IDF OTA API, and filesystem images stream directly to the LittleFS partition with sector-at-a-time erases. Neither path uses Arduino `Update` or its 4 KiB heap allocation on memory-constrained classic ESP32 builds. Filesystem uploads must exactly match the partition size; arbitrary file uploads are rejected.
-- Automatic filesystem updates treat remote `list.json` as an allowlist, preserve config/power-table/recovery metadata, and store the installed filesystem release version in NVS.
+- Web filesystem repair fetches the remote `list.json`, downloads only missing assets, and installs the fetched manifest only after repair succeeds. It never performs boot-time version upgrades or prunes existing files.
+- Downloads use bounded HTTP/TLS timeouts and temporary files so partial assets are never served. Repair completes before BLE allocation/scanning, avoiding their peak internal-RAM loads overlapping on classic ESP32.
 - Settings JSON/API behavior through `settingsProcessor()`.
 - Periodic web client update through `webClientUpdate()`.
 - BLE scanner page support.

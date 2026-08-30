@@ -62,7 +62,7 @@ std::string bleAdvertisementName(const char* deviceName) {
   return name;
 }
 
-void addIpAddressToAdvertisement(NimBLEAdvertising* advertising) {
+bool addIpAddressToAdvertisement(NimBLEAdvertising* advertising) {
   IPAddress ipAddress = WiFi.status() == WL_CONNECTED ? WiFi.localIP() : WiFi.softAPIP();
   const uint8_t manufacturerData[] = {
       0xff, 0xff,  // Reserved Bluetooth SIG company identifier for development/testing.
@@ -73,9 +73,45 @@ void addIpAddressToAdvertisement(NimBLEAdvertising* advertising) {
 
   if (advertising->setManufacturerData(manufacturerData, sizeof(manufacturerData))) {
     SS2K_LOG(BLE_SERVER_LOG_TAG, "Advertising WiFi IP address %s", ipAddress.toString().c_str());
+    return true;
   } else {
     SS2K_LOGW(BLE_SERVER_LOG_TAG, "Unable to fit WiFi IP address in BLE advertisement data");
+    return false;
   }
+}
+
+bool configureBLEAdvertisement(NimBLEAdvertising* advertising) {
+  // NimBLEAdvertising::setManufacturerData() appends rather than replaces an
+  // existing field. Rebuild both payloads so an IP refresh cannot retain the
+  // original 0.0.0.0 manufacturer data or overflow the 31-byte advertisement.
+  advertising->clearData();
+  advertising->enableScanResponse(true);
+  advertising->addServiceUUID(CYCLINGPOWERSERVICE_UUID);
+  advertising->addServiceUUID(CSCSERVICE_UUID);
+  // Garmin watches won't connect if HR is advertised.
+  // advertising->addServiceUUID(HEARTSERVICE_UUID);
+  // Most apps look for FTMS to recognize the device as a smart trainer.
+  advertising->addServiceUUID(FITNESSMACHINESERVICE_UUID);
+  advertising->setAppearance(0x0484);  // Cycling Power Sensor.
+  if (!addIpAddressToAdvertisement(advertising)) return false;
+
+  NimBLEAdvertisementData scanResponseData;
+  const std::string advertisedName = bleAdvertisementName(userConfig->getDeviceName());
+  if (advertisedName.size() < std::strlen(userConfig->getDeviceName())) {
+    scanResponseData.setShortName(advertisedName);
+    SS2K_LOGW(BLE_SERVER_LOG_TAG, "BLE device name shortened to '%s' to fit scan response", advertisedName.c_str());
+  } else {
+    scanResponseData.setName(advertisedName);
+  }
+  scanResponseData.setCompleteServices(SMARTSPIN2K_SERVICE_UUID);
+  if (!advertising->setScanResponseData(scanResponseData)) {
+    SS2K_LOGE(BLE_SERVER_LOG_TAG, "Unable to configure BLE scan response data");
+    return false;
+  }
+
+  advertising->setMaxInterval(250);
+  advertising->setMinInterval(160);
+  return true;
 }
 }  // namespace
 
@@ -96,9 +132,6 @@ void startBLEServer() {
 
   // start services
   BLEAdvertising* pAdvertising = BLEDevice::getAdvertising();
-  pAdvertising->enableScanResponse(true);
-  NimBLEAdvertisementData oScanResponseData;
-  std::vector<NimBLEUUID> oServiceUUIDs;
   cyclingSpeedCadenceService.setupService(spinBLEServer.pServer, &chrCallbacks);
   cyclingPowerService.setupService(spinBLEServer.pServer, &chrCallbacks);
   heartService.setupService(spinBLEServer.pServer, &chrCallbacks);
@@ -107,29 +140,12 @@ void startBLEServer() {
   deviceInformationService.setupService(spinBLEServer.pServer);
   // zwiftService.setupService(spinBLEServer.pServer);
   // openBikeControlService.setupService(spinBLEServer.pServer);
-  pAdvertising->addServiceUUID(CYCLINGPOWERSERVICE_UUID);
-  pAdvertising->addServiceUUID(CSCSERVICE_UUID);
-  // Garmin watches won't connect if HR is advertised. 
-  // pAdvertising->addServiceUUID(HEARTSERVICE_UUID);
-  // Most apps look for the fitness machine service UUID to recognize the device as a smart trainer.
-  pAdvertising->addServiceUUID(FITNESSMACHINESERVICE_UUID);
   // uncoment to enable as controller. Zwift won't pair as ct and controller at the same time.
   // pAdvertising->addServiceUUID(ZWIFT_RIDE_CUSTOM_SERVICE_UUID);
   // pAdvertising->addServiceUUID(OPENBIKECONTROL_SERVICE_UUID);
-  // Garmin devices need this in the primary advertisement to recognize the device as a cycling power sensor.
-  pAdvertising->setAppearance(0x0484);  // Cycling Power Sensor, per https://www.bluetooth.com/specifications/assigned-numbers/generic-access-profile/
-  // Keep the name and 128-bit SmartSpin2k UUID in the scan response. The primary
-  // advertisement uses the space previously occupied by the duplicate name for the IP address.
-  addIpAddressToAdvertisement(pAdvertising);
-  const std::string advertisedName = bleAdvertisementName(userConfig->getDeviceName());
-  if (advertisedName.size() < std::strlen(userConfig->getDeviceName())) {
-    oScanResponseData.setShortName(advertisedName);
-    SS2K_LOGW(BLE_SERVER_LOG_TAG, "BLE device name shortened to '%s' to fit scan response", advertisedName.c_str());
-  } else {
-    oScanResponseData.setName(advertisedName);
+  if (!configureBLEAdvertisement(pAdvertising)) {
+    SS2K_LOGE(BLE_SERVER_LOG_TAG, "Unable to configure BLE advertisement data");
   }
-  oScanResponseData.setCompleteServices(SMARTSPIN2K_SERVICE_UUID);
-  pAdvertising->setScanResponseData(oScanResponseData);
 
   // wattbikeService.setupService(spinBLEServer.pServer);  // No callback needed
   // sb20Service.begin();
@@ -137,11 +153,29 @@ void startBLEServer() {
 
   // const std::string fitnessData = {0b00000001, 0b00100000, 0b00000000};
   // pAdvertising->setServiceData(FITNESSMACHINESERVICE_UUID, fitnessData);
-  pAdvertising->setMaxInterval(250);
-  pAdvertising->setMinInterval(160);
   pAdvertising->start();
 
   SS2K_LOG(BLE_SERVER_LOG_TAG, "Bluetooth Characteristics defined!");
+}
+
+void refreshBLEAdvertisementIp() {
+  if (!NimBLEDevice::isInitialized()) {
+    SS2K_LOGW(BLE_SERVER_LOG_TAG, "BLE is not initialized; IP advertisement refresh deferred");
+    return;
+  }
+
+  NimBLEAdvertising* advertising = NimBLEDevice::getAdvertising();
+  const bool wasAdvertising      = advertising->isAdvertising();
+  if (wasAdvertising && !advertising->stop()) {
+    SS2K_LOGW(BLE_SERVER_LOG_TAG, "Unable to stop BLE advertising for IP address refresh");
+    return;
+  }
+  if (!configureBLEAdvertisement(advertising)) {
+    SS2K_LOGE(BLE_SERVER_LOG_TAG, "Unable to rebuild BLE advertisement with current IP address");
+  }
+  if (wasAdvertising && !advertising->start()) {
+    SS2K_LOGE(BLE_SERVER_LOG_TAG, "Unable to restart BLE advertising after IP address refresh");
+  }
 }
 
 void SpinBLEServer::update() {

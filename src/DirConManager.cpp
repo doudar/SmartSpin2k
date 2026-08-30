@@ -485,11 +485,6 @@ bool DirConManager::queueOutboundFrame(size_t clientIndex, const uint8_t* data, 
   if (clientIndex >= DIRCON_MAX_CLIENTS || data == nullptr || length == 0) {
     return false;
   }
-  if (length > DIRCON_SEND_BUFFER_SIZE) {
-    SS2K_LOG(DIRCON_LOG_TAG, "Cannot queue %u-byte frame for client %u; maximum is %u", static_cast<unsigned>(length), static_cast<unsigned>(clientIndex),
-             DIRCON_SEND_BUFFER_SIZE);
-    return false;
-  }
   if (xSemaphoreTake(s_outboundMutex, pdMS_TO_TICKS(10)) != pdTRUE) {
     SS2K_LOG(DIRCON_LOG_TAG, "Failed to acquire outbound queue mutex, dropping %s", notification ? "notification" : "response");
     return false;
@@ -508,6 +503,13 @@ bool DirConManager::queueOutboundFrame(size_t clientIndex, const uint8_t* data, 
   }
 
   if (clientActive[clientIndex] && subscriptionMatches) {
+    if (length > DIRCON_SEND_BUFFER_SIZE) {
+      SS2K_LOG(DIRCON_LOG_TAG, "Cannot queue %u-byte frame for client %u; maximum is %u", static_cast<unsigned>(length), static_cast<unsigned>(clientIndex),
+               DIRCON_SEND_BUFFER_SIZE);
+      xSemaphoreGive(s_outboundMutex);
+      return false;
+    }
+
     if (outbound.count >= DIRCON_OUTBOUND_QUEUE_DEPTH && !notification) {
       // Preserve command responses by evicting the newest notification that has not begun sending.
       for (size_t i = outbound.count; i > 0; i--) {
@@ -825,6 +827,27 @@ void DirConManager::notifyCharacteristic(const NimBLEUUID& serviceUuid, const Ni
 }
 
 void DirConManager::broadcastNotification(const NimBLEUUID& characteristicUuid, const uint8_t* data, size_t length, bool onlySubscribers) {
+  // Most characteristic updates have no DirCon recipient. Check before building
+  // the encoded frame so BLE scan callbacks do not compete with needless vector
+  // allocations on memory-constrained classic ESP32 devices.
+  bool hasRecipient = false;
+  xSemaphoreTake(s_outboundMutex, portMAX_DELAY);
+  for (size_t clientIndex = 0; clientIndex < DIRCON_MAX_CLIENTS && !hasRecipient; clientIndex++) {
+    if (!clientActive[clientIndex]) continue;
+    if (!onlySubscribers) {
+      hasRecipient = true;
+      break;
+    }
+    for (size_t subscriptionIndex = 0; subscriptionIndex < DIRCON_MAX_CHARACTERISTICS; subscriptionIndex++) {
+      if (clientSubscriptions[clientIndex][subscriptionIndex].active && clientSubscriptions[clientIndex][subscriptionIndex].uuid == characteristicUuid) {
+        hasRecipient = true;
+        break;
+      }
+    }
+  }
+  xSemaphoreGive(s_outboundMutex);
+  if (!hasRecipient) return;
+
   DirConMessage notification;  // stack-allocated, safe per-call
 
   notification.Request    = false;

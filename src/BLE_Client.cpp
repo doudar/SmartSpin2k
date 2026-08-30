@@ -72,14 +72,39 @@ static void notifyCB(NimBLERemoteCharacteristic* pBLERemoteCharacteristic, uint8
   }
 }
 
+static bool subscribeToCharacteristic(NimBLEClient* pClient, NimBLERemoteService* pSvc, const BLEServiceInfo& service, const NimBLEUUID& characteristicUUID) {
+  if (!pClient->isConnected()) {
+    return false;
+  }
+
+  // Ask NimBLE for only the characteristic we consume. Discovering every characteristic
+  // caches a heap object for each one and can exhaust the classic ESP32 heap on large GATT tables.
+  NimBLERemoteCharacteristic* pChr = pSvc->getCharacteristic(characteristicUUID);
+  if (!pChr) {
+    SS2K_LOG(BLE_CLIENT_LOG_TAG, "Characteristic %s not found in %s", characteristicUUID.toString().c_str(), service.name.c_str());
+    return false;
+  }
+
+  SS2K_LOG(BLE_CLIENT_LOG_TAG, "Found %s, %s", service.serviceUUID.toString().c_str(), pChr->getUUID().toString().c_str());
+  if (!pChr->canNotify() && !pChr->canIndicate()) {
+    SS2K_LOG(BLE_CLIENT_LOG_TAG, "%s %s does not support notifications or indications", service.name.c_str(), pChr->getUUID().toString().c_str());
+    return false;
+  }
+
+  const bool wantNotify = pChr->canNotify();
+  if (!pChr->subscribe(wantNotify, notifyCB)) {
+    SS2K_LOG(BLE_CLIENT_LOG_TAG, "Failed to subscribe to %s %s (handle %d)", service.name.c_str(), pChr->getUUID().toString().c_str(), pChr->getHandle());
+    return false;
+  }
+
+  SS2K_LOG(BLE_CLIENT_LOG_TAG, "Subscribed to %s %s handle: %d", service.name.c_str(), pChr->getUUID().toString().c_str(), pChr->getHandle());
+  return true;
+}
+
 /**
- * @brief Subscribes to all notifications for supported BLE services on the given client.
+ * @brief Subscribes to the notification characteristics consumed by SmartSpin2k.
  *
- * This function iterates through all supported BLE services and subscribes to notifications
- * for each characteristic that supports notifications or indications.
- *
- * @param pClient Pointer to the NimBLEClient object representing the BLE client.
- *                The client must be connected for the function to proceed.
+ * @param pClient Pointer to the connected NimBLE client.
  */
 bool subscribeToAllNotifications(NimBLEClient* pClient) {
   bool isSubscribed = false;
@@ -96,34 +121,20 @@ bool subscribeToAllNotifications(NimBLEClient* pClient) {
     NimBLERemoteService* pSvc = pClient->getService(service.serviceUUID);
     if (pSvc) {
       SS2K_LOG(BLE_CLIENT_LOG_TAG, "Found %s", service.name.c_str());
-      auto chars = pSvc->getCharacteristics(true);
-      for (auto* pChr : chars) {
-        if (!pChr) {
-          continue;
-        }
-        // Defensive: Ensure characteristic still belongs to this service (avoid stale pointer after service refresh)
-        if (pChr->getRemoteService() != pSvc) {
-          SS2K_LOGW(BLE_CLIENT_LOG_TAG, "Characteristic parent mismatch while subscribing %s", pChr->getUUID().toString().c_str());
-          continue;
-        }
-        if (!pClient->isConnected()) {
-          SS2K_LOGW(BLE_CLIENT_LOG_TAG, "Stopping subscription: client disconnected before subscribing to %s", pChr->getUUID().toString().c_str());
-          break;
-        }
-        SS2K_LOG(BLE_CLIENT_LOG_TAG, "Found %s, %s", service.serviceUUID.toString().c_str(), pChr->getUUID().toString().c_str());
-        if (pChr->canNotify() || pChr->canIndicate()) {
-          bool wantNotify = pChr->canNotify();
-          // Wrap subscribe in a try/catch-equivalent pattern: NimBLE doesn't throw, but we guard return status
-          if (wantNotify ? pChr->subscribe(true, notifyCB) : pChr->subscribe(false, notifyCB)) {
-            SS2K_LOG(BLE_CLIENT_LOG_TAG, "Subscribed to %s %s handle: %d", service.name.c_str(), pChr->getUUID().toString().c_str(), pChr->getHandle());
-            isSubscribed = true;
-          } else {
-            // Additional debug: check CCCD descriptor presence which subscribe() internally uses
-            NimBLERemoteDescriptor* cccd = pChr->getDescriptor(NimBLEUUID((uint16_t)0x2902));
-            SS2K_LOG(BLE_CLIENT_LOG_TAG, "Failed to subscribe to %s %s (handle %d, hasCCCD=%s)", service.name.c_str(), pChr->getUUID().toString().c_str(), pChr->getHandle(),
-                     cccd ? "Y" : "N");
-          }
-        }
+
+      // HID remotes may expose several Report characteristics with the same UUID. They
+      // are subscribed during connectBLE_HID(), where full discovery is intentional.
+      if (service.serviceUUID == HID_SERVICE_UUID) {
+        isSubscribed = true;
+        continue;
+      }
+
+      isSubscribed |= subscribeToCharacteristic(pClient, pSvc, service, service.characteristicUUID);
+
+      // FTMS control-point indications acknowledge commands sent later in postConnect().
+      // Status and training-status notifications are not consumed by this firmware.
+      if (service.serviceUUID == FITNESSMACHINESERVICE_UUID) {
+        isSubscribed |= subscribeToCharacteristic(pClient, pSvc, service, FITNESSMACHINECONTROLPOINT_UUID);
       }
     }
   }
@@ -537,8 +548,6 @@ void ScanCallbacks::onResult(const NimBLEAdvertisedDevice* advertisedDevice) {
  * @param duration The duration in seconds for which the scan should run
  */
 void SpinBLEClient::scanProcess(int duration) {
-  this->doScan = false;  // Confirming we did the scan
-
   NimBLEScan* pBLEScan = NimBLEDevice::getScan();
 
   static bool waitForOnScanEndToComplete = false;
@@ -551,8 +560,13 @@ void SpinBLEClient::scanProcess(int duration) {
     return;
   }
 
+  this->doScan = false;  // Confirming we started the requested scan.
+
   SS2K_LOG(BLE_CLIENT_LOG_TAG, "Scanning for BLE servers and putting them into a list...");
-  pBLEScan->start(duration, false, true);
+  if (!pBLEScan->start(duration, false, true)) {
+    this->doScan = true;
+    SS2K_LOGE(BLE_CLIENT_LOG_TAG, "Unable to start BLE scan");
+  }
 }
 
 void ScanCallbacks::onScanEnd(const NimBLEScanResults& results, int reason) {
@@ -846,8 +860,8 @@ void SpinBLEClient::connectBLE_HID(NimBLEClient* pClient) {
     // One real device reports 2 with the same UUID but
     // different handles. Using getCharacteristic() results
     // in subscribing to only one.
-    std::vector<NimBLERemoteCharacteristic*> charVector = pSvc->getCharacteristics(true);
-    for (auto& it : charVector) {
+    const std::vector<NimBLERemoteCharacteristic*>& charVector = pSvc->getCharacteristics(true);
+    for (auto* it : charVector) {
       if (it->getUUID() == NimBLEUUID(HID_REPORT_DATA_UUID)) {
         Serial.println(it->toString().c_str());
         if (it->canNotify()) {

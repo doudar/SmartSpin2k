@@ -23,7 +23,7 @@ class HTTP_Server {
   static void handleIndexFile();
   static void settingsProcessor();
   static void handleHrSlider();
-  static void syncWebServerFiles();
+  static bool syncWebServerFiles();
   
   static void webClientUpdate();
 

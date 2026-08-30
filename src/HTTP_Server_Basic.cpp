@@ -6,7 +6,6 @@
  */
 
 #include "Main.h"
-#include "Version_Converter.h"
 #include "Builtin_Pages.h"
 #include "HTTP_Server_Basic.h"
 #include "cert.h"
@@ -62,7 +61,6 @@ void writeStoredBuildVersion(const String& version) {
 namespace {
 const char* OTA_REC_NS     = "ota_recover";  // namespace
 const char* OTA_REC_KEY    = "ver";          // key storing last recovered firmware version
-const char* OTA_FS_VER_KEY = "fs_ver";     // key storing the installed web-filesystem version
 bool otaUploadRejected      = false;
 bool otaFilesystemUpload    = false;
 bool otaFirmwareUpdateBegun = false;
@@ -77,7 +75,10 @@ size_t otaFirmwareHeaderLength = 0;
 String otaUploadError;
 
 constexpr unsigned long NTP_SYNC_TIMEOUT_MS = 10000;
+constexpr time_t VALID_CLOCK_EPOCH           = 1609459200;  // 2021-01-01 UTC
 constexpr char LITTLEFS_PARTITION_LABEL[]    = "spiffs";
+
+bool networkServicesStarted = false;
 
 void abortFirmwareUpload() {
   if (otaFirmwareUpdateBegun) {
@@ -244,6 +245,8 @@ bool finishFilesystemUpload(size_t uploadedSize) {
 }
 
 bool beginHttpRequest(HTTPClient& request, NetworkClient& client, const String& url) {
+  request.setConnectTimeout(3000);
+  request.setTimeout(5000);
   if (request.begin(client, url)) return true;
   SS2K_LOGE(HTTP_SERVER_LOG_TAG, "Unable to initialize HTTP request for %s", url.c_str());
   return false;
@@ -270,22 +273,6 @@ String contentTypeForPath(String path) {
   return "application/octet-stream";
 }
 
-String getNVSFilesystemVersion() {
-  Preferences p;
-  if (!p.begin(OTA_REC_NS, true)) return "";
-  String version = p.getString(OTA_FS_VER_KEY, "");
-  p.end();
-  return version;
-}
-
-bool setNVSFilesystemVersion(const String& version) {
-  Preferences p;
-  if (!p.begin(OTA_REC_NS, false)) return false;
-  size_t length = p.putString(OTA_FS_VER_KEY, version);
-  p.end();
-  return length > 0;
-}
-
 bool manifestContains(const JsonArray& files, const String& filename) {
   for (JsonVariantConst entry : files) {
     String manifestName = "/" + entry.as<String>();
@@ -294,41 +281,22 @@ bool manifestContains(const JsonArray& files, const String& filename) {
   return false;
 }
 
-bool pruneFilesystem(const JsonArray& files) {
-  bool success = true;
-  while (true) {
-    File root = LittleFS.open("/");
-    if (!root || !root.isDirectory()) {
-      SS2K_LOG(HTTP_SERVER_LOG_TAG, "Failed to inspect filesystem before update");
-      return false;
-    }
+bool filesystemNeedsRepair() {
+  File manifest = LittleFS.open(DATA_FILELIST, FILE_READ);
+  if (!manifest) return true;
 
-    String staleName;
-    File entry = root.openNextFile();
-    while (entry) {
-      String filename = entry.name();
-      if (!filename.startsWith("/")) filename = "/" + filename;
-      bool preserved = filename == configFILENAME || filename == POWER_TABLE_FILENAME || filename == BUILD_VERSION_FILENAME;
-      if (!preserved && !manifestContains(files, filename)) {
-        staleName = filename;
-        entry.close();
-        break;
-      }
-      entry = root.openNextFile();
-    }
-    entry.close();
-    root.close();
+  JsonDocument doc;
+  DeserializationError error = deserializeJson(doc, manifest);
+  manifest.close();
+  if (error) return true;
 
-    if (staleName.isEmpty()) break;
-    if (LittleFS.remove(staleName)) {
-      SS2K_LOG(HTTP_SERVER_LOG_TAG, "Removed stale filesystem file: %s", staleName.c_str());
-    } else {
-      SS2K_LOG(HTTP_SERVER_LOG_TAG, "Failed to remove stale filesystem file: %s", staleName.c_str());
-      success = false;
-      break;
-    }
+  JsonArray files = doc.as<JsonArray>();
+  if (files.isNull() || (!manifestContains(files, "/index.html.gz") && !manifestContains(files, "/index.html"))) return true;
+
+  for (JsonVariantConst entry : files) {
+    if (!LittleFS.exists("/" + entry.as<String>())) return true;
   }
-  return success;
+  return false;
 }
 
 String getNVSRecoveryVersion() {
@@ -370,13 +338,44 @@ void _APSetup() {
   // WiFi.setHostname(userConfig->getDeviceName());
   WiFi.softAPsetHostname(userConfig->getDeviceName());
   WiFi.enableAP(true);
-  delay(500);  // Micro controller requires some time to reset the mode
+  delay(500);
 }
+
+namespace {
+void stopNetworkServices() {
+  dnsServer.stop();
+  DirConManager::stop();
+  if (networkServicesStarted) {
+    MDNS.end();
+    networkServicesStarted = false;
+  }
+}
+
+void startNetworkServices() {
+  if (networkServicesStarted) return;
+
+  if (!MDNS.begin(userConfig->getDeviceName())) {
+    SS2K_LOGE(HTTP_SERVER_LOG_TAG, "Error setting up MDNS responder");
+  } else {
+    MDNS.addService("http", "_tcp", 80);
+    MDNS.addServiceTxt("http", "_tcp", "lf", "0");
+    networkServicesStarted = true;
+  }
+}
+
+void logNetworkReady(const char* mode) {
+  SS2K_LOG(HTTP_SERVER_LOG_TAG, "%s ready, IP address: %s", mode, myIP.toString().c_str());
+  SS2K_LOG(HTTP_SERVER_LOG_TAG, "Open http://%s.local/", userConfig->getDeviceName());
+}
+}  // namespace
 
 // ********************************WIFI Setup*************************
 void startWifi() {
-  int i = 0;
-  
+  int connectionAttempts = 0;
+
+  stopNetworkServices();
+  httpServer.internetConnection = false;
+
   // Check build version for OTA WiFi issue handling
   String storedVersion = readStoredBuildVersion();
   String currentVersion = FIRMWARE_VERSION;
@@ -415,93 +414,72 @@ void startWifi() {
     }
   }
 
-  // Trying Station mode first:
+  // Complete WiFi setup before starting web-file repair, BLE, HTTP, or DirCon.
   if (strcmp(userConfig->getSsid(), DEVICE_NAME) != 0) {
     SS2K_LOG(HTTP_SERVER_LOG_TAG, "Connecting to: %s", userConfig->getSsid());
     _staSetup();
-    while (WiFi.status() != WL_CONNECTED) {
+    while (WiFi.status() != WL_CONNECTED && connectionAttempts < WIFI_CONNECT_TIMEOUT) {
       delay(1000);
-      SS2K_LOG(HTTP_SERVER_LOG_TAG, "Waiting for connection to be established...");
-      i++;
-      if (i > WIFI_CONNECT_TIMEOUT) {
-        SS2K_LOG(HTTP_SERVER_LOG_TAG, "Couldn't Connect. Switching to AP mode");
-        WiFi.disconnect(true, true);
-        WiFi.setAutoReconnect(false);
-        WiFi.mode(WIFI_MODE_NULL);
-        delay(1000);
-        break;
-      }
+      connectionAttempts++;
+      SS2K_LOG(HTTP_SERVER_LOG_TAG, "Waiting for WiFi connection (%d/%d)", connectionAttempts, WIFI_CONNECT_TIMEOUT);
+    }
+
+    if (WiFi.status() != WL_CONNECTED) {
+      SS2K_LOGW(HTTP_SERVER_LOG_TAG, "WiFi connection timed out; switching to AP mode");
+      WiFi.disconnect(true, false);
+      WiFi.setAutoReconnect(false);
+      WiFi.mode(WIFI_MODE_NULL);
+      delay(1000);
     }
   }
 
-  // Did we connect in STA mode?
   if (WiFi.status() == WL_CONNECTED) {
-    myIP                          = WiFi.localIP();
+    myIP                           = WiFi.localIP();
     httpServer.internetConnection = true;
-  }
-
-  // Couldn't connect to existing network, Create SoftAP
-  if (WiFi.status() != WL_CONNECTED) {
-    SS2K_LOG(HTTP_SERVER_LOG_TAG, "Starting AP Mode");
+    logNetworkReady("WiFi station");
+  } else {
     _APSetup();
-    if (strcmp(userConfig->getSsid(), DEVICE_NAME) == 0) {
-      // If default SSID is still in use, let the user select a new password.
-      // Else fall back to the default password.
-      WiFi.softAP(userConfig->getDeviceName(), userConfig->getPassword());
-      SS2K_LOG(HTTP_SERVER_LOG_TAG, "Using Stored Password");
-    } else {
-      SS2K_LOG(HTTP_SERVER_LOG_TAG, "Using Default Password");
-      WiFi.softAP(userConfig->getDeviceName(), DEFAULT_PASSWORD);
+    const bool usingStoredPassword = strcmp(userConfig->getSsid(), DEVICE_NAME) == 0;
+    const char* password            = usingStoredPassword ? userConfig->getPassword() : DEFAULT_PASSWORD;
+    SS2K_LOG(HTTP_SERVER_LOG_TAG, "Starting AP mode with %s password", usingStoredPassword ? "stored" : "default");
+    if (!WiFi.softAP(userConfig->getDeviceName(), password)) {
+      SS2K_LOGE(HTTP_SERVER_LOG_TAG, "Unable to start WiFi access point");
     }
+
     delay(50);
     myIP = WiFi.softAPIP();
-    /* Setup the DNS server redirecting all the domains to the apIP */
     dnsServer.setErrorReplyCode(DNSReplyCode::NoError);
     dnsServer.start(DNS_PORT, "*", myIP);
+    logNetworkReady("Access point");
   }
 
-  if (!MDNS.begin(userConfig->getDeviceName())) {
-    SS2K_LOG(HTTP_SERVER_LOG_TAG, "Error setting up MDNS responder!");
-  }
-
-  MDNS.addService("http", "_tcp", 80);
-  MDNS.addServiceTxt("http", "_tcp", "lf", "0");
-  SS2K_LOG(HTTP_SERVER_LOG_TAG, "Connected to %s IP address: %s", userConfig->getSsid(), myIP.toString().c_str());
-  SS2K_LOG(HTTP_SERVER_LOG_TAG, "Open http://%s.local/", userConfig->getDeviceName());
-
-  // Initialize DirCon MDNS service
-  if (DirConManager::start()) {
-    SS2K_LOG(HTTP_SERVER_LOG_TAG, "DirCon service started successfully");
-  } else {
-    SS2K_LOG(HTTP_SERVER_LOG_TAG, "Error starting DirCon service");
-  }
-
+  startNetworkServices();
   WiFi.setTxPower(WIFI_POWER_19_5dBm);
 
-  if (WiFi.getMode() == WIFI_STA) {
-    SS2K_LOG(HTTP_SERVER_LOG_TAG, "Syncing clock...");
-    configTime(0, 0, "pool.ntp.org");  // get UTC time via NTP
-    time_t now = time(nullptr);
-    SS2K_LOG(HTTP_SERVER_LOG_TAG, "Waiting for clock sync");
+  if (httpServer.internetConnection) {
+    SS2K_LOG(HTTP_SERVER_LOG_TAG, "Synchronizing clock before web filesystem repair");
+    configTime(0, 0, "pool.ntp.org");
     const unsigned long syncStarted = millis();
-    while (now < 10 && millis() - syncStarted < NTP_SYNC_TIMEOUT_MS) {
-      SS2K_LOG(".", ".");
+    time_t now                      = time(nullptr);
+    while (now < VALID_CLOCK_EPOCH && millis() - syncStarted < NTP_SYNC_TIMEOUT_MS) {
       delay(100);
       now = time(nullptr);
     }
-    if (now < 10) {
-      SS2K_LOGE(HTTP_SERVER_LOG_TAG, "Clock sync timed out; continuing startup");
+
+    if (now < VALID_CLOCK_EPOCH) {
+      SS2K_LOGW(HTTP_SERVER_LOG_TAG, "Clock synchronization timed out");
     } else {
-      SS2K_LOG(HTTP_SERVER_LOG_TAG, "Clock synced to: %.f", difftime(now, (time_t)0));
+      SS2K_LOG(HTTP_SERVER_LOG_TAG, "Clock synchronized");
     }
   }
 }
 
 void stopWifi() {
   SS2K_LOG(HTTP_SERVER_LOG_TAG, "Closing connection to: %s", userConfig->getSsid());
-  // Stop DirCon service before disconnecting WiFi
-  DirConManager::stop();
-  WiFi.disconnect();
+  stopNetworkServices();
+  WiFi.setAutoReconnect(false);
+  WiFi.disconnect(true, false);
+  WiFi.mode(WIFI_MODE_NULL);
 }
 
 void HTTP_Server::start() {
@@ -805,7 +783,7 @@ void HTTP_Server::webClientUpdate() {
       dnsServer.processNextRequest();
     }
     //  Keep MDNS alive
-    if ((millis() - mDnsTimer) > 30000) {
+    if (networkServicesStarted && (millis() - mDnsTimer) > 30000) {
       MDNS.addServiceTxt("http", "_tcp", "lf", String(mDnsTimer));
       mDnsTimer = millis();
     }
@@ -1016,80 +994,68 @@ void HTTP_Server::stop() {
 // github fingerprint
 // 70:94:DE:DD:E6:C4:69:48:3A:92:70:A1:48:56:78:2D:18:64:E0:B7
 
-void HTTP_Server::syncWebServerFiles() {
+bool HTTP_Server::syncWebServerFiles() {
+  if (!filesystemNeedsRepair()) {
+    SS2K_LOG(HTTP_SERVER_LOG_TAG, "Web filesystem is complete; repair skipped");
+    return true;
+  }
+
+  if (!httpServer.internetConnection || WiFi.status() != WL_CONNECTED) {
+    SS2K_LOGW(HTTP_SERVER_LOG_TAG, "Web filesystem has missing files, but station internet is unavailable");
+    return false;
+  }
+
   // HTTPClient keeps a non-owning pointer to the network client. Declare the
   // network client first so HTTPClient is destroyed before its transport.
   WiFiClientSecure localClient;
   HTTPClient http;
   localClient.setCACert(rootCACertificate);
-  SS2K_LOG(HTTP_SERVER_LOG_TAG, "Checking web filesystem:");
-  int httpCode = beginHttpGet(http, localClient, userConfig->getFirmwareUpdateURL() + String(FW_VERSIONFILE));
-  if (httpCode != HTTP_CODE_OK) {
-    SS2K_LOG(HTTP_SERVER_LOG_TAG, "error downloading %s %d", FW_VERSIONFILE, httpCode);
-    httpServer.internetConnection = false;
-    http.end();
-    return;
-  }
+  localClient.setHandshakeTimeout(20);
+  SS2K_LOG(HTTP_SERVER_LOG_TAG, "Repairing missing web filesystem files");
 
-  String serverVersion = http.getString();
-  serverVersion.trim();
-  SS2K_LOG(HTTP_SERVER_LOG_TAG, "  - Server version: %s", serverVersion.c_str());
-  httpServer.internetConnection = true;
-  http.end();
-
-  const String filesystemVersion = getNVSFilesystemVersion();
-  const bool indexPresent = filesystemIndexExists();
-  Version availableVer(serverVersion.c_str());
-  Version currentVer(FIRMWARE_VERSION);
-  // Development builds append branch/commit data to the release they follow.
-  // Treat that suffix as newer when the numeric date components are equal.
-  const bool firmwareIsAhead = currentVer > availableVer || (currentVer == availableVer && serverVersion != FIRMWARE_VERSION);
-  const bool filesystemUpgradeAvailable = !firmwareIsAhead &&
-                                          (filesystemVersion.isEmpty() || availableVer > Version(filesystemVersion.c_str()));
-  const bool refreshFilesystem = !indexPresent || filesystemUpgradeAvailable;
-
-  SS2K_LOG(HTTP_SERVER_LOG_TAG, "  - Filesystem version: %s%s", filesystemVersion.isEmpty() ? "not recorded" : filesystemVersion.c_str(),
-           refreshFilesystem ? " (refresh required)" : " (checking for missing files)");
-  if (firmwareIsAhead && indexPresent) {
-    SS2K_LOG(HTTP_SERVER_LOG_TAG, "  - Firmware is ahead of the server; existing release files will not be replaced");
-  }
-
-  httpCode = beginHttpGet(http, localClient, DATA_UPDATEURL DATA_FILELIST);
+  int httpCode = beginHttpGet(http, localClient, DATA_UPDATEURL DATA_FILELIST);
   JsonDocument doc;
   if (httpCode == HTTP_CODE_OK) {
     DeserializationError error = deserializeJson(doc, http.getStream());
     if (error) {
       SS2K_LOG(HTTP_SERVER_LOG_TAG, "Failed to read file list");
       http.end();
-      return;
+      return false;
     }
     httpServer.internetConnection = true;
   } else {
-    SS2K_LOG(HTTP_SERVER_LOG_TAG, "error downloading %s %d", DATA_FILELIST, httpCode);
+    SS2K_LOG(HTTP_SERVER_LOG_TAG, "error downloading %s %d (%s)", DATA_FILELIST, httpCode, HTTPClient::errorToString(httpCode).c_str());
     httpServer.internetConnection = false;
   }
   http.end();
-  if (httpCode != HTTP_CODE_OK) return;
+  if (httpCode != HTTP_CODE_OK) return false;
 
   JsonArray files = doc.as<JsonArray>();
   if (files.isNull() || (!manifestContains(files, "/index.html.gz") && !manifestContains(files, "/index.html"))) {
     SS2K_LOG(HTTP_SERVER_LOG_TAG, "Filesystem file list is invalid or has no index page");
-    return;
+    return false;
   }
 
-  bool filesystemUpdateSucceeded = refreshFilesystem ? pruneFilesystem(files) : true;
+  bool filesystemUpdateSucceeded = true;
   bool downloadedFile = false;
-  for (JsonVariant v : files) {
+  for (JsonVariantConst v : files) {
     String fileName = "/" + v.as<String>();
-    if (!refreshFilesystem && LittleFS.exists(fileName)) continue;
+    if (LittleFS.exists(fileName)) continue;
+    if (WiFi.status() != WL_CONNECTED) {
+      SS2K_LOGW(HTTP_SERVER_LOG_TAG, "Web filesystem repair stopped because WiFi disconnected");
+      filesystemUpdateSucceeded = false;
+      break;
+    }
 
     downloadedFile = true;
+    SS2K_LOG(HTTP_SERVER_LOG_TAG, "Downloading web file: %s", fileName.c_str());
     httpCode = beginHttpGet(http, localClient, DATA_UPDATEURL + fileName);
     if (httpCode == HTTP_CODE_OK) {
-      LittleFS.remove(fileName);
-      File file = LittleFS.open(fileName, FILE_WRITE, true);
+      const String temporaryFileName = fileName + ".download";
+      LittleFS.remove(temporaryFileName);
+      File file = LittleFS.open(temporaryFileName, FILE_WRITE, true);
       if (!file) {
-        SS2K_LOG(HTTP_SERVER_LOG_TAG, "Failed to create file, %s", fileName.c_str());
+        SS2K_LOG(HTTP_SERVER_LOG_TAG, "Failed to create temporary file for %s", fileName.c_str());
         filesystemUpdateSucceeded = false;
         http.end();
         continue;
@@ -1097,9 +1063,13 @@ void HTTP_Server::syncWebServerFiles() {
       int bytesWritten = http.writeToStream(&file);
       file.close();
       if (bytesWritten < 0) {
-        LittleFS.remove(fileName);
+        LittleFS.remove(temporaryFileName);
         SS2K_LOG(HTTP_SERVER_LOG_TAG, "Error writing %s (%d)", fileName.c_str(), bytesWritten);
         httpServer.internetConnection = false;
+        filesystemUpdateSucceeded = false;
+      } else if (!LittleFS.rename(temporaryFileName, fileName)) {
+        LittleFS.remove(temporaryFileName);
+        SS2K_LOGE(HTTP_SERVER_LOG_TAG, "Unable to install downloaded file %s", fileName.c_str());
         filesystemUpdateSucceeded = false;
       } else {
         if (fileName.endsWith(".gz")) {
@@ -1110,24 +1080,42 @@ void HTTP_Server::syncWebServerFiles() {
         httpServer.internetConnection = true;
       }
     } else {
-      SS2K_LOG(HTTP_SERVER_LOG_TAG, "Error downloading %s %d", fileName.c_str(), httpCode);
+      SS2K_LOG(HTTP_SERVER_LOG_TAG, "Error downloading %s %d (%s)", fileName.c_str(), httpCode, HTTPClient::errorToString(httpCode).c_str());
       httpServer.internetConnection = false;
       filesystemUpdateSucceeded = false;
     }
     http.end();
   }
 
-  if (refreshFilesystem) {
-    if (filesystemUpdateSucceeded && filesystemIndexExists()) {
-      if (setNVSFilesystemVersion(serverVersion)) {
-        SS2K_LOG(HTTP_SERVER_LOG_TAG, "Filesystem updated to version %s", serverVersion.c_str());
-      } else {
-        SS2K_LOG(HTTP_SERVER_LOG_TAG, "Failed to save filesystem version %s", serverVersion.c_str());
-      }
-    } else {
-      SS2K_LOG(HTTP_SERVER_LOG_TAG, "Filesystem update incomplete; version was not changed");
-    }
-  } else if (filesystemUpdateSucceeded) {
-    SS2K_LOG(HTTP_SERVER_LOG_TAG, downloadedFile ? "Missing web files restored" : "Web filesystem is complete");
+  if (!filesystemUpdateSucceeded || !filesystemIndexExists()) {
+    SS2K_LOGW(HTTP_SERVER_LOG_TAG, "Web filesystem repair incomplete");
+    return false;
   }
+
+  // Install the fetched manifest only after every missing asset is present.
+  // This keeps the next boot's local completeness check independent of TLS.
+  const String temporaryManifest = String(DATA_FILELIST) + ".download";
+  LittleFS.remove(temporaryManifest);
+  File manifest = LittleFS.open(temporaryManifest, FILE_WRITE, true);
+  if (!manifest) {
+    SS2K_LOGE(HTTP_SERVER_LOG_TAG, "Unable to create temporary web filesystem manifest");
+    return false;
+  }
+  const size_t manifestBytes = serializeJson(doc, manifest);
+  manifest.close();
+  if (manifestBytes == 0) {
+    LittleFS.remove(temporaryManifest);
+    SS2K_LOGE(HTTP_SERVER_LOG_TAG, "Unable to write web filesystem manifest");
+    return false;
+  }
+
+  LittleFS.remove(DATA_FILELIST);
+  if (!LittleFS.rename(temporaryManifest, DATA_FILELIST)) {
+    LittleFS.remove(temporaryManifest);
+    SS2K_LOGE(HTTP_SERVER_LOG_TAG, "Unable to install web filesystem manifest");
+    return false;
+  }
+
+  SS2K_LOG(HTTP_SERVER_LOG_TAG, downloadedFile ? "Missing web files restored" : "Web filesystem manifest restored");
+  return true;
 }

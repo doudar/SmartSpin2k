@@ -1,14 +1,10 @@
 #!/usr/bin/env python3
 """
 This script fetches the current CA certificate for raw.githubusercontent.com
-and updates the cert.h file with it during compilation.
+and updates cert.h before release firmware is compiled in GitHub Actions.
 
-Similar to git_tag_macro.py, this script is run as part of the build process
-to ensure the certificate is always up to date.
-
-This script can be run in two ways:
-1. Directly: python cert_updater.py
-2. As a PlatformIO pre-script: extra_scripts = pre:cert_updater.py
+Local PlatformIO builds intentionally do not run this script. It can also be
+run manually with: python cert_updater.py
 """
 
 import os
@@ -383,10 +379,7 @@ def log_to_stderr(message):
 
 def main():
     """
-    Main function when run directly or by PlatformIO build flags
-    
-    When called by PlatformIO in the build_flags section (like !python cert_updater.py),
-    it needs to print a valid build flag to stdout without any other output.
+    Update the checked-in certificate for a subsequent firmware build.
     """
     # Save the original print function
     original_print = print
@@ -425,9 +418,6 @@ def main():
         # Reset print back to original
         setattr(builtins, 'print', original_print)
         
-        # Print only the build flag to stdout - this will be picked up by PlatformIO
-        print("-DCERT_UPDATER_VERSION=1")
-        
         return 0
     except Exception as e:
         log_to_stderr(f"ERROR in cert_updater.py: {e}")
@@ -435,9 +425,7 @@ def main():
         # Reset print back to original
         setattr(builtins, 'print', original_print)
         
-        # Print only the build flag to stdout
-        print("-DCERT_UPDATER_ERROR=1")
         return 1
 
 if __name__ == "__main__":
-    main()
+    sys.exit(main())
