@@ -393,6 +393,7 @@ bool SS2K::_findEndStop(bool moveForward) {
   lastHomingSgThreshold = baseline.threshold;
 
   SS2K_LOG(MAIN_LOG_TAG, "Homing %s. Stable Threshold: %d, Sensitivity: %d", moveForward ? "forward (max)" : "backward (min)", baseline.threshold, baseline.sensitivity);
+  SS2K_LOG(MAIN_LOG_TAG, "pos: %d", stepper->getCurrentPosition());
 
   unsigned long lastLogTime = millis() - LOG_INTERVAL;  // Initialize last log time
   int currentSgResult       = 0;
@@ -416,22 +417,27 @@ bool SS2K::_findEndStop(bool moveForward) {
     // Periodically log the status for tuning
     if (millis() - lastLogTime > LOG_INTERVAL) {
       SS2K_LOG(MAIN_LOG_TAG, "Homing... Current SG: %d, Baseline: %d, Target: < %d", currentSgResult, baseline.threshold, baseline.threshold - baseline.sensitivity);
+      SS2K_LOG(MAIN_LOG_TAG, "pos: %d", stepper->getCurrentPosition());
       lastLogTime = millis();
       if (moveForward) fitnessMachineService.spinDown(FitnessMachineStatus::SpinDown_StopPedaling);
     }
 
     // Check for the stall condition
     if (currentSgResult < (baseline.threshold - baseline.sensitivity)) {
+      int32_t stallPosition = stepper->getCurrentPosition();
       stepper->forceStop();
       SS2K_LOG(MAIN_LOG_TAG, "Stall detected! SG dropped to %d. Threshold: %d", currentSgResult, baseline.threshold - baseline.sensitivity);
+      SS2K_LOG(MAIN_LOG_TAG, "pos: %d", stallPosition);
       delay(100);                   // Let motor settle
       setupTMCStepperDriver(true);  // Restore normal driver settings
       return true;
     }
   }
   // If we get here, the loop timed out
+  int32_t timeoutPosition = stepper->getCurrentPosition();
   stepper->forceStop();
   SS2K_LOG(MAIN_LOG_TAG, "Homing timed out!");
+  SS2K_LOG(MAIN_LOG_TAG, "pos: %d", timeoutPosition);
   setupTMCStepperDriver(true);  // Restore normal driver settings
   return false;
 }
