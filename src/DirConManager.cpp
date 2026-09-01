@@ -249,7 +249,7 @@ void DirConManager::updateStatusMessage() {
 void DirConManager::setupMDNS() {
   // Static buffers for strings to avoid repeated allocations
   static char macAddress[18];    // MAC format: 11:22:33:44:55:66\0
-  static char serialNumber[13];  // 112233445566\0
+  static char serialNumber[13];  // Twelve decimal digits plus null terminator
 
   // Get device MAC address using existing buffer
   strcpy(macAddress, WiFi.macAddress().c_str());
@@ -260,10 +260,11 @@ void DirConManager::setupMDNS() {
     }
   }
 
-  // The 12 hexadecimal digits of the WiFi MAC make a stable, unique serial number.
-  // Keep it as text; formatting ASCII MAC characters as integers caused collisions
-  // and also truncated the final digit in the previous 12-byte buffer.
-  snprintf(serialNumber, sizeof(serialNumber), "%s", macAddress);
+  // MyWhoosh expects the DirCon serial number to contain decimal digits only.
+  // Preserve the established encoding from the original MyWhoosh compatibility
+  // fix: encode the six characters in the first three MAC octets as ASCII hex.
+  snprintf(serialNumber, sizeof(serialNumber), "%02X%02X%02X%02X%02X%02X", macAddress[0], macAddress[1], macAddress[3], macAddress[4], macAddress[6],
+           macAddress[7]);
 
   // Add DirCon service to MDNS
   SS2K_LOG(DIRCON_LOG_TAG, "Adding DirCon MDNS service: %s.%s on port %d", DIRCON_MDNS_SERVICE_NAME, DIRCON_MDNS_SERVICE_PROTOCOL, DIRCON_TCP_PORT);
