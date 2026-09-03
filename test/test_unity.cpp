@@ -9,8 +9,8 @@
 #include "test.h"
 
 #ifndef ARDUINO
-#include <errno.h>      // For errno and EEXIST
-#include <stdio.h>      // For perror
+#include <errno.h>  // For errno and EEXIST
+#include <stdio.h>  // For perror
 #ifdef _WIN32
 #include <direct.h>
 #else
@@ -77,6 +77,7 @@ void setup() {
     TestErgLogReplay ergReplayTests;
     RUN_TEST(ergReplayTests.test_active_ride_log_and_gain_limits);
     RUN_TEST(ergReplayTests.test_active_ride_new_gain_replay);
+    RUN_TEST(ergReplayTests.test_table_position_confidence);
   }
 
   // BLE Device Unique Name Tests

@@ -26,6 +26,7 @@ class TestErgLogReplay {
  public:
   static void test_active_ride_log_and_gain_limits(void);
   static void test_active_ride_new_gain_replay(void);
+  static void test_table_position_confidence(void);
 };
 
 class TestPTLookupResistance {
@@ -36,34 +37,34 @@ class TestPTLookupResistance {
 };
 
 class TestPTLookupWatts {
-  public:
-   static void test_active_ride_reverse_lookup(void);
-   static void test_reverse_lookup_pathological_tables(void);
- };
+ public:
+  static void test_active_ride_reverse_lookup(void);
+  static void test_reverse_lookup_pathological_tables(void);
+};
 
 class TestPowerTableCsv {
-  public:
-    static void test_active_table_round_trip(void);
+ public:
+  static void test_active_table_round_trip(void);
 };
 
 class TestActiveRideTable {
-  public:
-    static void test_active_ride_table_generation(void);
-    static void test_compact_status_log_replay(void);
-    static void test_status_ride_table_generation(void);
-    static void test_active_table_status_prediction_accuracy(void);
-    static void test_active_table_transient_power_estimation(void);
+ public:
+  static void test_active_ride_table_generation(void);
+  static void test_compact_status_log_replay(void);
+  static void test_status_ride_table_generation(void);
+  static void test_active_table_status_prediction_accuracy(void);
+  static void test_active_table_transient_power_estimation(void);
 };
 
 class TestAdevName2UniqueName {
-public:
-    static void test_traditional_device_keeps_address_suffix(void);
-    static void test_android_device_no_address_suffix(void);
-    static void test_random_address_pattern_detection(void);
-    static void test_null_device_handling(void);
-    static void test_device_without_name(void);
-    static void test_backward_compatibility(void);
-    static void test_case_insensitive_device_matching(void);
+ public:
+  static void test_traditional_device_keeps_address_suffix(void);
+  static void test_android_device_no_address_suffix(void);
+  static void test_random_address_pattern_detection(void);
+  static void test_null_device_handling(void);
+  static void test_device_without_name(void);
+  static void test_backward_compatibility(void);
+  static void test_case_insensitive_device_matching(void);
 };
 
 class TestBleFirmwareUpdateProtocol {

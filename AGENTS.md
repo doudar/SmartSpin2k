@@ -419,6 +419,9 @@ Primary files: `include/ERG_Mode.h`, `src/ERG_Mode.cpp`.
 - For large setpoint changes, tries `_setPointChangeState()` using the power table when homed.
 - Falls back to `_inSetpointState()` proportional control.
 - Writes the new target to `rtConfig->targetIncline`.
+- While homed with a real power meter, settled samples validate the table's predicted stepper position against the position range for actual power plus/minus `ERG_MODE_PID_WINDOW`. One volatile confidence score represents alignment of the current homed bike with the learned table.
+- Once trusted, any target inside the reliable table's measured watt/cadence bounds permits an exact-position setpoint seek; targets outside those bounds stay on PID. The seek follows cadence changes while moving and settling, returns immediately to PID after crossing the watt target or timing out, and returns to PID maintain mode after stable readings.
+- `ERG_GUARDRAILS` is disabled by default; seek direction, travel bounds, overshoot handling, and timeouts live in the ERG controller instead of the stepper loop.
 
 `_setPointChangeState()`:
 

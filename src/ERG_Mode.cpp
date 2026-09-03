@@ -26,12 +26,12 @@ namespace {
 double scheduledErgGain(double sensitivity, int operatingWatts, int cadence, bool& usedPowerTable, PowerTableSlopeStatus::Value& slopeStatus) {
   usedPowerTable = false;
 
-  sensitivity     = ErgControl::sanitizeSensitivity(sensitivity);
+  sensitivity           = ErgControl::sanitizeSensitivity(sensitivity);
   const double fallback = ErgControl::fallbackGain(sensitivity, operatingWatts);
   double localStepsPerWatt;
   if (powerTable->lookupErgSlope(operatingWatts, cadence, localStepsPerWatt, &slopeStatus)) {
     const double gain = localStepsPerWatt * sensitivity / ErgControl::SLOPE_CONTROL_DIVISOR;
-    usedPowerTable = true;
+    usedPowerTable    = true;
     return ErgControl::blendedTableGain(gain, fallback);
   }
   return fallback;
@@ -55,20 +55,31 @@ void ErgMode::runERG() {
       isDelayed = false;
       ergTimer  = 0;
     }
-  } else if (lastSetPoint != 0 && rtConfig->getFTMSMode() == FitnessMachineControlPointProcedure::SetTargetPower  && rtConfig->cad.getValue() > MIN_ERG_CADENCE) {
+  } else if (lastSetPoint != 0 && rtConfig->getFTMSMode() == FitnessMachineControlPointProcedure::SetTargetPower && rtConfig->cad.getValue() > MIN_ERG_CADENCE) {
     SS2K_LOG(ERG_MODE_LOG_TAG, "Cadence above ERG minimum; restoring target to %dw", lastSetPoint);
     rtConfig->watts.setTarget(lastSetPoint);
     lastSetPoint = 0;
   }
 
+  _updateTableConfidence();
+
   const bool reachedIncreasingTarget = mode == Mode::INCREASING && rtConfig->watts.getValue() >= rtConfig->watts.getTarget();
   const bool reachedDecreasingTarget = mode == Mode::DECREASING && rtConfig->watts.getValue() <= rtConfig->watts.getTarget();
   if (reachedIncreasingTarget || reachedDecreasingTarget) {
-    SS2K_LOG(ERG_MODE_LOG_TAG, "ERG setpoint reached; resuming PID control");
-    mode      = Mode::MAINTAIN;
-    isDelayed = false;
-    ergTimer  = 0;
+    if (isTableSeeking()) {
+      if (abs(rtConfig->watts.getTarget() - rtConfig->watts.getValue()) > ERG_MODE_PID_WINDOW) {
+        _scoreTable(tableSeekTargetWatts, tableSeekCadence, false);
+      }
+      _stopTrustedTableSeek("power crossed target");
+    } else {
+      SS2K_LOG(ERG_MODE_LOG_TAG, "ERG setpoint reached; resuming PID control");
+      mode      = Mode::MAINTAIN;
+      isDelayed = false;
+      ergTimer  = 0;
+    }
   }
+
+  _handleTrustedTableSeek();
 
   if (isDelayed && (ss2k->getCurrentPosition() == ss2k->getTargetPosition())) {
     SS2K_LOG(ERG_MODE_LOG_TAG, "ERG delay cleared,  %dw, tgt %dw, pos %d, tgt %d", rtConfig->watts.getValue(), rtConfig->watts.getTarget(), ss2k->getCurrentPosition(),
@@ -84,7 +95,7 @@ void ErgMode::runERG() {
       isDelayed = false;
     }
 
-    if (mode != Mode::MAINTAIN) {
+    if (mode != Mode::MAINTAIN && !isTableSeeking()) {
       SS2K_LOG(ERG_MODE_LOG_TAG, "ERG setpoint seek complete; resuming PID control");
       mode = Mode::MAINTAIN;
     }
@@ -123,7 +134,7 @@ void ErgMode::runERG() {
       }
 
       // compute ERG
-      if ((rtConfig->getFTMSMode() == FitnessMachineControlPointProcedure::SetTargetPower) && (hasConnectedPowerMeter || simulationRunning)) {
+      if ((rtConfig->getFTMSMode() == FitnessMachineControlPointProcedure::SetTargetPower) && (hasConnectedPowerMeter || simulationRunning) && !isTableSeeking()) {
         this->computeErg();
       }
 
@@ -137,6 +148,7 @@ void ErgMode::runERG() {
     if (ss2k->resetPowerTableFlag) {
       LittleFS.remove(POWER_TABLE_FILENAME);
       powerTable->reset();
+      resetTableConfidence();
       userConfig->setHMin(INT32_MIN);
       userConfig->setHMax(INT32_MIN);
       spinBLEServer.spinDownFlag = 0;
@@ -163,7 +175,7 @@ void ErgMode::runERG() {
         if (tablePower > 0) {
           _smoothPWR = (previousPower + tablePower) / 2;
         } else {
-          _smoothPWR   = 0;
+          _smoothPWR    = 0;
           previousPower = 0;
         }
       } else {
@@ -220,10 +232,28 @@ void ErgMode::computeErg() {
 
 int32_t ErgMode::_setPointChangeState() {
   mode = (rtConfig->watts.getTarget() > rtConfig->watts.getValue()) ? Mode::INCREASING : Mode::DECREASING;
+
+  const int currentCadence = rtConfig->cad.getValue();
+  const int currentTarget  = rtConfig->watts.getTarget();
+  int32_t tableResult      = RETURN_ERROR;
+
+  // Once this part of the surface has repeatedly predicted the real bike,
+  // use it as a true feed-forward command. PID remains responsible for
+  // overshoot recovery and steady-state maintenance.
+  if (_tableTargetIsTrusted(currentTarget, currentCadence)) {
+    tableResult                  = powerTable->lookup(currentTarget, currentCadence);
+    const bool insideTravel      = tableResult > rtConfig->getMinStep() && tableResult < rtConfig->getMaxStep();
+    const bool movesTowardTarget = (mode == Mode::INCREASING && tableResult > ss2k->getCurrentPosition()) || (mode == Mode::DECREASING && tableResult < ss2k->getCurrentPosition());
+    if (tableResult != RETURN_ERROR && tableResult >= 0 && insideTravel && movesTowardTarget) {
+      _startTrustedTableSeek(tableResult);
+      return tableResult;
+    }
+    SS2K_LOG(ERG_MODE_LOG_TAG, "Trusted table result was unusable at %dw/%drpm; using conservative seek", currentTarget, currentCadence);
+  }
+
   // It's better to undershoot increasing watts and overshoot decreasing watts, so lets set the lookup target to the nearest side of POWERTABLE_WATT_INCREMENT
-  int adjustedWattTarget = (mode == Mode::INCREASING) ? rtConfig->watts.getTarget() - ERG_MODE_PID_WINDOW : rtConfig->watts.getTarget() + ERG_MODE_PID_WINDOW;
-  int32_t tableResult = powerTable->lookup(adjustedWattTarget,
-                                           (mode == Mode::INCREASING) ? rtConfig->cad.getValue() + POWERTABLE_CAD_INCREMENT : rtConfig->cad.getValue() - POWERTABLE_CAD_INCREMENT);
+  int adjustedWattTarget = (mode == Mode::INCREASING) ? currentTarget - ERG_MODE_PID_WINDOW : currentTarget + ERG_MODE_PID_WINDOW;
+  tableResult = powerTable->lookup(adjustedWattTarget, (mode == Mode::INCREASING) ? currentCadence + POWERTABLE_CAD_INCREMENT : currentCadence - POWERTABLE_CAD_INCREMENT);
 
   // Sanity check - with homing enabled, we should never have a negative result. If we do, something went wrong.
   if (rtConfig->getHomed() && tableResult < 0) {
@@ -265,6 +295,189 @@ int32_t ErgMode::_setPointChangeState() {
   return tableResult;
 }
 
+bool ErgMode::_positionPredictionIsAccurate(int watts, int cadence, int32_t actualPosition) {
+  if (watts <= 0 || cadence <= 0) return false;
+  const int32_t lowPosition  = powerTable->lookup(std::max(0, watts - ERG_MODE_PID_WINDOW), cadence);
+  const int32_t highPosition = powerTable->lookup(watts + ERG_MODE_PID_WINDOW, cadence);
+  if (lowPosition == RETURN_ERROR || highPosition == RETURN_ERROR) return false;
+  return ErgControl::positionMatchesPowerWindow(actualPosition, lowPosition, highPosition, ERG_TABLE_POSITION_PADDING_STEPS);
+}
+
+bool ErgMode::_tableTargetIsWithinMeasuredBounds(int watts, int cadence) const { return ErgControl::recordedTableBounds(powerTable->ptData).contains(watts, cadence); }
+
+bool ErgMode::_tableTargetIsTrusted(int watts, int cadence) const { return tableConfidence.trusted() && _tableTargetIsWithinMeasuredBounds(watts, cadence); }
+
+void ErgMode::_scoreTable(int watts, int cadence, bool accurate) {
+  const bool changed = tableConfidence.update(accurate);
+  if (changed) {
+    SS2K_LOG(ERG_MODE_LOG_TAG, "Power table is now %s after evidence at %dw/%drpm (confidence %u)", tableConfidence.trusted() ? "trusted" : "untrusted", watts, cadence,
+             tableConfidence.score());
+  }
+}
+
+void ErgMode::_updateTableConfidence() {
+  if (!rtConfig->getHomed()) {
+    if (confidenceWasHomed) resetTableConfidence();
+    confidenceWasHomed = false;
+    return;
+  }
+  confidenceWasHomed = true;
+
+  // A table seek has its own settling gate. Scoring its in-flight readings
+  // here would mistake motor travel and power-meter latency for table error.
+  if (isTableSeeking() || rtConfig->getFTMSMode() != FitnessMachineControlPointProcedure::SetTargetPower || !spinBLEClient.connectedPM || rtConfig->watts.getSimulate() ||
+      userConfig->getPTab4Pwr()) {
+    return;
+  }
+
+  const unsigned long wattsTimestamp = rtConfig->watts.getTimestamp();
+  if (wattsTimestamp == confidenceWattsTimestamp) return;
+  confidenceWattsTimestamp = wattsTimestamp;
+
+  const int cadence        = rtConfig->cad.getValue();
+  const bool cadenceStable = confidenceCadence > 0 && abs(cadence - confidenceCadence) <= ERG_TABLE_STABLE_CADENCE_DELTA;
+  confidenceCadence        = cadence;
+  if (!cadenceStable || ss2k->stepperIsRunning || abs(ss2k->getCurrentPosition() - ss2k->getTargetPosition()) > ERG_TABLE_SETTLED_POSITION_STEPS) return;
+
+  const int watts = rtConfig->watts.getValue();
+  if (!_tableTargetIsWithinMeasuredBounds(watts, cadence)) return;
+
+  // This runs before processPowerValue(), so the sample cannot certify a
+  // table value that was just adjusted using that same observation.
+  _scoreTable(watts, cadence, _positionPredictionIsAccurate(watts, cadence, ss2k->getCurrentPosition()));
+}
+
+unsigned long ErgMode::_trustedTableMoveDeadline(int32_t position) const {
+  const unsigned long speed         = std::max(1, userConfig->getStepperSpeed());
+  const unsigned long distance      = static_cast<unsigned long>(abs(position - ss2k->getCurrentPosition()));
+  const unsigned long estimatedMove = std::min(static_cast<unsigned long>(ERG_TABLE_MOVE_TIMEOUT_MS), distance * 2000UL / speed);
+  return millis() + estimatedMove + ERG_TABLE_SETTLE_TIMEOUT_MS;
+}
+
+void ErgMode::_startTrustedTableSeek(int32_t position) {
+  tableSeekState          = TableSeekState::MOVING;
+  tableSeekTargetWatts    = rtConfig->watts.getTarget();
+  tableSeekCadence        = rtConfig->cad.getValue();
+  tableSeekPosition       = position;
+  tableSeekLastWatts      = INT32_MIN;
+  tableSeekStableMatches  = 0;
+  tableSeekStableMisses   = 0;
+  tableSeekWattsTimestamp = rtConfig->watts.getTimestamp();
+  tableSeekDeadline       = _trustedTableMoveDeadline(position);
+  isDelayed               = false;
+  SS2K_LOG(ERG_MODE_LOG_TAG, "Trusted table seek: %dw/%drpm directly to %d", tableSeekTargetWatts, tableSeekCadence, position);
+}
+
+void ErgMode::_stopTrustedTableSeek(const char* reason) {
+  if (!isTableSeeking()) return;
+  SS2K_LOG(ERG_MODE_LOG_TAG, "Trusted table seek ended (%s); resuming PID", reason);
+  tableSeekState         = TableSeekState::INACTIVE;
+  tableSeekStableMatches = 0;
+  tableSeekStableMisses  = 0;
+  tableSeekLastWatts     = INT32_MIN;
+  mode                   = Mode::MAINTAIN;
+  isDelayed              = false;
+  ergTimer               = 0;
+}
+
+void ErgMode::_handleTrustedTableSeek() {
+  if (!isTableSeeking()) return;
+  if (!rtConfig->getHomed() || rtConfig->getFTMSMode() != FitnessMachineControlPointProcedure::SetTargetPower) {
+    _stopTrustedTableSeek("ERG or homing state changed");
+    return;
+  }
+  if (rtConfig->watts.getTarget() != tableSeekTargetWatts) {
+    _stopTrustedTableSeek("setpoint changed");
+    return;
+  }
+
+  const int cadence = rtConfig->cad.getValue();
+  if (cadence <= MIN_ERG_CADENCE) {
+    _stopTrustedTableSeek("cadence below ERG minimum");
+    return;
+  }
+
+  // Recalculate the feed-forward position as cadence changes. Only move for
+  // a physically meaningful difference, but remember every cadence update so
+  // single-RPM sensor jitter cannot accumulate into command chatter.
+  if (cadence != tableSeekCadence) {
+    if (!_tableTargetIsTrusted(tableSeekTargetWatts, cadence)) {
+      _stopTrustedTableSeek("cadence left the measured table bounds");
+      return;
+    }
+    const int32_t cadencePosition = powerTable->lookup(tableSeekTargetWatts, cadence);
+    if (cadencePosition == RETURN_ERROR || cadencePosition < 0 || cadencePosition <= rtConfig->getMinStep() || cadencePosition >= rtConfig->getMaxStep()) {
+      _stopTrustedTableSeek("cadence lookup failed");
+      return;
+    }
+    tableSeekCadence = cadence;
+    if (abs(cadencePosition - tableSeekPosition) > ERG_TABLE_POSITION_PADDING_STEPS) {
+      tableSeekPosition      = cadencePosition;
+      tableSeekState         = TableSeekState::MOVING;
+      tableSeekStableMatches = 0;
+      tableSeekStableMisses  = 0;
+      tableSeekLastWatts     = INT32_MIN;
+      tableSeekDeadline      = _trustedTableMoveDeadline(cadencePosition);
+      rtConfig->setTargetIncline(cadencePosition);
+      SS2K_LOG(ERG_MODE_LOG_TAG, "Trusted table seek followed cadence to %drpm, position %d", cadence, cadencePosition);
+    }
+  }
+
+  const unsigned long now = millis();
+  if (tableSeekState == TableSeekState::MOVING) {
+    if (static_cast<long>(now - tableSeekDeadline) >= 0) {
+      _stopTrustedTableSeek("motor movement timed out");
+      return;
+    }
+    if (ss2k->stepperIsRunning || abs(ss2k->getCurrentPosition() - tableSeekPosition) > ERG_TABLE_SETTLED_POSITION_STEPS) return;
+
+    tableSeekState          = TableSeekState::SETTLING;
+    tableSeekStableMatches  = 0;
+    tableSeekStableMisses   = 0;
+    tableSeekLastWatts      = INT32_MIN;
+    tableSeekWattsTimestamp = rtConfig->watts.getTimestamp();
+    tableSeekDeadline       = now + ERG_TABLE_SETTLE_TIMEOUT_MS;
+    SS2K_LOG(ERG_MODE_LOG_TAG, "Trusted table seek reached position %d; waiting for stable power", tableSeekPosition);
+    return;
+  }
+
+  if (static_cast<long>(now - tableSeekDeadline) >= 0) {
+    if (tableSeekStableMisses > 0) _scoreTable(tableSeekTargetWatts, tableSeekCadence, false);
+    _stopTrustedTableSeek("power settling timed out");
+    return;
+  }
+
+  const unsigned long wattsTimestamp = rtConfig->watts.getTimestamp();
+  if (wattsTimestamp == tableSeekWattsTimestamp) return;
+  tableSeekWattsTimestamp = wattsTimestamp;
+
+  const int watts    = rtConfig->watts.getValue();
+  const bool stable  = tableSeekLastWatts != INT32_MIN && abs(watts - tableSeekLastWatts) <= ERG_TABLE_STABLE_WATTS_DELTA;
+  tableSeekLastWatts = watts;
+  if (!stable) {
+    tableSeekStableMatches = 0;
+    tableSeekStableMisses  = 0;
+    return;
+  }
+
+  const bool accurate = _positionPredictionIsAccurate(watts, cadence, ss2k->getCurrentPosition());
+  if (accurate) {
+    ++tableSeekStableMatches;
+    tableSeekStableMisses = 0;
+  } else {
+    ++tableSeekStableMisses;
+    tableSeekStableMatches = 0;
+  }
+
+  if (tableSeekStableMatches >= ERG_TABLE_STABLE_READINGS) {
+    _scoreTable(tableSeekTargetWatts, tableSeekCadence, true);
+    _stopTrustedTableSeek("power stabilized inside prediction window");
+  } else if (tableSeekStableMisses >= ERG_TABLE_STABLE_READINGS) {
+    _scoreTable(tableSeekTargetWatts, tableSeekCadence, false);
+    _stopTrustedTableSeek("power stabilized outside prediction window");
+  }
+}
+
 // INTRODUCING PID CONTROL LOOP
 // Error: Difference between TW and Current W
 
@@ -283,11 +496,11 @@ int32_t ErgMode::_inSetpointState() {
 
   // Scale the proportional gain to the local power-table slope. This compensates for the eddy-current brake producing fewer watts per step at low resistance
   // and more watts per step at high resistance. ERG sensitivity controls how much of the predicted correction is applied and bounds bad model slopes.
-  const double configuredSensitivity = userConfig->getERGSensitivity();
-  bool usedPowerTable                = false;
+  const double configuredSensitivity       = userConfig->getERGSensitivity();
+  bool usedPowerTable                      = false;
   PowerTableSlopeStatus::Value slopeStatus = PowerTableSlopeStatus::InvalidRequest;
-  double Kp                          = scheduledErgGain(configuredSensitivity, target, rtConfig->cad.getValue(), usedPowerTable, slopeStatus);
-  const double controlSensitivity    = ErgControl::sanitizeSensitivity(configuredSensitivity);
+  double Kp                                = scheduledErgGain(configuredSensitivity, target, rtConfig->cad.getValue(), usedPowerTable, slopeStatus);
+  const double controlSensitivity          = ErgControl::sanitizeSensitivity(configuredSensitivity);
 
   Kp = ErgControl::errorScheduledGain(Kp, error, mode == Mode::MAINTAIN);
 

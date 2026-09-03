@@ -9,6 +9,7 @@
 #include "Main.h"
 #include "SS2KLog.h"
 #include "BLE_Fitness_Machine_Service.h"
+#include "ERG_Mode.h"
 #include "Power_Table.h"
 #include "settings.h"
 #include <Constants.h>
@@ -321,9 +322,7 @@ void SS2K::setupTMCStepperDriver(bool reset) {
 
 static int lastHomingSgThreshold = 0;
 
-static int getScaledHomingSensitivity() {
-  return round(userConfig->getHomingSensitivity() * currentBoard.homingSensitivityScaler);
-}
+static int getScaledHomingSensitivity() { return round(userConfig->getHomingSensitivity() * currentBoard.homingSensitivityScaler); }
 
 static HomingSgBaseline getHomingSgBaseline() {
   int samples[HOMING_SG_SAMPLE_COUNT];
@@ -358,8 +357,8 @@ static HomingSgBaseline getHomingSgBaseline() {
   int threshold             = round(trimmedTotal / (float)trimmedCount);
   int normalLowDrop         = threshold - trimmedMin;
   int measuredSensitivity   = max(configuredSensitivity, normalLowDrop + max(configuredSensitivity / 2, HOMING_SG_MIN_SAMPLE_MARGIN));
-  int maxSensitivity      = min(HOMING_MAX_SENSITIVITY, max(threshold, 1));
-  measuredSensitivity     = constrain(measuredSensitivity + 10, 1, maxSensitivity);
+  int maxSensitivity        = min(HOMING_MAX_SENSITIVITY, max(threshold, 1));
+  measuredSensitivity       = constrain(measuredSensitivity + 10, 1, maxSensitivity);
   SS2K_LOG(MAIN_LOG_TAG, "Homing SG baseline used %d/%d trimmed samples. Dropped: %d/%d, Spread: %d-%d, measured sensitivity: %d", trimmedCount, HOMING_SG_SAMPLE_COUNT,
            samples[minSampleIndex], samples[maxSampleIndex], trimmedMin, trimmedMax, measuredSensitivity);
   return {threshold, measuredSensitivity};
@@ -531,6 +530,7 @@ void SS2K::_findFTMSHome(bool bothDirections) {
 
 void SS2K::goHome(bool bothDirections) {
   SS2K_LOG(MAIN_LOG_TAG, "Starting homing procedure...");
+  ergMode->resetTableConfidence();
   if (bothDirections) {
     fitnessMachineService.spinDown(FitnessMachineStatus::SpinDown_SpinDownRequested);
     if (!userConfig->getPTab4Pwr()) {
