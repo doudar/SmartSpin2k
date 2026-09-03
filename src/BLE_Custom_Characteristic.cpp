@@ -1208,12 +1208,6 @@ void BLE_ss2kCustomCharacteristic::parseNemit() {
     return;
   }
 
-  if (userConfig->getStepperDir() != _oldParams.getStepperDir()) {
-    _oldParams.setStepperDir(userConfig->getStepperDir());
-    BLE_ss2kCustomCharacteristic::notify(BLE_shiftDir);
-    return;
-  }
-
   if (strcmp(userConfig->getFoundDevices(), _oldParams.getFoundDevices()) != 0) {
     _oldParams.setFoundDevices(userConfig->getFoundDevices());
     BLE_ss2kCustomCharacteristic::notify(BLE_foundDevices);
