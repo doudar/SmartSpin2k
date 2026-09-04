@@ -417,6 +417,7 @@ Primary files: `include/ERG_Mode.h`, `src/ERG_Mode.cpp`.
 - Raises target to `userConfig->minWatts` when apps request too little.
 - Skips if the same watt timestamp/target was already processed or current watts are negative.
 - For large setpoint changes, tries `_setPointChangeState()` using the power table when homed.
+- A trusted direct table seek keeps following cadence while the motor/power settles, including up to two cadence bins beyond the measured edge via nearest-row equal-torque scaling. Ordinary target crossings do not end the seek; a high-side overshoot beyond the PID window (or low-side reduction undershoot beyond twice that window) hands off immediately and seeds PID with the latest table position.
 - Falls back to `_inSetpointState()` proportional control.
 - Writes the new target to `rtConfig->targetIncline`.
 - While homed with a real power meter, settled samples validate the table's predicted stepper position against the position range for actual power plus/minus `ERG_MODE_PID_WINDOW`. One volatile confidence score represents alignment of the current homed bike with the learned table.

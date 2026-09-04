@@ -243,10 +243,14 @@ void TestErgLogReplay::test_table_position_confidence(void) {
   TEST_ASSERT_TRUE(confidence.trusted());
   TEST_ASSERT_EQUAL_UINT8(ErgControl::TableConfidence::TRUST_SCORE, confidence.score());
 
-  // Trust is hysteretic: one miss does not disable a proven table, but misses
-  // remove confidence twice as quickly as successful observations add it.
-  confidence.update(false);
-  TEST_ASSERT_TRUE(confidence.trusted());
+  // Trust is hysteretic: isolated misses do not disable a proven table. Keep
+  // applying misses until the configured revoke threshold is reached.
+  const int missesToRevoke = (ErgControl::TableConfidence::TRUST_SCORE - ErgControl::TableConfidence::REVOKE_SCORE + ErgControl::TableConfidence::MISS_PENALTY - 1) /
+                             ErgControl::TableConfidence::MISS_PENALTY;
+  for (int miss = 1; miss < missesToRevoke; ++miss) {
+    confidence.update(false);
+    TEST_ASSERT_TRUE(confidence.trusted());
+  }
   confidence.update(false);
   TEST_ASSERT_FALSE(confidence.trusted());
   TEST_ASSERT_EQUAL_UINT8(ErgControl::TableConfidence::REVOKE_SCORE, confidence.score());
@@ -279,6 +283,17 @@ void TestErgLogReplay::test_table_position_confidence(void) {
   TEST_ASSERT_TRUE(syntheticBounds.contains(200, 80));
   TEST_ASSERT_FALSE(syntheticBounds.contains(89, 80));
   TEST_ASSERT_FALSE(syntheticBounds.contains(200, 91));
+  TEST_ASSERT_EQUAL_INT(10, ErgControl::TABLE_SEEK_CADENCE_MARGIN_RPM);
+  TEST_ASSERT_TRUE(syntheticBounds.containsWithCadenceMargin(200, 60, ErgControl::TABLE_SEEK_CADENCE_MARGIN_RPM));
+  TEST_ASSERT_TRUE(syntheticBounds.containsWithCadenceMargin(200, 100, ErgControl::TABLE_SEEK_CADENCE_MARGIN_RPM));
+  TEST_ASSERT_FALSE(syntheticBounds.containsWithCadenceMargin(200, 59, ErgControl::TABLE_SEEK_CADENCE_MARGIN_RPM));
+  TEST_ASSERT_FALSE(syntheticBounds.containsWithCadenceMargin(200, 101, ErgControl::TABLE_SEEK_CADENCE_MARGIN_RPM));
+  TEST_ASSERT_FALSE(syntheticBounds.containsWithCadenceMargin(301, 80, ErgControl::TABLE_SEEK_CADENCE_MARGIN_RPM));
+
+  TEST_ASSERT_FALSE(ErgControl::tableSeekExceededPowerLimit(340, 360, true));
+  TEST_ASSERT_TRUE(ErgControl::tableSeekExceededPowerLimit(340, 361, true));
+  TEST_ASSERT_FALSE(ErgControl::tableSeekExceededPowerLimit(170, 130, false));
+  TEST_ASSERT_TRUE(ErgControl::tableSeekExceededPowerLimit(170, 129, false));
 
   PTData table;
   RideReplaySummary tableSummary;
@@ -293,6 +308,11 @@ void TestErgLogReplay::test_table_position_confidence(void) {
   ErgControl::TableConfidence replayConfidence;
   const ErgControl::RecordedTableBounds replayBounds = ErgControl::recordedTableBounds(table);
   PTHelpers helpers;
+  const int32_t edgePosition     = helpers.lookup(340, replayBounds.maxCadence, table);
+  const int32_t extendedPosition = helpers.lookup(340, replayBounds.maxCadence + 6, table);
+  TEST_ASSERT_NOT_EQUAL(RETURN_ERROR, edgePosition);
+  TEST_ASSERT_NOT_EQUAL(RETURN_ERROR, extendedPosition);
+  TEST_ASSERT_LESS_THAN_INT32_MESSAGE(edgePosition, extendedPosition, "high-cadence torque scaling should reduce resistance beyond the measured edge");
   int eligibleSamples = 0;
   int accurateSamples = 0;
   bool becameTrusted  = false;

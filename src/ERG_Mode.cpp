@@ -61,25 +61,25 @@ void ErgMode::runERG() {
     lastSetPoint = 0;
   }
 
+  if (tableSeekPidSeedValid &&
+      (rtConfig->getFTMSMode() != FitnessMachineControlPointProcedure::SetTargetPower || rtConfig->watts.getTarget() != tableSeekTargetWatts)) {
+    tableSeekPidSeedValid = false;
+  }
+
   _updateTableConfidence();
+
+  // A trusted seek gets the first look at cadence so its feed-forward target
+  // is refreshed before deciding whether an overshoot needs PID intervention.
+  _handleTrustedTableSeek();
 
   const bool reachedIncreasingTarget = mode == Mode::INCREASING && rtConfig->watts.getValue() >= rtConfig->watts.getTarget();
   const bool reachedDecreasingTarget = mode == Mode::DECREASING && rtConfig->watts.getValue() <= rtConfig->watts.getTarget();
-  if (reachedIncreasingTarget || reachedDecreasingTarget) {
-    if (isTableSeeking()) {
-      if (abs(rtConfig->watts.getTarget() - rtConfig->watts.getValue()) > ERG_MODE_PID_WINDOW) {
-        _scoreTable(tableSeekTargetWatts, tableSeekCadence, false);
-      }
-      _stopTrustedTableSeek("power crossed target");
-    } else {
-      SS2K_LOG(ERG_MODE_LOG_TAG, "ERG setpoint reached; resuming PID control");
-      mode      = Mode::MAINTAIN;
-      isDelayed = false;
-      ergTimer  = 0;
-    }
+  if (!isTableSeeking() && (reachedIncreasingTarget || reachedDecreasingTarget)) {
+    SS2K_LOG(ERG_MODE_LOG_TAG, "ERG setpoint reached; resuming PID control");
+    mode      = Mode::MAINTAIN;
+    isDelayed = false;
+    ergTimer  = 0;
   }
-
-  _handleTrustedTableSeek();
 
   if (isDelayed && (ss2k->getCurrentPosition() == ss2k->getTargetPosition())) {
     SS2K_LOG(ERG_MODE_LOG_TAG, "ERG delay cleared,  %dw, tgt %dw, pos %d, tgt %d", rtConfig->watts.getValue(), rtConfig->watts.getTarget(), ss2k->getCurrentPosition(),
@@ -305,7 +305,11 @@ bool ErgMode::_positionPredictionIsAccurate(int watts, int cadence, int32_t actu
 
 bool ErgMode::_tableTargetIsWithinMeasuredBounds(int watts, int cadence) const { return ErgControl::recordedTableBounds(powerTable->ptData).contains(watts, cadence); }
 
-bool ErgMode::_tableTargetIsTrusted(int watts, int cadence) const { return tableConfidence.trusted() && _tableTargetIsWithinMeasuredBounds(watts, cadence); }
+bool ErgMode::_tableTargetIsWithinTrustedBounds(int watts, int cadence) const {
+  return ErgControl::recordedTableBounds(powerTable->ptData).containsWithCadenceMargin(watts, cadence, ErgControl::TABLE_SEEK_CADENCE_MARGIN_RPM);
+}
+
+bool ErgMode::_tableTargetIsTrusted(int watts, int cadence) const { return tableConfidence.trusted() && _tableTargetIsWithinTrustedBounds(watts, cadence); }
 
 void ErgMode::_scoreTable(int watts, int cadence, bool accurate) {
   const bool changed = tableConfidence.update(accurate);
@@ -364,20 +368,24 @@ void ErgMode::_startTrustedTableSeek(int32_t position) {
   tableSeekStableMisses   = 0;
   tableSeekWattsTimestamp = rtConfig->watts.getTimestamp();
   tableSeekDeadline       = _trustedTableMoveDeadline(position);
+  tableSeekPidSeedValid   = false;
   isDelayed               = false;
-  SS2K_LOG(ERG_MODE_LOG_TAG, "Trusted table seek: %dw/%drpm directly to %d", tableSeekTargetWatts, tableSeekCadence, position);
+  SS2K_LOG(ERG_MODE_LOG_TAG, "Trusted table seek%s: %dw/%drpm directly to %d", _tableTargetIsWithinMeasuredBounds(tableSeekTargetWatts, tableSeekCadence) ? "" : " (cadence edge)",
+           tableSeekTargetWatts, tableSeekCadence, position);
 }
 
-void ErgMode::_stopTrustedTableSeek(const char* reason) {
+void ErgMode::_stopTrustedTableSeek(const char* reason, bool seedPidFromTable) {
   if (!isTableSeeking()) return;
   SS2K_LOG(ERG_MODE_LOG_TAG, "Trusted table seek ended (%s); resuming PID", reason);
-  tableSeekState         = TableSeekState::INACTIVE;
-  tableSeekStableMatches = 0;
-  tableSeekStableMisses  = 0;
-  tableSeekLastWatts     = INT32_MIN;
-  mode                   = Mode::MAINTAIN;
-  isDelayed              = false;
-  ergTimer               = 0;
+  tableSeekPidSeedValid    = seedPidFromTable;
+  tableSeekPidSeedPosition = tableSeekPosition;
+  tableSeekState           = TableSeekState::INACTIVE;
+  tableSeekStableMatches   = 0;
+  tableSeekStableMisses    = 0;
+  tableSeekLastWatts       = INT32_MIN;
+  mode                     = Mode::MAINTAIN;
+  isDelayed                = false;
+  ergTimer                 = 0;
 }
 
 void ErgMode::_handleTrustedTableSeek() {
@@ -402,7 +410,7 @@ void ErgMode::_handleTrustedTableSeek() {
   // single-RPM sensor jitter cannot accumulate into command chatter.
   if (cadence != tableSeekCadence) {
     if (!_tableTargetIsTrusted(tableSeekTargetWatts, cadence)) {
-      _stopTrustedTableSeek("cadence left the measured table bounds");
+      _stopTrustedTableSeek("cadence left the trusted table margin", true);
       return;
     }
     const int32_t cadencePosition = powerTable->lookup(tableSeekTargetWatts, cadence);
@@ -419,8 +427,20 @@ void ErgMode::_handleTrustedTableSeek() {
       tableSeekLastWatts     = INT32_MIN;
       tableSeekDeadline      = _trustedTableMoveDeadline(cadencePosition);
       rtConfig->setTargetIncline(cadencePosition);
-      SS2K_LOG(ERG_MODE_LOG_TAG, "Trusted table seek followed cadence to %drpm, position %d", cadence, cadencePosition);
+      SS2K_LOG(ERG_MODE_LOG_TAG, "Trusted table seek followed cadence to %drpm, position %d%s", cadence, cadencePosition,
+               _tableTargetIsWithinMeasuredBounds(tableSeekTargetWatts, cadence) ? "" : " (edge extrapolation)");
     }
+  }
+
+  // Crossing the target is expected while the brake and power meter settle.
+  // Keep following cadence through ordinary crossings, but abort promptly on
+  // a meaningful overshoot. Reductions get more low-side room because they
+  // are safer for the rider and the ride replay showed longer power latency.
+  const int watts = rtConfig->watts.getValue();
+  if (ErgControl::tableSeekExceededPowerLimit(tableSeekTargetWatts, watts, mode == Mode::INCREASING)) {
+    _scoreTable(tableSeekTargetWatts, tableSeekCadence, false);
+    _stopTrustedTableSeek(mode == Mode::INCREASING ? "power exceeded high-side safety limit" : "power exceeded low-side safety limit", true);
+    return;
   }
 
   const unsigned long now = millis();
@@ -451,7 +471,6 @@ void ErgMode::_handleTrustedTableSeek() {
   if (wattsTimestamp == tableSeekWattsTimestamp) return;
   tableSeekWattsTimestamp = wattsTimestamp;
 
-  const int watts    = rtConfig->watts.getValue();
   const bool stable  = tableSeekLastWatts != INT32_MIN && abs(watts - tableSeekLastWatts) <= ERG_TABLE_STABLE_WATTS_DELTA;
   tableSeekLastWatts = watts;
   if (!stable) {
@@ -460,7 +479,7 @@ void ErgMode::_handleTrustedTableSeek() {
     return;
   }
 
-  const bool accurate = _positionPredictionIsAccurate(watts, cadence, ss2k->getCurrentPosition());
+  const bool accurate = abs(watts - tableSeekTargetWatts) <= ERG_MODE_PID_WINDOW && _positionPredictionIsAccurate(watts, cadence, ss2k->getCurrentPosition());
   if (accurate) {
     ++tableSeekStableMatches;
     tableSeekStableMisses = 0;
@@ -525,8 +544,20 @@ int32_t ErgMode::_inSetpointState() {
     PID_output = -maxChange;
   }
 
-  // Calculate new incline
+  // Calculate new incline. On the first PID update after a table safety
+  // handoff, retain whichever of the cadence feed-forward position or normal
+  // PID correction reduces the current error more decisively. This prevents
+  // PID from cancelling a useful edge-cadence response before the motor has
+  // had a chance to execute it.
   float newIncline = ss2k->getCurrentPosition() + PID_output;
+  if (tableSeekPidSeedValid) {
+    if (watts > target) {
+      newIncline = std::min(newIncline, static_cast<float>(tableSeekPidSeedPosition));
+    } else if (watts < target) {
+      newIncline = std::max(newIncline, static_cast<float>(tableSeekPidSeedPosition));
+    }
+    tableSeekPidSeedValid = false;
+  }
 
   // Log output at the configured ERG interval.
   static unsigned long lastTime = 0;

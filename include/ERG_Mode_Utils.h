@@ -26,6 +26,13 @@ constexpr double TABLE_GAIN_BLEND              = 0.5;
 constexpr double GAIN_MIN_SENSITIVITY_RATIO    = 0.25;
 constexpr double GAIN_MAX_SENSITIVITY_RATIO    = 4.0;
 constexpr double SLOPE_CONTROL_DIVISOR         = 10.0;
+// lookup() safely extends cadence using equal-torque scaling against the
+// nearest measured row. Limit trusted seeks to two table rows beyond the
+// recorded edge so a short cadence surge remains covered without turning a
+// sparse table into an unlimited extrapolator.
+constexpr int TABLE_SEEK_CADENCE_MARGIN_RPM         = POWERTABLE_CAD_INCREMENT * 2;
+constexpr int TABLE_SEEK_INCREASE_OVERSHOOT_WATTS   = ERG_MODE_PID_WINDOW;
+constexpr int TABLE_SEEK_DECREASE_UNDERSHOOT_WATTS = ERG_MODE_PID_WINDOW * 2;
 
 // Runtime validation is deliberately independent of TableEntry::readings:
 // sample count describes how the table was built, while this score describes
@@ -72,7 +79,12 @@ struct RecordedTableBounds {
   int minCadence = 0;
   int maxCadence = 0;
 
-  bool contains(int watts, int cadence) const { return valid && watts >= minWatts && watts <= maxWatts && cadence >= minCadence && cadence <= maxCadence; }
+  bool containsWatts(int watts) const { return valid && watts >= minWatts && watts <= maxWatts; }
+  bool containsCadence(int cadence) const { return valid && cadence >= minCadence && cadence <= maxCadence; }
+  bool contains(int watts, int cadence) const { return containsWatts(watts) && containsCadence(cadence); }
+  bool containsWithCadenceMargin(int watts, int cadence, int margin) const {
+    return margin >= 0 && containsWatts(watts) && cadence >= minCadence - margin && cadence <= maxCadence + margin;
+  }
 };
 
 inline RecordedTableBounds recordedTableBounds(const PTData& table) {
@@ -118,6 +130,11 @@ inline bool positionMatchesPowerWindow(int32_t actualPosition, int32_t lowPositi
   const int32_t lower = std::min(lowPosition, highPosition);
   const int32_t upper = std::max(lowPosition, highPosition);
   return actualPosition >= lower - padding && actualPosition <= upper + padding;
+}
+
+inline bool tableSeekExceededPowerLimit(int targetWatts, int actualWatts, bool increasing) {
+  if (increasing) return actualWatts > targetWatts + TABLE_SEEK_INCREASE_OVERSHOOT_WATTS;
+  return actualWatts < targetWatts - TABLE_SEEK_DECREASE_UNDERSHOOT_WATTS;
 }
 
 inline double sanitizeSensitivity(double sensitivity) { return std::isfinite(sensitivity) && sensitivity > 0.0 ? sensitivity : 1.0; }

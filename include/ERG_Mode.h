@@ -43,6 +43,7 @@ class ErgMode {
     mode                     = Mode::MAINTAIN;
     tableSeekStableMatches   = 0;
     tableSeekStableMisses    = 0;
+    tableSeekPidSeedValid    = false;
     confidenceWattsTimestamp = 0;
     confidenceCadence        = 0;
     confidenceWasHomed       = false;
@@ -71,6 +72,8 @@ class ErgMode {
   unsigned long confidenceWattsTimestamp = 0;
   int confidenceCadence                  = 0;
   bool confidenceWasHomed                = false;
+  bool tableSeekPidSeedValid             = false;
+  int32_t tableSeekPidSeedPosition       = 0;
 
   // calculate incline if setpoint (from Zwift) changes
   int32_t _setPointChangeState();
@@ -82,10 +85,11 @@ class ErgMode {
   bool _positionPredictionIsAccurate(int watts, int cadence, int32_t actualPosition);
   bool _tableTargetIsTrusted(int watts, int cadence) const;
   bool _tableTargetIsWithinMeasuredBounds(int watts, int cadence) const;
+  bool _tableTargetIsWithinTrustedBounds(int watts, int cadence) const;
   void _scoreTable(int watts, int cadence, bool accurate);
   void _startTrustedTableSeek(int32_t position);
   void _handleTrustedTableSeek();
-  void _stopTrustedTableSeek(const char* reason);
+  void _stopTrustedTableSeek(const char* reason, bool seedPidFromTable = false);
   unsigned long _trustedTableMoveDeadline(int32_t position) const;
 
   // update localvalues + incline, creates a log
