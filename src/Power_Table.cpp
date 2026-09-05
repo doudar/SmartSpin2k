@@ -47,8 +47,10 @@ int PowerBuffer::getReadings() {
 }
 
 void PowerTable::processPowerValue(PowerBuffer& powerBuffer, int cadence, Measurement watts) {
-  if ((cadence >= (MINIMUM_TABLE_CAD - (POWERTABLE_CAD_INCREMENT / 2))) &&
-      (cadence <= (MINIMUM_TABLE_CAD + (POWERTABLE_CAD_INCREMENT * POWERTABLE_CAD_SIZE) - (POWERTABLE_CAD_SIZE / 2))) && (watts.getValue() > 10) &&  // adding constraints
+  // Use the same cadence binning rule for collection and insertion. This
+  // admits the complete edge bins (58-62 RPM and 103-107 RPM) while rejecting
+  // cadences that calculateIndex() cannot place in the table.
+  if (ptHelpers.cadenceIsWithinTable(cadence) && (watts.getValue() > 10) &&  // adding constraints
       (watts.getValue() < (POWERTABLE_WATT_SIZE * POWERTABLE_WATT_INCREMENT))) {
     if (powerBuffer.powerEntry[0].readings == 0) {  // we need to make sure stepper position is not negative so it only takes positive resistance values
       // Take Initial reading

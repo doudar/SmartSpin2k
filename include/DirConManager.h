@@ -23,6 +23,11 @@
 #define DIRCON_SEND_BUFFER_SIZE      256
 #define DIRCON_MAX_CHARACTERISTICS   20   // maximum number of characteristics to track for subscriptions
 #define DIRCON_MAX_SERVICES          10   // maximum number of services that can register with DirCon
+#define DIRCON_OUTBOUND_QUEUE_DEPTH  8    // bounded per-client queue; notifications are dropped when full
+#define DIRCON_SEND_STALL_TIMEOUT_MS 5000  // disconnect a client whose queued data cannot make progress
+#define DIRCON_TCP_KEEPIDLE_SECONDS  5
+#define DIRCON_TCP_KEEPINTVL_SECONDS 2
+#define DIRCON_TCP_KEEPCNT           3
 
 // Result struct populated by service write handler callbacks
 struct DirConWriteResult {
@@ -70,6 +75,7 @@ class DirConManager {
   static bool started;
   static String statusMessage;
   static WiFiClient dirConClients[DIRCON_MAX_CLIENTS];
+  static bool clientActive[DIRCON_MAX_CLIENTS];
   static WiFiServer* tcpServer;
   static void setupMDNS();
   static void updateStatusMessage();
@@ -78,9 +84,12 @@ class DirConManager {
   // TCP connection handling
   static void checkForNewClients();
   static void handleClientData();
+  static void drainOutboundQueues();
+  static void closeClient(size_t clientIndex, const char* reason);
+  static bool queueOutboundFrame(size_t clientIndex, const uint8_t* data, size_t length, bool notification, const NimBLEUUID* requiredSubscription = nullptr);
+  static void configureClientSocket(WiFiClient& client);
   static uint8_t receiveBuffer[DIRCON_MAX_CLIENTS][DIRCON_RECEIVE_BUFFER_SIZE];
   static size_t receiveBufferLength[DIRCON_MAX_CLIENTS];
-  static uint8_t sendBuffer[DIRCON_SEND_BUFFER_SIZE];
 
   // Message handling
   static bool processDirConMessage(DirConMessage* message, size_t clientIndex);

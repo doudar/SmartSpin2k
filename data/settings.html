@@ -145,13 +145,6 @@
         tooltipText: 'Make stepper silent at expense of torque',
         defaultValue: false
       },
-      autoUpdate: {
-        type: 'toggle',
-        title: 'Automatic Updates',
-        tooltip: 'OTA firmware',
-        tooltipText: 'Check for new firmware on boot?',
-        defaultValue: false
-      },
       stepperDir: {
         type: 'toggle',
         title: 'Stepper Motor Direction',
@@ -377,6 +370,9 @@
         } else {
           params.append(element.name, element.value);
         }
+
+        // Marks this as a settings-page update so omitted checkboxes are saved as false.
+        params.set('shiftStep', document.getElementById('shiftStep').value);
         
         const toggleIds = Object.entries(settingsConfig)
           .filter(([_, config]) => config.type === 'toggle')

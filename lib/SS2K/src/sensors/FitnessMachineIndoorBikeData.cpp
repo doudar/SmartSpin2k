@@ -6,7 +6,7 @@
  */
 
 #include "Data.h"
-#include "endian.h"
+#include "ByteUtils.h"
 #include "sensors/FitnessMachineIndoorBikeData.h"
 
 // See:
@@ -81,7 +81,7 @@ void FitnessMachineIndoorBikeData::decode(uint8_t *data, size_t length) {
         }
         dataIndex += byteSize;
         value             = convert(value, byteSize, signedFlags[typeIndex]);
-        double_t result   = double_t(static_cast<int>(std::round((value * resolutions[typeIndex] * 10) + 0.5)) / 10.0);
+        double_t result   = std::round(value * resolutions[typeIndex] * 10.0) / 10.0;
         values[typeIndex] = result;
         continue;
       }

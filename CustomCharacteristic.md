@@ -79,7 +79,7 @@ From BLE_common.h
 |BLE_simulateWatts         |0x0E   |bool |                                                   |    
 |BLE_simulateCad           |0x0F   |bool |                                                   |
 |BLE_FTMSMode               |0x10   |bool |                                                   |
-|BLE_autoUpdate            |0x11   |bool |updates on (01) or off (00)                        |
+|BLE_autoUpdate            |0x11   |bool |Deprecated compatibility field; always off         |
 |BLE_ssid                  |0x12   |     |Not Implemented                                    |
 |BLE_password              |0x13   |     |Not Implemented                                    |
 |BLE_foundDevices          |0x14   |     |Not Implemented                                    |

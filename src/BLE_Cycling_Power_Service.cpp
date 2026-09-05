@@ -6,6 +6,7 @@
  */
 #include "BLE_Cycling_Power_Service.h"
 #include "DirConManager.h"
+#include "ByteUtils.h"
 #include <Constants.h>
 
 BLE_Cycling_Power_Service::BLE_Cycling_Power_Service() : pPowerMonitor(nullptr), cyclingPowerFeatureCharacteristic(nullptr), sensorLocationCharacteristic(nullptr) {}
@@ -19,10 +20,7 @@ void BLE_Cycling_Power_Service::setupService(NimBLEServer *pServer, MyCharacteri
 
   CyclingPowerFeatureFlags::Types cpFeatureFlags = CyclingPowerFeatureFlags::WheelRevolutionDataSupported | CyclingPowerFeatureFlags::CrankRevolutionDataSupported;
 
-  cpFeature[0] = static_cast<uint8_t>(cpFeatureFlags & 0xFF);
-  cpFeature[1] = static_cast<uint8_t>((cpFeatureFlags >> 8) & 0xFF);
-  cpFeature[2] = static_cast<uint8_t>((cpFeatureFlags >> 16) & 0xFF);
-  cpFeature[3] = static_cast<uint8_t>((cpFeatureFlags >> 24) & 0xFF);
+  put_le32(cpFeature, static_cast<uint32_t>(cpFeatureFlags));
 
   cyclingPowerFeatureCharacteristic->setValue(cpFeature, sizeof(cpFeature));
   sensorLocationCharacteristic->setValue(cpsLocation, sizeof(cpsLocation));

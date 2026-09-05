@@ -10,9 +10,11 @@
 #include "BLE_Device_Identity.h"
 #include "BLE_Fitness_Machine_Service.h"
 #include "SS2KLog.h"
+#include "ByteUtils.h"
 
 #include <ArduinoJson.h>
 #include <Constants.h>
+#include <BLE_Custom_Characteristic.h>
 #include <memory>
 #include <NimBLEDevice.h>
 
@@ -22,6 +24,13 @@ SpinBLEClient spinBLEClient;
 
 static MyClientCallback myClientCallback;
 static ScanCallbacks myScanCallbacks;
+
+namespace {
+// The legacy characteristic is a single ATT value and can never carry an
+// unbounded scan. Keep a small snapshot for old config-app releases while the
+// versioned scan-result stream carries every device to current releases.
+constexpr size_t LEGACY_FOUND_DEVICES_MAX_LENGTH = 480;
+}
 
 void SpinBLEClient::start() {
   // Create the task for the BLE Client loop
@@ -71,14 +80,39 @@ static void notifyCB(NimBLERemoteCharacteristic* pBLERemoteCharacteristic, uint8
   }
 }
 
+static bool subscribeToCharacteristic(NimBLEClient* pClient, NimBLERemoteService* pSvc, const BLEServiceInfo& service, const NimBLEUUID& characteristicUUID) {
+  if (!pClient->isConnected()) {
+    return false;
+  }
+
+  // Ask NimBLE for only the characteristic we consume. Discovering every characteristic
+  // caches a heap object for each one and can exhaust the classic ESP32 heap on large GATT tables.
+  NimBLERemoteCharacteristic* pChr = pSvc->getCharacteristic(characteristicUUID);
+  if (!pChr) {
+    SS2K_LOG(BLE_CLIENT_LOG_TAG, "Characteristic %s not found in %s", characteristicUUID.toString().c_str(), service.name.c_str());
+    return false;
+  }
+
+  SS2K_LOG(BLE_CLIENT_LOG_TAG, "Found %s, %s", service.serviceUUID.toString().c_str(), pChr->getUUID().toString().c_str());
+  if (!pChr->canNotify() && !pChr->canIndicate()) {
+    SS2K_LOG(BLE_CLIENT_LOG_TAG, "%s %s does not support notifications or indications", service.name.c_str(), pChr->getUUID().toString().c_str());
+    return false;
+  }
+
+  const bool wantNotify = pChr->canNotify();
+  if (!pChr->subscribe(wantNotify, notifyCB)) {
+    SS2K_LOG(BLE_CLIENT_LOG_TAG, "Failed to subscribe to %s %s (handle %d)", service.name.c_str(), pChr->getUUID().toString().c_str(), pChr->getHandle());
+    return false;
+  }
+
+  SS2K_LOG(BLE_CLIENT_LOG_TAG, "Subscribed to %s %s handle: %d", service.name.c_str(), pChr->getUUID().toString().c_str(), pChr->getHandle());
+  return true;
+}
+
 /**
- * @brief Subscribes to all notifications for supported BLE services on the given client.
+ * @brief Subscribes to the notification characteristics consumed by SmartSpin2k.
  *
- * This function iterates through all supported BLE services and subscribes to notifications
- * for each characteristic that supports notifications or indications.
- *
- * @param pClient Pointer to the NimBLEClient object representing the BLE client.
- *                The client must be connected for the function to proceed.
+ * @param pClient Pointer to the connected NimBLE client.
  */
 bool subscribeToAllNotifications(NimBLEClient* pClient) {
   bool isSubscribed = false;
@@ -95,34 +129,20 @@ bool subscribeToAllNotifications(NimBLEClient* pClient) {
     NimBLERemoteService* pSvc = pClient->getService(service.serviceUUID);
     if (pSvc) {
       SS2K_LOG(BLE_CLIENT_LOG_TAG, "Found %s", service.name.c_str());
-      auto chars = pSvc->getCharacteristics(true);
-      for (auto* pChr : chars) {
-        if (!pChr) {
-          continue;
-        }
-        // Defensive: Ensure characteristic still belongs to this service (avoid stale pointer after service refresh)
-        if (pChr->getRemoteService() != pSvc) {
-          SS2K_LOGW(BLE_CLIENT_LOG_TAG, "Characteristic parent mismatch while subscribing %s", pChr->getUUID().toString().c_str());
-          continue;
-        }
-        if (!pClient->isConnected()) {
-          SS2K_LOGW(BLE_CLIENT_LOG_TAG, "Stopping subscription: client disconnected before subscribing to %s", pChr->getUUID().toString().c_str());
-          break;
-        }
-        SS2K_LOG(BLE_CLIENT_LOG_TAG, "Found %s, %s", service.serviceUUID.toString().c_str(), pChr->getUUID().toString().c_str());
-        if (pChr->canNotify() || pChr->canIndicate()) {
-          bool wantNotify = pChr->canNotify();
-          // Wrap subscribe in a try/catch-equivalent pattern: NimBLE doesn't throw, but we guard return status
-          if (wantNotify ? pChr->subscribe(true, notifyCB) : pChr->subscribe(false, notifyCB)) {
-            SS2K_LOG(BLE_CLIENT_LOG_TAG, "Subscribed to %s %s handle: %d", service.name.c_str(), pChr->getUUID().toString().c_str(), pChr->getHandle());
-            isSubscribed = true;
-          } else {
-            // Additional debug: check CCCD descriptor presence which subscribe() internally uses
-            NimBLERemoteDescriptor* cccd = pChr->getDescriptor(NimBLEUUID((uint16_t)0x2902));
-            SS2K_LOG(BLE_CLIENT_LOG_TAG, "Failed to subscribe to %s %s (handle %d, hasCCCD=%s)", service.name.c_str(), pChr->getUUID().toString().c_str(), pChr->getHandle(),
-                     cccd ? "Y" : "N");
-          }
-        }
+
+      // HID remotes may expose several Report characteristics with the same UUID. They
+      // are subscribed during connectBLE_HID(), where full discovery is intentional.
+      if (service.serviceUUID == HID_SERVICE_UUID) {
+        isSubscribed = true;
+        continue;
+      }
+
+      isSubscribed |= subscribeToCharacteristic(pClient, pSvc, service, service.characteristicUUID);
+
+      // FTMS control-point indications acknowledge commands sent later in postConnect().
+      // Status and training-status notifications are not consumed by this firmware.
+      if (service.serviceUUID == FITNESSMACHINESERVICE_UUID) {
+        isSubscribed |= subscribeToCharacteristic(pClient, pSvc, service, FITNESSMACHINECONTROLPOINT_UUID);
       }
     }
   }
@@ -407,6 +427,9 @@ void ScanCallbacks::onResult(const NimBLEAdvertisedDevice* advertisedDevice) {
     }
     SS2K_LOG(BLE_CLIENT_LOG_TAG, "Found device %s with %s", aDevName.c_str(), servicesStr.c_str());
     if (serviceInfo) {
+      const NimBLEUUID& primaryServiceUUID = advertisedDevice->isAdvertisingService(FITNESSMACHINESERVICE_UUID) ? FITNESSMACHINESERVICE_UUID : serviceInfo->serviceUUID;
+      BLE_ss2kCustomCharacteristic::notifyScanResult(aDevName, primaryServiceUUID);
+
       // Add device to foundDevices list
       JsonDocument devices;
       const char* foundDevicesJson = userConfig->getFoundDevices();
@@ -434,11 +457,12 @@ void ScanCallbacks::onResult(const NimBLEAdvertisedDevice* advertisedDevice) {
         }
         String output;
         serializeJson(devices, output);
-        userConfig->setFoundDevices(output);
+        if (output.length() <= LEGACY_FOUND_DEVICES_MAX_LENGTH) {
+          userConfig->setFoundDevices(output);
+        }
       }
 
       SS2K_LOG(BLE_CLIENT_LOG_TAG, "Supported Device: %s with service %s", aDevName.c_str(), serviceInfo->name.c_str());
-      const NimBLEUUID& primaryServiceUUID = serviceInfo->serviceUUID;
       // check to see if we're already connected to this device
       for (size_t i = 0; i < NUM_BLE_DEVICES; i++) {
         if (spinBLEClient.myBLEDevices[i].advertisedDevice != nullptr) {
@@ -536,8 +560,6 @@ void ScanCallbacks::onResult(const NimBLEAdvertisedDevice* advertisedDevice) {
  * @param duration The duration in seconds for which the scan should run
  */
 void SpinBLEClient::scanProcess(int duration) {
-  this->doScan = false;  // Confirming we did the scan
-
   NimBLEScan* pBLEScan = NimBLEDevice::getScan();
 
   static bool waitForOnScanEndToComplete = false;
@@ -550,12 +572,21 @@ void SpinBLEClient::scanProcess(int duration) {
     return;
   }
 
+  this->doScan = false;  // Confirming we started the requested scan.
+
   SS2K_LOG(BLE_CLIENT_LOG_TAG, "Scanning for BLE servers and putting them into a list...");
-  pBLEScan->start(duration, false, true);
+  userConfig->setFoundDevices("{}");
+  BLE_ss2kCustomCharacteristic::beginScanResults();
+  if (!pBLEScan->start(duration, false, true)) {
+    BLE_ss2kCustomCharacteristic::endScanResults();
+    this->doScan = true;
+    SS2K_LOGE(BLE_CLIENT_LOG_TAG, "Unable to start BLE scan");
+  }
 }
 
 void ScanCallbacks::onScanEnd(const NimBLEScanResults& results, int reason) {
   SS2K_LOG(BLE_CLIENT_LOG_TAG, "Scan Ended");
+  BLE_ss2kCustomCharacteristic::endScanResults();
 }
 
 // remove the last connected BLE Power Meter
@@ -620,8 +651,7 @@ void SpinBLEClient::FTMSControlPointWrite(const uint8_t* pData, int length) {
         char logBuf[kLogBufCapacity];
         if (modData[0] == FitnessMachineControlPointProcedure::SetIndoorBikeSimulationParameters) {  // use virtual Shifting
           int incline = ss2k->getTargetPosition() / userConfig->getInclineMultiplier();
-          modData[3]  = (uint8_t)(incline & 0xff);
-          modData[4]  = (uint8_t)(incline >> 8);
+          put_le16s(&modData[3], static_cast<int16_t>(incline));
           writeCharacteristic->writeValue(modData, length);
           logBufLength = ss2k_log_hex_to_buffer(modData, length, logBuf, 0, kLogBufCapacity);
           logBufLength += snprintf(logBuf + logBufLength, kLogBufCapacity - logBufLength, "-> Shifted Sim Data: %d", rtConfig->getShifterPosition());
@@ -718,9 +748,9 @@ void SpinBLEClient::postConnect() {
             auto rr = resistanceRangeCharacteristic->readValue();
             if (rr.size() >= 6) {
               const uint8_t* b = reinterpret_cast<const uint8_t*>(rr.data());
-              int16_t minRaw   = static_cast<int16_t>(b[0] | (static_cast<uint16_t>(b[1]) << 8));
-              int16_t maxRaw   = static_cast<int16_t>(b[2] | (static_cast<uint16_t>(b[3]) << 8));
-              uint16_t incRaw  = static_cast<uint16_t>(b[4] | (static_cast<uint16_t>(b[5]) << 8));
+              int16_t minRaw  = get_le16s(&b[0]);
+              int16_t maxRaw  = get_le16s(&b[2]);
+              uint16_t incRaw = get_le16(&b[4]);
 
               float incF = static_cast<float>(incRaw) / 10.0f;           // FTMS resolution 0.1, convert to actual increment value
               float minF = (static_cast<float>(minRaw) / 10.0f) / incF;  // Convert FTMS 0.1 units to normalized scale
@@ -846,8 +876,8 @@ void SpinBLEClient::connectBLE_HID(NimBLEClient* pClient) {
     // One real device reports 2 with the same UUID but
     // different handles. Using getCharacteristic() results
     // in subscribing to only one.
-    std::vector<NimBLERemoteCharacteristic*> charVector = pSvc->getCharacteristics(true);
-    for (auto& it : charVector) {
+    const std::vector<NimBLERemoteCharacteristic*>& charVector = pSvc->getCharacteristics(true);
+    for (auto* it : charVector) {
       if (it->getUUID() == NimBLEUUID(HID_REPORT_DATA_UUID)) {
         Serial.println(it->toString().c_str());
         if (it->canNotify()) {

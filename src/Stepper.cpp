@@ -9,6 +9,7 @@
 #include "Main.h"
 #include "SS2KLog.h"
 #include "BLE_Fitness_Machine_Service.h"
+#include "ERG_Mode.h"
 #include "Power_Table.h"
 #include "settings.h"
 #include <Constants.h>
@@ -272,6 +273,24 @@ void SS2K::setupTMCStepperDriver(bool reset) {
   }
   const bool initializeFastAccel = !reset || stepper == nullptr;
 
+  // FastAccelStepper only owns the ESP32 pulse-generation peripheral; it does
+  // not require a responding TMC UART. Initialize it even when the physical
+  // driver is absent so runtime setting writes cannot encounter a null object.
+  if (initializeFastAccel) {
+    engine.init();
+    stepper = engine.stepperConnectToPin(currentBoard.stepPin);
+    if (stepper == nullptr) {
+      SS2K_LOGE(MAIN_LOG_TAG, "Unable to initialize FastAccelStepper on pin %u", static_cast<unsigned>(currentBoard.stepPin));
+      return;
+    }
+    stepper->setDirectionPin(currentBoard.dirPin, userConfig->getStepperDir());
+    stepper->setEnablePin(currentBoard.enablePin);
+    stepper->setAutoEnable(true);
+    stepper->setSpeedInHz(DEFAULT_STEPPER_SPEED);
+    stepper->setAcceleration(STEPPER_ACCELERATION);
+    stepper->setDelayToDisable(65535);
+  }
+
   // TMCStepper's connection test is sufficient for normal configuration and
   // homing. The stricter IFCNT check is reserved for irreversible OTP writes.
   if (!recoverTmc2209OperationalConnection(driver)) {
@@ -279,16 +298,7 @@ void SS2K::setupTMCStepperDriver(bool reset) {
     return;
   }
 
-  // FastAccel setup
   if (initializeFastAccel) {
-    engine.init();
-    stepper = engine.stepperConnectToPin(currentBoard.stepPin);
-    stepper->setDirectionPin(currentBoard.dirPin, userConfig->getStepperDir());
-    stepper->setEnablePin(currentBoard.enablePin);
-    stepper->setAutoEnable(true);
-    stepper->setSpeedInHz(DEFAULT_STEPPER_SPEED);
-    stepper->setAcceleration(STEPPER_ACCELERATION);
-    stepper->setDelayToDisable(65535);
     // TMC Driver Setup
     driver->begin();
     if (verifyTmc2209ConnectionForOtp(driver)) {
@@ -312,9 +322,7 @@ void SS2K::setupTMCStepperDriver(bool reset) {
 
 static int lastHomingSgThreshold = 0;
 
-static int getScaledHomingSensitivity() {
-  return round(userConfig->getHomingSensitivity() * currentBoard.homingSensitivityScaler);
-}
+static int getScaledHomingSensitivity() { return round(userConfig->getHomingSensitivity() * currentBoard.homingSensitivityScaler); }
 
 static HomingSgBaseline getHomingSgBaseline() {
   int samples[HOMING_SG_SAMPLE_COUNT];
@@ -349,8 +357,8 @@ static HomingSgBaseline getHomingSgBaseline() {
   int threshold             = round(trimmedTotal / (float)trimmedCount);
   int normalLowDrop         = threshold - trimmedMin;
   int measuredSensitivity   = max(configuredSensitivity, normalLowDrop + max(configuredSensitivity / 2, HOMING_SG_MIN_SAMPLE_MARGIN));
-  int maxSensitivity      = min(HOMING_MAX_SENSITIVITY, max(threshold, 1));
-  measuredSensitivity     = constrain(measuredSensitivity + 10, 1, maxSensitivity);
+  int maxSensitivity        = min(HOMING_MAX_SENSITIVITY, max(threshold, 1));
+  measuredSensitivity       = constrain(measuredSensitivity + 10, 1, maxSensitivity);
   SS2K_LOG(MAIN_LOG_TAG, "Homing SG baseline used %d/%d trimmed samples. Dropped: %d/%d, Spread: %d-%d, measured sensitivity: %d", trimmedCount, HOMING_SG_SAMPLE_COUNT,
            samples[minSampleIndex], samples[maxSampleIndex], trimmedMin, trimmedMax, measuredSensitivity);
   return {threshold, measuredSensitivity};
@@ -384,6 +392,7 @@ bool SS2K::_findEndStop(bool moveForward) {
   lastHomingSgThreshold = baseline.threshold;
 
   SS2K_LOG(MAIN_LOG_TAG, "Homing %s. Stable Threshold: %d, Sensitivity: %d", moveForward ? "forward (max)" : "backward (min)", baseline.threshold, baseline.sensitivity);
+  SS2K_LOG(MAIN_LOG_TAG, "pos: %d", stepper->getCurrentPosition());
 
   unsigned long lastLogTime = millis() - LOG_INTERVAL;  // Initialize last log time
   int currentSgResult       = 0;
@@ -407,22 +416,27 @@ bool SS2K::_findEndStop(bool moveForward) {
     // Periodically log the status for tuning
     if (millis() - lastLogTime > LOG_INTERVAL) {
       SS2K_LOG(MAIN_LOG_TAG, "Homing... Current SG: %d, Baseline: %d, Target: < %d", currentSgResult, baseline.threshold, baseline.threshold - baseline.sensitivity);
+      SS2K_LOG(MAIN_LOG_TAG, "pos: %d", stepper->getCurrentPosition());
       lastLogTime = millis();
       if (moveForward) fitnessMachineService.spinDown(FitnessMachineStatus::SpinDown_StopPedaling);
     }
 
     // Check for the stall condition
     if (currentSgResult < (baseline.threshold - baseline.sensitivity)) {
+      int32_t stallPosition = stepper->getCurrentPosition();
       stepper->forceStop();
       SS2K_LOG(MAIN_LOG_TAG, "Stall detected! SG dropped to %d. Threshold: %d", currentSgResult, baseline.threshold - baseline.sensitivity);
+      SS2K_LOG(MAIN_LOG_TAG, "pos: %d", stallPosition);
       delay(100);                   // Let motor settle
       setupTMCStepperDriver(true);  // Restore normal driver settings
       return true;
     }
   }
   // If we get here, the loop timed out
+  int32_t timeoutPosition = stepper->getCurrentPosition();
   stepper->forceStop();
   SS2K_LOG(MAIN_LOG_TAG, "Homing timed out!");
+  SS2K_LOG(MAIN_LOG_TAG, "pos: %d", timeoutPosition);
   setupTMCStepperDriver(true);  // Restore normal driver settings
   return false;
 }
@@ -516,12 +530,19 @@ void SS2K::_findFTMSHome(bool bothDirections) {
 
 void SS2K::goHome(bool bothDirections) {
   SS2K_LOG(MAIN_LOG_TAG, "Starting homing procedure...");
+  ergMode->resetTableConfidence();
   if (bothDirections) {
     fitnessMachineService.spinDown(FitnessMachineStatus::SpinDown_SpinDownRequested);
     if (!userConfig->getPTab4Pwr()) {
       // clean slate for homing
       powerTable->reset();
     }
+  }
+
+  if (!stepper) {
+    SS2K_LOG(MAIN_LOG_TAG, "Homing unavailable because the stepper pulse generator is not initialized.");
+    fitnessMachineService.spinDown(FitnessMachineStatus::SpinDown_Error);
+    return;
   }
 
   // if we're using real resistance from a FTMS bike, find those values for the reported min and max resistance instead of using hard stops.
@@ -533,8 +554,8 @@ void SS2K::goHome(bool bothDirections) {
     }
   }
 
-  if (!stepper || !currentBoard.homingSupported) {
-    SS2K_LOG(MAIN_LOG_TAG, "Homing not supported or stepper not initialized.");
+  if (!currentBoard.homingSupported) {
+    SS2K_LOG(MAIN_LOG_TAG, "Homing is not supported by this board.");
     fitnessMachineService.spinDown(FitnessMachineStatus::SpinDown_Error);
     return;
   }
@@ -678,6 +699,11 @@ void SS2K::updateStepperPower(int pwr) {
 
 // Applies current StealthChop to driver
 void SS2K::updateStealthChop(bool coolStepEnabled) {
+  if (driver == nullptr) {
+    SS2K_LOG(MAIN_LOG_TAG, "Skipping StealthChop update because the TMC driver is not initialized");
+    return;
+  }
+
   bool stealthChopEnabled = userConfig->getStealthChop();
   driver->en_spreadCycle(!stealthChopEnabled);
   driver->pwm_autoscale(stealthChopEnabled);
@@ -712,6 +738,11 @@ void SS2K::updateStealthChop(bool coolStepEnabled) {
  * @param speed The desired speed for the stepper motor. If 0, the speed is retrieved from user configuration.
  */
 void SS2K::updateStepperSpeed(int speed) {
+  if (stepper == nullptr) {
+    SS2K_LOG(MAIN_LOG_TAG, "Skipping stepper speed update because FastAccelStepper is unavailable");
+    return;
+  }
+
   if (speed == 0) {
     speed = userConfig->getStepperSpeed();
   }

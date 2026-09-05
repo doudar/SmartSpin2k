@@ -8,13 +8,50 @@
 #pragma once
 
 #include <cstdint>
+#include <cstddef>
 #include <type_traits>
 
 namespace ZwiftProtocol {
 
+inline size_t encodeUleb128(uint64_t value, uint8_t* buffer) {
+	size_t length = 0;
+	do {
+		uint8_t byte = static_cast<uint8_t>(value & 0x7FU);
+		value >>= 7U;
+		if (value != 0) byte |= 0x80U;
+		buffer[length++] = byte;
+	} while (value != 0);
+	return length;
+}
+
+inline size_t decodeUleb128(const uint8_t* buffer, size_t bufferLength, uint64_t* value) {
+	if (buffer == nullptr || value == nullptr) return 0;
+	*value = 0;
+	for (size_t i = 0, shift = 0; i < bufferLength && shift < 64; ++i, shift += 7) {
+		const uint8_t byte = buffer[i];
+		*value |= static_cast<uint64_t>(byte & 0x7FU) << shift;
+		if ((byte & 0x80U) == 0) return i + 1;
+	}
+	return 0;
+}
+
+inline size_t uleb128Length(uint64_t value) {
+	size_t length = 1;
+	while ((value >>= 7U) != 0) ++length;
+	return length;
+}
+
+inline uint64_t encodeZigZag64(int64_t value) {
+	return (static_cast<uint64_t>(value) << 1U) ^ static_cast<uint64_t>(-(value < 0));
+}
+
+inline int64_t decodeZigZag64(uint64_t value) {
+	return static_cast<int64_t>((value >> 1U) ^ static_cast<uint64_t>(-static_cast<int64_t>(value & 1U)));
+}
+
 template <typename Enum>
-constexpr auto toUnderlying(Enum value) noexcept -> std::underlying_type_t<Enum> {
-	return static_cast<std::underlying_type_t<Enum>>(value);
+constexpr auto toUnderlying(Enum value) noexcept -> typename std::underlying_type<Enum>::type {
+	return static_cast<typename std::underlying_type<Enum>::type>(value);
 }
 
 enum class CommandCode : uint8_t {

@@ -61,6 +61,8 @@ jobs:
           platformio pkg install -e S3release
       - name: Check pre-commit hooks
         uses: pre-commit/action@v3.0.1
+      - name: Refresh GitHub TLS certificate
+        run: python cert_updater.py
       - name: Build firmware
         run: platformio run -e release
       - name: Build filesystem

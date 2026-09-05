@@ -8,6 +8,8 @@
 #pragma once
 
 #include <array>
+#include <cstdint>
+#include "ByteUtils.h"
 
 // The .xml file is wrong, make sure to reference the actual FTMS .pdf
 struct FitnessMachineIndoorBikeDataFlags {
@@ -73,7 +75,7 @@ struct FitnessMachineControlPointResultCode {
 // https://www.bluetooth.com/specifications/specs/fitness-machine-service-1-0/
 // Table 4.3: Definition of the bits of the Fitness Machine Features field
 struct FitnessMachineFeatureFlags {
-  enum Types : uint {
+  enum Types : uint32_t {
     AverageSpeedSupported              = 1U << 0,
     CadenceSupported                   = 1U << 1,
     TotalDistanceSupported             = 1U << 2,
@@ -97,7 +99,7 @@ struct FitnessMachineFeatureFlags {
 // https://www.bluetooth.com/specifications/specs/fitness-machine-service-1-0/
 // Table 4.4: Definition of the bits of the Target Setting Features field
 struct FitnessMachineTargetFlags {
-  enum Types : uint {
+  enum Types : uint32_t {
     SpeedTargetSettingSupported                           = 1U << 0,
     InclinationTargetSettingSupported                     = 1U << 1,
     ResistanceTargetSettingSupported                      = 1U << 2,
@@ -282,32 +284,28 @@ class CyclingPowerMeasurement {
     flagBits           |= flags.accumulatedEnergyPresent ? (1U << 11) : 0;
     flagBits           |= flags.offsetCompensationIndicator ? (1U << 12) : 0;
 
-    data[offset++] = static_cast<uint8_t>(flagBits & 0xFF);
-    data[offset++] = static_cast<uint8_t>((flagBits >> 8) & 0xFF);
+    put_le16(&data[offset], flagBits);
+    offset += 2;
 
     // Add Instantaneous Power
-    data[offset++] = static_cast<uint8_t>(instantaneousPower & 0xFF);
-    data[offset++] = static_cast<uint8_t>((instantaneousPower >> 8) & 0xFF);
+    put_le16s(&data[offset], instantaneousPower);
+    offset += 2;
 
     // Conditional fields based on flags
     if (flags.wheelRevolutionDataPresent) {
       // Add wheel revolution data if present
-      data[offset++] = static_cast<uint8_t>(cumulativeWheelRevolutions & 0xFF);
-      data[offset++] = static_cast<uint8_t>((cumulativeWheelRevolutions >> 8) & 0xFF);
-      data[offset++] = static_cast<uint8_t>((cumulativeWheelRevolutions >> 16) & 0xFF);
-      data[offset++] = static_cast<uint8_t>((cumulativeWheelRevolutions >> 24) & 0xFF);
-
-      data[offset++] = static_cast<uint8_t>(lastWheelEventTime & 0xFF);
-      data[offset++] = static_cast<uint8_t>((lastWheelEventTime >> 8) & 0xFF);
+      put_le32(&data[offset], cumulativeWheelRevolutions);
+      offset += 4;
+      put_le16(&data[offset], lastWheelEventTime);
+      offset += 2;
     }
     // Conditional fields based on flags
     if (flags.crankRevolutionDataPresent) {
       // Add crank revolution data if present
-      data[offset++] = static_cast<uint8_t>(cumulativeCrankRevolutions & 0xFF);
-      data[offset++] = static_cast<uint8_t>((cumulativeCrankRevolutions >> 8) & 0xFF);
-
-      data[offset++] = static_cast<uint8_t>(lastCrankEventTime & 0xFF);
-      data[offset++] = static_cast<uint8_t>((lastCrankEventTime >> 8) & 0xFF);
+      put_le16(&data[offset], cumulativeCrankRevolutions);
+      offset += 2;
+      put_le16(&data[offset], lastCrankEventTime);
+      offset += 2;
     }
 
     return offset;
@@ -363,22 +361,18 @@ class CscMeasurement {
     // Conditional fields based on flags
     if (flags.wheelRevolutionDataPresent) {
       // Add wheel revolution data if present
-      for (int i = 0; i < 4; ++i) {
-        data[offset++] = static_cast<uint8_t>((cumulativeWheelRevolutions >> (i * 8)) & 0xFF);
-      }
-      for (int i = 0; i < 2; ++i) {
-        data[offset++] = static_cast<uint8_t>((lastWheelEventTime >> (i * 8)) & 0xFF);
-      }
+      put_le32(&data[offset], cumulativeWheelRevolutions);
+      offset += 4;
+      put_le16(&data[offset], lastWheelEventTime);
+      offset += 2;
     }
 
     if (flags.crankRevolutionDataPresent) {
       // Add crank revolution data if present
-      for (int i = 0; i < 2; ++i) {
-        data[offset++] = static_cast<uint8_t>((cumulativeCrankRevolutions >> (i * 8)) & 0xFF);
-      }
-      for (int i = 0; i < 2; ++i) {
-        data[offset++] = static_cast<uint8_t>((lastCrankEventTime >> (i * 8)) & 0xFF);
-      }
+      put_le16(&data[offset], cumulativeCrankRevolutions);
+      offset += 2;
+      put_le16(&data[offset], lastCrankEventTime);
+      offset += 2;
     }
 
     return offset;

@@ -7,11 +7,7 @@
 
 #pragma once
 
-#ifndef PLATFORMIO_ENV_NATIVE
 #include <Arduino.h>
-#else
-#include <ArduinoFake.h>
-#endif
 
 #include "settings.h"
 
@@ -130,7 +126,7 @@ class userParameters {
   float inclineMultiplier;
   float powerCorrectionFactor;
   float ERGSensitivity;
-  bool autoUpdate;
+  bool autoUpdate;  // Deprecated compatibility field; boot-time firmware OTA is disabled.
   int stepperPower;
   int maxWatts;
   int minWatts;
@@ -175,7 +171,10 @@ class userParameters {
   float getERGSensitivity() { return ERGSensitivity; }
   void setERGSensitivity(float ergS) { ERGSensitivity = ergS; }
 
-  void setAutoUpdate(bool atd) { autoUpdate = atd; }
+  void setAutoUpdate(bool atd) {
+    (void)atd;
+    autoUpdate = false;
+  }
   bool getAutoUpdate() { return autoUpdate; }
 
   void setSsid(String sid) { ssid = sid; }

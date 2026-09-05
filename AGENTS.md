@@ -37,23 +37,29 @@ PlatformIO is the expected entry point.
 - Static analysis: `pio check -e debug`
 - Pre-commit checks: `pre-commit run --all-files`
 
+`pio` is installed at `/Users/anthonydoud/.platformio/penv/bin/pio` when it is not on `PATH`; use that absolute command rather than treating a missing shell alias as an unavailable test environment. Native tests are expected to run locally.
+
 S3 firmware and filesystem builds use `S3firmware.bin` and `S3littlefs.bin` as their native PlatformIO output/upload names. They also create `S3partitions.bin` and `S3bootloader.bin` copies for releases; the generic partition and bootloader intermediates remain because PlatformIO's flash uploader depends on those names.
 The GitHub release archive includes firmware, merged factory, LittleFS, partition-table, and bootloader binaries for both classic ESP32 and ESP32-S3 targets.
 GitHub Actions exports `SS2K_FIRMWARE_VERSION` from the date-based release tag before invoking PlatformIO. `git_tag_macro.py` requires that override in Actions so published firmware never receives a `git describe` commit suffix; local builds retain branch/commit version details.
+The release workflow runs `cert_updater.py` once before firmware builds. Local PlatformIO builds use the checked-in `include/cert.h` and do not perform network-dependent certificate updates.
 
 Filesystem builds stage deterministic gzip copies of every HTML/CSS source file under the environment build directory. They also refresh the checked-in `.gz` companions and `list.json` in `data/` or `data_s3/`, which are consumed by repository-based automatic OTA updates.
 
-Codex environment constraint:
-
-- Do not run PlatformIO firmware or filesystem builds from the Codex environment. The Windows Xtensa toolchain can hang and leave orphaned compiler processes here. Make the requested changes, run non-build checks where useful, and clearly leave PlatformIO build validation for the user to run manually.
-
 Important timing/network notes:
 
-- First PlatformIO builds/tests may download ESP32 platforms and toolchains. They can take 15-45 minutes for firmware builds and 5-15 minutes for native tests.
+- PlatformIO firmware/filesystem builds and USB flashing are supported from the Codex environment. Local builds normally finish in under five minutes.
+- A directly attached ESP32-S3 exposes its USB CDC serial port as `/dev/cu.usbmodem*` (currently `/dev/cu.usbmodem21101`). A debug build (`S3debug`, with `__DEBUG__` and `SERIAL_CUSTOM_CHARACTERISTIC`) can be observed directly with `/Users/anthonydoud/.platformio/penv/bin/pio device monitor -p /dev/cu.usbmodem21101`; confirm the present port with `ls /dev/cu.usb*` first. Serial monitoring is read-only, while uploading a debug build is an explicit device mutation and should only be done when the task authorizes it.
+- When testing attached hardware, do not switch the development machine's WiFi connection to the SmartSpin2k access point: that network has no internet access, while builds and tooling may require internet service. Communicate with the device over USB unless the user explicitly directs otherwise. Preserve the device's stored WiFi/LittleFS/NVS settings by preferring application-partition-only flashing (S3 app offset `0x60000`).
+- First PlatformIO builds/tests may download missing ESP32 platforms and toolchains and therefore take longer than normal.
 - In restricted environments, PlatformIO can fail on network downloads. If that happens, report it rather than trying to fake validation.
 - The firmware itself cannot be fully run without ESP32 hardware, BLE devices, and a stepper driver.
 
-Native tests cover sensor parsing, BLE device-name stability logic, power-buffer behavior, and power-table lookup/fill/save flows. When changing:
+Native tests cover sensor parsing, BLE device-name stability logic, firmware-update protocol handling, and power-table/ERG replay flows. When changing:
+
+- Native Arduino types/timing come from the repository-owned `lib/ArduinoCompat`; the suite does not use ArduinoFake. Keep this shim and test filesystem setup portable across Apple Clang/POSIX and Windows native toolchains.
+- Multi-byte protocol fields use `lib/SS2K/include/ByteUtils.h`, which wraps the platform `os/endian.h` implementation and adds explicit signed helpers such as `get_le16s()`/`put_le32s()`. ArduinoCompat supplies `os/endian.h` for native tests; do not add another endian implementation.
+- `test/data/active_ride_log.txt` is the single real-world fixture for power-table and ERG tests. Each test replays it independently through `test/test_data_helpers.h`; generated tables and audit reports belong under ignored `test/output/`.
 
 - `src/Power_Table.cpp` or `src/PowerTable_Helpers.cpp`, run `pio test -e native`.
 - `lib/SS2K/src/sensors/*`, run the native tests for sensor parsing.
@@ -91,7 +97,7 @@ Boot sequence:
 3. Start stepper serial and optional aux serial for Peloton.
 4. Mount LittleFS.
 5. Load and re-save `userConfig`.
-6. Start WiFi and run firmware update check.
+6. Complete WiFi station connection or AP fallback, synchronize the clock when online, and repair missing web files before starting BLE.
 7. Configure GPIO pins.
 8. Initialize LED state; commanded-reboot quiet mode uses RTC memory so true power cycles still show startup blink behavior.
 9. Configure TMC/FastAccelStepper via `SS2K::setupTMCStepperDriver()`.
@@ -239,9 +245,10 @@ Key functions:
 
 - `SpinBLEClient::start()`: creates BLE client task and configures scanning.
 - `ScanCallbacks::onResult()`: filters supported devices, updates `foundDevices`, sets slots to connect when user config matches.
+- Scan results for current config apps are streamed one device at a time on custom-characteristic ID `0x32`, with begin/device/end records and per-peer MTU fragmentation. The legacy `foundDevices` JSON remains capped at 480 bytes for older apps; do not make it unbounded again.
 - `SpinBLEClient::connectToServer()`: creates fresh BLE client, connects, sets slot state, removes duplicates.
 - `subscribeToAllNotifications()`: subscribes to notify/indicate characteristics for supported services.
-- `SpinBLEClient::postConnect()`: completes service subscriptions, reads FTMS resistance range, starts FTMS training where needed, drains notification queues.
+- `SpinBLEClient::postConnect()`: completes service subscriptions, reads FTMS resistance range, starts FTMS training where needed, drains notification queues. Notification setup discovers only the characteristics the firmware consumes so large remote GATT tables do not exhaust the classic ESP32 heap. HID is the exception because remotes can expose multiple Report characteristics with the same UUID.
 - `SpinBLEClient::checkBLEReconnect()`: sets `doScan` when configured devices are missing.
 - `SpinBLEClient::adevName2UniqueName()`: stable names for saved device preferences. Public/static random addresses get address suffix; private random addresses prefer manufacturer-data suffix or base name.
 
@@ -288,6 +295,7 @@ Primary files: `src/BLE_Server.cpp`, `src/BLE_Fitness_Machine_Service.cpp`, serv
 
 The primary BLE advertisement carries the current WiFi IPv4 address in versioned SmartSpin2k manufacturer data.
 The device name and 128-bit SmartSpin2k service UUID are kept in the scan response to stay within the legacy advertisement size limit.
+IP changes rebuild the complete advertisement and scan-response payloads before advertising restarts; NimBLE's manufacturer-data setter appends fields and must not be used alone to replace the previous IP.
 
 Zwift/OpenBikeControl services exist but are currently commented out in regular BLE advertising/setup; DirCon and the source files still matter.
 
@@ -385,6 +393,7 @@ Stepper safety:
 
 - Homed devices clamp to `rtConfig->minStep/maxStep`.
 - Unhomed devices use provisional defaults unless power-table/resistance updates refine limits.
+- FastAccelStepper pulse generation is initialized independently of TMC UART detection, so the firmware remains safe when the physical driver is absent. Runtime stepper-setting methods must still tolerate null driver/stepper pointers in case peripheral allocation fails.
 - Do not bypass `moveStepper()` target clamping for ordinary control paths.
 
 ## ERG Mode
@@ -408,8 +417,12 @@ Primary files: `include/ERG_Mode.h`, `src/ERG_Mode.cpp`.
 - Raises target to `userConfig->minWatts` when apps request too little.
 - Skips if the same watt timestamp/target was already processed or current watts are negative.
 - For large setpoint changes, tries `_setPointChangeState()` using the power table when homed.
+- A trusted direct table seek keeps following cadence while the motor/power settles, including up to two cadence bins beyond the measured edge via nearest-row equal-torque scaling. Ordinary target crossings do not end the seek; a high-side overshoot beyond the PID window (or low-side reduction undershoot beyond twice that window) hands off immediately and seeds PID with the latest table position.
 - Falls back to `_inSetpointState()` proportional control.
 - Writes the new target to `rtConfig->targetIncline`.
+- While homed with a real power meter, settled samples validate the table's predicted stepper position against the position range for actual power plus/minus `ERG_MODE_PID_WINDOW`. One volatile confidence score represents alignment of the current homed bike with the learned table.
+- Once trusted, any target inside the reliable table's measured watt/cadence bounds permits an exact-position setpoint seek; targets outside those bounds stay on PID. The seek follows cadence changes while moving and settling, returns immediately to PID after crossing the watt target or timing out, and returns to PID maintain mode after stable readings.
+- `ERG_GUARDRAILS` is disabled by default; seek direction, travel bounds, overshoot handling, and timeouts live in the ERG controller instead of the stepper loop.
 
 `_setPointChangeState()`:
 
@@ -421,6 +434,8 @@ Primary files: `include/ERG_Mode.h`, `src/ERG_Mode.cpp`.
 `_inSetpointState()`:
 
 - Uses proportional-only control with `ERGSensitivity`.
+- Keeps the original strict `lookupSlope()` for table validation. ERG uses `lookupErgSlope()`, which may use a near-edge measured segment only when the cadence-bounding rows agree and each segment has endpoint headroom; it never extrapolates beyond measured data.
+- Blends a trusted ERG table gain 50/50 with the watt-scheduled fallback gain and bounds raw table gain to 0.5-1.25x fallback before blending. This deliberately favors stable convergence over aggressive corrections. Fallback log lines include the rejected-slope reason.
 - Scales gain by watt error size.
 - Caps movement by stepper speed and `ERG_MODE_DELAY`.
 
@@ -440,8 +455,7 @@ Data structures:
 - `PowerBuffer`: fixed `POWER_SAMPLES` sample buffer used before committing a table entry.
 - `TableEntry`: compact stored table cell: `int16_t targetPosition`, `int8_t readings`.
 - `PTData`: `POWERTABLE_CAD_SIZE` x `POWERTABLE_WATT_SIZE` table.
-- `ResistanceModel`: regression model predicting position from watts/cadence and inverse watts from position/cadence.
-- `PTHelpers`: indexing, lookup, cleaning, interpolation, monotonic enforcement, and model fitting.
+- `PTHelpers`: indexing, measured-point interpolation/extrapolation, cleaning, and monotonic enforcement.
 
 Table dimensions/constants are in `include/settings.h`:
 
@@ -456,9 +470,9 @@ Flow:
 1. `PowerTable::processPowerValue()` accepts sane cadence/watts and stable position samples.
 2. A full `PowerBuffer` is averaged in `PowerTable::newEntry()`.
 3. `PTHelpers::calculateIndex()` maps watts/cadence to table indexes.
-4. `PTHelpers::enterData()` averages the cell, rejects monotonic violations, fills gaps, runs PAVA-style monotonic correction, fits `ResistanceModel`, and fills inferred cells.
-5. `lookup()` uses the model to predict a target position and multiplies by `TABLE_DIVISOR`.
-6. `lookupWatts()` inverses the model for `pTab4Pwr`.
+4. `PTHelpers::enterData()` averages the cell, rejects monotonic violations, and runs PAVA-style monotonic correction across measured entries.
+5. `lookup()` locally interpolates or extrapolates measured watt/position pairs, using equal-torque cadence scaling, and returns a full-scale position.
+6. `lookupWatts()` numerically inverts the cadence-blended forward `lookup()` surface, preserves exact measured anchors/plateau midpoints, and applies a monotonic cadence envelope for `pTab4Pwr`. Estimated power is bounded to the FTMS 4000 W maximum.
 
 Persistence:
 
@@ -470,8 +484,7 @@ Persistence:
 
 Caution:
 
-- `ResistanceModel::fit()` uses only entries with `readings >= 2`.
-- Inferred cells can improve lookup smoothness but should not be treated as real measurements.
+- Runtime lookup uses only entries with `readings >= 2`; legacy inferred cells with `readings == 1` are ignored.
 - Power-table and homing logic are tightly linked now. Loading/saving without homing is intentionally blocked.
 
 ## DirCon
@@ -489,6 +502,8 @@ DirCon exposes BLE-like services over TCP:
 - BLE server updates call `DirConManager::notifyCharacteristic()` so TCP clients receive corresponding updates.
 
 DirCon uses static buffers and fixed client/subscription arrays. Be cautious with dynamic allocation and payload sizes.
+Outbound DirCon frames use bounded per-client queues and are drained with non-blocking socket sends only from `DirConManager::update()`. Keep responses and notifications on that path so slow or vanished TCP peers cannot block firmware tasks or interleave frames.
+DirCon notification broadcasts check for an active subscribed recipient before encoding, avoiding unnecessary dynamic allocations during BLE scans.
 
 ## HTTP/Web UI
 
@@ -497,9 +512,12 @@ Primary files: `src/HTTP_Server_Basic.cpp`, `include/HTTP_Server_Basic.h`, `data
 Responsibilities:
 
 - Start/stop WiFi (`startWifi()`, `stopWifi()`).
+- WiFi startup is deliberately linear: wait for the configured station up to the connection timeout, fall back to AP mode if needed, and only then continue firmware initialization.
 - Serve LittleFS web assets and built-in OTA pages.
-- Firmware update flow through `HTTP_Server::FirmwareUpdate()`.
-- Automatic filesystem updates treat remote `list.json` as an allowlist, preserve config/power-table/recovery metadata, and store the installed filesystem release version in NVS.
+- Before BLE starts, boot checks the local `list.json`. If every listed asset exists, no TLS connection is created. `HTTP_Server::syncWebServerFiles()` is repair-only and runs synchronously when the local manifest is missing/invalid or a listed asset is absent and station internet is available.
+- Browser-uploaded firmware uses the low-level ESP-IDF OTA API, and filesystem images stream directly to the LittleFS partition with sector-at-a-time erases. Neither path uses Arduino `Update` or its 4 KiB heap allocation on memory-constrained classic ESP32 builds. Filesystem uploads must exactly match the partition size; arbitrary file uploads are rejected.
+- Web filesystem repair fetches the remote `list.json`, downloads only missing assets, and installs the fetched manifest only after repair succeeds. It never performs boot-time version upgrades or prunes existing files.
+- Downloads use bounded HTTP/TLS timeouts and temporary files so partial assets are never served. Repair completes before BLE allocation/scanning, avoiding their peak internal-RAM loads overlapping on classic ESP32.
 - Settings JSON/API behavior through `settingsProcessor()`.
 - Periodic web client update through `webClientUpdate()`.
 - BLE scanner page support.

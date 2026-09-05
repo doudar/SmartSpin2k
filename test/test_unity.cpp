@@ -9,19 +9,15 @@
 #include "test.h"
 
 #ifndef ARDUINO
-#include <sys/stat.h>   // For mkdir
-#include <sys/types.h>  // For mode_t, often required with sys/stat.h
-#include <errno.h>      // For errno and EEXIST
-#include <stdio.h>      // For perror
+#include <errno.h>  // For errno and EEXIST
+#include <stdio.h>  // For perror
+#ifdef _WIN32
+#include <direct.h>
+#else
+#include <sys/stat.h>
+#include <sys/types.h>
 #endif
-
-// Basic test functions
-void test_dummy_function(void) { TEST_ASSERT_EQUAL(1, 1); }
-
-void test_basic_math(void) {
-  TEST_ASSERT_EQUAL(4, 2 + 2);
-  TEST_ASSERT_EQUAL(6, 2 * 3);
-}
+#endif
 
 void setUp(void) {
   // set stuff up here
@@ -39,10 +35,6 @@ void setup() {
 
   // Start Unity
   UNITY_BEGIN();
-
-  // Run simple tests
-  RUN_TEST(test_dummy_function);
-  RUN_TEST(test_basic_math);
 
   // FitnessMachineIndoorBike Tests
   {
@@ -63,14 +55,29 @@ void setup() {
 
   // Power Table Lookup Tests
   {
-    TestPTLookupResistance test;
-    RUN_TEST(test.test_pt_lookup_resistance);
-    TestPTLookupWatts test2;
-    RUN_TEST(test2.test_pt_lookup_watts);
-    TestWritePowerTable test4;
-    RUN_TEST(test4.test_save_and_load);
-    TestTableFill test5;
-    RUN_TEST(test5.test_fill_incomplete_table);
+    TestPTLookupResistance forwardLookupTests;
+    RUN_TEST(forwardLookupTests.test_cadence_collection_boundaries);
+    RUN_TEST(forwardLookupTests.test_active_ride_forward_lookup);
+    RUN_TEST(forwardLookupTests.test_erg_slope_quality);
+    TestPTLookupWatts reverseLookupTests;
+    RUN_TEST(reverseLookupTests.test_active_ride_reverse_lookup);
+    RUN_TEST(reverseLookupTests.test_reverse_lookup_pathological_tables);
+    TestPowerTableCsv csvTests;
+    RUN_TEST(csvTests.test_active_table_round_trip);
+    TestActiveRideTable replayTests;
+    RUN_TEST(replayTests.test_active_ride_table_generation);
+    RUN_TEST(replayTests.test_compact_status_log_replay);
+    RUN_TEST(replayTests.test_status_ride_table_generation);
+    RUN_TEST(replayTests.test_active_table_status_prediction_accuracy);
+    RUN_TEST(replayTests.test_active_table_transient_power_estimation);
+  }
+
+  // ERG ride-log replay and gain scheduling tests
+  {
+    TestErgLogReplay ergReplayTests;
+    RUN_TEST(ergReplayTests.test_active_ride_log_and_gain_limits);
+    RUN_TEST(ergReplayTests.test_active_ride_new_gain_replay);
+    RUN_TEST(ergReplayTests.test_table_position_confidence);
   }
 
   // BLE Device Unique Name Tests
@@ -94,6 +101,23 @@ void setup() {
     RUN_TEST(test.test_transfer_timeout);
   }
 
+  // Shared endian helper tests
+  {
+    TestEndian test;
+    RUN_TEST(test.test_little_endian_signed_decode_and_round_trip);
+  }
+
+  // BLE protocol encode/decode round-trip tests
+  {
+    TestBleWireRoundTrip test;
+    RUN_TEST(test.test_dircon_uuid_round_trip);
+    RUN_TEST(test.test_all_custom_characteristic_formats);
+    RUN_TEST(test.test_ftms_round_trip);
+    RUN_TEST(test.test_csc_round_trip);
+    RUN_TEST(test.test_heart_rate_round_trip);
+    RUN_TEST(test.test_zwift_round_trip);
+  }
+
   UNITY_END();
 }
 
@@ -110,18 +134,14 @@ int main(int argc, char** argv) {
 // On POSIX systems, mkdir requires <sys/stat.h> and <sys/types.h>.
 // Mode 0777 gives read, write, execute permissions for owner, group, and others.
 #ifdef _WIN32
-  int result = mkdir(dir_path);  // Use _mkdir on Windows
+  int result = _mkdir(dir_path);
 #else
-  int result = mkdir(dir_path, 0777);  // Use mkdir on POSIX systems
+  int result = mkdir(dir_path, 0777);
 #endif
 
   if (result == -1) {
     // If mkdir failed, check why
-#ifdef _WIN32
     if (errno != EEXIST) {
-#else
-    if (errno != EEXIST) {
-#endif
       // EEXIST means the directory already exists, which is not an error for our purpose.
       // For any other error, print it.
       perror("Error creating directory test/output");

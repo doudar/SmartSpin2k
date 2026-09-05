@@ -22,40 +22,49 @@ class test_cyclePowerData {
   static void test_parses_speed(void);
 };
 
-class TestPowerBuffer {
+class TestErgLogReplay {
  public:
-  static void set__should_set_values__expect_values_added_to_correct_index(void);
+  static void test_active_ride_log_and_gain_limits(void);
+  static void test_active_ride_new_gain_replay(void);
+  static void test_table_position_confidence(void);
 };
 
 class TestPTLookupResistance {
  public:
-  static void test_pt_lookup_resistance(void);
+  static void test_cadence_collection_boundaries(void);
+  static void test_active_ride_forward_lookup(void);
+  static void test_erg_slope_quality(void);
 };
 
 class TestPTLookupWatts {
-  public:
-   static void test_pt_lookup_watts(void);
- };
-
-class TestWritePowerTable {
-  public:
-    static void test_save_and_load(void);
+ public:
+  static void test_active_ride_reverse_lookup(void);
+  static void test_reverse_lookup_pathological_tables(void);
 };
 
-class TestTableFill {
-  public:
-    static void test_fill_incomplete_table(void);
+class TestPowerTableCsv {
+ public:
+  static void test_active_table_round_trip(void);
+};
+
+class TestActiveRideTable {
+ public:
+  static void test_active_ride_table_generation(void);
+  static void test_compact_status_log_replay(void);
+  static void test_status_ride_table_generation(void);
+  static void test_active_table_status_prediction_accuracy(void);
+  static void test_active_table_transient_power_estimation(void);
 };
 
 class TestAdevName2UniqueName {
-public:
-    static void test_traditional_device_keeps_address_suffix(void);
-    static void test_android_device_no_address_suffix(void);
-    static void test_random_address_pattern_detection(void);
-    static void test_null_device_handling(void);
-    static void test_device_without_name(void);
-    static void test_backward_compatibility(void);
-    static void test_case_insensitive_device_matching(void);
+ public:
+  static void test_traditional_device_keeps_address_suffix(void);
+  static void test_android_device_no_address_suffix(void);
+  static void test_random_address_pattern_detection(void);
+  static void test_null_device_handling(void);
+  static void test_device_without_name(void);
+  static void test_backward_compatibility(void);
+  static void test_case_insensitive_device_matching(void);
 };
 
 class TestBleFirmwareUpdateProtocol {
@@ -64,4 +73,19 @@ class TestBleFirmwareUpdateProtocol {
   static void test_rejects_invalid_start_packets(void);
   static void test_encodes_status_packet(void);
   static void test_transfer_timeout(void);
+};
+
+class TestEndian {
+ public:
+  static void test_little_endian_signed_decode_and_round_trip(void);
+};
+
+class TestBleWireRoundTrip {
+ public:
+  static void test_dircon_uuid_round_trip(void);
+  static void test_all_custom_characteristic_formats(void);
+  static void test_ftms_round_trip(void);
+  static void test_csc_round_trip(void);
+  static void test_heart_rate_round_trip(void);
+  static void test_zwift_round_trip(void);
 };

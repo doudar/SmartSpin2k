@@ -56,7 +56,7 @@ void userParameters::setDefaults() {
   inclineMultiplier     = INCLINE_MULTIPLIER;
   powerCorrectionFactor = 1.0;
   ERGSensitivity        = ERG_SENSITIVITY;
-  autoUpdate            = AUTO_FIRMWARE_UPDATE;
+  autoUpdate            = false;
   ssid                  = DEVICE_NAME;
   password              = DEFAULT_PASSWORD;
   connectedPowerMeter   = CONNECTED_POWER_METER;
@@ -269,4 +269,3 @@ void userParameters::printFile() {
   // Close the file
   file.close();
 }
-

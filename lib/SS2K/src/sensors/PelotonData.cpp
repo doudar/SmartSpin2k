@@ -5,7 +5,7 @@
  * SPDX-License-Identifier: GPL-2.0-only
  */
 
-#include "endian.h"
+#include "ByteUtils.h"
 #include "sensors/PelotonData.h"
 #include "Constants.h"
 

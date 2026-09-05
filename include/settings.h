@@ -7,9 +7,6 @@
 
 #pragma once
 
-// Update firmware on boot?
-#define AUTO_FIRMWARE_UPDATE true
-
 // Default Bluetooth WiFi and MDNS Name
 const char* const DEVICE_NAME = "SmartSpin2k";
 
@@ -189,6 +186,12 @@ constexpr const char* ANY  = "any";
 // The client will be disconnected.
 #define BLE_CLIENT_DISCONNECT_TIMEOUT 5000
 
+// Interval for periodic main-task maintenance.
+#define MAIN_MAINTENANCE_INTERVAL_MS 6007
+
+// Interval for rider status logging used by ride analysis and power-table tests.
+#define RIDER_STATUS_LOG_INTERVAL_MS 1000
+
 #ifndef DEBUG_LOG_BUFFER_SIZE
 #define DEBUG_LOG_BUFFER_SIZE 600
 #endif
@@ -198,8 +201,9 @@ constexpr const char* ANY  = "any";
 
 #define RUNTIMECONFIG_JSON_SIZE 1000 + DEBUG_LOG_BUFFER_SIZE
 
-// Uncomment to use guardrails for ERG mode in the stepper loop.
-#define ERG_GUARDRAILS
+// Legacy instantaneous-watt guardrails in the stepper loop. ERG mode now owns
+// direction validation, overshoot recovery, cadence retargeting, and timeouts.
+// #define ERG_GUARDRAILS
 
 // Uncomment to enable the use of the power table for ERG mode.
 #define ERG_MODE_USE_POWER_TABLE

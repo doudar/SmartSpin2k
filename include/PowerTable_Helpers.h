@@ -13,6 +13,28 @@
 
 #define RETURN_ERROR               INT32_MIN
 
+class PowerTableSlopeStatus {
+ public:
+  enum Value : uint8_t {
+    Trusted,
+    InvalidRequest,
+    InsufficientRows,
+    MissingLocalSupport,
+    InconsistentRows,
+  };
+
+  static const char* name(Value status) {
+    switch (status) {
+      case Trusted: return "trusted";
+      case InvalidRequest: return "invalid request";
+      case InsufficientRows: return "one supporting row";
+      case MissingLocalSupport: return "missing local segment";
+      case InconsistentRows: return "inconsistent rows";
+    }
+    return "unknown";
+  }
+};
+
 class PowerEntry {
  public:
   int watts;
@@ -73,42 +95,20 @@ class PTData {
   TableRow tableRow[POWERTABLE_CAD_SIZE];
 };
 
-class ResistanceModel {
- private:
-  // Coefficients (Normalizing makes these fit in float/double safely)
-  // Model: Z = b0 + b1*x + b2*y + b3*x^2 + b4*y^2 + b5*x*y
-  double b[6]      = {0};
-  bool isQuadratic = false;
-  bool isValid     = false;
-
-  // Normalization bounds (to keep math stable)
-  double minW = 0, maxW = 1;
-  double minR = 0, maxR = 1;
-
-  // Helper: Normalize a value to 0.0 - 1.0 range
-  double normW(double w) { return (w - minW) / (maxW - minW); }
-  double normR(double r) { return (r - minR) / (maxR - minR); }
-  bool solveMatrix(double A[6][6], double B[6], int n);
-
- public:
-  void fit(const PTData& data);
-  int16_t predict(double watts, double rpm);
-  int predictWatts(int32_t resistance, float cadence);
-  bool getIsValid() { return isValid; }
-  bool getIsQuadratic() { return isQuadratic; }
-};
-
 class PTHelpers {
+ private:
+  void clean(PTData& ptData);
+  bool enforceMonotonicAcrossCadence(PTData& ptData);
+  bool enforceMonotonicAcrossPower(PTData& ptData);
+  int32_t invertForwardSurface(int cad, int32_t targetPosition, PTData& ptData);
+
  public:
-  ResistanceModel resistanceModel;
   int32_t lookup(int watts, int cad, PTData& ptData);
-  int lookupWatts(int cad, int32_t targetPosition, PTData& ptData);
+  bool lookupSlope(int watts, int cad, double& stepsPerWatt, PTData& ptData, PowerTableSlopeStatus::Value* status = nullptr);
+  bool lookupErgSlope(int watts, int cad, double& stepsPerWatt, PTData& ptData, PowerTableSlopeStatus::Value* status = nullptr);
+  int32_t lookupWatts(int cad, int32_t targetPosition, PTData& ptData);
   int getTotalReadings(PTData& ptData);
   ptIndex calculateIndex(int watts, int cad);
+  bool cadenceIsWithinTable(int cad);
   void enterData(PTData& ptData, ptIndex index, int pos);
-  void clean(PTData& ptData);
-  void fill(PTData& ptData);
-  void fillGaps(PTData& ptData);
-  bool fillAllWattColumns(PTData& ptData);
-  bool fillAllCadenceLines(PTData& ptData);
 };
