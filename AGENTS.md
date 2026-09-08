@@ -43,6 +43,7 @@ S3 firmware and filesystem builds use `S3firmware.bin` and `S3littlefs.bin` as t
 The GitHub release archive includes firmware, merged factory, LittleFS, partition-table, and bootloader binaries for both classic ESP32 and ESP32-S3 targets.
 GitHub Actions exports `SS2K_FIRMWARE_VERSION` from the date-based release tag before invoking PlatformIO. `git_tag_macro.py` requires that override in Actions so published firmware never receives a `git describe` commit suffix; local builds retain branch/commit version details.
 The release workflow runs `cert_updater.py` once before firmware builds. Local PlatformIO builds use the checked-in `include/cert.h` and do not perform network-dependent certificate updates.
+CI installs `pioarduino==6.1.19` from `requirements-ci.txt`; it still provides the `platformio` and `pio` commands. Use this fork's SCons 4.8.1 with pioarduino 55.03.311; upstream PlatformIO's newer SCons 4.11.1 conflicts with this platform's tool installation. CI cache restore prefixes include the requirements hash to avoid mixing Core/tool versions.
 
 Filesystem builds stage deterministic gzip copies of every HTML/CSS source file under the environment build directory. They also refresh the checked-in `.gz` companions and `list.json` in `data/` or `data_s3/`, which are consumed by repository-based automatic OTA updates.
 

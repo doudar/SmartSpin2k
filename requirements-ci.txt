@@ -1,0 +1,3 @@
+# Use pioarduino Core with the pioarduino ESP32 platform and its SCons 4.8.1.
+# This package still provides the platformio and pio commands.
+pioarduino==6.1.19
