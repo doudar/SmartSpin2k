@@ -212,13 +212,13 @@ JsonDocument doc;
   if (doc["ERGSensitivity"]) {
     setERGSensitivity(doc["ERGSensitivity"]);
   }
-  if (doc["maxWatts"]) {
+  if (!doc["maxWatts"].isNull()) {
     setMaxWatts(doc["maxWatts"]);
   }
   if (doc["stepperSpeed"]) {
     setStepperSpeed(doc["stepperSpeed"]);
   }
-  if (doc["minWatts"]) {
+  if (!doc["minWatts"].isNull()) {
     setMinWatts(doc["minWatts"]);
   }
   if (!doc["stepperDir"].isNull()) {

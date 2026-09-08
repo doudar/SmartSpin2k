@@ -547,7 +547,10 @@ void SS2K::FTMSModeShiftModifier() {
         rtConfig->setShifterPosition(ss2k->lastShifterPosition);  // reset shifter position because we're remapping it to ERG target
         const int proposedTarget = rtConfig->watts.getTarget() + (shiftDelta * ERG_PER_SHIFT);
         const int minimumTarget  = rtConfig->getHomed() ? 0 : userConfig->getMinWatts();
-        if (proposedTarget < minimumTarget || proposedTarget > userConfig->getMaxWatts()) {
+        const int maximumTarget  = userConfig->getMaxWatts();
+        const bool belowMinimum  = shiftDelta < 0 && proposedTarget < minimumTarget;
+        const bool aboveMaximum  = shiftDelta > 0 && maximumTarget > 0 && proposedTarget > maximumTarget;
+        if (belowMinimum || aboveMaximum) {
           SS2K_LOG(MAIN_LOG_TAG, "Shift to %dw blocked", proposedTarget);
           break;
         }
