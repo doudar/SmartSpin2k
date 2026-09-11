@@ -76,6 +76,13 @@
                 <span class="slider"></span>
               </label>
             </div>
+            <div class="toggle-group" style="margin-top: 0.5rem;">
+              <span>ERG Perfect</span>
+              <label class="switch">
+                <input type="checkbox" id="ergPerfect">
+                <span class="slider"></span>
+              </label>
+            </div>
           </div>
         </div>
 
@@ -231,6 +238,11 @@
           document.getElementById("wattsSlider").value = data.watts || 0;
           document.getElementById("wattsOutput").checked = data.simWatts;
           document.getElementById('wattsControls').style.display = data.simWatts ? 'block' : 'none';
+
+          if (document.getElementById('ergPerfect').checked && data.watts !== data.targetWatts) {
+            fetch('/wattsslider?value=' + encodeURIComponent(data.targetWatts), { method: 'GET' })
+              .catch(error => console.error('Error:', error));
+          }
 
           // Update heart rate
           document.getElementById("hrValue").innerHTML = data.hr || 40;
