@@ -2,15 +2,17 @@
 
 SmartSpin2k is an ESP32-based DIY smart trainer project that converts any spin bike into a connected fitness device compatible with Zwift, TrainerRoad, and other training apps. The firmware controls stepper motor resistance, handles BLE communication, serves a web interface, and manages sensor data.
 
-Always reference these instructions first and fallback to search or bash commands only when you encounter unexpected information that does not match the info here.
+Read `AGENTS.md` for current repository guidance; this file supplements its build and validation notes.
 
 ## Working Effectively
 
 ### Bootstrap Environment
-Install required tools and dependencies:
+Install required tools and dependencies from the repository root. Use a Python virtual environment; CI uses Python 3.11. When migrating an environment with upstream `platformio` installed, uninstall that package before installing pioarduino because they share Python modules and CLI entry points.
 - `sudo apt-get update && sudo apt-get install -y build-essential git python3 python3-pip`
-- `pip install platformio pre-commit`
+- `python -m pip install -r requirements-ci.txt pre-commit`
 - `pre-commit install --hook-type pre-push`
+
+Use pioarduino Core and the `pioarduino.pioarduino-ide` VS Code extension. The CLI commands remain `pio` and `platformio`, the configuration file remains `platformio.ini`, and tool packages remain under `.platformio`. Verify the selected Python environment with `python -m pip show pioarduino`.
 
 ### Build the Firmware
 - **CRITICAL**: Build takes 15-45 minutes depending on network connectivity. NEVER CANCEL. Set timeout to 60+ minutes.
@@ -77,7 +79,7 @@ Key directories and their purpose:
 - `lib/SS2K/src/sensors/` -- Sensor data parsing classes
 
 ### Build Dependencies
-External libraries loaded automatically by PlatformIO:
+External libraries loaded automatically by pioarduino:
 - NimBLE-ESP32 for Bluetooth Low Energy
 - TMCStepper for stepper motor control
 - FastAccelStepper for smooth motor movement
@@ -105,7 +107,7 @@ External libraries loaded automatically by PlatformIO:
 
 ### Troubleshooting Common Issues
 - **HTTPClientError during build**: This indicates network/firewall restrictions preventing platform downloads. No workaround available in restricted environments.
-- **Platform not found**: Run `pio platform install espressif32` to manually install the ESP32 platform (requires internet).
+- **Platform not found**: Run `pio pkg install -e release` and `pio pkg install -e S3release` to install the pioarduino ESP32 platform and dependencies pinned in `platformio.ini` (requires internet).
 - **Test failures**: Ensure you're running tests in native environment: `pio test -e native`
 - **SSL certificate warnings**: Update certificates with `python cert_updater.py` or manually update `include/cert.h`
 - **Build flag errors**: The Python scripts in build_flags must execute successfully. Test them individually if build fails.
@@ -115,6 +117,8 @@ Before working on the project, verify your environment:
 ```bash
 # Check tools are installed
 which python3 pio pre-commit
+# Verify that this Python environment contains pioarduino Core
+python -m pip show pioarduino
 # Verify project configuration
 pio project config
 # Test build scripts

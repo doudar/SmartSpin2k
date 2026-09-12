@@ -55,12 +55,16 @@ Hardware files and build assets are in [SS2k-Hardware](https://github.com/doudar
 
 ## Contributing
 1. Install Microsoft Visual Code. https://code.visualstudio.com/
-2. Install PlatformIO into Visual Code. https://platformio.org/platformio-ide
+2. Install the **pioarduino IDE** extension (`pioarduino.pioarduino-ide`) recommended by this repository in Visual Studio Code.
 3. Install Python https://www.python.org/downloads/
 4. Install Pre-commit. https://pre-commit.com `py -m pip install pre-commit`
 5. Follow any install warnings to add pre-commit to your path. 
 6. Install pre-push git hooks: `pre-commit install --hook-type pre-push`
-7. Open this project in PlatformIO.
+7. Open this project in the pioarduino IDE.
+
+For command-line builds, use a Python virtual environment and run `python -m pip install -r requirements-ci.txt` from the repository root to install the same pinned pioarduino Core used by CI. CI uses Python 3.11. If that environment already has the upstream `platformio` package installed, uninstall it before installing pioarduino; the two packages share Python modules and command names.
+
+pioarduino still uses `platformio.ini`, the `.platformio` tool directory, and the `pio` / `platformio` commands. Build with `pio run -e release` (classic ESP32) or `pio run -e S3release` (ESP32-S3), and run native tests with `pio test -e native`. See [AGENTS.md](AGENTS.md) for build and validation details.
 
 ## Important announcement for existing users
 If you experience an issue after upgrading firmware, please follow these instructions in the Wiki. Flashing instructions are available [HERE.](https://github.com/doudar/SmartSpin2k/wiki/Loading-Software)

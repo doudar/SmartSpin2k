@@ -12,6 +12,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Changed
 - Set classic ESP32 flash size to 4 MB in build defaults and release/debug configurations to match the existing partition table; retain 16 MB for ESP32-S3.
 - Switch CI to pioarduino Core 6.1.19 and isolate compatible tool caches to prevent the SCons `FortranCommon` import failure.
+- Update contributor and agent setup instructions to use pioarduino Core and its VS Code extension, including the shared CI version pin and platform-specific CLI lookup.
 - Fix handling of 0 value in min and max brake watts settings so they persist correctly. Correct ERG shift behavior when max brake watts is set to unlimited (0).
 
 ### Hardware

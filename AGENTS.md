@@ -21,14 +21,16 @@ Primary software directories:
 - `include/`: headers, settings, UUIDs, BLE data structures, board pins.
 - `lib/SS2K/`: core sensor parsing library used by firmware and native tests.
 - `lib/ArduinoCompat/`: native-test compatibility shims.
-- `test/`: Unity tests for native PlatformIO environment.
+- `test/`: Unity tests for the pioarduino native environment.
 - `data/`: web interface assets for classic ESP32 filesystem images.
 - `data_s3/`: ESP32-S3 filesystem assets; initially mirrors `data/` but may grow independently.
 - `.github/copilot-instructions.md`: older agent/build notes that may still be useful.
 
 ## Build And Test
 
-PlatformIO is the expected entry point.
+pioarduino Core is the expected build tool. Install the pinned version from the repository root with `python -m pip install -r requirements-ci.txt` in a Python virtual environment (CI uses Python 3.11). When migrating an environment that has upstream `platformio` installed, uninstall that package before installing pioarduino because both distributions provide the same Python modules and CLI entry points. For VS Code, use the `pioarduino.pioarduino-ide` extension recommended by this repository.
+
+The commands remain `pio` and `platformio`; configuration remains in `platformio.ini` and tool packages remain under `.platformio`. These compatibility names must not be renamed to `pioarduino`.
 
 - Build firmware: `pio run --environment release`
 - Build ESP32-S3 firmware: `pio run --environment S3release`
@@ -37,23 +39,23 @@ PlatformIO is the expected entry point.
 - Static analysis: `pio check -e debug`
 - Pre-commit checks: `pre-commit run --all-files`
 
-`pio` is installed at `/Users/anthonydoud/.platformio/penv/bin/pio` when it is not on `PATH`; use that absolute command rather than treating a missing shell alias as an unavailable test environment. Native tests are expected to run locally.
+If `pio` is not on `PATH`, check the active virtual environment or the IDE-managed Core: `~/.platformio/penv/bin/pio` on macOS/Linux, or `$env:USERPROFILE\.platformio\penv\Scripts\pio.exe` on Windows. Use the absolute executable when available. Verify the selected Python environment with `python -m pip show pioarduino`; `pio --version` alone does not identify which distribution owns the command. If the launcher points to a missing or inaccessible Python executable, report that environment problem. Native tests are expected to run locally.
 
-S3 firmware and filesystem builds use `S3firmware.bin` and `S3littlefs.bin` as their native PlatformIO output/upload names. They also create `S3partitions.bin` and `S3bootloader.bin` copies for releases; the generic partition and bootloader intermediates remain because PlatformIO's flash uploader depends on those names.
+S3 firmware and filesystem builds use `S3firmware.bin` and `S3littlefs.bin` as their native pioarduino output/upload names. They also create `S3partitions.bin` and `S3bootloader.bin` copies for releases; the generic partition and bootloader intermediates remain because pioarduino's flash uploader depends on those names.
 The GitHub release archive includes firmware, merged factory, LittleFS, partition-table, and bootloader binaries for both classic ESP32 and ESP32-S3 targets.
-GitHub Actions exports `SS2K_FIRMWARE_VERSION` from the date-based release tag before invoking PlatformIO. `git_tag_macro.py` requires that override in Actions so published firmware never receives a `git describe` commit suffix; local builds retain branch/commit version details.
-The release workflow runs `cert_updater.py` once before firmware builds. Local PlatformIO builds use the checked-in `include/cert.h` and do not perform network-dependent certificate updates.
+GitHub Actions exports `SS2K_FIRMWARE_VERSION` from the date-based release tag before invoking pioarduino. `git_tag_macro.py` requires that override in Actions so published firmware never receives a `git describe` commit suffix; local builds retain branch/commit version details.
+The release workflow runs `cert_updater.py` once before firmware builds. Local pioarduino builds use the checked-in `include/cert.h` and do not perform network-dependent certificate updates.
 CI installs `pioarduino==6.1.19` from `requirements-ci.txt`; it still provides the `platformio` and `pio` commands. Use this fork's SCons 4.8.1 with pioarduino 55.03.311; upstream PlatformIO's newer SCons 4.11.1 conflicts with this platform's tool installation. CI cache restore prefixes include the requirements hash to avoid mixing Core/tool versions.
 
 Filesystem builds stage deterministic gzip copies of every HTML/CSS source file under the environment build directory. They also refresh the checked-in `.gz` companions and `list.json` in `data/` or `data_s3/`, which are consumed by repository-based automatic OTA updates.
 
 Important timing/network notes:
 
-- PlatformIO firmware/filesystem builds and USB flashing are supported from the Codex environment. Local builds normally finish in under five minutes.
-- A directly attached ESP32-S3 exposes its USB CDC serial port as `/dev/cu.usbmodem*` (currently `/dev/cu.usbmodem21101`). A debug build (`S3debug`, with `__DEBUG__` and `SERIAL_CUSTOM_CHARACTERISTIC`) can be observed directly with `/Users/anthonydoud/.platformio/penv/bin/pio device monitor -p /dev/cu.usbmodem21101`; confirm the present port with `ls /dev/cu.usb*` first. Serial monitoring is read-only, while uploading a debug build is an explicit device mutation and should only be done when the task authorizes it.
+- pioarduino firmware/filesystem builds and USB flashing are supported from the Codex environment when the local toolchain is available. Local builds normally finish in under five minutes.
+- Locate an attached ESP32-S3's current USB CDC port with `pio device list` (typically `/dev/cu.usbmodem*` on macOS or `COM*` on Windows). A debug build (`S3debug`, with `__DEBUG__` and `SERIAL_CUSTOM_CHARACTERISTIC`) can be observed with `pio device monitor -p <port>`. Serial monitoring is read-only, while uploading a debug build is an explicit device mutation and should only be done when the task authorizes it.
 - When testing attached hardware, do not switch the development machine's WiFi connection to the SmartSpin2k access point: that network has no internet access, while builds and tooling may require internet service. Communicate with the device over USB unless the user explicitly directs otherwise. Preserve the device's stored WiFi/LittleFS/NVS settings by preferring application-partition-only flashing (S3 app offset `0x60000`).
-- First PlatformIO builds/tests may download missing ESP32 platforms and toolchains and therefore take longer than normal.
-- In restricted environments, PlatformIO can fail on network downloads. If that happens, report it rather than trying to fake validation.
+- First pioarduino builds/tests may download missing ESP32 platforms and toolchains and therefore take longer than normal.
+- In restricted environments, pioarduino can fail on network downloads. If that happens, report it rather than trying to fake validation.
 - The firmware itself cannot be fully run without ESP32 hardware, BLE devices, and a stepper driver.
 
 Native tests cover sensor parsing, BLE device-name stability logic, firmware-update protocol handling, and power-table/ERG replay flows. When changing:
