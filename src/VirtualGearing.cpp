@@ -10,6 +10,11 @@
 #include "BLE_OpenBikeControl_Service.h"
 #include <cmath>
 
+void SS2K::resetStartingGear() {
+  localGear = userConfig->getGearRatios().startGear(rtConfig->getHomed());
+  rtConfig->setShifterPosition(localGearingSelected() ? localGear : SHIFTER_MIDDLE_POSITION);
+}
+
 bool SS2K::localGearingSelected() const {
   const uint8_t mode = rtConfig->getFTMSMode();
   return !externalControl && !zwiftService.isConnected() && !openBikeControlService.isConnected() &&

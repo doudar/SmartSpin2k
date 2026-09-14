@@ -221,6 +221,7 @@ void SS2K::finishSetup() {
 
   // Load Config
   userConfig->loadFromLittleFS();
+  ss2k->resetStartingGear();
   userConfig->printFile();  // Print userConfig->contents to serial
   userConfig->saveToLittleFS();
 

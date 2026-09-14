@@ -164,6 +164,8 @@ After updating the profile over BLE/DirCon, send the existing save command
 `02 18` to persist it. Firmware-hosted web settings save automatically. JSON uses
 `gearRatios` as the scaled integer array. In local simulation/inclination modes,
 `BLE_shifterPosition` uses **1-based** gear numbers for bounded profiles and an
-unbounded signed shift count for Unlimited (startup/home 0). Indexed ratio reads use
+unbounded signed shift count for Unlimited (start at 0 unhomed, 8 homed). Bounded
+profiles start at one-third of their gear count, rounded down with a minimum of 1.
+Indexed ratio reads use
 **0-based** indexes. Bounded gear 1 is the zero shift offset; travel limits still apply.
 No companion-app changes are included here.

@@ -518,13 +518,12 @@ void SS2K::_findFTMSHome(bool bothDirections) {
     SS2K_LOG(MAIN_LOG_TAG, "Found Max Resistance Position: %d", rtConfig->resistance.getValue());
   }
   setupTMCStepperDriver(true);
-  rtConfig->setShifterPosition(0);
-  localGear = userConfig->getGearRatios().startGear();
   ss2k->setTargetPosition(0);
   rtConfig->setTargetIncline(0);
   stepper->moveTo(0);
   rtConfig->setMaxStep(userConfig->getHMax());  // Ensure it's set from config if not found
   rtConfig->setHomed(true);
+  resetStartingGear();
   userConfig->saveToLittleFS();
 }
 
@@ -661,8 +660,7 @@ void SS2K::goHome(bool bothDirections) {
 
   rtConfig->setHomed(true);
   setupTMCStepperDriver(true);  // Restore normal driver settings
-  rtConfig->setShifterPosition(0);
-  localGear = userConfig->getGearRatios().startGear();
+  resetStartingGear();
   ss2k->setTargetPosition(0);
   stepper->moveTo(0);
   if (bothDirections) fitnessMachineService.spinDown(FitnessMachineStatus::SpinDown_Success);

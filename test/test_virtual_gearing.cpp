@@ -39,9 +39,14 @@ void TestVirtualGearing::test_ratio_api() {
   const VirtualGearing::Gears original = gears;
   uint16_t values[26];
   for (int i = 0; i < 26; ++i) values[i] = static_cast<uint16_t>(500 + 200 * i);
-  for (int count : {11, 12, 13, 22, 24, 26}) {
+  const int counts[] = {2, 3, 11, 12, 13, 22, 24, 26};
+  const int startGears[] = {1, 1, 3, 4, 4, 7, 8, 8};
+  for (size_t i = 0; i < sizeof(counts) / sizeof(counts[0]); ++i) {
+    const int count = counts[i];
     TEST_ASSERT_TRUE(gears.assign(values, count));
     TEST_ASSERT_EQUAL_UINT8(count, gears.count);
+    TEST_ASSERT_EQUAL_INT(startGears[i], gears.startGear());
+    TEST_ASSERT_EQUAL_INT(startGears[i], gears.startGear(true));
     TEST_ASSERT_EQUAL_INT(count, gears.clampGear(1000));
     TEST_ASSERT_EQUAL_INT(1, gears.clampGear(-1));
   }
@@ -166,6 +171,8 @@ void TestVirtualGearing::test_unlimited_default_and_wire() {
   TEST_ASSERT_TRUE(gears.unlimited());
   TEST_ASSERT_EQUAL_UINT8(0, gears.count);
   TEST_ASSERT_EQUAL_INT(0, gears.startGear());
+  TEST_ASSERT_EQUAL_INT(0, gears.startGear(false));
+  TEST_ASSERT_EQUAL_INT(8, gears.startGear(true));
   for (int gear : {-1000, -1, 0, 1, 1000}) {
     TEST_ASSERT_EQUAL_INT(gear, gears.clampGear(gear));
     TEST_ASSERT_EQUAL_INT32(gear * 1200, gears.offsetSteps(gear, 1200));

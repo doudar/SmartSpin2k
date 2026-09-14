@@ -255,7 +255,8 @@ void bleClientTask(void* pvParameters) {
         } else {  // Startup Homing
           ss2k->goHome(false);
         }
-        rtConfig->setShifterPosition(SHIFTER_MIDDLE_POSITION); // Reset to middle position
+        // Use the groupset start gear and actual homing result, including Unlimited's 8/0 reset.
+        ss2k->resetStartingGear();
         spinBLEServer.spinDownFlag = 0;
       }
     }

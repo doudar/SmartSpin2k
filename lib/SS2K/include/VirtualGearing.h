@@ -78,7 +78,7 @@ struct Gears {
   }
 
   bool unlimited() const { return count == 0; }
-  int startGear() const { return unlimited() ? 0 : 1; }
+  int startGear(bool homed = false) const { return unlimited() ? (homed ? 8 : 0) : std::max(1, count / 3); }
   int clampGear(int gear) const { return unlimited() ? gear : std::max(1, std::min(gear, static_cast<int>(count))); }
   bool operator==(const Gears& other) const { return count == other.count && std::memcmp(ratios, other.ratios, count * sizeof(uint16_t)) == 0; }
 };

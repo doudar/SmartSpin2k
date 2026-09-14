@@ -62,6 +62,7 @@ class SS2K {
   void _findFTMSHome(bool bothDirections = false);
   void _resistanceMove();
   bool localGearingSelected() const;
+  void resetStartingGear();
   int32_t simulationTargetPosition() const;
 
   // the position the stepper motor will move to
