@@ -89,3 +89,14 @@ class TestBleWireRoundTrip {
   static void test_heart_rate_round_trip(void);
   static void test_zwift_round_trip(void);
 };
+
+class TestVirtualGearing {
+ public:
+  static void test_unlimited_default_and_wire();
+  static void test_ratio_api();
+  static void test_offset_normalization();
+  static void test_duplicate_and_identical_ratios();
+  static void test_profile_bounds_and_scaling();
+  static void test_offset_overflow();
+  static void test_packet_validation();
+};

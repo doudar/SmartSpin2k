@@ -325,8 +325,9 @@ void SS2K::maintenanceLoop(void* pvParameters) {
       }
       // Don't do these if updating and in spindown mode.
       if (!spinBLEServer.spinDownFlag) {
-        ss2k->moveStepper();
+        // Clamp/interpret a shift before it can command motor movement.
         ss2k->FTMSModeShiftModifier();
+        ss2k->moveStepper();
         ergMode->runERG();
       }
       // wattbikeService.parseNemit();
@@ -513,6 +514,27 @@ void SS2K::updateLED() {
 }
 
 void SS2K::FTMSModeShiftModifier() {
+  const bool localSelected = localGearingSelected();
+  if (localSelected != localGearingActive) {
+    if (localSelected) {
+      legacyShifterPosition = lastShifterPosition;
+      const VirtualGearing::Gears gears = userConfig->getGearRatios();
+      rtConfig->setShifterPosition(gears.clampGear(localGear));
+    } else if (!zwiftService.isConnected() && !openBikeControlService.isConnected()) {
+      rtConfig->setShifterPosition(legacyShifterPosition);
+    }
+    lastShifterPosition = rtConfig->getShifterPosition();
+    localGearingActive = localSelected;
+    BLE_ss2kCustomCharacteristic::notify(BLE_shifterPosition);
+  }
+  if (localSelected) {
+    const int gear = userConfig->getGearRatios().clampGear(rtConfig->getShifterPosition());
+    localGear = gear;
+    if (gear != rtConfig->getShifterPosition()) {
+      rtConfig->setShifterPosition(gear);
+      BLE_ss2kCustomCharacteristic::notify(BLE_shifterPosition);
+    }
+  }
   int shiftDelta = rtConfig->getShifterPosition() - ss2k->lastShifterPosition;
   if (shiftDelta) {  // Shift detected
     ss2k->setLEDEnabled(true);
@@ -586,6 +608,18 @@ void SS2K::FTMSModeShiftModifier() {
 
       default:  // Sim Mode
       {
+        if (localSelected) {
+          // Bound the logical gear independently of the final hardware travel clamp.
+          const VirtualGearing::Gears gears = userConfig->getGearRatios();
+          if (gears.unlimited()) {
+            SS2K_LOG(MAIN_LOG_TAG, "Unlimited gear %d", rtConfig->getShifterPosition());
+          } else {
+            SS2K_LOG(MAIN_LOG_TAG, "Gear %d/%u", rtConfig->getShifterPosition(), gears.count);
+          }
+          uint8_t controlData[] = {FitnessMachineControlPointProcedure::SetIndoorBikeSimulationParameters, 0x00, 0x00, 0x00, 0x00, 0x28, 0x33};
+          spinBLEClient.FTMSControlPointWrite(controlData, sizeof(controlData));
+          break;
+        }
         SS2K_LOG(MAIN_LOG_TAG, "Shift %+d pos %d tgt %d min %d max %d r_min %d r_max %d", shiftDelta, rtConfig->getShifterPosition(), ss2k->getTargetPosition(),
                  rtConfig->getMinStep(), rtConfig->getMaxStep(), rtConfig->getMinResistance(), rtConfig->getMaxResistance());
         // Block Shifts further out of bounds

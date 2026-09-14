@@ -196,11 +196,6 @@ constexpr const char* ANY  = "any";
 #define DEBUG_LOG_BUFFER_SIZE 600
 #endif
 
-// Max size of userconfig
-#define USERCONFIG_JSON_SIZE 2000 + DEBUG_LOG_BUFFER_SIZE
-
-#define RUNTIMECONFIG_JSON_SIZE 1000 + DEBUG_LOG_BUFFER_SIZE
-
 // Legacy instantaneous-watt guardrails in the stepper loop. ERG mode now owns
 // direction validation, overshoot recovery, cadence retargeting, and timeouts.
 // #define ERG_GUARDRAILS

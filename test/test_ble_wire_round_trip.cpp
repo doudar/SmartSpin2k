@@ -82,8 +82,14 @@ void TestBleWireRoundTrip::test_dircon_uuid_round_trip(void) {
 void TestBleWireRoundTrip::test_all_custom_characteristic_formats(void) {
   unsigned formatCounts[CustomUnknown + 1] = {0};
 
-  for (uint8_t id = BLE_firmwareUpdateURL; id <= BLE_scanResults; ++id) {
+  for (uint8_t id = BLE_firmwareUpdateURL; id <= BLE_gearRatios; ++id) {
     const CustomCharacteristicValueFormat format = customCharacteristicValueFormat(id);
+    // 0x33 was the retired experimental rider-weight field. Keep the wire ID
+    // reserved so a future field cannot accidentally reinterpret old writes.
+    if (id == 0x33) {
+      TEST_ASSERT_EQUAL(CustomUnknown, format);
+      continue;
+    }
     TEST_ASSERT_NOT_EQUAL_MESSAGE(CustomUnknown, format, "custom characteristic is missing a wire format");
     ++formatCounts[format];
 
@@ -146,6 +152,12 @@ void TestBleWireRoundTrip::test_all_custom_characteristic_formats(void) {
         TEST_ASSERT_EQUAL_STRING("log payload", logMessage);
         break;
       }
+      case CustomGearRatios: {
+        uint8_t value[3] = {0, 0, 0};
+        put_le16(value + 1, 4545);
+        TEST_ASSERT_EQUAL_UINT16(4545, get_le16(value + 1));
+        break;
+      }
       case CustomAction:
         // Action characteristics carry only operation and ID, so there is no value to round-trip.
         break;
@@ -165,6 +177,7 @@ void TestBleWireRoundTrip::test_all_custom_characteristic_formats(void) {
   TEST_ASSERT_EQUAL_UINT(1, formatCounts[CustomSettingsSnapshot]);
   TEST_ASSERT_EQUAL_UINT(1, formatCounts[CustomScanResultStream]);
   TEST_ASSERT_EQUAL_UINT(1, formatCounts[CustomBooleanWriteStringRead]);
+  TEST_ASSERT_EQUAL_UINT(1, formatCounts[CustomGearRatios]);
 }
 
 void TestBleWireRoundTrip::test_ftms_round_trip(void) {

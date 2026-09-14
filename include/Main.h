@@ -30,6 +30,9 @@ class SS2K {
   ButtonState upButtonState;
   ButtonState downButtonState;
   int lastShifterPosition;
+  bool localGearingActive = false;
+  int legacyShifterPosition = 0;
+  int localGear = 0;
   int shiftersHoldForScan;
   unsigned long int scanDelayTime;
   unsigned long int scanDelayStart;
@@ -58,6 +61,8 @@ class SS2K {
   bool _findEndStop(bool moveForward);
   void _findFTMSHome(bool bothDirections = false);
   void _resistanceMove();
+  bool localGearingSelected() const;
+  int32_t simulationTargetPosition() const;
 
   // the position the stepper motor will move to
   int32_t getTargetPosition() { return targetPosition; }

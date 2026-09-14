@@ -160,8 +160,7 @@ void SS2K::moveStepper() {
         ss2k->_resistanceMove();
       } else {
         // Simulation Mode
-        ss2k->targetPosition = rtConfig->getShifterPosition() * userConfig->getShiftStep();
-        ss2k->targetPosition += rtConfig->getTargetIncline() * userConfig->getInclineMultiplier();
+        ss2k->targetPosition = ss2k->simulationTargetPosition();
       }
     } else {
       // periodically log external control message
@@ -520,6 +519,7 @@ void SS2K::_findFTMSHome(bool bothDirections) {
   }
   setupTMCStepperDriver(true);
   rtConfig->setShifterPosition(0);
+  localGear = userConfig->getGearRatios().startGear();
   ss2k->setTargetPosition(0);
   rtConfig->setTargetIncline(0);
   stepper->moveTo(0);
@@ -530,6 +530,7 @@ void SS2K::_findFTMSHome(bool bothDirections) {
 
 void SS2K::goHome(bool bothDirections) {
   SS2K_LOG(MAIN_LOG_TAG, "Starting homing procedure...");
+  rtConfig->setHomed(false);
   ergMode->resetTableConfidence();
   if (bothDirections) {
     fitnessMachineService.spinDown(FitnessMachineStatus::SpinDown_SpinDownRequested);
@@ -661,6 +662,7 @@ void SS2K::goHome(bool bothDirections) {
   rtConfig->setHomed(true);
   setupTMCStepperDriver(true);  // Restore normal driver settings
   rtConfig->setShifterPosition(0);
+  localGear = userConfig->getGearRatios().startGear();
   ss2k->setTargetPosition(0);
   stepper->moveTo(0);
   if (bothDirections) fitnessMachineService.spinDown(FitnessMachineStatus::SpinDown_Success);
