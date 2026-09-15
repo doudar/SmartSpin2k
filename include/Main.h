@@ -75,6 +75,9 @@ class SS2K {
   void stopTasks();
   void restartWifi();
   void setupTMCStepperDriver(bool reset = false);
+  void updateHardwareSafety();
+  void updateDriverSafety(int s3CurrentPercent, bool s3Disabled);
+  bool stepperSafetyReady();
   void updateStepperPower(int pwr = 0);
   void updateStealthChop(bool coolStepEnabled = true);
   void updateStepperSpeed(int speed = 0);

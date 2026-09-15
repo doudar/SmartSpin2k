@@ -7,6 +7,15 @@
 
 #pragma once
 
+class TestThermalSafety {
+ public:
+  static void test_tmc_cooldown_and_recovery();
+  static void test_tmc_missing_samples_and_timer_wrap();
+  static void test_s3_thresholds_and_hysteresis();
+  static void test_s3_failed_sensor_preserves_protection();
+  static void test_combined_limits_and_setting_changes();
+};
+
 class test_fitnessMachineIndoorBikeData {
  public:
   static void test_parses_power(void);

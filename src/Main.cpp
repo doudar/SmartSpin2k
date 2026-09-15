@@ -9,6 +9,7 @@
 #include "Stepper.h"
 #include "SS2KLog.h"
 #include <Arduino.h>
+#include "driver/gpio.h"
 #include <cctype>
 #include <cstdlib>
 #include <LittleFS.h>
@@ -27,6 +28,7 @@
 #include "BLE_Zwift_Service.h"
 #include "BLE_OpenBikeControl_Service.h"
 #include "DirConManager.h"
+#include "ThermalSafety.h"
 
 // Peloton Serial
 HardwareSerial auxSerial(1);
@@ -199,6 +201,10 @@ void SS2K::finishSetup() {
   }
 #endif
   SS2K_LOG(MAIN_LOG_TAG, "Current Board Revision is: %s", currentBoard.name.c_str());
+  // Disable before serial, filesystem or WiFi setup can delay current limiting.
+  gpio_set_level(static_cast<gpio_num_t>(currentBoard.enablePin), 1);
+  pinMode(currentBoard.enablePin, OUTPUT);
+  digitalWrite(currentBoard.enablePin, HIGH);
 
   // initialize Stepper serial port
 
@@ -258,6 +264,7 @@ void SS2K::finishSetup() {
   ss2k->setLEDEnabled(shouldStartWithLedEnabled());
 
   ss2k->setupTMCStepperDriver();
+  ss2k->updateHardwareSafety();  // Establish thermal limits before BLE can start homing.
 
   SS2K_LOG(MAIN_LOG_TAG, "Setting up cpu Tasks");
 
@@ -304,9 +311,15 @@ void SS2K::maintenanceLoop(void* pvParameters) {
   static unsigned long maintenanceTimer    = millis();
   static unsigned long riderStatusLogTimer = millis();
   static unsigned long rebootTimer         = millis();
+  static uint32_t hardwareSafetyTimer      = millis();
 
   while (true) {
     delay(10);
+    // Keep thermal protection active during firmware updates and homing.
+    if (uint32_t(millis() - hardwareSafetyTimer) >= ThermalSafety::POLL_INTERVAL_MS) {
+      hardwareSafetyTimer = millis();
+      ss2k->updateHardwareSafety();
+    }
     BLEFirmwareUpdateLoop();
 
 #ifdef SERIAL_CUSTOM_CHARACTERISTIC

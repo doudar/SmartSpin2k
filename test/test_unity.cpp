@@ -36,6 +36,12 @@ void setup() {
   // Start Unity
   UNITY_BEGIN();
 
+  RUN_TEST(TestThermalSafety::test_tmc_cooldown_and_recovery);
+  RUN_TEST(TestThermalSafety::test_tmc_missing_samples_and_timer_wrap);
+  RUN_TEST(TestThermalSafety::test_s3_thresholds_and_hysteresis);
+  RUN_TEST(TestThermalSafety::test_s3_failed_sensor_preserves_protection);
+  RUN_TEST(TestThermalSafety::test_combined_limits_and_setting_changes);
+
   // FitnessMachineIndoorBike Tests
   {
     test_fitnessMachineIndoorBikeData test;
