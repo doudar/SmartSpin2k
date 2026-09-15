@@ -282,7 +282,7 @@ constexpr const char* ANY  = "any";
 #define DEFAULT_HOMING_SENSITIVITY 50
 
 // Stepper homing behavior
-#define HOME_TIMEOUT                  30000
+#define HOME_TIMEOUT                  45000
 #define HOMING_SG_SAMPLE_COUNT        24
 #define HOMING_SG_MIN_SAMPLE_MARGIN   10
 #define HOMING_SG_MAX_THRESHOLD_DRIFT 30
