@@ -315,7 +315,7 @@ void SS2K::maintenanceLoop(void* pvParameters) {
 
   while (true) {
     delay(10);
-    // Keep thermal protection active during firmware updates and homing.
+    // Keep thermal protection active during updates; the check defers during homing.
     if (uint32_t(millis() - hardwareSafetyTimer) >= ThermalSafety::POLL_INTERVAL_MS) {
       hardwareSafetyTimer = millis();
       ss2k->updateHardwareSafety();

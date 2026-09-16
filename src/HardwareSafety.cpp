@@ -112,7 +112,7 @@ void updateRadioCooling(bool reduce) {
 }  // namespace
 #endif
 
-void SS2K::updateHardwareSafety() {
+void SS2K::checkHardwareSafety() {
 #if defined(SMARTSPIN2K_S3)
   const auto previous = s3Protection;
   float temperature   = readS3Temperature();

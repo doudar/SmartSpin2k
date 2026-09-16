@@ -38,6 +38,7 @@ class SS2K {
   bool ledEnabled;
   void handleShiftButtons();
   static void finishSetup();
+  void checkHardwareSafety();
 
  public:
   bool stepperIsRunning;
