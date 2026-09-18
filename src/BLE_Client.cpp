@@ -255,7 +255,8 @@ void bleClientTask(void* pvParameters) {
         } else {  // Startup Homing
           ss2k->goHome(false);
         }
-        rtConfig->setShifterPosition(SHIFTER_MIDDLE_POSITION); // Reset to middle position
+        // Use the groupset start gear and actual homing result, including Unlimited's 8/0 reset.
+        ss2k->resetStartingGear();
         spinBLEServer.spinDownFlag = 0;
       }
     }
@@ -629,6 +630,7 @@ void SpinBLEClient::resetDevices(NimBLEClient* pClient) {
 
 // Control a connected FTMS trainer. If no args are passed, treat it like an external stepper motor.
 void SpinBLEClient::FTMSControlPointWrite(const uint8_t* pData, int length) {
+  if (!pData || length <= 0 || length > 7) return;
   if (userConfig->getFTMSControlPointWrite()) {
     NimBLEClient* pClient = nullptr;
     uint8_t modData[7];
@@ -649,16 +651,20 @@ void SpinBLEClient::FTMSControlPointWrite(const uint8_t* pData, int length) {
       if (writeCharacteristic) {
         const int kLogBufCapacity = length + 40;
         char logBuf[kLogBufCapacity];
-        if (modData[0] == FitnessMachineControlPointProcedure::SetIndoorBikeSimulationParameters) {  // use virtual Shifting
-          int incline = ss2k->getTargetPosition() / userConfig->getInclineMultiplier();
-          put_le16s(&modData[3], static_cast<int16_t>(incline));
+        if (length == 7 && modData[0] == FitnessMachineControlPointProcedure::SetIndoorBikeSimulationParameters) {
+          // Use the same current terrain + gear target as the local motor,
+          // rather than the previous loop's target when a command has just arrived.
+          const float multiplier = userConfig->getInclineMultiplier();
+          const double incline = multiplier > 0 ? ss2k->simulationTargetPosition() / static_cast<double>(multiplier) : 0;
+          const int16_t encodedIncline = static_cast<int16_t>(std::max(-32768.0, std::min(32767.0, incline)));
+          put_le16s(&modData[3], encodedIncline);
           writeCharacteristic->writeValue(modData, length);
           logBufLength = ss2k_log_hex_to_buffer(modData, length, logBuf, 0, kLogBufCapacity);
           logBufLength += snprintf(logBuf + logBufLength, kLogBufCapacity - logBufLength, "-> Shifted Sim Data: %d", rtConfig->getShifterPosition());
         } else {
           writeCharacteristic->writeValue(modData, length);
           logBufLength = ss2k_log_hex_to_buffer(modData, length, logBuf, 0, kLogBufCapacity);
-          logBufLength += snprintf(logBuf + logBufLength, kLogBufCapacity - logBufLength, "-> Shifted ERG Data: %d", rtConfig->getShifterPosition());
+          logBufLength += snprintf(logBuf + logBufLength, kLogBufCapacity - logBufLength, "-> Forwarded FTMS Data: %d", rtConfig->getShifterPosition());
         }
         SS2K_LOG(BLE_CLIENT_LOG_TAG, "%s", logBuf);
       }

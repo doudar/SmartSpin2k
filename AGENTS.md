@@ -112,7 +112,7 @@ Boot sequence:
 `SS2K::maintenanceLoop()` is the main cooperative loop. It roughly does:
 
 - Every `BLE_NOTIFY_DELAY`: `BLECommunications()`, flush logs, websocket loop.
-- If not updating and not in spindown: `ss2k->moveStepper()`, `ss2k->FTMSModeShiftModifier()`, `ergMode->runERG()`.
+- If not updating and not in spindown: `ss2k->FTMSModeShiftModifier()`, `ss2k->moveStepper()`, `ergMode->runERG()`.
 - Periodically poll Peloton aux serial via `txSerial()`.
 - Always handle local shifter button state.
 - Notify changed custom-characteristic values via `BLE_ss2kCustomCharacteristic::parseNemit()`.
@@ -371,7 +371,7 @@ Globals:
 - If `externalControl` is false:
   - ERG mode (`SetTargetPower`): `targetPosition = rtConfig->targetIncline`, with optional guardrails to avoid moving opposite the watt error.
   - Resistance mode (`SetTargetResistanceLevel`): calls `_resistanceMove()`.
-  - Simulation mode: target is `shifterPosition * shiftStep + targetIncline * inclineMultiplier`.
+  - Simulation mode: local gearing uses median-normalized ratio offsets plus `targetIncline * inclineMultiplier`; external/app-owned paths retain their existing controls.
 - If `syncMode`, stops movement and sets current stepper position to target.
 - Applies Peloton/resistance safety nudges and min/max step clamps.
 - Calls `stepper->moveTo(targetPosition)`.
@@ -398,6 +398,12 @@ Stepper safety:
 - Unhomed devices use provisional defaults unless power-table/resistance updates refine limits.
 - FastAccelStepper pulse generation is initialized independently of TMC UART detection, so the firmware remains safe when the physical driver is absent. Runtime stepper-setting methods must still tolerate null driver/stepper pointers in case peripheral allocation fails.
 - Do not bypass `moveStepper()` target clamping for ordinary control paths.
+
+## Virtual Gearing
+
+`lib/SS2K/include/VirtualGearing.h` maps sorted ratio arrays to integer motor offsets. `shiftStep` is the distance for the median positive adjacent ratio gap; even medians average the middle two gaps. Gear 1 has zero offset; duplicates share offsets, all-identical profiles stay at zero, and absolute calculation avoids rounding drift. `src/VirtualGearing.cpp` adds the existing terrain incline offset. Both boards use this in local simulation/inclination modes without weight, cadence, calibration/trust gating, or timed effects. Full targets pass through `moveStepper()` travel clamps. ERG, resistance, external control and app-owned shifting retain their own behavior. Unlimited is the default: an empty ratio array gives fixed `shifterPosition * shiftStep` offsets, no logical gear bounds, and start position 0 while unhomed or 8 after successful homing. Bounded profiles start at `max(1, gearCount / 3)` rounded down (24 gears: 8; 12/13 gears: 4) at both startup and homing, and clamp to the profile count. The BLE post-homing caller must use the same start gear for local gearing; other control modes retain their legacy reset. Motor travel guards apply in both modes. Median calculation happens before the profile's short publication lock.
+
+`userConfig.gearRatios` persists an empty array for Unlimited (default), or 2–26 sorted uint16 ratios in thousandths. Existing saved profiles are preserved. BLE count 0 (`02 34 00`) selects Unlimited; indexed reads then return an error. Custom ID `0x34`, HTTP settings, and both web asset trees expose it. The web groupset dropdown maps road/MTB/gravel presets to arrays; unmatched arrays are retained. Full 26-gear BLE writes need MTU >=58; metadata/indexed reads fit MTU 23. The experimental weight ID 0x33 is retired. See `VirtualGearing.md` and `CustomCharacteristic.md`. Run native tests and both firmware/filesystem builds for changes.
 
 ## ERG Mode
 

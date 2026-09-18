@@ -364,6 +364,7 @@ bool PowerTable::_save() {
 // Reset the PowerTable to 0;
 bool PowerTable::reset() {
   ss2k->resetPowerTableFlag = false;
+  rtConfig->setHomed(false);
   for (int i = 0; i < POWERTABLE_CAD_SIZE; i++) {
     for (int j = 0; j < POWERTABLE_WATT_SIZE; j++) {
       this->ptData.tableRow[i].tableEntry[j].targetPosition = INT16_MIN;
@@ -372,7 +373,6 @@ bool PowerTable::reset() {
   }
   userConfig->setHMax(INT32_MIN);
   userConfig->setHMin(INT32_MIN);
-  rtConfig->setHomed(false);
   File file = LittleFS.open(POWER_TABLE_FILENAME, FILE_READ);
   if (!file) {
     SS2K_LOG(POWERTABLE_LOG_TAG, "Failed to Load Power Table.");
