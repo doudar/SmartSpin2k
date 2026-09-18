@@ -529,6 +529,9 @@ void SS2K::_findFTMSHome(bool bothDirections) {
 
 void SS2K::goHome(bool bothDirections) {
   SS2K_LOG(MAIN_LOG_TAG, "Starting homing procedure...");
+  // Only shifts made during homing should abort it. Clear any pending delta that the
+  // shift modifier never got to consume (it is skipped while spinDownFlag is set).
+  ss2k->lastShifterPosition = rtConfig->getShifterPosition();
   rtConfig->setHomed(false);
   ergMode->resetTableConfidence();
   if (bothDirections) {

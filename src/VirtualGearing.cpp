@@ -13,6 +13,9 @@
 void SS2K::resetStartingGear() {
   localGear = userConfig->getGearRatios().startGear(rtConfig->getHomed());
   rtConfig->setShifterPosition(localGearingSelected() ? localGear : SHIFTER_MIDDLE_POSITION);
+  // A programmatic gear reset is not a rider shift. Keep the shift baseline in sync so
+  // nothing downstream (homing's abort check, FTMS forwarding) sees a phantom shift.
+  lastShifterPosition = rtConfig->getShifterPosition();
 }
 
 bool SS2K::localGearingSelected() const {
