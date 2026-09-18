@@ -24,16 +24,22 @@ bool SS2K::localGearingSelected() const {
          (mode == 0 || mode == FitnessMachineControlPointProcedure::SetTargetInclination || mode == FitnessMachineControlPointProcedure::SetIndoorBikeSimulationParameters);
 }
 
-int32_t SS2K::simulationTargetPosition() const {
+// Unclamped travel target for a logical gear. Shared with the shift-limit check so
+// both agree on where a gear would put the knob before the limits are applied.
+int32_t SS2K::gearTargetPosition(int gear) const {
   const int32_t shiftStep = userConfig->getShiftStep();
+  const int64_t offset = localGearingSelected() ? userConfig->getGearRatios().offsetSteps(gear, shiftStep) : static_cast<int64_t>(gear) * shiftStep;
+  const double target = offset + static_cast<double>(rtConfig->getTargetIncline()) * userConfig->getInclineMultiplier();
+  if (!std::isfinite(target)) return currentPosition;
+  return static_cast<int32_t>(std::max(static_cast<double>(INT32_MIN), std::min(static_cast<double>(INT32_MAX), target)));
+}
+
+int32_t SS2K::simulationTargetPosition() const {
   const bool localSelected = localGearingSelected();
   // An incoming FTMS command can enter sim mode before the next shift-modifier
   // pass restores the saved gear. Forward the same target that pass will select.
   const int gear = localSelected && !localGearingActive ? localGear : rtConfig->getShifterPosition();
-  const int64_t offset = localSelected ? userConfig->getGearRatios().offsetSteps(gear, shiftStep) : static_cast<int64_t>(gear) * shiftStep;
-  const double target = offset + static_cast<double>(rtConfig->getTargetIncline()) * userConfig->getInclineMultiplier();
-  if (!std::isfinite(target)) return currentPosition;
-  const int32_t requested = static_cast<int32_t>(std::max(static_cast<double>(INT32_MIN), std::min(static_cast<double>(INT32_MAX), target)));
+  const int32_t requested = gearTargetPosition(gear);
   // Apply the common travel limits before FTMS forwarding too. The motor loop
   // retains its additional hardware-specific guards and final travel check.
   const int32_t minimum = rtConfig->getMinStep();

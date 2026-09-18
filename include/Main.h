@@ -63,6 +63,7 @@ class SS2K {
   void _resistanceMove();
   bool localGearingSelected() const;
   void resetStartingGear();
+  int32_t gearTargetPosition(int gear) const;
   int32_t simulationTargetPosition() const;
 
   // the position the stepper motor will move to

@@ -612,7 +612,17 @@ void SS2K::FTMSModeShiftModifier() {
         if (localSelected) {
           // Bound the logical gear independently of the final hardware travel clamp.
           const VirtualGearing::Gears gears = userConfig->getGearRatios();
+          // clampGear() already bounds a configured groupset, but Unlimited has no gear
+          // ceiling. Without this the gear counter keeps climbing while the knob sits at
+          // the travel limit, and the rider shifts back through dead gears to move it.
           if (gears.unlimited()) {
+            const int32_t minimum   = rtConfig->getMinStep();
+            const int32_t maximum   = rtConfig->getMaxStep();
+            const int32_t requested = ss2k->gearTargetPosition(rtConfig->getShifterPosition());
+            if ((minimum < maximum) && ((shiftDelta < 0 && requested < minimum) || (shiftDelta > 0 && requested > maximum))) {
+              SS2K_LOG(MAIN_LOG_TAG, "Shift Blocked by stepper limits.");
+              rtConfig->setShifterPosition(ss2k->lastShifterPosition);
+            }
             SS2K_LOG(MAIN_LOG_TAG, "Unlimited gear %d", rtConfig->getShifterPosition());
           } else {
             SS2K_LOG(MAIN_LOG_TAG, "Gear %d/%u", rtConfig->getShifterPosition(), gears.count);
