@@ -57,7 +57,7 @@ class Boards {
     rev3.auxSerialRxPin     = 18;
     rev3.ledPin             = 2;
     rev3.pwrScaler          = 12;
-    rev3.rSense             = 0.04f;
+    rev3.rSense             = 0.08f;
     rev3.homingSupported    = true;
     rev3.homingSensitivityScaler = 1.6f;
 #else

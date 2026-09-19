@@ -97,9 +97,8 @@ void collectAndSet(NimBLEUUID charUUID, NimBLEUUID serviceUUID, std::string& uni
     if (charUUID == PELOTON_DATA_UUID) {
       // Peloton connected but using BLE Power Meter. So skip resistance for UUID's that aren't Peloton.
     } else {
-      rtConfig->resistance.setValue(sensorData->getResistance());
+      rtConfig->resistance.setValue(sensorData->getResistance(), false);  // Publish value and real-data flag together.
       logBufLength += snprintf(logBuf + logBufLength, kLogBufMaxLength - logBufLength, " RS(%d)", sensorData->getResistance() % 1000);
-      rtConfig->resistance.setSimulate(false);  // Mark as real data
     }
   }
 

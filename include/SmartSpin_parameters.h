@@ -8,6 +8,7 @@
 #pragma once
 
 #include <Arduino.h>
+#include <mutex>
 
 #include "settings.h"
 
@@ -21,19 +22,52 @@ class Measurement {
   int min;
   int max;
   unsigned long timestamp;
+  uint32_t valueTimestamp = 0;
+
+  // Shared by value writers and snapshot readers across firmware tasks. Keeping
+  // the mutex outside each instance also preserves Measurement's copy behavior.
+  static std::mutex& valueMutex() {
+    static std::mutex mutex;
+    return mutex;
+  }
+
+  void updateValue(int val) {
+    const unsigned long now = millis();
+    value = val;
+    timestamp = now;
+    valueTimestamp = static_cast<uint32_t>(now);
+  }
 
  public:
+  struct ValueSample {
+    int value;
+    uint32_t timestamp;
+    bool simulate;
+  };
+
   void setSimulate(bool sim) {
+    std::lock_guard<std::mutex> lock(valueMutex());
     simulate        = sim;
     this->timestamp = millis();
   }
   bool getSimulate() { return simulate; }
 
   void setValue(int val) {
-    value           = val;
-    this->timestamp = millis();
+    std::lock_guard<std::mutex> lock(valueMutex());
+    updateValue(val);
+  }
+  void setValue(int val, bool simulated) {
+    std::lock_guard<std::mutex> lock(valueMutex());
+    simulate = simulated;
+    updateValue(val);
   }
   int getValue() { return value; }
+
+  ValueSample getValueSample() const {
+    std::lock_guard<std::mutex> lock(valueMutex());
+    return {value, valueTimestamp, simulate};
+  }
+  uint32_t getValueTimestamp() const { return getValueSample().timestamp; }
 
   void setTarget(int tar) {
     target          = tar;

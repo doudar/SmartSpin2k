@@ -117,8 +117,7 @@ void BLE_Fitness_Machine_Service::update() {
   } else {
     // Calculate resistance from stepper position for bikes that don't report resistance
     resistanceValue = this->calculateResistanceFromPosition();
-    rtConfig->resistance.setValue(resistanceValue);
-    rtConfig->resistance.setSimulate(true); // Mark as simulated
+    rtConfig->resistance.setValue(resistanceValue, true);  // Publish value and simulated-data flag together.
   }
   ftmsIndoorBikeData.push_back(static_cast<uint8_t>(resistanceValue & 0xff));
   ftmsIndoorBikeData.push_back(static_cast<uint8_t>(resistanceValue >> 8));
