@@ -47,6 +47,17 @@ int PowerBuffer::getReadings() {
 }
 
 void PowerTable::processPowerValue(PowerBuffer& powerBuffer, int cadence, Measurement watts) {
+  static uint32_t collectedEpoch = 0;
+  if (collectedEpoch != positionEpoch) {
+    powerBuffer.reset();
+    collectedEpoch = positionEpoch;
+  }
+  // Do not learn watts against coordinates that are awaiting FTMS correction.
+  // A manual knob change can otherwise contaminate the table during confirmation.
+  if (ftmsPositionUncertain) {
+    if (powerBuffer.getReadings()) powerBuffer.reset();
+    return;
+  }
   // Use the same cadence binning rule for collection and insertion. This
   // admits the complete edge bins (58-62 RPM and 103-107 RPM) while rejecting
   // cadences that calculateIndex() cannot place in the table.
@@ -193,6 +204,29 @@ void PowerTable::newEntry(PowerBuffer& powerBuffer) {
   BLE_ss2kCustomCharacteristic::notify(0x27, index.cadIndex);
 }
 
+bool PowerTable::loadFtmsCalibration() {
+  ftmsCalibration = FtmsCalibration::Map{};
+  File file = LittleFS.open(POWER_TABLE_FILENAME, FILE_READ);
+  if (!file) return false;
+  const size_t cells = POWERTABLE_CAD_SIZE * POWERTABLE_WATT_SIZE * (sizeof(int16_t) + sizeof(int8_t));
+  const size_t header = 2 * sizeof(int) + sizeof(bool);
+  int version = 0, quality = 0;
+  bool homed = false;
+  uint8_t bytes[FtmsCalibration::WIRE_SIZE];
+  bool valid = file.size() == header + cells + sizeof(bytes) &&
+               file.read(reinterpret_cast<uint8_t*>(&version), sizeof(version)) == sizeof(version) && version == TABLE_VERSION &&
+               file.read(reinterpret_cast<uint8_t*>(&quality), sizeof(quality)) == sizeof(quality) && quality >= 0 &&
+               file.read(reinterpret_cast<uint8_t*>(&homed), sizeof(homed)) == sizeof(homed) && homed && file.seek(header + cells) &&
+               file.read(bytes, sizeof(bytes)) == sizeof(bytes) && ftmsCalibration.decode(bytes, sizeof(bytes));
+  file.close();
+  if (!valid || userConfig->getHMin() != 0 ||
+      !ftmsCalibration.matches(FtmsCalibration::identity(userConfig->getConnectedPowerMeter(), userConfig->getStepperDir()), userConfig->getHMax())) {
+    ftmsCalibration = FtmsCalibration::Map{};
+    return false;
+  }
+  return true;
+}
+
 bool PowerTable::_manageSaveState(bool canSkipReliabilityChecks) {
   // Homing is now a prerequisite for loading and saving the powertable.
   if (!rtConfig->getHomed()) {
@@ -210,14 +244,17 @@ bool PowerTable::_manageSaveState(bool canSkipReliabilityChecks) {
     }
 
     // Read version and size
-    int version;
+    int version = 0;
     file.read((uint8_t*)&version, sizeof(version));
-    int savedQuality;
+    int savedQuality = 0;
     file.read((uint8_t*)&savedQuality, sizeof(savedQuality));
-    bool savedHomed;
+    bool savedHomed = false;
     file.read((uint8_t*)&savedHomed, sizeof(savedHomed));
 
-    if (version != TABLE_VERSION) {
+    const size_t expected = 2 * sizeof(int) + sizeof(bool) + POWERTABLE_CAD_SIZE * POWERTABLE_WATT_SIZE * (sizeof(int16_t) + sizeof(int8_t));
+    // The version-6 watts prefix is independent of the optional trailer. A
+    // damaged/missing future trailer requires calibration, not loss of watts.
+    if (version != TABLE_VERSION || !savedHomed || savedQuality < 0 || file.size() < expected) {
       SS2K_LOG(POWERTABLE_LOG_TAG, "Expected power table version %d, found version %d", TABLE_VERSION, version);
       file.close();
       this->_save();
@@ -262,8 +299,6 @@ bool PowerTable::_manageSaveState(bool canSkipReliabilityChecks) {
       }
     }
     SS2K_LOG(POWERTABLE_LOG_TAG, "Loaded values directly");
-    //}
-
     file.close();
 
     // set the flag so it isn't loaded again this session.
@@ -290,17 +325,16 @@ bool PowerTable::_save() {
   int validReadings = ptHelpers.getTotalReadings(ptData);
 
   // Only proceed with saving if we have enough data to make the file useful
-  if (validReadings < 1) {
+  if (validReadings < 1 && !ftmsCalibration.valid()) {
     SS2K_LOG(POWERTABLE_LOG_TAG, "Not enough valid readings to save power table (%d)", validReadings);
     return false;
   }
 
-  // Delete existing file to avoid appending
-  LittleFS.remove(POWER_TABLE_FILENAME);
-
-  // Open file for writing
+  // Replace only a complete file, so a failed metadata/table write leaves the
+  // previous calibration usable. FILE_WRITE truncates the temporary file.
   SS2K_LOG(POWERTABLE_LOG_TAG, "Writing File: %s", POWER_TABLE_FILENAME);
-  File file = LittleFS.open(POWER_TABLE_FILENAME, FILE_WRITE);
+  const String temporary = String(POWER_TABLE_FILENAME) + ".tmp";
+  File file = LittleFS.open(temporary, FILE_WRITE);
   if (!file) {
     SS2K_LOG(POWERTABLE_LOG_TAG, "Failed to create file");
     return false;
@@ -352,9 +386,17 @@ bool PowerTable::_save() {
     }
     Serial.printf("\n");
   }
-  // Close the file
+  if (ftmsCalibration.valid()) {
+    uint8_t bytes[FtmsCalibration::WIRE_SIZE];
+    ftmsCalibration.encode(bytes);
+    if (file.write(bytes, sizeof(bytes)) != sizeof(bytes)) {
+      file.close();
+      return false;
+    }
+  }
+  file.flush();
   file.close();
-  Serial.printf("file Size %lu\n", file.size());
+  if (!LittleFS.rename(temporary, POWER_TABLE_FILENAME)) return false;
   lastSaveTime                    = millis();
   this->_hasBeenLoadedThisSession = true;
   SS2K_LOG(POWERTABLE_LOG_TAG, "Power table saved successfully with %d readings", validReadings);
@@ -363,7 +405,12 @@ bool PowerTable::_save() {
 
 // Reset the PowerTable to 0;
 bool PowerTable::reset() {
+  ftmsPositionUncertain = false;
   ss2k->resetPowerTableFlag = false;
+  rtConfig->setHomed(false);
+  ftmsCalibration = FtmsCalibration::Map{};
+  _hasBeenLoadedThisSession = true;
+  ++positionEpoch;
   for (int i = 0; i < POWERTABLE_CAD_SIZE; i++) {
     for (int j = 0; j < POWERTABLE_WATT_SIZE; j++) {
       this->ptData.tableRow[i].tableEntry[j].targetPosition = INT16_MIN;
@@ -372,17 +419,7 @@ bool PowerTable::reset() {
   }
   userConfig->setHMax(INT32_MIN);
   userConfig->setHMin(INT32_MIN);
-  rtConfig->setHomed(false);
-  File file = LittleFS.open(POWER_TABLE_FILENAME, FILE_READ);
-  if (!file) {
-    SS2K_LOG(POWERTABLE_LOG_TAG, "Failed to Load Power Table.");
-    file.close();
-    this->_save();
-    return false;
-  }
-  file.close();
-  this->_save();
-  return true;
+  return !LittleFS.exists(POWER_TABLE_FILENAME) || LittleFS.remove(POWER_TABLE_FILENAME);
 }
 
 void PowerTable::toLog() {

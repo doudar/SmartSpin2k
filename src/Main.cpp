@@ -9,6 +9,7 @@
 #include "Stepper.h"
 #include "SS2KLog.h"
 #include <Arduino.h>
+#include "driver/gpio.h"
 #include <cctype>
 #include <cstdlib>
 #include <LittleFS.h>
@@ -27,6 +28,7 @@
 #include "BLE_Zwift_Service.h"
 #include "BLE_OpenBikeControl_Service.h"
 #include "DirConManager.h"
+#include "ThermalSafety.h"
 
 // Peloton Serial
 HardwareSerial auxSerial(1);
@@ -199,6 +201,10 @@ void SS2K::finishSetup() {
   }
 #endif
   SS2K_LOG(MAIN_LOG_TAG, "Current Board Revision is: %s", currentBoard.name.c_str());
+  // Disable before serial, filesystem or WiFi setup can delay current limiting.
+  gpio_set_level(static_cast<gpio_num_t>(currentBoard.enablePin), 1);
+  pinMode(currentBoard.enablePin, OUTPUT);
+  digitalWrite(currentBoard.enablePin, HIGH);
 
   // initialize Stepper serial port
 
@@ -221,6 +227,7 @@ void SS2K::finishSetup() {
 
   // Load Config
   userConfig->loadFromLittleFS();
+  ss2k->resetStartingGear();
   userConfig->printFile();  // Print userConfig->contents to serial
   userConfig->saveToLittleFS();
 
@@ -258,6 +265,7 @@ void SS2K::finishSetup() {
   ss2k->setLEDEnabled(shouldStartWithLedEnabled());
 
   ss2k->setupTMCStepperDriver();
+  ss2k->updateHardwareSafety();  // Establish thermal limits before BLE can start homing.
 
   SS2K_LOG(MAIN_LOG_TAG, "Setting up cpu Tasks");
 
@@ -304,10 +312,17 @@ void SS2K::maintenanceLoop(void* pvParameters) {
   static unsigned long maintenanceTimer    = millis();
   static unsigned long riderStatusLogTimer = millis();
   static unsigned long rebootTimer         = millis();
+  static uint32_t hardwareSafetyTimer      = millis();
 
   while (true) {
     delay(10);
+    // Keep thermal protection active during updates; the check defers during homing.
+    if (uint32_t(millis() - hardwareSafetyTimer) >= ThermalSafety::POLL_INTERVAL_MS) {
+      hardwareSafetyTimer = millis();
+      ss2k->updateHardwareSafety();
+    }
     BLEFirmwareUpdateLoop();
+    ss2k->syncFtmsPosition();
 
 #ifdef SERIAL_CUSTOM_CHARACTERISTIC
     processSerialCustomCharacteristic();
@@ -325,8 +340,9 @@ void SS2K::maintenanceLoop(void* pvParameters) {
       }
       // Don't do these if updating and in spindown mode.
       if (!spinBLEServer.spinDownFlag) {
-        ss2k->moveStepper();
+        // Clamp/interpret a shift before it can command motor movement.
         ss2k->FTMSModeShiftModifier();
+        ss2k->moveStepper();
         ergMode->runERG();
       }
       // wattbikeService.parseNemit();
@@ -513,6 +529,26 @@ void SS2K::updateLED() {
 }
 
 void SS2K::FTMSModeShiftModifier() {
+  const bool localSelected = localGearingSelected();
+  if (localSelected != localGearingActive) {
+    if (localSelected) {
+      legacyShifterPosition = lastShifterPosition;
+      const VirtualGearing::Gears gears = userConfig->getGearRatios();
+      rtConfig->setShifterPosition(gears.clampGear(localGear));
+    } else if (!zwiftService.isConnected() && !openBikeControlService.isConnected()) {
+      rtConfig->setShifterPosition(legacyShifterPosition);
+    }
+    lastShifterPosition = rtConfig->getShifterPosition();
+    localGearingActive = localSelected;
+    BLE_ss2kCustomCharacteristic::notify(BLE_shifterPosition);
+  }
+  if (localSelected) {
+    const int gear = userConfig->getGearRatios().clampGear(rtConfig->getShifterPosition());
+    if (gear != rtConfig->getShifterPosition()) {
+      rtConfig->setShifterPosition(gear);
+      BLE_ss2kCustomCharacteristic::notify(BLE_shifterPosition);
+    }
+  }
   int shiftDelta = rtConfig->getShifterPosition() - ss2k->lastShifterPosition;
   if (shiftDelta) {  // Shift detected
     ss2k->setLEDEnabled(true);
@@ -586,6 +622,28 @@ void SS2K::FTMSModeShiftModifier() {
 
       default:  // Sim Mode
       {
+        if (localSelected) {
+          // Bound the logical gear independently of the final hardware travel clamp.
+          const VirtualGearing::Gears gears = userConfig->getGearRatios();
+          // clampGear() already bounds a configured groupset, but Unlimited has no gear
+          // ceiling. Without this the gear counter keeps climbing while the knob sits at
+          // the travel limit, and the rider shifts back through dead gears to move it.
+          if (gears.unlimited()) {
+            const int32_t minimum   = rtConfig->getMinStep();
+            const int32_t maximum   = rtConfig->getMaxStep();
+            const int32_t requested = ss2k->gearTargetPosition(rtConfig->getShifterPosition());
+            if ((minimum < maximum) && ((shiftDelta < 0 && requested < minimum) || (shiftDelta > 0 && requested > maximum))) {
+              SS2K_LOG(MAIN_LOG_TAG, "Shift Blocked by stepper limits.");
+              rtConfig->setShifterPosition(ss2k->lastShifterPosition);
+            }
+            SS2K_LOG(MAIN_LOG_TAG, "Unlimited gear %d", rtConfig->getShifterPosition());
+          } else {
+            SS2K_LOG(MAIN_LOG_TAG, "Gear %d/%u", rtConfig->getShifterPosition(), gears.count);
+          }
+          uint8_t controlData[] = {FitnessMachineControlPointProcedure::SetIndoorBikeSimulationParameters, 0x00, 0x00, 0x00, 0x00, 0x28, 0x33};
+          spinBLEClient.FTMSControlPointWrite(controlData, sizeof(controlData));
+          break;
+        }
         SS2K_LOG(MAIN_LOG_TAG, "Shift %+d pos %d tgt %d min %d max %d r_min %d r_max %d", shiftDelta, rtConfig->getShifterPosition(), ss2k->getTargetPosition(),
                  rtConfig->getMinStep(), rtConfig->getMaxStep(), rtConfig->getMinResistance(), rtConfig->getMaxResistance());
         // Block Shifts further out of bounds
@@ -615,6 +673,9 @@ void SS2K::FTMSModeShiftModifier() {
     ss2k->lastShifterPosition = rtConfig->getShifterPosition();
     BLE_ss2kCustomCharacteristic::notify(BLE_shifterPosition);
   }
+  // Remember the accepted gear after travel-limit checks. A rejected Unlimited
+  // shift must not reappear when the rider returns from ERG/resistance mode.
+  if (localSelected) localGear = rtConfig->getShifterPosition();
 }
 
 void SS2K::restartWifi() {

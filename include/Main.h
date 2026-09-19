@@ -30,14 +30,19 @@ class SS2K {
   ButtonState upButtonState;
   ButtonState downButtonState;
   int lastShifterPosition;
+  bool localGearingActive = false;
+  int legacyShifterPosition = 0;
+  int localGear = 0;
   int shiftersHoldForScan;
   unsigned long int scanDelayTime;
   unsigned long int scanDelayStart;
   int32_t targetPosition;
   int32_t currentPosition;
+  int32_t ftmsSimulationOffset = 0;
   bool ledEnabled;
   void handleShiftButtons();
   static void finishSetup();
+  void checkHardwareSafety();
 
  public:
   bool stepperIsRunning;
@@ -50,6 +55,7 @@ class SS2K {
   bool resetDefaultsFlag   = false;
   bool resetPowerTableFlag = false;
   bool isUpdating          = false;
+  bool ftmsHomingFailed    = false;  // Hold normal motor control after failure until homing succeeds.
 
   static void ARDUINO_ISR_ATTR maintenanceLoop(void *pvParameters);
   static void ARDUINO_ISR_ATTR handleUpShift();
@@ -57,7 +63,12 @@ class SS2K {
   static void moveStepper();
   bool _findEndStop(bool moveForward);
   void _findFTMSHome(bool bothDirections = false);
+  void syncFtmsPosition();
   void _resistanceMove();
+  bool localGearingSelected() const;
+  void resetStartingGear();
+  int32_t gearTargetPosition(int gear) const;
+  int32_t simulationTargetPosition() const;
 
   // the position the stepper motor will move to
   int32_t getTargetPosition() { return targetPosition; }
@@ -75,6 +86,9 @@ class SS2K {
   void stopTasks();
   void restartWifi();
   void setupTMCStepperDriver(bool reset = false);
+  void updateHardwareSafety();
+  void updateDriverSafety(int s3CurrentPercent, bool s3Disabled);
+  bool stepperSafetyReady();
   void updateStepperPower(int pwr = 0);
   void updateStealthChop(bool coolStepEnabled = true);
   void updateStepperSpeed(int speed = 0);

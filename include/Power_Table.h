@@ -10,6 +10,7 @@
 #include "settings.h"
 #include "SmartSpin_parameters.h"
 #include "PowerTable_Helpers.h"
+#include "FtmsCalibration.h"
 #include <vector>
 #define POWERTABLE_LOG_TAG "PTable"
 
@@ -20,6 +21,11 @@ class PowerTable {
 
   PTData ptData;
   PTHelpers ptHelpers;
+  FtmsCalibration::Map ftmsCalibration;
+  uint32_t positionEpoch = 0;
+  bool ftmsPositionUncertain = false;
+  // Metadata can be read before homing; watts remain gated on a known origin.
+  bool loadFtmsCalibration();
 
   // Pick up new power value and put them into the power table
   void processPowerValue(PowerBuffer& powerBuffer, int cadence, Measurement power);

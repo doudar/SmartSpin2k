@@ -63,7 +63,7 @@ void BLECommunications() {
   // **********************************Client***************************************
   for (auto& _BLEd : spinBLEClient.myBLEDevices) {  // loop through discovered devices
     if (_BLEd.connectedClientID != BLE_HS_CONN_HANDLE_NONE) {
-      if (_BLEd.advertisedDevice) {                                                                // is device registered?
+      if (_BLEd.getAdvertisement()) {                                                              // is device registered?
         if ((_BLEd.connectedClientID != BLE_HS_CONN_HANDLE_NONE) && (_BLEd.doConnect == false)) {  // client must not be in connection process
           if (BLEDevice::getClientByHandle(_BLEd.connectedClientID)) {                             // nullptr check
             BLEClient* pClient = NimBLEDevice::getClientByHandle(_BLEd.connectedClientID);

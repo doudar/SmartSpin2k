@@ -117,8 +117,7 @@ void BLE_Fitness_Machine_Service::update() {
   } else {
     // Calculate resistance from stepper position for bikes that don't report resistance
     resistanceValue = this->calculateResistanceFromPosition();
-    rtConfig->resistance.setValue(resistanceValue);
-    rtConfig->resistance.setSimulate(true); // Mark as simulated
+    rtConfig->resistance.setValue(resistanceValue, true);  // Publish value and simulated-data flag together.
   }
   ftmsIndoorBikeData.push_back(static_cast<uint8_t>(resistanceValue & 0xff));
   ftmsIndoorBikeData.push_back(static_cast<uint8_t>(resistanceValue >> 8));
@@ -185,6 +184,10 @@ void BLE_Fitness_Machine_Service::processFTMSWrite() {
         } break;
 
         case FitnessMachineControlPointProcedure::SetTargetInclination: {
+          if (length != 3) {
+            returnValue[2] = FitnessMachineControlPointResultCode::InvalidParameter;
+            break;
+          }
           rtConfig->setFTMSMode((uint8_t)rxValue[0]);
           returnValue[2] = FitnessMachineControlPointResultCode::Success;
           int16_t rawInclineTenthsPercent = get_le16s(&pData[1]);  // signed 0.1% units
@@ -286,11 +289,12 @@ void BLE_Fitness_Machine_Service::processFTMSWrite() {
         } break;
 
         case FitnessMachineControlPointProcedure::SetIndoorBikeSimulationParameters: {  // sim mode
+          if (length != 7) {
+            returnValue[2] = FitnessMachineControlPointResultCode::InvalidParameter;
+            break;
+          }
           rtConfig->setFTMSMode((uint8_t)rxValue[0]);
           returnValue[2] = FitnessMachineControlPointResultCode::Success;  // 0x01;
-          // int16_t windSpeed        = get_le16s(&pData[1]);
-          // int8_t rollingResistance = rxValue[5];
-          // int8_t windResistance    = rxValue[6];
           port = get_le16s(&pData[3]);
           rtConfig->setTargetIncline(port);
           logBufLength += snprintf(logBuf + logBufLength, kLogBufCapacity - logBufLength, "-> Sim Mode Incline %2f", rtConfig->getTargetIncline() / 100);

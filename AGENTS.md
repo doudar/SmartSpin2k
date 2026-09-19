@@ -36,6 +36,7 @@ The commands remain `pio` and `platformio`; configuration remains in `platformio
 - Build ESP32-S3 firmware: `pio run --environment S3release`
 - Build filesystem: `pio run --target buildfs`
 - Run native tests: `pio test --environment native`
+- Run motor integration regressions (requires `g++` on PATH): `python -B -m unittest discover -s test -p "test_*.py"`. These exercise production homing/gear orchestration and TMC recovery with fake peripherals.
 - Static analysis: `pio check -e debug`
 - Pre-commit checks: `pre-commit run --all-files`
 
@@ -46,6 +47,10 @@ The GitHub release archive includes firmware, merged factory, LittleFS, partitio
 GitHub Actions exports `SS2K_FIRMWARE_VERSION` from the date-based release tag before invoking pioarduino. `git_tag_macro.py` requires that override in Actions so published firmware never receives a `git describe` commit suffix; local builds retain branch/commit version details.
 The release workflow runs `cert_updater.py` once before firmware builds. Local pioarduino builds use the checked-in `include/cert.h` and do not perform network-dependent certificate updates.
 CI installs `pioarduino==6.1.19` from `requirements-ci.txt`; it still provides the `platformio` and `pio` commands. Use this fork's SCons 4.8.1 with pioarduino 55.03.311; upstream PlatformIO's newer SCons 4.11.1 conflicts with this platform's tool installation. CI cache restore prefixes include the requirements hash to avoid mixing Core/tool versions.
+
+Windows builds use `scripts/windows_ldgen.py` to launch ESP-IDF's linker-script generator directly, bypassing cmd.exe's 8191-character command limit. The fragment list can exceed that limit with long package paths; other build commands keep the normal SCons launcher.
+
+Concurrent firmware builds in one checkout race on `managed_components/` and `.pio/`. When other agents are building, use an isolated checkout or source snapshot with its own generated dependencies and build outputs; do not clean their shared build directories.
 
 Filesystem builds stage deterministic gzip copies of every HTML/CSS source file under the environment build directory. They also refresh the checked-in `.gz` companions and `list.json` in `data/` or `data_s3/`, which are consumed by repository-based automatic OTA updates.
 
@@ -112,7 +117,7 @@ Boot sequence:
 `SS2K::maintenanceLoop()` is the main cooperative loop. It roughly does:
 
 - Every `BLE_NOTIFY_DELAY`: `BLECommunications()`, flush logs, websocket loop.
-- If not updating and not in spindown: `ss2k->moveStepper()`, `ss2k->FTMSModeShiftModifier()`, `ergMode->runERG()`.
+- If not updating and not in spindown: `ss2k->FTMSModeShiftModifier()`, `ss2k->moveStepper()`, `ergMode->runERG()`.
 - Periodically poll Peloton aux serial via `txSerial()`.
 - Always handle local shifter button state.
 - Notify changed custom-characteristic values via `BLE_ss2kCustomCharacteristic::parseNemit()`.
@@ -137,6 +142,7 @@ Fields:
 - `target`: requested target value.
 - `min`, `max`: bounds used mostly for resistance ranges.
 - `timestamp`: updated by `setSimulate()`, `setValue()`, and `setTarget()`.
+- `valueTimestamp`: updated only by `setValue()`, including repeated equal values. `getValueSample()` returns value, value timestamp, and simulation flag together under a shared mutex. Resistance publishers use `setValue(value, simulated)` to update the source flag with the value.
 
 Used for `rtConfig->watts`, `hr`, `cad`, `batt`, and `resistance`.
 
@@ -222,7 +228,7 @@ Important gates in `collectAndSet()`:
 - Power is multiplied by `userConfig->getPowerCorrectionFactor()` and accepted from 1-2999 W.
 - Peloton cadence/power can be ignored when an external BLE power meter is configured.
 - If `userConfig->getPTab4Pwr()` is true, real sensor power does not overwrite watts because watts are derived from the power table.
-- IC Bike resistance is blacklisted due to non-standard behavior.
+- Resistance is currently accepted only from Grupetto devices; other sensor names are filtered out.
 - Real resistance clears `rtConfig->resistance.simulate`.
 
 ## BLE Client
@@ -250,6 +256,7 @@ Key functions:
 - `ScanCallbacks::onResult()`: filters supported devices, updates `foundDevices`, sets slots to connect when user config matches.
 - Scan results for current config apps are streamed one device at a time on custom-characteristic ID `0x32`, with begin/device/end records and per-peer MTU fragmentation. The legacy `foundDevices` JSON remains capped at 480 bytes for older apps; do not make it unbounded again.
 - `SpinBLEClient::connectToServer()`: creates fresh BLE client, connects, sets slot state, removes duplicates.
+- Device slots own immutable advertisement snapshots; read them through `getAdvertisement()` so disconnect callbacks cannot free a snapshot in use. Never retain a raw pointer from `onResult()`, because NimBLE deletes scan results on the next non-continuation scan. Pending connections take priority over starting another scan. `test/test_ble_scan_lifetime.py` covers snapshot lifetime, concurrent resets, and that scheduling boundary.
 - `subscribeToAllNotifications()`: subscribes to notify/indicate characteristics for supported services.
 - `SpinBLEClient::postConnect()`: completes service subscriptions, reads FTMS resistance range, starts FTMS training where needed, drains notification queues. Notification setup discovers only the characteristics the firmware consumes so large remote GATT tables do not exhaust the classic ESP32 heap. HID is the exception because remotes can expose multiple Report characteristics with the same UUID.
 - `SpinBLEClient::checkBLEReconnect()`: sets `doScan` when configured devices are missing.
@@ -371,7 +378,7 @@ Globals:
 - If `externalControl` is false:
   - ERG mode (`SetTargetPower`): `targetPosition = rtConfig->targetIncline`, with optional guardrails to avoid moving opposite the watt error.
   - Resistance mode (`SetTargetResistanceLevel`): calls `_resistanceMove()`.
-  - Simulation mode: target is `shifterPosition * shiftStep + targetIncline * inclineMultiplier`.
+  - Simulation mode: local gearing uses median-normalized ratio offsets plus `targetIncline * inclineMultiplier`; external/app-owned paths retain their existing controls.
 - If `syncMode`, stops movement and sets current stepper position to target.
 - Applies Peloton/resistance safety nudges and min/max step clamps.
 - Calls `stepper->moveTo(targetPosition)`.
@@ -387,8 +394,13 @@ Homing:
 
 - `goHome(false)` finds minimum/home only. Startup can use this.
 - `goHome(true)` performs a full spindown/homing and saves `hMin/hMax`.
-- If a real FTMS resistance-reporting device is connected, `_findFTMSHome()` homes by driving to reported min/max resistance.
+- If a real FTMS resistance-reporting device is connected, `_findFTMSHome()` calibrates from interior resistance transitions.
 - Otherwise `_findEndStop()` uses TMC StallGuard, with repeated taps and drift detection.
+- FTMS homing requires the Grupetto 0-100 scale, accepting advertised limits of 0/1 through 99/100. `include/FtmsHoming.h` measures transitions into 10 and 2 (upper: 90 and 98), averages steps per level across their eight-level separation, and extrapolates two levels. The far anchor uses an 80-step bracket because its error contributes only 0.25x to the result; the near anchor keeps a 20-step bracket. Probes grow from 150 to at most 600 steps on an unchanged level, with up to 3000 steps of plateau travel before no-progress failure; settling pauses alone must not reject a wide level 4. They use fast moves followed by full stationary confirmation; continuous travel still slows near each anchor. It approaches bracket probes from the interior to take up backlash. Stationary flipping across the requested adjacent pair is also a valid boundary position. A completed bracket is accepted even if the sensor skips the exact integer; do not add a final return-and-confirm move. These are virtual endpoints, not guaranteed physical stops; repeat full homing and relearn the power table when changing from the older timer-based origin. A missing or invalid FTMS PTAB map promotes startup to full calibration; valid maps recover coordinates from stationary midrange feedback with an under-20-second performance target (responsive noisy feedback may take longer; retain the overall safety deadline).
+- FTMS approaches quickly away from the anchors, with a nominal 300-step/s slow approach (correction retries can reduce it). Observe feedback during the dwell: unchanged levels can confirm after one stationary second for the initial endpoint observation, with a fresh report required. Measurements used to locate a boundary retain a two-second acquisition guard: 1.3-second delayed sensor reports produced an 88-step origin error with a universal one-second dwell. Changed values restart their confirmation window; a back-and-forth across adjacent levels spanning a second is also accepted. Only the requested pair identifies that anchor; unrelated adjacent jitter is not homing success. It reads `rtConfig->resistance.getValueSample()` and its value-only timestamp, rejecting simulated data; the legacy timestamp also changes on target writes. Fresh but unsettled observations use a bounded average after five seconds; noise is not a settling failure. Delayed crossings and wrong-way reports can retry within one shared 120-second deadline per endpoint. A no-progress retry requires a net response beyond two-level noise. Stop before reversing/retrying. Missing real feedback, motor errors, cancellation, or sustained lack of resistance response stop homing. One adjacent pair of jitter must not prolong motor travel without progress. Native tests cover noisy anchors, shifted crossings, delayed feedback, legacy limits, and bounded failure. Bracket widths are software tolerances, not physical repeatability with analog noise.
+- Read the homing clock after the sensor snapshot: a report published between the two reads otherwise underflows unsigned age checks. Only progress toward the target resets the no-progress timer. FTMS failures latch `ftmsHomingFailed`, blocking normal `moveStepper()` commands until successful homing, and the BLE task must not select the middle gear on failure. Every search exit stops the motor; failure logs include the cause, resistance, age and position.
+- Companion calibration widgets parse homing log phrases: preserve `Starting FTMS Homing`, `Homing to Min/Max Resistance... Current: ... Target: ...`, `Min position found`, `Max Position found: <steps>`, and `Homing procedure complete`. FTMS progress reports the active 10/2/90/98 endpoint target, then 67/50/33 during map sampling. `SpinDown_StopPedaling` (0x04) means minimum found / maximum search to the app; never emit it during the minimum search. Emit the maximum range and completion only after successful calibration/save. Keep `Homing aborted by user.` and `Homing timed out!` for their specific verdicts; `FTMS Homing timed out` is treated as a legacy nonterminal warning by the app.
+- FTMS calibration adds three stationary observations near 33/50/67, saving actual resistance (half-level units) and positions in a 32-byte FTM2 PTAB trailer. Accept nearby levels instead of hunting exact transitions; after two seconds of acquisition, confirm for one second or average fresh readings at five seconds. FTM1 transition metadata is incompatible and triggers full recalibration, preserving legacy watts. Match bike name, motor direction, zero minimum and maximum. Startup interpolates within measured support (including adjacent jitter) without travelling through zero. Successful homing clears `ftmsSimulationOffset` and sets the absolute starting-gear target (Unlimited: `8 * shiftStep`; ratios: the selected one-third gear's ratio offset). The maintenance motor loop applies that target after homing restores its safety policy; only subsequent ride-time synchronization adds an offset. `syncFtmsPosition()` rebases the complete coordinate offset at most once per minute: require 10 seconds of stationary feedback (adjacent-level jitter allowed), or 30 seconds for offsets above three local deadbands. Only applied corrections start the cooldown; driver-lock interruptions reset confirmation, not that timer. Ride-time estimates allow at most five levels of extension around the sparse samples, bounded to R30–70, with increased uncertainty; startup support stays strict. Pause watts collection while `ftmsPositionUncertain`, then discard pending samples via `positionEpoch` on correction. Periodic sync-check logs report why correction is waiting. See `FtmsStartupHoming.md` and native/metadata/gearing integration tests.
 - Homing aborts when shifter position changes.
 - Homing changes driver current/speed/StealthChop and must restore normal driver setup.
 
@@ -398,6 +410,15 @@ Stepper safety:
 - Unhomed devices use provisional defaults unless power-table/resistance updates refine limits.
 - FastAccelStepper pulse generation is initialized independently of TMC UART detection, so the firmware remains safe when the physical driver is absent. Runtime stepper-setting methods must still tolerate null driver/stepper pointers in case peripheral allocation fails.
 - Do not bypass `moveStepper()` target clamping for ordinary control paths.
+- Thermal/UART safety runs every 10 seconds in maintenance, including during updates, but pauses for the entire `goHome()` scope (including early exits). StallGuard homing keeps its original moves, reads, current settings and between-tap restores: no added thermal derating, EN/queue resets, IFCNT checks or thermal safety aborts. The enable callback passes through homing requests. The maintenance safety check takes a nonblocking driver lock; the homing pause uses that lock only at entry/exit, never during movement.
+- At homing scope exit, synchronously restore the saved current limits and motor interlock under the driver lock. Close the enable bypass atomically with its restored policy and stop queued motion for existing inhibits too; a previously latched inhibit is not a new transition. Advance the existing TMC cooldown deadline without clearing it or waiting for the next poll. Healthy return-to-zero moves remain queued.
+- Outside homing, EN stays high until startup setup can read the chip and advance IFCNT (no exact write-count/byte-count requirements). Once configured, failed status reads only log/retry; they do not disable or invalidate the driver. Confirmed driver resets trigger reconfiguration. Current is written on setup, settings changes or thermal-limit changes, not every poll. `include/ThermalSafety.h` owns the tested policies: TMC T120 halves requested current and disables EN after 30 seconds without cooling; OT disables immediately, and only valid clear temperature flags release the latch. S3 radios reduce at 70 C (WiFi 8.5 dBm/modem sleep, BLE minimum -24 dBm including active links); motor current tapers from 100% at 70 C to 50% at 80 C, with EN high above 80 C until <=78 C. Radios restore below 68 C. Temperature sensor failure inhibits the motor. S3 logs `T=%dC` every 10 seconds outside homing. Limits never change saved user current; the stricter current limit wins.
+
+## Virtual Gearing
+
+`lib/SS2K/include/VirtualGearing.h` maps sorted ratio arrays to integer motor offsets. `shiftStep` is the distance for the median positive adjacent ratio gap; even medians average the middle two gaps. Gear 1 has zero offset; duplicates share offsets, all-identical profiles stay at zero, and absolute calculation avoids rounding drift. `src/VirtualGearing.cpp` adds the existing terrain incline offset. Both boards use this in local simulation/inclination modes without weight, cadence, calibration/trust gating, or timed effects. Full targets pass through `moveStepper()` travel clamps. ERG, resistance, external control and app-owned shifting retain their own behavior. Unlimited is the default: an empty ratio array gives fixed `shifterPosition * shiftStep` offsets, no logical gear bounds, and start position 0 while unhomed or 8 after successful homing. Bounded profiles start at `max(1, gearCount / 3)` rounded down (24 gears: 8; 12/13 gears: 4) at both startup and homing, and clamp to the profile count. FTMS and mechanical homing both apply the selected starting gear from the calibrated zero, not from the final search position. Homing owns the successful start-gear reset after validating its final bounds; the BLE caller must not reset gears after failure/abort. Other control modes retain their legacy reset. Cache only accepted local gears after travel checks so a rejected Unlimited shift cannot return after a mode change. Motor travel guards apply in both modes. Median calculation happens before the profile's short publication lock.
+
+`userConfig.gearRatios` persists an empty array for Unlimited (default), or 2–26 sorted uint16 ratios in thousandths. Existing saved profiles are preserved. BLE count 0 (`02 34 00`) selects Unlimited; indexed reads then return an error. Custom ID `0x34`, HTTP settings, and both web asset trees expose it. The web groupset dropdown maps road/MTB/gravel presets to arrays; unmatched arrays are retained. Full 26-gear BLE writes need MTU >=58; metadata/indexed reads fit MTU 23. The experimental weight ID 0x33 is retired. See `VirtualGearing.md` and `CustomCharacteristic.md`. Run native tests and both firmware/filesystem builds for changes.
 
 ## ERG Mode
 
@@ -480,10 +501,10 @@ Flow:
 Persistence:
 
 - `_manageSaveState()` loads/saves `POWER_TABLE_FILENAME`.
-- Saving/loading requires `rtConfig->homed`.
+- Watts-table saving/loading requires `rtConfig->homed`; FTMS metadata is read separately before homing.
 - File format starts with `TABLE_VERSION`, saved reading quality, and saved homed state, then table entries.
-- `_save()` refuses to save with no valid readings.
-- `reset()` clears table, resets homing settings, and rewrites/attempts save.
+- `_save()` refuses empty saves unless valid FTMS calibration metadata exists; complete files replace saves through a temporary-file rename.
+- `reset()` clears the table and metadata, resets homing settings, and deletes the saved PTAB.
 
 Caution:
 
@@ -611,7 +632,7 @@ Changing BLE server characteristics:
 - `externalControl` bypasses normal target calculation but final state can still be affected by sync/clamping code.
 - Firmware OTA paths validate the incoming `esp_image_header_t` chip ID before starting flash writes; filesystem images are intentionally exempt from application-image validation.
 - BLE firmware OTA uses a length-aware versioned protocol documented in `BLEFirmwareUpdateProtocol.md`. It accepts variable data chunk sizes through writes with or without response, incrementally verifies CRC-32, and reports phase/error/byte-count status only through the firmware service control characteristic. Apps must wait for `Updating` before sending data; `Preparing` releases sensor links and erases the inactive partition outside the NimBLE callback. The server requests an ATT MTU exchange on connection and retries at OTA START, but transfers remain valid at MTU 23. Failed, aborted, disconnected, or 30-second-stalled transfers abort the inactive OTA handle and schedule a reboot; the boot partition is not changed until verification succeeds.
-- Stepper UART initialization drives TX high for 20 ms before starting hardware UART. Ordinary setup and power updates use TMCStepper's `test_connection()` with one idle-high recovery attempt. Initial OTP handling additionally requires the stricter CRC-valid/progressing `IFCNT` check; if that fails, ordinary setup continues but irreversible OTP access is skipped. If `OTP_IHOLD` is verified as unprogrammed, firmware programs byte 2/bit 5 for the 9% standalone hold-current default, while incompatible existing OTP values are never modified.
+- Stepper UART initialization drives TX high for 20 ms before starting hardware UART. Outside homing, setup/recovery checks CRC-valid `IOIN.VERSION == 0x21` with one idle-high recovery attempt, then checks that setup writes advance IFCNT. Runtime polling has no IFCNT gate. Do not infer UART failure from zero `DRV_STATUS`; status must remain independent of connectivity. Homing retains its original `test_connection()` check. Safety events use always-enabled SS2K_LOG so release builds retain failure reasons. SmartSpin2k pins the doudar/TMCStepper fork to a tested commit; the library accepts valid zero-CRC replies (including IFCNT=174) and rejects missing/corrupt replies. The library owns its UART regression in tests/test_uart_read.py. Run python -B -m unittest discover -s test -p test_tmc_recovery.py for firmware polling/recovery regression tests. Initial OTP handling retains `test_connection()` and a separate CRC-valid/progressing `IFCNT` check; if that fails, irreversible OTP access is skipped. If `OTP_IHOLD` is verified as unprogrammed, firmware programs byte 2/bit 5 for the 9% standalone hold-current default, while incompatible existing OTP values are never modified.
 - Many BLE and motor changes cannot be fully validated without hardware.
 
 ## Search Tips
