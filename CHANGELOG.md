@@ -8,6 +8,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+
+### Changed
+
+### Hardware
+
+
+## [26.9.15]
+
+### Added
 - Configurable ratio-based virtual gears with Unlimited, road, MTB, and gravel presets, persisted through web settings and the BLE/DirCon API.
 - TMC2209 thermal protection and ESP32-S3 temperature-based motor current and radio power limits.
 
