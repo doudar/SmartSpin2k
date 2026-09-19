@@ -1292,12 +1292,28 @@ CONFIG_SR_VADN_WEBRTC=y
 # end of Load Multiple Wake Words (WakeNet9s)
 
 #
-# Load Multiple Wake Words (WakeNet9)
+# Load Multiple Wake Words (WakeNet9 or WakeNet10)
 #
+# default:
+# CONFIG_SR_WN_WN10_HILEXIN_INT16 is not set
+# default:
+# CONFIG_SR_WN_WN10_XIAOAITONGXUE is not set
+# default:
+# CONFIG_SR_WN_WN10_XIAOAITONGXUE_INT16 is not set
+# default:
+# CONFIG_SR_WN_WN10_NIHAOXIAOZHI is not set
+# default:
+# CONFIG_SR_WN_WN10_NIHAOXIAOZHI_INT16 is not set
 # default:
 # CONFIG_SR_WN_WN9_HILEXIN is not set
 # default:
 # CONFIG_SR_WN_WN9_HIESP is not set
+# default:
+# CONFIG_SR_WN_WN10_MOSAICO is not set
+# default:
+# CONFIG_SR_WN_WN10_HEYHERMES is not set
+# default:
+# CONFIG_SR_WN_WN10_HEYNOVA is not set
 # default:
 # CONFIG_SR_WN_WN9L_JA_KONNICHIHAESP_TTS3 is not set
 # default:
@@ -1414,7 +1430,7 @@ CONFIG_SR_VADN_WEBRTC=y
 # CONFIG_SR_WN_WN9_HAI1XIAO3XIANG4_TTS3 is not set
 # default:
 # CONFIG_SR_WN_WN9L_NI3HAO3XING1BAO3_TTS3 is not set
-# end of Load Multiple Wake Words (WakeNet9)
+# end of Load Multiple Wake Words (WakeNet9 or WakeNet10)
 
 # default:
 CONFIG_SR_MN_CN_NONE=y
@@ -4895,6 +4911,8 @@ CONFIG_MDNS_TIMER_PERIOD_MS=100
 # CONFIG_MDNS_ENABLE_DEBUG_PRINTS is not set
 # default:
 CONFIG_MDNS_ENABLE_CONSOLE_CLI=y
+# default:
+CONFIG_MDNS_ENABLE_BROWSE=y
 # default:
 # CONFIG_MDNS_RESPOND_REVERSE_QUERIES is not set
 # default:

@@ -36,6 +36,14 @@ void setup() {
   // Start Unity
   UNITY_BEGIN();
 
+  RUN_TEST(TestThermalSafety::test_tmc_cooldown_and_recovery);
+  RUN_TEST(TestThermalSafety::test_tmc_missing_samples_and_timer_wrap);
+  RUN_TEST(TestThermalSafety::test_tmc_uart_probe_while_disabled);
+  RUN_TEST(TestThermalSafety::test_tmc_uart_probe_rejects_invalid_responses);
+  RUN_TEST(TestThermalSafety::test_s3_thresholds_and_hysteresis);
+  RUN_TEST(TestThermalSafety::test_s3_failed_sensor_preserves_protection);
+  RUN_TEST(TestThermalSafety::test_combined_limits_and_setting_changes);
+
   // FitnessMachineIndoorBike Tests
   {
     test_fitnessMachineIndoorBikeData test;
@@ -116,6 +124,24 @@ void setup() {
     RUN_TEST(test.test_csc_round_trip);
     RUN_TEST(test.test_heart_rate_round_trip);
     RUN_TEST(test.test_zwift_round_trip);
+  }
+
+  {
+    TestFtmsHoming test;
+    RUN_TEST(test.test_repeatable_startup);
+    RUN_TEST(test.test_both_ends_and_legacy);
+    RUN_TEST(test.test_missing_stuck_and_skipped_reports);
+    RUN_TEST(test.test_abort_and_feedback);
+    RUN_TEST(test.test_measurement_value_timer);
+    RUN_TEST(test.test_report_published_during_read);
+    RUN_TEST(test.test_wrong_direction_stops_motor);
+    RUN_TEST(test.test_delayed_crossing_after_stop);
+    RUN_TEST(test.test_stationary_reading_confirmation);
+    RUN_TEST(test.test_adjacent_boundary_noise);
+    RUN_TEST(test.test_shifted_crossing_retries);
+    RUN_TEST(test.test_responsive_retries_until_deadline);
+    RUN_TEST(test.test_accelerated_probe_repeatability);
+    RUN_TEST(test.test_one_second_startup_check);
   }
 
   UNITY_END();

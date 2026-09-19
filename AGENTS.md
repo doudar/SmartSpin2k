@@ -47,6 +47,10 @@ GitHub Actions exports `SS2K_FIRMWARE_VERSION` from the date-based release tag b
 The release workflow runs `cert_updater.py` once before firmware builds. Local pioarduino builds use the checked-in `include/cert.h` and do not perform network-dependent certificate updates.
 CI installs `pioarduino==6.1.19` from `requirements-ci.txt`; it still provides the `platformio` and `pio` commands. Use this fork's SCons 4.8.1 with pioarduino 55.03.311; upstream PlatformIO's newer SCons 4.11.1 conflicts with this platform's tool installation. CI cache restore prefixes include the requirements hash to avoid mixing Core/tool versions.
 
+Windows builds use `scripts/windows_ldgen.py` to launch ESP-IDF's linker-script generator directly, bypassing cmd.exe's 8191-character command limit. The fragment list can exceed that limit with long package paths; other build commands keep the normal SCons launcher.
+
+Concurrent firmware builds in one checkout race on `managed_components/` and `.pio/`. When other agents are building, use an isolated checkout or source snapshot with its own generated dependencies and build outputs; do not clean their shared build directories.
+
 Filesystem builds stage deterministic gzip copies of every HTML/CSS source file under the environment build directory. They also refresh the checked-in `.gz` companions and `list.json` in `data/` or `data_s3/`, which are consumed by repository-based automatic OTA updates.
 
 Important timing/network notes:
@@ -137,6 +141,7 @@ Fields:
 - `target`: requested target value.
 - `min`, `max`: bounds used mostly for resistance ranges.
 - `timestamp`: updated by `setSimulate()`, `setValue()`, and `setTarget()`.
+- `valueTimestamp`: updated only by `setValue()`, including repeated equal values. `getValueSample()` returns value, value timestamp, and simulation flag together under a shared mutex. Resistance publishers use `setValue(value, simulated)` to update the source flag with the value.
 
 Used for `rtConfig->watts`, `hr`, `cad`, `batt`, and `resistance`.
 
@@ -222,7 +227,7 @@ Important gates in `collectAndSet()`:
 - Power is multiplied by `userConfig->getPowerCorrectionFactor()` and accepted from 1-2999 W.
 - Peloton cadence/power can be ignored when an external BLE power meter is configured.
 - If `userConfig->getPTab4Pwr()` is true, real sensor power does not overwrite watts because watts are derived from the power table.
-- IC Bike resistance is blacklisted due to non-standard behavior.
+- Resistance is currently accepted only from Grupetto devices; other sensor names are filtered out.
 - Real resistance clears `rtConfig->resistance.simulate`.
 
 ## BLE Client
@@ -387,8 +392,12 @@ Homing:
 
 - `goHome(false)` finds minimum/home only. Startup can use this.
 - `goHome(true)` performs a full spindown/homing and saves `hMin/hMax`.
-- If a real FTMS resistance-reporting device is connected, `_findFTMSHome()` homes by driving to reported min/max resistance.
+- If a real FTMS resistance-reporting device is connected, `_findFTMSHome()` calibrates from interior resistance transitions.
 - Otherwise `_findEndStop()` uses TMC StallGuard, with repeated taps and drift detection.
+- FTMS homing requires the Grupetto 0-100 scale, accepting advertised limits of 0/1 through 99/100. `include/FtmsHoming.h` measures transitions into 10 and 2 (upper: 90 and 98), averages steps per level across their eight-level separation, and extrapolates two levels. The far anchor uses an 80-step bracket because its error contributes only 0.25x to the result; the near anchor keeps a 20-step bracket. Fixed 150-step probes use fast moves followed by full stationary confirmation; continuous travel still slows near each anchor. It approaches bracket probes from the interior to take up backlash. Stationary flipping across the requested adjacent pair is also a valid boundary position. These are virtual endpoints, not guaranteed physical stops; repeat full homing and relearn the power table when changing from the older timer-based origin. Startup requires a valid saved maximum.
+- FTMS approaches quickly away from the anchors, with a nominal 300-step/s slow approach (correction retries can reduce it). Observe feedback during the dwell: unchanged levels can confirm after one stationary second on startup/recovery, with a fresh report required. Measurements used to locate a boundary retain a two-second acquisition guard: 1.3-second delayed sensor reports produced an 88-step origin error with a universal one-second dwell. Changed values restart their confirmation window; a back-and-forth across adjacent levels spanning a second is also accepted. Only the requested pair identifies that anchor; unrelated adjacent jitter is not homing success. It reads `rtConfig->resistance.getValueSample()` and its value-only timestamp, rejecting simulated data; the legacy timestamp also changes on target writes. Delayed crossings, shifted final probes, wrong-way reports, and five-second unsettled observations retry within one shared 120-second deadline per endpoint. Stop before reversing/retrying. Missing real feedback, motor errors, cancellation, or sustained lack of resistance response stop homing. One adjacent pair of jitter must not prolong motor travel without progress. Native tests cover noisy anchors, shifted crossings, delayed feedback, legacy limits, and bounded failure. Bracket widths are software tolerances, not physical repeatability with analog noise.
+- Read the homing clock after the sensor snapshot: a report published between the two reads otherwise underflows unsigned age checks. Only progress toward the target resets the no-progress timer. FTMS failures latch `ftmsHomingFailed`, blocking normal `moveStepper()` commands until successful homing, and the BLE task must not select the middle gear on failure. Every search exit stops the motor; failure logs include the cause, resistance, age and position.
+- Companion calibration widgets parse homing log phrases: preserve `Starting FTMS Homing`, `Homing to Min/Max Resistance... Current: ... Target: ...`, `Min position found`, `Max Position found: <steps>`, and `Homing procedure complete`. FTMS progress reports the active 10/2/90/98 target. `SpinDown_StopPedaling` (0x04) means minimum found / maximum search to the app; never emit it during the minimum search. Emit the maximum range and completion only after successful calibration/save. Keep `Homing aborted by user.` and `Homing timed out!` for their specific verdicts; `FTMS Homing timed out` is treated as a legacy nonterminal warning by the app.
 - Homing aborts when shifter position changes.
 - Homing changes driver current/speed/StealthChop and must restore normal driver setup.
 
@@ -398,6 +407,8 @@ Stepper safety:
 - Unhomed devices use provisional defaults unless power-table/resistance updates refine limits.
 - FastAccelStepper pulse generation is initialized independently of TMC UART detection, so the firmware remains safe when the physical driver is absent. Runtime stepper-setting methods must still tolerate null driver/stepper pointers in case peripheral allocation fails.
 - Do not bypass `moveStepper()` target clamping for ordinary control paths.
+- Thermal/UART safety runs every 10 seconds in maintenance, including during updates, but pauses for the entire `goHome()` scope (including early exits). StallGuard homing keeps its original moves, reads, current settings and between-tap restores: no added thermal derating, EN/queue resets, IFCNT checks or thermal safety aborts. The enable callback passes through homing requests. The maintenance safety check takes a nonblocking driver lock; the homing pause uses that lock only at entry/exit, never during movement.
+- Outside homing, EN stays high until startup setup can read the chip and advance IFCNT (no exact write-count/byte-count requirements). Once configured, failed status reads only log/retry; they do not disable or invalidate the driver. Confirmed driver resets trigger reconfiguration. Current is written on setup, settings changes or thermal-limit changes, not every poll. `include/ThermalSafety.h` owns the tested policies: TMC T120 halves requested current and disables EN after 30 seconds without cooling; OT disables immediately, and only valid clear temperature flags release the latch. S3 radios reduce at 70 C (WiFi 8.5 dBm/modem sleep, BLE minimum -24 dBm including active links); motor current tapers from 100% at 70 C to 50% at 80 C, with EN high above 80 C until <=78 C. Radios restore below 68 C. Temperature sensor failure inhibits the motor. S3 logs `T=%dC` every 10 seconds outside homing. Limits never change saved user current; the stricter current limit wins.
 
 ## ERG Mode
 
@@ -611,7 +622,7 @@ Changing BLE server characteristics:
 - `externalControl` bypasses normal target calculation but final state can still be affected by sync/clamping code.
 - Firmware OTA paths validate the incoming `esp_image_header_t` chip ID before starting flash writes; filesystem images are intentionally exempt from application-image validation.
 - BLE firmware OTA uses a length-aware versioned protocol documented in `BLEFirmwareUpdateProtocol.md`. It accepts variable data chunk sizes through writes with or without response, incrementally verifies CRC-32, and reports phase/error/byte-count status only through the firmware service control characteristic. Apps must wait for `Updating` before sending data; `Preparing` releases sensor links and erases the inactive partition outside the NimBLE callback. The server requests an ATT MTU exchange on connection and retries at OTA START, but transfers remain valid at MTU 23. Failed, aborted, disconnected, or 30-second-stalled transfers abort the inactive OTA handle and schedule a reboot; the boot partition is not changed until verification succeeds.
-- Stepper UART initialization drives TX high for 20 ms before starting hardware UART. Ordinary setup and power updates use TMCStepper's `test_connection()` with one idle-high recovery attempt. Initial OTP handling additionally requires the stricter CRC-valid/progressing `IFCNT` check; if that fails, ordinary setup continues but irreversible OTP access is skipped. If `OTP_IHOLD` is verified as unprogrammed, firmware programs byte 2/bit 5 for the 9% standalone hold-current default, while incompatible existing OTP values are never modified.
+- Stepper UART initialization drives TX high for 20 ms before starting hardware UART. Outside homing, setup/recovery checks CRC-valid `IOIN.VERSION == 0x21` with one idle-high recovery attempt, then checks that setup writes advance IFCNT. Runtime polling has no IFCNT gate. Do not infer UART failure from zero `DRV_STATUS`; status must remain independent of connectivity. Homing retains its original `test_connection()` check. Safety events use always-enabled SS2K_LOG so release builds retain failure reasons. SmartSpin2k pins the doudar/TMCStepper fork to a tested commit; the library accepts valid zero-CRC replies (including IFCNT=174) and rejects missing/corrupt replies. The library owns its UART regression in tests/test_uart_read.py. Run python -B -m unittest discover -s test -p test_tmc_recovery.py for firmware polling/recovery regression tests. Initial OTP handling retains `test_connection()` and a separate CRC-valid/progressing `IFCNT` check; if that fails, irreversible OTP access is skipped. If `OTP_IHOLD` is verified as unprogrammed, firmware programs byte 2/bit 5 for the 9% standalone hold-current default, while incompatible existing OTP values are never modified.
 - Many BLE and motor changes cannot be fully validated without hardware.
 
 ## Search Tips
