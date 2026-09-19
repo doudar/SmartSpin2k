@@ -22,6 +22,7 @@ C/Users/
 dependencies.lock
 dependencies.lock.*
 .vscode/settings.json
+.clangd
 *.map
 graphify-out/
 

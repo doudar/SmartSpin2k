@@ -833,6 +833,11 @@ void HTTP_Server::settingsProcessor() {
   bool wasBTUpdate       = false;
   bool wasSettingsUpdate = false;
   bool reboot            = false;
+  // Reject malformed new settings before applying any part of this request.
+  if (server.hasArg("gearRatios") && !userConfig->setGearRatiosJSON(server.arg("gearRatios"))) {
+    server.send(400, "text/plain", "Supply [] for unlimited gears, or 2 to 26 sorted ratios from 500 to 6000 (ratio x 1000).");
+    return;
+  }
   if (!server.arg("ssid").isEmpty()) {
     tString = server.arg("ssid");
     tString.trim();

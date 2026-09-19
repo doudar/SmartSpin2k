@@ -67,6 +67,8 @@ static const uint8_t BLE_hardwareVersion       = 0x2F;
 static const uint8_t BLE_BLELogging            = 0x30;
 static const uint8_t BLE_allSettings           = 0x31;
 static const uint8_t BLE_scanResults           = 0x32;
+// 0x33 was the retired experimental rider-weight setting; do not reuse.
+static const uint8_t BLE_gearRatios            = 0x34;
 
 enum CustomCharacteristicValueFormat : uint8_t {
   CustomAction,
@@ -79,6 +81,7 @@ enum CustomCharacteristicValueFormat : uint8_t {
   CustomSettingsSnapshot,
   CustomScanResultStream,
   CustomBooleanWriteStringRead,
+  CustomGearRatios,
   CustomUnknown
 };
 
@@ -140,6 +143,7 @@ inline CustomCharacteristicValueFormat customCharacteristicValueFormat(uint8_t i
     case BLE_BLELogging: return CustomBooleanWriteStringRead;
     case BLE_allSettings: return CustomSettingsSnapshot;
     case BLE_scanResults: return CustomScanResultStream;
+    case BLE_gearRatios: return CustomGearRatios;
     default: return CustomUnknown;
   }
 }

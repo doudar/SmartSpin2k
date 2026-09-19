@@ -144,6 +144,17 @@ void setup() {
     RUN_TEST(test.test_one_second_startup_check);
   }
 
+  {
+    TestVirtualGearing test;
+    RUN_TEST(test.test_unlimited_default_and_wire);
+    RUN_TEST(test.test_ratio_api);
+    RUN_TEST(test.test_offset_normalization);
+    RUN_TEST(test.test_duplicate_and_identical_ratios);
+    RUN_TEST(test.test_profile_bounds_and_scaling);
+    RUN_TEST(test.test_offset_overflow);
+    RUN_TEST(test.test_packet_validation);
+  }
+
   UNITY_END();
 }
 

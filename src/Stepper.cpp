@@ -315,8 +315,7 @@ void SS2K::moveStepper() {
         ss2k->_resistanceMove();
       } else {
         // Simulation Mode
-        ss2k->targetPosition = rtConfig->getShifterPosition() * userConfig->getShiftStep();
-        ss2k->targetPosition += rtConfig->getTargetIncline() * userConfig->getInclineMultiplier();
+        ss2k->targetPosition = ss2k->simulationTargetPosition();
       }
     } else {
       // periodically log external control message
@@ -803,12 +802,12 @@ void SS2K::_findFTMSHome(bool bothDirections) {
     SS2K_LOG(MAIN_LOG_TAG, "Max Position found: %d", static_cast<int32_t>(range));
   }
   setupTMCStepperDriver(true);
-  rtConfig->setShifterPosition(0);
   ss2k->setTargetPosition(0);
   rtConfig->setTargetIncline(0);
   stepper->moveTo(0);
   rtConfig->setHomed(true);
   ss2k->ftmsHomingFailed = false;
+  resetStartingGear();
   SS2K_LOG(MAIN_LOG_TAG, "FTMS homing complete: estimated zero=%d, range=%d steps", minimum, static_cast<int32_t>(range));
   SS2K_LOG(MAIN_LOG_TAG, "Homing procedure complete.");
 }
@@ -816,6 +815,10 @@ void SS2K::_findFTMSHome(bool bothDirections) {
 void SS2K::goHome(bool bothDirections) {
   HomingSafetyPause safetyPause;
   SS2K_LOG(MAIN_LOG_TAG, "Starting homing procedure...");
+  // Only shifts made during homing should abort it. Clear any pending delta that the
+  // shift modifier never got to consume (it is skipped while spinDownFlag is set).
+  ss2k->lastShifterPosition = rtConfig->getShifterPosition();
+  rtConfig->setHomed(false);
   ergMode->resetTableConfidence();
   const bool useFTMSHoming = !rtConfig->resistance.getSimulate() && strcmp(userConfig->getConnectedPowerMeter(), NONE) != 0 && rtConfig->resistance.getMax() > 0;
   if (bothDirections) {
@@ -950,7 +953,6 @@ void SS2K::goHome(bool bothDirections) {
 
   rtConfig->setHomed(true);
   setupTMCStepperDriver(true);  // Restore normal driver settings
-  rtConfig->setShifterPosition(0);
   ss2k->setTargetPosition(0);
   stepper->moveTo(0);
   if (bothDirections) fitnessMachineService.spinDown(FitnessMachineStatus::SpinDown_Success);
@@ -968,7 +970,10 @@ void SS2K::goHome(bool bothDirections) {
     rtConfig->setHomed(false);
   }
   SS2K_LOG(MAIN_LOG_TAG, "Homing procedure complete.");
-  if (rtConfig->getHomed()) ss2k->ftmsHomingFailed = false;
+  if (rtConfig->getHomed()) {
+    ss2k->ftmsHomingFailed = false;
+    resetStartingGear();
+  }
 }
 
 // Applies current power to driver

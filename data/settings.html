@@ -75,11 +75,15 @@
         tooltipText: 'DNS Name the device will use on the network.',
         defaultValue: 'loading'
       },
+      gearRatios: {
+        type: 'groupset',
+        title: 'Simulated Groupset'
+      },
       shiftStep: {
         type: 'slider',
         title: 'Shift Amount',
-        tooltip: 'Sim Mode step size',
-        tooltipText: 'Amount to move stepper per gear shift. Try to target ~30watt changes.',
+        tooltip: 'Ratio based step size',
+        tooltipText: 'In Unlimited mode, each shift moves this many steps. For a groupset, this is the movement for the median positive ratio gap; larger gaps make larger moves.',
         min: 10, max: 6000, step: 50, 
         defaultValue: 1200,
         unit: ''
@@ -97,7 +101,7 @@
         type: 'slider',
         title: 'Incline Multiplier',
         tooltip: 'Sim Mode hill effect',
-        tooltipText: 'Increase to make incline changes more noticeable. Adjust until hills feel realistic.',
+        tooltipText: 'Number of stepper steps added for each unit of simulated incline.',
         min: 1, max: 10, step: 1,
         defaultValue: 5,
         unit: 'x'
@@ -175,6 +179,79 @@
       }
     };
 
+    const groupsetPresets = [
+      {
+        name: 'Unlimited',
+        gearing: 'Fixed spacing · No gear limits',
+        description: 'Each shift moves by Shift Amount, with no upper or lower gear limit. The default setup.',
+        chainrings: [],
+        cassette: []
+      },
+      {
+        name: 'Standard Road Compact',
+        gearing: '50/34T | 11–34T',
+        description: 'Balanced gearing for climbing and flats.',
+        chainrings: [50, 34],
+        cassette: [11, 12, 13, 14, 15, 17, 19, 21, 24, 28, 30, 34]
+      },
+      {
+        name: 'MTB 1x12 – Wide Range',
+        gearing: '32T | 10–52T',
+        description: 'Modern trail gearing with a bailout gear for punishing climbs.',
+        chainrings: [32],
+        cassette: [10, 12, 14, 16, 18, 21, 24, 28, 32, 36, 42, 52]
+      },
+      {
+        name: 'Gravel 1x13 – Optimized XPLR',
+        gearing: '42T | 10–46T',
+        description: 'Tighter cassette steps tailored for high-speed gravel racing.',
+        chainrings: [42],
+        cassette: [10, 11, 12, 13, 15, 17, 19, 21, 24, 28, 32, 38, 46]
+      }
+    ].map(preset => ({
+      ...preset,
+      ratios: preset.chainrings.flatMap(front => preset.cassette.map(rear => Math.round(front / rear * 1000))).sort((a, b) => a - b)
+    }));
+
+    function createGroupsetSetting(id, config) {
+      return `<div class="setting-group">
+        <h2><label for="${id}">${config.title}</label></h2>
+        <select id="${id}" name="${id}" class="device-select" aria-describedby="groupsetGearing groupsetDescription" disabled
+          onchange="updateGroupsetDescription(); sendSetting(this)">
+          <option value="" disabled selected>Loading groupset…</option>
+          ${groupsetPresets.map(preset => `<option value="${JSON.stringify(preset.ratios)}">${preset.name}</option>`).join('')}
+        </select>
+        <p id="groupsetGearing" class="groupset-gearing"></p>
+        <p id="groupsetDescription" class="groupset-description" aria-live="polite"></p>
+      </div>`;
+    }
+
+    function updateGroupsetDescription() {
+      const value = document.getElementById('gearRatios').value;
+      const preset = groupsetPresets.find(preset => JSON.stringify(preset.ratios) === value);
+      const count = value ? JSON.parse(value).length : 0;
+      document.getElementById('groupsetGearing').textContent = preset
+        ? (count ? `${preset.gearing} · ${count} virtual gears` : preset.gearing)
+        : (count ? `${count} virtual gears` : '');
+      document.getElementById('groupsetDescription').textContent = preset
+        ? preset.description
+        : 'Your saved custom gearing is retained. Choose a preset to replace it.';
+    }
+
+    function loadGroupset(ratios) {
+      const select = document.getElementById('gearRatios');
+      const value = JSON.stringify(ratios);
+      const oldCustom = select.querySelector('[data-custom]');
+      if (oldCustom) oldCustom.remove();
+      if (!groupsetPresets.some(preset => JSON.stringify(preset.ratios) === value)) {
+        const option = new Option('Current custom groupset', value);
+        option.dataset.custom = 'true';
+        select.appendChild(option);
+      }
+      select.value = value;
+      updateGroupsetDescription();
+    }
+
     // Generate HTML for text input settings
     function createTextSetting(id, config) {
       const isPassword = config.type === 'password';
@@ -198,9 +275,9 @@
             </label>
           </div>`;
       } else {
-        html += `<input type="text" id="${id}" name="${id}" value="${config.defaultValue}" />`;
+        html += `<input type="${config.type === 'number' ? 'number' : 'text'}" id="${id}" name="${id}" aria-label="${config.title}" value="${config.defaultValue}"
+          ${config.type === 'number' ? `min="${config.min}" max="${config.max}" step="${config.step}" required` : ''} />`;
       }
-      
       html += `</div>`;
       return html;
     }
@@ -253,11 +330,15 @@
       for (const [id, config] of Object.entries(settingsConfig)) {
         switch (config.type) {
           case 'text':
+          case 'number':
           case 'password':
             html += createTextSetting(id, config);
             break;
           case 'slider':
             html += createSliderSetting(id, config);
+            break;
+          case 'groupset':
+            html += createGroupsetSetting(id, config);
             break;
           case 'toggle':
             html += createToggleSetting(id, config);
@@ -312,10 +393,13 @@
       xhttp.onreadystatechange = function () {
         if (this.readyState == 4 && this.status == 200) {
           var obj = JSON.parse(this.responseText);
+          document.getElementById('gearRatios').disabled = false;
           for (const key in obj) {
             const el = document.getElementById(key);
             if (el) {
-              if (el.type === 'checkbox') {
+              if (key === 'gearRatios') {
+                loadGroupset(obj[key]);
+              } else if (el.type === 'checkbox') {
                 el.checked = !!obj[key];
               } else {
                 el.value = obj[key];
@@ -385,14 +469,28 @@
         });
         
         fetch('/send_settings?' + params.toString(), { method: 'GET' })
-          .then(() => showSaveStatus('Settings saved', 'success'))
-          .catch(error => showSaveStatus('Failed to save settings', 'error'));
+          .then(async response => {
+            if (!response.ok) throw new Error(await response.text());
+            showSaveStatus('Settings saved', 'success');
+          })
+          .catch(error => showSaveStatus(error.message || 'Failed to save settings', 'error'));
       }, 300);
     }
 
     window.addEventListener('load', () => {
       generateSettings();
       startConfigUpdate();
+      document.querySelector('form').addEventListener('submit', async event => {
+        event.preventDefault();
+        const params = new URLSearchParams(new FormData(event.target));
+        try {
+          const response = await fetch('/send_settings?' + params.toString());
+          if (!response.ok) throw new Error(await response.text());
+          showSaveStatus('Settings saved', 'success');
+        } catch (error) {
+          showSaveStatus(error.message, 'error');
+        }
+      });
     });
   </script>
 </body>

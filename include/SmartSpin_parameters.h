@@ -11,6 +11,11 @@
 #include <mutex>
 
 #include "settings.h"
+#include "VirtualGearing.h"
+#ifndef PLATFORMIO_ENV_NATIVE
+#include <freertos/FreeRTOS.h>
+#include <freertos/task.h>
+#endif
 
 #define CONFIG_LOG_TAG "Config"
 
@@ -130,10 +135,10 @@ class RuntimeParameters {
   void setHomed(bool hmd) { homed = hmd; }
   int getHomed() { return homed; }
 
-  void setMinStep(int32_t ms) { ms != INT32_MIN ? minStep = ms : minStep = -DEFAULT_STEPPER_TRAVEL; }
+  void setMinStep(int32_t ms) { minStep = ms != INT32_MIN ? ms : -DEFAULT_STEPPER_TRAVEL; }
   int32_t getMinStep() { return minStep; }
 
-  void setMaxStep(int32_t ms) { ms != INT32_MIN ? maxStep = ms : maxStep = DEFAULT_STEPPER_TRAVEL; }
+  void setMaxStep(int32_t ms) { maxStep = ms != INT32_MIN ? ms : DEFAULT_STEPPER_TRAVEL; }
   int32_t getMaxStep() { return maxStep; }
 
   void setSimTargetWatts(int tgt) { simTargetWatts = tgt; }
@@ -153,6 +158,10 @@ class RuntimeParameters {
 
 class userParameters {
  private:
+  VirtualGearing::Gears gearRatios;
+#ifndef PLATFORMIO_ENV_NATIVE
+  mutable portMUX_TYPE gearMutex = portMUX_INITIALIZER_UNLOCKED;
+#endif
   String firmwareUpdateURL;
   String deviceName;
   int shiftStep;
@@ -181,6 +190,30 @@ class userParameters {
   String foundDevices          = "";
 
  public:
+  VirtualGearing::Gears getGearRatios() const {
+#ifndef PLATFORMIO_ENV_NATIVE
+    portENTER_CRITICAL(&gearMutex);
+#endif
+    const VirtualGearing::Gears copy = gearRatios;
+#ifndef PLATFORMIO_ENV_NATIVE
+    portEXIT_CRITICAL(&gearMutex);
+#endif
+    return copy;
+  }
+  bool setGearRatios(const uint16_t* values, size_t count) {
+    VirtualGearing::Gears next;
+    if (!next.assign(values, count)) return false;
+#ifndef PLATFORMIO_ENV_NATIVE
+    portENTER_CRITICAL(&gearMutex);
+#endif
+    gearRatios = next;
+#ifndef PLATFORMIO_ENV_NATIVE
+    portEXIT_CRITICAL(&gearMutex);
+#endif
+    return true;
+  }
+  bool setGearRatiosJSON(const String& json);
+
   void setFirmwareUpdateURL(String fURL) { firmwareUpdateURL = fURL; }
   const char* getFirmwareUpdateURL() { return firmwareUpdateURL.c_str(); }
 

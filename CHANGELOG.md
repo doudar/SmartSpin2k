@@ -8,8 +8,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+- Configurable ratio-based virtual gears with Unlimited, road, MTB, and gravel presets, persisted through web settings and the BLE/DirCon API.
+- TMC2209 thermal protection and ESP32-S3 temperature-based motor current and radio power limits.
 
 ### Changed
+- Calibrate FTMS resistance endpoints from confirmed interior transitions, with bounded retries, delayed/noisy feedback handling, and a motor hold after failed homing.
+- Select the configured starting gear only after successful homing, preserve calibration progress messages, and keep rejected Unlimited shifts from returning after control-mode changes.
+- Improve TMC UART setup/recovery and support long ESP-IDF linker-generator commands on Windows.
 
 ### Hardware
 
