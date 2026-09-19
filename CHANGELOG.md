@@ -10,6 +10,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Added
 
 ### Changed
+- Restore thermal current limits and motor inhibition immediately when homing exits, including early returns and previously latched thermal/sensor faults.
 
 ### Hardware
 

@@ -77,6 +77,9 @@ bool s3MotorInhibited = false;
 ThermalSafety::TmcProtection tmcProtection;
 bool homingActive = false;
 
+void applyMotorInterlock(bool resumeAfterHoming = false);
+bool applyDriverCurrent(bool logChange);
+
 // Pause safety for the whole original homing routine, including all early exits.
 // No driver mutex is held during motion or StallGuard sampling.
 class HomingSafetyPause {
@@ -91,9 +94,14 @@ class HomingSafetyPause {
   }
   ~HomingSafetyPause() {
     DriverLock lock;
-    portENTER_CRITICAL(&enableMux);
-    homingActive = false;
-    portEXIT_CRITICAL(&enableMux);
+    // Homing can outlast the TMC cooldown deadline. No new telemetry is needed
+    // to retain/expire a hot latch; only a later valid cool report may clear it.
+    tmcProtection.update(false, false, false, millis());
+    // Close the bypass and reassert EN/stop queued motion even when the inhibit
+    // was already set before homing. Do this before any current-setting UART work.
+    applyMotorInterlock(true);
+    requestedCurrent = userConfig->getStepperPower();
+    if (driver && driverConfigured) applyDriverCurrent(true);
   }
 };
 
@@ -107,8 +115,8 @@ bool guardedEnablePin(uint8_t pin, uint8_t value) {
   return level;
 }
 
-void applyMotorInterlock() {
-  if (homingActive) return;
+void applyMotorInterlock(bool resumeAfterHoming) {
+  if (homingActive && !resumeAfterHoming) return;
   bool inhibit = !driverConfigured || s3MotorInhibited || tmcProtection.disabled();
   if (!inhibit && !ss2k->stepperSafetyReady() && stepper) {
     // Discard any movement submitted while blocked. Reset enable bookkeeping
@@ -118,7 +126,9 @@ void applyMotorInterlock() {
     stepper->setAutoEnable(true);
   }
   portENTER_CRITICAL(&enableMux);
-  bool newlyInhibited = inhibit && !motorInhibited;
+  // End the homing bypass atomically with the restored enable policy.
+  if (resumeAfterHoming) homingActive = false;
+  bool newlyInhibited = inhibit && (!motorInhibited || resumeAfterHoming);
   motorInhibited      = inhibit;
   if (inhibit) digitalWrite(currentBoard.enablePin, HIGH);
   portEXIT_CRITICAL(&enableMux);
