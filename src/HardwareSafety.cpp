@@ -24,7 +24,7 @@ float readS3Temperature() {
     esp_err_t result                   = temperature_sensor_install(&config, &temperatureSensor);
     if (result == ESP_OK) result = temperature_sensor_enable(temperatureSensor);
     if (result != ESP_OK) {
-      SS2K_LOGE(MAIN_LOG_TAG, "S3 temperature sensor setup failed: %s; motor inhibited, retry in 10s", esp_err_to_name(result));
+      SS2K_LOG(MAIN_LOG_TAG, "S3 temperature sensor setup failed: %s; motor inhibited, retry in 10s", esp_err_to_name(result));
       if (temperatureSensor) temperature_sensor_uninstall(temperatureSensor);
       temperatureSensor = nullptr;
       return NAN;
@@ -33,7 +33,7 @@ float readS3Temperature() {
   float temperature = NAN;
   esp_err_t result  = temperature_sensor_get_celsius(temperatureSensor, &temperature);
   if (result != ESP_OK) {
-    SS2K_LOGE(MAIN_LOG_TAG, "S3 temperature read failed: %s; motor inhibited, retry in 10s", esp_err_to_name(result));
+    SS2K_LOG(MAIN_LOG_TAG, "S3 temperature read failed: %s; motor inhibited, retry in 10s", esp_err_to_name(result));
     return NAN;
   }
   return temperature;
@@ -54,19 +54,19 @@ void updateRadioCooling(bool reduce) {
         wifiPowerSaved = true;
       }
       if (power > WIFI_COOLING_POWER && esp_wifi_set_max_tx_power(WIFI_COOLING_POWER) != ESP_OK)
-        SS2K_LOGE(MAIN_LOG_TAG, "S3 cooling: WiFi TX power reduction failed; retry in 10s");
+        SS2K_LOG(MAIN_LOG_TAG, "S3 cooling: WiFi TX power reduction failed; retry in 10s");
     }
     if (esp_wifi_get_ps(&sleep) == ESP_OK) {
       if (!wifiSleepSaved) {
         savedSleep     = sleep;
         wifiSleepSaved = true;
       }
-      if (sleep == WIFI_PS_NONE && esp_wifi_set_ps(WIFI_PS_MIN_MODEM) != ESP_OK) SS2K_LOGE(MAIN_LOG_TAG, "S3 cooling: WiFi modem sleep failed; retry in 10s");
+      if (sleep == WIFI_PS_NONE && esp_wifi_set_ps(WIFI_PS_MIN_MODEM) != ESP_OK) SS2K_LOG(MAIN_LOG_TAG, "S3 cooling: WiFi modem sleep failed; retry in 10s");
     }
   } else {
     if (wifiPowerSaved && esp_wifi_set_max_tx_power(savedWifiPower) == ESP_OK) wifiPowerSaved = false;
     if (wifiSleepSaved && esp_wifi_set_ps(savedSleep) == ESP_OK) wifiSleepSaved = false;
-    if (wifiPowerSaved || wifiSleepSaved) SS2K_LOGE(MAIN_LOG_TAG, "S3 cooling: WiFi restore pending; retry in 10s");
+    if (wifiPowerSaved || wifiSleepSaved) SS2K_LOG(MAIN_LOG_TAG, "S3 cooling: WiFi restore pending; retry in 10s");
   }
 
   // NimBLEDevice::setPower(All) only changes ADV/SCAN/DEFAULT, so include
@@ -95,12 +95,12 @@ void updateRadioCooling(bool reduce) {
         blePowerSaved[i] = true;
       }
       if (current > ESP_PWR_LVL_N24 && esp_ble_tx_power_set(type, ESP_PWR_LVL_N24) != ESP_OK)
-        SS2K_LOGE(MAIN_LOG_TAG, "S3 cooling: BLE TX power reduction failed for type %d; retry in 10s", i);
+        SS2K_LOG(MAIN_LOG_TAG, "S3 cooling: BLE TX power reduction failed for type %d; retry in 10s", i);
     } else if (blePowerSaved[i]) {
       if (esp_ble_tx_power_set(type, savedBlePower[i]) == ESP_OK)
         blePowerSaved[i] = false;
       else
-        SS2K_LOGE(MAIN_LOG_TAG, "S3 cooling: BLE TX power restore failed for type %d; retry in 10s", i);
+        SS2K_LOG(MAIN_LOG_TAG, "S3 cooling: BLE TX power restore failed for type %d; retry in 10s", i);
     }
   }
   if (!reduce) {

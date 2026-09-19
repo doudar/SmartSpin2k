@@ -7,7 +7,52 @@
 
 #include <unity.h>
 #include "ThermalSafety.h"
+#include "Stepper.h"
 #include "test.h"
+
+namespace {
+// No DRV_STATUS or write API: connectivity must not depend on motor state or
+// enable the outputs. Emulate the library refreshing CRCerror on each read.
+struct IdentityDriver {
+  uint32_t response     = 0x21000001;  // TMC2209 identity with ENN high.
+  bool responseCrcError = false;
+  bool CRCerror         = true;
+  int reads             = 0;
+
+  uint32_t IOIN() {
+    ++reads;
+    CRCerror = responseCrcError;
+    return response;
+  }
+};
+}  // namespace
+
+void TestThermalSafety::test_tmc_uart_probe_while_disabled() {
+  IdentityDriver driver;
+  auto probe = TmcUart::probe(driver);
+  TEST_ASSERT_TRUE(probe.valid());
+  TEST_ASSERT_EQUAL_HEX32(0x21000001, probe.ioin);
+  TEST_ASSERT_EQUAL(1, driver.reads);
+  // GPIO inputs can change without changing UART availability.
+  driver.response = 0x210003FF;
+  TEST_ASSERT_TRUE(TmcUart::probe(driver).valid());
+  driver.response = 0x21000000;
+  TEST_ASSERT_TRUE(TmcUart::probe(driver).valid());
+}
+
+void TestThermalSafety::test_tmc_uart_probe_rejects_invalid_responses() {
+  IdentityDriver driver;
+  driver.responseCrcError = true;
+  TEST_ASSERT_FALSE(TmcUart::probe(driver).valid());
+  // A subsequent valid response recovers without recreating the driver.
+  driver.responseCrcError = false;
+  TEST_ASSERT_TRUE(TmcUart::probe(driver).valid());
+  const uint32_t invalidResponses[] = {0, 0xFFFFFFFF, 0x20000001};
+  for (uint32_t invalid : invalidResponses) {
+    driver.response = invalid;
+    TEST_ASSERT_FALSE(TmcUart::probe(driver).valid());
+  }
+}
 
 void TestThermalSafety::test_tmc_cooldown_and_recovery() {
   ThermalSafety::TmcProtection protection;
@@ -32,6 +77,13 @@ void TestThermalSafety::test_tmc_cooldown_and_recovery() {
 
 void TestThermalSafety::test_tmc_missing_samples_and_timer_wrap() {
   ThermalSafety::TmcProtection protection;
+  // Lost telemetry alone must never stop a previously cool driver.
+  protection.update(true, false, false, 0);
+  for (uint32_t now = 10000; now <= 60000; now += 10000) {
+    protection.update(false, false, false, now);
+    TEST_ASSERT_FALSE(protection.disabled());
+    TEST_ASSERT_EQUAL(100, protection.percent());
+  }
   const uint32_t start = UINT32_MAX - 5000;
   protection.update(true, true, false, start);
   protection.update(false, false, false, uint32_t(start + 20000));

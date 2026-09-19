@@ -255,7 +255,7 @@ void bleClientTask(void* pvParameters) {
         } else {  // Startup Homing
           ss2k->goHome(false);
         }
-        rtConfig->setShifterPosition(SHIFTER_MIDDLE_POSITION); // Reset to middle position
+        if (rtConfig->getHomed()) rtConfig->setShifterPosition(SHIFTER_MIDDLE_POSITION);  // Move to the riding position only after successful calibration.
         spinBLEServer.spinDownFlag = 0;
       }
     }

@@ -51,6 +51,7 @@ class SS2K {
   bool resetDefaultsFlag   = false;
   bool resetPowerTableFlag = false;
   bool isUpdating          = false;
+  bool ftmsHomingFailed    = false;  // Hold normal motor control after failure until homing succeeds.
 
   static void ARDUINO_ISR_ATTR maintenanceLoop(void *pvParameters);
   static void ARDUINO_ISR_ATTR handleUpShift();

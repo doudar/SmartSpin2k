@@ -11,6 +11,8 @@ class TestThermalSafety {
  public:
   static void test_tmc_cooldown_and_recovery();
   static void test_tmc_missing_samples_and_timer_wrap();
+  static void test_tmc_uart_probe_while_disabled();
+  static void test_tmc_uart_probe_rejects_invalid_responses();
   static void test_s3_thresholds_and_hysteresis();
   static void test_s3_failed_sensor_preserves_protection();
   static void test_combined_limits_and_setting_changes();
@@ -87,6 +89,24 @@ class TestBleFirmwareUpdateProtocol {
 class TestEndian {
  public:
   static void test_little_endian_signed_decode_and_round_trip(void);
+};
+
+class TestFtmsHoming {
+ public:
+  static void test_repeatable_startup(void);
+  static void test_both_ends_and_legacy(void);
+  static void test_missing_stuck_and_skipped_reports(void);
+  static void test_abort_and_feedback(void);
+  static void test_measurement_value_timer(void);
+  static void test_report_published_during_read(void);
+  static void test_wrong_direction_stops_motor(void);
+  static void test_delayed_crossing_after_stop(void);
+  static void test_stationary_reading_confirmation(void);
+  static void test_adjacent_boundary_noise(void);
+  static void test_shifted_crossing_retries(void);
+  static void test_responsive_retries_until_deadline(void);
+  static void test_accelerated_probe_repeatability(void);
+  static void test_one_second_startup_check(void);
 };
 
 class TestBleWireRoundTrip {

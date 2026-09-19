@@ -14,6 +14,7 @@
 #include "settings.h"
 #include <Constants.h>
 #include "ThermalSafety.h"
+#include "FtmsHoming.h"
 #include "freertos/semphr.h"
 
 HardwareSerial stepperSerial(2);
@@ -126,14 +127,14 @@ void applyMotorInterlock() {
       stepper->forceStopAndNewPosition(stepper->getCurrentPosition());
       stepper->disableOutputs();  // Also reset auto-enable's cached enable timer.
     }
-    SS2K_LOGE(MAIN_LOG_TAG, "Motor inhibited: TMC configured=%d, TMC thermal stop=%d, S3 stop=%d; EN held high", driverConfigured, tmcProtection.disabled(), s3MotorInhibited);
+    SS2K_LOG(MAIN_LOG_TAG, "Motor inhibited: TMC configured=%d, TMC thermal stop=%d, S3 stop=%d; EN held high", driverConfigured, tmcProtection.disabled(), s3MotorInhibited);
   }
 }
 
-void driverCommunicationFailed() {
+void driverCommunicationFailed(const char* stage) {
   driverConfigured  = false;
   applyMotorInterlock();
-  SS2K_LOGE(MAIN_LOG_TAG, "TMC configuration/communication unavailable; EN held high, retry in 10s");
+  SS2K_LOG(MAIN_LOG_TAG, "TMC configuration/communication unavailable at %s; EN held high, retry in 10s", stage);
 }
 
 bool applyDriverCurrent(bool logChange) {
@@ -142,23 +143,11 @@ bool applyDriverCurrent(bool logChange) {
   // unrepresentable. In particular, rms_current(0) underflows in TMCStepper 0.7.3.
   float minimumCurrent = 1000.0f * 0.180f / (32.0f * 1.41421f * (currentBoard.rSense + 0.02f));
   if (current < ceilf(minimumCurrent)) {
-    SS2K_LOGE(MAIN_LOG_TAG, "TMC requested current %d mA is below safe library range; motor inhibited", current);
-    driverCommunicationFailed();
-    return false;
-  }
-  uint8_t before = driver->IFCNT();
-  if (driver->CRCerror) {
-    driverCommunicationFailed();
+    SS2K_LOG(MAIN_LOG_TAG, "TMC requested current %d mA is below safe library range; motor inhibited", current);
+    driverCommunicationFailed("current range");
     return false;
   }
   driver->rms_current(current, HOLD_PWR_SCALER);
-  uint8_t after = driver->IFCNT();
-  // rms_current writes CHOPCONF once and IHOLD_IRUN twice. Confirm all three
-  // writes reached the chip; the library's rms_current getter is not telemetry.
-  if (driver->CRCerror || static_cast<uint8_t>(after - before) != 3) {
-    driverCommunicationFailed();
-    return false;
-  }
   if (logChange)
     SS2K_LOG(MAIN_LOG_TAG, "Stepper current requested=%d mA, applied=%d mA, TMC limit=%d%%, S3 limit=%d%%", requestedCurrent, current, tmcProtection.percent(), s3CurrentLimit);
   return true;
@@ -176,10 +165,10 @@ void updateTmcTemperature(bool valid, uint32_t status) {
         SS2K_LOG(MAIN_LOG_TAG, "TMC temperature flags cleared; restoring current subject to S3 limit");
         break;
       case ThermalSafety::TmcState::Reduced:
-        SS2K_LOGE(MAIN_LOG_TAG, "TMC T120/temperature warning asserted; halving motor current, 30s cooldown deadline");
+        SS2K_LOG(MAIN_LOG_TAG, "TMC T120/temperature warning asserted; halving motor current, 30s cooldown deadline");
         break;
       case ThermalSafety::TmcState::Disabled:
-        SS2K_LOGE(MAIN_LOG_TAG, "TMC cooling failed after 30s or OT shutdown asserted; EN held high until temperature flags clear");
+        SS2K_LOG(MAIN_LOG_TAG, "TMC cooling failed after 30s or OT shutdown asserted; EN held high until temperature flags clear");
         break;
     }
   }
@@ -191,6 +180,24 @@ constexpr uint32_t TMC2209_OTP_IHOLD_9_PERCENT = 0x01UL << TMC2209_OTP_IHOLD_SHI
 constexpr uint16_t TMC2209_OTP_PROGRAM_IHOLD_9 = 0xBD25;  // Magic 0xBD, OTP byte 2, bit 5.
 
 bool recoverTmc2209OperationalConnection(TMC2209Stepper* tmcDriver) {
+  if (!homingActive) {
+    // test_connection() infers connectivity from DRV_STATUS != 0. Use the
+    // fixed chip identity instead, so status/thermal state cannot block the
+    // reads needed to release an interlock. Keep EN high during recovery.
+    auto probe = TmcUart::probe(*tmcDriver);
+    if (probe.valid()) return true;
+    SS2K_LOG(MAIN_LOG_TAG, "TMC UART identity failed: IOIN=0x%08lX, CRC error=%d; forcing idle-high recovery", static_cast<unsigned long>(probe.ioin), probe.crcError);
+    initializeStepperSerial(true);
+    probe = TmcUart::probe(*tmcDriver);
+    if (!probe.valid()) {
+      SS2K_LOG(MAIN_LOG_TAG, "TMC UART identity recovery failed: IOIN=0x%08lX, CRC error=%d", static_cast<unsigned long>(probe.ioin), probe.crcError);
+      return false;
+    }
+    SS2K_LOG(MAIN_LOG_TAG, "TMC UART recovered");
+    return true;
+  }
+
+  // Preserve the original connection check during homing.
   uint8_t connectionStatus = tmcDriver->test_connection();
   if (connectionStatus == 0) {
     return true;
@@ -285,6 +292,7 @@ void programTmc2209LowHoldCurrentOtp(TMC2209Stepper* tmcDriver) {
 }  // namespace
 
 void SS2K::moveStepper() {
+  if (ss2k->ftmsHomingFailed) return;
   if (!ss2k->stepperSafetyReady()) return;
   static bool _stepperDir = userConfig->getStepperDir();
   if (stepper) {
@@ -432,7 +440,7 @@ void SS2K::setupTMCStepperDriver(bool reset) {
     engine.init();
     stepper = engine.stepperConnectToPin(currentBoard.stepPin);
     if (stepper == nullptr) {
-      SS2K_LOGE(MAIN_LOG_TAG, "Unable to initialize FastAccelStepper on pin %u", static_cast<unsigned>(currentBoard.stepPin));
+      SS2K_LOG(MAIN_LOG_TAG, "Unable to initialize FastAccelStepper on pin %u", static_cast<unsigned>(currentBoard.stepPin));
       return;
     }
     stepper->setDirectionPin(currentBoard.dirPin, userConfig->getStepperDir());
@@ -444,13 +452,13 @@ void SS2K::setupTMCStepperDriver(bool reset) {
     stepper->setDelayToDisable(65535);
   }
 
-  // Recover the UART first; configuration/current writes are verified with
-  // IFCNT before releasing EN. OTP retains its separate one-time check.
+  // Confirm UART reads and writes during setup. Normal temperature polling
+  // does not reconfigure or disable a working driver on a missed reply.
   if (!recoverTmc2209OperationalConnection(driver)) {
     if (homingActive) {
       SS2K_LOG(MAIN_LOG_TAG, "Skipping TMC driver setup because UART is unavailable");
     } else {
-      driverCommunicationFailed();
+      driverCommunicationFailed("UART identity");
     }
     return;
   }
@@ -467,20 +475,19 @@ void SS2K::setupTMCStepperDriver(bool reset) {
   }
 
   uint8_t setupCounter = 0;
-  uint16_t setupBytes  = 0;
   if (!homingActive) {
     uint32_t status = driver->DRV_STATUS();
     if (driver->CRCerror) {
-      driverCommunicationFailed();
+      driverCommunicationFailed("setup DRV_STATUS (CRC)");
       return;
     }
+    SS2K_LOG(MAIN_LOG_TAG, "TMC setup thermal status: DRV_STATUS=0x%08lX", static_cast<unsigned long>(status));
     updateTmcTemperature(true, status);
     setupCounter = driver->IFCNT();
     if (driver->CRCerror) {
-      driverCommunicationFailed();
+      driverCommunicationFailed("setup IFCNT before write (CRC)");
       return;
     }
-    setupBytes = driver->bytesWritten;
     driver->GSTAT(1);  // Acknowledge reset; later resets trigger reconfiguration.
   }
   driver->pdn_disable(true);       // Use PDN pin to enable UART communication instead of grounding signal
@@ -502,15 +509,15 @@ void SS2K::setupTMCStepperDriver(bool reset) {
   }
   requestedCurrent = userConfig->getStepperPower();
   if (!applyDriverCurrent(true)) return;
-  uint16_t writtenBytes = static_cast<uint16_t>(driver->bytesWritten - setupBytes);
   uint8_t finalCounter  = driver->IFCNT();
-  if (driver->CRCerror || writtenBytes % 8 != 0 || static_cast<uint8_t>(finalCounter - setupCounter) != writtenBytes / 8) {
-    driverCommunicationFailed();
+  if (driver->CRCerror || finalCounter == setupCounter) {
+    SS2K_LOG(MAIN_LOG_TAG, "TMC setup writes not acknowledged: IFCNT %u -> %u, read error=%d; retry in 10s", setupCounter, finalCounter, driver->CRCerror);
+    driverCommunicationFailed("setup write acknowledgement");
     return;
   }
   driverConfigured = true;
   applyMotorInterlock();
-  SS2K_LOG(MAIN_LOG_TAG, "TMC setup complete; current-limit writes verified");
+  SS2K_LOG(MAIN_LOG_TAG, "TMC setup complete; UART reads and writes working");
   this->setCurrentPosition(stepper->getCurrentPosition());
 }
 
@@ -532,7 +539,7 @@ void SS2K::updateDriverSafety(int s3Percent, bool s3Disabled) {
   if (homingActive) return;
   bool limitChanged = s3CurrentLimit != s3Percent;
   s3CurrentLimit    = s3Percent;
-  // Never open an existing interlock until the new current limit is verified.
+  // Apply an S3 temperature stop immediately, independently of TMC telemetry.
   if (s3Disabled) {
     s3MotorInhibited = true;
     applyMotorInterlock();
@@ -547,26 +554,23 @@ void SS2K::updateDriverSafety(int s3Percent, bool s3Disabled) {
   bool valid      = !driver->CRCerror;
   auto previous   = tmcProtection.state;
   updateTmcTemperature(valid, status);
-  // Close promptly on overtemperature; recovery waits for verified current below.
+  // Close promptly on overtemperature. A missed read alone is not a motor fault.
   if (tmcProtection.disabled()) applyMotorInterlock();
   if (!valid) {
-    driverCommunicationFailed();
-    return;
+    SS2K_LOG(MAIN_LOG_TAG, "TMC temperature read failed; keeping previous thermal state, retry in 10s");
   }
   uint8_t resetStatus = driver->GSTAT();
   if (driver->CRCerror) {
-    driverCommunicationFailed();
-    return;
-  }
-  if (resetStatus & 1) {
-    SS2K_LOGE(MAIN_LOG_TAG, "TMC reset detected; reapplying complete configuration");
+    SS2K_LOG(MAIN_LOG_TAG, "TMC reset-status read failed; keeping driver configured, retry in 10s");
+  } else if (resetStatus & 1) {
+    SS2K_LOG(MAIN_LOG_TAG, "TMC reset detected; reapplying complete configuration");
     setupTMCStepperDriver(true);
     return;
   }
-  if (!applyDriverCurrent(limitChanged || previous != tmcProtection.state)) return;
+  if ((limitChanged || previous != tmcProtection.state) && !applyDriverCurrent(true)) return;
   bool wasReady = stepperSafetyReady();
   applyMotorInterlock();
-  if (!wasReady && stepperSafetyReady()) SS2K_LOG(MAIN_LOG_TAG, "Motor safety interlock cleared; current limit verified");
+  if (!wasReady && stepperSafetyReady()) SS2K_LOG(MAIN_LOG_TAG, "Motor thermal stop cleared; resuming with current limit");
 }
 
 static int lastHomingSgThreshold = 0;
@@ -691,99 +695,132 @@ bool SS2K::_findEndStop(bool moveForward) {
 }
 
 void SS2K::_findFTMSHome(bool bothDirections) {
+  // These progress phrases are parsed by the companion calibration widgets.
   SS2K_LOG(MAIN_LOG_TAG, "Starting FTMS Homing...");
-  unsigned long timer       = millis();
-  unsigned long lastLogTime = 0;
-  int lastResistance        = 0;
-  int i                     = 0;
-  const int iMax            = 600;
-
-  auto runHomingSweep = [&](int targetResistance, const char* logTemplate, bool notifySpinDown) {
-    timer                   = millis();
-    i                       = 0;
-    int32_t lastPosition    = ss2k->getCurrentPosition();
-    const int32_t minTravel = userConfig->getShiftStep();
-    while ((rtConfig->resistance.getValue() != targetResistance) && ((i < iMax) || (abs(ss2k->getCurrentPosition() - lastPosition) < minTravel))) {
-      if (millis() - timer > HOME_TIMEOUT) {
-        SS2K_LOG(MAIN_LOG_TAG, "FTMS Homing timed out!");
-        setupTMCStepperDriver(true);  // Restore normal driver settings
-        return;
-      }
-      if (rtConfig->getShifterPosition() != ss2k->lastShifterPosition) {
-        SS2K_LOG(MAIN_LOG_TAG, "FTMS Homing aborted by user.");
-        stepper->forceStop();
-        setupTMCStepperDriver(true);  // Restore normal driver settings
-        return;
-      }
-      ss2k->setCurrentPosition(stepper->getCurrentPosition());
-      rtConfig->resistance.setTarget(targetResistance);
-      rtConfig->setTargetIncline(ss2k->getCurrentPosition());
-      ss2k->_resistanceMove();
-      stepper->moveTo(ss2k->targetPosition);
-      delay(5);
-      if (lastResistance != rtConfig->resistance.getValue()) {
-        lastResistance = rtConfig->resistance.getValue();
-        lastPosition   = ss2k->getCurrentPosition();
-        i              = 0;
-      }
-      if (logTemplate && (millis() - lastLogTime > LOG_INTERVAL)) {
-        SS2K_LOG(MAIN_LOG_TAG, logTemplate, rtConfig->resistance.getValue(), targetResistance);
-        if (notifySpinDown) {
-          fitnessMachineService.spinDown(FitnessMachineStatus::SpinDown_StopPedaling);
-        }
-        lastLogTime = millis();
-      }
-      i++;
+  SS2K_LOG(MAIN_LOG_TAG, "FTMS homing request: both=%d resistance=%d range=%d-%d savedMax=%d", bothDirections, rtConfig->resistance.getValue(),
+           rtConfig->resistance.getMin(), rtConfig->resistance.getMax(), userConfig->getHMax());
+  rtConfig->setHomed(false);
+  struct HomingIO {
+    int shifterPosition;
+    bool searchingMax = false;
+    int targetResistance = 10;
+    uint32_t lastLog = 0;
+    uint32_t now() { return millis(); }
+    Measurement::ValueSample sample() { return rtConfig->resistance.getValueSample(); }
+    int32_t position() { return stepper->getCurrentPosition(); }
+    bool moving() { return stepper->isRunning(); }
+    bool cancelled() { return rtConfig->getShifterPosition() != shifterPosition; }
+    void stop() { stepper->forceStop(); }
+    void logProgress() {
+      SS2K_LOG(MAIN_LOG_TAG, "Homing to %s Resistance... Current: %d, Target: %d, pos: %d", searchingMax ? "Max" : "Min", sample().value,
+               targetResistance, position());
+      lastLog = now();
     }
+    void setBoundaryTarget(int target) {
+      targetResistance = target;
+      logProgress();
+    }
+    bool moveTo(int32_t target, int speed) {
+      SS2K_LOG(MAIN_LOG_TAG, "FTMS seek: resistance=%d position=%d target=%d speed=%d", sample().value, position(), target, speed);
+      ss2k->updateStepperSpeed(speed);
+      return stepper->moveTo(target) == 0;
+    }
+    void poll() {
+      delay(5);
+      ss2k->setCurrentPosition(position());
+      if (now() - lastLog > LOG_INTERVAL) {
+        logProgress();
+        // The companion interprets this status as minimum found / seeking max.
+        if (searchingMax) fitnessMachineService.spinDown(FitnessMachineStatus::SpinDown_StopPedaling);
+      }
+    }
+  } io{ss2k->lastShifterPosition};
 
-    bool reachedTarget   = (rtConfig->resistance.getValue() == targetResistance);
-    int32_t travelDelta  = abs(ss2k->getCurrentPosition() - lastPosition);
-    bool iterExceeded    = (i >= iMax);
-    bool travelSatisfied = (travelDelta >= minTravel);
-    SS2K_LOG(MAIN_LOG_TAG, "FTMS Homing sweep exit: target=%d current=%d reached=%s iter=%d/%d travelΔ=%d minTravel=%d travelMet=%s", targetResistance,
-             rtConfig->resistance.getValue(), reachedTarget ? "true" : "false", i, iMax, travelDelta, minTravel, travelSatisfied ? "true" : "false");
+  auto fail = [&]() {
+    if (io.cancelled()) SS2K_LOG(MAIN_LOG_TAG, "Homing aborted by user.");
+    ss2k->ftmsHomingFailed = true;
+    stepper->forceStop();
+    while (stepper->isRunning()) delay(5);
+    ss2k->setCurrentPosition(stepper->getCurrentPosition());
+    ss2k->setTargetPosition(ss2k->getCurrentPosition());
+    rtConfig->setTargetIncline(ss2k->getCurrentPosition());
+    setupTMCStepperDriver(true);
+    SS2K_LOG(MAIN_LOG_TAG, "FTMS homing failed or aborted; motor held until successful homing. Calibration was not saved.");
   };
 
-  ss2k->updateStepperSpeed(1500);  // Use a slow-medium speed for homing
-
-  // first back off of the stop if we're already there
-  int midTarget = round((rtConfig->resistance.getMax() - rtConfig->resistance.getMin()) / 4.0f);
-  rtConfig->resistance.setTarget(midTarget);
-  runHomingSweep(midTarget, nullptr, false);
-  runHomingSweep(rtConfig->resistance.getMin(), "Homing to Min Resistance... Current: %d, Target: %d", false);
-  lastResistance = rtConfig->resistance.getValue();
-
-  // log found positions
-  SS2K_LOG(MAIN_LOG_TAG, "Found Min Resistance Position: %d", rtConfig->resistance.getValue());
-  stepper->setCurrentPosition(0);
-  ss2k->setCurrentPosition(0);
-  ss2k->setTargetPosition(0);
-  rtConfig->setTargetIncline(0);
-  rtConfig->setMinStep(0);
+  // Only the interior 1..99 levels are required; advertised 0/100 are optional.
+  if (!FtmsHoming::supportsRange(rtConfig->resistance.getMin(), rtConfig->resistance.getMax())) {
+    SS2K_LOG(MAIN_LOG_TAG, "FTMS transition homing requires the 1-99 interior of the 0-100 resistance scale.");
+    fail();
+    return;
+  }
+  if (!bothDirections && userConfig->getHMax() <= 0) {
+    SS2K_LOG(MAIN_LOG_TAG, "Full FTMS calibration is required before startup homing.");
+    fail();
+    return;
+  }
+  FtmsHoming::Search<HomingIO> search(io);
+  int32_t minimum, maximum;
+  auto findEndpoint = [&](bool upper, int32_t& endpoint) {
+    if (search.endpoint(upper, endpoint)) return true;
+    auto sample = io.sample();
+    SS2K_LOG(MAIN_LOG_TAG, "FTMS homing failure: %s; resistance=%d simulated=%d age=%lu ms position=%d", FtmsHoming::failureName(search.failure()), sample.value,
+             sample.simulate, static_cast<unsigned long>(io.now() - sample.timestamp), io.position());
+    if (search.failure() == FtmsHoming::Failure::Timeout) SS2K_LOG(MAIN_LOG_TAG, "Homing timed out!");
+    fail();
+    return false;
+  };
+  if (!findEndpoint(false, minimum)) return;
+  SS2K_LOG(MAIN_LOG_TAG, "Min position found: 0 (FTMS origin: %d)", minimum);
   if (bothDirections) {
-    runHomingSweep(rtConfig->resistance.getMax(), "Homing to Max Resistance... Current: %d, Target: %d", true);
-    rtConfig->setMaxStep(stepper->getCurrentPosition());
-    userConfig->setHMin(rtConfig->getMinStep());
-    userConfig->setHMax(rtConfig->getMaxStep());
-    SS2K_LOG(MAIN_LOG_TAG, "Found Max Resistance Position: %d", rtConfig->resistance.getValue());
+    io.searchingMax = true;
+    io.setBoundaryTarget(90);
+    fitnessMachineService.spinDown(FitnessMachineStatus::SpinDown_StopPedaling);
+    if (!findEndpoint(true, maximum)) return;
+  }
+  int64_t range = bothDirections ? static_cast<int64_t>(maximum) - minimum : userConfig->getHMax();
+  if (range <= 0 || range > INT32_MAX || io.cancelled()) {
+    fail();
+    return;
+  }
+
+  // Rebase only after all requested measurements succeeded. The motor is stopped
+  // at a measured interior point; zero is a virtual, extrapolated coordinate.
+  int64_t rebased = static_cast<int64_t>(stepper->getCurrentPosition()) - minimum;
+  if (rebased < 0 || rebased > INT32_MAX) {
+    fail();
+    return;
+  }
+  stepper->setCurrentPosition(static_cast<int32_t>(rebased));
+  ss2k->setCurrentPosition(static_cast<int32_t>(rebased));
+  rtConfig->setMinStep(0);
+  rtConfig->setMaxStep(static_cast<int32_t>(range));
+  if (bothDirections) {
+    if (!userConfig->getPTab4Pwr()) powerTable->reset();
+    userConfig->setHMin(0);
+    userConfig->setHMax(static_cast<int32_t>(range));
+    userConfig->saveToLittleFS();
+    SS2K_LOG(MAIN_LOG_TAG, "Max Position found: %d", static_cast<int32_t>(range));
   }
   setupTMCStepperDriver(true);
   rtConfig->setShifterPosition(0);
   ss2k->setTargetPosition(0);
   rtConfig->setTargetIncline(0);
   stepper->moveTo(0);
-  rtConfig->setMaxStep(userConfig->getHMax());  // Ensure it's set from config if not found
   rtConfig->setHomed(true);
-  userConfig->saveToLittleFS();
+  ss2k->ftmsHomingFailed = false;
+  SS2K_LOG(MAIN_LOG_TAG, "FTMS homing complete: estimated zero=%d, range=%d steps", minimum, static_cast<int32_t>(range));
+  SS2K_LOG(MAIN_LOG_TAG, "Homing procedure complete.");
 }
 
 void SS2K::goHome(bool bothDirections) {
   HomingSafetyPause safetyPause;
   SS2K_LOG(MAIN_LOG_TAG, "Starting homing procedure...");
   ergMode->resetTableConfidence();
+  const bool useFTMSHoming = !rtConfig->resistance.getSimulate() && strcmp(userConfig->getConnectedPowerMeter(), NONE) != 0 && rtConfig->resistance.getMax() > 0;
   if (bothDirections) {
     fitnessMachineService.spinDown(FitnessMachineStatus::SpinDown_SpinDownRequested);
-    if (!userConfig->getPTab4Pwr()) {
+    if (!userConfig->getPTab4Pwr() && !useFTMSHoming) {
       // clean slate for homing
       powerTable->reset();
     }
@@ -796,12 +833,15 @@ void SS2K::goHome(bool bothDirections) {
   }
 
   // if we're using real resistance from a FTMS bike, find those values for the reported min and max resistance instead of using hard stops.
-  if (!rtConfig->resistance.getSimulate() && userConfig->getConnectedPowerMeter() != NONE && rtConfig->resistance.getMax() > 0) {
+  if (useFTMSHoming) {
     ss2k->_findFTMSHome(bothDirections);
     if (rtConfig->getHomed()) {
       fitnessMachineService.spinDown(FitnessMachineStatus::SpinDown_Success);
-      return;
+    } else {
+      fitnessMachineService.spinDown(FitnessMachineStatus::SpinDown_Error);
     }
+    // An FTMS abort/failure must not start a different, mechanical homing run.
+    return;
   }
 
   if (!currentBoard.homingSupported) {
@@ -928,6 +968,7 @@ void SS2K::goHome(bool bothDirections) {
     rtConfig->setHomed(false);
   }
   SS2K_LOG(MAIN_LOG_TAG, "Homing procedure complete.");
+  if (rtConfig->getHomed()) ss2k->ftmsHomingFailed = false;
 }
 
 // Applies current power to driver
