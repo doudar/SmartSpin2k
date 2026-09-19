@@ -703,6 +703,43 @@ bool SS2K::_findEndStop(bool moveForward) {
   return false;
 }
 
+void SS2K::syncFtmsPosition() {
+  static FtmsCalibration::DriftGuard guard;
+  const auto sample = rtConfig->resistance.getValueSample();
+  const uint32_t now = millis();
+  DriverLock lock(false);
+  if (!lock.locked()) { guard.interrupt(); return; }
+  const uint8_t mode = rtConfig->getFTMSMode();
+  const bool positionMode = mode == FitnessMachineControlPointProcedure::SetTargetPower || mode == FitnessMachineControlPointProcedure::SetTargetResistanceLevel;
+  const int32_t desired = positionMode ? rtConfig->getTargetIncline() : simulationTargetPosition();
+  const int32_t current = stepper ? stepper->getCurrentPosition() : 0;
+  const bool eligible = stepper && rtConfig->getHomed() && !homingActive && !ftmsHomingFailed && !isUpdating && !spinBLEServer.spinDownFlag && !ergMode->isTableSeeking() &&
+                        !externalControl && !syncMode && !sample.simulate && stepperSafetyReady() && !stepper->isRunning() &&
+                        desired == current && targetPosition == current && userConfig->getHMin() == 0 && (positionMode || localGearingSelected()) &&
+                        powerTable->ftmsCalibration.matches(FtmsCalibration::identity(userConfig->getConnectedPowerMeter(), userConfig->getStepperDir()),
+                                                            userConfig->getHMax());
+  const int delta = guard.correction(powerTable->ftmsCalibration, now, sample.timestamp, sample.value, current, eligible);
+  powerTable->ftmsPositionUncertain = guard.uncertain();
+  static uint32_t lastSyncLog = 0;
+  if (!delta && rtConfig->getHomed() && powerTable->ftmsCalibration.valid() && now - lastSyncLog >= FtmsCalibration::INTERVAL_MS) {
+    lastSyncLog = now;
+    SS2K_LOG(MAIN_LOG_TAG, "FTMS sync check: resistance=%d steps=%d eligible=%d state=%s", sample.value, current, eligible, guard.reason());
+  }
+  if (!delta) return;
+  const int64_t corrected = static_cast<int64_t>(current) + delta;
+  const int64_t offset = static_cast<int64_t>(ftmsSimulationOffset) + delta;
+  if (corrected <= rtConfig->getMinStep() || corrected >= rtConfig->getMaxStep() || offset < INT32_MIN || offset > INT32_MAX) return;
+  // Rebase all active position owners together. In simulation, retain the
+  // current gear's physical setting; its next command must not undo this sync.
+  stepper->setCurrentPosition(static_cast<int32_t>(corrected));
+  currentPosition = targetPosition = static_cast<int32_t>(corrected);
+  ftmsSimulationOffset = static_cast<int32_t>(offset);
+  if (positionMode) rtConfig->setTargetIncline(static_cast<int32_t>(corrected));
+  ++powerTable->positionEpoch;
+  ergMode->resetTableConfidence();
+  SS2K_LOG(MAIN_LOG_TAG, "FTMS position sync: resistance=%d steps=%d->%d correction=%d (no motor move)", sample.value, current, currentPosition, delta);
+}
+
 void SS2K::_findFTMSHome(bool bothDirections) {
   // These progress phrases are parsed by the companion calibration widgets.
   SS2K_LOG(MAIN_LOG_TAG, "Starting FTMS Homing...");
@@ -711,6 +748,7 @@ void SS2K::_findFTMSHome(bool bothDirections) {
   rtConfig->setHomed(false);
   struct HomingIO {
     int shifterPosition;
+    uint32_t source;
     bool searchingMax = false;
     int targetResistance = 10;
     uint32_t lastLog = 0;
@@ -718,7 +756,10 @@ void SS2K::_findFTMSHome(bool bothDirections) {
     Measurement::ValueSample sample() { return rtConfig->resistance.getValueSample(); }
     int32_t position() { return stepper->getCurrentPosition(); }
     bool moving() { return stepper->isRunning(); }
-    bool cancelled() { return rtConfig->getShifterPosition() != shifterPosition; }
+    bool cancelled() {
+      return rtConfig->getShifterPosition() != shifterPosition ||
+             FtmsCalibration::identity(userConfig->getConnectedPowerMeter(), userConfig->getStepperDir()) != source;
+    }
     void stop() { stepper->forceStop(); }
     void logProgress() {
       SS2K_LOG(MAIN_LOG_TAG, "Homing to %s Resistance... Current: %d, Target: %d, pos: %d", searchingMax ? "Max" : "Min", sample().value,
@@ -743,11 +784,12 @@ void SS2K::_findFTMSHome(bool bothDirections) {
         if (searchingMax) fitnessMachineService.spinDown(FitnessMachineStatus::SpinDown_StopPedaling);
       }
     }
-  } io{ss2k->lastShifterPosition};
+  } io{ss2k->lastShifterPosition, FtmsCalibration::identity(userConfig->getConnectedPowerMeter(), userConfig->getStepperDir())};
 
   auto fail = [&]() {
     if (io.cancelled()) SS2K_LOG(MAIN_LOG_TAG, "Homing aborted by user.");
     ss2k->ftmsHomingFailed = true;
+    rtConfig->setHomed(false);
     stepper->forceStop();
     while (stepper->isRunning()) delay(5);
     ss2k->setCurrentPosition(stepper->getCurrentPosition());
@@ -763,15 +805,15 @@ void SS2K::_findFTMSHome(bool bothDirections) {
     fail();
     return;
   }
-  if (!bothDirections && userConfig->getHMax() <= 0) {
-    SS2K_LOG(MAIN_LOG_TAG, "Full FTMS calibration is required before startup homing.");
-    fail();
-    return;
+  const bool requestedFull = bothDirections;
+  if (!bothDirections && !powerTable->loadFtmsCalibration()) {
+    SS2K_LOG(MAIN_LOG_TAG, "PTAB has no matching FTMS map; performing full FTMS calibration.");
+    bothDirections = true;
+    fitnessMachineService.spinDown(FitnessMachineStatus::SpinDown_SpinDownRequested);
   }
   FtmsHoming::Search<HomingIO> search(io);
   int32_t minimum, maximum;
-  auto findEndpoint = [&](bool upper, int32_t& endpoint) {
-    if (search.endpoint(upper, endpoint)) return true;
+  auto searchFailed = [&]() {
     auto sample = io.sample();
     SS2K_LOG(MAIN_LOG_TAG, "FTMS homing failure: %s; resistance=%d simulated=%d age=%lu ms position=%d", FtmsHoming::failureName(search.failure()), sample.value,
              sample.simulate, static_cast<unsigned long>(io.now() - sample.timestamp), io.position());
@@ -779,24 +821,52 @@ void SS2K::_findFTMSHome(bool bothDirections) {
     fail();
     return false;
   };
-  if (!findEndpoint(false, minimum)) return;
+  auto findEndpoint = [&](bool upper, int32_t& endpoint) { return search.endpoint(upper, endpoint) || searchFailed(); };
+  FtmsCalibration::Map calibration;
+  if (bothDirections) {
+    if (!findEndpoint(false, minimum)) return;
+  } else if (!search.recover(powerTable->ftmsCalibration, minimum)) {
+    searchFailed();
+    return;
+  }
   SS2K_LOG(MAIN_LOG_TAG, "Min position found: 0 (FTMS origin: %d)", minimum);
   if (bothDirections) {
     io.searchingMax = true;
     io.setBoundaryTarget(90);
     fitnessMachineService.spinDown(FitnessMachineStatus::SpinDown_StopPedaling);
     if (!findEndpoint(true, maximum)) return;
+    const int64_t measuredRange = static_cast<int64_t>(maximum) - minimum;
+    if (measuredRange <= 0 || measuredRange > INT32_MAX) { fail(); return; }
+    // Keep the app in its post-minimum phase while collecting the sparse map.
+    for (int i = FtmsCalibration::COUNT - 1; i >= 0; --i) {
+      int32_t reference;
+      const int scale = static_cast<int>(measuredRange / 100);
+      if (!search.reference(FtmsCalibration::FIRST + i * FtmsCalibration::GAP, reference, calibration.level2[i], scale)) {
+        searchFailed();
+        return;
+      }
+      int64_t coordinate = static_cast<int64_t>(reference) - minimum;
+      if (coordinate <= 0 || coordinate > INT32_MAX) { fail(); return; }
+      calibration.position[i] = static_cast<int32_t>(coordinate);
+      SS2K_LOG(MAIN_LOG_TAG, "FTMS map sample: resistance=%.1f position=%d travel=%.1f%%", calibration.level2[i] / 2.0,
+               calibration.position[i], 100.0 * coordinate / measuredRange);
+    }
   }
   int64_t range = bothDirections ? static_cast<int64_t>(maximum) - minimum : userConfig->getHMax();
   if (range <= 0 || range > INT32_MAX || io.cancelled()) {
     fail();
     return;
   }
+  if (bothDirections) {
+    calibration.maximum = static_cast<int32_t>(range);
+    calibration.source = io.source;
+    if (!calibration.valid()) { fail(); return; }
+  }
 
   // Rebase only after all requested measurements succeeded. The motor is stopped
   // at a measured interior point; zero is a virtual, extrapolated coordinate.
   int64_t rebased = static_cast<int64_t>(stepper->getCurrentPosition()) - minimum;
-  if (rebased < 0 || rebased > INT32_MAX) {
+  if (rebased < 0 || rebased > range || rebased > INT32_MAX) {
     fail();
     return;
   }
@@ -805,19 +875,32 @@ void SS2K::_findFTMSHome(bool bothDirections) {
   rtConfig->setMinStep(0);
   rtConfig->setMaxStep(static_cast<int32_t>(range));
   if (bothDirections) {
-    if (!userConfig->getPTab4Pwr()) powerTable->reset();
+    // A legacy migration adds metadata without discarding existing watt data.
+    if (requestedFull && !userConfig->getPTab4Pwr()) powerTable->reset();
     userConfig->setHMin(0);
     userConfig->setHMax(static_cast<int32_t>(range));
+    powerTable->ftmsCalibration = calibration;
+  }
+  setupTMCStepperDriver(true);
+  rtConfig->setHomed(true);
+  if (bothDirections) {
+    if (!powerTable->_hasBeenLoadedThisSession) powerTable->_manageSaveState();
+    if (!powerTable->_save()) { fail(); return; }
     userConfig->saveToLittleFS();
     SS2K_LOG(MAIN_LOG_TAG, "Max Position found: %d", static_cast<int32_t>(range));
   }
-  setupTMCStepperDriver(true);
-  ss2k->setTargetPosition(0);
+  ss2k->setTargetPosition(static_cast<int32_t>(rebased));
+  ++powerTable->positionEpoch;
   rtConfig->setTargetIncline(0);
-  stepper->moveTo(0);
-  rtConfig->setHomed(true);
   ss2k->ftmsHomingFailed = false;
   resetStartingGear();
+  // Homing establishes the gear origin. Queue the selected gear's absolute
+  // offset from zero; normal motor control applies it after homing exits and
+  // restores its safety policy. Ride-time synchronization may add an offset
+  // later, but must not redefine where the starting gear is at each home.
+  ss2k->ftmsSimulationOffset = 0;
+  if (localGearingSelected()) ss2k->setTargetPosition(simulationTargetPosition());
+  else rtConfig->setTargetIncline(static_cast<int32_t>(rebased));
   SS2K_LOG(MAIN_LOG_TAG, "FTMS homing complete: estimated zero=%d, range=%d steps", minimum, static_cast<int32_t>(range));
   SS2K_LOG(MAIN_LOG_TAG, "Homing procedure complete.");
 }
@@ -828,6 +911,7 @@ void SS2K::goHome(bool bothDirections) {
   // Only shifts made during homing should abort it. Clear any pending delta that the
   // shift modifier never got to consume (it is skipped while spinDownFlag is set).
   ss2k->lastShifterPosition = rtConfig->getShifterPosition();
+  ss2k->ftmsSimulationOffset = 0;
   rtConfig->setHomed(false);
   ergMode->resetTableConfidence();
   const bool useFTMSHoming = !rtConfig->resistance.getSimulate() && strcmp(userConfig->getConnectedPowerMeter(), NONE) != 0 && rtConfig->resistance.getMax() > 0;

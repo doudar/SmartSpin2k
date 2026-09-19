@@ -142,6 +142,11 @@ void setup() {
     RUN_TEST(test.test_responsive_retries_until_deadline);
     RUN_TEST(test.test_accelerated_probe_repeatability);
     RUN_TEST(test.test_one_second_startup_check);
+    RUN_TEST(test.test_wide_resistance_four);
+    RUN_TEST(test.test_calibrated_startup_and_map);
+    RUN_TEST(test.test_stationary_drift_guard);
+    RUN_TEST(test.test_sparse_noisy_observations);
+    RUN_TEST(test.test_manual_knob_resync);
   }
 
   {

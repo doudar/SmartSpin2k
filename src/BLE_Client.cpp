@@ -185,7 +185,7 @@ void bleClientTask(void* pvParameters) {
       SS2K_LOG(BLE_CLIENT_LOG_TAG, "Disconnecting all connected servers due to update.");
       for (auto& _BLEd : spinBLEClient.myBLEDevices) {  // loop through discovered devices
         if (_BLEd.connectedClientID != BLE_HS_CONN_HANDLE_NONE) {
-          if (_BLEd.advertisedDevice) {                                                                // is device registered?
+          if (_BLEd.getAdvertisement()) {                                                              // is device registered?
             if ((_BLEd.connectedClientID != BLE_HS_CONN_HANDLE_NONE) && (_BLEd.doConnect == false)) {  // client must not be in connection process
               if (BLEDevice::getClientByPeerAddress(_BLEd.peerAddress)) {                              // nullptr check
                 NimBLEClient* pClient = NimBLEDevice::getClientByPeerAddress(_BLEd.peerAddress);
@@ -268,13 +268,13 @@ bool SpinBLEClient::connectToServer() {
   NimBLEUUID serviceUUID;
   NimBLEUUID charUUID;
 
-  const NimBLEAdvertisedDevice* myDevice = nullptr;
+  std::shared_ptr<const NimBLEAdvertisedDevice> myDevice;
   int device_number                      = -1;
 
   for (int i = 0; i < NUM_BLE_DEVICES; i++) {
     if (spinBLEClient.myBLEDevices[i].doConnect == true) {   // Client wants to be connected
-      if (spinBLEClient.myBLEDevices[i].advertisedDevice) {  // Client is assigned
-        myDevice = spinBLEClient.myBLEDevices[i].advertisedDevice;
+      myDevice = spinBLEClient.myBLEDevices[i].getAdvertisement();
+      if (myDevice) {  // Client is assigned
         SS2K_LOG(BLE_CLIENT_LOG_TAG, "Connecting slot %d", i);
         device_number = i;
         break;
@@ -295,7 +295,7 @@ bool SpinBLEClient::connectToServer() {
     String deviceName = myDevice->haveName() ? String(myDevice->getName().c_str()) : "Unknown";
     SS2K_LOG(BLE_CLIENT_LOG_TAG, "Getting service info for device: %s with %d services", deviceName.c_str(), myDevice->getServiceUUIDCount());
 
-    const BLEServiceInfo* serviceInfo = getDeviceServiceInfo(myDevice, deviceName);
+    const BLEServiceInfo* serviceInfo = getDeviceServiceInfo(myDevice.get(), deviceName);
     if (!serviceInfo) {
       SS2K_LOG(BLE_CLIENT_LOG_TAG, "No supported service UUID found for device: %s", deviceName.c_str());
       spinBLEClient.myBLEDevices[device_number].reset();
@@ -311,7 +311,7 @@ bool SpinBLEClient::connectToServer() {
     return false;
   }
 
-  SS2K_LOG(BLE_CLIENT_LOG_TAG, "Forming a connection to: %s", this->adevName2UniqueName(myDevice).c_str());
+  SS2K_LOG(BLE_CLIENT_LOG_TAG, "Forming a connection to: %s", this->adevName2UniqueName(myDevice.get()).c_str());
 
   NimBLEClient* pClient          = nullptr;
   auto handleFailedClientConnect = [&]() {
@@ -333,11 +333,11 @@ bool SpinBLEClient::connectToServer() {
   // Initial connection parameters: 30-60 ms interval, 0 latency, 5-second supervision timeout.
   pClient->setConnectionParams(connectionParams[0], connectionParams[1], connectionParams[2], connectionParams[3]);
   pClient->setConnectTimeout(10000);  // 10 seconds
-  if (!pClient->connect(myDevice, true, false, false)) {
+  if (!pClient->connect(myDevice.get(), true, false, false)) {
     return handleFailedClientConnect();
   }
 
-  SS2K_LOG(BLE_CLIENT_LOG_TAG, "Connected to: %s - %s RSSI %d", this->adevName2UniqueName(myDevice).c_str(), pClient->getPeerAddress().toString().c_str(), pClient->getRssi());
+  SS2K_LOG(BLE_CLIENT_LOG_TAG, "Connected to: %s - %s RSSI %d", this->adevName2UniqueName(myDevice.get()).c_str(), pClient->getPeerAddress().toString().c_str(), pClient->getRssi());
   if (serviceUUID == HID_SERVICE_UUID) {
     connectBLE_HID(pClient);
     SS2K_LOG(BLE_CLIENT_LOG_TAG, "Successful remote subscription.");
@@ -346,7 +346,7 @@ bool SpinBLEClient::connectToServer() {
   // Update the advertised device info
   rtConfig->resistance.setSimulate(true); // Mark as simulated data until we get a real value from the device
   spinBLEClient.myBLEDevices[device_number].doConnect = false;
-  spinBLEClient.myBLEDevices[device_number].set(myDevice, pClient->getConnHandle(), serviceUUID, charUUID);
+  spinBLEClient.myBLEDevices[device_number].set(myDevice.get(), pClient->getConnHandle(), serviceUUID, charUUID);
   spinBLEClient.myBLEDevices[device_number].peerAddress = pClient->getPeerAddress();
   removeDuplicates(pClient);
 
@@ -466,7 +466,7 @@ void ScanCallbacks::onResult(const NimBLEAdvertisedDevice* advertisedDevice) {
       SS2K_LOG(BLE_CLIENT_LOG_TAG, "Supported Device: %s with service %s", aDevName.c_str(), serviceInfo->name.c_str());
       // check to see if we're already connected to this device
       for (size_t i = 0; i < NUM_BLE_DEVICES; i++) {
-        if (spinBLEClient.myBLEDevices[i].advertisedDevice != nullptr) {
+        if (spinBLEClient.myBLEDevices[i].getAdvertisement()) {
           if (bleDeviceIdentifierEquals(aDevName.c_str(), spinBLEClient.myBLEDevices[i].uniqueName.c_str())) {
             SS2K_LOG(BLE_CLIENT_LOG_TAG, "%s already connected on slot %d", aDevName.c_str(), i);
             return;  // Already connected to this device
@@ -519,7 +519,7 @@ void ScanCallbacks::onResult(const NimBLEAdvertisedDevice* advertisedDevice) {
         // Check if slot is available or if this device is already assigned to this slot
         // For randomized addresses (Android devices), use uniqueName for comparison
         // For traditional devices, fall back to address comparison for backward compatibility
-        bool slotAvailable = (spinBLEClient.myBLEDevices[i].advertisedDevice == nullptr);
+        bool slotAvailable = !spinBLEClient.myBLEDevices[i].getAdvertisement();
         bool deviceMatches = false;
 
         if (!slotAvailable) {
@@ -558,9 +558,16 @@ void ScanCallbacks::onResult(const NimBLEAdvertisedDevice* advertisedDevice) {
  * of previously found devices, which might still be getting processed in the
  * onScanEnd callback. Without this delay, data could be getting read as it is deleted, causing a crash.
  *
- * @param duration The duration in seconds for which the scan should run
+ * @param duration The duration in milliseconds for which the scan should run
  */
 void SpinBLEClient::scanProcess(int duration) {
+  // A scan callback can queue a device after the task's connection pass.
+  // Give that connection priority over restarting discovery on this iteration.
+  for (const auto& device : myBLEDevices) {
+    if (device.doConnect) {
+      return;
+    }
+  }
   NimBLEScan* pBLEScan = NimBLEDevice::getScan();
 
   static bool waitForOnScanEndToComplete = false;
@@ -592,23 +599,21 @@ void ScanCallbacks::onScanEnd(const NimBLEScanResults& results, int reason) {
 
 // remove the last connected BLE Power Meter
 void SpinBLEClient::removeDuplicates(NimBLEClient* pClient) {
-  // BLEAddress thisAddress = pClient->getPeerAddress();
-  SpinBLEAdvertisedDevice tBLEd;
-  SpinBLEAdvertisedDevice oldBLEd;
+  NimBLEUUID serviceUUID;
   for (size_t i = 0; i < NUM_BLE_DEVICES; i++) {  // Disconnect oldest PM to avoid two connected.
-    tBLEd = this->myBLEDevices[i];
-    if (tBLEd.peerAddress == pClient->getPeerAddress()) {
+    if (this->myBLEDevices[i].peerAddress == pClient->getPeerAddress()) {
+      serviceUUID = this->myBLEDevices[i].serviceUUID;
       break;
     }
   }
 
   for (size_t i = 0; i < NUM_BLE_DEVICES; i++) {  // Disconnect oldest PM to avoid two connected.
-    oldBLEd = this->myBLEDevices[i];
-    if (oldBLEd.advertisedDevice) {
-      if ((tBLEd.serviceUUID == oldBLEd.serviceUUID) && (tBLEd.peerAddress != oldBLEd.peerAddress)) {
+    auto& oldBLEd = this->myBLEDevices[i];
+    if (oldBLEd.getAdvertisement()) {
+      if ((serviceUUID == oldBLEd.serviceUUID) && (pClient->getPeerAddress() != oldBLEd.peerAddress)) {
         if (BLEDevice::getClientByPeerAddress(oldBLEd.peerAddress)) {
           if (BLEDevice::getClientByPeerAddress(oldBLEd.peerAddress)->isConnected()) {
-            SS2K_LOG(BLE_CLIENT_LOG_TAG, "%s Detected as a duplicate.  Disconnecting: %s", tBLEd.peerAddress.toString().c_str(), oldBLEd.peerAddress.toString().c_str());
+            SS2K_LOG(BLE_CLIENT_LOG_TAG, "%s Detected as a duplicate.  Disconnecting: %s", pClient->getPeerAddress().toString().c_str(), oldBLEd.peerAddress.toString().c_str());
             NimBLEDevice::deleteClient(BLEDevice::getClientByPeerAddress(oldBLEd.peerAddress));
             oldBLEd.reset(true);
             return;
@@ -676,14 +681,13 @@ void SpinBLEClient::postConnect() {
   for (auto& _BLEd : spinBLEClient.myBLEDevices) {
     // Check that the device has been assigned and it hasn't been post connected.
     if ((_BLEd.connectedClientID != BLE_HS_CONN_HANDLE_NONE) && !_BLEd.isPostConnected) {
-      // Guard against stale / cleared advertisedDevice pointers (can happen after disconnect + erase())
-      if (_BLEd.advertisedDevice == nullptr) {
+      // A disconnect may have cleared the slot before post-connect setup.
+      const auto advertisement = _BLEd.getAdvertisement();
+      if (!advertisement) {
         SS2K_LOGW(BLE_CLIENT_LOG_TAG, "Skipping postConnect: null advertisedDevice (ConnID %d)", _BLEd.connectedClientID);
         continue;
       }
-      // Prefer the stored uniqueName (captured at discovery) to avoid dereferencing the NimBLEAdvertisedDevice
-      // unnecessarily (haveName()->findAdvField() has caused crashes when backing storage was freed).
-      String adevName = _BLEd.uniqueName.empty() ? this->adevName2UniqueName(_BLEd.advertisedDevice) : String(_BLEd.uniqueName.c_str());
+      String adevName = _BLEd.uniqueName.empty() ? this->adevName2UniqueName(advertisement.get()) : String(_BLEd.uniqueName.c_str());
       SS2K_LOG(BLE_CLIENT_LOG_TAG, "Post connecting: %s , ConnID %d, PrimaryChar %s", adevName.c_str(), _BLEd.connectedClientID, _BLEd.charUUID.toString().c_str());
       NimBLEClient* pClient = NimBLEDevice::getClientByPeerAddress(_BLEd.peerAddress);
       if (pClient) {
@@ -972,7 +976,7 @@ void SpinBLEClient::checkBLEReconnect() {
 }
 
 void SpinBLEClient::reconnectAllDevices() {
-  for (auto i : spinBLEClient.myBLEDevices) {
+  for (auto& i : spinBLEClient.myBLEDevices) {
     if (NimBLEDevice::getClientByHandle(i.connectedClientID)) {
       if (NimBLEDevice::getClientByHandle(i.connectedClientID)->isConnected()) {
         NimBLEDevice::getClientByHandle(i.connectedClientID)->disconnect();
@@ -1088,7 +1092,9 @@ void SpinBLEAdvertisedDevice::set(const NimBLEAdvertisedDevice* device, int id, 
   }
   String adevName = spinBLEClient.adevName2UniqueName(device);
   SS2K_LOG(BLE_CLIENT_LOG_TAG, "Setting Device %s", adevName.c_str());
-  this->advertisedDevice = const_cast<const NimBLEAdvertisedDevice*>(device);
+  const auto advertisement = std::make_shared<const NimBLEAdvertisedDevice>(*device);
+  std::atomic_store(&this->advertisedDevice, advertisement);
+  device                = advertisement.get();
   this->peerAddress      = device->getAddress();
   // Set the unique name for stable device identification
   this->uniqueName        = adevName.c_str();
@@ -1165,7 +1171,7 @@ void SpinBLEAdvertisedDevice::set(const NimBLEAdvertisedDevice* device, int id, 
  */
 void SpinBLEAdvertisedDevice::clearState(bool resetAdvertisedDevice) {
   if (resetAdvertisedDevice) {
-    advertisedDevice = nullptr;
+    std::atomic_store(&advertisedDevice, std::shared_ptr<const NimBLEAdvertisedDevice>{});
     peerAddress      = NimBLEAddress();  // zero / cleared
     this->uniqueName.clear();            // Clear the unique name
   }

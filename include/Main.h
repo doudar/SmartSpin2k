@@ -38,6 +38,7 @@ class SS2K {
   unsigned long int scanDelayStart;
   int32_t targetPosition;
   int32_t currentPosition;
+  int32_t ftmsSimulationOffset = 0;
   bool ledEnabled;
   void handleShiftButtons();
   static void finishSetup();
@@ -62,6 +63,7 @@ class SS2K {
   static void moveStepper();
   bool _findEndStop(bool moveForward);
   void _findFTMSHome(bool bothDirections = false);
+  void syncFtmsPosition();
   void _resistanceMove();
   bool localGearingSelected() const;
   void resetStartingGear();

@@ -322,6 +322,7 @@ void SS2K::maintenanceLoop(void* pvParameters) {
       ss2k->updateHardwareSafety();
     }
     BLEFirmwareUpdateLoop();
+    ss2k->syncFtmsPosition();
 
 #ifdef SERIAL_CUSTOM_CHARACTERISTIC
     processSerialCustomCharacteristic();

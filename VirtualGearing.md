@@ -12,7 +12,10 @@ An empty `gearRatios` array (`[]`) selects Unlimited, the default for new/reset
 settings and older configurations without a gear profile. Each shift moves by
 `shiftStep`, and the logical shift position can go positive or negative without
 a groupset limit. The start position is 0 while unhomed and 8 after successful
-homing. Saved homing bounds alone do not count as a successful home this boot.
+homing, with a physical target of `8 * shiftStep` above the calibrated zero.
+FTMS homing moves directly from the recovered position to that target through
+normal motor control; it does not assign gear 8 to the search endpoint.
+Saved homing bounds alone do not count as a successful home this boot.
 Motor travel limits remain active. An existing saved groupset is retained when upgrading.
 
 ```
@@ -40,7 +43,10 @@ Gear numbers are bounded to 1 through the profile length, independent of hardwar
 travel. A profile change from 22 to 13 gears clamps gear 22 to gear 13. Mode
 changes retain the last local gear for the session. Startup and homing use
 `max(1, gearCount / 3)`, rounded down: gear 8 for 24 gears, or gear 4 for 12/13
-gears. Normal control then applies that gear's resistance offset after homing.
+gears. Normal control then applies that gear's ratio offset from calibrated zero
+after either FTMS or mechanical homing. This is one third of the gear count,
+not one third of total motor travel. Homing clears any prior ride-time drift
+offset; later stationary FTMS corrections retain their coordinate-only behavior.
 Duplicate ratios share an offset and zero gaps do not count toward the
 median. An all-identical profile has zero shift offset in every gear.
 

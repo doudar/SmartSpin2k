@@ -142,13 +142,16 @@ typedef struct NotifyData {
 class SpinBLEAdvertisedDevice {
  private:
   QueueHandle_t dataBufferQueue = nullptr;
+  // Scan restarts delete NimBLE's results. Keep an immutable, owned snapshot;
+  // shared ownership also keeps it alive while a connection attempt uses it.
+  std::shared_ptr<const NimBLEAdvertisedDevice> advertisedDevice;
 
   void clearState(bool resetAdvertisedDevice);  // NEW
 
  public:
   SpinBLEAdvertisedDevice() { clearState(true); }  // NEW
 
-  const NimBLEAdvertisedDevice* advertisedDevice = nullptr;
+  std::shared_ptr<const NimBLEAdvertisedDevice> getAdvertisement() const { return std::atomic_load(&advertisedDevice); }
   NimBLEAddress peerAddress;
 
   std::string uniqueName = "";  // Stable identifier using adevName2UniqueName()

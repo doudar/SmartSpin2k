@@ -27,6 +27,10 @@ struct Bike {
   double velocity = 0;
   int pending = 50;
   bool legacy = false, stuck = false, skipTwo = false;
+  bool freezeFour = false;
+  bool loggedCurve = false, skipThirty = false;
+  int movingNoise = 0;
+  int stuckValue = 50;
   bool usedFast = false;
   bool simulated = false;
   bool reverseResponse = false;
@@ -47,6 +51,7 @@ struct Bike {
   uint32_t clockOffset = 0;
   uint32_t reportLagMs = 200;
   int stepsPerUnit = 100;
+  int wideFourSteps = 0;
   std::deque<std::pair<uint32_t, double>> positions;
   int delayedCrossings = 0;
   std::deque<int> boundaryTargets;
@@ -112,7 +117,21 @@ struct Bike {
       // Preserve acquisition delay after the motor stops, as in the user's
       // 2026-09-17 log: R=6 at rest later becomes R=5 at that same position.
       double reportedPosition = positions.front().second + (crossingShifted ? 80 : 0);
-      pending = stuck ? 50 : static_cast<int>(std::floor((reverseResponse ? 100 * stepsPerUnit - reportedPosition : reportedPosition) / stepsPerUnit + 0.5));
+      pending = stuck ? stuckValue : static_cast<int>(std::floor((reverseResponse ? 100 * stepsPerUnit - reportedPosition : reportedPosition) / stepsPerUnit + 0.5));
+      if (loggedCurve && !stuck) {
+        // Stationary readings from the 2026-09-19 10:52 log, not moving
+        // notifications (those lag the physical position by several seconds).
+        const double x[] = {2323, 4959, 7485, 10214};
+        int i = reportedPosition < x[1] ? 0 : (reportedPosition < x[2] ? 1 : 2);
+        pending = static_cast<int>(std::round(40 + 10 * i + 10 * (reportedPosition - x[i]) / (x[i + 1] - x[i])));
+      }
+      if (movingNoise) pending += ((nextReport / 1000) % 2 ? movingNoise : -movingNoise);
+      if (skipThirty && pending == 30) pending = 31;
+      if (wideFourSteps && !stuck) {
+        if (reportedPosition >= 4.5 * stepsPerUnit + wideFourSteps) pending = static_cast<int>(std::floor((reportedPosition - wideFourSteps) / stepsPerUnit + 0.5));
+        else if (reportedPosition >= 3.5 * stepsPerUnit) pending = 4;
+      }
+      if (freezeFour && pending == 4) { stuck = true; stuckValue = 4; }
       if (jitter && clock >= jitterStartMs && clock < jitterEndMs) pending = 50 + jitterSpan * ((nextReport / 1000) % 2);
       if (boundaryNoise && !moving()) {
         double units = reportedPosition / stepsPerUnit;
@@ -202,12 +221,17 @@ void TestFtmsHoming::test_missing_stuck_and_skipped_reports() {
     if (fault == 6) bike.motorFailure = true;
     FtmsHoming::Search<Bike> search(bike);
     int32_t zero = INT32_MIN;
+    if (fault == 3) {
+      TEST_ASSERT_TRUE(search.endpoint(false, zero)); // A skipped level still has a bounded crossing.
+      TEST_ASSERT_INT32_WITHIN(40, 50, zero);
+      TEST_ASSERT_FALSE(bike.moving());
+      continue;
+    }
     TEST_ASSERT_FALSE(search.endpoint(false, zero));
     TEST_ASSERT_FALSE(bike.moving());
     TEST_ASSERT_EQUAL_INT32(INT32_MIN, zero);
     TEST_ASSERT_LESS_OR_EQUAL_UINT32(FtmsHoming::END_TIMEOUT_MS, bike.clock);
     if (fault < 2) TEST_ASSERT_LESS_OR_EQUAL_UINT32(bike.stopReports + FtmsHoming::REPORT_TIMEOUT_MS, bike.clock);
-    if (fault == 3) TEST_ASSERT_EQUAL_INT(static_cast<int>(FtmsHoming::Failure::Timeout), static_cast<int>(search.failure()));
     if (fault == 6) TEST_ASSERT_EQUAL_INT(static_cast<int>(FtmsHoming::Failure::Motor), static_cast<int>(search.failure()));
     if (fault == 5) {
       TEST_ASSERT_EQUAL_INT(static_cast<int>(FtmsHoming::Failure::NoProgress), static_cast<int>(search.failure()));
@@ -327,10 +351,10 @@ void TestFtmsHoming::test_stationary_reading_confirmation() {
   FtmsHoming::Search<Bike> unstableSearch(unsettled);
   zero = INT32_MIN;
   TEST_ASSERT_FALSE(unstableSearch.endpoint(false, zero));
-  TEST_ASSERT_EQUAL_INT(static_cast<int>(FtmsHoming::Failure::Timeout), static_cast<int>(unstableSearch.failure()));
+  TEST_ASSERT_EQUAL_INT(static_cast<int>(FtmsHoming::Failure::NoProgress), static_cast<int>(unstableSearch.failure()));
   TEST_ASSERT_EQUAL_INT32(INT32_MIN, zero);
   TEST_ASSERT_FALSE(unsettled.moving());
-  TEST_ASSERT_EQUAL_UINT32(FtmsHoming::END_TIMEOUT_MS, unsettled.clock);
+  TEST_ASSERT_LESS_THAN_UINT32(FtmsHoming::END_TIMEOUT_MS, unsettled.clock);
 }
 
 void TestFtmsHoming::test_adjacent_boundary_noise() {
@@ -407,7 +431,7 @@ void TestFtmsHoming::test_responsive_retries_until_deadline() {
     int32_t endpoint = INT32_MIN;
     TEST_ASSERT_TRUE_MESSAGE(search.endpoint(false, endpoint), FtmsHoming::failureName(search.failure()));
     TEST_ASSERT_INT32_WITHIN(25, 50, endpoint);
-    TEST_ASSERT_GREATER_OR_EQUAL_UINT32(missingLevel ? 60000 : 12000, bike.clock);
+    if (!missingLevel) TEST_ASSERT_GREATER_OR_EQUAL_UINT32(12000, bike.clock);
     TEST_ASSERT_LESS_THAN_UINT32(FtmsHoming::END_TIMEOUT_MS, bike.clock);
     TEST_ASSERT_FALSE(bike.moving());
   }
@@ -452,4 +476,284 @@ void TestFtmsHoming::test_one_second_startup_check() {
   TEST_ASSERT_EQUAL_INT(300, bike.speed);
   TEST_ASSERT_EQUAL_INT32(INT32_MIN, endpoint);
   TEST_ASSERT_FALSE(bike.moving());
+}
+
+void TestFtmsHoming::test_wide_resistance_four() {
+  for (int width : {1200, 2400}) {
+    Bike bike;
+    bike.wideFourSteps = width;
+    bike.pos = bike.target = 5000 + width;
+    bike.acceleration = 3000;
+    bike.reportLagMs = 1300;
+    FtmsHoming::Search<Bike> search(bike);
+    int32_t origin;
+    TEST_ASSERT_TRUE_MESSAGE(search.endpoint(false, origin), FtmsHoming::failureName(search.failure()));
+    TEST_ASSERT_INT32_WITHIN(35, 50 - width / 4, origin);
+    TEST_ASSERT_FALSE(bike.moving());
+    TEST_ASSERT_LESS_THAN_UINT32(FtmsHoming::END_TIMEOUT_MS, bike.clock);
+    printf("Wide R4 (%d extra steps): %u ms\n", width, bike.clock);
+  }
+  Bike frozen;
+  frozen.freezeFour = true;
+  FtmsHoming::Search<Bike> failed(frozen);
+  int32_t unchanged = INT32_MIN;
+  TEST_ASSERT_FALSE(failed.endpoint(false, unchanged));
+  TEST_ASSERT_EQUAL_INT(static_cast<int>(FtmsHoming::Failure::NoProgress), static_cast<int>(failed.failure()));
+  TEST_ASSERT_EQUAL_INT32(INT32_MIN, unchanged);
+  TEST_ASSERT_FALSE(frozen.moving());
+  TEST_ASSERT_LESS_THAN_UINT32(FtmsHoming::END_TIMEOUT_MS, frozen.clock);
+}
+
+void TestFtmsHoming::test_calibrated_startup_and_map() {
+  Bike calibration;
+  calibration.acceleration = 3000;
+  calibration.reportLagMs = 1300;
+  calibration.pos = calibration.target = 9900;
+  FtmsHoming::Search<Bike> search(calibration);
+  FtmsCalibration::Map map;
+  map.source = FtmsCalibration::identity("Grupetto 32", false);
+  map.maximum = 9900;
+  for (int i = FtmsCalibration::COUNT - 1; i >= 0; --i) {
+    int32_t reference;
+    TEST_ASSERT_TRUE_MESSAGE(search.reference(FtmsCalibration::FIRST + i * FtmsCalibration::GAP, reference, map.level2[i], map.maximum / 100), FtmsHoming::failureName(search.failure()));
+    map.position[i] = reference - 50;
+    TEST_ASSERT_INT32_WITHIN(50, map.level2[i] * 50 - 50, map.position[i]);
+  }
+  printf("Three FTMS map observations: %u ms\n", calibration.clock);
+  TEST_ASSERT_TRUE(map.valid());
+  uint8_t bytes[FtmsCalibration::WIRE_SIZE];
+  map.encode(bytes);
+  FtmsCalibration::Map loaded;
+  TEST_ASSERT_TRUE(loaded.decode(bytes, sizeof(bytes)));
+  TEST_ASSERT_TRUE(loaded.matches(map.source, map.maximum));
+  TEST_ASSERT_FALSE(loaded.matches(map.source + 1, map.maximum));
+  TEST_ASSERT_FALSE(loaded.matches(map.source, map.maximum + 1));
+  TEST_ASSERT_FALSE(loaded.decode(bytes, sizeof(bytes) - 1));
+  bytes[15] ^= 1;
+  TEST_ASSERT_FALSE(loaded.decode(bytes, sizeof(bytes)));
+  for (int start : {3500, 3640, 4960, 5040, 6300, 6500}) {
+    for (uint32_t phase : {800u, 1250u}) {
+      Bike bike;
+      bike.pos = bike.target = start;
+      bike.nextReport = phase;
+      bike.reportLagMs = 1300;
+      FtmsHoming::Search<Bike> recovery(bike);
+      int32_t origin = INT32_MIN;
+      TEST_ASSERT_TRUE_MESSAGE(recovery.recover(map, origin), FtmsHoming::failureName(recovery.failure()));
+      // A stationary quantized reading has bin-width uncertainty, not the
+      // narrow repeatability of deliberately measuring its transition.
+      TEST_ASSERT_INT32_WITHIN(140, 50, origin);
+      TEST_ASSERT_EQUAL_UINT32(UINT32_MAX, bike.firstMoveTime);
+      TEST_ASSERT_LESS_THAN_UINT32(5000, bike.clock);
+    }
+  }
+  for (int fault = 0; fault < 4; ++fault) {
+    Bike bike;
+    bike.stuck = fault == 3;
+    if (fault == 0) bike.simulated = true;
+    if (fault == 1) bike.stopReports = 0;
+    if (fault == 2) bike.abortAt = 500;
+    // A constant in-range sensor cannot prove a live motor, but recovery issues
+    // no motion. Missing/simulated/cancelled feedback must never be accepted.
+    FtmsHoming::Search<Bike> recovery(bike);
+    int32_t origin = INT32_MIN;
+    TEST_ASSERT_EQUAL_INT(fault == 3, recovery.recover(map, origin));
+    TEST_ASSERT_FALSE(bike.moving());
+    TEST_ASSERT_LESS_THAN_UINT32(20000, bike.clock);
+  }
+  for (int scale : {100, 300}) {
+    FtmsCalibration::Map larger = map;
+    larger.maximum = 99 * scale;
+    for (int i = 0; i < FtmsCalibration::COUNT; ++i) larger.position[i] = larger.level2[i] * scale / 2 - scale / 2;
+    for (int level : {1, 20, 80, 99}) {
+      Bike bike;
+      bike.stepsPerUnit = scale;
+      bike.pos = bike.target = level * scale;
+      bike.reportLagMs = 1300;
+      bike.acceleration = 3000;
+      FtmsHoming::Search<Bike> recovery(bike);
+      int32_t origin;
+      bool success = recovery.recover(larger, origin);
+      printf("FTMS reference startup R%d scale%d: %u ms, %s\n", level, scale, bike.clock, FtmsHoming::failureName(recovery.failure()));
+      TEST_ASSERT_TRUE_MESSAGE(success, FtmsHoming::failureName(recovery.failure()));
+      TEST_ASSERT_INT32_WITHIN(scale / 2 + 40, scale / 2, origin);
+      TEST_ASSERT_LESS_THAN_UINT32(20000, bike.clock);
+    }
+  }
+}
+
+void TestFtmsHoming::test_stationary_drift_guard() {
+  FtmsCalibration::Map map;
+  map.source = 123;
+  map.maximum = 30000;
+  for (int i = 0; i < FtmsCalibration::COUNT; ++i) map.position[i] = map.level2[i] * 150;
+  int32_t center, uncertainty;
+  TEST_ASSERT_TRUE(map.estimate(50, center, uncertainty));
+  TEST_ASSERT_FALSE(map.estimate(4, center, uncertainty));
+  for (int scenario = 0; scenario < 9; ++scenario) {
+    FtmsCalibration::DriftGuard guard;
+    guard.reset(1000); // A previous applied correction starts the minute cooldown.
+    int total = 0;
+    for (uint32_t time = 1000; time <= 70000; time += 1000) {
+      bool eligible = scenario != 1;
+      int resistance = scenario == 2 ? 50 + (time / 1000) % 2 : (scenario == 6 ? 4 : 50);
+      int32_t position = center - 500;
+      if (scenario == 3) position += time;
+      if (scenario == 4) position = center;
+      if (scenario == 5) position = center - 5000;
+      uint32_t stamp = scenario == 7 ? 1 : time;
+      if (scenario == 8 && time >= 59000 && time <= 66000) eligible = false;
+      total += guard.correction(map, time, stamp, resistance, position, eligible);
+    }
+    TEST_ASSERT_EQUAL_INT(scenario == 0 ? 500 : (scenario == 2 ? 650 : (scenario == 5 ? 5000 : 0)), total);
+  }
+  FtmsCalibration::DriftGuard wrapped;
+  uint32_t start = UINT32_MAX - 5000;
+  wrapped.reset(start);
+  int total = 0;
+  for (uint32_t elapsed = 0; elapsed <= 70000; elapsed += 1000)
+    total += wrapped.correction(map, start + elapsed, start + elapsed, 50, center + 500, true);
+  TEST_ASSERT_EQUAL_INT(-500, total);
+}
+
+void TestFtmsHoming::test_sparse_noisy_observations() {
+  for (int noise : {0, 2}) {
+    for (uint32_t lag : {1300u, 2500u}) {
+      Bike bike;
+      bike.loggedCurve = true;
+      bike.movingNoise = noise;
+      bike.reportLagMs = lag;
+      bike.acceleration = 3000;
+      bike.pos = bike.target = 17083;
+      FtmsHoming::Search<Bike> search(bike);
+      FtmsCalibration::Map map;
+      map.source = 1;
+      map.maximum = 24502;
+      for (int i = FtmsCalibration::COUNT - 1; i >= 0; --i) {
+        int32_t position;
+        TEST_ASSERT_TRUE_MESSAGE(search.reference(33 + 17 * i, position, map.level2[i], 245), FtmsHoming::failureName(search.failure()));
+        map.position[i] = position + 6836;
+      }
+      TEST_ASSERT_TRUE(map.valid());
+      TEST_ASSERT_LESS_THAN_UINT32(40000, bike.clock);
+      printf("Log-shaped sparse map, lag=%u noise=%d: %u ms\n", lag, noise, bike.clock);
+      int32_t center, uncertainty;
+      TEST_ASSERT_TRUE(map.estimate(50, center, uncertainty));
+      TEST_ASSERT_INT32_WITHIN(2 * 264, 4959 + 6836, center);
+      TEST_ASSERT_FALSE(bike.moving());
+    }
+  }
+  // Startup remains usable with responsive noisy feedback even if bounded
+  // acquisition takes it beyond the ideal <20 second performance target.
+  Bike noisyBoot;
+  noisyBoot.stepsPerUnit = 300;
+  noisyBoot.pos = noisyBoot.target = 29700;
+  noisyBoot.movingNoise = 2;
+  noisyBoot.reportLagMs = 2500;
+  noisyBoot.acceleration = 3000;
+  FtmsCalibration::Map bootMap;
+  bootMap.source = 1;
+  bootMap.maximum = 29700;
+  for (int i = 0; i < FtmsCalibration::COUNT; ++i) bootMap.position[i] = bootMap.level2[i] * 150 - 150;
+  FtmsHoming::Search<Bike> bootSearch(noisyBoot);
+  int32_t zero;
+  TEST_ASSERT_TRUE_MESSAGE(bootSearch.recover(bootMap, zero), FtmsHoming::failureName(bootSearch.failure()));
+  TEST_ASSERT_INT32_WITHIN(600, 150, zero);
+  TEST_ASSERT_LESS_THAN_UINT32(30000, noisyBoot.clock);
+  printf("Noisy R99 startup with 2.5s feedback lag: %u ms\n", noisyBoot.clock);
+  // The old exact-transition search failed when the log jumped 29 -> 31.
+  Bike skipped;
+  skipped.skipThirty = true;
+  skipped.pos = skipped.target = 4000;
+  skipped.acceleration = 3000;
+  skipped.reportLagMs = 2500;
+  FtmsHoming::Search<Bike> skippedSearch(skipped);
+  int32_t position;
+  uint8_t level2 = 0;
+  TEST_ASSERT_TRUE(skippedSearch.reference(30, position, level2, 100));
+  TEST_ASSERT_EQUAL_INT(62, level2);
+  TEST_ASSERT_LESS_THAN_UINT32(15000, skipped.clock);
+
+  // No motion is needed just to make a noisy, already-nearby reading perfect.
+  Bike noisy;
+  noisy.jitter = noisy.stuck = true;
+  noisy.jitterSpan = 4;
+  noisy.jitterStartMs = 0;
+  FtmsHoming::Search<Bike> noisySearch(noisy);
+  TEST_ASSERT_TRUE(noisySearch.reference(52, position, level2, 100));
+  TEST_ASSERT_INT_WITHIN(2, 104, level2);
+  TEST_ASSERT_EQUAL_UINT32(UINT32_MAX, noisy.firstMoveTime);
+  TEST_ASSERT_LESS_THAN_UINT32(6000, noisy.clock);
+
+  // Fresh timestamps alone must not let a non-responsive sensor drive forever.
+  Bike frozen;
+  frozen.stuck = true;
+  FtmsHoming::Search<Bike> frozenSearch(frozen);
+  TEST_ASSERT_FALSE(frozenSearch.reference(33, position, level2, 250));
+  TEST_ASSERT_EQUAL_INT(static_cast<int>(FtmsHoming::Failure::NoProgress), static_cast<int>(frozenSearch.failure()));
+  TEST_ASSERT_GREATER_OR_EQUAL_INT(3000, std::abs(frozen.position() - 5000));
+  TEST_ASSERT_FALSE(frozen.moving());
+  TEST_ASSERT_LESS_THAN_UINT32(20000, frozen.clock);
+}
+
+void TestFtmsHoming::test_manual_knob_resync() {
+  // Reproduce the 11:40 log: R48/P11520, shift to P9100 with R38/39,
+  // then manually turn the knob to R32 while the motor counter stays 9100.
+  // The log omits the saved map; use a 255-step/level map consistent with
+  // those two observed positions, not a claimed reconstruction of its PTAB.
+  for (int firstLevel2 : {62, 66, 70}) {
+    FtmsCalibration::Map map;
+    map.source = 1;
+    map.maximum = 24413;
+    map.level2[0] = firstLevel2;
+    for (int i = 0; i < FtmsCalibration::COUNT; ++i) map.position[i] = map.level2[i] * 255 / 2 - 720;
+    FtmsCalibration::DriftGuard guard;
+    int32_t position = 11520;
+    uint32_t correctedAt = 0;
+    for (uint32_t time = 105000; time <= 207000; time += 1000) {
+      if (time == 128000 || time == 129000) {
+        position -= 1210;
+        TEST_ASSERT_EQUAL_INT(0, guard.correction(map, time, time, 48, position, false));
+        continue;
+      }
+      int resistance = time < 130000 ? 48 : (time < 158000 ? 38 + (time / 1000) % 2 : (time == 158000 ? 37 : (time == 159000 ? 33 : 32)));
+      int correction = guard.correction(map, time, time, resistance, position, true);
+      if (time < 160000) TEST_ASSERT_EQUAL_INT(0, correction);
+      if (time == 165000) TEST_ASSERT_TRUE(guard.uncertain());
+      if (correction) { position += correction; correctedAt = time; }
+    }
+    TEST_ASSERT_EQUAL_INT32(7440, position);
+    TEST_ASSERT_GREATER_OR_EQUAL_UINT32(169000, correctedAt);
+    TEST_ASSERT_LESS_OR_EQUAL_UINT32(190000, correctedAt);
+    TEST_ASSERT_FALSE(guard.uncertain());
+    int32_t center, uncertainty;
+    TEST_ASSERT_TRUE(map.estimateForSync(64, center, uncertainty));
+    TEST_ASSERT_EQUAL_INT32(7440, center);
+    TEST_ASSERT_FALSE(map.estimateForSync(58, center, uncertainty));
+    TEST_ASSERT_FALSE(map.estimateForSync(142, center, uncertainty));
+    TEST_ASSERT_FALSE(map.estimateHalf(60, center, uncertainty)); // Startup support remains strict.
+  }
+  // Once the average is within deadband, an individual edge of adjacent
+  // jitter must not keep suspending otherwise valid watts collection.
+  FtmsCalibration::Map jitterMap;
+  jitterMap.source = 1;
+  jitterMap.maximum = 30000;
+  for (int i = 0; i < FtmsCalibration::COUNT; ++i) jitterMap.position[i] = jitterMap.level2[i] * 150;
+  FtmsCalibration::DriftGuard jitterGuard;
+  for (uint32_t t = 0; t <= 20000; t += 1000) {
+    TEST_ASSERT_EQUAL_INT(0, jitterGuard.correction(jitterMap, t, t, 50 + (t / 1000) % 2, 14850, true));
+    if (t >= 10000) TEST_ASSERT_FALSE(jitterGuard.uncertain());
+  }
+  // Interrupting observation restarts confirmation, not the correction timer.
+  FtmsCalibration::Map map;
+  map.source = 1;
+  map.maximum = 30000;
+  for (int i = 0; i < FtmsCalibration::COUNT; ++i) map.position[i] = map.level2[i] * 150;
+  FtmsCalibration::DriftGuard guard;
+  int correction = 0;
+  for (uint32_t t = 1000; t <= 11000; t += 1000) correction += guard.correction(map, t, t, 50, 14000, true);
+  TEST_ASSERT_EQUAL_INT(1000, correction);
+  guard.interrupt(); // e.g. a brief driver-lock conflict must not erase cooldown.
+  for (uint32_t t = 12000; t < 71000; t += 1000) TEST_ASSERT_EQUAL_INT(0, guard.correction(map, t, t, 50, 14000, true));
+  TEST_ASSERT_EQUAL_INT(1000, guard.correction(map, 71000, 71000, 50, 14000, true));
 }

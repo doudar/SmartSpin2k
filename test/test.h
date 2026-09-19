@@ -107,6 +107,11 @@ class TestFtmsHoming {
   static void test_responsive_retries_until_deadline(void);
   static void test_accelerated_probe_repeatability(void);
   static void test_one_second_startup_check(void);
+  static void test_wide_resistance_four(void);
+  static void test_calibrated_startup_and_map(void);
+  static void test_stationary_drift_guard(void);
+  static void test_sparse_noisy_observations(void);
+  static void test_manual_knob_resync(void);
 };
 
 class TestBleWireRoundTrip {

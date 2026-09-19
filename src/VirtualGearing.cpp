@@ -29,7 +29,7 @@ bool SS2K::localGearingSelected() const {
 int32_t SS2K::gearTargetPosition(int gear) const {
   const int32_t shiftStep = userConfig->getShiftStep();
   const int64_t offset = localGearingSelected() ? userConfig->getGearRatios().offsetSteps(gear, shiftStep) : static_cast<int64_t>(gear) * shiftStep;
-  const double target = offset + static_cast<double>(rtConfig->getTargetIncline()) * userConfig->getInclineMultiplier();
+  const double target = offset + static_cast<double>(ftmsSimulationOffset) + static_cast<double>(rtConfig->getTargetIncline()) * userConfig->getInclineMultiplier();
   if (!std::isfinite(target)) return currentPosition;
   return static_cast<int32_t>(std::max(static_cast<double>(INT32_MIN), std::min(static_cast<double>(INT32_MAX), target)));
 }
