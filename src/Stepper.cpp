@@ -306,7 +306,6 @@ void programTmc2209LowHoldCurrentOtp(TMC2209Stepper* tmcDriver) {
 }  // namespace
 
 void SS2K::moveStepper() {
-  if (ss2k->ftmsHomingFailed) return;
   if (!ss2k->stepperSafetyReady()) return;
   static bool _stepperDir = userConfig->getStepperDir();
   if (stepper) {
@@ -347,7 +346,7 @@ void SS2K::moveStepper() {
       ss2k->syncMode = false;
     }
 
-    if (ss2k->pelotonIsConnected && !rtConfig->getHomed()) {
+    if (ss2k->pelotonIsConnected && !rtConfig->getHomed() && !ss2k->homingFallback) {
       // Peloton + not homed: gently walk away from the edges unless the user is actively shifting past them
       if (rtConfig->resistance.getValue() < rtConfig->getMinResistance()) {  // Below allowed resistance
         // Nudge upward unless the user already asked to move higher
@@ -393,7 +392,7 @@ void SS2K::_resistanceMove() {
   if (rtConfig->resistance.getSimulate()) {
     int32_t minPos, maxPos;
     bool usePwr = false;
-    if (userConfig->getHMin() != INT32_MIN && userConfig->getHMax() != INT32_MIN) {
+    if (rtConfig->getHomed() && userConfig->getHMin() != INT32_MIN && userConfig->getHMax() != INT32_MIN) {
       minPos = userConfig->getHMin();
       maxPos = userConfig->getHMax();
     } else if (rtConfig->getMinStep() != -DEFAULT_STEPPER_TRAVEL && rtConfig->getMaxStep() != DEFAULT_STEPPER_TRAVEL) {
@@ -708,7 +707,7 @@ void SS2K::syncFtmsPosition() {
   const bool positionMode = mode == FitnessMachineControlPointProcedure::SetTargetPower || mode == FitnessMachineControlPointProcedure::SetTargetResistanceLevel;
   const int32_t desired = positionMode ? rtConfig->getTargetIncline() : simulationTargetPosition();
   const int32_t current = stepper ? stepper->getCurrentPosition() : 0;
-  const bool eligible = stepper && rtConfig->getHomed() && !homingActive && !ftmsHomingFailed && !isUpdating && !spinBLEServer.spinDownFlag && !ergMode->isTableSeeking() &&
+  const bool eligible = stepper && rtConfig->getHomed() && !homingActive && !isUpdating && !spinBLEServer.spinDownFlag && !ergMode->isTableSeeking() &&
                         !externalControl && !syncMode && !sample.simulate && stepperSafetyReady() && !stepper->isRunning() &&
                         desired == current && targetPosition == current && userConfig->getHMin() == 0 && (positionMode || localGearingSelected()) &&
                         powerTable->ftmsCalibration.matches(FtmsCalibration::identity(userConfig->getConnectedPowerMeter(), userConfig->getStepperDir()),
@@ -787,7 +786,6 @@ void SS2K::_findFTMSHome(bool bothDirections) {
 
   auto fail = [&]() {
     if (io.cancelled()) SS2K_LOG(MAIN_LOG_TAG, "Homing aborted by user.");
-    ss2k->ftmsHomingFailed = true;
     rtConfig->setHomed(false);
     stepper->forceStop();
     while (stepper->isRunning()) delay(5);
@@ -795,7 +793,7 @@ void SS2K::_findFTMSHome(bool bothDirections) {
     ss2k->setTargetPosition(ss2k->getCurrentPosition());
     rtConfig->setTargetIncline(ss2k->getCurrentPosition());
     setupTMCStepperDriver(true);
-    SS2K_LOG(MAIN_LOG_TAG, "FTMS homing failed or aborted; motor held until successful homing. Calibration was not saved.");
+    SS2K_LOG(MAIN_LOG_TAG, "FTMS homing failed or aborted. Calibration was not saved.");
   };
 
   // Only the interior 1..99 levels are required; advertised 0/100 are optional.
@@ -875,23 +873,24 @@ void SS2K::_findFTMSHome(bool bothDirections) {
   rtConfig->setMaxStep(static_cast<int32_t>(range));
   if (bothDirections) {
     // A legacy migration adds metadata without discarding existing watt data.
-    if (requestedFull && !userConfig->getPTab4Pwr()) powerTable->reset();
-    userConfig->setHMin(0);
-    userConfig->setHMax(static_cast<int32_t>(range));
+    if (requestedFull && !userConfig->getPTab4Pwr()) powerTable->clearRuntime();
     powerTable->ftmsCalibration = calibration;
   }
   setupTMCStepperDriver(true);
   rtConfig->setHomed(true);
   if (bothDirections) {
-    if (!powerTable->_hasBeenLoadedThisSession) powerTable->_manageSaveState();
+    // Load legacy watts without writing anything until the final atomic save.
+    if (!powerTable->_hasBeenLoadedThisSession) powerTable->_manageSaveState(false, false);
     if (!powerTable->_save()) { fail(); return; }
+    userConfig->setHMin(0);
+    userConfig->setHMax(static_cast<int32_t>(range));
     userConfig->saveToLittleFS();
     SS2K_LOG(MAIN_LOG_TAG, "Max Position found: %d", static_cast<int32_t>(range));
   }
   ss2k->setTargetPosition(static_cast<int32_t>(rebased));
   ++powerTable->positionEpoch;
   rtConfig->setTargetIncline(0);
-  ss2k->ftmsHomingFailed = false;
+  ss2k->homingFallback = false;
   resetStartingGear();
   // Homing establishes the gear origin. Queue the selected gear's absolute
   // offset from zero; normal motor control applies it after homing exits and
@@ -904,22 +903,58 @@ void SS2K::_findFTMSHome(bool bothDirections) {
   SS2K_LOG(MAIN_LOG_TAG, "Homing procedure complete.");
 }
 
+void SS2K::useUnhomedFallback() {
+  // The failed search may have moved or rebased the motor. Establish a fresh
+  // local origin while stopped; neither saved bounds nor old watts are valid here.
+  if (stepper) {
+    stepper->forceStop();
+    while (stepper->isRunning()) delay(5);
+    stepper->setCurrentPosition(0);
+  }
+  currentPosition = targetPosition = 0;
+  stepperIsRunning = false;
+  homingFallback = true;
+  externalControl = syncMode = false;
+  ftmsSimulationOffset = 0;
+  rtConfig->setHomed(false);
+  rtConfig->setMinStep(-DEFAULT_STEPPER_TRAVEL);
+  rtConfig->setMaxStep(DEFAULT_STEPPER_TRAVEL);
+  rtConfig->setFTMSMode(FitnessMachineControlPointProcedure::SetIndoorBikeSimulationParameters);
+  rtConfig->setTargetIncline(0);
+  powerTable->clearRuntime();
+  ergMode->resetTableConfidence();
+  legacyShifterPosition = 0;
+  localGearingActive = localGearingSelected();
+  resetStartingGear();
+  SS2K_LOG(MAIN_LOG_TAG, "Homing unavailable; using Unlimited gearing and temporary power-table limits. Saved calibration retained.");
+}
+
 void SS2K::goHome(bool bothDirections) {
   HomingSafetyPause safetyPause;
+  // Every unsuccessful exit takes the same rideable fallback, including early
+  // returns and FTMS save failures. Preserve persisted calibration settings.
+  struct HomingOutcome {
+    int32_t savedMin = userConfig->getHMin();
+    int32_t savedMax = userConfig->getHMax();
+    ~HomingOutcome() {
+      if (!rtConfig->getHomed()) {
+        userConfig->setHMin(savedMin);
+        userConfig->setHMax(savedMax);
+        ss2k->useUnhomedFallback();
+      }
+    }
+  } outcome;
   SS2K_LOG(MAIN_LOG_TAG, "Starting homing procedure...");
   // Only shifts made during homing should abort it. Clear any pending delta that the
   // shift modifier never got to consume (it is skipped while spinDownFlag is set).
   ss2k->lastShifterPosition = rtConfig->getShifterPosition();
   ss2k->ftmsSimulationOffset = 0;
   rtConfig->setHomed(false);
+  powerTable->clearRuntime(!bothDirections || userConfig->getPTab4Pwr());
   ergMode->resetTableConfidence();
   const bool useFTMSHoming = !rtConfig->resistance.getSimulate() && strcmp(userConfig->getConnectedPowerMeter(), NONE) != 0 && rtConfig->resistance.getMax() > 0;
   if (bothDirections) {
     fitnessMachineService.spinDown(FitnessMachineStatus::SpinDown_SpinDownRequested);
-    if (!userConfig->getPTab4Pwr() && !useFTMSHoming) {
-      // clean slate for homing
-      powerTable->reset();
-    }
   }
 
   if (!stepper) {
@@ -1040,8 +1075,25 @@ void SS2K::goHome(bool bothDirections) {
       return;
     }
     rtConfig->setMaxStep(stepper->getCurrentPosition() - userConfig->getShiftStep());
-    userConfig->setHMax(rtConfig->getMaxStep());
     SS2K_LOG(MAIN_LOG_TAG, "Max Position found: %d", rtConfig->getMaxStep());
+  }
+
+  if (!bothDirections) rtConfig->setMaxStep(userConfig->getHMax());
+  if (rtConfig->getMaxStep() <= rtConfig->getMinStep()) {
+    setupTMCStepperDriver(true);
+    SS2K_LOG(MAIN_LOG_TAG, "Homing failed. Invalid range. Min:%d Max:%d", rtConfig->getMinStep(), rtConfig->getMaxStep());
+    fitnessMachineService.spinDown(FitnessMachineStatus::SpinDown_Error);
+    return;
+  }
+
+  // Retire an old mechanical table only after both endpoints are confirmed.
+  // A failed search must leave it intact, but a successful full recalibration
+  // must not reload old coordinates on the next boot before new watts are saved.
+  if (bothDirections && !userConfig->getPTab4Pwr() && !powerTable->reset()) {
+    setupTMCStepperDriver(true);
+    SS2K_LOG(MAIN_LOG_TAG, "Homing failed. Could not reset the saved power table.");
+    fitnessMachineService.spinDown(FitnessMachineStatus::SpinDown_Error);
+    return;
   }
 
   rtConfig->setHomed(true);
@@ -1051,20 +1103,14 @@ void SS2K::goHome(bool bothDirections) {
   if (bothDirections) fitnessMachineService.spinDown(FitnessMachineStatus::SpinDown_Success);
 
   // --- FINALIZE AND SAVE ---
-  rtConfig->setMaxStep(userConfig->getHMax());  // Ensure max step is set from config if not found
   if (bothDirections) {
     userConfig->setHMin(rtConfig->getMinStep());
     userConfig->setHMax(rtConfig->getMaxStep());
     userConfig->saveToLittleFS();
-  } else if (rtConfig->getMaxStep() < rtConfig->getMinStep()) {  // homing failed
-    SS2K_LOG(MAIN_LOG_TAG, "Homing failed. Positions were reversed. Min:%d Max:%d", rtConfig->getMinStep(), rtConfig->getMaxStep());
-    rtConfig->setMaxStep(INT32_MIN);
-    rtConfig->setMinStep(INT32_MIN);
-    rtConfig->setHomed(false);
   }
   SS2K_LOG(MAIN_LOG_TAG, "Homing procedure complete.");
   if (rtConfig->getHomed()) {
-    ss2k->ftmsHomingFailed = false;
+    ss2k->homingFallback = false;
     resetStartingGear();
   }
 }

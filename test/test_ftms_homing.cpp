@@ -51,6 +51,10 @@ struct Bike {
   uint32_t clockOffset = 0;
   uint32_t reportLagMs = 200;
   int stepsPerUnit = 100;
+  int backlashSteps = 0;
+  double brakePosition = 0;
+  bool misleadingMovingReports = false;
+  uint32_t lastMotionTime = 0, failMotorAt = UINT32_MAX;
   int wideFourSteps = 0;
   std::deque<std::pair<uint32_t, double>> positions;
   int delayedCrossings = 0;
@@ -81,7 +85,7 @@ struct Bike {
     spikePending = spikeOnStop;
   }
   bool moveTo(int32_t value, int hz) {
-    if (motorFailure) return false;
+    if (motorFailure || clock >= failMotorAt) return false;
     if (firstMoveTime == UINT32_MAX) firstMoveTime = clock;
     spikePending = false;
     target = value;
@@ -90,8 +94,12 @@ struct Bike {
     return true;
   }
   void poll() {
-    if (positions.empty()) positions.push_back({clock, pos});
+    if (positions.empty()) {
+      brakePosition = pos;
+      positions.push_back({clock, pos});
+    }
     clock += 5;
+    if (moving()) lastMotionTime = clock;
     if (acceleration) {
       double distance = target - pos;
       double desired = std::fmin(speed, std::sqrt(2 * acceleration * std::abs(distance)));
@@ -111,7 +119,10 @@ struct Bike {
       if (pos < target) pos = std::fmin(pos + delta, target);
       else if (pos > target) pos = std::fmax(pos - delta, target);
     }
-    positions.push_back({clock, pos});
+    // Play in the drive: reversals move the shaft before the brake follows.
+    if (backlashSteps) brakePosition = std::max(pos - backlashSteps / 2.0, std::min(pos + backlashSteps / 2.0, brakePosition));
+    else brakePosition = pos;
+    positions.push_back({clock, brakePosition});
     while (positions.size() > 1 && positions[1].first + reportLagMs <= clock) positions.pop_front();
     if (clock >= nextReport) {
       // Preserve acquisition delay after the motor stops, as in the user's
@@ -148,6 +159,7 @@ struct Bike {
       }
       if (pending < (legacy ? 1 : 0)) pending = legacy ? 1 : 0;
       if (pending > (legacy ? 99 : 100)) pending = legacy ? 99 : 100;
+      if (misleadingMovingReports && (moving() || (lastMotionTime && clock - lastMotionTime < 2000))) pending = 50;
       if (skipTwo && clock < skipTwoUntilMs && pending == 2) pending = 1;
       if (spikePending && !moving() && clock - stoppedAt >= 1000 && pending >= 3 && pending <= 13) {
         pending -= 2;  // A wider outlier is not adjacent boundary dithering.
@@ -543,11 +555,10 @@ void TestFtmsHoming::test_calibrated_startup_and_map() {
       FtmsHoming::Search<Bike> recovery(bike);
       int32_t origin = INT32_MIN;
       TEST_ASSERT_TRUE_MESSAGE(recovery.recover(map, origin), FtmsHoming::failureName(recovery.failure()));
-      // A stationary quantized reading has bin-width uncertainty, not the
-      // narrow repeatability of deliberately measuring its transition.
-      TEST_ASSERT_INT32_WITHIN(140, 50, origin);
-      TEST_ASSERT_EQUAL_UINT32(UINT32_MAX, bike.firstMoveTime);
-      TEST_ASSERT_LESS_THAN_UINT32(5000, bike.clock);
+      TEST_ASSERT_INT32_WITHIN(FtmsHoming::ANCHOR_TOLERANCE, 50, origin);
+      TEST_ASSERT_NOT_EQUAL(UINT32_MAX, bike.firstMoveTime);
+      TEST_ASSERT_LESS_THAN_UINT32(60000, bike.clock);
+      TEST_ASSERT_EQUAL_INT(50, bike.boundaryTargets.back());
     }
   }
   for (int fault = 0; fault < 4; ++fault) {
@@ -556,13 +567,12 @@ void TestFtmsHoming::test_calibrated_startup_and_map() {
     if (fault == 0) bike.simulated = true;
     if (fault == 1) bike.stopReports = 0;
     if (fault == 2) bike.abortAt = 500;
-    // A constant in-range sensor cannot prove a live motor, but recovery issues
-    // no motion. Missing/simulated/cancelled feedback must never be accepted.
+    // Even an in-range reading must now prove a response to the common approach.
     FtmsHoming::Search<Bike> recovery(bike);
     int32_t origin = INT32_MIN;
-    TEST_ASSERT_EQUAL_INT(fault == 3, recovery.recover(map, origin));
+    TEST_ASSERT_FALSE(recovery.recover(map, origin));
     TEST_ASSERT_FALSE(bike.moving());
-    TEST_ASSERT_LESS_THAN_UINT32(20000, bike.clock);
+    TEST_ASSERT_LESS_THAN_UINT32(FtmsHoming::END_TIMEOUT_MS, bike.clock);
   }
   for (int scale : {100, 300}) {
     FtmsCalibration::Map larger = map;
@@ -580,7 +590,59 @@ void TestFtmsHoming::test_calibrated_startup_and_map() {
       printf("FTMS reference startup R%d scale%d: %u ms, %s\n", level, scale, bike.clock, FtmsHoming::failureName(recovery.failure()));
       TEST_ASSERT_TRUE_MESSAGE(success, FtmsHoming::failureName(recovery.failure()));
       TEST_ASSERT_INT32_WITHIN(scale / 2 + 40, scale / 2, origin);
-      TEST_ASSERT_LESS_THAN_UINT32(20000, bike.clock);
+      TEST_ASSERT_LESS_THAN_UINT32(60000, bike.clock);
+    }
+  }
+  // Match full calibration and reboot recovery with ~3 levels of mechanical
+  // play. Include a boot exactly at the reference: it must still re-approach.
+  for (uint32_t lag : {1300u, 2500u}) {
+    Bike calibrated;
+    calibrated.stepsPerUnit = 250;
+    calibrated.backlashSteps = 750;
+    calibrated.reportLagMs = lag;
+    calibrated.acceleration = 3000;
+    calibrated.pos = calibrated.target = 24750;
+    FtmsCalibration::Map repeatable;
+    repeatable.source = 1;
+    repeatable.maximum = 24750;
+    FtmsHoming::Search<Bike> full(calibrated);
+    for (int i = FtmsCalibration::COUNT - 1; i >= 0; --i) {
+      int32_t point;
+      TEST_ASSERT_TRUE_MESSAGE(full.reference(33 + 17 * i, point, repeatable.level2[i], 250), FtmsHoming::failureName(full.failure()));
+      repeatable.position[i] = point - 125;
+    }
+    TEST_ASSERT_TRUE(repeatable.valid());
+    TEST_ASSERT_EQUAL_INT(FtmsCalibration::REFERENCE_LEVEL2, repeatable.level2[1]);
+    for (int level : {0, 26, 50, 100}) {
+      Bike boot;
+      boot.stepsPerUnit = 250;
+      boot.backlashSteps = 750;
+      boot.reportLagMs = lag;
+      boot.acceleration = 3000;
+      boot.misleadingMovingReports = true; // False R50 reports persist for two seconds after stopping.
+      boot.pos = boot.target = level * 250;
+      FtmsHoming::Search<Bike> recovery(boot);
+      int32_t origin;
+      TEST_ASSERT_TRUE_MESSAGE(recovery.recover(repeatable, origin), FtmsHoming::failureName(recovery.failure()));
+      TEST_ASSERT_INT32_WITHIN(FtmsHoming::ANCHOR_TOLERANCE, 125, origin);
+      TEST_ASSERT_FALSE(boot.moving());
+      TEST_ASSERT_LESS_THAN_UINT32(FtmsHoming::END_TIMEOUT_MS, boot.clock);
+      printf("Common downward reference R%d, backlash750 lag%u: %u ms, origin%d\n", level, lag, boot.clock, origin);
+    }
+    for (int fault = 0; fault < 3; ++fault) {
+      Bike interrupted;
+      interrupted.stepsPerUnit = 250;
+      interrupted.pos = interrupted.target = 0;
+      if (fault == 0) interrupted.stopReports = 8000;
+      if (fault == 1) interrupted.abortAt = 8000;
+      if (fault == 2) interrupted.failMotorAt = 8000;
+      FtmsHoming::Search<Bike> recovery(interrupted);
+      int32_t origin = INT32_MIN;
+      TEST_ASSERT_FALSE(recovery.recover(repeatable, origin));
+      TEST_ASSERT_EQUAL_INT32(INT32_MIN, origin);
+      TEST_ASSERT_FALSE(interrupted.moving());
+      const auto expected = fault == 0 ? FtmsHoming::Failure::StaleReport : (fault == 1 ? FtmsHoming::Failure::Cancelled : FtmsHoming::Failure::Motor);
+      TEST_ASSERT_EQUAL_INT(static_cast<int>(expected), static_cast<int>(recovery.failure()));
     }
   }
 }
@@ -646,7 +708,7 @@ void TestFtmsHoming::test_sparse_noisy_observations() {
         map.position[i] = position + 6836;
       }
       TEST_ASSERT_TRUE(map.valid());
-      TEST_ASSERT_LESS_THAN_UINT32(40000, bike.clock);
+      TEST_ASSERT_LESS_THAN_UINT32(90000, bike.clock);
       printf("Log-shaped sparse map, lag=%u noise=%d: %u ms\n", lag, noise, bike.clock);
       int32_t center, uncertainty;
       TEST_ASSERT_TRUE(map.estimateHalf(100, center, uncertainty));
@@ -670,7 +732,7 @@ void TestFtmsHoming::test_sparse_noisy_observations() {
   int32_t zero;
   TEST_ASSERT_TRUE_MESSAGE(bootSearch.recover(bootMap, zero), FtmsHoming::failureName(bootSearch.failure()));
   TEST_ASSERT_INT32_WITHIN(600, 150, zero);
-  TEST_ASSERT_LESS_THAN_UINT32(30000, noisyBoot.clock);
+  TEST_ASSERT_LESS_THAN_UINT32(FtmsHoming::END_TIMEOUT_MS, noisyBoot.clock);
   printf("Noisy R99 startup with 2.5s feedback lag: %u ms\n", noisyBoot.clock);
   // The old exact-transition search failed when the log jumped 29 -> 31.
   Bike skipped;
@@ -733,16 +795,16 @@ void TestFtmsHoming::test_manual_knob_resync() {
       if (time == 165000) TEST_ASSERT_TRUE(guard.uncertain());
       if (correction) { position += correction; correctedAt = time; }
     }
-    TEST_ASSERT_EQUAL_INT32(7440, position);
+    TEST_ASSERT_INT32_WITHIN(1, 7440, position); // Half-level coordinates truncate to whole steps.
     TEST_ASSERT_GREATER_OR_EQUAL_UINT32(169000, correctedAt);
     TEST_ASSERT_LESS_OR_EQUAL_UINT32(190000, correctedAt);
     TEST_ASSERT_FALSE(guard.uncertain());
     int32_t center, uncertainty;
     TEST_ASSERT_TRUE(map.estimateForSync(64, center, uncertainty));
-    TEST_ASSERT_EQUAL_INT32(7440, center);
+    TEST_ASSERT_INT32_WITHIN(1, 7440, center);
     TEST_ASSERT_FALSE(map.estimateForSync(58, center, uncertainty));
     TEST_ASSERT_FALSE(map.estimateForSync(142, center, uncertainty));
-    TEST_ASSERT_FALSE(map.estimateHalf(60, center, uncertainty)); // Startup support remains strict.
+    TEST_ASSERT_FALSE(map.estimateHalf(60, center, uncertainty)); // Strict interpolation stays within measured support.
   }
   // Once the average is within deadband, an individual edge of adjacent
   // jitter must not keep suspending otherwise valid watts collection.

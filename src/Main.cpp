@@ -533,7 +533,7 @@ void SS2K::FTMSModeShiftModifier() {
   if (localSelected != localGearingActive) {
     if (localSelected) {
       legacyShifterPosition = lastShifterPosition;
-      const VirtualGearing::Gears gears = userConfig->getGearRatios();
+      const VirtualGearing::Gears gears = activeGearRatios();
       rtConfig->setShifterPosition(gears.clampGear(localGear));
     } else if (!zwiftService.isConnected() && !openBikeControlService.isConnected()) {
       rtConfig->setShifterPosition(legacyShifterPosition);
@@ -543,7 +543,7 @@ void SS2K::FTMSModeShiftModifier() {
     BLE_ss2kCustomCharacteristic::notify(BLE_shifterPosition);
   }
   if (localSelected) {
-    const int gear = userConfig->getGearRatios().clampGear(rtConfig->getShifterPosition());
+    const int gear = activeGearRatios().clampGear(rtConfig->getShifterPosition());
     if (gear != rtConfig->getShifterPosition()) {
       rtConfig->setShifterPosition(gear);
       BLE_ss2kCustomCharacteristic::notify(BLE_shifterPosition);
@@ -624,7 +624,7 @@ void SS2K::FTMSModeShiftModifier() {
       {
         if (localSelected) {
           // Bound the logical gear independently of the final hardware travel clamp.
-          const VirtualGearing::Gears gears = userConfig->getGearRatios();
+          const VirtualGearing::Gears gears = activeGearRatios();
           // clampGear() already bounds a configured groupset, but Unlimited has no gear
           // ceiling. Without this the gear counter keeps climbing while the knob sits at
           // the travel limit, and the rider shifts back through dead gears to move it.

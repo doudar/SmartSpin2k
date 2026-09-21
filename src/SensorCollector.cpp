@@ -76,7 +76,7 @@ void collectAndSet(const NimBLEUUID& charUUID, const NimBLEUUID& serviceUUID, co
     }
   }
 
-  if (sensorData->hasPower() && !rtConfig->watts.getSimulate() && !userConfig->getPTab4Pwr()) {
+  if (sensorData->hasPower() && !rtConfig->watts.getSimulate() && !ss2k->usePowerTableForPower()) {
     if ((charUUID == PELOTON_DATA_UUID) && !((strcmp(userConfig->getConnectedPowerMeter(), NONE) == 0) || (strcmp(userConfig->getConnectedPowerMeter(), ANY) == 0))) {
       // Peloton connected but using BLE Power Meter. So skip power for Peloton UUID.
     } else {

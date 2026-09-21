@@ -55,10 +55,9 @@ void PowerTable::processPowerValue(PowerBuffer& powerBuffer, int cadence, Measur
   // cadences that calculateIndex() cannot place in the table.
   if (ptHelpers.cadenceIsWithinTable(cadence) && (watts.getValue() > 10) &&  // adding constraints
       (watts.getValue() < (POWERTABLE_WATT_SIZE * POWERTABLE_WATT_INCREMENT))) {
-    if (powerBuffer.powerEntry[0].readings == 0) {  // we need to make sure stepper position is not negative so it only takes positive resistance values
+    if (powerBuffer.powerEntry[0].readings == 0) {
       // Take Initial reading
       powerBuffer.set(0);
-      // Check if the current stepper position is within a 5% range of the previous stepper position and that the current position is not negative
     }
 
     int currentPos = ss2k->getCurrentPosition() / TABLE_DIVISOR;
@@ -99,8 +98,8 @@ void PowerTable::setStepperMinMax() {
     SS2K_LOG(POWERTABLE_LOG_TAG, "HOMING VALUES NOT FOUND");
   }
 
-  // if the FTMS device reports resistance feedback, skip estimating min_max
-  if (rtConfig->resistance.getValue() > 0 && !rtConfig->resistance.getSimulate()) {
+  // Failed homing always uses watt-derived limits, even with real resistance feedback.
+  if (!ss2k->homingFallback && rtConfig->resistance.getValue() > 0 && !rtConfig->resistance.getSimulate()) {
     rtConfig->setMinStep(-DEFAULT_STEPPER_TRAVEL);
     rtConfig->setMaxStep(DEFAULT_STEPPER_TRAVEL);
     SS2K_LOG(POWERTABLE_LOG_TAG, "Using Resistance Travel Limits");
@@ -217,7 +216,7 @@ bool PowerTable::loadFtmsCalibration() {
   return true;
 }
 
-bool PowerTable::_manageSaveState(bool /*canSkipReliabilityChecks*/) {
+bool PowerTable::_manageSaveState(bool /*canSkipReliabilityChecks*/, bool allowSave) {
   // Homing is now a prerequisite for loading and saving the powertable.
   if (!rtConfig->getHomed()) {
     return false;
@@ -229,7 +228,7 @@ bool PowerTable::_manageSaveState(bool /*canSkipReliabilityChecks*/) {
     if (!file) {
       SS2K_LOG(POWERTABLE_LOG_TAG, "Failed to Load Power Table.");
       file.close();
-      this->_save();
+      if (allowSave) this->_save();
       return false;
     }
 
@@ -247,13 +246,13 @@ bool PowerTable::_manageSaveState(bool /*canSkipReliabilityChecks*/) {
     if (version != TABLE_VERSION || !savedHomed || savedQuality < 0 || file.size() < expected) {
       SS2K_LOG(POWERTABLE_LOG_TAG, "Expected power table version %d, found version %d", TABLE_VERSION, version);
       file.close();
-      this->_save();
+      if (allowSave) this->_save();
       return false;
     }
 
     // Is the data we are working with better than the saved file?
     int activeReadings = ptHelpers.getTotalReadings(ptData);
-    if (activeReadings > savedQuality) {
+    if (allowSave && activeReadings > savedQuality) {
       SS2K_LOG(POWERTABLE_LOG_TAG, "Active table had a reliability of %d, vs %d for the saved file. Overwriting save.", activeReadings, savedQuality);
       file.close();
       this->_save();
@@ -268,7 +267,7 @@ bool PowerTable::_manageSaveState(bool /*canSkipReliabilityChecks*/) {
     if (!file) {
       SS2K_LOG(POWERTABLE_LOG_TAG, "Failed to Load Power Table. Resetting the save.");
       file.close();
-      this->_save();
+      if (allowSave) this->_save();
       return false;
     }
 
@@ -296,7 +295,7 @@ bool PowerTable::_manageSaveState(bool /*canSkipReliabilityChecks*/) {
   }
 
   // Implement saving on a timer
-  if ((millis() - lastSaveTime) > POWER_TABLE_SAVE_INTERVAL) {
+  if (allowSave && (millis() - lastSaveTime) > POWER_TABLE_SAVE_INTERVAL) {
     this->_save();
     lastSaveTime = millis();
   }
@@ -393,13 +392,13 @@ bool PowerTable::_save() {
   return true;  // return successful
 }
 
-// Reset the PowerTable to 0;
-bool PowerTable::reset() {
+// Start a new coordinate session without modifying the persisted calibration.
+void PowerTable::clearRuntime(bool allowSavedTableLoad) {
   ftmsPositionUncertain = false;
-  ss2k->resetPowerTableFlag = false;
-  rtConfig->setHomed(false);
   ftmsCalibration = FtmsCalibration::Map{};
-  _hasBeenLoadedThisSession = true;
+  _hasBeenLoadedThisSession = !allowSavedTableLoad;
+  saveFlag = false;
+  lastSaveTime = millis();
   ++positionEpoch;
   for (int i = 0; i < POWERTABLE_CAD_SIZE; i++) {
     for (int j = 0; j < POWERTABLE_WATT_SIZE; j++) {
@@ -407,6 +406,12 @@ bool PowerTable::reset() {
       this->ptData.tableRow[i].tableEntry[j].readings       = 0;
     }
   }
+}
+
+bool PowerTable::reset() {
+  clearRuntime();
+  ss2k->resetPowerTableFlag = false;
+  rtConfig->setHomed(false);
   userConfig->setHMax(INT32_MIN);
   userConfig->setHMin(INT32_MIN);
   return !LittleFS.exists(POWER_TABLE_FILENAME) || LittleFS.remove(POWER_TABLE_FILENAME);

@@ -13,15 +13,23 @@
 void SS2K::resetStartingGear() {
   // Spindown is a procedure, not a riding mode. Leaving its opcode selected
   // bypasses local gearing and interprets the recovered position as terrain.
-  if (rtConfig->getHomed() && rtConfig->getFTMSMode() == FitnessMachineControlPointProcedure::SpinDownControl) {
+  if ((rtConfig->getHomed() || homingFallback) && rtConfig->getFTMSMode() == FitnessMachineControlPointProcedure::SpinDownControl) {
     rtConfig->setFTMSMode(FitnessMachineControlPointProcedure::SetIndoorBikeSimulationParameters);
     rtConfig->setTargetIncline(0);
   }
-  localGear = userConfig->getGearRatios().startGear(rtConfig->getHomed());
-  rtConfig->setShifterPosition(localGearingSelected() ? localGear : SHIFTER_MIDDLE_POSITION);
+  localGear = activeGearRatios().startGear(rtConfig->getHomed());
+  rtConfig->setShifterPosition(homingFallback ? 0 : (localGearingSelected() ? localGear : SHIFTER_MIDDLE_POSITION));
   // A programmatic gear reset is not a rider shift. Keep the shift baseline in sync so
   // nothing downstream (homing's abort check, FTMS forwarding) sees a phantom shift.
   lastShifterPosition = rtConfig->getShifterPosition();
+}
+
+VirtualGearing::Gears SS2K::activeGearRatios() const {
+  return homingFallback ? VirtualGearing::Gears{} : userConfig->getGearRatios();
+}
+
+bool SS2K::usePowerTableForPower() const {
+  return userConfig->getPTab4Pwr() && !homingFallback;
 }
 
 bool SS2K::localGearingSelected() const {
@@ -34,7 +42,7 @@ bool SS2K::localGearingSelected() const {
 // both agree on where a gear would put the knob before the limits are applied.
 int32_t SS2K::gearTargetPosition(int gear) const {
   const int32_t shiftStep = userConfig->getShiftStep();
-  const int64_t offset = localGearingSelected() ? userConfig->getGearRatios().offsetSteps(gear, shiftStep) : static_cast<int64_t>(gear) * shiftStep;
+  const int64_t offset = localGearingSelected() ? activeGearRatios().offsetSteps(gear, shiftStep) : static_cast<int64_t>(gear) * shiftStep;
   const double target = offset + static_cast<double>(ftmsSimulationOffset) + static_cast<double>(rtConfig->getTargetIncline()) * userConfig->getInclineMultiplier();
   if (!std::isfinite(target)) return currentPosition;
   return static_cast<int32_t>(std::max(static_cast<double>(INT32_MIN), std::min(static_cast<double>(INT32_MAX), target)));

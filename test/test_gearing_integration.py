@@ -25,14 +25,19 @@ class TestGearingIntegration(unittest.TestCase):
         gearing = (ROOT / "src/VirtualGearing.cpp").read_text(encoding="utf-8")
         header = (ROOT / "include/Main.h").read_text(encoding="utf-8")
         parameters = (ROOT / "src/SmartSpin_parameters.cpp").read_text(encoding="utf-8")
+        table_source = (ROOT / "src/Power_Table.cpp").read_text(encoding="utf-8")
+        fitness_source = (ROOT / "src/BLE_Fitness_Machine_Service.cpp").read_text(encoding="utf-8")
         production = "\n".join([
             function(parameters, "void userParameters::setDefaults("),
             *[function(gearing, signature) for signature in (
-                "void SS2K::resetStartingGear(", "bool SS2K::localGearingSelected(",
+                "void SS2K::resetStartingGear(", "VirtualGearing::Gears SS2K::activeGearRatios(", "bool SS2K::usePowerTableForPower(", "bool SS2K::localGearingSelected(",
                 "int32_t SS2K::gearTargetPosition(", "int32_t SS2K::simulationTargetPosition(")],
             function(main, "void SS2K::FTMSModeShiftModifier("),
+            function(table_source, "void PowerTable::clearRuntime("),
+            function(table_source, "void PowerTable::setStepperMinMax("),
+            function(fitness_source, "int BLE_Fitness_Machine_Service::calculateResistanceFromPosition("),
             *[function(stepper, signature) for signature in (
-                "void SS2K::_resistanceMove(", "void SS2K::moveStepper(", "void SS2K::syncFtmsPosition(", "void SS2K::_findFTMSHome(", "void SS2K::goHome(")],
+                "void SS2K::useUnhomedFallback(", "void SS2K::_resistanceMove(", "void SS2K::moveStepper(", "void SS2K::syncFtmsPosition(", "void SS2K::_findFTMSHome(", "void SS2K::goHome(")],
         ])
         harness = r'''
 #include <cassert>
@@ -46,6 +51,7 @@ unsigned long testMillis() { return clockMs; }
 #include "BLE_Definitions.h"
 #include "FtmsCalibration.h"
 #include "ResistanceControl.h"
+#include "PowerTable_Helpers.h"
 #define ARDUINO_ISR_ATTR
 #define SS2K_LOG(...) ((void)0)
 using std::max;
@@ -58,8 +64,9 @@ userParameters* userConfig = &config;
 RuntimeParameters runtime{};
 RuntimeParameters* rtConfig = &runtime;
 bool safetyReady = true, searchSucceeds = true, abortSearch = false;
-bool metadataPresent = false, saveSucceeds = true;
+bool metadataPresent = false, saveSucceeds = true, resetSucceeds = true;
 bool changeSourceDuringMap = false;
+int failedMechanicalEnd = -1;
 int fullSearches = 0, recoveries = 0, mapSearches = 0;
 int saved = 0, pauses = 0, lastHomingSgThreshold = 10;
 bool homingActive = false;
@@ -99,23 +106,33 @@ struct Client {
   void FTMSControlPointWrite(const uint8_t*, int) { forwardedTarget = ss2k->simulationTargetPosition(); }
 } spinBLEClient;
 struct Server { int spinDownFlag = 0; } spinBLEServer;
-struct Fitness {
+struct BLE_Fitness_Machine_Service {
   int status = 0;
   void spinDown(int value) { status = value; }
+  int calculateResistanceFromPosition();
 } fitnessMachineService;
 struct Erg { void resetTableConfidence() {} bool isTableSeeking() { return false; } } erg;
 Erg* ergMode = &erg;
-struct Table {
+struct PowerTable {
+  PTData ptData;
+  PTHelpers ptHelpers;
+  unsigned long lastSaveTime = 0;
+  bool saveFlag = false;
   FtmsCalibration::Map ftmsCalibration;
+  FtmsCalibration::Map savedCalibration;
   bool ftmsPositionUncertain = false;
   uint32_t positionEpoch = 0;
   bool _hasBeenLoadedThisSession = false;
   int resets = 0, saves = 0;
-  bool loadFtmsCalibration() { return metadataPresent; }
-  bool _manageSaveState() { _hasBeenLoadedThisSession = true; return true; }
-  bool _save() { ++saves; return saveSucceeds; }
-  void reset() { ++resets; rtConfig->setHomed(false); userConfig->setHMax(INT32_MIN); }
+  bool loadFtmsCalibration() { ftmsCalibration = savedCalibration; return metadataPresent; }
+  bool _manageSaveState(bool = false, bool = true) { _hasBeenLoadedThisSession = true; return true; }
+  bool _save() { ++saves; if (saveSucceeds) savedCalibration = ftmsCalibration; return saveSucceeds; }
+  void clearRuntime(bool allowSavedTableLoad = false);
+  void setStepperMinMax();
+  int32_t lookup(int watts, int cadence) { return ptHelpers.lookup(watts, cadence, ptData); }
+  bool reset() { ++resets; rtConfig->setHomed(false); userConfig->setHMax(INT32_MIN); return resetSucceeds; }
 } table;
+using Table = PowerTable;
 Table* powerTable = &table;
 void userParameters::saveToLittleFS() { ++saved; }
 void SS2K::setLEDEnabled(bool) {}
@@ -123,7 +140,7 @@ void SS2K::setupTMCStepperDriver(bool) {}
 void SS2K::updateStepperPower(int) {}
 void SS2K::updateStepperSpeed(int) {}
 bool SS2K::stepperSafetyReady() { return safetyReady; }
-bool SS2K::_findEndStop(bool upper) { motor.pos = upper ? 20000 : -1000; return true; }
+bool SS2K::_findEndStop(bool upper) { motor.pos = upper ? 20000 : -1000; return failedMechanicalEnd != int(upper); }
 // Isolate orchestration from the independently tested sensor search.
 namespace FtmsHoming {
 enum class Failure { Timeout };
@@ -144,17 +161,18 @@ template<class IO> struct Search {
   }
   bool reference(int level, int32_t& result, uint8_t& observed, int) {
     ++mapSearches;
-    observed = 2 * level;
-    result = level * 200;
+    observed = level == FtmsCalibration::REFERENCE_LEVEL ? FtmsCalibration::REFERENCE_LEVEL2 : 2 * level;
+    result = observed * 100;
     motor.pos = result;
     if (changeSourceDuringMap) config.setConnectedPowerMeter("Changed bike");
     return searchSucceeds && !io.cancelled();
   }
   bool recover(const FtmsCalibration::Map& map, int32_t& result) {
     ++recoveries;
-    int32_t center, uncertainty;
-    if (!map.estimateHalf(2 * rtConfig->resistance.getValue(), center, uncertainty)) return false;
-    result = motor.pos - center;
+    if (!map.valid()) return false;
+    const int32_t crossing = motor.pos + 100;
+    result = crossing - map.position[1];
+    motor.pos = crossing + 7; // The last probe is not the bracket midpoint.
     return searchSucceeds;
   }
   Failure failure() { return Failure::Timeout; }
@@ -184,7 +202,10 @@ void reset(bool ftms = false) {
   fullSearches = recoveries = mapSearches = 0;
   metadataPresent = false;
   saveSucceeds = true;
+  resetSucceeds = true;
   changeSourceDuringMap = false;
+  failedMechanicalEnd = -1;
+  currentBoard.homingSupported = true;
   table = Table{};
   controller.resetStartingGear();
 }
@@ -237,8 +258,9 @@ int main() {
       // A shift pending before homing is not a cancellation.
       runtime.setShifterPosition(3);
       controller.goHome(true);
-      assert(runtime.getHomed() && !controller.ftmsHomingFailed && pauses == 0);
+      assert(runtime.getHomed() && !controller.homingFallback && pauses == 0);
       assert(saved == 1);
+      assert(table.resets == (ftms ? 0 : 1)); // Mechanical reset happens only after success.
       assertGear(bounded ? 4 : 8);
       controller.FTMSModeShiftModifier();
       controller.moveStepper();
@@ -285,24 +307,24 @@ int main() {
   controller.goHome(false);
   assert(runtime.getHomed() && fullSearches == 2 && mapSearches == 3 && recoveries == 0);
   assert(table.resets == 0 && table.saves == 1);
-  assert(table.ftmsCalibration.position[1] == 10000);
+  assert(table.ftmsCalibration.position[1] == 10100);
   metadataPresent = true;
   fullSearches = mapSearches = 0;
   controller.goHome(false);
   assert(runtime.getHomed() && fullSearches == 0 && mapSearches == 0 && recoveries == 1);
-  assert(motor.pos == 10000 && controller.getTargetPosition() == 800);
+  assert(motor.pos == 10107 && controller.getTargetPosition() == 800);
   controller.moveStepper();
   assert(motor.pos == 800); // Move directly to eight shifts above zero after recovery.
 
   reset(true);
   saveSucceeds = false;
   controller.goHome(false);
-  assert(!runtime.getHomed() && controller.ftmsHomingFailed && saved == 0);
+  assert(!runtime.getHomed() && controller.homingFallback && saved == 0);
 
   reset(true);
   changeSourceDuringMap = true;
   controller.goHome(false);
-  assert(!runtime.getHomed() && controller.ftmsHomingFailed && saved == 0 && table.saves == 0);
+  assert(!runtime.getHomed() && controller.homingFallback && saved == 0 && table.saves == 0);
 
   // Synchronization changes coordinates, never sends a motor command; the
   // next simulation/ERG update must retain the corrected stationary position.
@@ -358,10 +380,11 @@ int main() {
   runtime.setMaxStep(24413);
   table.ftmsCalibration.maximum = 24413;
   for (int i = 0; i < FtmsCalibration::COUNT; ++i) table.ftmsCalibration.position[i] = table.ftmsCalibration.level2[i] * 255 / 2 - 720;
+  table.savedCalibration = table.ftmsCalibration;
   metadataPresent = true;
   runtime.resistance.setValue(48, false);
   controller.goHome(false);
-  assert(motor.pos == 11520);
+  assert(motor.pos == table.ftmsCalibration.position[1] + 7);
   controller.FTMSModeShiftModifier();
   controller.moveStepper();
   assert(motor.pos == 11520); // Eight shifts of 1440, regardless of recovered position.
@@ -386,29 +409,85 @@ int main() {
     controller.syncFtmsPosition();
     if (second == 5) assert(table.ftmsPositionUncertain);
   }
-  assert(motor.pos == 7440 && controller.getTargetPosition() == 7440);
+  assert(std::abs(motor.pos - 7440) <= 1 && controller.getTargetPosition() == motor.pos);
   assert(motor.commands == commandsBeforeReseat && !table.ftmsPositionUncertain);
   assertGear(6);
   controller.moveStepper();
-  assert(motor.pos == 7440);
+  assert(std::abs(motor.pos - 7440) <= 1); // Half-level map positions truncate to whole steps.
 
-  // Failed/aborted FTMS homing retains the gear and latches normal motor control.
+  // Failed/aborted FTMS homing starts a fresh, rideable Unlimited session.
   for (bool abort : {false, true}) {
     reset(true);
+    config.setGearRatios(ratios, 12);
+    config.setHMin(0);
+    config.setPTab4Pwr(true);
+    runtime.setFTMSMode(FitnessMachineControlPointProcedure::SpinDownControl);
     runtime.setShifterPosition(5);
     abortSearch = abort;
     searchSucceeds = abort;
     controller.goHome(true);
-    assert(!runtime.getHomed() && controller.ftmsHomingFailed && pauses == 0);
-    assert(runtime.getShifterPosition() == (abort ? 6 : 5) && saved == 0);
+    assert(!runtime.getHomed() && controller.homingFallback && pauses == 0);
+    assertGear(0);
+    assert(saved == 0 && table.resets == 0 && table.saves == 0);
+    assert(config.getHMin() == 0 && config.getHMax() == 20000);
+    assert(config.getGearRatios().count == 12 && config.getPTab4Pwr());
+    assert(controller.activeGearRatios().unlimited() && !controller.usePowerTableForPower());
+    assert(runtime.getMinStep() == -DEFAULT_STEPPER_TRAVEL && runtime.getMaxStep() == DEFAULT_STEPPER_TRAVEL);
+    assert(runtime.getFTMSMode() == FitnessMachineControlPointProcedure::SetIndoorBikeSimulationParameters);
+    assert(motor.pos == 0 && controller.getTargetPosition() == 0);
+    assert(fitnessMachineService.calculateResistanceFromPosition() == 50); // Wide provisional range, not saved 0..20000.
     int commands = motor.commands;
+    runtime.setShifterPosition(-1);
+    controller.FTMSModeShiftModifier();
+    controller.moveStepper();
+    assert(motor.commands == commands + 1 && motor.pos == -100);
+    runtime.setShifterPosition(1);
+    controller.FTMSModeShiftModifier();
+    controller.moveStepper();
+    assert(motor.pos == 100);
+    // Fresh relative samples predict brake-watt limits even with live FTMS
+    // resistance feedback. Negative samples survive subsequent insertions.
+    config.setMinWatts(90);
+    config.setMaxWatts(300);
+    runtime.watts.setValue(200);
+    table.ptHelpers.enterData(table.ptData, table.ptHelpers.calculateIndex(90, NORMAL_CAD), -20);
+    table.ptHelpers.enterData(table.ptData, table.ptHelpers.calculateIndex(300, NORMAL_CAD), 40);
+    table.setStepperMinMax();
+    assert(runtime.getMinStep() == -200 && runtime.getMaxStep() == 400);
+    runtime.setShifterPosition(-2);
+    controller.FTMSModeShiftModifier();
+    controller.moveStepper();
+    assert(motor.pos == -200 && runtime.getShifterPosition() == -2);
+    runtime.setShifterPosition(-3);
+    controller.FTMSModeShiftModifier();
+    assertGear(-2); // Stop extra downshifts at the learned minimum.
+    runtime.setShifterPosition(5);
+    controller.FTMSModeShiftModifier();
+    assertGear(-2); // Stop extra upshifts at the learned maximum.
+    // Peloton's ordinary unhomed resistance nudges must not bypass fallback's
+    // watt-derived motor limits, including ERG/external position commands.
+    controller.pelotonIsConnected = true;
+    runtime.setFTMSMode(FitnessMachineControlPointProcedure::SetTargetPower);
+    runtime.setTargetIncline(1000);
+    controller.moveStepper();
+    assert(motor.pos == 399);
+    runtime.setTargetIncline(-1000);
+    controller.moveStepper();
+    assert(motor.pos == -199);
+    runtime.setFTMSMode(FitnessMachineControlPointProcedure::SetIndoorBikeSimulationParameters);
+    controller.pelotonIsConnected = false;
+    // Hardware protection still inhibits dispatch, without latching homing failure.
+    safetyReady = false;
+    commands = motor.commands;
     controller.moveStepper();
     assert(motor.commands == commands);
+    safetyReady = true;
     searchSucceeds = true;
     abortSearch = false;
     controller.goHome(true);
-    assert(runtime.getHomed() && !controller.ftmsHomingFailed);
-    assertGear(8);
+    assert(runtime.getHomed() && !controller.homingFallback);
+    assertGear(4);
+    assert(!controller.activeGearRatios().unlimited() && controller.usePowerTableForPower());
   }
   // Invalid saved mechanical bounds must not select the homed start gear.
   reset();
@@ -416,7 +495,38 @@ int main() {
   runtime.setShifterPosition(3);
   controller.goHome(false);
   assert(!runtime.getHomed() && pauses == 0);
-  assertGear(3);
+  assertGear(0);
+  assert(controller.homingFallback && runtime.getMinStep() == -DEFAULT_STEPPER_TRAVEL);
+
+  // A failed physical minimum, maximum, unsupported board or absent motor uses
+  // the same fallback without deleting saved calibration or keeping partial limits.
+  for (int failure = 0; failure < 5; ++failure) {
+    reset();
+    config.setHMin(0);
+    config.setGearRatios(ratios, 12);
+    runtime.setFTMSMode(FitnessMachineControlPointProcedure::SpinDownControl);
+    failedMechanicalEnd = failure;
+    if (failure == 2) currentBoard.homingSupported = false;
+    if (failure == 3) stepper = nullptr;
+    if (failure == 4) resetSucceeds = false;
+    controller.goHome(true);
+    assert(!runtime.getHomed() && controller.homingFallback && pauses == 0);
+    assertGear(0);
+    assert(saved == 0 && table.resets == (failure == 4 ? 1 : 0) && table.saves == 0);
+    assert(config.getHMin() == 0 && config.getHMax() == 20000);
+    assert(runtime.getMinStep() == -DEFAULT_STEPPER_TRAVEL && runtime.getMaxStep() == DEFAULT_STEPPER_TRAVEL);
+    if (stepper) {
+      runtime.setShifterPosition(-2);
+      controller.FTMSModeShiftModifier();
+      controller.moveStepper();
+      assert(motor.pos == -200);
+      // Saved 0..20000 must not be used by simulated resistance mode.
+      runtime.setFTMSMode(FitnessMachineControlPointProcedure::SetTargetResistanceLevel);
+      runtime.resistance.setTarget(50);
+      controller._resistanceMove();
+      assert(runtime.getFTMSMode() == FitnessMachineControlPointProcedure::SetTargetPower);
+    }
+  }
 
   // Reject an Unlimited shift at the travel limit, immediately enter ERG,
   // then return to SIM without another local-mode loop in between.
@@ -473,6 +583,7 @@ int main() {
                 compiler, "-std=c++17", "-DPLATFORMIO_ENV_NATIVE",
                 "-I" + str(ROOT / "include"), "-I" + str(ROOT / "lib/SS2K/include"),
                 "-I" + str(ROOT / "lib/ArduinoCompat/include"), str(cpp), "-o", str(exe),
+                str(ROOT / "src/PowerTable_Helpers.cpp"),
             ], check=True)
             subprocess.run([str(exe)], check=True)
 

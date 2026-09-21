@@ -11,14 +11,16 @@
 #include <stddef.h>
 #include "ByteUtils.h"
 
-// A small, immutable map of stationary observations in the PTAB coordinate frame.
+// A small, immutable map in the PTAB coordinate frame, with a repeatable middle crossing.
 // Never learn this map from drifting ride positions or extrapolate into the ends.
 namespace FtmsCalibration {
 constexpr int COUNT = 3;
 constexpr int FIRST = 33;
 constexpr int GAP = 17;
 constexpr size_t WIRE_SIZE = 32;
-constexpr uint32_t MAGIC = 0x324d5446;  // FTM2: stationary samples, not FTM1 transitions
+constexpr int REFERENCE_LEVEL = 50;
+constexpr uint8_t REFERENCE_LEVEL2 = 2 * REFERENCE_LEVEL + 1;  // Downward 51 -> 50 boundary.
+constexpr uint32_t MAGIC = 0x334d5446;  // FTM3: fixed, downward middle reference.
 constexpr uint32_t STABLE_MS = 10000;
 constexpr uint32_t OFFSET_STABLE_MS = 30000;
 constexpr uint32_t INTERVAL_MS = 60000;
@@ -44,10 +46,10 @@ struct Map {
   uint32_t source = 0;
   int32_t maximum = 0;
   int32_t position[COUNT] = {};
-  uint8_t level2[COUNT] = {66, 100, 134};  // Twice resistance; adjacent jitter can average to a half level.
+  uint8_t level2[COUNT] = {66, REFERENCE_LEVEL2, 134};  // Twice resistance; crossings lie between levels.
 
   bool valid() const {
-    if (!source || maximum <= 0) return false;
+    if (!source || maximum <= 0 || level2[1] != REFERENCE_LEVEL2) return false;
     for (int i = 0; i < COUNT; ++i) {
       if (position[i] <= 0 || position[i] >= maximum) return false;
       const int nominal = 2 * (FIRST + i * GAP);
@@ -65,7 +67,7 @@ struct Map {
   }
   // Ride-time correction includes a short extension to 30--70. Samples can
   // land at 31--35 / 65--69; an R32 reading must not silently disable syncing.
-  // Startup still uses strict measured support, and the unreliable ends stay out.
+  // Startup uses the fixed middle crossing; the unreliable ends stay out of sync.
   bool estimateForSync(int resistance2, int32_t& center, int32_t& uncertainty) const {
     return estimatePosition(resistance2, center, uncertainty, true);
   }

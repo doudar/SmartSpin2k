@@ -370,8 +370,8 @@ int BLE_Fitness_Machine_Service::calculateResistanceFromPosition() {
   int32_t currentPosition = ss2k->getCurrentPosition();
   int32_t minPos, maxPos;
   
-  // Use homing values if available, otherwise use stepper min/max
-  if (userConfig->getHMin() != INT32_MIN && userConfig->getHMax() != INT32_MIN) {
+  // Saved bounds are usable only after this session established their origin.
+  if (rtConfig->getHomed() && userConfig->getHMin() != INT32_MIN && userConfig->getHMax() != INT32_MIN) {
     minPos = userConfig->getHMin();
     maxPos = userConfig->getHMax();
   } else {
@@ -385,7 +385,7 @@ int BLE_Fitness_Machine_Service::calculateResistanceFromPosition() {
   }
   
   // Calculate resistance as percentage (0-100) based on position
-  int resistance = ((currentPosition - minPos) * 100) / (maxPos - minPos);
+  int resistance = static_cast<int>((static_cast<int64_t>(currentPosition) - minPos) * 100 / (static_cast<int64_t>(maxPos) - minPos));
   
   // Clamp to valid range
   if (resistance < 0) resistance = 0;

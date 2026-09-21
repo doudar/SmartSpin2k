@@ -52,7 +52,7 @@ class SS2K {
   bool resetDefaultsFlag   = false;
   bool resetPowerTableFlag = false;
   bool isUpdating          = false;
-  bool ftmsHomingFailed    = false;  // Hold normal motor control after failure until homing succeeds.
+  bool homingFallback     = false;  // Runtime-only Unlimited gearing until a successful home.
 
   static void ARDUINO_ISR_ATTR maintenanceLoop(void *);
   static void ARDUINO_ISR_ATTR handleUpShift();
@@ -63,6 +63,9 @@ class SS2K {
   void syncFtmsPosition();
   void _resistanceMove();
   bool localGearingSelected() const;
+  VirtualGearing::Gears activeGearRatios() const;
+  bool usePowerTableForPower() const;
+  void useUnhomedFallback();
   void resetStartingGear();
   int32_t gearTargetPosition(int gear) const;
   int32_t simulationTargetPosition() const;

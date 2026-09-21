@@ -50,14 +50,17 @@ class PowerTable {
   // returns watts for given cadence and target position. Returns RETURN_ERROR if not found.
   int32_t lookupWatts(int cad, int32_t targetPosition) { return this->ptHelpers.lookupWatts(cad, targetPosition, this->ptData); }
 
-  // automatically load or save the Power Table
-  bool _manageSaveState(bool canSkipReliabilityChecks = false);
+  // Automatically load/save; allowSave=false reads without repairing or replacing the file.
+  bool _manageSaveState(bool canSkipReliabilityChecks = false, bool allowSave = true);
 
   // save powertable from littlefs
   bool _save();
 
   // Reset the active power table and delete the saved power table.
   bool reset();
+
+  // Discard coordinates in RAM without touching the saved table or homing settings.
+  void clearRuntime(bool allowSavedTableLoad = false);
 
   // Display power table in log
   void toLog();

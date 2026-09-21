@@ -254,8 +254,7 @@ void bleClientTask(void* pvParameters) {
         } else {  // Startup Homing
           ss2k->goHome(false);
         }
-        // goHome() selects the riding gear only after successful calibration.
-        // Leave the stopped position and failure latch intact on failure/abort.
+        // goHome() selects the calibrated gear or the unhomed Unlimited fallback.
         spinBLEServer.spinDownFlag = 0;
       }
     }

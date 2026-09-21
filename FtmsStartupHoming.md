@@ -1,5 +1,49 @@
 # FTMS startup recovery and position synchronization
 
+## September 21: one shared downward reference (current policy)
+
+The three startup runs in the 11:05 log selected the same gear-8 target, P6426,
+but settled at R28–29, R26, and R29. Recovery had accepted R48 approached upward
+for the low starts and R55 approached downward for the high start. Those
+different references confound interpolation error, sensor settling, and drive
+play; the log alone cannot distinguish their contributions.
+
+Full calibration and every startup now share the same R51-to-R50 downward
+crossing search. First, bounded stationary-observation moves stage near R58;
+then the search approaches from above and brackets the crossing to 80 steps.
+Reversed bracket probes back off by five estimated resistance levels (capped
+at 6000 steps) before approaching downward again. A reading taken during motion
+cannot establish the reference. Each measurement requires a stopped motor,
+at least two seconds of dwell, and fresh confirmed feedback. Adjacent 50/51
+jitter is accepted only after a downward approach. The 120-second deadline,
+no-response travel guards, cancellation, and motor/report failures still apply.
+
+The middle map entry stores that crossing at R50.5. Startup subtracts the saved
+crossing coordinate from the newly measured bracket midpoint, rather than
+interpolating whichever middle reading it happens to reach. The motor's final
+probe position need not equal the bracket midpoint; rebasing accounts for that.
+The outer map samples remain stationary observations near R33 and R67 for
+ride-time interpolation. Initial calibration and startup use the same code
+for the middle reference, including approach and settling.
+
+This is the 32-byte FTM3 trailer. FTM1/FTM2 maps trigger a one-time full
+calibration; automatic migration retains saved watts and only replaces the
+file after successful calibration. A failed search uses the runtime Unlimited
+fallback. Startup now includes a repeatable crossing search even if powered on
+at R50, so the old under-20-second/no-motion targets below no longer apply.
+The prior implementation and measurements below are historical context.
+
+Native regressions cover calibration followed by boots from R0/R26/R50/R100
+with 750 steps of drive play, 1.3/2.5-second sensor delays, and false R50 reports
+through motion and the first two stopped seconds. Recovered origins differ from
+the calibration frame by at most 80 steps in this model. These cases take
+36–53 seconds, excluding BLE connection and the move to the starting gear;
+the wider-noise case takes about 85 seconds. These are simulated timings, not
+hardware measurements. Mid-search cancellation, missing feedback and motor
+command failure stop without producing a recovered origin. Persistence tests
+verify FTM2 migration preserves watt entries and leaves the saved file untouched
+until successful replacement.
+
 ## September 19 log findings
 
 The 09:16 run failed after 49.7 seconds on the no-progress guard at resistance 4.

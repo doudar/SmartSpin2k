@@ -117,7 +117,7 @@ void ErgMode::runERG() {
       const bool hasConnectedPowerMeter = spinBLEClient.connectedPM;
       const bool simulationRunning      = rtConfig->watts.getTarget() || rtConfig->watts.getSimulate();
 
-      if (!userConfig->getPTab4Pwr()) {
+      if (!ss2k->usePowerTableForPower()) {
         // add values to Power table
         powerTable->processPowerValue(powerBuffer, rtConfig->cad.getValue(), rtConfig->watts);
       }
@@ -147,7 +147,7 @@ void ErgMode::runERG() {
     loopCounter++;
   }
 
-  if (userConfig->getPTab4Pwr()) {
+  if (ss2k->usePowerTableForPower()) {
     // only do this twice as often as ERG_MODE_DELAY
     static float previousPower             = 0;
     static unsigned long int pTab4pwrTimer = millis();
@@ -318,7 +318,7 @@ void ErgMode::_updateTableConfidence() {
   // A table seek has its own settling gate. Scoring its in-flight readings
   // here would mistake motor travel and power-meter latency for table error.
   if (isTableSeeking() || rtConfig->getFTMSMode() != FitnessMachineControlPointProcedure::SetTargetPower || !spinBLEClient.connectedPM || rtConfig->watts.getSimulate() ||
-      userConfig->getPTab4Pwr()) {
+      ss2k->usePowerTableForPower()) {
     return;
   }
 

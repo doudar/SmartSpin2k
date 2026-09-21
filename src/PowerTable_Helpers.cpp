@@ -765,11 +765,11 @@ bool PTHelpers::enforceMonotonicAcrossPower(PTData& ptData) {
 void PTHelpers::clean(PTData& ptData) {
   int removed = 0;
 
-  // Remove inferred/invalid entries and negative positions.
+  // Unhomed sessions use a relative origin, so negative positions are valid.
   for (int i = 0; i < POWERTABLE_CAD_SIZE; i++) {
     for (int j = 0; j < POWERTABLE_WATT_SIZE; j++) {
       //human readings are 2+
-      if (ptData.tableRow[i].tableEntry[j].readings < 2 || ptData.tableRow[i].tableEntry[j].targetPosition < 0) {
+      if (ptData.tableRow[i].tableEntry[j].readings < 2 || ptData.tableRow[i].tableEntry[j].targetPosition == INT16_MIN) {
         if (ptData.tableRow[i].tableEntry[j].targetPosition != INT16_MIN) {
           removed++;
         }

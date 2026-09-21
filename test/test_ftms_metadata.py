@@ -16,7 +16,7 @@ class TestFtmsMetadata(unittest.TestCase):
         source = (ROOT / "src/Power_Table.cpp").read_text(encoding="utf-8")
         production = "\n".join(function(source, signature) for signature in (
             "bool PowerTable::loadFtmsCalibration(", "bool PowerTable::_manageSaveState(",
-            "bool PowerTable::_save(", "bool PowerTable::reset("))
+            "bool PowerTable::_save(", "void PowerTable::clearRuntime(", "bool PowerTable::reset("))
         harness = r'''
 #include <cassert>
 #include <cstring>
@@ -110,13 +110,15 @@ struct PowerTable {
   Helpers ptHelpers;
   FtmsCalibration::Map ftmsCalibration;
   bool ftmsPositionUncertain = false;
+  bool saveFlag = false;
   bool _hasBeenLoadedThisSession = false;
   uint32_t positionEpoch = 0;
   unsigned long lastSaveTime = 0;
   bool loadFtmsCalibration();
-  bool _manageSaveState(bool canSkipReliabilityChecks = false);
+  bool _manageSaveState(bool canSkipReliabilityChecks = false, bool allowSave = true);
   bool _save();
   bool reset();
+  void clearRuntime(bool allowSavedTableLoad = false);
 };
 /* PRODUCTION */
 FtmsCalibration::Map makeMap() {
@@ -152,7 +154,24 @@ int main() {
   PowerTable boot;
   assert(boot.loadFtmsCalibration()); // Only metadata may load before homing.
   assert(boot.ftmsCalibration.level2[0] == 67 && boot.ftmsCalibration.level2[2] == 132);
-  // Old FTM1 transition coordinates must not be interpreted as FTM2 samples.
+  // FTM2's arbitrary middle sample cannot stand in for the downward crossing.
+  Bytes oldSamples = saved;
+  auto trailer = oldSamples.data() + legacy.size();
+  put_le32(trailer, 0x324d5446);
+  put_le32(trailer + 28, FtmsCalibration::checksum(trailer, 28));
+  *LittleFS.files[POWER_TABLE_FILENAME] = oldSamples;
+  assert(!boot.loadFtmsCalibration());
+  assert(*LittleFS.files[POWER_TABLE_FILENAME] == oldSamples);
+  runtime.homed = true;
+  PowerTable sampleMigration;
+  sampleMigration.ftmsCalibration = makeMap();
+  assert(sampleMigration._manageSaveState(false, false));
+  assert(sampleMigration.ptData.tableRow[0].tableEntry[0].targetPosition == 123);
+  assert(*LittleFS.files[POWER_TABLE_FILENAME] == oldSamples);
+  assert(sampleMigration._save());
+  assert(std::equal(legacy.begin(), legacy.end(), LittleFS.files[POWER_TABLE_FILENAME]->begin()));
+  runtime.homed = false;
+  // Older FTM1 coordinates also require calibration, preserving watt entries.
   Bytes oldMetadata = legacy;
   oldMetadata.resize(legacy.size() + 40, 0);
   put_le32(oldMetadata.data() + legacy.size(), 0x314d5446);
@@ -203,6 +222,38 @@ int main() {
   assert(!migrated._save());
   assert(*LittleFS.files[POWER_TABLE_FILENAME] == saved);
   failRename = false;
+  // Homing's load-only phase must not repair/overwrite an invalid saved file
+  // before its one final atomic save succeeds.
+  Bytes invalid = saved;
+  invalid[0] = 0;
+  *LittleFS.files[POWER_TABLE_FILENAME] = invalid;
+  PowerTable loadOnly;
+  loadOnly.ftmsCalibration = makeMap();
+  assert(!loadOnly._manageSaveState(false, false));
+  assert(*LittleFS.files[POWER_TABLE_FILENAME] == invalid);
+  *LittleFS.files[POWER_TABLE_FILENAME] = saved;
+  // Fallback learning uses a clean in-memory table and never opens/replaces the
+  // saved calibration, even when its temporary table has more readings.
+  runtime.homed = false;
+  migrated.ftmsPositionUncertain = migrated.saveFlag = true;
+  const uint32_t oldEpoch = migrated.positionEpoch;
+  migrated.clearRuntime();
+  assert(migrated.positionEpoch == oldEpoch + 1 && !migrated.ftmsPositionUncertain && !migrated.saveFlag);
+  assert(!migrated.ftmsCalibration.valid() && migrated._hasBeenLoadedThisSession);
+  assert(migrated.ptHelpers.getTotalReadings(migrated.ptData) == 0);
+  assert(config.minimum == 0 && config.maximum == 30000);
+  migrated.ptData.tableRow[0].tableEntry[0].targetPosition = -50;
+  migrated.ptData.tableRow[0].tableEntry[0].readings = 50;
+  assert(!migrated._manageSaveState() && !migrated._save());
+  assert(*LittleFS.files[POWER_TABLE_FILENAME] == saved);
+  // A later successful startup home discards temporary coordinates first,
+  // then reloads the original saved table instead of saving the temporary one.
+  migrated.clearRuntime(true);
+  assert(!migrated._hasBeenLoadedThisSession);
+  runtime.homed = true;
+  assert(migrated._manageSaveState());
+  assert(migrated.ptData.tableRow[0].tableEntry[0].targetPosition == 123);
+  assert(*LittleFS.files[POWER_TABLE_FILENAME] == saved);
   PowerTable empty;
   empty.ftmsCalibration = makeMap();
   assert(empty._save()); // New calibration persists before the first watt sample.

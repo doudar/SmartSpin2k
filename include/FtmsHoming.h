@@ -82,12 +82,18 @@ template <class IO> class Search {
 
   Failure failure() const { return failure_; }
 
-  // Sample near the requested level, storing what the sensor actually reports.
-  // A skipped integer or a moving analog boundary must not cause fine bisection.
+  // Outer points sample near the requested level; the middle is the shared
+  // downward crossing used to recover coordinates on every startup.
   bool reference(int target, int32_t& position, uint8_t& level2, int stepsPerLevel) {
     StopOnExit stopOnExit{io_};
     started_ = io_.now();
     failure_ = Failure::Boundary;
+    if (target == FtmsCalibration::REFERENCE_LEVEL) {
+      if (!middleReference(position, stepsPerLevel)) return false;
+      level2 = FtmsCalibration::REFERENCE_LEVEL2;
+      failure_ = Failure::None;
+      return true;
+    }
     io_.setBoundaryTarget(target);
     if (stepsPerLevel < 20) return fail(Failure::Boundary);
     if (!observationReady_ || observationPosition_ != io_.position() || io_.now() - valueTimestamp_ > FtmsCalibration::FRESH_MS) {
@@ -121,29 +127,13 @@ template <class IO> class Search {
   bool recover(const FtmsCalibration::Map& map, int32_t& origin) {
     StopOnExit stopOnExit{io_};
     if (!map.valid()) return fail(Failure::Boundary);
-    started_ = io_.now();
-    // Twenty seconds is a performance target, not a reason to discard fresh
-    // responsive feedback. No-response travel and the overall safety deadline
-    // still bound recovery when the brake does not follow the requested moves.
-    if (!stationaryObservation()) return false;
-    int32_t coordinate, uncertainty;
-    // If booted outside the trustworthy middle, move toward 50 in bounded
-    // chunks. Stop as soon as a stationary reading enters the measured map;
-    // do not spend the remaining startup budget refining an unnecessary edge.
-    int64_t unresponsiveTravel = 0;
-    while (!map.estimateHalf(observationLevel2(), coordinate, uncertainty)) {
-      const int before = observationLevel2();
-      const int32_t previous = io_.position();
-      const float scale = 2.0f * (map.position[2] - map.position[0]) / (map.level2[2] - map.level2[0]);
-      const int32_t next = resistanceController_.update(previous, (before + 1) / 2, 50, valueTimestamp_, io_.now(), 6000, sensitivity_, scale);
-      if (!move(next, REFERENCE_SPEED) || !stationaryObservation()) return false;
-      const int64_t delta = static_cast<int64_t>(io_.position()) - previous;
-      const int progress = (observationLevel2() - before) * (delta > 0 ? 1 : -1);
-      unresponsiveTravel += delta < 0 ? -delta : delta;
-      if (progress > 2) unresponsiveTravel = 0;
-      if (unresponsiveTravel >= MAX_PLATEAU_STEPS) return fail(Failure::NoProgress);
-    }
-    int64_t zero = static_cast<int64_t>(io_.position()) - coordinate;
+    const int scale = static_cast<int>(2LL * (map.position[2] - map.position[0]) / (map.level2[2] - map.level2[0]));
+    int32_t crossing;
+    uint8_t level2;
+    // Use the identical search as full calibration, even when booted in-map.
+    // The returned bracket midpoint can differ from the final motor position.
+    if (!reference(FtmsCalibration::REFERENCE_LEVEL, crossing, level2, scale)) return false;
+    int64_t zero = static_cast<int64_t>(crossing) - map.position[1];
     if (zero < INT32_MIN || zero > INT32_MAX) return fail(Failure::Boundary);
     origin = static_cast<int32_t>(zero);
     failure_ = Failure::None;
@@ -170,6 +160,23 @@ template <class IO> class Search {
   int32_t observationPosition_ = 0;
   int observation2_ = 0;
   Failure failure_ = Failure::None;
+  int lastMoveDirection_ = 0;
+  bool directionalReference_ = false;
+  int referenceScale_ = 0;
+
+  bool middleReference(int32_t& position, int stepsPerLevel) {
+    // Clear the reference by several levels before approaching downward. This
+    // also takes up play when startup begins below (or exactly at) the crossing.
+    int32_t staging;
+    uint8_t observed;
+    if (!reference(FtmsCalibration::REFERENCE_LEVEL + 8, staging, observed, stepsPerLevel)) return false;
+    directionalReference_ = true;
+    referenceScale_ = stepsPerLevel;
+    const int backoff = static_cast<int>(std::min<int64_t>(6000, 5LL * stepsPerLevel));
+    const bool found = stoppedReading(true) && boundary(FtmsCalibration::REFERENCE_LEVEL, -1, position, ANCHOR_TOLERANCE, backoff);
+    directionalReference_ = false;
+    return found;
+  }
 
   bool fail(Failure failure) {
     failure_ = failure;
@@ -267,6 +274,7 @@ template <class IO> class Search {
   bool move(int32_t position, int speed) {
     observationReady_ = false;
     stationaryBoundary_ = false;
+    if (position != io_.position()) lastMoveDirection_ = position > io_.position() ? 1 : -1;
     if (!io_.moveTo(position, speed)) return fail(Failure::Motor);
     bool fresh;
     do {
@@ -282,12 +290,13 @@ template <class IO> class Search {
 
   bool atBoundary(int target, int direction) const {
     int low = direction < 0 ? target : target - 1;
-    return stationaryBoundary_ && stationaryLow_ == low && stationaryHigh_ == low + 1;
+    return stationaryBoundary_ && stationaryLow_ == low && stationaryHigh_ == low + 1 &&
+           (!directionalReference_ || lastMoveDirection_ == direction);
   }
 
   int observationLevel2() const { return observation2_; }
 
-  // Hold the motor and require fresh stationary feedback stable for one second.
+  // Hold the motor for at least two seconds and confirm fresh stationary feedback.
   // Adjacent quantization noise is represented by a half level. Larger changes
   // restart confirmation; persistently noisy feedback still gets an average.
   bool stationaryObservation() {
@@ -324,7 +333,7 @@ template <class IO> class Search {
         }
         const bool stable = valueTimestamp_ - firstTime >= SETTLE_MS;
         const bool adjacentJitter = changes >= 2 && valueTimestamp_ - windowTime >= SETTLE_MS;
-        if (stable || adjacentJitter) {
+        if ((stable || adjacentJitter) && valueTimestamp_ - stopped >= 2 * SETTLE_MS) {
           stationaryLow_ = stable ? resistance_ : low;
           stationaryHigh_ = stable ? resistance_ : high;
           stationaryBoundary_ = stationaryLow_ != stationaryHigh_;
@@ -374,26 +383,27 @@ template <class IO> class Search {
       // complete stop and dwell after every incremental motor target.
       if (io_.now() - lastCommand >= 10) {
         const int32_t next = resistanceController_.update(io_.position(), resistance_, target, valueTimestamp_, io_.now(), shiftStep_, sensitivity_);
+        if (next != io_.position()) lastMoveDirection_ = next > io_.position() ? 1 : -1;
         if (!io_.moveTo(next, std::abs(error) <= 3 ? std::min(speed, FINE_SPEED) : speed)) return fail(Failure::Motor);
         lastCommand = io_.now();
       }
     }
   }
 
-  bool boundary(int target, int direction, int32_t& result, int tolerance) {
+  bool boundary(int target, int direction, int32_t& result, int tolerance, int backoffSteps = FINE_STEP) {
     io_.setBoundaryTarget(target);
     // A quantized analog crossing can shift between probes. Reacquire it instead
     // of rejecting the whole calibration on one final reading. Keep trying
     // while resistance responds, within the shared endpoint deadline.
     while (true) {
       failure_ = Failure::Boundary;
-      if (boundaryAttempt(target, direction, result, tolerance)) return true;
+      if (boundaryAttempt(target, direction, result, tolerance, backoffSteps)) return true;
       if (!retryable()) return false;
-      if (!stoppedReading()) return false;
+      if (!stoppedReading(directionalReference_)) return false;
     }
   }
 
-  bool boundaryAttempt(int target, int direction, int32_t& result, int tolerance) {
+  bool boundaryAttempt(int target, int direction, int32_t& result, int tolerance, int backoffSteps) {
     attemptStartResistance_ = resistance_;
     if (atBoundary(target, direction)) {
       result = io_.position();
@@ -403,8 +413,22 @@ template <class IO> class Search {
     // Only the final transition bracket needs precision probes.
     const int approach = target - 2 * direction;
     int approachSpeed = FAST_SPEED;
+    int progressResistance = resistance_;
+    int32_t approachProgressPosition = io_.position();
     while ((resistance_ - approach) * direction < 0 || (resistance_ - target) * direction >= 0) {
-      if (!seekResistance(approach, approachSpeed) || !stoppedReading(true)) return false;
+      if (directionalReference_) {
+        // Moving reports lag the brake. This reference uses only completed
+        // moves and two-second stationary observations, including its approach.
+        const int64_t estimate = static_cast<int64_t>(approach - resistance_) * referenceScale_;
+        const int delta = static_cast<int>(std::max<int64_t>(-6000, std::min<int64_t>(6000, estimate)));
+        if (!moveBy(delta, REFERENCE_SPEED) || !stoppedReading(true)) return false;
+        if (std::abs(resistance_ - progressResistance) > 2) {
+          progressResistance = resistance_;
+          approachProgressPosition = io_.position();
+        } else if (std::abs(static_cast<int64_t>(io_.position()) - approachProgressPosition) >= MAX_PLATEAU_STEPS) {
+          return fail(Failure::NoProgress);
+        }
+      } else if (!seekResistance(approach, approachSpeed) || !stoppedReading(true)) return false;
       if (atBoundary(target, direction)) { result = io_.position(); return true; }
       approachSpeed = std::max(TOLERANCE, approachSpeed / 2);
     }
@@ -449,7 +473,7 @@ template <class IO> class Search {
     int32_t after = io_.position();
     // Re-approach each trial from the original interior position so backlash
     // is taken up in the same direction for every measured crossing.
-    int64_t backoff = static_cast<int64_t>(before) - direction * FINE_STEP;
+    int64_t backoff = static_cast<int64_t>(before) - direction * backoffSteps;
     if (backoff < INT32_MIN || backoff > INT32_MAX) return false;
     const int32_t interior = static_cast<int32_t>(backoff);
     // These are bounded repositioning moves inside an already measured region.
