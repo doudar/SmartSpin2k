@@ -88,9 +88,13 @@ class HomingSafetyPause {
     DriverLock lock;
     portENTER_CRITICAL(&enableMux);
     homingActive      = true;
-    bool wasInhibited = motorInhibited;
     portEXIT_CRITICAL(&enableMux);
-    if (wasInhibited && stepper) stepper->setAutoEnable(true);
+    // Cadence normally selects manual enable, but FastAccelStepper retains its
+    // earlier auto-disable countdown when that mode changes. Homing skips the
+    // maintenance enableOutputs() calls; a long dwell can therefore disable EN
+    // while subsequent commands still advance the software position. Always
+    // let homing moves refresh the countdown and re-enable an expired output.
+    if (stepper) stepper->setAutoEnable(true);
   }
   ~HomingSafetyPause() {
     DriverLock lock;
@@ -418,14 +422,13 @@ void SS2K::_resistanceMove() {
     }
     rtConfig->setTargetIncline(pos);
   } else {
-    int actualDelta = rtConfig->resistance.getTarget() - rtConfig->resistance.getValue();
-    int direction   = (actualDelta > 0) ? 1 : -1;
-    if (abs(actualDelta) > 20 - userConfig->getERGSensitivity()) {
-      rtConfig->setTargetIncline(ss2k->getCurrentPosition() + userConfig->getShiftStep() * direction);
-    } else if (abs(actualDelta) > 1) {
-      rtConfig->setTargetIncline(ss2k->getCurrentPosition() + actualDelta * 3 + (userConfig->getERGSensitivity() * direction));
-    } else {
-      rtConfig->setTargetIncline(ss2k->getCurrentPosition() + actualDelta + (userConfig->getERGSensitivity() * direction));
+    static ResistanceControl::Controller controller;
+    const auto sample = rtConfig->resistance.getValueSample();
+    const float previousDamping = controller.damping();
+    rtConfig->setTargetIncline(controller.update(ss2k->getCurrentPosition(), sample.value, rtConfig->resistance.getTarget(), sample.timestamp, millis(),
+                                               userConfig->getShiftStep(), userConfig->getERGSensitivity()));
+    if (controller.damping() != previousDamping) {
+      SS2K_LOG(MAIN_LOG_TAG, "Resistance damping: D=%.1fs target=%d actual=%d", controller.damping(), rtConfig->resistance.getTarget(), sample.value);
     }
   }
   ss2k->targetPosition = rtConfig->getTargetIncline();
@@ -752,6 +755,7 @@ void SS2K::_findFTMSHome(bool bothDirections) {
     bool searchingMax = false;
     int targetResistance = 10;
     uint32_t lastLog = 0;
+    uint32_t lastMoveLog = 0;
     uint32_t now() { return millis(); }
     Measurement::ValueSample sample() { return rtConfig->resistance.getValueSample(); }
     int32_t position() { return stepper->getCurrentPosition(); }
@@ -771,7 +775,10 @@ void SS2K::_findFTMSHome(bool bothDirections) {
       logProgress();
     }
     bool moveTo(int32_t target, int speed) {
-      SS2K_LOG(MAIN_LOG_TAG, "FTMS seek: resistance=%d position=%d target=%d speed=%d", sample().value, position(), target, speed);
+      if (now() - lastMoveLog >= LOG_INTERVAL) {
+        SS2K_LOG(MAIN_LOG_TAG, "FTMS seek: resistance=%d position=%d target=%d speed=%d", sample().value, position(), target, speed);
+        lastMoveLog = now();
+      }
       ss2k->updateStepperSpeed(speed);
       return stepper->moveTo(target) == 0;
     }
@@ -811,7 +818,7 @@ void SS2K::_findFTMSHome(bool bothDirections) {
     bothDirections = true;
     fitnessMachineService.spinDown(FitnessMachineStatus::SpinDown_SpinDownRequested);
   }
-  FtmsHoming::Search<HomingIO> search(io);
+  FtmsHoming::Search<HomingIO> search(io, userConfig->getShiftStep(), userConfig->getERGSensitivity());
   int32_t minimum, maximum;
   auto searchFailed = [&]() {
     auto sample = io.sample();

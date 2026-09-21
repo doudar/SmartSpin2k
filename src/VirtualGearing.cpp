@@ -11,6 +11,12 @@
 #include <cmath>
 
 void SS2K::resetStartingGear() {
+  // Spindown is a procedure, not a riding mode. Leaving its opcode selected
+  // bypasses local gearing and interprets the recovered position as terrain.
+  if (rtConfig->getHomed() && rtConfig->getFTMSMode() == FitnessMachineControlPointProcedure::SpinDownControl) {
+    rtConfig->setFTMSMode(FitnessMachineControlPointProcedure::SetIndoorBikeSimulationParameters);
+    rtConfig->setTargetIncline(0);
+  }
   localGear = userConfig->getGearRatios().startGear(rtConfig->getHomed());
   rtConfig->setShifterPosition(localGearingSelected() ? localGear : SHIFTER_MIDDLE_POSITION);
   // A programmatic gear reset is not a rider shift. Keep the shift baseline in sync so

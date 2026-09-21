@@ -9,6 +9,7 @@
 
 #include <stdint.h>
 #include "FtmsCalibration.h"
+#include "ResistanceControl.h"
 
 namespace FtmsHoming {
 enum class Failure { None, Cancelled, Simulated, StaleReport, Timeout, InvalidResistance, NoProgress, WrongDirection, Motor, Boundary };
@@ -51,7 +52,8 @@ inline bool supportsRange(int minimum, int maximum) { return minimum >= 0 && min
 // allows replay against quantized sensors with delayed 1 Hz reports.
 template <class IO> class Search {
  public:
-  explicit Search(IO& io) : io_(io), started_(io.now()), lastReport_(io.now()), lastChange_(io.now()) {
+  explicit Search(IO& io, int shiftStep = 1200, float sensitivity = 3) : io_(io), started_(io.now()), lastReport_(io.now()), lastChange_(io.now()),
+                                                                     shiftStep_(shiftStep), sensitivity_(sensitivity) {
     auto sample = io_.sample();
     valueTimestamp_ = sample.timestamp;
     resistance_ = sample.value;
@@ -59,19 +61,12 @@ template <class IO> class Search {
 
   bool endpoint(bool upper, int32_t& endpoint) {
     // Every exit stops the motor, including a failed read while it is moving.
-    struct StopOnExit {
-      IO& io;
-      ~StopOnExit() { io.stop(); }
-    } stopOnExit{io_};
+    StopOnExit stopOnExit{io_};
     failure_ = Failure::Boundary;
     started_ = io_.now();
-    timeout_ = END_TIMEOUT_MS;
     int direction = upper ? 1 : -1;
     while (true) {
-      if (!stoppedReading()) {
-        if (retryable()) continue;
-        return false;
-      }
+      if (!stoppedReading()) return false;
       int32_t anchor, edge;
       if (!boundary(upper ? 90 : 10, direction, anchor, ANCHOR_TOLERANCE) || !boundary(upper ? 98 : 2, direction, edge, TOLERANCE)) return false;
       int64_t span = static_cast<int64_t>(edge) - anchor;
@@ -89,18 +84,17 @@ template <class IO> class Search {
 
   // Sample near the requested level, storing what the sensor actually reports.
   // A skipped integer or a moving analog boundary must not cause fine bisection.
-  bool reference(int target, int32_t& position, uint8_t& level2, int stepsPerLevel = FINE_STEP) {
-    struct StopOnExit { IO& io; ~StopOnExit() { io.stop(); } } stopOnExit{io_};
+  bool reference(int target, int32_t& position, uint8_t& level2, int stepsPerLevel) {
+    StopOnExit stopOnExit{io_};
     started_ = io_.now();
-    timeout_ = END_TIMEOUT_MS;
     failure_ = Failure::Boundary;
     io_.setBoundaryTarget(target);
     if (stepsPerLevel < 20) return fail(Failure::Boundary);
     if (!observationReady_ || observationPosition_ != io_.position() || io_.now() - valueTimestamp_ > FtmsCalibration::FRESH_MS) {
       if (!stationaryObservation()) return false;
     }
-    int bestError = 201;
-    int32_t progressPosition = io_.position();
+    int lastObservation = observationLevel2();
+    int64_t unresponsiveTravel = 0;
     while (true) {
       const int observed = observationLevel2();
       int error = observed - 2 * target;
@@ -110,29 +104,27 @@ template <class IO> class Search {
         level2 = static_cast<uint8_t>(observed);
         break;
       }
-      if (error < bestError) { bestError = error; progressPosition = io_.position(); }
-      const int64_t travel = static_cast<int64_t>(io_.position()) - progressPosition;
-      if (travel >= MAX_PLATEAU_STEPS || travel <= -MAX_PLATEAU_STEPS) return fail(Failure::NoProgress);
-      int64_t delta = static_cast<int64_t>(2 * target - observed) * stepsPerLevel / 2;
-      if (delta > 6000) delta = 6000;
-      if (delta < -6000) delta = -6000;
-      const int64_t next = static_cast<int64_t>(io_.position()) + delta;
-      if (next < INT32_MIN || next > INT32_MAX - FINE_STEP) return fail(Failure::Motor);
-      if (delta > 0 && !move(static_cast<int32_t>(next) + FINE_STEP, REFERENCE_SPEED)) return false;
-      if (!move(static_cast<int32_t>(next), REFERENCE_SPEED) || !stationaryObservation()) return false;
+      const int32_t previous = io_.position();
+      const int32_t next = resistanceController_.update(previous, (observed + 1) / 2, target, valueTimestamp_, io_.now(), 6000, sensitivity_, stepsPerLevel);
+      if (!move(next, REFERENCE_SPEED) || !stationaryObservation()) return false;
+      unresponsiveTravel += std::abs(static_cast<int64_t>(io_.position()) - previous);
+      if (std::abs(observationLevel2() - lastObservation) > 2) {
+        unresponsiveTravel = 0;
+        lastObservation = observationLevel2();
+      }
+      if (unresponsiveTravel >= MAX_PLATEAU_STEPS) return fail(Failure::NoProgress);
     }
     failure_ = Failure::None;
     return true;
   }
 
   bool recover(const FtmsCalibration::Map& map, int32_t& origin) {
-    struct StopOnExit { IO& io; ~StopOnExit() { io.stop(); } } stopOnExit{io_};
+    StopOnExit stopOnExit{io_};
     if (!map.valid()) return fail(Failure::Boundary);
     started_ = io_.now();
     // Twenty seconds is a performance target, not a reason to discard fresh
     // responsive feedback. No-response travel and the overall safety deadline
     // still bound recovery when the brake does not follow the requested moves.
-    timeout_ = END_TIMEOUT_MS;
     if (!stationaryObservation()) return false;
     int32_t coordinate, uncertainty;
     // If booted outside the trustworthy middle, move toward 50 in bounded
@@ -141,11 +133,11 @@ template <class IO> class Search {
     int64_t unresponsiveTravel = 0;
     while (!map.estimateHalf(observationLevel2(), coordinate, uncertainty)) {
       const int before = observationLevel2();
-      int64_t delta = static_cast<int64_t>(100 - before) * (map.position[FtmsCalibration::COUNT - 1] - map.position[0]) /
-                      (map.level2[FtmsCalibration::COUNT - 1] - map.level2[0]);
-      if (delta > 6000) delta = 6000;
-      if (delta < -6000) delta = -6000;
-      if (!moveBy(static_cast<int>(delta), REFERENCE_SPEED) || !stationaryObservation()) return false;
+      const int32_t previous = io_.position();
+      const float scale = 2.0f * (map.position[2] - map.position[0]) / (map.level2[2] - map.level2[0]);
+      const int32_t next = resistanceController_.update(previous, (before + 1) / 2, 50, valueTimestamp_, io_.now(), 6000, sensitivity_, scale);
+      if (!move(next, REFERENCE_SPEED) || !stationaryObservation()) return false;
+      const int64_t delta = static_cast<int64_t>(io_.position()) - previous;
       const int progress = (observationLevel2() - before) * (delta > 0 ? 1 : -1);
       unresponsiveTravel += delta < 0 ? -delta : delta;
       if (progress > 2) unresponsiveTravel = 0;
@@ -159,9 +151,16 @@ template <class IO> class Search {
   }
 
  private:
+  struct StopOnExit {
+    IO& io;
+    ~StopOnExit() { io.stop(); }
+  };
+
   IO& io_;
   uint32_t started_, lastReport_, lastChange_, valueTimestamp_;
-  uint32_t timeout_ = END_TIMEOUT_MS;
+  int shiftStep_;
+  float sensitivity_;
+  ResistanceControl::Controller resistanceController_;
   int resistance_ = 0;
   // Only describes the latest stationary observation, never moving reports.
   int stationaryLow_ = 0, stationaryHigh_ = 0;
@@ -203,7 +202,7 @@ template <class IO> class Search {
     }
     if (sample.simulate) return fail(Failure::Simulated);
     if (io_.cancelled()) return fail(Failure::Cancelled);
-    if (now - started_ >= timeout_) return fail(Failure::Timeout);
+    if (now - started_ >= END_TIMEOUT_MS) return fail(Failure::Timeout);
     if (now - lastReport_ >= REPORT_TIMEOUT_MS) return fail(Failure::StaleReport);
     if (fresh && (resistance_ < 0 || resistance_ > 100)) return fail(Failure::InvalidResistance);
     return true;
@@ -288,43 +287,95 @@ template <class IO> class Search {
 
   int observationLevel2() const { return observation2_; }
 
-  // Two fresh stationary reports AFTER the acquisition guard. Repeated old
-  // reports during the first two seconds are not evidence that the brake has
-  // settled. Adjacent quantization noise is represented by a half level.
+  // Hold the motor and require fresh stationary feedback stable for one second.
+  // Adjacent quantization noise is represented by a half level. Larger changes
+  // restart confirmation; persistently noisy feedback still gets an average.
   bool stationaryObservation() {
     observationReady_ = false;
     io_.stop();
     bool fresh;
     do { if (!poll(fresh)) return false; } while (io_.moving());
     const uint32_t stopped = io_.now();
-    uint32_t firstTime = 0;
-    int first = 0;
+    uint32_t firstTime = 0, windowTime = 0;
+    int first = 0, low = 0, high = 0, changes = 0;
     int sampleSum = 0, sampleCount = 0;
+    int recent[2] = {};
     bool haveFirst = false;
     while (true) {
       if (!poll(fresh)) return false;
-      if (fresh && valueTimestamp_ - stopped >= 2 * SETTLE_MS) {
+      if (fresh && static_cast<int32_t>(valueTimestamp_ - stopped) >= 0) {
+        sampleSum -= recent[sampleCount % 2];
+        recent[sampleCount % 2] = resistance_;
         sampleSum += resistance_;
         ++sampleCount;
-        if (!haveFirst || resistance_ < first - 1 || resistance_ > first + 1) {
+        if (!haveFirst || resistance_ < high - 1 || resistance_ > low + 1) {
+          low = high = resistance_;
+          changes = 0;
+          windowTime = valueTimestamp_;
+        } else if (resistance_ != first) {
+          low = std::min(low, resistance_);
+          high = std::max(high, resistance_);
+          ++changes;
+        }
+        if (!haveFirst || resistance_ != first) {
           first = resistance_;
           firstTime = valueTimestamp_;
           haveFirst = true;
-        } else if (valueTimestamp_ - firstTime >= SETTLE_MS) {
-          stationaryLow_ = first < resistance_ ? first : resistance_;
-          stationaryHigh_ = first > resistance_ ? first : resistance_;
+        }
+        const bool stable = valueTimestamp_ - firstTime >= SETTLE_MS;
+        const bool adjacentJitter = changes >= 2 && valueTimestamp_ - windowTime >= SETTLE_MS;
+        if (stable || adjacentJitter) {
+          stationaryLow_ = stable ? resistance_ : low;
+          stationaryHigh_ = stable ? resistance_ : high;
           stationaryBoundary_ = stationaryLow_ != stationaryHigh_;
-          observation2_ = first + resistance_;
+          observation2_ = stationaryLow_ + stationaryHigh_;
           observationPosition_ = io_.position();
           observationReady_ = true;
           return true;
         }
       }
       if (io_.now() - stopped >= STABLE_READING_TIMEOUT_MS && sampleCount) {
-        observation2_ = (2 * sampleSum + sampleCount / 2) / sampleCount;
+        observation2_ = (2 * sampleSum + std::min(sampleCount, 2) / 2) / std::min(sampleCount, 2);
         observationPosition_ = io_.position();
         observationReady_ = true;
         return true;
+      }
+    }
+  }
+
+  bool seekResistance(int target, int speed) {
+    observationReady_ = false;
+    stationaryBoundary_ = false;
+    const int initialError = target - resistance_;
+    int progressResistance = resistance_;
+    int32_t progressPosition = io_.position();
+    uint32_t lastCommand = io_.now() - 10;
+    while (true) {
+      bool fresh;
+      if (!poll(fresh)) return false;
+      const int error = target - resistance_;
+      if ((error == 0) || (initialError > 0 && error < 0) || (initialError < 0 && error > 0)) {
+        io_.stop();
+        return true;
+      }
+      if (fresh && std::abs(resistance_ - progressResistance) > 2) {
+        progressResistance = resistance_;
+        progressPosition = io_.position();
+      }
+      const int64_t travel = static_cast<int64_t>(io_.position()) - progressPosition;
+      if (travel >= MAX_PLATEAU_STEPS || travel <= -MAX_PLATEAU_STEPS) {
+        if (!stationaryObservation()) return false;
+        if (std::abs(resistance_ - progressResistance) <= 2) return fail(Failure::NoProgress);
+        progressResistance = resistance_;
+        progressPosition = io_.position();
+        continue;
+      }
+      // Match normal maintenance's control cadence, rather than waiting for a
+      // complete stop and dwell after every incremental motor target.
+      if (io_.now() - lastCommand >= 10) {
+        const int32_t next = resistanceController_.update(io_.position(), resistance_, target, valueTimestamp_, io_.now(), shiftStep_, sensitivity_);
+        if (!io_.moveTo(next, std::abs(error) <= 3 ? std::min(speed, FINE_SPEED) : speed)) return fail(Failure::Motor);
+        lastCommand = io_.now();
       }
     }
   }
@@ -338,10 +389,7 @@ template <class IO> class Search {
       failure_ = Failure::Boundary;
       if (boundaryAttempt(target, direction, result, tolerance)) return true;
       if (!retryable()) return false;
-      do {
-        if (stoppedReading()) break;
-        if (!retryable()) return false;
-      } while (true);
+      if (!stoppedReading()) return false;
     }
   }
 
@@ -351,83 +399,26 @@ template <class IO> class Search {
       result = io_.position();
       return true;
     }
-    // Approach from two levels inside the range even if startup is at an end.
-    // Far travel is continuous; fresh reports bound each decision to ~1 Hz.
-    int approach = target - 2 * direction;
-    int lastDirection = 0;
+    // Use the same live resistance controller to reach the interior side.
+    // Only the final transition bracket needs precision probes.
+    const int approach = target - 2 * direction;
+    int approachSpeed = FAST_SPEED;
+    while ((resistance_ - approach) * direction < 0 || (resistance_ - target) * direction >= 0) {
+      if (!seekResistance(approach, approachSpeed) || !stoppedReading(true)) return false;
+      if (atBoundary(target, direction)) { result = io_.position(); return true; }
+      approachSpeed = std::max(TOLERANCE, approachSpeed / 2);
+    }
     int bestResistance = resistance_;
-    bool settled = true;
-    int speedLimit = FAST_SPEED;
-    int progressTarget = approach;
-    auto distanceToTarget = [&]() {
-      int distance = resistance_ - progressTarget;
-      return distance < 0 ? -distance : distance;
-    };
-    int bestDistance = distanceToTarget();
     uint32_t progress = io_.now();
+    int bestDistance = std::abs(resistance_ - target);
+    auto distanceToTarget = [&]() { return std::abs(resistance_ - target); };
     auto progressing = [&]() {
       int distance = distanceToTarget();
-      if (distance < bestDistance) {
-        bestDistance = distance;
-        progress = io_.now();
-      }
+      if (distance < bestDistance) { bestDistance = distance; progress = io_.now(); }
       return io_.now() - progress < NO_PROGRESS_MS;
     };
-    while (true) {
-      while ((resistance_ - approach) * direction < 0 || (resistance_ - target) * direction >= 0) {
-        if (!progressing()) return fail(Failure::NoProgress);
-        int travelDirection = resistance_ < approach ? 1 : -1;
-        if (lastDirection && lastDirection != travelDirection) {
-          // Drain the sensor's view of the old motion before reversing. A late
-          // report from that motion must not look like wrong-way new motion.
-          if (!settled && !stoppedReading()) return false;
-          if (atBoundary(target, direction)) {
-            result = io_.position();
-            return true;
-          }
-          settled = true;
-          speedLimit /= 2;
-          if (speedLimit < TOLERANCE) speedLimit = TOLERANCE;
-          lastDirection = 0;
-          continue;  // Recompute direction from the settled resistance.
-        }
-        if (lastDirection != travelDirection) bestResistance = resistance_;
-        lastDirection = travelDirection;
-        int error = resistance_ - approach;
-        if (error < 0) error = -error;
-        // Brake before the next 1 Hz report can carry us across the anchor.
-        int speed = error > 3 ? (error - 2) * FINE_STEP / 2 : FINE_SPEED;
-        if (speed < FINE_SPEED) speed = FINE_SPEED;
-        if (speed > speedLimit) speed = speedLimit;
-        int64_t next = static_cast<int64_t>(io_.position()) + travelDirection * speed * 2;
-        if (next < INT32_MIN || next > INT32_MAX || !io_.moveTo(static_cast<int32_t>(next), speed)) return fail(Failure::Motor);
-        settled = false;
-        stationaryBoundary_ = false;
-        bool fresh;
-        do {
-          if (!poll(fresh)) return false;
-        } while (!fresh);
-        if ((resistance_ - bestResistance) * travelDirection < -2) return fail(Failure::WrongDirection);
-        if ((resistance_ - bestResistance) * travelDirection > 0) bestResistance = resistance_;
-      }
-      if (!settled && !stoppedReading(true)) return false;
-      if (atBoundary(target, direction)) {
-        result = io_.position();
-        return true;
-      }
-      settled = true;
-      if ((resistance_ - target) * direction < 0) break;
-      // The real bike reported 6 while stopping, then 5 at the same position.
-      // Back out and confirm an interior position instead of failing or treating
-      // that late sample as an accurately located transition. Keep the existing
-      // timeout/progress budget and reduce speed on reversal.
-    }
 
     int32_t before = io_.position();
-    bestResistance = resistance_;
-    progress = io_.now();
-    progressTarget = target;
-    bestDistance = distanceToTarget();
     int32_t progressPosition = io_.position();
     int probeStep = FINE_STEP;
     while ((resistance_ - target) * direction < 0) {

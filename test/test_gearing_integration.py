@@ -5,6 +5,9 @@ The native suite separately exercises the FTMS search and thermal policies.
 """
 
 from pathlib import Path
+import json
+import math
+import re
 import shutil
 import subprocess
 import tempfile
@@ -29,7 +32,7 @@ class TestGearingIntegration(unittest.TestCase):
                 "int32_t SS2K::gearTargetPosition(", "int32_t SS2K::simulationTargetPosition(")],
             function(main, "void SS2K::FTMSModeShiftModifier("),
             *[function(stepper, signature) for signature in (
-                "void SS2K::moveStepper(", "void SS2K::syncFtmsPosition(", "void SS2K::_findFTMSHome(", "void SS2K::goHome(")],
+                "void SS2K::_resistanceMove(", "void SS2K::moveStepper(", "void SS2K::syncFtmsPosition(", "void SS2K::_findFTMSHome(", "void SS2K::goHome(")],
         ])
         harness = r'''
 #include <cassert>
@@ -42,6 +45,7 @@ unsigned long testMillis() { return clockMs; }
 #include "SmartSpin_parameters.h"
 #include "BLE_Definitions.h"
 #include "FtmsCalibration.h"
+#include "ResistanceControl.h"
 #define ARDUINO_ISR_ATTR
 #define SS2K_LOG(...) ((void)0)
 using std::max;
@@ -119,7 +123,6 @@ void SS2K::setupTMCStepperDriver(bool) {}
 void SS2K::updateStepperPower(int) {}
 void SS2K::updateStepperSpeed(int) {}
 bool SS2K::stepperSafetyReady() { return safetyReady; }
-void SS2K::_resistanceMove() {}
 bool SS2K::_findEndStop(bool upper) { motor.pos = upper ? 20000 : -1000; return true; }
 // Isolate orchestration from the independently tested sensor search.
 namespace FtmsHoming {
@@ -128,7 +131,7 @@ const char* failureName(Failure) { return "timeout"; }
 bool supportsRange(int low, int high) { return low == 0 && high == 100; }
 template<class IO> struct Search {
   IO& io;
-  explicit Search(IO& value) : io(value) {}
+  explicit Search(IO& value, int, float) : io(value) {}
   bool endpoint(bool upper, int32_t& result) {
     ++fullSearches;
     assert(pauses == 1);
@@ -150,7 +153,7 @@ template<class IO> struct Search {
   bool recover(const FtmsCalibration::Map& map, int32_t& result) {
     ++recoveries;
     int32_t center, uncertainty;
-    if (!map.estimate(rtConfig->resistance.getValue(), center, uncertainty)) return false;
+    if (!map.estimateHalf(2 * rtConfig->resistance.getValue(), center, uncertainty)) return false;
     result = motor.pos - center;
     return searchSucceeds;
   }
@@ -190,6 +193,42 @@ void assertGear(int gear) {
   assert(controller.getLastShifterPosition() == gear);
 }
 int main() {
+  // Actual FTMS spindown mode, for every shipped profile and both home paths.
+  /* SHIPPED PROFILES */
+  const uint16_t* profiles[] = {nullptr, road, mtb, gravel};
+  const int counts[] = {0,24,12,13};
+  const int starts[] = {8,8,4,4};
+  for (int profile = 0; profile < 4; ++profile) {
+    for (bool ftms : {false, true}) {
+      for (bool full : {false, true}) {
+        reset(ftms);
+        config.setShiftStep(1200);
+        assert(config.setGearRatios(profiles[profile], counts[profile]));
+        runtime.setFTMSMode(FitnessMachineControlPointProcedure::SpinDownControl);
+        runtime.setTargetIncline(7484); // Old recovered position must not become terrain.
+        controller.goHome(full);
+        assertGear(starts[profile]);
+        assert(runtime.getFTMSMode() == FitnessMachineControlPointProcedure::SetIndoorBikeSimulationParameters);
+        assert(runtime.getTargetIncline() == 0);
+        const int expected = config.getGearRatios().offsetSteps(starts[profile], 1200);
+        controller.FTMSModeShiftModifier();
+        controller.moveStepper();
+        assert(motor.pos == expected && motor.pos < 10000);
+      }
+    }
+  }
+  // Run the real resistance controller repeatedly at target: no downward creep.
+  reset(true);
+  runtime.setHomed(true);
+  runtime.setFTMSMode(FitnessMachineControlPointProcedure::SetTargetResistanceLevel);
+  runtime.resistance.setTarget(50);
+  motor.pos = 9000;
+  for (int i = 0; i < 100; ++i) {
+    clockMs += 10;
+    runtime.resistance.setValue(50, false);
+    controller.moveStepper();
+    assert(motor.pos == 9000 && runtime.getTargetIncline() == 9000);
+  }
   const uint16_t ratios[] = {1000,1100,1200,1300,1400,1500,1600,1700,1800,1900,2000,2100};
   for (bool ftms : {false, true}) {
     for (bool bounded : {false, true}) {
@@ -413,6 +452,15 @@ int main() {
   assert(motor.pos == 799);
 }
 '''
+        preset_pattern = r"chainrings: (\[[^\]]*\]),\s*cassette: (\[[^\]]*\])"
+        presets = re.findall(preset_pattern, (ROOT / "data/settings.html").read_text(encoding="utf-8"))
+        self.assertEqual(presets, re.findall(preset_pattern, (ROOT / "data_s3/settings.html").read_text(encoding="utf-8")))
+        self.assertEqual(len(presets), 4)
+        declarations = []
+        for name, (fronts, rears) in zip(("road", "mtb", "gravel"), presets[1:]):
+            ratios = sorted(math.floor(f / r * 1000 + 0.5) for f in json.loads(fronts) for r in json.loads(rears))
+            declarations.append("const uint16_t " + name + "[] = {" + ",".join(map(str, ratios)) + "};")
+        harness = harness.replace("/* SHIPPED PROFILES */", "\n".join(declarations))
         harness = harness.replace("/* CONTROLLER */", function(header, "class SS2K {"))
         harness = harness.replace("/* FIRMWARE */", production)
         compiler = shutil.which("g++")

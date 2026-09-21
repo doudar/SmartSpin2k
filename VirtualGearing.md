@@ -47,6 +47,10 @@ gears. Normal control then applies that gear's ratio offset from calibrated zero
 after either FTMS or mechanical homing. This is one third of the gear count,
 not one third of total motor travel. Homing clears any prior ride-time drift
 offset; later stationary FTMS corrections retain their coordinate-only behavior.
+Successful FTMS spindown also clears its procedure opcode to simulation mode and
+zeros incline before selecting the gear. Otherwise local ratio gearing is
+bypassed and the recovered position can incorrectly become a terrain offset.
+Regression coverage includes Unlimited (8), Road (8), MTB (4), and Gravel (4).
 Duplicate ratios share an offset and zero gaps do not count toward the
 median. An all-identical profile has zero shift offset in every gear.
 

@@ -60,10 +60,6 @@ struct Map {
 
   // Interpolate only inside measured support. A full local level covers the
   // two quantized observations; 40 extra steps is a policy allowance for noise.
-  bool estimate(int resistance, int32_t& center, int32_t& uncertainty) const {
-    if (resistance < 0 || resistance > 100) return false;
-    return estimateHalf(2 * resistance, center, uncertainty);
-  }
   bool estimateHalf(int resistance2, int32_t& center, int32_t& uncertainty) const {
     return estimatePosition(resistance2, center, uncertainty, false);
   }
@@ -130,7 +126,6 @@ class DriftGuard {
     return "unknown";
   }
   void interrupt() { tracking_ = false; uncertain_ = false; state_ = State::Ineligible; }
-  void reset(uint32_t now) { interrupt(); lastCorrection_ = now; haveCorrection_ = true; }
   // Feed every maintenance pass. Interruptions discard stationary evidence,
   // but do not restart the minute timer or forget a recently applied correction.
   int correction(const Map& map, uint32_t now, uint32_t sampleTime, int resistance, int32_t position, bool eligible) {

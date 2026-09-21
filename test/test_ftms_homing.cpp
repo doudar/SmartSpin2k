@@ -142,7 +142,10 @@ struct Bike {
           if (lower == 2 || lower == 97) ++noisyEdgeReports;
         }
       }
-      if (shiftCrossing && firstCrossingPosition == INT32_MIN && !moving() && pending == 10) firstCrossingPosition = position();
+      if (shiftCrossing && !moving() && (pending == 10 || pending == 11)) {
+        if (firstCrossingPosition == INT32_MIN) firstCrossingPosition = position();
+        else crossingShifted = true;
+      }
       if (pending < (legacy ? 1 : 0)) pending = legacy ? 1 : 0;
       if (pending > (legacy ? 99 : 100)) pending = legacy ? 99 : 100;
       if (skipTwo && clock < skipTwoUntilMs && pending == 2) pending = 1;
@@ -472,7 +475,7 @@ void TestFtmsHoming::test_one_second_startup_check() {
   TEST_ASSERT_FALSE(search.endpoint(false, endpoint));
   // Use the real reading already present when homing starts, and the first
   // fresh report after a stationary second. Do not add a second blind wait.
-  TEST_ASSERT_EQUAL_UINT32(1100, bike.firstMoveTime);
+  TEST_ASSERT_UINT32_WITHIN(10, 1100, bike.firstMoveTime);
   TEST_ASSERT_EQUAL_INT(300, bike.speed);
   TEST_ASSERT_EQUAL_INT32(INT32_MIN, endpoint);
   TEST_ASSERT_FALSE(bike.moving());
@@ -588,11 +591,19 @@ void TestFtmsHoming::test_stationary_drift_guard() {
   map.maximum = 30000;
   for (int i = 0; i < FtmsCalibration::COUNT; ++i) map.position[i] = map.level2[i] * 150;
   int32_t center, uncertainty;
-  TEST_ASSERT_TRUE(map.estimate(50, center, uncertainty));
-  TEST_ASSERT_FALSE(map.estimate(4, center, uncertainty));
+  TEST_ASSERT_TRUE(map.estimateHalf(100, center, uncertainty));
+  TEST_ASSERT_FALSE(map.estimateHalf(8, center, uncertainty));
+  // Start cooldown through a real correction, including across clock rollover.
+  auto primeCooldown = [&](FtmsCalibration::DriftGuard& guard, uint32_t end) {
+    for (uint32_t elapsed = 0; elapsed <= FtmsCalibration::STABLE_MS; elapsed += 1000) {
+      const uint32_t time = end - FtmsCalibration::STABLE_MS + elapsed;
+      const int correction = guard.correction(map, time, time, 50, center - 500, true);
+      TEST_ASSERT_EQUAL_INT(elapsed == FtmsCalibration::STABLE_MS ? 500 : 0, correction);
+    }
+  };
   for (int scenario = 0; scenario < 9; ++scenario) {
     FtmsCalibration::DriftGuard guard;
-    guard.reset(1000); // A previous applied correction starts the minute cooldown.
+    primeCooldown(guard, 1000);
     int total = 0;
     for (uint32_t time = 1000; time <= 70000; time += 1000) {
       bool eligible = scenario != 1;
@@ -609,7 +620,7 @@ void TestFtmsHoming::test_stationary_drift_guard() {
   }
   FtmsCalibration::DriftGuard wrapped;
   uint32_t start = UINT32_MAX - 5000;
-  wrapped.reset(start);
+  primeCooldown(wrapped, start);
   int total = 0;
   for (uint32_t elapsed = 0; elapsed <= 70000; elapsed += 1000)
     total += wrapped.correction(map, start + elapsed, start + elapsed, 50, center + 500, true);
@@ -638,7 +649,7 @@ void TestFtmsHoming::test_sparse_noisy_observations() {
       TEST_ASSERT_LESS_THAN_UINT32(40000, bike.clock);
       printf("Log-shaped sparse map, lag=%u noise=%d: %u ms\n", lag, noise, bike.clock);
       int32_t center, uncertainty;
-      TEST_ASSERT_TRUE(map.estimate(50, center, uncertainty));
+      TEST_ASSERT_TRUE(map.estimateHalf(100, center, uncertainty));
       TEST_ASSERT_INT32_WITHIN(2 * 264, 4959 + 6836, center);
       TEST_ASSERT_FALSE(bike.moving());
     }

@@ -49,9 +49,15 @@ trailer is 32 bytes: magic/version (4), source/direction fingerprint (4), maximu
 (4), three positions (12), three doubled-resistance values (3), reserved byte
 (1), and checksum (4). This replaces the five-point, 40-byte FTM1 format.
 
-The acquisition guard remains two seconds after motion stops. A further second
-of fresh nearby reports confirms a sample. If readings keep varying, use their
-bounded average at five seconds instead of failing for lack of settling. A
+Target movement shares `ResistanceControl::Controller` with normal resistance
+mode. Endpoint approaches use its live incremental targets; map/startup moves
+use the measured steps-per-level gain with a 6000-step move limit. Once the
+stepper reaches its position target, fresh unchanged resistance for one second
+confirms the sample. Monotonic adjacent changes restart confirmation; an actual
+back-and-forth across adjacent levels can confirm their midpoint. Persistently
+noisy feedback uses the latest two readings at five seconds rather than failing.
+Only final endpoint transition probes retain their two-second acquisition guard
+for repeatable zero estimation. A
 previous confirmed observation is reused between adjacent map searches; do not
 wait again before issuing the next movement. Every saved sample is logged with
 actual resistance, coordinate, and percentage of travel.
@@ -143,15 +149,55 @@ physical motion or a guarantee of hardware repeatability.
 | Synthetic scenario | Time |
 | --- | ---: |
 | Stationary startup within measured support | Under 5 s, no movement |
-| Startup R1/R20/R80/R99 at 100 steps/level | 9–10 s |
-| Startup R1/R99 at 300 steps/level | 18 s |
-| Noisy R99 startup at 300 steps/level, 2.5 s report delay | 21.3 s (accepted) |
-| Three map observations, ideal 100 steps/level | 20 s |
-| Three observations, this log's middle curve, 1.3/2.5 s delay | 28 s |
-| Same curve with additional +/-2 level noise | 34.6 s |
-| Minimum with an extra 1200/2400-step level 4 | 82/88 s |
+| Startup R1/R20/R80/R99 at 100 steps/level | 7 s |
+| Startup R1/R99 at 300 steps/level | 12 s |
+| Noisy R99 startup at 300 steps/level, 2.5 s report delay | 19 s |
+| Three map observations, ideal 100 steps/level | 15 s |
+| Three observations, this log's middle curve, 1.3/2.5 s delay | 22/26 s |
+| Same curve with additional +/-2 level noise | 34.5 s |
+| Minimum with an extra 1200/2400-step level 4 | 81/87 s |
 
 Full first-time calibration remains longer than startup recovery. These search timings exclude BLE connection and the subsequent move to the
 starting gear. They are simulations, not measurements on the user's bike.
 Integration regressions cover actual persistence and homing orchestration,
 failed writes/renames, migration, and correction without physical movement.
+
+## Shared resistance control and September 19 14:50 log
+
+The recorded calibration spans about 175 seconds: 64 seconds finding minimum,
+80 finding maximum, and 30 sampling the map. Samples R32/P7484,
+R48.5/P11622 and R67/P16161 show a middle interpolation residual of 47 steps.
+These measurements support a sparse map but not a raw resistance-percent to
+travel-percent identity. The existing three-point, 32-byte format is unchanged.
+
+Exact resistance target equality now holds the current position. The shared
+controller adds derivative braking based on fresh resistance reports. Crossings
+from more than two levels below to more than two above (or vice versa) add
+0.5 seconds to D, capped at 2.5 seconds. D only reduces movement approaching a
+target; it never commands motion away from it. A new target or ten seconds of
+controller inactivity resets D. A fresh unchanged reading sets velocity to zero;
+held reports older than 1.5 seconds stop contributing derivative braking.
+Normal resistance moves log changes in D. No persistent metadata is added.
+
+The spindown opcode previously remained selected after success, bypassing local
+gearing and allowing the recovered step position to become an incline term.
+Successful spindown now returns to simulation with zero incline before selecting
+the starting gear. All shipped groupsets are covered by integration regressions.
+
+## September 20 full-calibration motor-enable failure
+
+The 20:24 log recovers from R90 using saved metadata in about six seconds,
+then moves to the correct starting-gear position (P6426/R25). A later full
+calibration finds minimum after 58 seconds, then reports R1–2 while its counter
+moves P1108 to P4143 toward the R90 target and trips the no-response guard.
+R90 is the requested anchor, not the resistance reached at failure.
+
+Homing inherited manual enable from cadence unless a thermal inhibit was active.
+FastAccelStepper retains its previous automatic-disable countdown when manual
+enable is selected; stationary time during a long calibration can expire it.
+Normal maintenance continually re-enables outputs while pedaling, but is skipped
+during homing. Subsequent manual-mode commands can advance the step counter with
+outputs disabled. Homing now always selects automatic enable so each move renews
+the timer and re-enables an expired output. Safety interlocks are still restored
+on exit. This reproduces the counter-without-physical-motion failure in a test;
+the log contains no EN-pin measurement, so confirmation on the bike is needed.
