@@ -345,10 +345,7 @@ class CscMeasurement {
   uint16_t cumulativeCrankRevolutions;
   uint16_t lastCrankEventTime;  // Resolution of 1/1024 seconds
 
-  CscMeasurement() : cumulativeWheelRevolutions(0), lastWheelEventTime(0), cumulativeCrankRevolutions(0), lastCrankEventTime(0) {
-    // Clear all flags initially
-    *(reinterpret_cast<uint8_t*>(&flags)) = 0;
-  }
+  CscMeasurement() : flags{}, cumulativeWheelRevolutions(0), lastWheelEventTime(0), cumulativeCrankRevolutions(0), lastCrankEventTime(0) {}
 
   size_t toByteArray(Buffer& data) const {
     size_t offset     = 0;

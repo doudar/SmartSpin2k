@@ -193,12 +193,7 @@ void BLE_Zwift_Service::setupService(NimBLEServer* pServer) {
 }
 
 void BLE_Zwift_Service::update() {
-  unsigned long now                     = millis();
-  static unsigned long lastadvTime      = 0;
-  static bool advertiseManufacturerData = true;
-  static bool swapAdv                   = false;
-  const unsigned long advSwapIntervalMs = 10000;  // Toggle Manufacturer data advertisement every 10 seconds with current BLE address
-  NimBLEAdvertising* pAdvertising       = NimBLEDevice::getAdvertising();
+  unsigned long now = millis();
 
   if (!keepAlive(now)) {
     return;
@@ -359,27 +354,6 @@ void BLE_Zwift_Service::sendGeneralInfoSyncTx() {
   pos += cpos;
 
   sendSyncTxPayload(resp, pos);
-}
-
-void BLE_Zwift_Service::sendTrainerConfigSimulationStatus(uint32_t realGearRatioX10000, uint32_t virtualGearRatioX10000) {
-  uint8_t content[16];
-  size_t cpos = 0;
-
-  content[cpos++] = makeTag(ZwiftProtocol::TrainerConfigSimulation::Field::RealGearRatio, WireType::Varint);
-  cpos += encodeUleb128(realGearRatioX10000, &content[cpos]);
-  content[cpos++] = makeTag(ZwiftProtocol::TrainerConfigSimulation::Field::VirtualGearRatio, WireType::Varint);
-  cpos += encodeUleb128(virtualGearRatioX10000, &content[cpos]);
-
-  uint8_t payload[20];
-  size_t pos     = 0;
-  payload[pos++] = toUnderlying(CommandCode::TrainerConfigStatus);
-  payload[pos++] = makeTag(ZwiftProtocol::TrainerConfigStatus::Field::Simulation, WireType::LengthDelimited);
-  pos += encodeUleb128(static_cast<uint64_t>(cpos), &payload[pos]);
-  memcpy(&payload[pos], content, cpos);
-  pos += cpos;
-
-  SS2K_LOG(getLogTag(), "Sending TrainerConfigStatus simulation: real=%u virtual=%u", realGearRatioX10000, virtualGearRatioX10000);
-  sendAsyncPayload(payload, pos);
 }
 
 void BLE_Zwift_Service::sendTrainerConfigVirtualShiftStatus(uint8_t virtualShiftingMode) {

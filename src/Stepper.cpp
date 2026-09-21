@@ -361,13 +361,7 @@ void SS2K::moveStepper() {
           ss2k->targetPosition = ss2k->getCurrentPosition() - 20;
         }
       }
-    } else if (!rtConfig->getHomed()) {  // Not homed: keep target inside the provisional range.
-      if (ss2k->targetPosition < rtConfig->getMinStep()) {
-        ss2k->targetPosition = rtConfig->getMinStep() + 1;
-      } else if (ss2k->targetPosition > rtConfig->getMaxStep()) {
-        ss2k->targetPosition = rtConfig->getMaxStep() - 1;
-      }
-    } else {  // Homed: simple clamp to the known good range
+    } else {  // Keep target inside the known or provisional range.
       if (ss2k->targetPosition < rtConfig->getMinStep()) {
         ss2k->targetPosition = rtConfig->getMinStep() + 1;
       } else if (ss2k->targetPosition > rtConfig->getMaxStep()) {
@@ -635,7 +629,6 @@ static HomingSgBaseline getHomingSgBaseline() {
  */
 bool SS2K::_findEndStop(bool moveForward) {
   unsigned long timeoutTimer = millis();
-  HomingSgBaseline baseline  = {0, getScaledHomingSensitivity()};
 
   // --- SETUP DRIVER FOR SENSORLESS HOMING ---
   // Use very low power for sensitive stall detection
@@ -653,14 +646,13 @@ bool SS2K::_findEndStop(bool moveForward) {
   // Wait for the motor to reach a stable speed before sampling
   delay(300);
 
-  baseline              = getHomingSgBaseline();
+  const HomingSgBaseline baseline = getHomingSgBaseline();
   lastHomingSgThreshold = baseline.threshold;
 
   SS2K_LOG(MAIN_LOG_TAG, "Homing %s. Stable Threshold: %d, Sensitivity: %d", moveForward ? "forward (max)" : "backward (min)", baseline.threshold, baseline.sensitivity);
   SS2K_LOG(MAIN_LOG_TAG, "pos: %d", stepper->getCurrentPosition());
 
   unsigned long lastLogTime = millis() - LOG_INTERVAL;  // Initialize last log time
-  int currentSgResult       = 0;
   while ((millis() - timeoutTimer) < HOME_TIMEOUT) {
     delay(5);
     // Allow user to abort the homing process with a shift
@@ -671,7 +663,7 @@ bool SS2K::_findEndStop(bool moveForward) {
       return false;
     }
 
-    currentSgResult = driver->SG_RESULT();
+    int currentSgResult = driver->SG_RESULT();
     // if zero detected, wait 10ms and sample again.
     if (currentSgResult == 0) {
       delay(10);

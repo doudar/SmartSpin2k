@@ -118,6 +118,8 @@ void setup() {
   // BLE protocol encode/decode round-trip tests
   {
     TestBleWireRoundTrip test;
+    RUN_TEST(test.test_factory_preserves_cached_parser_state);
+    RUN_TEST(test.test_nimble_uuid_comparison_and_rendering);
     RUN_TEST(test.test_dircon_uuid_round_trip);
     RUN_TEST(test.test_all_custom_characteristic_formats);
     RUN_TEST(test.test_ftms_round_trip);
@@ -169,7 +171,7 @@ void loop() {
 
 // For native testing
 #ifndef ARDUINO
-int main(int argc, char** argv) {
+int main() {
   // Create test/output directory if it doesn't exist for native builds
   const char* dir_path = "test/output";
 // Attempt to create the directory.

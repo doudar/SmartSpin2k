@@ -94,8 +94,6 @@ void TestVirtualGearing::test_duplicate_and_identical_ratios() {
   // Zero gaps are excluded before taking the even median (100 + 200) / 2.
   const int32_t expected[] = {0, 0, 67, 67, 200};
   assertOffsets(gears, 100, expected, 5);
-  TEST_ASSERT_EQUAL_INT32(gears.offsetSteps(1, 100), gears.offsetSteps(2, 100));
-  TEST_ASSERT_EQUAL_INT32(gears.offsetSteps(3, 100), gears.offsetSteps(4, 100));
 
   const uint16_t identicalRatios[] = {1200, 1200, 1200, 1200};
   TEST_ASSERT_TRUE(gears.assign(identicalRatios, 4));

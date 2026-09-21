@@ -29,14 +29,7 @@ void BLE_Cycling_Speed_Cadence::setupService(NimBLEServer *pServer, MyCharacteri
 }
 
 void BLE_Cycling_Speed_Cadence::update() {
-  /*if (!spinBLEServer.clientSubscribed.CyclingSpeedCadence) {
-    return;
-  }*/
-
   CscMeasurement csc;
-
-  // Clear all flags initially
-  *(reinterpret_cast<uint8_t *>(&(csc.flags))) = 0;
 
   // Set flags based on data presence
   csc.flags.wheelRevolutionDataPresent = 1;  // Wheel Revolution Data Present

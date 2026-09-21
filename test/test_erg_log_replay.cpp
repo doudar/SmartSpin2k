@@ -7,6 +7,7 @@
 
 #include <unity.h>
 
+#include <algorithm>
 #include <cmath>
 #include <fstream>
 #include <limits>
@@ -22,7 +23,6 @@
 namespace {
 
 struct ErgSample {
-  int timestamp;
   int watts;
   int target;
   double gain;
@@ -30,8 +30,6 @@ struct ErgSample {
 
 struct ErgInterval {
   int target;
-  int start;
-  int end;
   double sensitivity;
   std::vector<ErgSample> samples;
 };
@@ -81,16 +79,12 @@ void TestErgLogReplay::test_active_ride_log_and_gain_limits(void) {
     }
 
     if (std::regex_search(line, match, targetPattern)) {
-      const int timestamp = std::stoi(match[1].str());
-      if (!intervals.empty()) intervals.back().end = timestamp;
-      intervals.push_back({std::stoi(match[2].str()), timestamp, timestamp, sensitivity, {}});
+      intervals.push_back({std::stoi(match[2].str()), sensitivity, {}});
       continue;
     }
 
     if (!intervals.empty() && std::regex_search(line, match, samplePattern)) {
-      const int timestamp = std::stoi(match[1].str());
-      intervals.back().samples.push_back({timestamp, std::stoi(match[2].str()), std::stoi(match[3].str()), std::stod(match[4].str())});
-      intervals.back().end = timestamp;
+      intervals.back().samples.push_back({std::stoi(match[2].str()), std::stoi(match[3].str()), std::stod(match[4].str())});
     }
   }
 

@@ -228,7 +228,6 @@ bool prepareOtaPartition() {
 
   transfer.otaBegun       = true;
   transfer.state          = BleFirmwareUpdate::State::Updating;
-  transfer.error          = BleFirmwareUpdate::Error::None;
   transfer.lastActivityMs = millis();
   SS2K_LOG(BLE_OTA_LOG_TAG, "Flash ready: conn=%u partition=%s prepare=%lums; accepting firmware data", transfer.connectionHandle, transfer.updatePartition->label,
            static_cast<unsigned long>(millis() - prepareStartedMs));
@@ -288,7 +287,6 @@ void startTransfer(const uint8_t* data, size_t length, NimBLEConnInfo& connInfo)
   transfer.expectedCrc32    = request.imageCrc32;
   transfer.active           = true;
   transfer.state            = BleFirmwareUpdate::State::Preparing;
-  transfer.error            = BleFirmwareUpdate::Error::None;
   transfer.startedMs        = millis();
   transfer.lastActivityMs   = millis();
   if (ss2k != nullptr) ss2k->isUpdating = true;

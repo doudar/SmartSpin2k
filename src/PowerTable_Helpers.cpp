@@ -102,7 +102,7 @@ bool slopesAgree(double first, double second) {
   return std::max(first, second) <= std::min(first, second) * MAX_LOCAL_SLOPE_RATIO;
 }
 
-bool getObservedWattBounds(int cad, PTData& ptData, int& minimumWatts, int& maximumWatts) {
+bool getObservedWattBounds(int cad, const PTData& ptData, int& minimumWatts, int& maximumWatts) {
   minimumWatts = MAX_ESTIMATED_POWER_WATTS;
   maximumWatts = 0;
   bool found   = false;
@@ -259,7 +259,7 @@ void PTHelpers::enterData(PTData& ptData, ptIndex index, int pos) {
 
   entry.targetPosition = pos;  // Update the target position with the new average
   // Increment readings, capping at the max value.
-  if (entry.readings < MAX_NEIGHBOR_WEIGHT && !moveTable) {
+  if (entry.readings < MAX_NEIGHBOR_WEIGHT) {
     entry.readings++;
   }
 
@@ -297,7 +297,7 @@ bool PTHelpers::cadenceIsWithinTable(int cad) {
 }
 
 
-int32_t PTHelpers::lookup(int watts, int cad, PTData& ptData) {
+int32_t PTHelpers::lookup(int watts, int cad, const PTData& ptData) {
   if (cad <= 0 || watts < 0) return RETURN_ERROR;
 
   float rowPosition[POWERTABLE_CAD_SIZE];
@@ -400,13 +400,11 @@ int32_t PTHelpers::lookup(int watts, int cad, PTData& ptData) {
 
   int lowerRow = 0;
   int upperRow = 1;
-  if (cad > rowCadence[0]) {
-    for (int i = 1; i < validRows; i++) {
-      if (cad <= rowCadence[i]) {
-        lowerRow = i - 1;
-        upperRow = i;
-        break;
-      }
+  for (int i = 1; i < validRows; i++) {
+    if (cad <= rowCadence[i]) {
+      lowerRow = i - 1;
+      upperRow = i;
+      break;
     }
   }
 
@@ -416,7 +414,7 @@ int32_t PTHelpers::lookup(int watts, int cad, PTData& ptData) {
   return storedPositionToSteps(position);
 }
 
-bool PTHelpers::lookupSlope(int watts, int cad, double& stepsPerWatt, PTData& ptData, PowerTableSlopeStatus::Value* status) {
+bool PTHelpers::lookupSlope(int watts, int cad, double& stepsPerWatt, const PTData& ptData, PowerTableSlopeStatus::Value* status) {
   stepsPerWatt = 0.0;
   const auto setStatus = [status](PowerTableSlopeStatus::Value value) {
     if (status != nullptr) *status = value;
@@ -511,7 +509,7 @@ bool PTHelpers::lookupSlope(int watts, int cad, double& stepsPerWatt, PTData& pt
   return trusted;
 }
 
-bool PTHelpers::lookupErgSlope(int watts, int cad, double& stepsPerWatt, PTData& ptData, PowerTableSlopeStatus::Value* status) {
+bool PTHelpers::lookupErgSlope(int watts, int cad, double& stepsPerWatt, const PTData& ptData, PowerTableSlopeStatus::Value* status) {
   stepsPerWatt = 0.0;
   const auto setStatus = [status](PowerTableSlopeStatus::Value value) {
     if (status != nullptr) *status = value;
@@ -588,7 +586,7 @@ bool PTHelpers::lookupErgSlope(int watts, int cad, double& stepsPerWatt, PTData&
 }
 
 // returns the total number of readings in the power table
-int PTHelpers::getTotalReadings(PTData& ptData) {
+int PTHelpers::getTotalReadings(const PTData& ptData) {
   int totalReadings = 0;
   for (int i = 0; i < POWERTABLE_CAD_SIZE; i++) {
     for (int j = 0; j < POWERTABLE_WATT_SIZE; j++) {
@@ -601,7 +599,7 @@ int PTHelpers::getTotalReadings(PTData& ptData) {
 // Invert the cadence-blended forward surface. Inverting each cadence row
 // independently makes nearly-flat row segments explode during extrapolation
 // and creates discontinuities as cadence crosses a row boundary.
-int32_t PTHelpers::invertForwardSurface(int cad, int32_t targetPosition, PTData& ptData) {
+int32_t PTHelpers::invertForwardSurface(int cad, int32_t targetPosition, const PTData& ptData) {
   if (cad <= 0) return 0;
 
   int observedMinimumWatts;
@@ -683,7 +681,7 @@ int32_t PTHelpers::invertForwardSurface(int cad, int32_t targetPosition, PTData&
   return static_cast<int32_t>(std::round(watts));
 }
 
-int32_t PTHelpers::lookupWatts(int cad, int32_t targetPosition, PTData& ptData) {
+int32_t PTHelpers::lookupWatts(int cad, int32_t targetPosition, const PTData& ptData) {
   if (cad <= 0) return 0;
 
   // Invert at the table cadence knots, then apply a cumulative monotonic

@@ -8,6 +8,7 @@
 #include "BleAppender.h"
 #include "Main.h"
 #include "BLE_Custom_Characteristic.h"
+#include <utility>
 
 void BleAppender::Initialize() {}
 
@@ -28,7 +29,7 @@ void BleAppender::Log(const char *message) {
 
 std::string BleAppender::getLastMessage() {
   if (!messageQueue.empty()) {
-    std::string msg = messageQueue.front();
+    std::string msg = std::move(messageQueue.front());
     messageQueue.pop();
     return msg;
   }
@@ -52,8 +53,8 @@ void BleAppender::appendMessage(const char *message) {
 
   // Truncate message if it's too long on its own
   if (msg.length() > MAX_MESSAGE_SIZE) {
-    msg = msg.substr(0, MAX_MESSAGE_SIZE);
+    msg.resize(MAX_MESSAGE_SIZE);
   }
 
-  messageQueue.push(msg);
+  messageQueue.push(std::move(msg));
 }

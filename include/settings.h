@@ -85,10 +85,6 @@ const char* const DEFAULT_PASSWORD = "password";
 // would move 1200 steps to compensate, however ERG_Sensitivity values much different than 1.0 imply shiftStep has been improperly configured.
 #define ERG_SENSITIVITY 3.0f
 
-// Number of watts per shift expected by ERG mode for it's calculation. The user should target this number by adjusting Shift Step until WATTS_PER_SHIFT
-// is obtained as closely as possible during each shift.
-#define WATTS_PER_SHIFT 30
-
 // Amount to change watt target per shift in ERG mode.
 #define ERG_PER_SHIFT 10
 
@@ -171,10 +167,6 @@ constexpr const char* ANY  = "any";
 // nothing.
 #define CONNECTED_REMOTE NONE
 
-// number of main loops the shifters need to be held before a BLE scan is
-// initiated.
-#define SHIFTERS_HOLD_FOR_SCAN 2
-
 // stealthChop enabled by default
 #define STEALTHCHOP true
 
@@ -236,9 +228,6 @@ constexpr const char* ANY  = "any";
 // Max downvotes that a neighbor can have
 #define MAX_NEIGHBOR_WEIGHT 2 * POWER_SAMPLES
 
-// Min downvotes that a neighbor can have
-#define MIN_NEIGHBOR_WEIGHT 0
-
 // How often in ms to save the power table if no new data is added and user is pedaling.
 #define POWER_TABLE_SAVE_INTERVAL 240000
 
@@ -252,15 +241,6 @@ constexpr const char* ANY  = "any";
 // Limit power table size to save memory
 #define TABLE_DIVISOR 10.0f
 
-// Max distance a failed neighbor can be horizontally from target position
-#define HORIZONTAL_NEIGHBOR_RANGE 0.6f
-
-// Max distance a failed neighbor can be vertically from target position
-#define VERTICAL_NEIGHBOR_RANGE 0.8f
-
-// Temperature of the ESP32 at which to start reducing the power output of the stepper motor driver.
-#define THROTTLE_TEMP 90
-
 // Size of the Aux Serial Buffer for Peloton
 #define AUX_BUF_SIZE 10
 
@@ -269,9 +249,6 @@ constexpr const char* ANY  = "any";
 
 // If not receiving Peloton Messages, how long to wait before next TX attempt is
 #define TX_CHECK_INTERVAL 20
-
-// Interval for polling ble battery updates
-#define BATTERY_UPDATE_INTERVAL_MILLIS 300000
 
 // Base homing sensitivity before applying the detected board's scaler.
 #define DEFAULT_HOMING_SENSITIVITY 50

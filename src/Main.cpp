@@ -306,7 +306,7 @@ void loop() {  // Delete this task so we can make one that's more memory efficie
   vTaskDelete(NULL);
 }
 
-void SS2K::maintenanceLoop(void* pvParameters) {
+void SS2K::maintenanceLoop(void*) {
   finishSetup();
 
   static unsigned long maintenanceTimer    = millis();

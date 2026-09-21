@@ -116,7 +116,7 @@ void BLE_Fitness_Machine_Service::update() {
     resistanceValue = rtConfig->resistance.getValue();
   } else {
     // Calculate resistance from stepper position for bikes that don't report resistance
-    resistanceValue = this->calculateResistanceFromPosition();
+    resistanceValue = calculateResistanceFromPosition();
     rtConfig->resistance.setValue(resistanceValue, true);  // Publish value and simulated-data flag together.
   }
   ftmsIndoorBikeData.push_back(static_cast<uint8_t>(resistanceValue & 0xff));
@@ -156,7 +156,6 @@ void BLE_Fitness_Machine_Service::processFTMSWrite() {
       return;
     }
     std::vector<uint8_t> returnValue        = {FitnessMachineControlPointProcedure::ResponseCode, (uint8_t)rxValue[0], FitnessMachineControlPointResultCode::OpCodeNotSupported};
-    BLECharacteristic *pCharacteristic      = NimBLEDevice::getServer()->getServiceByUUID(FITNESSMACHINESERVICE_UUID)->getCharacteristic(FITNESSMACHINECONTROLPOINT_UUID);
     std::vector<uint8_t> ftmsStatus         = {FitnessMachineStatus::ReservedForFutureUse};
     std::vector<uint8_t> ftmsTrainingStatus = {0x00, FitnessMachineTrainingStatus::Other};
 
@@ -207,26 +206,6 @@ void BLE_Fitness_Machine_Service::processFTMSWrite() {
 
           if (requestedResistance >= rtConfig->getMinResistance() && requestedResistance <= rtConfig->getMaxResistance()) {
             rtConfig->resistance.setTarget(requestedResistance);
-            
-            // For bikes that don't report resistance, calculate stepper position from resistance level (0-100)
-            bool hasResistanceReporting = (!rtConfig->resistance.getSimulate() && 
-                                          (rtConfig->resistance.getTimestamp() > 0 && 
-                                           (millis() - rtConfig->resistance.getTimestamp()) < 5000));
-            
-            if (!hasResistanceReporting) {
-              int32_t minPos, maxPos;
-              
-              // Use homing values if available, otherwise use stepper min/max
-              if (userConfig->getHMin() != INT32_MIN && userConfig->getHMax() != INT32_MIN) {
-                minPos = userConfig->getHMin();
-                maxPos = userConfig->getHMax();
-              } else {
-                minPos = rtConfig->getMinStep();
-                maxPos = rtConfig->getMaxStep();
-              }
-              
-              // TODO: Implement calculation of target position from resistance percentage if resistance reporting is unavailable.
-            }
             
             returnValue[2] = FitnessMachineControlPointResultCode::Success;
             logBufLength += snprintf(logBuf + logBufLength, kLogBufCapacity - logBufLength, "-> Resistance Mode: %d", rtConfig->resistance.getTarget());
@@ -316,7 +295,7 @@ void BLE_Fitness_Machine_Service::processFTMSWrite() {
           // The response parameter for a successful spin down command.
           // Values are Target Speed Low and Target Speed High in km/h with a resolution of 0.01.
           // Example: 8.00 km/h (0x0320) and 24.00 km/h (0x0960)
-          uint8_t responseParams[] = {0x20, 0x03, 0x60, 0x09};
+          const uint8_t responseParams[] = {0x20, 0x03, 0x60, 0x09};
 
           // Build the complete, correct response in a single vector
           returnValue = {FitnessMachineControlPointProcedure::ResponseCode, (uint8_t)rxValue[0], FitnessMachineControlPointResultCode::Success};

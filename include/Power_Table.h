@@ -11,7 +11,6 @@
 #include "SmartSpin_parameters.h"
 #include "PowerTable_Helpers.h"
 #include "FtmsCalibration.h"
-#include <vector>
 #define POWERTABLE_LOG_TAG "PTable"
 
 class PowerTable {

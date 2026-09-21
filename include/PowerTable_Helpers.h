@@ -100,14 +100,14 @@ class PTHelpers {
   void clean(PTData& ptData);
   bool enforceMonotonicAcrossCadence(PTData& ptData);
   bool enforceMonotonicAcrossPower(PTData& ptData);
-  int32_t invertForwardSurface(int cad, int32_t targetPosition, PTData& ptData);
+  int32_t invertForwardSurface(int cad, int32_t targetPosition, const PTData& ptData);
 
  public:
-  int32_t lookup(int watts, int cad, PTData& ptData);
-  bool lookupSlope(int watts, int cad, double& stepsPerWatt, PTData& ptData, PowerTableSlopeStatus::Value* status = nullptr);
-  bool lookupErgSlope(int watts, int cad, double& stepsPerWatt, PTData& ptData, PowerTableSlopeStatus::Value* status = nullptr);
-  int32_t lookupWatts(int cad, int32_t targetPosition, PTData& ptData);
-  int getTotalReadings(PTData& ptData);
+  int32_t lookup(int watts, int cad, const PTData& ptData);
+  bool lookupSlope(int watts, int cad, double& stepsPerWatt, const PTData& ptData, PowerTableSlopeStatus::Value* status = nullptr);
+  bool lookupErgSlope(int watts, int cad, double& stepsPerWatt, const PTData& ptData, PowerTableSlopeStatus::Value* status = nullptr);
+  int32_t lookupWatts(int cad, int32_t targetPosition, const PTData& ptData);
+  int getTotalReadings(const PTData& ptData);
   ptIndex calculateIndex(int watts, int cad);
   bool cadenceIsWithinTable(int cad);
   void enterData(PTData& ptData, ptIndex index, int pos);

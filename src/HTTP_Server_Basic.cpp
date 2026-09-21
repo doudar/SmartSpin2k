@@ -371,8 +371,6 @@ void logNetworkReady(const char* mode) {
 
 // ********************************WIFI Setup*************************
 void startWifi() {
-  int connectionAttempts = 0;
-
   stopNetworkServices();
   httpServer.internetConnection = false;
 
@@ -416,6 +414,7 @@ void startWifi() {
 
   // Complete WiFi setup before starting web-file repair, BLE, HTTP, or DirCon.
   if (strcmp(userConfig->getSsid(), DEVICE_NAME) != 0) {
+    int connectionAttempts = 0;
     SS2K_LOG(HTTP_SERVER_LOG_TAG, "Connecting to: %s", userConfig->getSsid());
     _staSetup();
     while (WiFi.status() != WL_CONNECTED && connectionAttempts < WIFI_CONNECT_TIMEOUT) {
@@ -868,13 +867,13 @@ void HTTP_Server::settingsProcessor() {
     }
   }
   if (!server.arg("maxWatts").isEmpty()) {
-    uint64_t maxWatts = server.arg("maxWatts").toInt();
+    int maxWatts = server.arg("maxWatts").toInt();
     if (maxWatts >= 0 && maxWatts <= 2000) {
       userConfig->setMaxWatts(maxWatts);
     }
   }
   if (!server.arg("minWatts").isEmpty()) {
-    uint64_t minWatts = server.arg("minWatts").toInt();
+    int minWatts = server.arg("minWatts").toInt();
     if (minWatts >= 0 && minWatts <= 200) {
       userConfig->setMinWatts(minWatts);
     }

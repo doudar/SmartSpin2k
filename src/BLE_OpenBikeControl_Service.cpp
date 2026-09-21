@@ -40,11 +40,7 @@ static OpenBikeControlAppInfoCallbacks obcAppInfoCallbacks;
 static OpenBikeControlButtonStateCallbacks obcButtonStateCallbacks;
 
 BLE_OpenBikeControl_Service::BLE_OpenBikeControl_Service()
-    : pOpenBikeControlService(nullptr),
-      buttonStateCharacteristic(nullptr),
-      hapticFeedbackCharacteristic(nullptr),
-      appInformationCharacteristic(nullptr),
-      _lastClientActivityMs(0) {}
+    : buttonStateCharacteristic(nullptr), _lastClientActivityMs(0) {}
 
 void BLE_OpenBikeControl_Service::setupMDNS() {
   if (!openBikeControlServiceSetupCalled || openBikeControlMdnsStarted) {
@@ -104,7 +100,7 @@ void BLE_OpenBikeControl_Service::addServiceUuidToMDNS(const NimBLEUUID& service
     }
     strcpy(&fullUuidListBuffer[fullUuidListLength], fullUuid);
     fullUuidListLength += fullUuidLen;
-    MDNS.addServiceTxt(OPENBIKECONTROL_MDNS_SERVICE_NAME, OPENBIKECONTROL_MDNS_SERVICE_PROTOCOL, "service-uuids", (const char *)fullUuidListBuffer);
+    MDNS.addServiceTxt(OPENBIKECONTROL_MDNS_SERVICE_NAME, OPENBIKECONTROL_MDNS_SERVICE_PROTOCOL, "service-uuids", static_cast<const char *>(fullUuidListBuffer));
   } else {
     SS2K_LOG(kOpenBikeControlLogTag, "Warning: Not enough space to add full UUID %s", fullUuid);
   }
@@ -113,25 +109,25 @@ void BLE_OpenBikeControl_Service::addServiceUuidToMDNS(const NimBLEUUID& service
 void BLE_OpenBikeControl_Service::setupService(NimBLEServer *pServer) {
   openBikeControlServiceSetupCalled = true;
 
-  pOpenBikeControlService = pServer->createService(OPENBIKECONTROL_SERVICE_UUID);
+  NimBLEService *const service = pServer->createService(OPENBIKECONTROL_SERVICE_UUID);
 
-  buttonStateCharacteristic = pOpenBikeControlService->createCharacteristic(OPENBIKECONTROL_BUTTON_STATE_CHARACTERISTIC_UUID, NIMBLE_PROPERTY::READ | NIMBLE_PROPERTY::NOTIFY);
+  buttonStateCharacteristic = service->createCharacteristic(OPENBIKECONTROL_BUTTON_STATE_CHARACTERISTIC_UUID, NIMBLE_PROPERTY::READ | NIMBLE_PROPERTY::NOTIFY);
   buttonStateCharacteristic->setCallbacks(&obcButtonStateCallbacks);
 
   const uint8_t initialButtonState[] = {kOpenBikeControlButtonStateMessageType, kOpenBikeControlShiftUpButtonId, kOpenBikeControlButtonReleasedState,
                                         kOpenBikeControlShiftDownButtonId, kOpenBikeControlButtonReleasedState};
   buttonStateCharacteristic->setValue(initialButtonState, sizeof(initialButtonState));
 
-  hapticFeedbackCharacteristic =
-      pOpenBikeControlService->createCharacteristic(OPENBIKECONTROL_HAPTIC_CHARACTERISTIC_UUID, NIMBLE_PROPERTY::WRITE | NIMBLE_PROPERTY::WRITE_NR);
+  NimBLECharacteristic *const hapticFeedbackCharacteristic =
+      service->createCharacteristic(OPENBIKECONTROL_HAPTIC_CHARACTERISTIC_UUID, NIMBLE_PROPERTY::WRITE | NIMBLE_PROPERTY::WRITE_NR);
   hapticFeedbackCharacteristic->setCallbacks(&obcHapticCallbacks);
 
-  appInformationCharacteristic =
-      pOpenBikeControlService->createCharacteristic(OPENBIKECONTROL_APP_INFO_CHARACTERISTIC_UUID, NIMBLE_PROPERTY::WRITE | NIMBLE_PROPERTY::WRITE_NR);
+  NimBLECharacteristic *const appInformationCharacteristic =
+      service->createCharacteristic(OPENBIKECONTROL_APP_INFO_CHARACTERISTIC_UUID, NIMBLE_PROPERTY::WRITE | NIMBLE_PROPERTY::WRITE_NR);
   appInformationCharacteristic->setCallbacks(&obcAppInfoCallbacks);
 
   DirConManager::registerService(
-      pOpenBikeControlService->getUUID(),
+      service->getUUID(),
       [](NimBLECharacteristic *characteristic, const uint8_t *data, size_t length, DirConWriteResult *result) -> bool {
         if (characteristic->getUUID().equals(NimBLEUUID(OPENBIKECONTROL_HAPTIC_CHARACTERISTIC_UUID))) {
           openBikeControlService.handleHapticWrite(data, length, true);
@@ -210,7 +206,7 @@ void BLE_OpenBikeControl_Service::handleAppInfoWrite(const uint8_t *data, size_t
   }
 
   markClientActivity();
-  SS2K_LOG(kOpenBikeControlLogTag, "App info update from %s (len=%d, version=%u)", isDirCon ? "DirCon" : "BLE", length, data[1]);
+  SS2K_LOG(kOpenBikeControlLogTag, "App info update from %s (len=%zu, version=%u)", isDirCon ? "DirCon" : "BLE", length, data[1]);
 }
 
 void BLE_OpenBikeControl_Service::handleButtonStateSubscription(uint16_t subValue) {

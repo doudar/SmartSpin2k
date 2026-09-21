@@ -8,13 +8,20 @@
 #include "Main.h"
 #include "SS2KLog.h"
 #include "BLE_Common.h"
-#include "Constants.h"
 
-#include <Arduino.h>
-#include <math.h>
-#include <sensors/SensorData.h>
-#include <sensors/SensorDataFactory.h>
-#include <NimBLEDevice.h>
+namespace BLEServices {
+// Share one service table instead of allocating a copy in every including translation unit.
+const std::vector<BLEServiceInfo> SUPPORTED_SERVICES = {
+    {CYCLINGPOWERSERVICE_UUID, CYCLINGPOWERMEASUREMENT_UUID, "Cycling Power Service"},
+    {CSCSERVICE_UUID, CSCMEASUREMENT_UUID, "Cycling Speed And Cadence Service"},
+    {HEARTSERVICE_UUID, HEARTCHARACTERISTIC_UUID, "Heart Rate Service"},
+    {ECHELON_DEVICE_UUID, ECHELON_SERVICE_UUID, "Echelon Device"},  // Discovery and data use separate Echelon services.
+    {ECHELON_SERVICE_UUID, ECHELON_DATA_UUID, "Echelon Service"},
+    {CHRONO_SERVICE_UUID, CHRONO_DATA_UUID, "Spinner Chrono"},
+    {FITNESSMACHINESERVICE_UUID, FITNESSMACHINEINDOORBIKEDATA_UUID, "Fitness Machine Service"},
+    {HID_SERVICE_UUID, HID_REPORT_DATA_UUID, "HID Service"},
+    {FLYWHEEL_UART_SERVICE_UUID, FLYWHEEL_UART_TX_UUID, "Flywheel UART Service"}};
+}  // namespace BLEServices
 
 /**
  * @brief Retrieves the BLE service information for a given advertised device and device name.
@@ -32,7 +39,7 @@ const BLEServiceInfo* getDeviceServiceInfo(const NimBLEAdvertisedDevice* adverti
     return nullptr;
   }
 
-  for (const auto& service : SUPPORTED_SERVICES) {
+  for (const auto& service : BLEServices::SUPPORTED_SERVICES) {
     // Special case for Flywheel which requires name check
     if (service.serviceUUID == FLYWHEEL_UART_SERVICE_UUID) {
       if (advertisedDevice->isAdvertisingService(service.serviceUUID) && deviceName == String(FLYWHEEL_BLE_NAME)) {
@@ -48,25 +55,13 @@ const BLEServiceInfo* getDeviceServiceInfo(const NimBLEAdvertisedDevice* adverti
   return nullptr;
 }
 
-/**
- * @brief Checks if a BLE device is supported based on its advertised information and name.
- *
- * Determines whether the specified BLE device is supported by attempting to retrieve its service information.
- *
- * @param advertisedDevice Pointer to the advertised BLE device to check.
- * @param deviceName The name of the device to match against.
- * @return true if the device is supported; false otherwise.
- */
-bool isDeviceSupported(const NimBLEAdvertisedDevice* advertisedDevice, const String& deviceName) { return getDeviceServiceInfo(advertisedDevice, deviceName) != nullptr; }
-
 void BLECommunications() {
   // **********************************Client***************************************
   for (auto& _BLEd : spinBLEClient.myBLEDevices) {  // loop through discovered devices
     if (_BLEd.connectedClientID != BLE_HS_CONN_HANDLE_NONE) {
       if (_BLEd.getAdvertisement()) {                                                              // is device registered?
-        if ((_BLEd.connectedClientID != BLE_HS_CONN_HANDLE_NONE) && (_BLEd.doConnect == false)) {  // client must not be in connection process
-          if (BLEDevice::getClientByHandle(_BLEd.connectedClientID)) {                             // nullptr check
-            BLEClient* pClient = NimBLEDevice::getClientByHandle(_BLEd.connectedClientID);
+        if (!_BLEd.doConnect) {  // client must not be in connection process
+          if (BLEClient* pClient = BLEDevice::getClientByHandle(_BLEd.connectedClientID)) {
             // Client connected with a valid UUID registered
             if ((_BLEd.serviceUUID != BLEUUID((uint16_t)0x0000)) && (pClient->isConnected())) {
               // Check for data timeout and trigger disconnect if needed

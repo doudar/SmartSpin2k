@@ -10,20 +10,20 @@
 #include <Constants.h>
 #include "DirConManager.h"
 
-BLE_Wattbike_Service::BLE_Wattbike_Service() : pWattbikeService(nullptr), wattbikeReadCharacteristic(nullptr), wattbikeWriteCharacteristic(nullptr) {}
+BLE_Wattbike_Service::BLE_Wattbike_Service() : wattbikeReadCharacteristic(nullptr) {}
 
 void BLE_Wattbike_Service::setupService(NimBLEServer *pServer) {
   // Create Wattbike service
-  pWattbikeService = spinBLEServer.pServer->createService(WATTBIKE_SERVICE_UUID);
+  NimBLEService *const service = pServer->createService(WATTBIKE_SERVICE_UUID);
 
   // Create characteristic for gear notifications
-  wattbikeReadCharacteristic = pWattbikeService->createCharacteristic(WATTBIKE_READ_UUID, NIMBLE_PROPERTY::READ | NIMBLE_PROPERTY::NOTIFY);
+  wattbikeReadCharacteristic = service->createCharacteristic(WATTBIKE_READ_UUID, NIMBLE_PROPERTY::READ | NIMBLE_PROPERTY::NOTIFY);
 
   // Create characteristic for receiving commands
-  wattbikeWriteCharacteristic = pWattbikeService->createCharacteristic(WATTBIKE_WRITE_UUID, NIMBLE_PROPERTY::WRITE);
+  service->createCharacteristic(WATTBIKE_WRITE_UUID, NIMBLE_PROPERTY::WRITE);
 
   // Start the service
-  spinBLEServer.pServer->getAdvertising()->addServiceUUID(pWattbikeService->getUUID());
+  pServer->getAdvertising()->addServiceUUID(service->getUUID());
 }
 
 void BLE_Wattbike_Service::parseNemit() {

@@ -36,7 +36,7 @@ struct Gears {
   }
 
  public:
-  Gears() { updateSpacing(); }
+  Gears() = default;
 
   // Zero gaps are excluded from the median; duplicate gears share a position.
   // Calculate from gear 1 each time so repeated shifts cannot accumulate rounding.

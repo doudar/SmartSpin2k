@@ -9,14 +9,6 @@
 #include "SS2KLog.h"
 #include "BLE_Custom_Characteristic.h"
 #include <LittleFS.h>
-#include <vector>
-#include <algorithm>
-#include <cmath>
-#include <limits>
-#include <numeric>
-#include <unordered_map>
-#include <map>
-#include <complex>
 
 void PowerBuffer::set(int i) {
   this->powerEntry[i].readings++;
@@ -97,8 +89,6 @@ void PowerTable::processPowerValue(PowerBuffer& powerBuffer, int cadence, Measur
 
 // Set min / max stepper position
 void PowerTable::setStepperMinMax() {
-  int32_t _return = RETURN_ERROR;
-
   // if Homing was preformed, skip estimating min_max
   if (rtConfig->getHomed() && userConfig->getHMin() != INT32_MIN && userConfig->getHMax() != INT32_MIN) {
     SS2K_LOG(POWERTABLE_LOG_TAG, "Using detected travel limits during homing");
@@ -119,7 +109,7 @@ void PowerTable::setStepperMinMax() {
 
   int minBreakWatts = userConfig->getMinWatts();
   if (minBreakWatts > 1) {
-    _return = this->lookup(minBreakWatts, NORMAL_CAD);
+    int32_t _return = this->lookup(minBreakWatts, NORMAL_CAD);
     if (_return != RETURN_ERROR) {
       // never set less than one shift below current incline.
       if ((_return >= ss2k->getCurrentPosition()) && (rtConfig->watts.getValue() > userConfig->getMinWatts())) {
@@ -138,7 +128,7 @@ void PowerTable::setStepperMinMax() {
 
   int maxBreakWatts = userConfig->getMaxWatts();
   if (maxBreakWatts > 1) {
-    _return = this->lookup(maxBreakWatts, NORMAL_CAD);
+    int32_t _return = this->lookup(maxBreakWatts, NORMAL_CAD);
     if (_return != RETURN_ERROR) {
       // never set less than one shift above current incline.
       if ((_return <= ss2k->getCurrentPosition()) && (rtConfig->watts.getValue() < userConfig->getMaxWatts())) {
@@ -227,7 +217,7 @@ bool PowerTable::loadFtmsCalibration() {
   return true;
 }
 
-bool PowerTable::_manageSaveState(bool canSkipReliabilityChecks) {
+bool PowerTable::_manageSaveState(bool /*canSkipReliabilityChecks*/) {
   // Homing is now a prerequisite for loading and saving the powertable.
   if (!rtConfig->getHomed()) {
     return false;

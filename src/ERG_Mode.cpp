@@ -6,18 +6,12 @@
  */
 
 #include "ERG_Mode.h"
-#include "ERG_Mode_Utils.h"
 #include "SS2KLog.h"
 #include "Main.h"
-#include "BLE_Custom_Characteristic.h"
 #include "Power_Table.h"
 #include <LittleFS.h>
-#include <vector>
 #include <algorithm>
 #include <cmath>
-#include <limits>
-#include <numeric>
-#include <unordered_map>
 
 static unsigned long ergTimer = millis() + ERG_MODE_DELAY;
 static bool isDelayed         = false;
@@ -41,8 +35,6 @@ double scheduledErgGain(double sensitivity, int operatingWatts, int cadence, boo
 
 void ErgMode::runERG() {
   static PowerBuffer powerBuffer;
-  static bool hasConnectedPowerMeter = false;
-  static bool simulationRunning      = false;
   static int loopCounter             = 0;
   static int lastSetPoint            = 0;
 
@@ -122,11 +114,8 @@ void ErgMode::runERG() {
     }
 
     if (rtConfig->cad.getValue() > MIN_ERG_CADENCE / 2) {
-      hasConnectedPowerMeter = spinBLEClient.connectedPM;
-      simulationRunning      = rtConfig->watts.getTarget();
-      if (!simulationRunning) {
-        simulationRunning = rtConfig->watts.getSimulate();
-      }
+      const bool hasConnectedPowerMeter = spinBLEClient.connectedPM;
+      const bool simulationRunning      = rtConfig->watts.getTarget() || rtConfig->watts.getSimulate();
 
       if (!userConfig->getPTab4Pwr()) {
         // add values to Power table
@@ -235,13 +224,12 @@ int32_t ErgMode::_setPointChangeState() {
 
   const int currentCadence = rtConfig->cad.getValue();
   const int currentTarget  = rtConfig->watts.getTarget();
-  int32_t tableResult      = RETURN_ERROR;
 
   // Once this part of the surface has repeatedly predicted the real bike,
   // use it as a true feed-forward command. PID remains responsible for
   // overshoot recovery and steady-state maintenance.
   if (_tableTargetIsTrusted(currentTarget, currentCadence)) {
-    tableResult                  = powerTable->lookup(currentTarget, currentCadence);
+    const int32_t tableResult     = powerTable->lookup(currentTarget, currentCadence);
     const bool insideTravel      = tableResult > rtConfig->getMinStep() && tableResult < rtConfig->getMaxStep();
     const bool movesTowardTarget = (mode == Mode::INCREASING && tableResult > ss2k->getCurrentPosition()) || (mode == Mode::DECREASING && tableResult < ss2k->getCurrentPosition());
     if (tableResult != RETURN_ERROR && tableResult >= 0 && insideTravel && movesTowardTarget) {
@@ -253,7 +241,7 @@ int32_t ErgMode::_setPointChangeState() {
 
   // It's better to undershoot increasing watts and overshoot decreasing watts, so lets set the lookup target to the nearest side of POWERTABLE_WATT_INCREMENT
   int adjustedWattTarget = (mode == Mode::INCREASING) ? currentTarget - ERG_MODE_PID_WINDOW : currentTarget + ERG_MODE_PID_WINDOW;
-  tableResult = powerTable->lookup(adjustedWattTarget, (mode == Mode::INCREASING) ? currentCadence + POWERTABLE_CAD_INCREMENT : currentCadence - POWERTABLE_CAD_INCREMENT);
+  int32_t tableResult = powerTable->lookup(adjustedWattTarget, (mode == Mode::INCREASING) ? currentCadence + POWERTABLE_CAD_INCREMENT : currentCadence - POWERTABLE_CAD_INCREMENT);
 
   // Sanity check - with homing enabled, we should never have a negative result. If we do, something went wrong.
   if (rtConfig->getHomed() && tableResult < 0) {

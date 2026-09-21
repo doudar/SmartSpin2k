@@ -12,17 +12,13 @@
 #include <memory>
 #include <Arduino.h>
 #include <queue>
-#include <deque>
 #include <vector>
 #include "Main.h"
 #include "BLE_Definitions.h"
-// #include "BLE_Wattbike_Service.h"
-// #include "BLE_SB20_Service.h"
 #include "Constants.h"
 
 // Client size allocated to the queue for receiving characteristic data
-#define NOTIFY_DATA_QUEUE_SIZE   25
-#define NOTIFY_DATA_QUEUE_LENGTH 10
+#define NOTIFY_DATA_QUEUE_SIZE 25
 
 // BLE Connection Parameters:
 // minInterval – [in] The minimum connection interval in 1.25ms units.
@@ -39,18 +35,8 @@ struct BLEServiceInfo {
 };
 
 namespace BLEServices {
-const std::vector<BLEServiceInfo> SUPPORTED_SERVICES = {{CYCLINGPOWERSERVICE_UUID, CYCLINGPOWERMEASUREMENT_UUID, "Cycling Power Service"},
-                                                        {CSCSERVICE_UUID, CSCMEASUREMENT_UUID, "Cycling Speed And Cadence Service"},
-                                                        {HEARTSERVICE_UUID, HEARTCHARACTERISTIC_UUID, "Heart Rate Service"},
-                                                        {ECHELON_DEVICE_UUID, ECHELON_SERVICE_UUID, "Echelon Device"},  // Two lines for Echelon
-                                                        {ECHELON_SERVICE_UUID, ECHELON_DATA_UUID, "Echelon Service"},   // Because one is for search, the other for data
-                                                        {CHRONO_SERVICE_UUID, CHRONO_DATA_UUID, "Spinner Chrono"},
-                                                        {FITNESSMACHINESERVICE_UUID, FITNESSMACHINEINDOORBIKEDATA_UUID, "Fitness Machine Service"},
-                                                        {HID_SERVICE_UUID, HID_REPORT_DATA_UUID, "HID Service"},
-                                                        {FLYWHEEL_UART_SERVICE_UUID, FLYWHEEL_UART_TX_UUID, "Flywheel UART Service"}};
+extern const std::vector<BLEServiceInfo> SUPPORTED_SERVICES;
 }
-
-using BLEServices::SUPPORTED_SERVICES;
 
 #define BLE_CLIENT_LOG_TAG  "BLE_Client"
 #define BLE_COMMON_LOG_TAG  "BLE_Common"
@@ -64,9 +50,6 @@ void setupBLE();
 extern TaskHandle_t BLEClientTask;
 // ***********************Common**********************************
 void BLECommunications();
-
-// Check if a BLE device supports any of our supported services
-bool isDeviceSupported(const NimBLEAdvertisedDevice* advertisedDevice, const String& deviceName = "");
 
 // Get service info for a supported device
 const BLEServiceInfo* getDeviceServiceInfo(const NimBLEAdvertisedDevice* advertisedDevice, const String& deviceName = "");
@@ -146,10 +129,10 @@ class SpinBLEAdvertisedDevice {
   // shared ownership also keeps it alive while a connection attempt uses it.
   std::shared_ptr<const NimBLEAdvertisedDevice> advertisedDevice;
 
-  void clearState(bool resetAdvertisedDevice);  // NEW
+  void clearState(bool resetAdvertisedDevice);
 
  public:
-  SpinBLEAdvertisedDevice() { clearState(true); }  // NEW
+  SpinBLEAdvertisedDevice() { clearState(true); }
 
   std::shared_ptr<const NimBLEAdvertisedDevice> getAdvertisement() const { return std::atomic_load(&advertisedDevice); }
   NimBLEAddress peerAddress;
@@ -176,9 +159,7 @@ class SpinBLEAdvertisedDevice {
 };
 
 class SpinBLEClient {
- private:
- public:  // Not all of these need to be public. This should be cleaned up
-          // later.
+ public:
   boolean connectedPM            = false;
   boolean connectedHRM           = false;
   boolean connectedCD            = false;
@@ -193,7 +174,6 @@ class SpinBLEClient {
 
   BLERemoteCharacteristic* pRemoteCharacteristic = nullptr;
 
-  // BLEDevices myBLEDevices;
   SpinBLEAdvertisedDevice myBLEDevices[NUM_BLE_DEVICES];
 
   void start();

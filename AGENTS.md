@@ -185,7 +185,6 @@ Private state:
 
 - Button debounce and current button states.
 - `lastShifterPosition`: previous logical shift position for delta detection.
-- Scan delay state.
 - `targetPosition` and `currentPosition`: actual stepper positions.
 
 Public flags:
@@ -263,6 +262,7 @@ Key functions:
 - `SpinBLEClient::adevName2UniqueName()`: stable names for saved device preferences. Public/static random addresses get address suffix; private random addresses prefer manufacturer-data suffix or base name.
 
 `BLEServices::SUPPORTED_SERVICES` maps service UUIDs to the characteristic UUIDs this firmware expects. If adding sensor support, update this list, `SensorDataFactory`, and tests if parsing is involved.
+The service table has one shared definition in `src/BLE_Common.cpp`; keep it out of the header to avoid allocating a separate vector and service-name strings in every translation unit.
 
 ## Sensor Parsing Library
 

@@ -99,7 +99,6 @@ class DirConManager {
 
   // Service and characteristic handling
   static void addBleServiceUuid(const NimBLEUUID& serviceUuid);
-  static std::vector<NimBLECharacteristic*> getCharacteristics(const NimBLEUUID& serviceUuid);
   static uint8_t getDirConProperties(uint32_t characteristicProperties);
   static NimBLECharacteristic* findCharacteristic(const NimBLEUUID& characteristicUuid);
 
@@ -107,7 +106,6 @@ class DirConManager {
   static Subscription clientSubscriptions[DIRCON_MAX_CLIENTS][DIRCON_MAX_CHARACTERISTICS];
   static void addSubscription(size_t clientIndex, const NimBLEUUID& characteristicUuid);
   static void removeSubscription(size_t clientIndex, const NimBLEUUID& characteristicUuid);
-  static void removeAllSubscriptions(size_t clientIndex);
   static bool hasSubscription(size_t clientIndex, const NimBLEUUID& characteristicUuid);
 
   // Sequence number tracking

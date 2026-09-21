@@ -116,6 +116,8 @@ class TestFtmsHoming {
 
 class TestBleWireRoundTrip {
  public:
+  static void test_factory_preserves_cached_parser_state(void);
+  static void test_nimble_uuid_comparison_and_rendering(void);
   static void test_dircon_uuid_round_trip(void);
   static void test_all_custom_characteristic_formats(void);
   static void test_ftms_round_trip(void);

@@ -15,8 +15,8 @@ static const uint8_t cc_write   = 0x02;
 static const uint8_t cc_success = 0x80;
 static const uint8_t cc_error   = 0xFF;
 
-// Custom-characteristic variable identifiers. Keep these contiguous so tests can
-// verify that every protocol value has an explicitly documented wire format.
+// Custom-characteristic variable identifiers. Keep these values stable, including
+// reserved IDs. Tests verify that each assigned ID has an explicit wire format.
 static const uint8_t BLE_firmwareUpdateURL     = 0x01;
 static const uint8_t BLE_incline               = 0x02;
 static const uint8_t BLE_simulatedWatts        = 0x03;
@@ -53,7 +53,7 @@ static const uint8_t BLE_minBrakeWatts         = 0x21;
 static const uint8_t BLE_maxBrakeWatts         = 0x22;
 static const uint8_t BLE_restartBLE            = 0x23;
 static const uint8_t BLE_scanBLE               = 0x24;
-static const uint8_t BLE_firmwareVer            = 0x25;
+static const uint8_t BLE_firmwareVer           = 0x25;
 static const uint8_t BLE_resetPowerTable       = 0x26;
 static const uint8_t BLE_powerTableData        = 0x27;
 static const uint8_t BLE_simulatedTargetWatts  = 0x28;

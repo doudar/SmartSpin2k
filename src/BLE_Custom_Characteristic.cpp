@@ -185,7 +185,7 @@ std::vector<uint8_t> makeSettingsSnapshotChunk(SettingsSnapshotTransfer& snapsho
 bool sendNextSettingsSnapshotChunk(NimBLECharacteristic* characteristic) {
   if (!settingsSnapshot.active || settingsSnapshot.chunk >= settingsSnapshot.chunkCount) return false;
 
-  uint16_t chunkNumber         = settingsSnapshot.chunk;
+  const uint16_t chunkNumber   = settingsSnapshot.chunk;
   std::vector<uint8_t> packet = makeSettingsSnapshotChunk(settingsSnapshot);
 
   if (!characteristic->indicate(packet.data(), packet.size(), settingsSnapshot.connHandle)) {
@@ -272,7 +272,7 @@ void startDirConSettingsSnapshot(NimBLECharacteristic* characteristic) {
 }  // namespace
 
 void BLE_ss2kCustomCharacteristic::setupService(NimBLEServer *pServer) {
-  pSmartSpin2kService = spinBLEServer.pServer->createService(SMARTSPIN2K_SERVICE_UUID);
+  pSmartSpin2kService = pServer->createService(SMARTSPIN2K_SERVICE_UUID);
   smartSpin2kCharacteristic =
       pSmartSpin2kService->createCharacteristic(SMARTSPIN2K_CHARACTERISTIC_UUID, NIMBLE_PROPERTY::WRITE | NIMBLE_PROPERTY::INDICATE | NIMBLE_PROPERTY::NOTIFY);
   smartSpin2kCharacteristic->setValue(ss2kCustomCharacteristicValue, sizeof(ss2kCustomCharacteristicValue));
@@ -291,7 +291,7 @@ void BLE_ss2kCustomCharacteristic::setupService(NimBLEServer *pServer) {
     std::string request(reinterpret_cast<const char*>(data), length);
     BLE_ss2kCustomCharacteristic::process(request, BLE_HS_CONN_HANDLE_NONE, 23, false);
     result->updateResponseData = true;
-    if (length >= 2 && data[0] == cc_read && data[1] == BLE_allSettings) {
+    if (data[0] == cc_read && data[1] == BLE_allSettings) {
       result->autoSubscribeUuids[0] = characteristic->getUUID();
       result->autoSubscribeCount    = 1;
     }
@@ -375,7 +375,7 @@ void BLE_ss2kCustomCharacteristic::notifyScanResult(const String& name, const Ni
 
 void BLE_ss2kCustomCharacteristic::endScanResults() { sendScanResultPayload(ScanResultProtocol::Event::End, scanResultSequence); }
 
-void BLE_ss2kCustomCharacteristic::process(std::string rxValue, uint16_t connHandle, uint16_t mtu, bool indicateResponse) {
+void BLE_ss2kCustomCharacteristic::process(const std::string& rxValue, uint16_t connHandle, uint16_t mtu, bool indicateResponse) {
   // Find the Characteristic
   if (rxValue.length() < 2 || NimBLEDevice::getServer()->getServiceByUUID(SMARTSPIN2K_SERVICE_UUID) == nullptr) {
     return;
@@ -394,7 +394,7 @@ void BLE_ss2kCustomCharacteristic::process(std::string rxValue, uint16_t connHan
   // Avoid interleaving legacy responses with an acknowledged snapshot transfer.
   if (settingsSnapshot.active) return;
 
-  uint8_t *pData                        = reinterpret_cast<uint8_t *>(&rxValue[0]);
+  const uint8_t *pData                  = reinterpret_cast<const uint8_t *>(rxValue.data());
 
 #ifdef CUSTOM_CHAR_DEBUG
 #define LOG_BUF_APPEND(...) logBufLength += snprintf(logBuf + logBufLength, kLogBufCapacity - logBufLength, __VA_ARGS__)
@@ -444,7 +444,7 @@ void BLE_ss2kCustomCharacteristic::process(std::string rxValue, uint16_t connHan
         returnString   = userConfig->getFirmwareUpdateURL();
       } else if (rxValue[0] == cc_write) {
         returnValue[0] = cc_success;
-        String str     = (char *)pData;
+        String str     = reinterpret_cast<const char *>(pData);
         str.remove(0, 2);
         userConfig->setFirmwareUpdateURL(str);
         LOG_BUF_APPEND("(%s)", userConfig->getFirmwareUpdateURL());
@@ -519,7 +519,7 @@ void BLE_ss2kCustomCharacteristic::process(std::string rxValue, uint16_t connHan
       if (rxValue[0] == cc_write) {
         returnValue[0] = cc_success;
         rtConfig->setSimulatedSpeed(get_le16(&pData[2]) / 10.0f);
-        LOG_BUF_APPEND("(%d)", rtConfig->getSimulatedSpeed());
+        LOG_BUF_APPEND("(%f)", rtConfig->getSimulatedSpeed());
       }
     } break;
 
@@ -530,7 +530,7 @@ void BLE_ss2kCustomCharacteristic::process(std::string rxValue, uint16_t connHan
         returnString   = userConfig->getDeviceName();
       } else if (rxValue[0] == cc_write) {
         returnValue[0] = cc_success;
-        String str     = (char *)pData;
+        String str     = reinterpret_cast<const char *>(pData);
         str.remove(0, 2);
         userConfig->setDeviceName(str);
         LOG_BUF_APPEND("(%s)", userConfig->getDeviceName());
@@ -688,7 +688,7 @@ void BLE_ss2kCustomCharacteristic::process(std::string rxValue, uint16_t connHan
         returnString   = userConfig->getSsid();
       } else if (rxValue[0] == cc_write) {
         returnValue[0] = cc_success;
-        String str     = (char *)pData;
+        String str     = reinterpret_cast<const char *>(pData);
         str.remove(0, 2);
         userConfig->setSsid(str);
         LOG_BUF_APPEND("(%s)", userConfig->getSsid());
@@ -702,7 +702,7 @@ void BLE_ss2kCustomCharacteristic::process(std::string rxValue, uint16_t connHan
         returnString   = userConfig->getPassword();
       } else if (rxValue[0] == cc_write) {
         returnValue[0] = cc_success;
-        String str     = (char *)pData;
+        String str     = reinterpret_cast<const char *>(pData);
         str.remove(0, 2);
         userConfig->setPassword(str);
         LOG_BUF_APPEND("(%s)", "******");
@@ -716,7 +716,7 @@ void BLE_ss2kCustomCharacteristic::process(std::string rxValue, uint16_t connHan
         returnString   = userConfig->getFoundDevices();
       } else if (rxValue[0] == cc_write) {
         returnValue[0] = cc_success;
-        String str     = (char *)pData;
+        String str     = reinterpret_cast<const char *>(pData);
         str.remove(0, 2);
         userConfig->setFoundDevices(str);
         LOG_BUF_APPEND("(%s)", userConfig->getFoundDevices());
@@ -730,7 +730,7 @@ void BLE_ss2kCustomCharacteristic::process(std::string rxValue, uint16_t connHan
         returnString   = userConfig->getConnectedPowerMeter();
       } else if (rxValue[0] == cc_write) {
         returnValue[0] = cc_success;
-        String str     = (char *)pData;
+        String str     = reinterpret_cast<const char *>(pData);
         str.remove(0, 2);
         userConfig->setConnectedPowerMeter(str);
         LOG_BUF_APPEND("(%s)", userConfig->getConnectedPowerMeter());
@@ -744,7 +744,7 @@ void BLE_ss2kCustomCharacteristic::process(std::string rxValue, uint16_t connHan
         returnString   = userConfig->getConnectedHeartMonitor();
       } else if (rxValue[0] == cc_write) {
         returnValue[0] = cc_success;
-        String str     = (char *)pData;
+        String str     = reinterpret_cast<const char *>(pData);
         str.remove(0, 2);
         userConfig->setConnectedHeartMonitor(str);
         LOG_BUF_APPEND("(%s)", userConfig->getConnectedHeartMonitor());
@@ -759,7 +759,6 @@ void BLE_ss2kCustomCharacteristic::process(std::string rxValue, uint16_t connHan
         returnLength += 2;
       }
       if (rxValue[0] == cc_write) {
-        returnValue[0] = cc_success;
         rtConfig->setShifterPosition(get_le16s(&pData[2]));
         LOG_BUF_APPEND("(%d)", rtConfig->getShifterPosition());
 #ifdef CUSTOM_CHAR_DEBUG
@@ -788,7 +787,7 @@ void BLE_ss2kCustomCharacteristic::process(std::string rxValue, uint16_t connHan
       if (rxValue[0] == cc_write) {
         returnValue[0] = cc_success;
         ss2k->setTargetPosition(get_le32s(&pData[2]));
-        LOG_BUF_APPEND(" (%f)", ss2k->getTargetPosition());
+        LOG_BUF_APPEND(" (%d)", ss2k->getTargetPosition());
       }
       break;
 

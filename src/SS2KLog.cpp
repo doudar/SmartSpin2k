@@ -13,8 +13,7 @@ LogHandler logHandler = LogHandler();
 
 uint8_t LogHandler::_messageBuffer[LOG_BUFFER_SIZE_BYTES];
 
-LogHandler::LogHandler() {
-  _logBufferMutex      = xSemaphoreCreateMutex();
+LogHandler::LogHandler() : _logBufferMutex(xSemaphoreCreateMutex()) {
   _messageBufferHandle = xMessageBufferCreateStatic(LOG_BUFFER_SIZE_BYTES, _messageBuffer, &_messageBufferStruct);
 }
 

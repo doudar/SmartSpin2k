@@ -22,10 +22,9 @@ class WebSocketAppender : public ILogAppender {
   static const uint16_t port      = 8080;
   static const uint8_t maxClients = 4;
 
-  void Initialize();
+  void Initialize() override;
   uint8_t GetClientsCount();
   void AddClient(WebsocketsClient* client);
-  void CheckConnectedClients();
 
   WebsocketsServer _webSocketsServer;
   WebsocketsClient* _clients[maxClients];

@@ -61,7 +61,7 @@ void SpinBLEClient::start() {
  * @param length Length of the data received.
  * @param isNotify Boolean indicating if the notification is a notify or indicate.
  */
-static void notifyCB(NimBLERemoteCharacteristic* pBLERemoteCharacteristic, uint8_t* pData, size_t length, bool isNotify) {
+static void notifyCB(NimBLERemoteCharacteristic* pBLERemoteCharacteristic, uint8_t* pData, size_t length, bool /*isNotify*/) {
   // Parse BLE shifter info.
   if (pBLERemoteCharacteristic->getRemoteService()->getUUID() == HID_SERVICE_UUID) {
     Serial.print(pData[0], HEX);
@@ -186,9 +186,8 @@ void bleClientTask(void* pvParameters) {
       for (auto& _BLEd : spinBLEClient.myBLEDevices) {  // loop through discovered devices
         if (_BLEd.connectedClientID != BLE_HS_CONN_HANDLE_NONE) {
           if (_BLEd.getAdvertisement()) {                                                              // is device registered?
-            if ((_BLEd.connectedClientID != BLE_HS_CONN_HANDLE_NONE) && (_BLEd.doConnect == false)) {  // client must not be in connection process
-              if (BLEDevice::getClientByPeerAddress(_BLEd.peerAddress)) {                              // nullptr check
-                NimBLEClient* pClient = NimBLEDevice::getClientByPeerAddress(_BLEd.peerAddress);
+            if (!_BLEd.doConnect) {  // client must not be in connection process
+              if (NimBLEClient* pClient = NimBLEDevice::getClientByPeerAddress(_BLEd.peerAddress)) {
                 pClient->disconnect();
               }
             }
@@ -599,9 +598,10 @@ void ScanCallbacks::onScanEnd(const NimBLEScanResults& results, int reason) {
 
 // remove the last connected BLE Power Meter
 void SpinBLEClient::removeDuplicates(NimBLEClient* pClient) {
+  const NimBLEAddress peerAddress = pClient->getPeerAddress();
   NimBLEUUID serviceUUID;
   for (size_t i = 0; i < NUM_BLE_DEVICES; i++) {  // Disconnect oldest PM to avoid two connected.
-    if (this->myBLEDevices[i].peerAddress == pClient->getPeerAddress()) {
+    if (this->myBLEDevices[i].peerAddress == peerAddress) {
       serviceUUID = this->myBLEDevices[i].serviceUUID;
       break;
     }
@@ -610,11 +610,11 @@ void SpinBLEClient::removeDuplicates(NimBLEClient* pClient) {
   for (size_t i = 0; i < NUM_BLE_DEVICES; i++) {  // Disconnect oldest PM to avoid two connected.
     auto& oldBLEd = this->myBLEDevices[i];
     if (oldBLEd.getAdvertisement()) {
-      if ((serviceUUID == oldBLEd.serviceUUID) && (pClient->getPeerAddress() != oldBLEd.peerAddress)) {
-        if (BLEDevice::getClientByPeerAddress(oldBLEd.peerAddress)) {
-          if (BLEDevice::getClientByPeerAddress(oldBLEd.peerAddress)->isConnected()) {
-            SS2K_LOG(BLE_CLIENT_LOG_TAG, "%s Detected as a duplicate.  Disconnecting: %s", pClient->getPeerAddress().toString().c_str(), oldBLEd.peerAddress.toString().c_str());
-            NimBLEDevice::deleteClient(BLEDevice::getClientByPeerAddress(oldBLEd.peerAddress));
+      if ((serviceUUID == oldBLEd.serviceUUID) && (peerAddress != oldBLEd.peerAddress)) {
+        if (NimBLEClient* oldClient = NimBLEDevice::getClientByPeerAddress(oldBLEd.peerAddress)) {
+          if (oldClient->isConnected()) {
+            SS2K_LOG(BLE_CLIENT_LOG_TAG, "%s Detected as a duplicate.  Disconnecting: %s", peerAddress.toString().c_str(), oldBLEd.peerAddress.toString().c_str());
+            NimBLEDevice::deleteClient(oldClient);
             oldBLEd.reset(true);
             return;
           }
@@ -644,8 +644,9 @@ void SpinBLEClient::FTMSControlPointWrite(const uint8_t* pData, int length) {
     }
     for (int i = 0; i < NUM_BLE_DEVICES; i++) {
       if (myBLEDevices[i].isPostConnected && (myBLEDevices[i].serviceUUID == FITNESSMACHINESERVICE_UUID)) {
-        if (NimBLEDevice::getClientByPeerAddress(myBLEDevices[i].peerAddress)->getService(FITNESSMACHINESERVICE_UUID)) {
-          pClient = NimBLEDevice::getClientByPeerAddress(myBLEDevices[i].peerAddress);
+        NimBLEClient* candidate = NimBLEDevice::getClientByPeerAddress(myBLEDevices[i].peerAddress);
+        if (candidate && candidate->getService(FITNESSMACHINESERVICE_UUID)) {
+          pClient = candidate;
           break;
         }
       }
@@ -713,10 +714,11 @@ void SpinBLEClient::postConnect() {
           rtConfig->setMaxResistance(MAX_ECHELON_RESISTANCE);
         }
 
-        if (pClient->getService(FITNESSMACHINESERVICE_UUID)) {
+        NimBLERemoteService* fitnessService = pClient->getService(FITNESSMACHINESERVICE_UUID);
+        if (fitnessService) {
           SS2K_LOG(BLE_CLIENT_LOG_TAG, "Initializing FTMS on device: %s", _BLEd.uniqueName.c_str());
 
-          auto featuresCharacteristic = pClient->getService(FITNESSMACHINESERVICE_UUID)->getCharacteristic(FITNESSMACHINEFEATURE_UUID);
+          auto featuresCharacteristic = fitnessService->getCharacteristic(FITNESSMACHINEFEATURE_UUID);
           if (featuresCharacteristic == nullptr) {
             SS2K_LOG(BLE_CLIENT_LOG_TAG, "Failed to find FTMS features characteristic UUID: %s", FITNESSMACHINEFEATURE_UUID.toString().c_str());
           } else {
@@ -731,7 +733,7 @@ void SpinBLEClient::postConnect() {
                   SS2K_LOG(BLE_CLIENT_LOG_TAG, "FTMS Control Point StartOrResume not supported on: %s", _BLEd.uniqueName.c_str());
                 }
 
-                NimBLERemoteCharacteristic* writeCharacteristic = pClient->getService(FITNESSMACHINESERVICE_UUID)->getCharacteristic(FITNESSMACHINECONTROLPOINT_UUID);
+                NimBLERemoteCharacteristic* writeCharacteristic = fitnessService->getCharacteristic(FITNESSMACHINECONTROLPOINT_UUID);
                 if (writeCharacteristic == nullptr) {
                   SS2K_LOG(BLE_CLIENT_LOG_TAG, "Failed to find FTMS control characteristic UUID: %s, on %s", FITNESSMACHINECONTROLPOINT_UUID.toString().c_str(),
                            _BLEd.uniqueName.c_str());
@@ -749,7 +751,7 @@ void SpinBLEClient::postConnect() {
             }
           }
           // update resistance range if supported:
-          auto resistanceRangeCharacteristic = pClient->getService(FITNESSMACHINESERVICE_UUID)->getCharacteristic(FITNESSMACHINERESISTANCELEVELRANGE_UUID);
+          auto resistanceRangeCharacteristic = fitnessService->getCharacteristic(FITNESSMACHINERESISTANCELEVELRANGE_UUID);
           // Schwinn IC4 bikes don't transmit in the proper format, so we need to ignore this on bikes with names that start with "IC Bike"
           if (adevName.startsWith("IC Bike")) {
             SS2K_LOG(BLE_CLIENT_LOG_TAG, "Ignoring FTMS Resistance Range characteristic on IC Bike device: %s", _BLEd.uniqueName.c_str());
@@ -977,9 +979,9 @@ void SpinBLEClient::checkBLEReconnect() {
 
 void SpinBLEClient::reconnectAllDevices() {
   for (auto& i : spinBLEClient.myBLEDevices) {
-    if (NimBLEDevice::getClientByHandle(i.connectedClientID)) {
-      if (NimBLEDevice::getClientByHandle(i.connectedClientID)->isConnected()) {
-        NimBLEDevice::getClientByHandle(i.connectedClientID)->disconnect();
+    if (NimBLEClient* client = NimBLEDevice::getClientByHandle(i.connectedClientID)) {
+      if (client->isConnected()) {
+        client->disconnect();
         i.reset(true);
       }
     }
@@ -988,14 +990,11 @@ void SpinBLEClient::reconnectAllDevices() {
 
 // Poll BLE devices for battCharacteristic if available and read value.
 void SpinBLEClient::handleBattInfo(NimBLEClient* pClient, bool updateNow = false) {
-  static unsigned long last_battery_update = 0;
-  if (pClient->getService(BATTERYSERVICE_UUID) == nullptr) {
+  NimBLERemoteService* batteryService = pClient->getService(BATTERYSERVICE_UUID);
+  if (batteryService == nullptr) {
     return;
   }
-  if (pClient->getService(BATTERYSERVICE_UUID)->getCharacteristic(BATTERYCHARACTERISTIC_UUID) == nullptr) {
-    return;
-  }
-  BLERemoteCharacteristic* battCharacteristic = pClient->getService(BATTERYSERVICE_UUID)->getCharacteristic(BATTERYCHARACTERISTIC_UUID);
+  BLERemoteCharacteristic* battCharacteristic = batteryService->getCharacteristic(BATTERYCHARACTERISTIC_UUID);
   if (battCharacteristic != nullptr) {
     std::string value = battCharacteristic->readValue();
     rtConfig->batt.setValue((uint8_t)value[0]);

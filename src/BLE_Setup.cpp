@@ -8,7 +8,6 @@
 #include "BLE_Common.h"
 #include "Main.h"
 #include "SS2KLog.h"
-#include <ArduinoJson.h>
 #include <NimBLEDevice.h>
 
 void setupBLE() {  // Common BLE setup for both client and server

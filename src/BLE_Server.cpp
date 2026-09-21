@@ -8,15 +8,12 @@
 #include "Main.h"
 #include "SS2KLog.h"
 #include "BLE_Common.h"
-#include <ArduinoJson.h>
 #include <Constants.h>
 #include <NimBLEDevice.h>
 #include <NimBLEUtils.h>
 #include <WiFi.h>
 #include <host/ble_gatt.h>
-#include <cmath>
 #include <cstring>
-#include <limits>
 #include <string>
 #include "BLE_Cycling_Speed_Cadence.h"
 #include "BLE_Cycling_Power_Service.h"
@@ -274,7 +271,7 @@ void MyServerCallbacks::onMTUChange(uint16_t MTU, NimBLEConnInfo& connInfo) {
   SS2K_LOG(BLE_SERVER_LOG_TAG, "ATT MTU updated to %u for connection %u", MTU, connInfo.getConnHandle());
 }
 
-bool MyServerCallbacks::onConnParamsUpdateRequest(uint16_t handle, const ble_gap_upd_params* params) {
+bool MyServerCallbacks::onConnParamsUpdateRequest(uint16_t handle, const ble_gap_upd_params*) {
   SS2K_LOG(BLE_SERVER_LOG_TAG, "Updated Server Connection Parameters for handle: %d", handle);
   return true;
 }
@@ -285,7 +282,7 @@ void MyCharacteristicCallbacks::onRead(NimBLECharacteristic* pCharacteristic, Ni
   SS2K_LOG(BLE_SERVER_LOG_TAG, "Read from %s by client: %s", pCharacteristic->getUUID().toString().c_str(), connInfo.getAddress().toString().c_str());
 }
 
-void MyCharacteristicCallbacks::onWrite(NimBLECharacteristic* pCharacteristic, NimBLEConnInfo& connInfo) {
+void MyCharacteristicCallbacks::onWrite(NimBLECharacteristic* pCharacteristic, NimBLEConnInfo&) {
   if (pCharacteristic->getUUID() == FITNESSMACHINECONTROLPOINT_UUID) {
     spinBLEServer.writeCache.push(pCharacteristic->getValue());
   } else {
@@ -293,7 +290,7 @@ void MyCharacteristicCallbacks::onWrite(NimBLECharacteristic* pCharacteristic, N
   }
 }
 
-void MyCharacteristicCallbacks::onStatus(NimBLECharacteristic* pCharacteristic, int code) {
+void MyCharacteristicCallbacks::onStatus(NimBLECharacteristic* pCharacteristic, int) {
 // loop through and accumulate the data into a C++ string
 // only used for extensive logging.
 #ifndef DEBUG_BLE_TX_RX
@@ -312,7 +309,6 @@ void MyCharacteristicCallbacks::onStatus(NimBLECharacteristic* pCharacteristic, 
 
 void MyCharacteristicCallbacks::onSubscribe(NimBLECharacteristic* pCharacteristic, NimBLEConnInfo& connInfo, uint16_t subValue) {
   String str       = "Client ID: ";
-  NimBLEUUID pUUID = pCharacteristic->getUUID();
   str += connInfo.getConnHandle();
   str += " Address: ";
   str += connInfo.getAddress().toString().c_str();
@@ -346,7 +342,7 @@ void logCharacteristic(char* buffer, const size_t bufferCapacity, const byte* da
   bufferLength += snprintf(buffer + bufferLength, bufferCapacity - bufferLength, "-> %s | %s | ", serviceUUID.toString().c_str(), charUUID.toString().c_str());
   va_list args;
   va_start(args, format);
-  bufferLength += vsnprintf(buffer + bufferLength, bufferCapacity - bufferLength, format, args);
+  vsnprintf(buffer + bufferLength, bufferCapacity - bufferLength, format, args);
   va_end(args);
 
   SS2K_LOG(BLE_SERVER_LOG_TAG, "%s", buffer);

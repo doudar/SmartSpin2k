@@ -8,6 +8,8 @@
 #include "BLE_Device_Information_Service.h"
 #include "Constants.h"
 
+#include <Arduino.h>
+#include <NimBLEDevice.h>
 #include <array>
 #include <cstdio>
 
@@ -34,43 +36,33 @@ std::array<uint8_t, 8> buildSystemId(uint64_t efuseMac) {
 }
 }
 
-BLE_Device_Information_Service::BLE_Device_Information_Service()
-    : pDeviceInformationService(nullptr),
-      pManufacturerNameCharacteristic(nullptr),
-      pModelNumberCharacteristic(nullptr),
-      pSerialNumberCharacteristic(nullptr),
-      pHardwareRevisionCharacteristic(nullptr),
-      pFirmwareRevisionCharacteristic(nullptr),
-      pSoftwareRevisionCharacteristic(nullptr),
-      pSystemIDCharacteristic(nullptr),
-      pPnPIDCharacteristic(nullptr) {}
-
 void BLE_Device_Information_Service::setupService(NimBLEServer* pServer) {
   const uint64_t efuseMac           = ESP.getEfuseMac();
   const String serialNumber         = buildSerialNumber(efuseMac);
   const std::array<uint8_t, 8> systemId = buildSystemId(efuseMac);
 
-  pDeviceInformationService = pServer->createService(DEVICE_INFORMATION_SERVICE_UUID);
+  NimBLEService* const deviceInformationService = pServer->createService(DEVICE_INFORMATION_SERVICE_UUID);
 
-  pManufacturerNameCharacteristic = pDeviceInformationService->createCharacteristic(MANUFACTURER_NAME_UUID, NIMBLE_PROPERTY::READ);
-  pManufacturerNameCharacteristic->setValue(kDisManufacturerName);
+  NimBLECharacteristic* const manufacturerNameCharacteristic =
+      deviceInformationService->createCharacteristic(MANUFACTURER_NAME_UUID, NIMBLE_PROPERTY::READ);
+  manufacturerNameCharacteristic->setValue(kDisManufacturerName);
 
-  pModelNumberCharacteristic = pDeviceInformationService->createCharacteristic(MODEL_NUMBER_UUID, NIMBLE_PROPERTY::READ);
-  pModelNumberCharacteristic->setValue(kDisModelNumber);
+  NimBLECharacteristic* const modelNumberCharacteristic = deviceInformationService->createCharacteristic(MODEL_NUMBER_UUID, NIMBLE_PROPERTY::READ);
+  modelNumberCharacteristic->setValue(kDisModelNumber);
 
-  pSerialNumberCharacteristic = pDeviceInformationService->createCharacteristic(SERIAL_NUMBER_UUID, NIMBLE_PROPERTY::READ);
-  pSerialNumberCharacteristic->setValue(serialNumber);
+  NimBLECharacteristic* const serialNumberCharacteristic = deviceInformationService->createCharacteristic(SERIAL_NUMBER_UUID, NIMBLE_PROPERTY::READ);
+  serialNumberCharacteristic->setValue(serialNumber);
 
-  pHardwareRevisionCharacteristic = pDeviceInformationService->createCharacteristic(HARDWARE_REVISION_UUID, NIMBLE_PROPERTY::READ);
-  pHardwareRevisionCharacteristic->setValue(kDisHardwareRevision);
+  NimBLECharacteristic* const hardwareRevisionCharacteristic = deviceInformationService->createCharacteristic(HARDWARE_REVISION_UUID, NIMBLE_PROPERTY::READ);
+  hardwareRevisionCharacteristic->setValue(kDisHardwareRevision);
 
-  pFirmwareRevisionCharacteristic = pDeviceInformationService->createCharacteristic(FIRMWARE_REVISION_UUID, NIMBLE_PROPERTY::READ);
-  pFirmwareRevisionCharacteristic->setValue(FIRMWARE_VERSION);
+  NimBLECharacteristic* const firmwareRevisionCharacteristic = deviceInformationService->createCharacteristic(FIRMWARE_REVISION_UUID, NIMBLE_PROPERTY::READ);
+  firmwareRevisionCharacteristic->setValue(FIRMWARE_VERSION);
 
-  pSoftwareRevisionCharacteristic = pDeviceInformationService->createCharacteristic(SOFTWARE_REVISION_UUID, NIMBLE_PROPERTY::READ);
-  pSoftwareRevisionCharacteristic->setValue(FIRMWARE_VERSION);
+  NimBLECharacteristic* const softwareRevisionCharacteristic = deviceInformationService->createCharacteristic(SOFTWARE_REVISION_UUID, NIMBLE_PROPERTY::READ);
+  softwareRevisionCharacteristic->setValue(FIRMWARE_VERSION);
 
-  pSystemIDCharacteristic = pDeviceInformationService->createCharacteristic(SYSTEM_ID_UUID, NIMBLE_PROPERTY::READ);
-  pSystemIDCharacteristic->setValue(systemId.data(), systemId.size());
+  NimBLECharacteristic* const systemIdCharacteristic = deviceInformationService->createCharacteristic(SYSTEM_ID_UUID, NIMBLE_PROPERTY::READ);
+  systemIdCharacteristic->setValue(systemId.data(), systemId.size());
 
 }

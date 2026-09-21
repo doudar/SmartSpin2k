@@ -33,9 +33,6 @@ class SS2K {
   bool localGearingActive = false;
   int legacyShifterPosition = 0;
   int localGear = 0;
-  int shiftersHoldForScan;
-  unsigned long int scanDelayTime;
-  unsigned long int scanDelayStart;
   int32_t targetPosition;
   int32_t currentPosition;
   int32_t ftmsSimulationOffset = 0;
@@ -57,7 +54,7 @@ class SS2K {
   bool isUpdating          = false;
   bool ftmsHomingFailed    = false;  // Hold normal motor control after failure until homing succeeds.
 
-  static void ARDUINO_ISR_ATTR maintenanceLoop(void *pvParameters);
+  static void ARDUINO_ISR_ATTR maintenanceLoop(void *);
   static void ARDUINO_ISR_ATTR handleUpShift();
   static void ARDUINO_ISR_ATTR handleDownShift();
   static void moveStepper();
@@ -110,9 +107,6 @@ class SS2K {
     externalControl     = false;
     syncMode            = false;
     lastShifterPosition = 0;
-    shiftersHoldForScan = SHIFTERS_HOLD_FOR_SCAN;
-    scanDelayTime       = 10000;
-    scanDelayStart      = 0;
     pelotonIsConnected  = false;
     txCheck             = TX_CHECK_INTERVAL;
   }

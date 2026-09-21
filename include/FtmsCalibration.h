@@ -110,7 +110,6 @@ struct Map {
 class DriftGuard {
  public:
   enum class State { Ineligible, Stale, Settling, OutsideMap, Deadband, ConfirmingOffset, Cooldown, Corrected };
-  State state() const { return state_; }
   bool uncertain() const { return uncertain_; }
   const char* reason() const {
     switch (state_) {
