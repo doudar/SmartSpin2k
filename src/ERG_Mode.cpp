@@ -14,7 +14,6 @@
 #include <cmath>
 
 static unsigned long ergTimer = millis() + ERG_MODE_DELAY;
-static bool isDelayed         = false;
 
 namespace {
 double scheduledErgGain(double sensitivity, int operatingWatts, int cadence, bool& usedPowerTable, PowerTableSlopeStatus::Value& slopeStatus) {
@@ -44,8 +43,7 @@ void ErgMode::runERG() {
       lastSetPoint = rtConfig->watts.getTarget();
       rtConfig->watts.setTarget(userConfig->getMinWatts());
       mode      = Mode::MAINTAIN;
-      isDelayed = false;
-      ergTimer  = 0;
+      ergTimer  = millis();
     }
   } else if (lastSetPoint != 0 && rtConfig->getFTMSMode() == FitnessMachineControlPointProcedure::SetTargetPower && rtConfig->cad.getValue() > MIN_ERG_CADENCE) {
     SS2K_LOG(ERG_MODE_LOG_TAG, "Cadence above ERG minimum; restoring target to %dw", lastSetPoint);
@@ -63,31 +61,10 @@ void ErgMode::runERG() {
   // A trusted seek gets the first look at cadence so its feed-forward target
   // is refreshed before deciding whether an overshoot needs PID intervention.
   _handleTrustedTableSeek();
+  _handleFeedbackWait();
 
-  const bool reachedIncreasingTarget = mode == Mode::INCREASING && rtConfig->watts.getValue() >= rtConfig->watts.getTarget();
-  const bool reachedDecreasingTarget = mode == Mode::DECREASING && rtConfig->watts.getValue() <= rtConfig->watts.getTarget();
-  if (!isTableSeeking() && (reachedIncreasingTarget || reachedDecreasingTarget)) {
-    SS2K_LOG(ERG_MODE_LOG_TAG, "ERG setpoint reached; resuming PID control");
-    mode      = Mode::MAINTAIN;
-    isDelayed = false;
-    ergTimer  = 0;
-  }
-
-  if (isDelayed && (ss2k->getCurrentPosition() == ss2k->getTargetPosition())) {
-    SS2K_LOG(ERG_MODE_LOG_TAG, "ERG delay cleared,  %dw, tgt %dw, pos %d, tgt %d", rtConfig->watts.getValue(), rtConfig->watts.getTarget(), ss2k->getCurrentPosition(),
-             ss2k->getTargetPosition());
-    ergTimer  = millis() + ERG_MODE_DELAY;
-    isDelayed = false;
-  }
-
-  if ((millis() > ergTimer)) {
-    if (isDelayed) {
-      SS2K_LOG(ERG_MODE_LOG_TAG, "ERG wait expired, %dw, tgt %dw, pos %d, tgt %d", rtConfig->watts.getValue(), rtConfig->watts.getTarget(), ss2k->getCurrentPosition(),
-               ss2k->getTargetPosition());
-      isDelayed = false;
-    }
-
-    if (mode != Mode::MAINTAIN && !isTableSeeking()) {
+  if (static_cast<int32_t>(static_cast<uint32_t>(millis()) - static_cast<uint32_t>(ergTimer)) >= 0) {
+    if (mode != Mode::MAINTAIN && !isTableSeeking() && !feedbackWaiting) {
       SS2K_LOG(ERG_MODE_LOG_TAG, "ERG setpoint seek complete; resuming PID control");
       mode = Mode::MAINTAIN;
     }
@@ -117,13 +94,18 @@ void ErgMode::runERG() {
       const bool hasConnectedPowerMeter = spinBLEClient.connectedPM;
       const bool simulationRunning      = rtConfig->watts.getTarget() || rtConfig->watts.getSimulate();
 
-      if (!ss2k->usePowerTableForPower()) {
+      if (feedbackWaiting) {
+        // Delayed power belongs to the position before this move. Do not
+        // teach the table that it was measured at the new position.
+        if (powerBuffer.getReadings()) powerBuffer.reset();
+      } else if (!ss2k->usePowerTableForPower()) {
         // add values to Power table
         powerTable->processPowerValue(powerBuffer, rtConfig->cad.getValue(), rtConfig->watts);
       }
 
       // compute ERG
-      if ((rtConfig->getFTMSMode() == FitnessMachineControlPointProcedure::SetTargetPower) && (hasConnectedPowerMeter || simulationRunning) && !isTableSeeking()) {
+      if ((rtConfig->getFTMSMode() == FitnessMachineControlPointProcedure::SetTargetPower) && (hasConnectedPowerMeter || simulationRunning) && !isTableSeeking() &&
+          !feedbackWaiting) {
         this->computeErg();
       }
 
@@ -193,8 +175,10 @@ void ErgMode::computeErg() {
     rtConfig->watts.setTarget(userConfig->getMinWatts());
   }
 
-  // check for new watt value or new set point, if watts < 0 treat as faulty
-  if ((this->prevWatts.getTimestamp() == rtConfig->watts.getTimestamp() && this->prevWatts.getTarget() == rtConfig->watts.getTarget()) || rtConfig->watts.getValue() < 0) {
+  // Target writes also update Measurement's general timestamp. Only a new
+  // value sample or an actually different target permits another correction.
+  const auto powerSample = rtConfig->watts.getValueSample();
+  if ((this->prevWatts.getValueSample().timestamp == powerSample.timestamp && this->prevWatts.getTarget() == rtConfig->watts.getTarget()) || powerSample.value < 0) {
     SS2K_LOG(ERG_MODE_LOG_TAG, "Watts previously processed.");
     return;
   }
@@ -265,22 +249,76 @@ int32_t ErgMode::_setPointChangeState() {
   if (tableResult == RETURN_ERROR) {
     SS2K_LOG(ERG_MODE_LOG_TAG, "Lookup Error. Using PID");
     tableResult = _inSetpointState();
-  } else {
-    if (tableResult != ss2k->getCurrentPosition()) {  // add some time to wait while the knob moves to target position.
-      isDelayed             = true;
-      long int stepDistance = abs(ss2k->getCurrentPosition() - tableResult);
-      // Calculate time to add based on step distance and stepper speed
-      long int timeToAdd = round((((double)stepDistance * 1000.0) / (double)userConfig->getStepperSpeed()) * 2);
-      if (timeToAdd > 10000) {  // 10 seconds
-        SS2K_LOG(ERG_MODE_LOG_TAG, "Capping ERG seek time to 10 seconds");
-        timeToAdd = 10000;
-      }
-      SS2K_LOG(ERG_MODE_LOG_TAG, "Adjusted setpoint returned: %dw %drpm Waiting:%dms PowerTable Result: %d", adjustedWattTarget, rtConfig->cad.getValue(), timeToAdd, tableResult);
-      ergTimer += timeToAdd;
-    }
-    ergTimer += (ERG_MODE_DELAY);  // Wait for power meter to register new watts
+  } else if (tableResult != ss2k->getCurrentPosition()) {
+    SS2K_LOG(ERG_MODE_LOG_TAG, "Adjusted setpoint returned: %dw %drpm PowerTable Result: %d", adjustedWattTarget, currentCadence, tableResult);
+    _startFeedbackWait();
   }
   return tableResult;
+}
+
+void ErgMode::_startFeedbackWait() {
+  feedbackWaiting      = true;
+  feedbackMotorSettled = false;
+  feedbackTargetWatts  = rtConfig->watts.getTarget();
+  feedbackIncreasing   = feedbackTargetWatts > rtConfig->watts.getValue();
+  feedbackStartedAt    = millis();
+  SS2K_LOG(ERG_MODE_LOG_TAG, "ERG feedback wait: %dw -> %dw; waiting for movement and power response", rtConfig->watts.getValue(), feedbackTargetWatts);
+}
+
+void ErgMode::_handleFeedbackWait() {
+  if (!feedbackWaiting) return;
+
+  // A different request must not inherit the old move's delay. Cadence-stop
+  // handling above also gets priority over waiting for power to catch up.
+  if (rtConfig->getFTMSMode() != FitnessMachineControlPointProcedure::SetTargetPower || rtConfig->watts.getTarget() != feedbackTargetWatts ||
+      rtConfig->cad.getValue() <= MIN_ERG_CADENCE) {
+    feedbackWaiting = false;
+    mode            = Mode::MAINTAIN;
+    ergTimer        = millis();
+    return;
+  }
+
+  const auto sample  = rtConfig->watts.getValueSample();
+  const uint32_t now = millis();  // Read after the snapshot to avoid unsigned age underflow.
+  const bool fresh   = sample.value >= 0 && now - sample.timestamp <= ERG_FEEDBACK_MAX_AGE_MS;
+  const char* reason = nullptr;
+  bool timedOut      = false;
+  if (fresh && ErgControl::tableSeekExceededPowerLimit(feedbackTargetWatts, sample.value, feedbackIncreasing)) {
+    reason = "power crossed safety limit";
+  } else if (now - feedbackStartedAt >= ERG_TABLE_MOVE_TIMEOUT_MS + ERG_FEEDBACK_TIMEOUT_MS) {
+    reason   = "overall timeout";
+    timedOut = true;
+  } else if (ss2k->stepperIsRunning || ss2k->getCurrentPosition() != ss2k->getTargetPosition()) {
+    feedbackMotorSettled = false;
+    if (now - feedbackStartedAt < ERG_TABLE_MOVE_TIMEOUT_MS) return;
+    reason   = "movement timeout";
+    timedOut = true;
+  } else {
+    if (!feedbackMotorSettled) {
+      feedbackMotorSettled = true;
+      feedbackSettledAt    = now;
+      SS2K_LOG(ERG_MODE_LOG_TAG, "ERG motor settled; waiting %ums for power feedback", static_cast<unsigned>(ERG_FEEDBACK_SETTLE_MS));
+    }
+    // Newly delivered reports can still describe the brake before the move.
+    // Require a value sample taken after the complete acquisition interval;
+    // target/config writes must not count as new power feedback.
+    if (fresh && static_cast<int32_t>(sample.timestamp - feedbackSettledAt) >= static_cast<int32_t>(ERG_FEEDBACK_SETTLE_MS)) {
+      reason = "power acquisition complete";
+    } else if (now - feedbackSettledAt >= ERG_FEEDBACK_TIMEOUT_MS) {
+      reason   = "power feedback timeout";
+      timedOut = true;
+    } else {
+      return;
+    }
+  }
+
+  feedbackWaiting = false;
+  mode            = Mode::MAINTAIN;
+  // A timeout must not turn stale power into another corrective move. Wait
+  // for the next sample (or a new target) through normal ERG deduplication.
+  if (timedOut) prevWatts = rtConfig->watts;
+  ergTimer = now;
+  SS2K_LOG(ERG_MODE_LOG_TAG, "ERG feedback wait ended (%s): %dw, target %dw", reason, sample.value, feedbackTargetWatts);
 }
 
 bool ErgMode::_positionPredictionIsAccurate(int watts, int cadence, int32_t actualPosition) {
@@ -318,7 +356,7 @@ void ErgMode::_updateTableConfidence() {
   // A table seek has its own settling gate. Scoring its in-flight readings
   // here would mistake motor travel and power-meter latency for table error.
   if (isTableSeeking() || rtConfig->getFTMSMode() != FitnessMachineControlPointProcedure::SetTargetPower || !spinBLEClient.connectedPM || rtConfig->watts.getSimulate() ||
-      ss2k->usePowerTableForPower()) {
+      ss2k->usePowerTableForPower() || feedbackWaiting) {
     return;
   }
 
@@ -357,7 +395,7 @@ void ErgMode::_startTrustedTableSeek(int32_t position) {
   tableSeekWattsTimestamp = rtConfig->watts.getTimestamp();
   tableSeekDeadline       = _trustedTableMoveDeadline(position);
   tableSeekPidSeedValid   = false;
-  isDelayed               = false;
+  feedbackWaiting         = false;
   SS2K_LOG(ERG_MODE_LOG_TAG, "Trusted table seek%s: %dw/%drpm directly to %d", _tableTargetIsWithinMeasuredBounds(tableSeekTargetWatts, tableSeekCadence) ? "" : " (cadence edge)",
            tableSeekTargetWatts, tableSeekCadence, position);
 }
@@ -372,8 +410,8 @@ void ErgMode::_stopTrustedTableSeek(const char* reason, bool seedPidFromTable) {
   tableSeekStableMisses    = 0;
   tableSeekLastWatts       = INT32_MIN;
   mode                     = Mode::MAINTAIN;
-  isDelayed                = false;
-  ergTimer                 = 0;
+  feedbackWaiting          = false;
+  ergTimer                 = millis();
 }
 
 void ErgMode::_handleTrustedTableSeek() {
@@ -546,6 +584,11 @@ int32_t ErgMode::_inSetpointState() {
     }
     tableSeekPidSeedValid = false;
   }
+
+  // Pace large fallback corrections instead of reducing sensitivity for
+  // normal maintenance. Small residual errors retain their existing gain
+  // and 700 ms cadence, including the +/-10 W region.
+  if (abs(error) > ERG_LARGE_CORRECTION_WATTS && static_cast<int32_t>(newIncline) != ss2k->getCurrentPosition()) _startFeedbackWait();
 
   // Log output at the configured ERG interval.
   static unsigned long lastTime = 0;

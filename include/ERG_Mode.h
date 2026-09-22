@@ -23,6 +23,10 @@ constexpr int ERG_TABLE_STABLE_WATTS_DELTA     = ERG_MODE_PID_WINDOW / 2;
 constexpr int ERG_TABLE_STABLE_READINGS        = 3;
 constexpr int ERG_TABLE_SETTLE_TIMEOUT_MS      = 5000;
 constexpr int ERG_TABLE_MOVE_TIMEOUT_MS        = 10000;
+constexpr uint32_t ERG_FEEDBACK_SETTLE_MS      = 2500;
+constexpr uint32_t ERG_FEEDBACK_TIMEOUT_MS     = 5000;
+constexpr uint32_t ERG_FEEDBACK_MAX_AGE_MS     = 1500;
+constexpr int ERG_LARGE_CORRECTION_WATTS       = 50;
 
 struct Mode {
   static const int MAINTAIN   = 0;
@@ -44,6 +48,7 @@ class ErgMode {
     tableSeekStableMatches   = 0;
     tableSeekStableMisses    = 0;
     tableSeekPidSeedValid    = false;
+    feedbackWaiting          = false;
     confidenceWattsTimestamp = 0;
     confidenceCadence        = 0;
     confidenceWasHomed       = false;
@@ -74,6 +79,12 @@ class ErgMode {
   bool confidenceWasHomed                = false;
   bool tableSeekPidSeedValid             = false;
   int32_t tableSeekPidSeedPosition       = 0;
+  bool feedbackWaiting                   = false;
+  bool feedbackMotorSettled              = false;
+  bool feedbackIncreasing                = false;
+  int feedbackTargetWatts                = 0;
+  uint32_t feedbackStartedAt             = 0;
+  uint32_t feedbackSettledAt             = 0;
 
   // calculate incline if setpoint (from Zwift) changes
   int32_t _setPointChangeState();
@@ -91,6 +102,8 @@ class ErgMode {
   void _handleTrustedTableSeek();
   void _stopTrustedTableSeek(const char* reason, bool seedPidFromTable = false);
   unsigned long _trustedTableMoveDeadline(int32_t position) const;
+  void _startFeedbackWait();
+  void _handleFeedbackWait();
 
   // update localvalues + incline, creates a log
   void _updateValues(float newIncline);

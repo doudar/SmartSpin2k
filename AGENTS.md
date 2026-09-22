@@ -146,7 +146,7 @@ Fields:
 
 Used for `rtConfig->watts`, `hr`, `cad`, `batt`, and `resistance`.
 
-Be careful: timestamp equality is used by ERG code to skip already processed watt samples. If adding setters or bypassing setters, update behavior can silently break.
+ERG deduplication uses the value-only timestamp plus target equality, so repeated target/config writes cannot turn held power into another correction. If adding setters or bypassing setters, preserve this distinction.
 
 ### `RuntimeParameters`
 
@@ -426,7 +426,7 @@ Primary files: `include/ERG_Mode.h`, `src/ERG_Mode.cpp`.
 
 `ErgMode::runERG()` is called from the main maintenance loop. It:
 
-- Waits for delayed stepper movement after large power-table seeks.
+- Waits for stepper completion and power acquisition after conservative table seeks or proportional corrections with more than 50 W error.
 - Saves power table after delayed `saveFlag`.
 - Loads power table once per session.
 - Adds live power/cadence/position samples to the power table when cadence exists and `pTab4Pwr` is false.
@@ -445,7 +445,7 @@ Primary files: `include/ERG_Mode.h`, `src/ERG_Mode.cpp`.
 - Falls back to `_inSetpointState()` proportional control.
 - Writes the new target to `rtConfig->targetIncline`.
 - While homed with a real power meter, settled samples validate the table's predicted stepper position against the position range for actual power plus/minus `ERG_MODE_PID_WINDOW`. One volatile confidence score represents alignment of the current homed bike with the learned table.
-- Once trusted, any target inside the reliable table's measured watt/cadence bounds permits an exact-position setpoint seek; targets outside those bounds stay on PID. The seek follows cadence changes while moving and settling, returns immediately to PID after crossing the watt target or timing out, and returns to PID maintain mode after stable readings.
+- Trusted direct seeks require the recorded watt range and the allowed cadence margin; other large target changes try the conservative seek before falling back to proportional control.
 - `ERG_GUARDRAILS` is disabled by default; seek direction, travel bounds, overshoot handling, and timeouts live in the ERG controller instead of the stepper loop.
 
 `_setPointChangeState()`:
@@ -453,7 +453,7 @@ Primary files: `include/ERG_Mode.h`, `src/ERG_Mode.cpp`.
 - Chooses increasing/decreasing mode.
 - Looks up a position near the target watts/cadence with a PID window offset.
 - Rejects table results that move the wrong way or become negative while homed.
-- Adds delay based on step distance and configured stepper speed.
+- Conservative seeks wait for actual motor completion (including travel clamps), then a power value sample published at least 2.5 seconds later. Ordinary target crossings retain this acquisition guard; excessive overshoot releases it immediately. Movement, missing-feedback and overall timeouts are bounded; timeouts consume held power so repeated target writes cannot restart corrections. New targets, mode changes and stopped cadence cancel the wait. Housekeeping continues during waits, but partial learning buffers are cleared and delayed power is excluded from table learning/confidence.
 
 `_inSetpointState()`:
 
@@ -462,6 +462,7 @@ Primary files: `include/ERG_Mode.h`, `src/ERG_Mode.cpp`.
 - Blends a trusted ERG table gain 50/50 with the watt-scheduled fallback gain and bounds raw table gain to 0.5-1.25x fallback before blending. This deliberately favors stable convergence over aggressive corrections. Fallback log lines include the rejected-slope reason.
 - Scales gain by watt error size.
 - Caps movement by stepper speed and `ERG_MODE_DELAY`.
+- Errors over 50 W use the same movement/feedback wait to avoid stacking large corrections against delayed power, including when no table is available. Gain scheduling, user sensitivity and normal 700 ms small-error corrections are unchanged. `python -B -m unittest discover -s test -p test_erg_feedback.py` runs production ERG orchestration with fake peripherals, the captured 198 W handoff regression, and delayed-feedback models; simulated peaks are not hardware validation.
 
 ## Power Table
 
