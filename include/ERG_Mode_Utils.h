@@ -26,11 +26,6 @@ constexpr double TABLE_GAIN_BLEND              = 0.5;
 constexpr double GAIN_MIN_SENSITIVITY_RATIO    = 0.25;
 constexpr double GAIN_MAX_SENSITIVITY_RATIO    = 4.0;
 constexpr double SLOPE_CONTROL_DIVISOR         = 10.0;
-// lookup() safely extends cadence using equal-torque scaling against the
-// nearest measured row. Limit trusted seeks to two table rows beyond the
-// recorded edge so a short cadence surge remains covered without turning a
-// sparse table into an unlimited extrapolator.
-constexpr int TABLE_SEEK_CADENCE_MARGIN_RPM         = POWERTABLE_CAD_INCREMENT * 2;
 constexpr int TABLE_SEEK_INCREASE_OVERSHOOT_WATTS   = ERG_MODE_PID_WINDOW;
 constexpr int TABLE_SEEK_DECREASE_UNDERSHOOT_WATTS = ERG_MODE_PID_WINDOW * 2;
 
@@ -42,7 +37,7 @@ class TableConfidence {
   static constexpr uint8_t MAX_SCORE    = 24;
   static constexpr uint8_t TRUST_SCORE  = 16;
   static constexpr uint8_t REVOKE_SCORE = 8;
-  static constexpr uint8_t MISS_PENALTY = 2;
+  static constexpr uint8_t MISS_PENALTY = 1;
 
   void reset() { state = 0; }
 
@@ -82,9 +77,6 @@ struct RecordedTableBounds {
   bool containsWatts(int watts) const { return valid && watts >= minWatts && watts <= maxWatts; }
   bool containsCadence(int cadence) const { return valid && cadence >= minCadence && cadence <= maxCadence; }
   bool contains(int watts, int cadence) const { return containsWatts(watts) && containsCadence(cadence); }
-  bool containsWithCadenceMargin(int watts, int cadence, int margin) const {
-    return margin >= 0 && containsWatts(watts) && cadence >= minCadence - margin && cadence <= maxCadence + margin;
-  }
 };
 
 inline RecordedTableBounds recordedTableBounds(const PTData& table) {
@@ -168,6 +160,14 @@ inline double errorScheduledGain(double gain, int error, bool maintaining) {
   if (absoluteError < 50) return gain * 0.75;
   if (absoluteError > 100) return gain * 1.25;
   return gain;
+}
+
+// Brake an approach already visible in fresh meter reports. This never
+// reverses the requested correction and has no steady-error dead band.
+inline int approachingError(int error, double wattsPerSecond) {
+  if (error * wattsPerSecond <= 0 || std::abs(wattsPerSecond) < 2.0) return error;
+  const double remaining = std::max(0.0, std::abs(static_cast<double>(error)) - std::abs(wattsPerSecond) * 2.0);
+  return static_cast<int>(std::round(error < 0 ? -remaining : remaining));
 }
 
 inline double clampGain(double gain, double sensitivity) {

@@ -277,12 +277,13 @@ void TestErgLogReplay::test_table_position_confidence(void) {
   TEST_ASSERT_TRUE(syntheticBounds.contains(200, 80));
   TEST_ASSERT_FALSE(syntheticBounds.contains(89, 80));
   TEST_ASSERT_FALSE(syntheticBounds.contains(200, 91));
-  TEST_ASSERT_EQUAL_INT(10, ErgControl::TABLE_SEEK_CADENCE_MARGIN_RPM);
-  TEST_ASSERT_TRUE(syntheticBounds.containsWithCadenceMargin(200, 60, ErgControl::TABLE_SEEK_CADENCE_MARGIN_RPM));
-  TEST_ASSERT_TRUE(syntheticBounds.containsWithCadenceMargin(200, 100, ErgControl::TABLE_SEEK_CADENCE_MARGIN_RPM));
-  TEST_ASSERT_FALSE(syntheticBounds.containsWithCadenceMargin(200, 59, ErgControl::TABLE_SEEK_CADENCE_MARGIN_RPM));
-  TEST_ASSERT_FALSE(syntheticBounds.containsWithCadenceMargin(200, 101, ErgControl::TABLE_SEEK_CADENCE_MARGIN_RPM));
-  TEST_ASSERT_FALSE(syntheticBounds.containsWithCadenceMargin(301, 80, ErgControl::TABLE_SEEK_CADENCE_MARGIN_RPM));
+
+  TEST_ASSERT_EQUAL_INT(10, ErgControl::approachingError(10, 0));
+  TEST_ASSERT_EQUAL_INT(-10, ErgControl::approachingError(-10, 0));
+  TEST_ASSERT_EQUAL_INT(0, ErgControl::approachingError(20, 15));
+  TEST_ASSERT_EQUAL_INT(0, ErgControl::approachingError(-20, -15));
+  TEST_ASSERT_EQUAL_INT(20, ErgControl::approachingError(20, -15));
+  TEST_ASSERT_EQUAL_INT(-20, ErgControl::approachingError(-20, 15));
 
   TEST_ASSERT_FALSE(ErgControl::tableSeekExceededPowerLimit(340, 360, true));
   TEST_ASSERT_TRUE(ErgControl::tableSeekExceededPowerLimit(340, 361, true));

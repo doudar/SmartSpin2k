@@ -96,6 +96,7 @@ Config* userConfig = &config;
 struct Controller { bool resetPowerTableFlag = false; } controller;
 Controller* ss2k = &controller;
 struct Entry { int16_t targetPosition = INT16_MIN; int8_t readings = 0; };
+using TableEntry = Entry;
 struct Row { Entry tableEntry[POWERTABLE_WATT_SIZE]; };
 struct Data { Row tableRow[POWERTABLE_CAD_SIZE]; };
 struct Helpers {

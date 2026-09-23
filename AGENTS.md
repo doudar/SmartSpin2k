@@ -441,28 +441,27 @@ Primary files: `include/ERG_Mode.h`, `src/ERG_Mode.cpp`.
 - Raises target to `userConfig->minWatts` when apps request too little.
 - Skips if the same watt timestamp/target was already processed or current watts are negative.
 - For large setpoint changes, tries `_setPointChangeState()` using the power table when homed.
-- A trusted direct table seek keeps following cadence while the motor/power settles, including up to two cadence bins beyond the measured edge via nearest-row equal-torque scaling. Ordinary target crossings do not end the seek; a high-side overshoot beyond the PID window (or low-side reduction undershoot beyond twice that window) hands off immediately and seeds PID with the latest table position.
+- Trusted forward seeks permit extrapolated watts/cadence when the local forward surface increases and the position fits calibrated travel; they do not require measured-bin bounds or a valid local derivative. They also handle small target changes and maintenance cadence changes of at least 3 RPM. Cadence maintenance uses position differences to preserve the feedback correction already learned. Cadence updates cannot extend a seek beyond ten seconds. Ordinary crossings settle; excessive overshoot hands off immediately. Stale power stops the seek.
 - Falls back to `_inSetpointState()` proportional control.
 - Writes the new target to `rtConfig->targetIncline`.
-- While homed with a real power meter, settled samples validate the table's predicted stepper position against the position range for actual power plus/minus `ERG_MODE_PID_WINDOW`. One volatile confidence score represents alignment of the current homed bike with the learned table.
-- Trusted direct seeks require the recorded watt range and the allowed cadence margin; other large target changes try the conservative seek before falling back to proportional control.
+- While homed with a real power meter, value-only power timestamps validate the table against actual watts plus/minus `ERG_MODE_PID_WINDOW`, including extrapolated points. Negative evidence requires stationary acquisition time; seek overshoot or timeout alone is not negative evidence. Confidence gains/loses one point per eligible observation, trusts at 16, caps at 24 and revokes at 8. Persistent stationary mismatch still revokes trust.
 - `ERG_GUARDRAILS` is disabled by default; seek direction, travel bounds, overshoot handling, and timeouts live in the ERG controller instead of the stepper loop.
 
 `_setPointChangeState()`:
 
 - Chooses increasing/decreasing mode.
-- Looks up a position near the target watts/cadence with a PID window offset.
+- Uses a trusted direct forward lookup, otherwise a relative forward-table correction. The older watt/cadence-offset seek is only a fallback when the relative lookup cannot establish a useful direction.
 - Rejects table results that move the wrong way or become negative while homed.
-- Conservative seeks wait for actual motor completion (including travel clamps), then a power value sample published at least 2.5 seconds later. Ordinary target crossings retain this acquisition guard; excessive overshoot releases it immediately. Movement, missing-feedback and overall timeouts are bounded; timeouts consume held power so repeated target writes cannot restart corrections. New targets, mode changes and stopped cadence cancel the wait. Housekeeping continues during waits, but partial learning buffers are cleared and delayed power is excluded from table learning/confidence.
+- Feedback waits require actual motor completion and a fresh value sample at least 2.5 seconds later. An absent or still-approaching response can extend this to the bounded five-second feedback deadline; excessive overshoot releases it immediately. Movement and overall timeouts are bounded; timeouts consume held power so repeated target writes cannot restart corrections. New targets, mode changes and stopped cadence cancel waits. Housekeeping continues, but partial learning buffers are cleared and delayed power is excluded from learning/confidence.
 
 `_inSetpointState()`:
 
-- Uses proportional-only control with `ERGSensitivity`.
+- For errors above 20 W, uses the forward position difference between measured/anticipated and requested watts, including sparse-row interpolation and extrapolation. At sensitivity 5 the correction fraction is 1 when trusted and 0.5 otherwise, bounded by motor speed/travel and followed by acquisition waiting. A two-second projection of fresh power trend only reduces corrections already approaching target; a fixed residual has no new dead band. Smaller errors or unusable forward differences retain proportional control with `ERGSensitivity`.
 - Keeps the original strict `lookupSlope()` for table validation. ERG uses `lookupErgSlope()`, which may use a near-edge measured segment only when the cadence-bounding rows agree and each segment has endpoint headroom; it never extrapolates beyond measured data.
 - Blends a trusted ERG table gain 50/50 with the watt-scheduled fallback gain and bounds raw table gain to 0.5-1.25x fallback before blending. This deliberately favors stable convergence over aggressive corrections. Fallback log lines include the rejected-slope reason.
 - Scales gain by watt error size.
 - Caps movement by stepper speed and `ERG_MODE_DELAY`.
-- Errors over 50 W use the same movement/feedback wait to avoid stacking large corrections against delayed power, including when no table is available. Gain scheduling, user sensitivity and normal 700 ms small-error corrections are unchanged. `python -B -m unittest discover -s test -p test_erg_feedback.py` runs production ERG orchestration with fake peripherals, the captured 198 W handoff regression, and delayed-feedback models; simulated peaks are not hardware validation.
+- Fallback errors over 50 W use the same movement/feedback wait when no usable table difference exists. `python -B -m unittest discover -s test -p test_erg_feedback.py` exercises production orchestration and forward lookup with fake peripherals: sparse 60/100 RPM rows, requests beyond recorded watts, 1 Hz delayed power, cadence changes, trust retention/revocation, and stale/time-out paths. Simulated settling is not hardware validation; unexpected plant changes can still exceed the ten-second target.
 
 ## Power Table
 
@@ -478,7 +477,7 @@ Data structures:
 
 - `PowerEntry`: raw sample with watts, cadence, target position, resistance, reading count.
 - `PowerBuffer`: fixed `POWER_SAMPLES` sample buffer used before committing a table entry.
-- `TableEntry`: compact stored table cell: `int16_t targetPosition`, `int8_t readings`.
+- `TableEntry`: stored fields `int16_t targetPosition`, `int8_t readings`, plus runtime-only fractional fitted position and publication marker. Serialize the two stored fields explicitly; never serialize the struct.
 - `PTData`: `POWERTABLE_CAD_SIZE` x `POWERTABLE_WATT_SIZE` table.
 - `PTHelpers`: indexing, measured-point interpolation/extrapolation, cleaning, and monotonic enforcement.
 
@@ -492,10 +491,10 @@ Table dimensions/constants are in `include/settings.h`:
 
 Flow:
 
-1. `PowerTable::processPowerValue()` accepts sane cadence/watts and stable position samples.
+1. `PowerTable::processPowerValue()` consumes each real value timestamp once (target writes do not count), including repeated equal watts. Five fresh reports, at least 750 ms apart, form a window after a two-second acquisition guard. Reports/gaps over 1.5 seconds, seeks, feedback waits, stops, simulated/table-derived watts, uncertain FTMS coordinates, or position-epoch changes reset acquisition. Position span is at most 100 full steps, cadence span 3 RPM, power span max(20 W, 15% of midpoint). Small motor corrections within the span are allowed; substantial pending travel blocks learning. Call collection even when learning is disabled so old partial windows cannot survive.
 2. A full `PowerBuffer` is averaged in `PowerTable::newEntry()`.
-3. `PTHelpers::calculateIndex()` maps watts/cadence to table indexes.
-4. `PTHelpers::enterData()` averages the cell, rejects monotonic violations, and runs PAVA-style monotonic correction across measured entries.
+3. `newEntry()` normalizes watts to the cadence row using equal torque, then adjusts position to the watt-bin center using the local forward slope. Without a slope, retain one off-grid observation per row until a separated stable observation supports a positive slope; do not relabel raw off-grid positions. Pending anchors are runtime-only and invalidated on load/import/coordinate changes.
+4. `PTHelpers::enterData()` retains fractional estimates with at most four observations of historical weight (independent of the persisted reliability cap of 20), then applies weighted monotonic fitting to populated rows/columns. The prior is the previous fitted surface: consistent conflicting evidence moves neighbors together without vetoes or deleting anchors. Empty cells stay empty; every changed cadence row is notified. Load/import/reset invalidate runtime estimates. `test/test_ftms_sync_collection.py` exercises production collection, normalization, and fitting with synthetic fresh reports.
 5. `lookup()` locally interpolates or extrapolates measured watt/position pairs, using equal-torque cadence scaling, and returns a full-scale position.
 6. `lookupWatts()` numerically inverts the cadence-blended forward `lookup()` surface, preserves exact measured anchors/plateau midpoints, and applies a monotonic cadence envelope for `pTab4Pwr`. Estimated power is bounded to the FTMS 4000 W maximum.
 

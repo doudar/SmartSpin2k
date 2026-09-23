@@ -960,12 +960,14 @@ void BLE_ss2kCustomCharacteristic::process(const std::string& rxValue, uint16_t 
         returnValue[0] = cc_success;
         if (rxValue[2] >= 0 && rxValue[2] < POWERTABLE_CAD_SIZE) {
           for (int i = 0; i < POWERTABLE_WATT_SIZE; i++) {
+            powerTable->ptData.tableRow[rxValue[2]].tableEntry[i]                = TableEntry{};
             powerTable->ptData.tableRow[rxValue[2]].tableEntry[i].targetPosition = get_le16s(&pData[i * 2 + 3]);
             // Ensure each entry has a valid reading count to be considered during loading
             if (powerTable->ptData.tableRow[rxValue[2]].tableEntry[i].targetPosition != INT16_MIN) {
               powerTable->ptData.tableRow[rxValue[2]].tableEntry[i].readings = MINIMUM_RELIABLE_POSITIONS + 1;
             }
           }
+          ++powerTable->positionEpoch;
           // Save with explicit version management
           powerTable->_hasBeenLoadedThisSession = true;  // Prevent reload attempts
           powerTable->saveFlag                  = true;

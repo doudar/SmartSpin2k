@@ -27,6 +27,8 @@ constexpr uint32_t ERG_FEEDBACK_SETTLE_MS      = 2500;
 constexpr uint32_t ERG_FEEDBACK_TIMEOUT_MS     = 5000;
 constexpr uint32_t ERG_FEEDBACK_MAX_AGE_MS     = 1500;
 constexpr int ERG_LARGE_CORRECTION_WATTS       = 50;
+constexpr int ERG_TABLE_CORRECTION_WATTS       = ERG_MODE_PID_WINDOW;
+constexpr int ERG_TABLE_CADENCE_SEEK_RPM       = 3;
 
 struct Mode {
   static const int MAINTAIN   = 0;
@@ -52,6 +54,10 @@ class ErgMode {
     confidenceWattsTimestamp = 0;
     confidenceCadence        = 0;
     confidenceWasHomed       = false;
+    confidenceSettledAt      = 0;
+    cadenceReference         = 0;
+    responseTimestamp        = 0;
+    responseTrend            = 0;
   }
 
  private:
@@ -83,20 +89,31 @@ class ErgMode {
   bool feedbackMotorSettled              = false;
   bool feedbackIncreasing                = false;
   int feedbackTargetWatts                = 0;
+  int feedbackStartWatts                 = 0;
   uint32_t feedbackStartedAt             = 0;
   uint32_t feedbackSettledAt             = 0;
+  uint32_t confidenceSettledAt           = 0;
+  int32_t confidencePosition             = 0;
+  int cadenceReference                   = 0;
+  uint32_t tableSeekStartedAt            = 0;
+  int32_t tableSeekOffset                = 0;
+  uint32_t responseTimestamp             = 0;
+  int responseWatts                      = 0;
+  double responseTrend                   = 0;
 
   // calculate incline if setpoint (from Zwift) changes
   int32_t _setPointChangeState();
 
   // calculate incline if setpoint is unchanged
   int32_t _inSetpointState();
+  int32_t _tableCorrection(int watts, int target, int cadence);
+  void _observePowerResponse();
 
   void _updateTableConfidence();
   bool _positionPredictionIsAccurate(int watts, int cadence, int32_t actualPosition);
   bool _tableTargetIsTrusted(int watts, int cadence) const;
   bool _tableTargetIsWithinMeasuredBounds(int watts, int cadence) const;
-  bool _tableTargetIsWithinTrustedBounds(int watts, int cadence) const;
+  bool _tableTargetIsUsable(int watts, int cadence) const;
   void _scoreTable(int watts, int cadence, bool accurate);
   void _startTrustedTableSeek(int32_t position);
   void _handleTrustedTableSeek();

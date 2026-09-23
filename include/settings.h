@@ -223,10 +223,17 @@ constexpr const char* ANY  = "any";
 #define POWERTABLE_CAD_INCREMENT 5
 
 // Number of similar power samples to take before writing to the Power Table
-#define POWER_SAMPLES 10
+#define POWER_SAMPLES 5
 
-// Max downvotes that a neighbor can have
-#define MAX_NEIGHBOR_WEIGHT 2 * POWER_SAMPLES
+// Persisted reliability count; independent of the shorter learning history.
+#define MAX_NEIGHBOR_WEIGHT 20
+// Learning history is deliberately shorter than the persisted reliability count.
+#define POWER_TABLE_HISTORY         4
+#define POWER_SAMPLE_MAX_AGE_MS     1500
+#define POWER_SAMPLE_MIN_SPACING_MS 750
+#define POWER_SAMPLE_SETTLE_MS      2000
+#define POWER_SAMPLE_POSITION_SPAN  100
+#define POWER_SAMPLE_CADENCE_SPAN   3
 
 // How often in ms to save the power table if no new data is added and user is pedaling.
 #define POWER_TABLE_SAVE_INTERVAL 240000

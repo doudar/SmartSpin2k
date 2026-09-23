@@ -39,7 +39,7 @@ class PowerEntry {
  public:
   int watts;
   int resistance;
-  int32_t targetPosition;
+  float targetPosition;
   int cad;
   int readings;
 
@@ -66,7 +66,12 @@ struct ptIndex {
 class PowerBuffer {
  public:
   PowerEntry powerEntry[POWER_SAMPLES];
-  void set(int);
+  uint32_t positionEpoch = 0, lastReport = 0, lastAccepted = 0, stableSince = 0;
+  bool seenReport = false, stable = false;
+  int32_t minimumPosition = 0, maximumPosition = 0;
+  int minimumCadence = 0, maximumCadence = 0;
+  void set(int i, int watts, int cadence, int32_t position);
+  void clearSamples();
   void reset();
   int getReadings();
 };
@@ -76,6 +81,10 @@ class TableEntry {
  public:
   int16_t targetPosition;
   int8_t readings;
+  // Runtime-only fitted estimate. The file and BLE formats still contain only
+  // targetPosition/readings. Keep fractions through averaging and projection.
+  float learningPosition    = 0;
+  int16_t publishedPosition = INT16_MIN;
 
   TableEntry() {
     this->targetPosition = INT16_MIN;
@@ -110,5 +119,5 @@ class PTHelpers {
   int getTotalReadings(const PTData& ptData);
   ptIndex calculateIndex(int watts, int cad);
   bool cadenceIsWithinTable(int cad);
-  void enterData(PTData& ptData, ptIndex index, int pos);
+  uint16_t enterData(PTData& ptData, ptIndex index, float pos);
 };

@@ -27,7 +27,7 @@ class PowerTable {
   bool loadFtmsCalibration();
 
   // Pick up new power value and put them into the power table
-  void processPowerValue(PowerBuffer& powerBuffer, int cadence, Measurement power);
+  void processPowerValue(PowerBuffer& powerBuffer, int cadence, const Measurement& power, bool learningAllowed = true);
 
   // Sets stepper min/max value from power table
   void setStepperMinMax();
@@ -66,6 +66,12 @@ class PowerTable {
   void toLog();
 
  private:
+  struct LearningAnchor {
+    float watts = 0, position = 0;
+    bool valid = false, published = false;
+  };
+  LearningAnchor learningAnchors[POWERTABLE_CAD_SIZE];
+  uint32_t learningEpoch     = 0;
   unsigned long lastSaveTime = millis();
 };
 

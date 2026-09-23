@@ -9,80 +9,97 @@
 #include "SS2KLog.h"
 #include "BLE_Custom_Characteristic.h"
 #include <LittleFS.h>
+#include <algorithm>
+#include <cmath>
 
-void PowerBuffer::set(int i) {
-  this->powerEntry[i].readings++;
-  this->powerEntry[i].watts          = rtConfig->watts.getValue();
-  this->powerEntry[i].cad            = rtConfig->cad.getValue();
-  this->powerEntry[i].targetPosition = ss2k->getCurrentPosition() / TABLE_DIVISOR;  // dividing by 10 to save memory.
+void PowerBuffer::set(int i, int watts, int cadence, int32_t position) {
+  powerEntry[i].readings       = 1;
+  powerEntry[i].watts          = watts;
+  powerEntry[i].cad            = cadence;
+  powerEntry[i].targetPosition = static_cast<float>(position) / TABLE_DIVISOR;
+}
+
+void PowerBuffer::clearSamples() {
+  for (auto& entry : powerEntry) entry = PowerEntry{};
 }
 
 void PowerBuffer::reset() {
-  SS2K_LOG(POWERTABLE_LOG_TAG, "Power Buffer Reset");
-  for (int i = 0; i < POWER_SAMPLES; i++) {
-    this->powerEntry[i].readings       = 0;
-    this->powerEntry[i].cad            = 0;
-    this->powerEntry[i].watts          = 0;
-    this->powerEntry[i].targetPosition = 0;
-  }
+  clearSamples();
+  stable = false;
+  // Do not forget the last report: a pause or target write cannot make it fresh.
 }
 
-// return the number of entries with readings.
 int PowerBuffer::getReadings() {
-  int ret = 0;
-  for (int i = 0; i < POWER_SAMPLES; i++) {
-    if (this->powerEntry[i].readings != 0) {
-      ret++;
-    }
-  }
-  return ret;
+  int count = 0;
+  for (const auto& entry : powerEntry) count += entry.readings != 0;
+  return count;
 }
 
-void PowerTable::processPowerValue(PowerBuffer& powerBuffer, int cadence, Measurement watts) {
-  static uint32_t collectedEpoch = 0;
-  if (collectedEpoch != positionEpoch) {
-    powerBuffer.reset();
-    collectedEpoch = positionEpoch;
+void PowerTable::processPowerValue(PowerBuffer& buffer, int cadence, const Measurement& watts, bool learningAllowed) {
+  const auto sample  = watts.getValueSample();
+  const uint32_t now = millis();  // Read after the snapshot to avoid unsigned age underflow.
+  const bool fresh   = !buffer.seenReport || sample.timestamp != buffer.lastReport;
+  const bool gap     = buffer.seenReport && static_cast<uint32_t>(sample.timestamp - buffer.lastReport) > POWER_SAMPLE_MAX_AGE_MS;
+  buffer.seenReport  = true;
+  buffer.lastReport  = sample.timestamp;
+  if (buffer.positionEpoch != positionEpoch) {
+    buffer.reset();
+    buffer.positionEpoch = positionEpoch;
   }
-  // Do not learn watts against coordinates that are awaiting FTMS correction.
-  // A manual knob change can otherwise contaminate the table during confirmation.
-  if (ftmsPositionUncertain) {
-    if (powerBuffer.getReadings()) powerBuffer.reset();
+  if (!learningAllowed || ftmsPositionUncertain || sample.simulate || !ptHelpers.cadenceIsWithinTable(cadence) || sample.value <= 10 ||
+      sample.value >= POWERTABLE_WATT_SIZE * POWERTABLE_WATT_INCREMENT || static_cast<uint32_t>(now - sample.timestamp) > POWER_SAMPLE_MAX_AGE_MS) {
+    buffer.reset();
     return;
   }
-  // Use the same cadence binning rule for collection and insertion. This
-  // admits the complete edge bins (58-62 RPM and 103-107 RPM) while rejecting
-  // cadences that calculateIndex() cannot place in the table.
-  if (ptHelpers.cadenceIsWithinTable(cadence) && (watts.getValue() > 10) &&  // adding constraints
-      (watts.getValue() < (POWERTABLE_WATT_SIZE * POWERTABLE_WATT_INCREMENT))) {
-    if (powerBuffer.powerEntry[0].readings == 0) {
-      // Take Initial reading
-      powerBuffer.set(0);
-    }
+  if (gap) buffer.reset();
 
-    int currentPos = ss2k->getCurrentPosition() / TABLE_DIVISOR;
-    int targetPos  = powerBuffer.powerEntry[0].targetPosition;
-    int range      = (userConfig->getShiftStep() * 2) / TABLE_DIVISOR;
+  const int32_t position = ss2k->getCurrentPosition();
+  // Pending substantial travel also excludes delayed power before motion starts.
+  if (std::abs(static_cast<int64_t>(ss2k->getTargetPosition()) - position) > POWER_SAMPLE_POSITION_SPAN) {
+    buffer.reset();
+    return;
+  }
+  if (buffer.stable) {
+    buffer.minimumPosition = std::min(buffer.minimumPosition, position);
+    buffer.maximumPosition = std::max(buffer.maximumPosition, position);
+    buffer.minimumCadence  = std::min(buffer.minimumCadence, cadence);
+    buffer.maximumCadence  = std::max(buffer.maximumCadence, cadence);
+    if (static_cast<int64_t>(buffer.maximumPosition) - buffer.minimumPosition > POWER_SAMPLE_POSITION_SPAN ||
+        buffer.maximumCadence - buffer.minimumCadence > POWER_SAMPLE_CADENCE_SPAN)
+      buffer.reset();
+  }
+  if (!buffer.stable) {
+    buffer.stable          = true;
+    buffer.stableSince     = now;
+    buffer.minimumPosition = buffer.maximumPosition = position;
+    buffer.minimumCadence = buffer.maximumCadence = cadence;
+    return;
+  }
+  if (!fresh || static_cast<uint32_t>(sample.timestamp - buffer.stableSince) < POWER_SAMPLE_SETTLE_MS ||
+      static_cast<uint32_t>(sample.timestamp - buffer.stableSince) > static_cast<uint32_t>(now - buffer.stableSince) ||
+      (buffer.getReadings() && static_cast<uint32_t>(sample.timestamp - buffer.lastAccepted) < POWER_SAMPLE_MIN_SPACING_MS))
+    return;
 
-    if (currentPos >= (targetPos - range) && currentPos <= (targetPos + range)) {
-      for (int i = 1; i < POWER_SAMPLES; i++) {
-        if (powerBuffer.powerEntry[i].readings == 0) {
-          powerBuffer.set(i);  // Add additional readings to the buffer.
-          break;
-        }
-      }
-      if (powerBuffer.powerEntry[POWER_SAMPLES - 1].readings == 1) {  // If buffer is full, create a new table entry and clear the buffer.
-        long int timer = millis();
-        this->newEntry(powerBuffer);
-        SS2K_LOG(POWERTABLE_LOG_TAG, "New Entry Processed in %ld ms", millis() - timer);
-        this->toLog();
-        this->_manageSaveState();
-        powerBuffer.reset();
-      }
-    } else {  // Reading was outside the range - clear the buffer and start over.
-      SS2K_LOG(POWERTABLE_LOG_TAG, "Entry into buffer was outside the range. Clearing buffer.");
-      powerBuffer.reset();
-    }
+  int minimumWatts = sample.value, maximumWatts = sample.value;
+  for (const auto& entry : buffer.powerEntry) {
+    if (!entry.readings) continue;
+    minimumWatts = std::min(minimumWatts, entry.watts);
+    maximumWatts = std::max(maximumWatts, entry.watts);
+  }
+  if (maximumWatts - minimumWatts > std::max(20, (maximumWatts + minimumWatts) * 15 / 200)) {
+    buffer.reset();
+    return;
+  }
+  buffer.set(buffer.getReadings(), sample.value, cadence, position);
+  buffer.lastAccepted = sample.timestamp;
+  if (buffer.getReadings() == POWER_SAMPLES) {
+    newEntry(buffer);
+    toLog();
+    _manageSaveState();
+    buffer.clearSamples();
+    // Consecutive stable windows need no extra dwell, but each has its own span.
+    buffer.minimumPosition = buffer.maximumPosition = position;
+    buffer.minimumCadence = buffer.maximumCadence = cadence;
   }
 }
 
@@ -176,8 +193,8 @@ void PowerTable::newEntry(PowerBuffer& powerBuffer) {
     return;
   }
 
-  ptIndex index = ptHelpers.calculateIndex(watts, cad);
-  SS2K_LOG(POWERTABLE_LOG_TAG, "Averaged Entry: watts=%f, cad=%f, targetPosition=%f, (%d)(%d)", watts, cad, targetPosition, index.cadIndex, index.wattIndex);
+  ptIndex index = ptHelpers.calculateIndex(std::lround(watts), std::lround(cad));
+  SS2K_LOG(POWERTABLE_LOG_TAG, "Raw observation: watts=%f, cad=%f, targetPosition=%f, (%d)(%d)", watts, cad, targetPosition, index.cadIndex, index.wattIndex);
 
   if ((index.cadIndex < 0) || (index.cadIndex > (POWERTABLE_CAD_SIZE - 1))) {
     SS2K_LOG(POWERTABLE_LOG_TAG, "Cad index was out of range %d", index.cadIndex);
@@ -189,8 +206,50 @@ void PowerTable::newEntry(PowerBuffer& powerBuffer) {
     return;
   }
 
-  ptHelpers.enterData(ptData, index, (int)targetPosition);
-  BLE_ss2kCustomCharacteristic::notify(0x27, index.cadIndex);
+  if (learningEpoch != positionEpoch) {
+    for (auto& anchor : learningAnchors) anchor = LearningAnchor{};
+    learningEpoch = positionEpoch;
+  }
+  const int gridCadence = MINIMUM_TABLE_CAD + index.cadIndex * POWERTABLE_CAD_INCREMENT;
+  // Equal torque places the observation at the row cadence before watt binning.
+  const float rowWatts = watts * gridCadence / cad;
+  index                = ptHelpers.calculateIndex(std::lround(rowWatts), gridCadence);
+  if (index.wattIndex < 0 || index.wattIndex >= POWERTABLE_WATT_SIZE) return;
+  const int gridWatts  = index.wattIndex * POWERTABLE_WATT_INCREMENT;
+  auto& anchor         = learningAnchors[index.cadIndex];
+  uint16_t changedRows = 0;
+  const auto insert    = [&](ptIndex cellIndex, float position) {
+    SS2K_LOG(POWERTABLE_LOG_TAG, "Averaged Entry: watts=%f, cad=%f, targetPosition=%f, (%d)(%d)", static_cast<double>(cellIndex.wattIndex * POWERTABLE_WATT_INCREMENT),
+             static_cast<double>(gridCadence), static_cast<double>(position), cellIndex.cadIndex, cellIndex.wattIndex);
+    changedRows |= ptHelpers.enterData(ptData, cellIndex, position);
+  };
+  float normalizedPosition = targetPosition;
+  const int32_t lower      = lookup(gridWatts - POWERTABLE_WATT_INCREMENT / 2, gridCadence);
+  const int32_t upper      = lookup(gridWatts + POWERTABLE_WATT_INCREMENT / 2, gridCadence);
+  if (lower != RETURN_ERROR && upper != RETURN_ERROR && upper > lower) {
+    const float slope = static_cast<float>(upper - lower) / (POWERTABLE_WATT_INCREMENT * TABLE_DIVISOR);
+    normalizedPosition += (gridWatts - rowWatts) * slope;
+  } else if (anchor.valid && std::abs(rowWatts - anchor.watts) >= POWERTABLE_WATT_INCREMENT / 2.0f && (targetPosition - anchor.position) * (rowWatts - anchor.watts) > 0) {
+    const float slope = (targetPosition - anchor.position) / (rowWatts - anchor.watts);
+    normalizedPosition += (gridWatts - rowWatts) * slope;
+    const ptIndex anchorIndex = ptHelpers.calculateIndex(std::lround(anchor.watts), gridCadence);
+    if (!anchor.published && anchorIndex.wattIndex >= 0 && anchorIndex.wattIndex < POWERTABLE_WATT_SIZE) {
+      insert(anchorIndex, anchor.position + (anchorIndex.wattIndex * POWERTABLE_WATT_INCREMENT - anchor.watts) * slope);
+    }
+  } else if (std::abs(rowWatts - gridWatts) > 0.5f) {
+    // A lone observation cannot determine steps/watt. Retain it until another
+    // stable, separated point supports a positive local slope in this row.
+    if (!anchor.valid || std::abs(rowWatts - anchor.watts) >= POWERTABLE_WATT_INCREMENT / 2.0f) anchor = {rowWatts, targetPosition, true};
+    SS2K_LOG(POWERTABLE_LOG_TAG, "Holding off-grid observation for a measured slope: %.1fW at %drpm", rowWatts, gridCadence);
+    return;
+  }
+  anchor = {rowWatts, targetPosition, true, true};
+  SS2K_LOG(POWERTABLE_LOG_TAG, "Grid observation: %.1fW -> %dW, position %.2f -> %.2f", rowWatts, gridWatts, targetPosition, normalizedPosition);
+  insert(index, normalizedPosition);
+  // Projection may move neighboring cadence rows too; publish every changed row.
+  for (int row = 0; row < POWERTABLE_CAD_SIZE; ++row) {
+    if (changedRows & (1u << row)) BLE_ss2kCustomCharacteristic::notify(0x27, row);
+  }
 }
 
 bool PowerTable::loadFtmsCalibration() {
@@ -283,10 +342,12 @@ bool PowerTable::_manageSaveState(bool /*canSkipReliabilityChecks*/, bool allowS
         int8_t savedReadings        = 0;
         file.read((uint8_t*)&savedTargetPosition, sizeof(savedTargetPosition));
         file.read((uint8_t*)&savedReadings, sizeof(savedReadings));
+        this->ptData.tableRow[i].tableEntry[j]                = TableEntry{};
         this->ptData.tableRow[i].tableEntry[j].targetPosition = savedTargetPosition;
         this->ptData.tableRow[i].tableEntry[j].readings       = savedReadings;
       }
     }
+    ++positionEpoch;
     SS2K_LOG(POWERTABLE_LOG_TAG, "Loaded values directly");
     file.close();
 
@@ -402,8 +463,7 @@ void PowerTable::clearRuntime(bool allowSavedTableLoad) {
   ++positionEpoch;
   for (int i = 0; i < POWERTABLE_CAD_SIZE; i++) {
     for (int j = 0; j < POWERTABLE_WATT_SIZE; j++) {
-      this->ptData.tableRow[i].tableEntry[j].targetPosition = INT16_MIN;
-      this->ptData.tableRow[i].tableEntry[j].readings       = 0;
+      this->ptData.tableRow[i].tableEntry[j] = TableEntry{};
     }
   }
 }
