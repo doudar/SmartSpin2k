@@ -105,13 +105,13 @@ Boot sequence:
 3. Start stepper serial and optional aux serial for Peloton.
 4. Mount LittleFS.
 5. Load and re-save `userConfig`.
-6. Complete WiFi station connection or AP fallback, synchronize the clock when online, and repair missing web files before starting BLE.
+6. Start configured WiFi in STA mode without waiting; only unconfigured devices start an AP. Check for missing web files before BLE.
 7. Configure GPIO pins.
 8. Initialize LED state; commanded-reboot quiet mode uses RTC memory so true power cycles still show startup blink behavior.
 9. Configure TMC/FastAccelStepper via `SS2K::setupTMCStepperDriver()`.
 10. Register log appenders.
 11. Start BLE via `setupBLE()`.
-12. Start web server and DirCon.
+12. Start the web server. The maintenance loop starts mDNS and DirCon after WiFi has an IP address.
 13. Create `SS2K::maintenanceLoop` task.
 
 `SS2K::maintenanceLoop()` is the main cooperative loop. It roughly does:
@@ -537,10 +537,9 @@ Primary files: `src/HTTP_Server_Basic.cpp`, `include/HTTP_Server_Basic.h`, `data
 
 Responsibilities:
 
-- Start/stop WiFi (`startWifi()`, `stopWifi()`).
-- WiFi startup is deliberately linear: wait for the configured station up to the connection timeout, fall back to AP mode if needed, and only then continue firmware initialization.
+- Start/stop WiFi (`startWifi()`, `stopWifi()`) and poll connectivity in `updateWifi()` from the existing maintenance task. Configured devices remain in STA mode. Auto-reconnect is disabled so failed station attempts are paced: up to three app-initiated attempts 15 seconds apart, then a 60-second pause before another burst. The Arduino core still performs one unconditional first-connect retry after a disconnect. AP mode is reserved for an unconfigured SSID. mDNS and DirCon start only after an IP is available and stop on station loss. Clock sync is polled without a startup wait. No additional task stack is allocated.
 - Serve LittleFS web assets and built-in OTA pages.
-- Before BLE starts, boot checks the local `list.json`. If every listed asset exists, no TLS connection is created. `HTTP_Server::syncWebServerFiles()` is repair-only and runs synchronously when the local manifest is missing/invalid or a listed asset is absent and station internet is available.
+- Before BLE starts, boot checks the local `list.json`. If every listed asset exists, no TLS connection is created and WiFi startup does not wait. Only when files are missing, `HTTP_Server::syncWebServerFiles()` waits up to ten seconds for the station and repairs synchronously before BLE starts. If the station remains unavailable, normal startup continues in STA mode.
 - Browser-uploaded firmware uses the low-level ESP-IDF OTA API, and filesystem images stream directly to the LittleFS partition with sector-at-a-time erases. Neither path uses Arduino `Update` or its 4 KiB heap allocation on memory-constrained classic ESP32 builds. Filesystem uploads must exactly match the partition size; arbitrary file uploads are rejected.
 - Web filesystem repair fetches the remote `list.json`, downloads only missing assets, and installs the fetched manifest only after repair succeeds. It never performs boot-time version upgrades or prunes existing files.
 - Downloads use bounded HTTP/TLS timeouts and temporary files so partial assets are never served. Repair completes before BLE allocation/scanning, avoiding their peak internal-RAM loads overlapping on classic ESP32.

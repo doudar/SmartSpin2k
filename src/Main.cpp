@@ -246,8 +246,7 @@ void SS2K::finishSetup() {
   }
 #endif
 
-  // Finish WiFi and web filesystem repair before BLE and network services add
-  // their runtime memory and traffic load.
+  // Start WiFi early, then let the maintenance loop finish network setup.
   startWifi();
   httpServer.syncWebServerFiles();
 
@@ -280,13 +279,7 @@ void SS2K::finishSetup() {
   logHandler.initialize();
   ss2k->startTasks();
   httpServer.start();
-
-  SS2K_LOG(MAIN_LOG_TAG, "Starting DirCon TCP service");
-  if (DirConManager::start()) {
-    SS2K_LOG(MAIN_LOG_TAG, "DirCon TCP service started successfully");
-  } else {
-    SS2K_LOGE(MAIN_LOG_TAG, "Failed to start DirCon TCP service");
-  }
+  updateWifi();
 
 #ifdef TEST_PTAB4PWR
   userConfig->setHMin(0);
@@ -316,6 +309,7 @@ void SS2K::maintenanceLoop(void*) {
 
   while (true) {
     delay(10);
+    updateWifi();
     // Keep thermal protection active during updates; the check defers during homing.
     if (uint32_t(millis() - hardwareSafetyTimer) >= ThermalSafety::POLL_INTERVAL_MS) {
       hardwareSafetyTimer = millis();
@@ -686,9 +680,7 @@ void SS2K::restartWifi() {
   startWifi();
   refreshBLEAdvertisementIp();
   httpServer.start();
-  if (!DirConManager::start()) {
-    SS2K_LOGE(MAIN_LOG_TAG, "Failed to restart DirCon TCP service");
-  }
+  updateWifi();
 }
 
 void SS2K::handleShiftButtons() {

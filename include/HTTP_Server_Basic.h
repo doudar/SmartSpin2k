@@ -31,6 +31,7 @@ class HTTP_Server {
 
 // wifi Function
 void startWifi();
+void updateWifi();
 void stopWifi();
 
 
