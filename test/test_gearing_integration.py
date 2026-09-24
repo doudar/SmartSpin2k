@@ -111,7 +111,7 @@ struct BLE_Fitness_Machine_Service {
   void spinDown(int value) { status = value; }
   int calculateResistanceFromPosition();
 } fitnessMachineService;
-struct Erg { void resetTableConfidence() {} bool isTableSeeking() { return false; } } erg;
+struct Erg { void resetTableConfidence() {} void prepareMode() {} bool isTableSeeking() { return false; } } erg;
 Erg* ergMode = &erg;
 struct PowerTable {
   PTData ptData;

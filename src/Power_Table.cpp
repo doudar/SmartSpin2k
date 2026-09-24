@@ -38,25 +38,35 @@ int PowerBuffer::getReadings() {
 void PowerTable::processPowerValue(PowerBuffer& buffer, int cadence, const Measurement& watts, bool learningAllowed) {
   const auto sample  = watts.getValueSample();
   const uint32_t now = millis();  // Read after the snapshot to avoid unsigned age underflow.
+  const auto resetCollection = [&](const char* reason) {
+    // Report lost acquisition windows, not every disabled 700 ms poll.
+    if (buffer.stable) {
+      SS2K_LOG(POWERTABLE_LOG_TAG, "Collection reset: %s, samples=%d, positionSpan=%ld, cadenceSpan=%d", reason, buffer.getReadings(),
+               static_cast<long>(buffer.maximumPosition - buffer.minimumPosition), buffer.maximumCadence - buffer.minimumCadence);
+    }
+    buffer.reset();
+  };
   const bool fresh   = !buffer.seenReport || sample.timestamp != buffer.lastReport;
   const bool gap     = buffer.seenReport && static_cast<uint32_t>(sample.timestamp - buffer.lastReport) > POWER_SAMPLE_MAX_AGE_MS;
   buffer.seenReport  = true;
   buffer.lastReport  = sample.timestamp;
   if (buffer.positionEpoch != positionEpoch) {
-    buffer.reset();
+    resetCollection("coordinate epoch changed");
     buffer.positionEpoch = positionEpoch;
   }
   if (!learningAllowed || ftmsPositionUncertain || sample.simulate || !ptHelpers.cadenceIsWithinTable(cadence) || sample.value <= 10 ||
       sample.value >= POWERTABLE_WATT_SIZE * POWERTABLE_WATT_INCREMENT || static_cast<uint32_t>(now - sample.timestamp) > POWER_SAMPLE_MAX_AGE_MS) {
-    buffer.reset();
+    resetCollection(!learningAllowed ? "controller acquisition or table-derived power" : ftmsPositionUncertain ? "uncertain coordinates" :
+                    sample.simulate ? "simulated power" : !ptHelpers.cadenceIsWithinTable(cadence) ? "cadence outside learning range" :
+                    static_cast<uint32_t>(now - sample.timestamp) > POWER_SAMPLE_MAX_AGE_MS ? "stale power" : "power outside learning range");
     return;
   }
-  if (gap) buffer.reset();
+  if (gap) resetCollection("power report gap");
 
   const int32_t position = ss2k->getCurrentPosition();
   // Pending substantial travel also excludes delayed power before motion starts.
   if (std::abs(static_cast<int64_t>(ss2k->getTargetPosition()) - position) > POWER_SAMPLE_POSITION_SPAN) {
-    buffer.reset();
+    resetCollection("pending travel exceeds 100 steps");
     return;
   }
   if (buffer.stable) {
@@ -64,9 +74,10 @@ void PowerTable::processPowerValue(PowerBuffer& buffer, int cadence, const Measu
     buffer.maximumPosition = std::max(buffer.maximumPosition, position);
     buffer.minimumCadence  = std::min(buffer.minimumCadence, cadence);
     buffer.maximumCadence  = std::max(buffer.maximumCadence, cadence);
-    if (static_cast<int64_t>(buffer.maximumPosition) - buffer.minimumPosition > POWER_SAMPLE_POSITION_SPAN ||
-        buffer.maximumCadence - buffer.minimumCadence > POWER_SAMPLE_CADENCE_SPAN)
-      buffer.reset();
+    if (static_cast<int64_t>(buffer.maximumPosition) - buffer.minimumPosition > POWER_SAMPLE_POSITION_SPAN)
+      resetCollection("position span exceeds 100 steps");
+    else if (buffer.maximumCadence - buffer.minimumCadence > POWER_SAMPLE_CADENCE_SPAN)
+      resetCollection("cadence span");
   }
   if (!buffer.stable) {
     buffer.stable          = true;
@@ -87,7 +98,7 @@ void PowerTable::processPowerValue(PowerBuffer& buffer, int cadence, const Measu
     maximumWatts = std::max(maximumWatts, entry.watts);
   }
   if (maximumWatts - minimumWatts > std::max(20, (maximumWatts + minimumWatts) * 15 / 200)) {
-    buffer.reset();
+    resetCollection("power span");
     return;
   }
   buffer.set(buffer.getReadings(), sample.value, cadence, position);

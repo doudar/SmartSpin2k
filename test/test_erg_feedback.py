@@ -237,6 +237,59 @@ int main(int argc,char** argv) {
       }
       assert(logged("overall seek timeout"));
     }
+  } else if(scenario=="mode_entry") {
+    setup(30,75); motor.current=6500; rtConfig->setTargetIncline(7);
+    controller.prepareMode(); assert(rtConfig->getTargetIncline()==6500);
+    rtConfig->setTargetIncline(8000); controller.prepareMode(); assert(rtConfig->getTargetIncline()==8000);
+    rtConfig->setFTMSMode(17); controller.prepareMode(); rtConfig->setTargetIncline(100);
+    motor.current=12000; rtConfig->setFTMSMode(5); controller.prepareMode();
+    assert(rtConfig->getTargetIncline()==12000);
+  } else if(scenario=="stale_partial_motion") {
+    setup(155,155); table.sloped=true; table.lookupResult=motor.current;
+    for(int t=1000;t<=26000;t+=1000)step(t,155);
+    rtConfig->watts.setTarget(310); step(27000,155);
+    const int commanded=rtConfig->getTargetIncline(); motor.current=11000;
+    step(30100,155,false,false); assert(!controller.isTableSeeking());
+    step(30800,155,false,true); assert(rtConfig->getTargetIncline()==commanded);
+    assert(!controller.collectionAllowed()); // Large move remains blocked near arrival.
+    step(31500,155); step(32500,196); step(33500,280);
+    assert(rtConfig->getTargetIncline()==commanded);
+    step(34500,310); assert(rtConfig->getTargetIncline()==commanded);
+    assert(logged("power acquisition complete"));
+  } else if(scenario=="small_seek_collection" || scenario=="growing_seek_collection") {
+    setup(155,155); table.sloped=true; table.lookupResult=motor.current;
+    for(int t=1000;t<=26000;t+=1000)step(t,155);
+    table.lookupResult=motor.current+28-(175-155)*12;
+    rtConfig->watts.setTarget(175); step(27000,155);
+    assert(controller.isTableSeeking()); assert(controller.collectionAllowed());
+    if(scenario=="growing_seek_collection") {
+      table.lookupResult+=40;rtConfig->cad.setValue(95);step(28000,170);
+      assert(controller.collectionAllowed());
+      table.lookupResult+=40;rtConfig->cad.setValue(96);step(29000,170);
+      assert(!controller.collectionAllowed()); // Individually small retargets cannot reset the origin.
+    } else {
+      step(28000,168); assert(controller.collectionAllowed());
+      step(30100,168,true,false); assert(controller.collectionAllowed());
+      step(31200,168,true,false); assert(!controller.isTableSeeking());
+      assert(controller.collectionAllowed()); // Small seek's acquisition handoff also remains eligible.
+    }
+  } else if(scenario=="cadence_feedback_reference") {
+    setup(155,155);table.sloped=true;table.lookupResult=motor.current;
+    for(int t=1000;t<=26000;t+=1000)step(t,155);
+    step(27000,196);step(28000,196);
+    rtConfig->cad.setValue(100);step(29000,180);step(30000,160);step(31000,155);
+    assert(logged("power acquisition complete"));
+    assert(!controller.isTableSeeking()); // Acquired feedback already includes the new cadence.
+  } else if(scenario=="opposed_cadence") {
+    setup(200,200);table.surface=true;rtConfig->cad.setValue(90);
+    for(int cad:{75,100})for(int watts:{90,180,270}) {
+      auto& entry=table.ptData.tableRow[(cad-60)/5].tableEntry[watts/30];
+      entry.targetPosition=std::lround((10000+(watts*90.0/cad-100)*20)/10);entry.readings=3;
+    }
+    motor.current=motor.target=table.lookup(200,90);rtConfig->setTargetIncline(motor.current);
+    for(int t=1000;t<=26000;t+=1000)step(t,200);
+    const int before=motor.current;rtConfig->cad.setValue(100);step(27000,160);
+    assert(rtConfig->getTargetIncline()>before); // Never lower resistance when already 40 W below target.
   } else if(scenario.find("surface_")==0) {
     // Only two widely separated cadence rows, no samples above 270 W.
     // Both the production forward lookup and production controller run here.
@@ -341,7 +394,8 @@ class TestErgFeedback(unittest.TestCase):
         for scenario in ["ride_handoff", "crossing_and_safety", "reduction_safety", "new_target", "cadence_stop",
                          "mode_change", "missing_feedback", "movement_timeout", "no_table", "small_error",
                          "clamped_move", "clock_wrap", "trusted_seek", "trusted_seek_late_uptime", "simulation_1000", "simulation_2000", "simulation_3000",
-                         "simulation_missing_2000", "trust_transients", "stale_seek", "seek_deadline", "sparse_seventy", "extrapolated_cadence"]:
+                         "simulation_missing_2000", "trust_transients", "stale_seek", "seek_deadline", "sparse_seventy", "extrapolated_cadence",
+                         "mode_entry", "stale_partial_motion", "small_seek_collection", "growing_seek_collection", "cadence_feedback_reference", "opposed_cadence"]:
             with self.subTest(scenario=scenario):
                 subprocess.run([str(self.exe), scenario], check=True)
 

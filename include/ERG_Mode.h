@@ -41,6 +41,11 @@ class ErgMode {
   // What used to be in the ERGTaskLoop(). This is the main control function for ERG Mode and the powertable operations.
   void runERG();
   void computeErg();
+  // Called after reading actual motor position, before interpreting targetIncline.
+  void prepareMode();
+  bool collectionAllowed() const {
+    return !(isTableSeeking() || feedbackWaiting) || controlMaximum - static_cast<int64_t>(controlMinimum) < POWER_SAMPLE_POSITION_SPAN;
+  }
   void _writeLog(float currentIncline, float newIncline, int currentSetPoint, int newSetPoint, int currentWatts, int newWatts, int currentCadence, int newCadence);
   bool isTableSeeking() const { return tableSeekState != TableSeekState::INACTIVE; }
   void resetTableConfidence() {
@@ -97,9 +102,13 @@ class ErgMode {
   int cadenceReference                   = 0;
   uint32_t tableSeekStartedAt            = 0;
   int32_t tableSeekOffset                = 0;
+  uint32_t tableSeekArrivedAt            = 0;
   uint32_t responseTimestamp             = 0;
   int responseWatts                      = 0;
   double responseTrend                   = 0;
+  bool wasErgMode                        = false;
+  int32_t controlMinimum                 = 0;
+  int32_t controlMaximum                 = 0;
 
   // calculate incline if setpoint (from Zwift) changes
   int32_t _setPointChangeState();
@@ -108,6 +117,7 @@ class ErgMode {
   int32_t _inSetpointState();
   int32_t _tableCorrection(int watts, int target, int cadence);
   void _observePowerResponse();
+  void _trackControlMove(int32_t position);
 
   void _updateTableConfidence();
   bool _positionPredictionIsAccurate(int watts, int cadence, int32_t actualPosition);
@@ -117,7 +127,7 @@ class ErgMode {
   void _scoreTable(int watts, int cadence, bool accurate);
   void _startTrustedTableSeek(int32_t position);
   void _handleTrustedTableSeek();
-  void _stopTrustedTableSeek(const char* reason, bool seedPidFromTable = false);
+  void _stopTrustedTableSeek(const char* reason, bool seedPidFromTable = false, bool acquireFeedback = false);
   unsigned long _trustedTableMoveDeadline(int32_t position) const;
   void _startFeedbackWait();
   void _handleFeedbackWait();

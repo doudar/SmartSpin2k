@@ -311,6 +311,7 @@ void SS2K::moveStepper() {
   if (stepper) {
     ss2k->stepperIsRunning = stepper->isRunning();
     ss2k->currentPosition  = stepper->getCurrentPosition();
+    ergMode->prepareMode();
     if (!ss2k->externalControl) {
       if ((rtConfig->getFTMSMode() == FitnessMachineControlPointProcedure::SetTargetPower)) {
 #ifdef ERG_GUARDRAILS

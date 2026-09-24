@@ -81,16 +81,16 @@ int main(int argc, char** argv) {
     feed(); feed(); feed(); assert(buffer.getReadings()==1);
     for(int i=0;i<20;++i) {clockMs+=10;rtConfig->watts.setTarget(300);table.processPowerValue(buffer,80,rtConfig->watts);}
     assert(buffer.getReadings()==1 && commits==0);
-    for(int i=0;i<4;++i)feed();
+    for(int i=0;i<POWER_SAMPLES-1;++i)feed();
     assert(commits==1 && buffer.getReadings()==0);
   } else if(scenario=="fresh_equal" || scenario=="wrap") {
     if(scenario=="wrap")clockMs=UINT32_MAX-3000;
-    for(int i=0;i<7;++i)feed();
+    for(int i=0;i<POWER_SAMPLES+2;++i)feed();
     assert(commits==1); assert(table.ptData.tableRow[4].tableEntry[7].targetPosition==1500);
-    for(int i=0;i<5;++i)feed(); assert(commits==2);
+    for(int i=0;i<POWER_SAMPLES;++i)feed(); assert(commits==2);
   } else if(scenario=="motion" || scenario=="pending_motion" || scenario=="cadence" || scenario=="power_spike" || scenario=="gap" || scenario=="stop" ||
             scenario=="blocked" || scenario=="ftms" || scenario=="epoch" || scenario=="simulated") {
-    for(int i=0;i<5;++i)feed(); assert(buffer.getReadings()==3);
+    for(int i=0;i<POWER_SAMPLES+1;++i)feed(); assert(buffer.getReadings()==POWER_SAMPLES-1);
     if(scenario=="motion")motor.current=motor.target=15500;
     if(scenario=="pending_motion")motor.target=15500;
     if(scenario=="gap")clockMs+=3000;
@@ -100,7 +100,7 @@ int main(int argc, char** argv) {
     feed(scenario!="gap",scenario=="power_spike"?300:210,scenario=="stop"?0:scenario=="cadence"?85:80,scenario!="blocked");
     assert(buffer.getReadings()==0 && commits==0);
     table.ftmsPositionUncertain=false;rtConfig->watts.setSimulate(false);motor.current=motor.target=16000;
-    for(int i=0;i<7;++i)feed();
+    for(int i=0;i<POWER_SAMPLES+2;++i)feed();
     assert(commits==1 && table.ptData.tableRow[4].tableEntry[7].targetPosition==1600);
   } else if(scenario=="poll_700ms") {
     clockMs=0;
@@ -109,10 +109,14 @@ int main(int argc, char** argv) {
       if(t%1000==0)rtConfig->watts.setValue(210);
       if(t%700==0)table.processPowerValue(buffer,80,rtConfig->watts);
     }
-    assert(commits==2 && buffer.getReadings()==3);
+    assert(commits==13/POWER_SAMPLES && buffer.getReadings()==13%POWER_SAMPLES);
+  } else if(scenario=="cumulative_small_moves") {
+    for(int i=0;i<4;++i) {motor.current+=40;motor.target=motor.current;feed();}
+    assert(commits==0 && buffer.getReadings()==0); // 120-step span resets the partial window.
+    for(int i=0;i<POWER_SAMPLES+1;++i)feed();assert(commits==1);
   } else if(scenario=="small_moves") {
-    for(int i=0;i<7;++i) {motor.current+=10; motor.target=motor.current+20;feed();}
-    assert(commits==1); assert(table.ptData.tableRow[4].tableEntry[7].targetPosition==1505);
+    for(int i=0;i<POWER_SAMPLES+2;++i) {motor.current+=10; motor.target=motor.current+20;feed();}
+    assert(commits==1); assert(table.ptData.tableRow[4].tableEntry[7].targetPosition==1500+(POWER_SAMPLES+5)/2);
   } else if(scenario=="burst") {
     for(int i=0;i<3;++i)feed();assert(buffer.getReadings()==1);
     for(int i=0;i<5;++i){clockMs+=100;rtConfig->watts.setValue(210);table.processPowerValue(buffer,80,rtConfig->watts);}
@@ -190,7 +194,7 @@ class TestPowerTableLearning(unittest.TestCase):
                             "-I"+str(ROOT / "lib/ArduinoCompat/include"), str(cpp),
                             str(ROOT / "src/PowerTable_Helpers.cpp"), "-o", str(exe)], check=True)
             for scenario in ("duplicates", "fresh_equal", "wrap", "motion", "pending_motion", "cadence", "power_spike",
-                             "gap", "stop", "blocked", "ftms", "epoch", "simulated", "poll_700ms", "small_moves", "burst", "up", "down", "fraction",
+                             "gap", "stop", "blocked", "ftms", "epoch", "simulated", "poll_700ms", "small_moves", "cumulative_small_moves", "burst", "up", "down", "fraction",
                              "interior", "edge", "power_neighbor", "outlier", "grid", "grid_cadence", "bootstrap", "bootstrap_exact",
                              "anchor_epoch", "import", "random_surface", "notify_neighbors"):
                 with self.subTest(scenario=scenario):
