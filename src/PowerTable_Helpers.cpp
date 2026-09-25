@@ -268,6 +268,20 @@ bool PTHelpers::cadenceIsWithinTable(int cad) {
 }
 
 
+bool PTHelpers::hasErgSeekSupport(const PTData& ptData) {
+  // Three watt anchors in each of two cadence rows give the forward seek
+  // more than one local segment and an independently learned cadence trend.
+  int supportedRows = 0;
+  for (const auto& row : ptData.tableRow) {
+    int reliablePoints = 0;
+    for (const auto& entry : row.tableEntry) {
+      if (entry.targetPosition != INT16_MIN && entry.readings >= 2 && ++reliablePoints >= 3) break;
+    }
+    if (reliablePoints >= 3 && ++supportedRows >= 2) return true;
+  }
+  return false;
+}
+
 int32_t PTHelpers::lookup(int watts, int cad, const PTData& ptData) {
   if (cad <= 0 || watts < 0) return RETURN_ERROR;
 

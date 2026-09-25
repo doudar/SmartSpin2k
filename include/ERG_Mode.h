@@ -26,7 +26,9 @@ constexpr int ERG_TABLE_MOVE_TIMEOUT_MS        = 10000;
 constexpr uint32_t ERG_FEEDBACK_SETTLE_MS      = 2500;
 constexpr uint32_t ERG_FEEDBACK_TIMEOUT_MS     = 5000;
 constexpr uint32_t ERG_FEEDBACK_MAX_AGE_MS     = 1500;
-constexpr int ERG_LARGE_CORRECTION_WATTS       = 50;
+constexpr int ERG_FEEDBACK_HIGH_OVERSHOOT_WATTS = ERG_MODE_PID_WINDOW;
+constexpr int ERG_FEEDBACK_WORSENING_WATTS      = 30;
+
 constexpr int ERG_TABLE_CORRECTION_WATTS       = ERG_MODE_PID_WINDOW;
 constexpr int ERG_TABLE_CADENCE_SEEK_RPM       = 3;
 
@@ -63,6 +65,7 @@ class ErgMode {
     cadenceReference         = 0;
     responseTimestamp        = 0;
     responseTrend            = 0;
+    feedbackEarlyRetreatTarget = INT32_MIN;
   }
 
  private:
@@ -95,6 +98,7 @@ class ErgMode {
   bool feedbackIncreasing                = false;
   int feedbackTargetWatts                = 0;
   int feedbackStartWatts                 = 0;
+  int feedbackEarlyRetreatTarget         = INT32_MIN;
   uint32_t feedbackStartedAt             = 0;
   uint32_t feedbackSettledAt             = 0;
   uint32_t confidenceSettledAt           = 0;
@@ -121,6 +125,7 @@ class ErgMode {
 
   void _updateTableConfidence();
   bool _positionPredictionIsAccurate(int watts, int cadence, int32_t actualPosition);
+  bool _tableHasSeekSupport() const;
   bool _tableTargetIsTrusted(int watts, int cadence) const;
   bool _tableTargetIsWithinMeasuredBounds(int watts, int cadence) const;
   bool _tableTargetIsUsable(int watts, int cadence) const;

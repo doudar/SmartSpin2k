@@ -60,13 +60,17 @@ int PowerBuffer::getReadings() { int n=0; for(const auto& entry:powerEntry) n+=e
 struct PowerTable {
   PTData ptData;
   PTHelpers helpers;
-  bool surface=false, sloped=false;
+  bool surface=false, sloped=false, failHighCadence=false;
   bool saveFlag=false, _hasBeenLoadedThisSession=true;
-  int lookupResult=11866, samples=0, loads=0;
+  int lookupResult=11866, cadenceSlope=0, samples=0, loads=0;
   bool lookupErgSlope(int, int, double&, PowerTableSlopeStatus::Value* status) {
-    *status=PowerTableSlopeStatus::InsufficientRows; return false;
+    *status=PowerTableSlopeStatus::InsufficientRows;return false;
   }
-  int lookup(int watts,int cadence) { return surface ? helpers.lookup(watts,cadence,ptData) : sloped ? lookupResult+(watts-155)*12 : lookupResult; }
+  int lookup(int watts,int cadence) {
+    if(failHighCadence && cadence>=100) return RETURN_ERROR;
+    return surface ? helpers.lookup(watts,cadence,ptData) : sloped ? lookupResult+(watts-155)*12+(cadence-94)*cadenceSlope : lookupResult;
+  }
+  bool hasErgSeekSupport() { return !surface || helpers.hasErgSeekSupport(ptData); }
   int lookupWatts(int,int) { return 155; }
   void processPowerValue(PowerBuffer&,int,const Measurement&,bool allowed=true) { if (allowed) ++samples; }
   void setStepperMinMax() {}
@@ -126,6 +130,30 @@ int main(int argc,char** argv) {
     step(2400,140); assert(rtConfig->getTargetIncline()==9000);
     step(2500,110); assert(rtConfig->getTargetIncline()>9000);
     assert(logged("power crossed safety limit"));
+  } else if(scenario=="worsening_reduction" || scenario=="ordinary_reduction") {
+    // The 924 ride had a 374 -> 330 W retreat, followed by a higher power
+    // report after the motor settled. That report should release the wait;
+    // ordinary variation and pre-settlement reports should not.
+    setup(374,330);table.sloped=true;table.lookupResult=motor.current;
+    step(1000,374);const int firstRetreat=rtConfig->getTargetIncline();
+    assert(logged("feedback wait:"));
+    if(scenario=="worsening_reduction") {
+      step(1800,430,false);assert(rtConfig->getTargetIncline()==firstRetreat);
+      step(2500,430);assert(rtConfig->getTargetIncline()==firstRetreat);
+      step(3200,438);assert(rtConfig->getTargetIncline()<firstRetreat);
+      assert(logged("power rose after reduction"));
+      const int secondRetreat=rtConfig->getTargetIncline();
+      step(3900,450); // The second move has just settled.
+      step(4600,490); // Delayed watts are still rising; do not stack a third move.
+      assert(rtConfig->getTargetIncline()==secondRetreat);
+      int earlyReleases=0;
+      for(const auto& entry:logs)if(entry.find("power rose after reduction")!=std::string::npos)++earlyReleases;
+      assert(earlyReleases==1);
+    } else {
+      step(1800,374);step(2500,389);step(3200,370);
+      assert(rtConfig->getTargetIncline()==firstRetreat);
+      assert(!logged("power rose after reduction"));
+    }
   } else if(scenario=="new_target") {
     beginSeek(); step(2000,198); rtConfig->watts.setTarget(155); table.lookupResult=9000;
     step(2100,198); assert(rtConfig->getTargetIncline()==9000);
@@ -156,9 +184,22 @@ int main(int argc,char** argv) {
     assert(rtConfig->getTargetIncline()==11866);
   } else if(scenario=="no_table") {
     setup(); rtConfig->setHomed(false); step(1000,196);
-    float commanded=rtConfig->getTargetIncline(); assert(commanded>10083);
-    step(1700,196); step(2400,196); assert(rtConfig->getTargetIncline()==commanded);
-    step(4200,260); assert(rtConfig->getTargetIncline()>commanded);
+    int previous=rtConfig->getTargetIncline();assert(previous>10083);
+    for(int t:{1700,2400,3100}) {
+      step(t,196);const int current=rtConfig->getTargetIncline();assert(current>previous);
+      previous=current;
+    }
+    assert(!logged("feedback wait:"));
+    step(4200,260); // Rising power can make the trend guard hold a cycle.
+    step(5500,260);assert(rtConfig->getTargetIncline()>previous);
+  } else if(scenario=="pid_no_wait_decrease") {
+    setup(350,250);rtConfig->setHomed(false);step(1000,350);
+    int previous=rtConfig->getTargetIncline();assert(previous<10083);
+    for(int t:{1700,2400,3100}) {
+      step(t,350);const int current=rtConfig->getTargetIncline();assert(current<previous);
+      previous=current;
+    }
+    assert(!logged("feedback wait:"));
   } else if(scenario=="small_error") {
     setup(300,310); rtConfig->setHomed(false); step(1000,300);
     int previous=rtConfig->getTargetIncline(); assert(previous>10083);
@@ -280,6 +321,66 @@ int main(int argc,char** argv) {
     rtConfig->cad.setValue(100);step(29000,180);step(30000,160);step(31000,155);
     assert(logged("power acquisition complete"));
     assert(!controller.isTableSeeking()); // Acquired feedback already includes the new cadence.
+  } else if(scenario=="trusted_cadence_amend" || scenario=="unusable_cadence_wait" || scenario=="trusted_seek_safety") {
+    setup(155,155);table.sloped=true;table.lookupResult=motor.current;table.cadenceSlope=-100;
+    for(int t=1000;t<=26000;t+=1000)step(t,155);
+    assert(logged("now trusted"));
+    rtConfig->watts.setTarget(330);step(27000,155);
+    assert(controller.isTableSeeking());
+    const int original=rtConfig->getTargetIncline();
+    if(scenario=="trusted_seek_safety") {
+      rtConfig->cad.setValue(100);step(27800,355,false);
+      assert(!controller.isTableSeeking());
+      assert(logged("power exceeded high-side safety limit"));
+      assert(rtConfig->getTargetIncline()<original);
+      return 0;
+    }
+    motor.current=original-280;rtConfig->cad.setValue(100);
+    if(scenario=="unusable_cadence_wait")table.failHighCadence=true;
+    step(27800,162,false);
+    if(scenario=="trusted_cadence_amend") {
+      // A higher cadence predicts less resistance even while delayed watts
+      // remain low. Amend the in-flight seek instead of adding a table move.
+      assert(controller.isTableSeeking());
+      assert(rtConfig->getTargetIncline()==original-600);
+      assert(!logged("cadence correction opposed power error"));
+      assert(!logged("Table feedback correction"));
+      step(28500,250);assert(controller.isTableSeeking());
+    } else {
+      // An unusable cadence lookup may exit, but must acquire the pending
+      // motor/power response before another table-sized correction.
+      assert(!controller.isTableSeeking());
+      assert(rtConfig->getTargetIncline()==original);
+      assert(logged("cadence lookup is no longer usable"));
+      step(28500,180,false);assert(rtConfig->getTargetIncline()==original);
+      step(29500,250);step(31000,290);
+      assert(rtConfig->getTargetIncline()==original);
+      step(32500,330);assert(logged("power acquisition complete"));
+      assert(!logged("Table feedback correction"));
+    }
+  } else if(scenario=="fresh_table_gate") {
+    setup(165,165);table.surface=true;rtConfig->cad.setValue(80);
+    auto add=[&](int cad,int watts,int position){
+      auto& cell=table.ptData.tableRow[(cad-MINIMUM_TABLE_CAD)/5].tableEntry[watts/30];
+      cell.targetPosition=position/TABLE_DIVISOR;cell.readings=3;
+    };
+    add(80,150,12000);add(80,180,13000);
+    assert(!table.hasErgSeekSupport());
+    motor.current=motor.target=table.lookup(165,80);rtConfig->setTargetIncline(motor.current);
+    for(int t=1000;t<=26000;t+=1000)step(t,165);
+    assert(!logged("now trusted"));
+    rtConfig->watts.setTarget(175);step(27000,165);
+    rtConfig->cad.setValue(82);step(28000,165);
+    assert(!controller.isTableSeeking());
+    assert(!logged("Table feedback correction"));
+    add(80,210,14000);add(85,150,11500);add(85,180,12500);add(85,210,13500);
+    assert(table.hasErgSeekSupport());
+    rtConfig->cad.setValue(80);rtConfig->watts.setTarget(165);
+    motor.current=motor.target=table.lookup(165,80);rtConfig->setTargetIncline(motor.current);
+    for(int t=29000;t<=55000;t+=1000)step(t,165);
+    assert(logged("now trusted"));
+    rtConfig->watts.setTarget(175);step(56000,165);
+    assert(controller.isTableSeeking());
   } else if(scenario=="opposed_cadence") {
     setup(200,200);table.surface=true;rtConfig->cad.setValue(90);
     for(int cad:{75,100})for(int watts:{90,180,270}) {
@@ -391,11 +492,13 @@ class TestErgFeedback(unittest.TestCase):
         cls.temp.cleanup()
 
     def test_production_erg_feedback_wait(self):
-        for scenario in ["ride_handoff", "crossing_and_safety", "reduction_safety", "new_target", "cadence_stop",
-                         "mode_change", "missing_feedback", "movement_timeout", "no_table", "small_error",
+        for scenario in ["ride_handoff", "crossing_and_safety", "reduction_safety", "worsening_reduction", "ordinary_reduction",
+                         "new_target", "cadence_stop",
+                         "mode_change", "missing_feedback", "movement_timeout", "no_table", "pid_no_wait_decrease", "small_error",
                          "clamped_move", "clock_wrap", "trusted_seek", "trusted_seek_late_uptime", "simulation_1000", "simulation_2000", "simulation_3000",
                          "simulation_missing_2000", "trust_transients", "stale_seek", "seek_deadline", "sparse_seventy", "extrapolated_cadence",
-                         "mode_entry", "stale_partial_motion", "small_seek_collection", "growing_seek_collection", "cadence_feedback_reference", "opposed_cadence"]:
+                         "mode_entry", "stale_partial_motion", "small_seek_collection", "growing_seek_collection", "cadence_feedback_reference",
+                         "trusted_cadence_amend", "unusable_cadence_wait", "trusted_seek_safety", "fresh_table_gate", "opposed_cadence"]:
             with self.subTest(scenario=scenario):
                 subprocess.run([str(self.exe), scenario], check=True)
 

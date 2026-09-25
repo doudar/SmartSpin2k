@@ -37,6 +37,7 @@ class PowerTable {
 
   // returns target position for given cadence and watts. Returns RETURN_ERROR if not found.
   int32_t lookup(int watts, int cad) { return this->ptHelpers.lookup(watts, cad, this->ptData); }
+  bool hasErgSeekSupport() { return this->ptHelpers.hasErgSeekSupport(this->ptData); }
 
   // Returns a local steps-per-watt slope only when two nearby cadence rows
   // provide consistent measured segments around the requested watts.

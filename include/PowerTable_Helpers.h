@@ -113,6 +113,7 @@ class PTHelpers {
 
  public:
   int32_t lookup(int watts, int cad, const PTData& ptData);
+  bool hasErgSeekSupport(const PTData& ptData);
   bool lookupSlope(int watts, int cad, double& stepsPerWatt, const PTData& ptData, PowerTableSlopeStatus::Value* status = nullptr);
   bool lookupErgSlope(int watts, int cad, double& stepsPerWatt, const PTData& ptData, PowerTableSlopeStatus::Value* status = nullptr);
   int32_t lookupWatts(int cad, int32_t targetPosition, const PTData& ptData);
