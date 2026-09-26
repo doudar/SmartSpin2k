@@ -429,7 +429,7 @@ Primary files: `include/ERG_Mode.h`, `src/ERG_Mode.cpp`.
 `ErgMode::runERG()` is called from the main maintenance loop. It:
 
 - Waits for stepper completion and power acquisition after conservative table seeks or proportional corrections with more than 50 W error.
-- Saves power table after delayed `saveFlag`.
+- The first custom-characteristic power-table row queues startup/low-stop (or FTMS reference) homing. Startup homing preserves the active table and pending `saveFlag` so BLE reception continues; only full homing clears the table on entry. Saving keeps the ten-second transfer delay and retries on failure. Failed homing still enters the normal unhomed fallback.
 - Loads power table once per session.
 - Adds live power/cadence/position samples to the power table when cadence exists and `pTab4Pwr` is false.
 - Calls `computeErg()` when FTMS mode is target power and a power meter or simulation is active.

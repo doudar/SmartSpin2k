@@ -29,6 +29,7 @@ HARNESS = r'''
 #include <string>
 #include <vector>
 #include "ERG_Mode.h"
+#include "ByteUtils.h"
 uint32_t clockMs = 100;
 std::vector<std::string> logs;
 void record(const char*, const char* format, ...) {
@@ -59,9 +60,12 @@ void PowerBuffer::reset() { for(auto& entry:powerEntry) entry.readings=0; }
 int PowerBuffer::getReadings() { int n=0; for(const auto& entry:powerEntry) n+=entry.readings!=0; return n; }
 struct PowerTable {
   PTData ptData;
+  uint32_t positionEpoch=0;
   PTHelpers helpers;
   bool surface=false, sloped=false, failHighCadence=false;
   bool saveFlag=false, _hasBeenLoadedThisSession=true;
+  bool saveSucceeds=true;
+  int saves=0;
   int lookupResult=11866, cadenceSlope=0, samples=0, loads=0;
   bool lookupErgSlope(int, int, double&, PowerTableSlopeStatus::Value* status) {
     *status=PowerTableSlopeStatus::InsufficientRows;return false;
@@ -74,11 +78,20 @@ struct PowerTable {
   int lookupWatts(int,int) { return 155; }
   void processPowerValue(PowerBuffer&,int,const Measurement&,bool allowed=true) { if (allowed) ++samples; }
   void setStepperMinMax() {}
-  void _save() {}
+  bool _save() { ++saves; assert(spinBLEServer.spinDownFlag!=1); return saveSucceeds; }
   void _manageSaveState(bool=false) { ++loads; _hasBeenLoadedThisSession=true; }
   void reset() {}
 } table;
 PowerTable* powerTable=&table;
+void writeRow(int row, int position) {
+  std::string rxValue(3+2*POWERTABLE_WATT_SIZE, '\0');
+  const uint8_t cc_write=2, cc_success=128;
+  rxValue[0]=cc_write; rxValue[2]=row;
+  auto* pData=reinterpret_cast<uint8_t*>(&rxValue[0]);
+  for(int i=0;i<POWERTABLE_WATT_SIZE;++i) put_le16s(pData+3+2*i,position);
+  uint8_t returnValue[3]{};
+  /* PRODUCTION_UPLOAD */
+}
 /* PRODUCTION_ERG */
 
 ErgMode controller;
@@ -109,7 +122,45 @@ void beginSeek() { setup(); step(1000,196); assert(rtConfig->getTargetIncline()=
 
 int main(int argc,char** argv) {
   assert(argc==2); std::string scenario=argv[1];
-  if(scenario=="ride_handoff") {
+  if(scenario=="upload_home" || scenario=="upload_save_failure" || scenario=="upload_full_home") {
+    setup(); rtConfig->setFTMSMode(17);
+    if(scenario=="upload_full_home") spinBLEServer.spinDownFlag=2;
+    writeRow(0,1234);
+    assert(spinBLEServer.spinDownFlag==(scenario=="upload_full_home"?2:1));
+    assert(table.saves==0 && table.ptData.tableRow[0].tableEntry[0].targetPosition==1234);
+    // Startup homing retains the table while subsequent writes continue.
+    rtConfig->setHomed(false);
+    clockMs=9000; writeRow(1,-123);
+    spinBLEServer.spinDownFlag=0;
+    rtConfig->setHomed(true);
+    step(10000,196);
+    assert(table.saves==0 && table.ptData.tableRow[0].tableEntry[0].targetPosition==1234);
+    writeRow(2,INT16_MIN); // No second homing request for the same transfer.
+    writeRow(POWERTABLE_CAD_SIZE,999); // Invalid rows do not disturb the transfer.
+    assert(spinBLEServer.spinDownFlag==0);
+    step(20000,196); assert(table.saves==0);
+    if(scenario=="upload_save_failure") table.saveSucceeds=false;
+    step(21000,196);
+    assert(table.saves==1);
+    assert(table.ptData.tableRow[0].tableEntry[0].targetPosition==1234);
+    assert(table.ptData.tableRow[1].tableEntry[0].targetPosition==-123);
+    assert(table.ptData.tableRow[1].tableEntry[0].readings==MINIMUM_RELIABLE_POSITIONS+1);
+    assert(table.ptData.tableRow[2].tableEntry[0].readings==0);
+    assert(table.positionEpoch==3 && spinBLEServer.spinDownFlag==0);
+    if(!table.saveSucceeds) {
+      assert(table.saveFlag && spinBLEServer.spinDownFlag==0);
+      table.saveSucceeds=true;
+      step(22000,196); step(32000,196);
+      assert(table.saves==1 && spinBLEServer.spinDownFlag==0);
+      step(33000,196);
+      assert(table.saves==2 && !table.saveFlag && spinBLEServer.spinDownFlag==0);
+    } else {
+      assert(!table.saveFlag);
+      step(40000,196);
+      assert(table.saves==1 && spinBLEServer.spinDownFlag==0);
+    }
+    writeRow(3,321); assert(spinBLEServer.spinDownFlag==1); // New upload homes again.
+  } else if(scenario=="ride_handoff") {
     // Captured 155 -> 310 W transition: motor arrived while power still
     // reported 198 W. The old 700 ms handoff commanded another 700 steps.
     beginSeek(); table._hasBeenLoadedThisSession=false; step(2000,198); step(2700,198);
@@ -480,12 +531,19 @@ class TestErgFeedback(unittest.TestCase):
         for header in ['"SS2KLog.h"', '"Main.h"', '"Power_Table.h"', '<LittleFS.h>']:
             source = source.replace('#include ' + header, '')
         cpp = folder / "erg.cpp"
-        cpp.write_text(HARNESS.replace("/* PRODUCTION_ERG */", source), encoding="utf-8")
+        custom = (ROOT / "src/BLE_Custom_Characteristic.cpp").read_text(encoding="utf-8")
+        custom = custom.split("case BLE_powerTableData:  // 0x27", 1)[1].split("case BLE_simulatedTargetWatts:", 1)[0]
+        custom = custom[custom.index("if (rxValue[0] == cc_write)"):custom.rindex("break;")]
+        cpp.write_text(HARNESS.replace("/* PRODUCTION_ERG */", source).replace("/* PRODUCTION_UPLOAD */", custom), encoding="utf-8")
         cls.exe = folder / "erg.exe"
+        endian = folder / "endian.o"
+        subprocess.run([compiler, "-x", "c", "-I" + str(ROOT / "lib/ArduinoCompat/include"), "-c",
+                        str(ROOT / "lib/ArduinoCompat/src/os/endian.c"), "-o", str(endian)], check=True)
         subprocess.run([compiler, "-std=c++17", "-DPLATFORMIO_ENV_NATIVE", "-I" + str(folder),
                         "-I" + str(ROOT / "include"), "-I" + str(ROOT / "lib/SS2K/include"),
                         "-I" + str(ROOT / "lib/ArduinoCompat/include"),
-                        str(cpp), str(ROOT / "src/PowerTable_Helpers.cpp"), "-o", str(cls.exe)], check=True)
+                        str(cpp), str(ROOT / "src/PowerTable_Helpers.cpp"),
+                        str(endian), "-o", str(cls.exe)], check=True)
 
     @classmethod
     def tearDownClass(cls):
@@ -506,6 +564,11 @@ class TestErgFeedback(unittest.TestCase):
         for delay in (1000,2000,3000):
             with self.subTest(delay=delay):
                 subprocess.run([str(self.exe), "surface_"+str(delay)], check=True)
+
+    def test_upload_continues_during_homing(self):
+        for scenario in ("upload_home", "upload_save_failure", "upload_full_home"):
+            with self.subTest(scenario=scenario):
+                subprocess.run([str(self.exe), scenario], check=True)
 
 
 if __name__ == "__main__":

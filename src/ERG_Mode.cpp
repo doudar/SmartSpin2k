@@ -35,14 +35,14 @@ double scheduledErgGain(double sensitivity, int operatingWatts, int cadence, boo
 void ErgMode::prepareMode() {
   const bool active = rtConfig->getFTMSMode() == FitnessMachineControlPointProcedure::SetTargetPower;
   if (active == wasErgMode) return;
-  wasErgMode = active;
-  tableSeekState = TableSeekState::INACTIVE;
+  wasErgMode      = active;
+  tableSeekState  = TableSeekState::INACTIVE;
   feedbackWaiting = tableSeekPidSeedValid = false;
-  mode = Mode::MAINTAIN;
-  cadenceReference = 0;
-  responseTimestamp = 0;
-  responseTrend = 0;
-  feedbackEarlyRetreatTarget = INT32_MIN;
+  mode                                    = Mode::MAINTAIN;
+  cadenceReference                        = 0;
+  responseTimestamp                       = 0;
+  responseTrend                           = 0;
+  feedbackEarlyRetreatTarget              = INT32_MIN;
   prevWatts.setTarget(0);
   ergTimer = millis();
   if (active) {
@@ -59,8 +59,8 @@ void ErgMode::_trackControlMove(int32_t position) {
 
 void ErgMode::runERG() {
   static PowerBuffer powerBuffer;
-  static int loopCounter             = 0;
-  static int lastSetPoint            = 0;
+  static int loopCounter  = 0;
+  static int lastSetPoint = 0;
 
   _observePowerResponse();
 
@@ -69,8 +69,8 @@ void ErgMode::runERG() {
       SS2K_LOG(ERG_MODE_LOG_TAG, "Cadence below ERG minimum; lowering target to %dw", userConfig->getMinWatts());
       lastSetPoint = rtConfig->watts.getTarget();
       rtConfig->watts.setTarget(userConfig->getMinWatts());
-      mode      = Mode::MAINTAIN;
-      ergTimer  = millis();
+      mode     = Mode::MAINTAIN;
+      ergTimer = millis();
     }
   } else if (lastSetPoint != 0 && rtConfig->getFTMSMode() == FitnessMachineControlPointProcedure::SetTargetPower && rtConfig->cad.getValue() > MIN_ERG_CADENCE) {
     SS2K_LOG(ERG_MODE_LOG_TAG, "Cadence above ERG minimum; restoring target to %dw", lastSetPoint);
@@ -78,8 +78,7 @@ void ErgMode::runERG() {
     lastSetPoint = 0;
   }
 
-  if (tableSeekPidSeedValid &&
-      (rtConfig->getFTMSMode() != FitnessMachineControlPointProcedure::SetTargetPower || rtConfig->watts.getTarget() != tableSeekTargetWatts)) {
+  if (tableSeekPidSeedValid && (rtConfig->getFTMSMode() != FitnessMachineControlPointProcedure::SetTargetPower || rtConfig->watts.getTarget() != tableSeekTargetWatts)) {
     tableSeekPidSeedValid = false;
   }
 
@@ -100,17 +99,18 @@ void ErgMode::runERG() {
     ergTimer = millis() + ERG_MODE_DELAY;
 
     static unsigned long int saveFlagCooldown = 0;
-    // save powertable if saveFlag has been set for 10 seconds using a saveFlagCooldown timer
-    // this is to provide enough time to transmit a new powerTable using BLE.
+    // Homing is already queued by the first uploaded row. Allow ten seconds
+    // for the remaining rows before saving; runERG is paused during homing.
     if (powerTable->saveFlag) {
-      if (saveFlagCooldown == 0) {
-        saveFlagCooldown = millis();
-      }
+      if (saveFlagCooldown == 0) saveFlagCooldown = millis();
       if ((millis() - saveFlagCooldown) > 10000) {
-        powerTable->_save();
-        saveFlagCooldown     = 0;
-        powerTable->saveFlag = false;
+        saveFlagCooldown = 0;
+        if (powerTable->_save()) {
+          powerTable->saveFlag = false;
+        }
       }
+    } else {
+      saveFlagCooldown = 0;
     }
     // Load power table if not yet loaded this session
     if (!powerTable->_hasBeenLoadedThisSession) {
@@ -221,7 +221,7 @@ void ErgMode::computeErg() {
     const int32_t after  = powerTable->lookup(target, cadence);
     if (before != RETURN_ERROR && after != RETURN_ERROR) {
       const int64_t position = static_cast<int64_t>(ss2k->getTargetPosition()) + after - before;
-      const int error = target - powerSample.value;
+      const int error        = target - powerSample.value;
       if (position > rtConfig->getMinStep() && position < rtConfig->getMaxStep() &&
           (std::abs(error) <= ERG_MODE_PID_WINDOW || (position - ss2k->getCurrentPosition()) * error >= 0)) {
         mode   = position > ss2k->getCurrentPosition() ? Mode::INCREASING : Mode::DECREASING;
@@ -257,7 +257,7 @@ int32_t ErgMode::_setPointChangeState() {
   // use it as a true feed-forward command. PID remains responsible for
   // overshoot recovery and steady-state maintenance.
   if (_tableTargetIsTrusted(currentTarget, currentCadence)) {
-    const int32_t tableResult     = powerTable->lookup(currentTarget, currentCadence);
+    const int32_t tableResult    = powerTable->lookup(currentTarget, currentCadence);
     const bool insideTravel      = tableResult > rtConfig->getMinStep() && tableResult < rtConfig->getMaxStep();
     const bool movesTowardTarget = (mode == Mode::INCREASING && tableResult > ss2k->getCurrentPosition()) || (mode == Mode::DECREASING && tableResult < ss2k->getCurrentPosition());
     if (tableResult != RETURN_ERROR && tableResult >= 0 && insideTravel && movesTowardTarget) {
@@ -361,7 +361,7 @@ void ErgMode::_handleFeedbackWait() {
     // the full acquisition window before permitting another bounded move.
     if (!feedbackIncreasing && feedbackEarlyRetreatTarget != feedbackTargetWatts && fresh && static_cast<int32_t>(sample.timestamp - feedbackSettledAt) > 0 &&
         sample.value > feedbackStartWatts + ERG_FEEDBACK_WORSENING_WATTS && sample.value > feedbackTargetWatts + ERG_FEEDBACK_HIGH_OVERSHOOT_WATTS) {
-      reason = "power rose after reduction";
+      reason                     = "power rose after reduction";
       feedbackEarlyRetreatTarget = feedbackTargetWatts;
     } else {
       // Newly delivered reports can still describe the brake before the move.
@@ -388,7 +388,7 @@ void ErgMode::_handleFeedbackWait() {
   feedbackWaiting = false;
   // The acquired watts already include this cadence; do not compensate twice.
   cadenceReference = rtConfig->cad.getValue();
-  mode            = Mode::MAINTAIN;
+  mode             = Mode::MAINTAIN;
   // A timeout must not turn stale power into another corrective move. Wait
   // for the next sample (or a new target) through normal ERG deduplication.
   if (timedOut) prevWatts = rtConfig->watts;
@@ -421,9 +421,7 @@ bool ErgMode::_tableTargetIsUsable(int watts, int cadence) const {
 
 bool ErgMode::_tableHasSeekSupport() const { return powerTable->hasErgSeekSupport(); }
 
-bool ErgMode::_tableTargetIsTrusted(int watts, int cadence) const {
-  return tableConfidence.trusted() && _tableHasSeekSupport() && _tableTargetIsUsable(watts, cadence);
-}
+bool ErgMode::_tableTargetIsTrusted(int watts, int cadence) const { return tableConfidence.trusted() && _tableHasSeekSupport() && _tableTargetIsUsable(watts, cadence); }
 
 void ErgMode::_scoreTable(int watts, int cadence, bool accurate) {
   const bool changed = tableConfidence.update(accurate);
@@ -514,7 +512,7 @@ void ErgMode::_stopTrustedTableSeek(const char* reason, bool seedPidFromTable, b
     const uint32_t arrivedAt = tableSeekArrivedAt;
     _startFeedbackWait();
     feedbackMotorSettled = tableSeekState == TableSeekState::SETTLING;
-    feedbackSettledAt = arrivedAt;
+    feedbackSettledAt    = arrivedAt;
   }
   tableSeekPidSeedValid    = seedPidFromTable;
   tableSeekPidSeedPosition = tableSeekPosition;

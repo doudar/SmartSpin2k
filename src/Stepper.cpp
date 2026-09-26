@@ -951,7 +951,14 @@ void SS2K::goHome(bool bothDirections) {
   ss2k->lastShifterPosition = rtConfig->getShifterPosition();
   ss2k->ftmsSimulationOffset = 0;
   rtConfig->setHomed(false);
-  powerTable->clearRuntime(!bothDirections || userConfig->getPTab4Pwr());
+  // Startup/low-stop homing only recovers the existing table's origin. Keep
+  // incoming custom-characteristic rows and their pending save intact.
+  if (bothDirections) {
+    powerTable->clearRuntime(userConfig->getPTab4Pwr());
+  } else {
+    powerTable->ftmsPositionUncertain = false;
+    ++powerTable->positionEpoch;
+  }
   ergMode->resetTableConfidence();
   const bool useFTMSHoming = !rtConfig->resistance.getSimulate() && strcmp(userConfig->getConnectedPowerMeter(), NONE) != 0 && rtConfig->resistance.getMax() > 0;
   if (bothDirections) {

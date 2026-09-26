@@ -83,7 +83,6 @@ This characteristic allows for reading and writing various user configuration pa
 
 */
 
-
 #include <BLE_Common.h>
 #include <Power_Table.h>
 #include <BLE_Custom_Characteristic.h>
@@ -105,13 +104,13 @@ constexpr size_t DIRCON_SETTINGS_SNAPSHOT_PAYLOAD_LENGTH = 200;
 
 struct SettingsSnapshotTransfer {
   std::string json;
-  size_t offset = 0;
-  size_t payloadLength = 0;
-  uint16_t chunk = 0;
-  uint16_t chunkCount = 0;
-  uint16_t connHandle = BLE_HS_CONN_HANDLE_NONE;
+  size_t offset              = 0;
+  size_t payloadLength       = 0;
+  uint16_t chunk             = 0;
+  uint16_t chunkCount        = 0;
+  uint16_t connHandle        = BLE_HS_CONN_HANDLE_NONE;
   unsigned long lastActivity = 0;
-  bool active = false;
+  bool active                = false;
 };
 
 SettingsSnapshotTransfer settingsSnapshot;
@@ -119,9 +118,7 @@ SettingsSnapshotTransfer dirConSettingsSnapshot;
 uint16_t scanResultId       = 0;
 uint16_t scanResultSequence = 0;
 
-void resetSettingsSnapshot() {
-  settingsSnapshot = SettingsSnapshotTransfer();
-}
+void resetSettingsSnapshot() { settingsSnapshot = SettingsSnapshotTransfer(); }
 
 void sendScanResultPayload(ScanResultProtocol::Event event, uint16_t sequence, const std::vector<uint8_t>& payload = {}) {
   NimBLEServer* server = NimBLEDevice::getServer();
@@ -135,9 +132,9 @@ void sendScanResultPayload(ScanResultProtocol::Event event, uint16_t sequence, c
   // differ. This keeps even the 23-byte minimum MTU valid without retaining a
   // scan-wide JSON document in firmware memory.
   for (const uint16_t connHandle : server->getPeerDevices()) {
-    const uint16_t mtu       = server->getPeerMTU(connHandle);
-    const size_t attPayload  = mtu > 3 ? mtu - 3 : 20;
-    const size_t fragmentMax = attPayload > ScanResultProtocol::HEADER_LENGTH ? attPayload - ScanResultProtocol::HEADER_LENGTH : 1;
+    const uint16_t mtu             = server->getPeerMTU(connHandle);
+    const size_t attPayload        = mtu > 3 ? mtu - 3 : 20;
+    const size_t fragmentMax       = attPayload > ScanResultProtocol::HEADER_LENGTH ? attPayload - ScanResultProtocol::HEADER_LENGTH : 1;
     const size_t fragmentCountSize = payload.empty() ? 1 : (payload.size() + fragmentMax - 1) / fragmentMax;
     if (fragmentCountSize > UINT8_MAX) {
       SS2K_LOGE(CUSTOM_CHAR_LOG_TAG, "Scan result %u requires too many fragments", static_cast<unsigned>(sequence));
@@ -146,13 +143,12 @@ void sendScanResultPayload(ScanResultProtocol::Event event, uint16_t sequence, c
 
     const uint8_t fragmentCount = static_cast<uint8_t>(fragmentCountSize);
     for (uint8_t fragment = 0; fragment < fragmentCount; ++fragment) {
-      const size_t offset = fragment * fragmentMax;
-      const size_t length = payload.empty() ? 0 : std::min(fragmentMax, payload.size() - offset);
-      std::vector<uint8_t> packet = ScanResultProtocol::makePacket(event, scanResultId, sequence, fragment, fragmentCount,
-                                                                   length == 0 ? nullptr : payload.data() + offset, length);
+      const size_t offset         = fragment * fragmentMax;
+      const size_t length         = payload.empty() ? 0 : std::min(fragmentMax, payload.size() - offset);
+      std::vector<uint8_t> packet = ScanResultProtocol::makePacket(event, scanResultId, sequence, fragment, fragmentCount, length == 0 ? nullptr : payload.data() + offset, length);
       if (!characteristic->notify(packet.data(), packet.size(), connHandle)) {
-        SS2K_LOGW(CUSTOM_CHAR_LOG_TAG, "Failed to send scan result %u fragment %u/%u", static_cast<unsigned>(sequence),
-                  static_cast<unsigned>(fragment + 1), static_cast<unsigned>(fragmentCount));
+        SS2K_LOGW(CUSTOM_CHAR_LOG_TAG, "Failed to send scan result %u fragment %u/%u", static_cast<unsigned>(sequence), static_cast<unsigned>(fragment + 1),
+                  static_cast<unsigned>(fragmentCount));
         break;
       }
     }
@@ -185,12 +181,11 @@ std::vector<uint8_t> makeSettingsSnapshotChunk(SettingsSnapshotTransfer& snapsho
 bool sendNextSettingsSnapshotChunk(NimBLECharacteristic* characteristic) {
   if (!settingsSnapshot.active || settingsSnapshot.chunk >= settingsSnapshot.chunkCount) return false;
 
-  const uint16_t chunkNumber   = settingsSnapshot.chunk;
+  const uint16_t chunkNumber  = settingsSnapshot.chunk;
   std::vector<uint8_t> packet = makeSettingsSnapshotChunk(settingsSnapshot);
 
   if (!characteristic->indicate(packet.data(), packet.size(), settingsSnapshot.connHandle)) {
-    SS2K_LOGE(CUSTOM_CHAR_LOG_TAG, "Failed to send settings snapshot chunk %u/%u", static_cast<unsigned>(chunkNumber + 1),
-              static_cast<unsigned>(settingsSnapshot.chunkCount));
+    SS2K_LOGE(CUSTOM_CHAR_LOG_TAG, "Failed to send settings snapshot chunk %u/%u", static_cast<unsigned>(chunkNumber + 1), static_cast<unsigned>(settingsSnapshot.chunkCount));
     resetSettingsSnapshot();
     return false;
   }
@@ -208,10 +203,10 @@ void startSettingsSnapshot(NimBLECharacteristic* characteristic, uint16_t connHa
     resetSettingsSnapshot();
   }
 
-  String json          = userConfig->returnJSON();
-  size_t attPayload    = mtu > 3 ? mtu - 3 : 20;
-  size_t chunkPayload  = attPayload > SETTINGS_SNAPSHOT_HEADER_LENGTH ? attPayload - SETTINGS_SNAPSHOT_HEADER_LENGTH : 1;
-  size_t chunkCount    = (json.length() + chunkPayload - 1) / chunkPayload;
+  String json         = userConfig->returnJSON();
+  size_t attPayload   = mtu > 3 ? mtu - 3 : 20;
+  size_t chunkPayload = attPayload > SETTINGS_SNAPSHOT_HEADER_LENGTH ? attPayload - SETTINGS_SNAPSHOT_HEADER_LENGTH : 1;
+  size_t chunkCount   = (json.length() + chunkPayload - 1) / chunkPayload;
   if (chunkCount == 0 || chunkCount > UINT16_MAX) {
     SS2K_LOGE(CUSTOM_CHAR_LOG_TAG, "Settings snapshot is too large to send");
     return;
@@ -223,8 +218,8 @@ void startSettingsSnapshot(NimBLECharacteristic* characteristic, uint16_t connHa
   settingsSnapshot.connHandle    = connHandle;
   settingsSnapshot.lastActivity  = millis();
   settingsSnapshot.active        = true;
-  SS2K_LOG(CUSTOM_CHAR_LOG_TAG, "Sending %zu-byte settings snapshot in %u chunks (MTU %u)", settingsSnapshot.json.length(),
-           static_cast<unsigned>(settingsSnapshot.chunkCount), static_cast<unsigned>(mtu));
+  SS2K_LOG(CUSTOM_CHAR_LOG_TAG, "Sending %zu-byte settings snapshot in %u chunks (MTU %u)", settingsSnapshot.json.length(), static_cast<unsigned>(settingsSnapshot.chunkCount),
+           static_cast<unsigned>(mtu));
   sendNextSettingsSnapshotChunk(characteristic);
 }
 
@@ -257,12 +252,12 @@ void startDirConSettingsSnapshot(NimBLECharacteristic* characteristic) {
     return;
   }
 
-  dirConSettingsSnapshot                  = SettingsSnapshotTransfer();
-  dirConSettingsSnapshot.json             = std::string(json.c_str(), json.length());
-  dirConSettingsSnapshot.payloadLength    = DIRCON_SETTINGS_SNAPSHOT_PAYLOAD_LENGTH;
-  dirConSettingsSnapshot.chunkCount       = static_cast<uint16_t>(chunkCount);
-  dirConSettingsSnapshot.lastActivity     = millis();
-  dirConSettingsSnapshot.active           = true;
+  dirConSettingsSnapshot               = SettingsSnapshotTransfer();
+  dirConSettingsSnapshot.json          = std::string(json.c_str(), json.length());
+  dirConSettingsSnapshot.payloadLength = DIRCON_SETTINGS_SNAPSHOT_PAYLOAD_LENGTH;
+  dirConSettingsSnapshot.chunkCount    = static_cast<uint16_t>(chunkCount);
+  dirConSettingsSnapshot.lastActivity  = millis();
+  dirConSettingsSnapshot.active        = true;
 
   // The first chunk is returned in the DirCon write response. Remaining chunks
   // are sent as notifications from update(), after the client is subscribed.
@@ -271,7 +266,7 @@ void startDirConSettingsSnapshot(NimBLECharacteristic* characteristic) {
 }
 }  // namespace
 
-void BLE_ss2kCustomCharacteristic::setupService(NimBLEServer *pServer) {
+void BLE_ss2kCustomCharacteristic::setupService(NimBLEServer* pServer) {
   pSmartSpin2kService = pServer->createService(SMARTSPIN2K_SERVICE_UUID);
   smartSpin2kCharacteristic =
       pSmartSpin2kService->createCharacteristic(SMARTSPIN2K_CHARACTERISTIC_UUID, NIMBLE_PROPERTY::WRITE | NIMBLE_PROPERTY::INDICATE | NIMBLE_PROPERTY::NOTIFY);
@@ -316,17 +311,17 @@ void BLE_ss2kCustomCharacteristic::update() {
   }
 }
 
-void ss2kCustomCharacteristicCallbacks::onWrite(NimBLECharacteristic *pCharacteristic, NimBLEConnInfo &connInfo) {
+void ss2kCustomCharacteristicCallbacks::onWrite(NimBLECharacteristic* pCharacteristic, NimBLEConnInfo& connInfo) {
   std::string rxValue = pCharacteristic->getValue();
   // SS2K_LOG(CUSTOM_CHAR_LOG_TAG, "Write from %s", connInfo.getAddress().toString().c_str());
   BLE_ss2kCustomCharacteristic::process(rxValue, connInfo.getConnHandle(), connInfo.getMTU());
 }
 
-void ss2kCustomCharacteristicCallbacks::onSubscribe(NimBLECharacteristic *pCharacteristic, NimBLEConnInfo &connInfo, uint16_t subValue) {
+void ss2kCustomCharacteristicCallbacks::onSubscribe(NimBLECharacteristic* pCharacteristic, NimBLEConnInfo& connInfo, uint16_t subValue) {
   SS2K_LOG(CUSTOM_CHAR_LOG_TAG, "Subscribe from %s", connInfo.getAddress().toString().c_str());
   NimBLEDevice::setMTU(515);
 }
-void ss2kCustomCharacteristicCallbacks::onStatus(NimBLECharacteristic *pCharacteristic, int code) {
+void ss2kCustomCharacteristicCallbacks::onStatus(NimBLECharacteristic* pCharacteristic, int code) {
 // loop through and accumulate the data into a C++ string
 #ifdef CUSTOM_CHAR_DEBUG
   std::string characteristicValue = pCharacteristic->getValue();
@@ -367,7 +362,7 @@ void BLE_ss2kCustomCharacteristic::beginScanResults() {
 }
 
 void BLE_ss2kCustomCharacteristic::notifyScanResult(const String& name, const NimBLEUUID& serviceUuid) {
-  const std::string uuid = serviceUuid.toString();
+  const std::string uuid          = serviceUuid.toString();
   const std::vector<uint8_t> body = ScanResultProtocol::makeDeviceBody(uuid, std::string(name.c_str(), name.length()));
   sendScanResultPayload(ScanResultProtocol::Event::Device, scanResultSequence, body);
   ++scanResultSequence;
@@ -380,7 +375,7 @@ void BLE_ss2kCustomCharacteristic::process(const std::string& rxValue, uint16_t 
   if (rxValue.length() < 2 || NimBLEDevice::getServer()->getServiceByUUID(SMARTSPIN2K_SERVICE_UUID) == nullptr) {
     return;
   }
-  NimBLECharacteristic *pCharacteristic = NimBLEDevice::getServer()->getServiceByUUID(SMARTSPIN2K_SERVICE_UUID)->getCharacteristic(SMARTSPIN2K_CHARACTERISTIC_UUID);
+  NimBLECharacteristic* pCharacteristic = NimBLEDevice::getServer()->getServiceByUUID(SMARTSPIN2K_SERVICE_UUID)->getCharacteristic(SMARTSPIN2K_CHARACTERISTIC_UUID);
 
   if (rxValue[0] == cc_read && static_cast<uint8_t>(rxValue[1]) == BLE_allSettings) {
     if (indicateResponse) {
@@ -394,7 +389,7 @@ void BLE_ss2kCustomCharacteristic::process(const std::string& rxValue, uint16_t 
   // Avoid interleaving legacy responses with an acknowledged snapshot transfer.
   if (settingsSnapshot.active) return;
 
-  const uint8_t *pData                  = reinterpret_cast<const uint8_t *>(rxValue.data());
+  const uint8_t* pData = reinterpret_cast<const uint8_t*>(rxValue.data());
 
 #ifdef CUSTOM_CHAR_DEBUG
 #define LOG_BUF_APPEND(...) logBufLength += snprintf(logBuf + logBufLength, kLogBufCapacity - logBufLength, __VA_ARGS__)
@@ -418,13 +413,24 @@ void BLE_ss2kCustomCharacteristic::process(const std::string& rxValue, uint16_t 
   if (rxValue[0] == cc_write) {
     switch (customCharacteristicValueFormat(static_cast<uint8_t>(rxValue[1]))) {
       case CustomUnsigned16:
-      case CustomSigned16: requiredLength = 4; break;
-      case CustomSigned32: requiredLength = 6; break;
+      case CustomSigned16:
+        requiredLength = 4;
+        break;
+      case CustomSigned32:
+        requiredLength = 6;
+        break;
       case CustomBoolean:
-      case CustomBooleanWriteStringRead: requiredLength = 3; break;
-      case CustomGearRatios: requiredLength = 3; break;
-      case CustomPowerTableRow: requiredLength = 3 + (2 * POWERTABLE_WATT_SIZE); break;
-      default: break;
+      case CustomBooleanWriteStringRead:
+        requiredLength = 3;
+        break;
+      case CustomGearRatios:
+        requiredLength = 3;
+        break;
+      case CustomPowerTableRow:
+        requiredLength = 3 + (2 * POWERTABLE_WATT_SIZE);
+        break;
+      default:
+        break;
     }
   } else if (rxValue[0] == cc_read && static_cast<uint8_t>(rxValue[1]) == BLE_powerTableData) {
     requiredLength = 3;
@@ -444,7 +450,7 @@ void BLE_ss2kCustomCharacteristic::process(const std::string& rxValue, uint16_t 
         returnString   = userConfig->getFirmwareUpdateURL();
       } else if (rxValue[0] == cc_write) {
         returnValue[0] = cc_success;
-        String str     = reinterpret_cast<const char *>(pData);
+        String str     = reinterpret_cast<const char*>(pData);
         str.remove(0, 2);
         userConfig->setFirmwareUpdateURL(str);
         LOG_BUF_APPEND("(%s)", userConfig->getFirmwareUpdateURL());
@@ -530,7 +536,7 @@ void BLE_ss2kCustomCharacteristic::process(const std::string& rxValue, uint16_t 
         returnString   = userConfig->getDeviceName();
       } else if (rxValue[0] == cc_write) {
         returnValue[0] = cc_success;
-        String str     = reinterpret_cast<const char *>(pData);
+        String str     = reinterpret_cast<const char*>(pData);
         str.remove(0, 2);
         userConfig->setDeviceName(str);
         LOG_BUF_APPEND("(%s)", userConfig->getDeviceName());
@@ -688,7 +694,7 @@ void BLE_ss2kCustomCharacteristic::process(const std::string& rxValue, uint16_t 
         returnString   = userConfig->getSsid();
       } else if (rxValue[0] == cc_write) {
         returnValue[0] = cc_success;
-        String str     = reinterpret_cast<const char *>(pData);
+        String str     = reinterpret_cast<const char*>(pData);
         str.remove(0, 2);
         userConfig->setSsid(str);
         LOG_BUF_APPEND("(%s)", userConfig->getSsid());
@@ -702,7 +708,7 @@ void BLE_ss2kCustomCharacteristic::process(const std::string& rxValue, uint16_t 
         returnString   = userConfig->getPassword();
       } else if (rxValue[0] == cc_write) {
         returnValue[0] = cc_success;
-        String str     = reinterpret_cast<const char *>(pData);
+        String str     = reinterpret_cast<const char*>(pData);
         str.remove(0, 2);
         userConfig->setPassword(str);
         LOG_BUF_APPEND("(%s)", "******");
@@ -716,7 +722,7 @@ void BLE_ss2kCustomCharacteristic::process(const std::string& rxValue, uint16_t 
         returnString   = userConfig->getFoundDevices();
       } else if (rxValue[0] == cc_write) {
         returnValue[0] = cc_success;
-        String str     = reinterpret_cast<const char *>(pData);
+        String str     = reinterpret_cast<const char*>(pData);
         str.remove(0, 2);
         userConfig->setFoundDevices(str);
         LOG_BUF_APPEND("(%s)", userConfig->getFoundDevices());
@@ -730,7 +736,7 @@ void BLE_ss2kCustomCharacteristic::process(const std::string& rxValue, uint16_t 
         returnString   = userConfig->getConnectedPowerMeter();
       } else if (rxValue[0] == cc_write) {
         returnValue[0] = cc_success;
-        String str     = reinterpret_cast<const char *>(pData);
+        String str     = reinterpret_cast<const char*>(pData);
         str.remove(0, 2);
         userConfig->setConnectedPowerMeter(str);
         LOG_BUF_APPEND("(%s)", userConfig->getConnectedPowerMeter());
@@ -744,7 +750,7 @@ void BLE_ss2kCustomCharacteristic::process(const std::string& rxValue, uint16_t 
         returnString   = userConfig->getConnectedHeartMonitor();
       } else if (rxValue[0] == cc_write) {
         returnValue[0] = cc_success;
-        String str     = reinterpret_cast<const char *>(pData);
+        String str     = reinterpret_cast<const char*>(pData);
         str.remove(0, 2);
         userConfig->setConnectedHeartMonitor(str);
         LOG_BUF_APPEND("(%s)", userConfig->getConnectedHeartMonitor());
@@ -953,26 +959,26 @@ void BLE_ss2kCustomCharacteristic::process(const std::string& rxValue, uint16_t 
         for (int i = 0; i < POWERTABLE_WATT_SIZE; i++) {
           uint8_t encodedPosition[2];
           put_le16s(encodedPosition, powerTable->ptData.tableRow[row].tableEntry[i].targetPosition);
-          returnString.append(reinterpret_cast<const char *>(encodedPosition), sizeof(encodedPosition));
+          returnString.append(reinterpret_cast<const char*>(encodedPosition), sizeof(encodedPosition));
         }
       }
       if (rxValue[0] == cc_write) {
         returnValue[0] = cc_success;
         if (rxValue[2] >= 0 && rxValue[2] < POWERTABLE_CAD_SIZE) {
+          const bool firstRow = !powerTable->saveFlag;
           for (int i = 0; i < POWERTABLE_WATT_SIZE; i++) {
-            powerTable->ptData.tableRow[rxValue[2]].tableEntry[i]                = TableEntry{};
-            powerTable->ptData.tableRow[rxValue[2]].tableEntry[i].targetPosition = get_le16s(&pData[i * 2 + 3]);
-            // Ensure each entry has a valid reading count to be considered during loading
-            if (powerTable->ptData.tableRow[rxValue[2]].tableEntry[i].targetPosition != INT16_MIN) {
-              powerTable->ptData.tableRow[rxValue[2]].tableEntry[i].readings = MINIMUM_RELIABLE_POSITIONS + 1;
-            }
+            auto& entry          = powerTable->ptData.tableRow[rxValue[2]].tableEntry[i];
+            entry                = TableEntry{};
+            entry.targetPosition = get_le16s(&pData[i * 2 + 3]);
+            if (entry.targetPosition != INT16_MIN) entry.readings = MINIMUM_RELIABLE_POSITIONS + 1;
           }
           ++powerTable->positionEpoch;
-          // Save with explicit version management
-          powerTable->_hasBeenLoadedThisSession = true;  // Prevent reload attempts
+          powerTable->_hasBeenLoadedThisSession = true;
           powerTable->saveFlag                  = true;
           // Saved tables all use hMin of Zero and this is not set by the app.
           userConfig->setHMin(0);
+          // Startup homing preserves the table while BLE receives more rows.
+          if (firstRow && !spinBLEServer.spinDownFlag) spinBLEServer.spinDownFlag = 1;
         } else {
           // SS2K_LOG(CUSTOM_CHAR_LOG_TAG, "Table row invalid");
           //  Logging causes crashes in ISR
@@ -1014,7 +1020,7 @@ void BLE_ss2kCustomCharacteristic::process(const std::string& rxValue, uint16_t 
       }
       if (rxValue[0] == cc_write) {
         returnValue[0] = cc_success;
-        int32_t hMin = get_le32s(&pData[2]);
+        int32_t hMin   = get_le32s(&pData[2]);
         userConfig->setHMin(hMin);
         rtConfig->setMinStep(hMin);
         LOG_BUF_APPEND(" (%d)", hMin);
@@ -1108,7 +1114,7 @@ void BLE_ss2kCustomCharacteristic::process(const std::string& rxValue, uint16_t 
         if (next.decode(pData + 2, rxValue.size() - 2) && userConfig->setGearRatios(next.ratios, next.count)) {
           returnValue[0] = cc_success;
           returnValue[2] = next.count;
-          returnLength = 3;
+          returnLength   = 3;
         }
       } else if (rxValue[0] == cc_read && (rxValue.size() == 2 || rxValue.size() == 3)) {
         const VirtualGearing::Gears gears = userConfig->getGearRatios();
@@ -1117,7 +1123,7 @@ void BLE_ss2kCustomCharacteristic::process(const std::string& rxValue, uint16_t 
         if (rxValue.size() == 2 || pData[2] < gears.count) {
           returnValue[0] = cc_success;
           returnValue[2] = gears.count;
-          returnLength = 3;
+          returnLength   = 3;
           if (rxValue.size() == 3) {
             returnValue[3] = pData[2];
             put_le16(&returnValue[4], gears.ratios[pData[2]]);

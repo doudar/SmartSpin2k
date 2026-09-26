@@ -90,6 +90,7 @@ From BLE_common.h
 |BLE_targetPosition        |0x19   |int36|Position (in steps) the motor is maintaining.      |
 |BLE_externalControl       |0x1A   |bool |01 disables internal calculation of targetPosition.|
 |BLE_syncMode              |0x1B   |bool |01 stops motor movement for external calibration   |
+|BLE_powerTableData        |0x27   |row  |Read/write a power-table row; first upload row queues homing|
 |BLE_UDPLogging            |0x2E   |bool |Enable/disable UDP log streaming                   |
 |BLE_hardwareVersion       |0x2F   |str  |Read-only detected hardware revision                |
 |BLE_BLELogging            |0x30   |bool/str|Write: enable/disable BLE log streaming. Read: returns last log message|
@@ -97,6 +98,8 @@ From BLE_common.h
 |BLE_gearRatios            |0x34   |array|Atomic gear profile write; metadata/indexed reads     |
 
 *syncMode will disable the movement of the stepper motor by forcing stepperPosition = targetPosition prior to the motor control. While this mode is enabled, it allows the client to set parameters like incline and shifterPosition without moving the motor from it's current position. Once the parameters are set, this mode should be turned back off and SS2K will resume normal operation.
+
+The first power-table row write (`02 27 <row> <little-endian int16 positions...>`) immediately queues low-stop homing, or FTMS reference homing for a connected bike reporting real resistance. The usual cadence check still applies. Startup homing preserves the active table and pending save, so BLE can continue receiving rows during homing. Full homing retains its existing table-reset behavior. Saving keeps the ten-second transfer delay and retries on failure. Further rows while the save is pending do not restart homing.
 
 
 This characteristic also notifies when a shift is preformed or the button is pressed. 

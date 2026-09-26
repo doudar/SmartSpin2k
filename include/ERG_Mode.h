@@ -30,7 +30,7 @@ constexpr int ERG_FEEDBACK_HIGH_OVERSHOOT_WATTS = ERG_MODE_PID_WINDOW;
 constexpr int ERG_FEEDBACK_WORSENING_WATTS      = 30;
 
 constexpr int ERG_TABLE_CORRECTION_WATTS       = ERG_MODE_PID_WINDOW;
-constexpr int ERG_TABLE_CADENCE_SEEK_RPM       = 3;
+constexpr int ERG_TABLE_CADENCE_SEEK_RPM       = POWERTABLE_CAD_INCREMENT;
 
 struct Mode {
   static const int MAINTAIN   = 0;

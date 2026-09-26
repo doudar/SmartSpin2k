@@ -349,6 +349,26 @@ int main() {
   controller.moveStepper();
   assert(motor.pos == 19999);
 
+  // Startup homing retains uploaded rows and their pending save, for both
+  // mechanical and FTMS paths. Explicit full homing still clears the table.
+  for (bool ftms : {false, true}) {
+    reset(ftms);
+    config.setHMax(20000);
+    table.ptData.tableRow[0].tableEntry[0].targetPosition = 1234;
+    table.ptData.tableRow[0].tableEntry[0].readings = 4;
+    table._hasBeenLoadedThisSession = true;
+    table.saveFlag = true;
+    controller.goHome(false);
+    assert(runtime.getHomed());
+    assert(table.ptData.tableRow[0].tableEntry[0].targetPosition == 1234);
+    assert(table.ptData.tableRow[0].tableEntry[0].readings == 4);
+    assert(table.saveFlag && table._hasBeenLoadedThisSession);
+    controller.goHome(true);
+    assert(runtime.getHomed());
+    assert(table.ptData.tableRow[0].tableEntry[0].targetPosition == INT16_MIN);
+    assert(!table.saveFlag);
+  }
+
   // Legacy startup calibrates both ends and adds three observations, without
   // resetting the watts table. New metadata bypasses the endpoint searches.
   reset(true);
