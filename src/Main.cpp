@@ -264,6 +264,13 @@ void SS2K::finishSetup() {
   ss2k->setLEDEnabled(shouldStartWithLedEnabled());
 
   ss2k->setupTMCStepperDriver();
+  // Assign the power-on knob position to the starting gear without moving it.
+  // Homing, when configured, replaces this provisional coordinate later.
+  if (stepper) {
+    ss2k->setTargetPosition(ss2k->gearTargetPosition(rtConfig->getShifterPosition()));
+    stepper->setCurrentPosition(ss2k->getTargetPosition());
+    ss2k->setCurrentPosition(stepper->getCurrentPosition());
+  }
   ss2k->updateHardwareSafety();  // Establish thermal limits before BLE can start homing.
 
   SS2K_LOG(MAIN_LOG_TAG, "Setting up cpu Tasks");

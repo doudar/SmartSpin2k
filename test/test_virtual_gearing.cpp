@@ -46,7 +46,6 @@ void TestVirtualGearing::test_ratio_api() {
     TEST_ASSERT_TRUE(gears.assign(values, count));
     TEST_ASSERT_EQUAL_UINT8(count, gears.count);
     TEST_ASSERT_EQUAL_INT(startGears[i], gears.startGear());
-    TEST_ASSERT_EQUAL_INT(startGears[i], gears.startGear(true));
     TEST_ASSERT_EQUAL_INT(count, gears.clampGear(1000));
     TEST_ASSERT_EQUAL_INT(1, gears.clampGear(-1));
   }
@@ -168,9 +167,7 @@ void TestVirtualGearing::test_unlimited_default_and_wire() {
   VirtualGearing::Gears gears;
   TEST_ASSERT_TRUE(gears.unlimited());
   TEST_ASSERT_EQUAL_UINT8(0, gears.count);
-  TEST_ASSERT_EQUAL_INT(0, gears.startGear());
-  TEST_ASSERT_EQUAL_INT(0, gears.startGear(false));
-  TEST_ASSERT_EQUAL_INT(8, gears.startGear(true));
+  TEST_ASSERT_EQUAL_INT(8, gears.startGear());
   for (int gear : {-1000, -1, 0, 1, 1000}) {
     TEST_ASSERT_EQUAL_INT(gear, gears.clampGear(gear));
     TEST_ASSERT_EQUAL_INT32(gear * 1200, gears.offsetSteps(gear, 1200));

@@ -179,6 +179,9 @@ template<class IO> struct Search {
 };
 }
 /* FIRMWARE */
+void initializeStartupPosition() {
+  /* STARTUP POSITION */
+}
 void reset(bool ftms = false) {
   controller = SS2K();
   runtime = RuntimeParameters{};
@@ -214,12 +217,57 @@ void assertGear(int gear) {
   assert(controller.getLastShifterPosition() == gear);
 }
 int main() {
+  // No calibration: power-on gear 8 is the existing knob position. First shifts
+  // move one step either way, and mode changes retain the same gear origin.
+  reset();
+  config.setHMin(INT32_MIN);
+  config.setHMax(INT32_MIN);
+  runtime.setMinStep(-DEFAULT_STEPPER_TRAVEL);
+  controller.resetStartingGear();
+  initializeStartupPosition();
+  assertGear(8);
+  assert(motor.commands == 0 && motor.pos == 800);
+  assert(controller.getCurrentPosition() == 800 && controller.getTargetPosition() == 800);
+  controller.FTMSModeShiftModifier();
+  controller.moveStepper();
+  assert(motor.pos == 800);
+  for (int gear : {9, 8, 7, 8}) {
+    runtime.setShifterPosition(gear);
+    controller.FTMSModeShiftModifier();
+    controller.moveStepper();
+    assert(motor.pos == gear * 100);
+  }
+  runtime.setFTMSMode(FitnessMachineControlPointProcedure::SetTargetPower);
+  controller.FTMSModeShiftModifier();
+  runtime.setFTMSMode(FitnessMachineControlPointProcedure::SetIndoorBikeSimulationParameters);
+  controller.FTMSModeShiftModifier();
+  controller.moveStepper();
+  assertGear(8);
+  assert(motor.pos == 800);
+  // A later home replaces the power-on origin with calibrated zero.
+  controller.goHome(true);
+  controller.FTMSModeShiftModifier();
+  controller.moveStepper();
+  assertGear(8);
+  assert(runtime.getHomed() && motor.pos == 800);
+
   // Actual FTMS spindown mode, for every shipped profile and both home paths.
   /* SHIPPED PROFILES */
   const uint16_t* profiles[] = {nullptr, road, mtb, gravel};
   const int counts[] = {0,24,12,13};
   const int starts[] = {8,8,4,4};
   for (int profile = 0; profile < 4; ++profile) {
+    reset();
+    config.setShiftStep(1200);
+    assert(config.setGearRatios(profiles[profile], counts[profile]));
+    controller.resetStartingGear();
+    initializeStartupPosition();
+    const int startupPosition = config.getGearRatios().offsetSteps(starts[profile], 1200);
+    assertGear(starts[profile]);
+    assert(motor.commands == 0 && motor.pos == startupPosition);
+    controller.FTMSModeShiftModifier();
+    controller.moveStepper();
+    assert(motor.pos == startupPosition);
     for (bool ftms : {false, true}) {
       for (bool full : {false, true}) {
         reset(ftms);
@@ -573,6 +621,8 @@ int main() {
         harness = harness.replace("/* SHIPPED PROFILES */", "\n".join(declarations))
         harness = harness.replace("/* CONTROLLER */", function(header, "class SS2K {"))
         harness = harness.replace("/* FIRMWARE */", production)
+        startup = main[main.index("  ss2k->setupTMCStepperDriver();"):]
+        harness = harness.replace("/* STARTUP POSITION */", function(startup, "if (stepper)"))
         compiler = shutil.which("g++")
         self.assertIsNotNone(compiler)
         with tempfile.TemporaryDirectory() as directory:

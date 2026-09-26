@@ -17,7 +17,7 @@ void SS2K::resetStartingGear() {
     rtConfig->setFTMSMode(FitnessMachineControlPointProcedure::SetIndoorBikeSimulationParameters);
     rtConfig->setTargetIncline(0);
   }
-  localGear = activeGearRatios().startGear(rtConfig->getHomed());
+  localGear = homingFallback ? 0 : activeGearRatios().startGear();
   rtConfig->setShifterPosition(homingFallback ? 0 : (localGearingSelected() ? localGear : SHIFTER_MIDDLE_POSITION));
   // A programmatic gear reset is not a rider shift. Keep the shift baseline in sync so
   // nothing downstream (homing's abort check, FTMS forwarding) sees a phantom shift.
