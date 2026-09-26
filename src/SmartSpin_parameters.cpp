@@ -47,6 +47,8 @@ JsonDocument doc;
 
 // Default Values
 void userParameters::setDefaults() {
+  const VirtualGearing::Gears defaults;
+  setGearRatios(defaults.ratios, defaults.count);
   firmwareUpdateURL     = FW_UPDATEURL;
   deviceName            = DEVICE_NAME;
   shiftStep             = DEFAULT_SHIFT_STEP;
@@ -87,6 +89,9 @@ String userParameters::returnJSON() {
   doc["firmwareVersion"]       = FIRMWARE_VERSION;
   doc["deviceName"]            = deviceName;
   doc["shiftStep"]             = shiftStep;
+  const VirtualGearing::Gears gears = getGearRatios();
+  JsonArray ratios = doc["gearRatios"].to<JsonArray>();
+  for (size_t i = 0; i < gears.count; ++i) ratios.add(gears.ratios[i]);
   doc["stepperPower"]          = stepperPower;
   doc["stepperSpeed"]          = stepperSpeed;
   doc["stealthChop"]           = stealthChop;
@@ -139,6 +144,9 @@ void userParameters::saveToLittleFS() {
   doc["firmwareUpdateURL"]     = firmwareUpdateURL;
   doc["deviceName"]            = deviceName;
   doc["shiftStep"]             = shiftStep;
+  const VirtualGearing::Gears gears = getGearRatios();
+  JsonArray ratios = doc["gearRatios"].to<JsonArray>();
+  for (size_t i = 0; i < gears.count; ++i) ratios.add(gears.ratios[i]);
   doc["stepperPower"]          = stepperPower;
   doc["stepperSpeed"]          = stepperSpeed;
   doc["stealthChop"]           = stealthChop;
@@ -192,6 +200,12 @@ JsonDocument doc;
   if (error) {
     SS2K_LOG(CONFIG_LOG_TAG, "Failed to deserialize. Using defaults");
     return;
+  }
+
+  if (doc["gearRatios"].is<JsonArray>()) {
+    String ratios;
+    serializeJson(doc["gearRatios"], ratios);
+    setGearRatiosJSON(ratios);
   }
 
   // Copy values from the JsonDocument to the Config
@@ -268,4 +282,20 @@ void userParameters::printFile() {
 
   // Close the file
   file.close();
+}
+
+// JSON and binary profiles share the same whole-array validation.
+bool userParameters::setGearRatiosJSON(const String& json) {
+  if (json.length() > 256) return false;
+  JsonDocument doc;
+  if (deserializeJson(doc, json) || !doc.is<JsonArray>()) return false;
+  JsonArray array = doc.as<JsonArray>();
+  if (array.size() == 1 || array.size() > VirtualGearing::MAX_GEARS) return false;
+  uint16_t values[VirtualGearing::MAX_GEARS];
+  size_t i = 0;
+  for (JsonVariant value : array) {
+    if (!value.is<uint16_t>()) return false;
+    values[i++] = value.as<uint16_t>();
+  }
+  return setGearRatios(values, i);
 }

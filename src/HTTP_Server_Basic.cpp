@@ -75,10 +75,20 @@ size_t otaFirmwareHeaderLength = 0;
 String otaUploadError;
 
 constexpr unsigned long NTP_SYNC_TIMEOUT_MS = 10000;
+constexpr unsigned long WIFI_RETRY_DELAY_MS  = 15000;
+constexpr unsigned long WIFI_BACKOFF_MS      = 60000;
+constexpr uint8_t WIFI_ATTEMPTS_PER_BURST    = 3;
+constexpr unsigned long NETWORK_SERVICE_RETRY_MS = 5000;
 constexpr time_t VALID_CLOCK_EPOCH           = 1609459200;  // 2021-01-01 UTC
 constexpr char LITTLEFS_PARTITION_LABEL[]    = "spiffs";
 
-bool networkServicesStarted = false;
+bool networkServicesStarted           = false;
+bool stationConnected                 = false;
+bool clockSyncPending                 = false;
+unsigned long clockSyncStarted        = 0;
+unsigned long lastWifiRetry           = 0;
+unsigned long lastNetworkServiceRetry = 0;
+uint8_t wifiAttempts                  = 0;
 
 void abortFirmwareUpload() {
   if (otaFirmwareUpdateBegun) {
@@ -325,9 +335,11 @@ bool setNVSRecoveryVersion(const String& v) {
 void _staSetup() {
   WiFi.setHostname(userConfig->getDeviceName());
   WiFi.mode(WIFI_STA);
-  WiFi.begin(userConfig->getSsid(), userConfig->getPassword());
-  WiFi.setAutoReconnect(true);
+  // The core can reconnect continuously for a missing SSID; pace retries here
+  // so an invalid configuration does not keep contending with BLE for RF time.
+  WiFi.setAutoReconnect(false);
   WiFi.setSleep(false);
+  WiFi.begin(userConfig->getSsid(), userConfig->getPassword());
 }
 
 void _APSetup() {
@@ -371,10 +383,13 @@ void logNetworkReady(const char* mode) {
 
 // ********************************WIFI Setup*************************
 void startWifi() {
-  int connectionAttempts = 0;
-
   stopNetworkServices();
   httpServer.internetConnection = false;
+  stationConnected = false;
+  clockSyncPending = false;
+  lastNetworkServiceRetry = 0;
+  wifiAttempts = 0;
+  myIP = IPAddress();
 
   // Check build version for OTA WiFi issue handling
   String storedVersion = readStoredBuildVersion();
@@ -414,29 +429,12 @@ void startWifi() {
     }
   }
 
-  // Complete WiFi setup before starting web-file repair, BLE, HTTP, or DirCon.
+  // Start the station without holding up BLE, motor control or the web server.
   if (strcmp(userConfig->getSsid(), DEVICE_NAME) != 0) {
     SS2K_LOG(HTTP_SERVER_LOG_TAG, "Connecting to: %s", userConfig->getSsid());
     _staSetup();
-    while (WiFi.status() != WL_CONNECTED && connectionAttempts < WIFI_CONNECT_TIMEOUT) {
-      delay(1000);
-      connectionAttempts++;
-      SS2K_LOG(HTTP_SERVER_LOG_TAG, "Waiting for WiFi connection (%d/%d)", connectionAttempts, WIFI_CONNECT_TIMEOUT);
-    }
-
-    if (WiFi.status() != WL_CONNECTED) {
-      SS2K_LOGW(HTTP_SERVER_LOG_TAG, "WiFi connection timed out; switching to AP mode");
-      WiFi.disconnect(true, false);
-      WiFi.setAutoReconnect(false);
-      WiFi.mode(WIFI_MODE_NULL);
-      delay(1000);
-    }
-  }
-
-  if (WiFi.status() == WL_CONNECTED) {
-    myIP                           = WiFi.localIP();
-    httpServer.internetConnection = true;
-    logNetworkReady("WiFi station");
+    lastWifiRetry = millis();
+    wifiAttempts = 1;
   } else {
     _APSetup();
     const bool usingStoredPassword = strcmp(userConfig->getSsid(), DEVICE_NAME) == 0;
@@ -453,23 +451,71 @@ void startWifi() {
     logNetworkReady("Access point");
   }
 
-  startNetworkServices();
   WiFi.setTxPower(WIFI_POWER_19_5dBm);
+}
 
-  if (httpServer.internetConnection) {
-    SS2K_LOG(HTTP_SERVER_LOG_TAG, "Synchronizing clock before web filesystem repair");
-    configTime(0, 0, "pool.ntp.org");
-    const unsigned long syncStarted = millis();
-    time_t now                      = time(nullptr);
-    while (now < VALID_CLOCK_EPOCH && millis() - syncStarted < NTP_SYNC_TIMEOUT_MS) {
-      delay(100);
-      now = time(nullptr);
+void updateWifi() {
+  const bool configured = strcmp(userConfig->getSsid(), DEVICE_NAME) != 0;
+  const bool connected  = configured ? WiFi.status() == WL_CONNECTED : WiFi.getMode() == WIFI_AP;
+
+  if (configured && !connected) {
+    if (stationConnected) {
+      SS2K_LOGW(HTTP_SERVER_LOG_TAG, "WiFi station disconnected; waiting to reconnect");
+      stopNetworkServices();
+      stationConnected = false;
+      clockSyncPending = false;
+      lastNetworkServiceRetry = 0;
+      httpServer.internetConnection = false;
+      myIP = IPAddress();
+      refreshBLEAdvertisementIp();
+      wifiAttempts = 0;
+      lastWifiRetry = millis() - WIFI_RETRY_DELAY_MS;
     }
+    const unsigned long retryDelay = wifiAttempts >= WIFI_ATTEMPTS_PER_BURST ? WIFI_BACKOFF_MS : WIFI_RETRY_DELAY_MS;
+    if (millis() - lastWifiRetry >= retryDelay) {
+      if (wifiAttempts >= WIFI_ATTEMPTS_PER_BURST) wifiAttempts = 0;
+      lastWifiRetry = millis();
+      ++wifiAttempts;
+      SS2K_LOGW(HTTP_SERVER_LOG_TAG, "WiFi station still disconnected; retrying (%u/%u)", wifiAttempts, WIFI_ATTEMPTS_PER_BURST);
+      WiFi.reconnect();
+    }
+    return;
+  }
+  if (!connected) return;
 
-    if (now < VALID_CLOCK_EPOCH) {
-      SS2K_LOGW(HTTP_SERVER_LOG_TAG, "Clock synchronization timed out");
-    } else {
+  const IPAddress currentIP = configured ? WiFi.localIP() : WiFi.softAPIP();
+  if (currentIP == IPAddress()) return;
+  wifiAttempts = 0;
+  if (currentIP != myIP) {
+    stopNetworkServices();
+    lastNetworkServiceRetry = 0;
+    myIP = currentIP;
+    stationConnected = configured;
+    httpServer.internetConnection = configured;
+    logNetworkReady(configured ? "WiFi station" : "Access point");
+    refreshBLEAdvertisementIp();
+    if (configured) {
+      configTime(0, 0, "pool.ntp.org");
+      clockSyncStarted = millis();
+      clockSyncPending = true;
+    }
+  }
+
+  if (lastNetworkServiceRetry == 0 || millis() - lastNetworkServiceRetry >= NETWORK_SERVICE_RETRY_MS) {
+    lastNetworkServiceRetry = millis();
+    if (!networkServicesStarted) startNetworkServices();
+    if (networkServicesStarted && !DirConManager::start()) {
+      SS2K_LOGE(HTTP_SERVER_LOG_TAG, "Failed to start DirCon TCP service");
+    }
+  }
+
+  if (clockSyncPending) {
+    if (time(nullptr) >= VALID_CLOCK_EPOCH) {
+      clockSyncPending = false;
       SS2K_LOG(HTTP_SERVER_LOG_TAG, "Clock synchronized");
+    } else if (millis() - clockSyncStarted >= NTP_SYNC_TIMEOUT_MS) {
+      clockSyncPending = false;
+      SS2K_LOGW(HTTP_SERVER_LOG_TAG, "Clock synchronization timed out");
     }
   }
 }
@@ -477,6 +523,12 @@ void startWifi() {
 void stopWifi() {
   SS2K_LOG(HTTP_SERVER_LOG_TAG, "Closing connection to: %s", userConfig->getSsid());
   stopNetworkServices();
+  stationConnected = false;
+  clockSyncPending = false;
+  lastNetworkServiceRetry = 0;
+  wifiAttempts = 0;
+  httpServer.internetConnection = false;
+  myIP = IPAddress();
   WiFi.setAutoReconnect(false);
   WiFi.disconnect(true, false);
   WiFi.mode(WIFI_MODE_NULL);
@@ -833,6 +885,11 @@ void HTTP_Server::settingsProcessor() {
   bool wasBTUpdate       = false;
   bool wasSettingsUpdate = false;
   bool reboot            = false;
+  // Reject malformed new settings before applying any part of this request.
+  if (server.hasArg("gearRatios") && !userConfig->setGearRatiosJSON(server.arg("gearRatios"))) {
+    server.send(400, "text/plain", "Supply [] for unlimited gears, or 2 to 26 sorted ratios from 500 to 6000 (ratio x 1000).");
+    return;
+  }
   if (!server.arg("ssid").isEmpty()) {
     tString = server.arg("ssid");
     tString.trim();
@@ -863,13 +920,13 @@ void HTTP_Server::settingsProcessor() {
     }
   }
   if (!server.arg("maxWatts").isEmpty()) {
-    uint64_t maxWatts = server.arg("maxWatts").toInt();
+    int maxWatts = server.arg("maxWatts").toInt();
     if (maxWatts >= 0 && maxWatts <= 2000) {
       userConfig->setMaxWatts(maxWatts);
     }
   }
   if (!server.arg("minWatts").isEmpty()) {
-    uint64_t minWatts = server.arg("minWatts").toInt();
+    int minWatts = server.arg("minWatts").toInt();
     if (minWatts >= 0 && minWatts <= 200) {
       userConfig->setMinWatts(minWatts);
     }
@@ -998,6 +1055,21 @@ bool HTTP_Server::syncWebServerFiles() {
   if (!filesystemNeedsRepair()) {
     SS2K_LOG(HTTP_SERVER_LOG_TAG, "Web filesystem is complete; repair skipped");
     return true;
+  }
+
+  // Missing files are exceptional. Preserve the pre-BLE repair path without
+  // making ordinary WiFi startup wait for a station connection.
+  if (strcmp(userConfig->getSsid(), DEVICE_NAME) != 0) {
+    const unsigned long connectStarted = millis();
+    while (WiFi.status() != WL_CONNECTED && millis() - connectStarted < WIFI_CONNECT_TIMEOUT * 1000UL) delay(100);
+    if (WiFi.status() == WL_CONNECTED) {
+      httpServer.internetConnection = true;
+      if (time(nullptr) < VALID_CLOCK_EPOCH) {
+        configTime(0, 0, "pool.ntp.org");
+        const unsigned long syncStarted = millis();
+        while (time(nullptr) < VALID_CLOCK_EPOCH && millis() - syncStarted < NTP_SYNC_TIMEOUT_MS) delay(100);
+      }
+    }
   }
 
   if (!httpServer.internetConnection || WiFi.status() != WL_CONNECTED) {

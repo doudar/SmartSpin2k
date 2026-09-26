@@ -114,22 +114,22 @@ void CyclePowerData::decode(uint8_t *data, size_t length) {
       return;
     }
 
-    this->lastCrankRev       = this->crankRev;
-    this->crankRev           = get_le16(&data[cPos]);
-    this->lastCrankEventTime = this->crankEventTime;
-    this->crankEventTime     = get_le16(&data[cPos + 2]);
-    if (this->crankRev != this->lastCrankRev && this->crankEventTime != this->lastCrankEventTime) {
+    const uint16_t previousCrankRev      = this->crankRev;
+    const uint16_t previousCrankEventTime = this->crankEventTime;
+    this->crankRev                       = get_le16(&data[cPos]);
+    this->crankEventTime                 = get_le16(&data[cPos + 2]);
+    if (this->crankRev != previousCrankRev && this->crankEventTime != previousCrankEventTime) {
       // This casting behavior makes sure the roll over works correctly. Unit tests confirm
-      const float crankChange = (uint16_t)((this->crankRev - this->lastCrankRev) * 1024);
-      const float timeElapsed = (uint16_t)(this->crankEventTime - this->lastCrankEventTime);
-      float cadence           = (crankChange / timeElapsed) * 60.0f;  // cadence in RPM
-      if (cadence > 1) {
-        if (cadence > 200) {  // Human is unlikely producing 200+ cadence
+      const float crankChange     = (uint16_t)((this->crankRev - previousCrankRev) * 1024);
+      const float timeElapsed     = (uint16_t)(this->crankEventTime - previousCrankEventTime);
+      float computedCadence       = (crankChange / timeElapsed) * 60.0f;  // cadence in RPM
+      if (computedCadence > 1) {
+        if (computedCadence > 200) {  // Human is unlikely producing 200+ cadence
           // Cadence Error: Could happen if cadence measurements were missed
           //                Leave cadence unchanged
-          cadence = this->cadence;
+          computedCadence = this->cadence;
         }
-        this->cadence        = cadence;
+        this->cadence           = computedCadence;
         this->lastCadUpdateTime = getTimeMillis();
       }
     } else {

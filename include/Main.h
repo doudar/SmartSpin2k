@@ -30,14 +30,16 @@ class SS2K {
   ButtonState upButtonState;
   ButtonState downButtonState;
   int lastShifterPosition;
-  int shiftersHoldForScan;
-  unsigned long int scanDelayTime;
-  unsigned long int scanDelayStart;
+  bool localGearingActive = false;
+  int legacyShifterPosition = 0;
+  int localGear = 0;
   int32_t targetPosition;
   int32_t currentPosition;
+  int32_t ftmsSimulationOffset = 0;
   bool ledEnabled;
   void handleShiftButtons();
   static void finishSetup();
+  void checkHardwareSafety();
 
  public:
   bool stepperIsRunning;
@@ -50,14 +52,23 @@ class SS2K {
   bool resetDefaultsFlag   = false;
   bool resetPowerTableFlag = false;
   bool isUpdating          = false;
+  bool homingFallback     = false;  // Runtime-only Unlimited gearing until a successful home.
 
-  static void ARDUINO_ISR_ATTR maintenanceLoop(void *pvParameters);
+  static void ARDUINO_ISR_ATTR maintenanceLoop(void *);
   static void ARDUINO_ISR_ATTR handleUpShift();
   static void ARDUINO_ISR_ATTR handleDownShift();
   static void moveStepper();
   bool _findEndStop(bool moveForward);
   void _findFTMSHome(bool bothDirections = false);
+  void syncFtmsPosition();
   void _resistanceMove();
+  bool localGearingSelected() const;
+  VirtualGearing::Gears activeGearRatios() const;
+  bool usePowerTableForPower() const;
+  void useUnhomedFallback();
+  void resetStartingGear();
+  int32_t gearTargetPosition(int gear) const;
+  int32_t simulationTargetPosition() const;
 
   // the position the stepper motor will move to
   int32_t getTargetPosition() { return targetPosition; }
@@ -75,6 +86,9 @@ class SS2K {
   void stopTasks();
   void restartWifi();
   void setupTMCStepperDriver(bool reset = false);
+  void updateHardwareSafety();
+  void updateDriverSafety(int s3CurrentPercent, bool s3Disabled);
+  bool stepperSafetyReady();
   void updateStepperPower(int pwr = 0);
   void updateStealthChop(bool coolStepEnabled = true);
   void updateStepperSpeed(int speed = 0);
@@ -96,9 +110,6 @@ class SS2K {
     externalControl     = false;
     syncMode            = false;
     lastShifterPosition = 0;
-    shiftersHoldForScan = SHIFTERS_HOLD_FOR_SCAN;
-    scanDelayTime       = 10000;
-    scanDelayStart      = 0;
     pelotonIsConnected  = false;
     txCheck             = TX_CHECK_INTERVAL;
   }

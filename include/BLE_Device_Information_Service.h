@@ -7,22 +7,9 @@
 
 #pragma once
 
-#include <NimBLEDevice.h>
-#include "BLE_Common.h"
+class NimBLEServer;
 
 class BLE_Device_Information_Service {
  public:
-  BLE_Device_Information_Service();
   void setupService(NimBLEServer* pServer);
-
- private:
-  NimBLEService* pDeviceInformationService;
-  NimBLECharacteristic* pManufacturerNameCharacteristic;
-  NimBLECharacteristic* pModelNumberCharacteristic;
-  NimBLECharacteristic* pSerialNumberCharacteristic;
-  NimBLECharacteristic* pHardwareRevisionCharacteristic;
-  NimBLECharacteristic* pFirmwareRevisionCharacteristic;
-  NimBLECharacteristic* pSoftwareRevisionCharacteristic;
-  NimBLECharacteristic* pSystemIDCharacteristic;
-  NimBLECharacteristic* pPnPIDCharacteristic;
 };

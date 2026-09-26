@@ -90,12 +90,16 @@ From BLE_common.h
 |BLE_targetPosition        |0x19   |int36|Position (in steps) the motor is maintaining.      |
 |BLE_externalControl       |0x1A   |bool |01 disables internal calculation of targetPosition.|
 |BLE_syncMode              |0x1B   |bool |01 stops motor movement for external calibration   |
+|BLE_powerTableData        |0x27   |row  |Read/write a power-table row; first upload row queues homing|
 |BLE_UDPLogging            |0x2E   |bool |Enable/disable UDP log streaming                   |
 |BLE_hardwareVersion       |0x2F   |str  |Read-only detected hardware revision                |
 |BLE_BLELogging            |0x30   |bool/str|Write: enable/disable BLE log streaming. Read: returns last log message|
 |BLE_allSettings           |0x31   |JSON |Read-only chunked snapshot of all user settings         |
+|BLE_gearRatios            |0x34   |array|Atomic gear profile write; metadata/indexed reads     |
 
 *syncMode will disable the movement of the stepper motor by forcing stepperPosition = targetPosition prior to the motor control. While this mode is enabled, it allows the client to set parameters like incline and shifterPosition without moving the motor from it's current position. Once the parameters are set, this mode should be turned back off and SS2K will resume normal operation.
+
+The first power-table row write (`02 27 <row> <little-endian int16 positions...>`) immediately queues low-stop homing, or FTMS reference homing for a connected bike reporting real resistance. The usual cadence check still applies. Startup homing preserves the active table and pending save, so BLE can continue receiving rows during homing. Full homing retains its existing table-reset behavior. Saving keeps the ten-second transfer delay and retries on failure. Further rows while the save is pending do not restart homing.
 
 
 This characteristic also notifies when a shift is preformed or the button is pressed. 
@@ -127,3 +131,44 @@ All-settings snapshot (BLE or DirCon):
 | 7 | remainder | UTF-8 JSON bytes |
 
 The client validates that it received chunks `0` through `chunk count - 1`, concatenates the bytes after each header, and parses the result as JSON. If the connection closes or a chunk is missing, discard the partial snapshot and issue the read command again. Unknown JSON properties should be ignored so newly added settings remain backward compatible. The snapshot includes sensitive settings such as the Wi-Fi password, consistent with the existing individual password read command.
+
+## Virtual gearing settings (firmware API)
+
+Gear profiles are persisted on both targets and used for ratio-based stepper
+shifting. Shift Amount sets the motor distance for the median positive ratio gap.
+See [VirtualGearing.md](VirtualGearing.md). The experimental rider-weight ID 0x33
+is retired and returns an unsupported/error response; it must not be reused.
+
+### Gear ratios (`0x34`)
+
+Store each effective chainring/sprocket ratio multiplied by 1000 in an unsigned
+LE16. Supply zero values for Unlimited (default), or 2–26 values, each 500–6000,
+in nondecreasing order. An entire profile
+is validated before replacing the live array; rejected writes leave it unchanged.
+Duplicate ratios are allowed for overlapping double-chainring combinations.
+
+- Unlimited: write `02 34 00`; success/metadata response `80 34 00`. Indexed reads
+  return `FF 34`. JSON stores `gearRatios: []`; fixed Shift Amount spacing applies.
+- Write: `02 34 <count u8> <ratio0 LE16> ... <ratioN LE16>`.
+- Success: `80 34 <count>`. Failure: `FF 34`.
+- Metadata read: `01 34`; response: `80 34 <count>`.
+- Indexed read: `01 34 <zero-based index>`; response:
+  `80 34 <count> <index> <ratio LE16>`. Out-of-range indexes return `FF 34`.
+- Changed-value notification: `80 34 <count>`, including edits that keep the count
+  unchanged. Refresh via indexed reads or the chunked all-settings snapshot.
+- A 26-gear write is 55 bytes, requiring ATT MTU **58 or larger** for a single
+  normal BLE write. Negotiate MTU before writing the full profile. Reads,
+  notifications and all-settings snapshots work at MTU 23. DirCon has no ATT limit.
+- Example profile `[1000,1500,2000]`: write `02 34 03 E8 03 DC 05 D0 07`;
+  success `80 34 03`. Read index 1 with `01 34 01`; response
+  `80 34 03 01 DC 05`.
+
+After updating the profile over BLE/DirCon, send the existing save command
+`02 18` to persist it. Firmware-hosted web settings save automatically. JSON uses
+`gearRatios` as the scaled integer array. In local simulation/inclination modes,
+`BLE_shifterPosition` uses **1-based** gear numbers for bounded profiles and an
+unbounded signed shift count for Unlimited (start at 0 unhomed, 8 homed). Bounded
+profiles start at one-third of their gear count, rounded down with a minimum of 1.
+Indexed ratio reads use
+**0-based** indexes. Bounded gear 1 is the zero shift offset; travel limits still apply.
+No companion-app changes are included here.

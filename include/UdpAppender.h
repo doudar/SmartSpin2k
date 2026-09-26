@@ -12,8 +12,8 @@
 #include "LogAppender.h"
 class UdpAppender : public ILogAppender {
  public:
-  void Log(const char *message);
-  void Initialize();
+  void Log(const char *message) override;
+  void Initialize() override;
 
  private:
   static const uint16_t port = 10000;

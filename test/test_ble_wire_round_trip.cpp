@@ -7,36 +7,41 @@
 
 #include <climits>
 #include <cstring>
+#include <memory>
+#include <string>
+#include <vector>
 
 #include <unity.h>
 
 #include "BLE_Definitions.h"
 #include "CustomCharacteristicProtocol.h"
+#include "Constants.h"
 #include "DirConUUIDCodec.h"
 #include "ScanResultProtocol.h"
 #include "Zwift_Protocol_Messages.h"
 #include "sensors/CscSensorData.h"
 #include "sensors/FitnessMachineIndoorBikeData.h"
 #include "sensors/HeartRateData.h"
+#include "sensors/SensorDataFactory.h"
 #include "ByteUtils.h"
 #include "test.h"
 
 namespace {
 
 void assertSigned16RoundTrip(int16_t value) {
-  uint8_t bytes[2] = {0, 0};
+  uint8_t bytes[2];
   put_le16s(bytes, value);
   TEST_ASSERT_EQUAL_INT16(value, get_le16s(bytes));
 }
 
 void assertSigned32RoundTrip(int32_t value) {
-  uint8_t bytes[4] = {0, 0, 0, 0};
+  uint8_t bytes[4];
   put_le32s(bytes, value);
   TEST_ASSERT_EQUAL_INT32(value, get_le32s(bytes));
 }
 
 void assertUnsigned16RoundTrip(uint16_t value) {
-  uint8_t bytes[2] = {0, 0};
+  uint8_t bytes[2];
   put_le16(bytes, value);
   TEST_ASSERT_EQUAL_UINT16(value, get_le16(bytes));
 }
@@ -54,6 +59,66 @@ size_t makeIndoorBikeData(int16_t resistance, int16_t power, uint8_t* bytes) {
 }
 
 }  // namespace
+
+void TestBleWireRoundTrip::test_factory_preserves_cached_parser_state(void) {
+  std::shared_ptr<SensorData> retained;
+  {
+    SensorDataFactory factory;
+    uint8_t powerPacket[8] = {};
+    put_le16(powerPacket, 0x20);  // Crank revolution data present.
+    put_le16s(powerPacket + 2, 200);
+    put_le16(powerPacket + 4, 10);
+    put_le16(powerPacket + 6, 1024);
+    retained = factory.getSensorData(CYCLINGPOWERMEASUREMENT_UUID, "primary", powerPacket, sizeof(powerPacket));
+    TEST_ASSERT_EQUAL_FLOAT(0, retained->getCadence());
+
+    // Grow the cache while retaining the original parser and its previous sample.
+    for (int i = 0; i < 32; ++i) {
+      auto other = factory.getSensorData(CYCLINGPOWERMEASUREMENT_UUID, "other-" + std::to_string(i), powerPacket, sizeof(powerPacket));
+      TEST_ASSERT_TRUE(other.get() != retained.get());
+      TEST_ASSERT_EQUAL_FLOAT(0, other->getCadence());
+    }
+
+    put_le16s(powerPacket + 2, 225);
+    put_le16(powerPacket + 4, 11);
+    put_le16(powerPacket + 6, 2048);
+    auto cached = factory.getSensorData(CYCLINGPOWERMEASUREMENT_UUID, "primary", powerPacket, sizeof(powerPacket));
+    TEST_ASSERT_TRUE(cached.get() == retained.get());
+    TEST_ASSERT_EQUAL_FLOAT(60, cached->getCadence());
+
+    uint8_t heartPacket[] = {0, 123};
+    auto heart = factory.getSensorData(HEARTCHARACTERISTIC_UUID, "primary", heartPacket, sizeof(heartPacket));
+    TEST_ASSERT_TRUE(heart.get() != retained.get());
+    TEST_ASSERT_EQUAL_INT(123, heart->getHeartRate());
+  }
+  TEST_ASSERT_EQUAL_INT(225, retained->getPower());
+  TEST_ASSERT_EQUAL_FLOAT(60, retained->getCadence());
+}
+
+void TestBleWireRoundTrip::test_nimble_uuid_comparison_and_rendering(void) {
+  const NimBLEUUID uuid16(static_cast<uint16_t>(0x180D));
+  const NimBLEUUID different16(static_cast<uint16_t>(0x180F));
+  TEST_ASSERT_TRUE(uuid16 == NimBLEUUID(static_cast<uint16_t>(0x180D)));
+  TEST_ASSERT_TRUE(uuid16 != different16);
+  TEST_ASSERT_EQUAL_STRING("0x180d", uuid16.toString().c_str());
+
+  const NimBLEUUID uuid32(static_cast<uint32_t>(0x12345678));
+  const NimBLEUUID different32(static_cast<uint32_t>(0x12345679));
+  TEST_ASSERT_TRUE(uuid32 == NimBLEUUID(static_cast<uint32_t>(0x12345678)));
+  TEST_ASSERT_TRUE(uuid32 != different32);
+  TEST_ASSERT_EQUAL_STRING("0x12345678", uuid32.toString().c_str());
+
+  const NimBLEUUID uuid128("12345678-9abc-def0-1234-56789abcdef0");
+  const NimBLEUUID different128("12345678-9abc-def0-1234-56789abcdef1");
+  TEST_ASSERT_TRUE(uuid128 == NimBLEUUID("12345678-9abc-def0-1234-56789abcdef0"));
+  TEST_ASSERT_TRUE(uuid128 != different128);
+  TEST_ASSERT_EQUAL_STRING("12345678-9abc-def0-1234-56789abcdef0", uuid128.toString().c_str());
+
+  const NimBLEUUID assigned16(static_cast<uint16_t>(0x180D));
+  const NimBLEUUID base128("0000180d-0000-1000-8000-00805f9b34fb");
+  TEST_ASSERT_TRUE(assigned16 == base128);
+  TEST_ASSERT_TRUE(base128 == assigned16);
+}
 
 void TestBleWireRoundTrip::test_dircon_uuid_round_trip(void) {
   const uint8_t expectedFtmsBytes[] = {0x00, 0x00, 0x18, 0x26, 0x00, 0x00, 0x10, 0x00, 0x80, 0x00, 0x00, 0x80, 0x5f, 0x9b, 0x34, 0xfb};
@@ -82,17 +147,20 @@ void TestBleWireRoundTrip::test_dircon_uuid_round_trip(void) {
 void TestBleWireRoundTrip::test_all_custom_characteristic_formats(void) {
   unsigned formatCounts[CustomUnknown + 1] = {0};
 
-  for (uint8_t id = BLE_firmwareUpdateURL; id <= BLE_scanResults; ++id) {
+  for (uint8_t id = BLE_firmwareUpdateURL; id <= BLE_gearRatios; ++id) {
     const CustomCharacteristicValueFormat format = customCharacteristicValueFormat(id);
+    // 0x33 was the retired experimental rider-weight field. Keep the wire ID
+    // reserved so a future field cannot accidentally reinterpret old writes.
+    if (id == 0x33) {
+      TEST_ASSERT_EQUAL(CustomUnknown, format);
+      continue;
+    }
     TEST_ASSERT_NOT_EQUAL_MESSAGE(CustomUnknown, format, "custom characteristic is missing a wire format");
     ++formatCounts[format];
 
     switch (format) {
-      case CustomBoolean: {
-        const uint8_t positive = 1;
-        TEST_ASSERT_EQUAL_UINT8(1, positive);
+      case CustomBoolean:
         break;
-      }
       case CustomUnsigned16:
         assertUnsigned16RoundTrip(0xBEEF);
         break;
@@ -139,11 +207,12 @@ void TestBleWireRoundTrip::test_all_custom_characteristic_formats(void) {
         TEST_ASSERT_EQUAL_UINT8(6, packet[ScanResultProtocol::HEADER_LENGTH]);
         break;
       }
-      case CustomBooleanWriteStringRead: {
-        const uint8_t enabled = 1;
-        const char logMessage[] = "log payload";
-        TEST_ASSERT_EQUAL_UINT8(1, enabled);
-        TEST_ASSERT_EQUAL_STRING("log payload", logMessage);
+      case CustomBooleanWriteStringRead:
+        break;
+      case CustomGearRatios: {
+        uint8_t value[3] = {0, 0, 0};
+        put_le16(value + 1, 4545);
+        TEST_ASSERT_EQUAL_UINT16(4545, get_le16(value + 1));
         break;
       }
       case CustomAction:
@@ -165,6 +234,7 @@ void TestBleWireRoundTrip::test_all_custom_characteristic_formats(void) {
   TEST_ASSERT_EQUAL_UINT(1, formatCounts[CustomSettingsSnapshot]);
   TEST_ASSERT_EQUAL_UINT(1, formatCounts[CustomScanResultStream]);
   TEST_ASSERT_EQUAL_UINT(1, formatCounts[CustomBooleanWriteStringRead]);
+  TEST_ASSERT_EQUAL_UINT(1, formatCounts[CustomGearRatios]);
 }
 
 void TestBleWireRoundTrip::test_ftms_round_trip(void) {
@@ -183,8 +253,6 @@ void TestBleWireRoundTrip::test_ftms_round_trip(void) {
 
   // Unsigned FTMS control-point values: target cadence and simulation coefficients.
   assertUnsigned16RoundTrip(190);
-  TEST_ASSERT_EQUAL_UINT8(45, static_cast<uint8_t>(45));
-  TEST_ASSERT_EQUAL_UINT8(90, static_cast<uint8_t>(90));
 
   uint8_t payload[10];
   FitnessMachineIndoorBikeData positive;

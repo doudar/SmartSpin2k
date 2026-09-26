@@ -7,6 +7,7 @@
 
 #include <unity.h>
 
+#include <algorithm>
 #include <cmath>
 #include <fstream>
 #include <limits>
@@ -22,7 +23,6 @@
 namespace {
 
 struct ErgSample {
-  int timestamp;
   int watts;
   int target;
   double gain;
@@ -30,8 +30,6 @@ struct ErgSample {
 
 struct ErgInterval {
   int target;
-  int start;
-  int end;
   double sensitivity;
   std::vector<ErgSample> samples;
 };
@@ -81,16 +79,12 @@ void TestErgLogReplay::test_active_ride_log_and_gain_limits(void) {
     }
 
     if (std::regex_search(line, match, targetPattern)) {
-      const int timestamp = std::stoi(match[1].str());
-      if (!intervals.empty()) intervals.back().end = timestamp;
-      intervals.push_back({std::stoi(match[2].str()), timestamp, timestamp, sensitivity, {}});
+      intervals.push_back({std::stoi(match[2].str()), sensitivity, {}});
       continue;
     }
 
     if (!intervals.empty() && std::regex_search(line, match, samplePattern)) {
-      const int timestamp = std::stoi(match[1].str());
-      intervals.back().samples.push_back({timestamp, std::stoi(match[2].str()), std::stoi(match[3].str()), std::stod(match[4].str())});
-      intervals.back().end = timestamp;
+      intervals.back().samples.push_back({std::stoi(match[2].str()), std::stoi(match[3].str()), std::stod(match[4].str())});
     }
   }
 
@@ -283,12 +277,13 @@ void TestErgLogReplay::test_table_position_confidence(void) {
   TEST_ASSERT_TRUE(syntheticBounds.contains(200, 80));
   TEST_ASSERT_FALSE(syntheticBounds.contains(89, 80));
   TEST_ASSERT_FALSE(syntheticBounds.contains(200, 91));
-  TEST_ASSERT_EQUAL_INT(10, ErgControl::TABLE_SEEK_CADENCE_MARGIN_RPM);
-  TEST_ASSERT_TRUE(syntheticBounds.containsWithCadenceMargin(200, 60, ErgControl::TABLE_SEEK_CADENCE_MARGIN_RPM));
-  TEST_ASSERT_TRUE(syntheticBounds.containsWithCadenceMargin(200, 100, ErgControl::TABLE_SEEK_CADENCE_MARGIN_RPM));
-  TEST_ASSERT_FALSE(syntheticBounds.containsWithCadenceMargin(200, 59, ErgControl::TABLE_SEEK_CADENCE_MARGIN_RPM));
-  TEST_ASSERT_FALSE(syntheticBounds.containsWithCadenceMargin(200, 101, ErgControl::TABLE_SEEK_CADENCE_MARGIN_RPM));
-  TEST_ASSERT_FALSE(syntheticBounds.containsWithCadenceMargin(301, 80, ErgControl::TABLE_SEEK_CADENCE_MARGIN_RPM));
+
+  TEST_ASSERT_EQUAL_INT(10, ErgControl::approachingError(10, 0));
+  TEST_ASSERT_EQUAL_INT(-10, ErgControl::approachingError(-10, 0));
+  TEST_ASSERT_EQUAL_INT(0, ErgControl::approachingError(20, 15));
+  TEST_ASSERT_EQUAL_INT(0, ErgControl::approachingError(-20, -15));
+  TEST_ASSERT_EQUAL_INT(20, ErgControl::approachingError(20, -15));
+  TEST_ASSERT_EQUAL_INT(-20, ErgControl::approachingError(-20, 15));
 
   TEST_ASSERT_FALSE(ErgControl::tableSeekExceededPowerLimit(340, 360, true));
   TEST_ASSERT_TRUE(ErgControl::tableSeekExceededPowerLimit(340, 361, true));

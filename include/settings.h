@@ -85,10 +85,6 @@ const char* const DEFAULT_PASSWORD = "password";
 // would move 1200 steps to compensate, however ERG_Sensitivity values much different than 1.0 imply shiftStep has been improperly configured.
 #define ERG_SENSITIVITY 3.0f
 
-// Number of watts per shift expected by ERG mode for it's calculation. The user should target this number by adjusting Shift Step until WATTS_PER_SHIFT
-// is obtained as closely as possible during each shift.
-#define WATTS_PER_SHIFT 30
-
 // Amount to change watt target per shift in ERG mode.
 #define ERG_PER_SHIFT 10
 
@@ -171,10 +167,6 @@ constexpr const char* ANY  = "any";
 // nothing.
 #define CONNECTED_REMOTE NONE
 
-// number of main loops the shifters need to be held before a BLE scan is
-// initiated.
-#define SHIFTERS_HOLD_FOR_SCAN 2
-
 // stealthChop enabled by default
 #define STEALTHCHOP true
 
@@ -195,11 +187,6 @@ constexpr const char* ANY  = "any";
 #ifndef DEBUG_LOG_BUFFER_SIZE
 #define DEBUG_LOG_BUFFER_SIZE 600
 #endif
-
-// Max size of userconfig
-#define USERCONFIG_JSON_SIZE 2000 + DEBUG_LOG_BUFFER_SIZE
-
-#define RUNTIMECONFIG_JSON_SIZE 1000 + DEBUG_LOG_BUFFER_SIZE
 
 // Legacy instantaneous-watt guardrails in the stepper loop. ERG mode now owns
 // direction validation, overshoot recovery, cadence retargeting, and timeouts.
@@ -236,13 +223,17 @@ constexpr const char* ANY  = "any";
 #define POWERTABLE_CAD_INCREMENT 5
 
 // Number of similar power samples to take before writing to the Power Table
-#define POWER_SAMPLES 10
+#define POWER_SAMPLES 3
 
-// Max downvotes that a neighbor can have
-#define MAX_NEIGHBOR_WEIGHT 2 * POWER_SAMPLES
-
-// Min downvotes that a neighbor can have
-#define MIN_NEIGHBOR_WEIGHT 0
+// Persisted reliability count; independent of the shorter learning history.
+#define MAX_NEIGHBOR_WEIGHT 20
+// Learning history is deliberately shorter than the persisted reliability count.
+#define POWER_TABLE_HISTORY         4
+#define POWER_SAMPLE_MAX_AGE_MS     1500
+#define POWER_SAMPLE_MIN_SPACING_MS 750
+#define POWER_SAMPLE_SETTLE_MS      2000
+#define POWER_SAMPLE_POSITION_SPAN  100
+#define POWER_SAMPLE_CADENCE_SPAN   3
 
 // How often in ms to save the power table if no new data is added and user is pedaling.
 #define POWER_TABLE_SAVE_INTERVAL 240000
@@ -257,15 +248,6 @@ constexpr const char* ANY  = "any";
 // Limit power table size to save memory
 #define TABLE_DIVISOR 10.0f
 
-// Max distance a failed neighbor can be horizontally from target position
-#define HORIZONTAL_NEIGHBOR_RANGE 0.6f
-
-// Max distance a failed neighbor can be vertically from target position
-#define VERTICAL_NEIGHBOR_RANGE 0.8f
-
-// Temperature of the ESP32 at which to start reducing the power output of the stepper motor driver.
-#define THROTTLE_TEMP 90
-
 // Size of the Aux Serial Buffer for Peloton
 #define AUX_BUF_SIZE 10
 
@@ -274,9 +256,6 @@ constexpr const char* ANY  = "any";
 
 // If not receiving Peloton Messages, how long to wait before next TX attempt is
 #define TX_CHECK_INTERVAL 20
-
-// Interval for polling ble battery updates
-#define BATTERY_UPDATE_INTERVAL_MILLIS 300000
 
 // Base homing sensitivity before applying the detected board's scaler.
 #define DEFAULT_HOMING_SENSITIVITY 50

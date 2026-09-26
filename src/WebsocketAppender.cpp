@@ -16,7 +16,6 @@ WebSocketAppender::WebSocketAppender() {
 
 void WebSocketAppender::Initialize() { _webSocketsServer.listen(WebSocketAppender::port); }
 void WebSocketAppender::Loop() {
-  // CheckConnectedClients();
   if (WiFi.status() == WL_CONNECTED && GetClientsCount() < maxClients) {
     if (_webSocketsServer.poll() == false) {
       return;
@@ -63,22 +62,6 @@ void WebSocketAppender::AddClient(WebsocketsClient* client) {
     if (_clients[index] == NULL) {
       _clients[index] = client;
       return;
-    }
-  }
-}
-
-void WebSocketAppender::CheckConnectedClients() {
-  for (uint8_t index = 0; index < maxClients; index++) {
-    WebsocketsClient* client = _clients[index];
-    if (client == NULL) {
-      continue;
-    }
-
-    if (!client->available()) {
-      // Serial.println("Remove disconnected websocket client.");
-      _clients[index] = NULL;
-      client->close();
-      delete client;
     }
   }
 }

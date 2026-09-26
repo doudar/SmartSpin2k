@@ -16,7 +16,8 @@ class BLE_ss2kCustomCharacteristic {
   void setupService(NimBLEServer *pServer);
   void update();
   // Used internally for notify and onWrite Callback.
-  static void process(std::string rxValue, uint16_t connHandle = BLE_HS_CONN_HANDLE_NONE, uint16_t mtu = 23, bool indicateResponse = true);
+  static void process(const std::string& rxValue, uint16_t connHandle = BLE_HS_CONN_HANDLE_NONE, uint16_t mtu = 23,
+                      bool indicateResponse = true);
   // Custom Characteristic value that needs to be notified
   static void notify(char _item, int tableRow = -1);
   static void beginScanResults();
@@ -26,8 +27,8 @@ class BLE_ss2kCustomCharacteristic {
   static void parseNemit();
 
  private:
-  NimBLEService *pSmartSpin2kService;
-  NimBLECharacteristic *smartSpin2kCharacteristic;
+  NimBLEService *pSmartSpin2kService = nullptr;
+  NimBLECharacteristic *smartSpin2kCharacteristic = nullptr;
   uint8_t ss2kCustomCharacteristicValue[3] = {0x00, 0x00, 0x00};
 };
 

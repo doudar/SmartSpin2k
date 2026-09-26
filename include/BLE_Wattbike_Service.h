@@ -17,7 +17,5 @@ class BLE_Wattbike_Service {
   void parseNemit();
 
  private:
-  NimBLEService *pWattbikeService;
   NimBLECharacteristic *wattbikeReadCharacteristic;
-  NimBLECharacteristic *wattbikeWriteCharacteristic;
 };

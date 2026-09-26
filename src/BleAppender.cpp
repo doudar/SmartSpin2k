@@ -8,35 +8,13 @@
 #include "BleAppender.h"
 #include "Main.h"
 #include "BLE_Custom_Characteristic.h"
+#include <utility>
 
-void BleAppender::Initialize() {}
+void BleAppender::Initialize() { pendingMessage.clear(); }
 
 void BleAppender::Log(const char *message) {
-  if (!rtConfig->getBleLogEnabled()) {
-    return;
-  }
-
-  // Cache the message
-  appendMessage(message);
-
-  // Use the existing custom characteristic notification mechanism
-  // only notify if there are messages to send
-  if (!messageQueue.empty()) {
-    BLE_ss2kCustomCharacteristic::notify(BLE_BLELogging);
-  }
-}
-
-std::string BleAppender::getLastMessage() {
-  if (!messageQueue.empty()) {
-    std::string msg = messageQueue.front();
-    messageQueue.pop();
-    return msg;
-  }
-  return "";
-}
-
-void BleAppender::appendMessage(const char *message) {
-  if (message == nullptr) {
+  pendingMessage.clear();
+  if (!rtConfig->getBleLogEnabled() || message == nullptr) {
     return;
   }
 
@@ -52,8 +30,15 @@ void BleAppender::appendMessage(const char *message) {
 
   // Truncate message if it's too long on its own
   if (msg.length() > MAX_MESSAGE_SIZE) {
-    msg = msg.substr(0, MAX_MESSAGE_SIZE);
+    msg.resize(MAX_MESSAGE_SIZE);
   }
 
-  messageQueue.push(msg);
+  pendingMessage = std::move(msg);
+  BLE_ss2kCustomCharacteristic::notify(BLE_BLELogging);
+  // A settings snapshot can suppress notify before it consumes the message.
+  // Drop that unsent log: replaying one old message per new arrival leaves a
+  // permanent delay which grows with every interruption (including calibration).
+  pendingMessage.clear();
 }
+
+std::string BleAppender::getLastMessage() { return std::exchange(pendingMessage, std::string()); }

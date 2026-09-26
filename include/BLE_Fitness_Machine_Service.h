@@ -19,7 +19,7 @@ class BLE_Fitness_Machine_Service {
   void processFTMSWrite();
   
  private:
-  int calculateResistanceFromPosition();
+  static int calculateResistanceFromPosition();
   BLEService *pFitnessMachineService;
   BLECharacteristic *fitnessMachineFeature;
   BLECharacteristic *fitnessMachineIndoorBikeData;

@@ -491,9 +491,8 @@ bool DirConManager::queueOutboundFrame(size_t clientIndex, const uint8_t* data, 
     return false;
   }
 
-  bool queued                   = false;
-  DirConOutboundQueue& outbound = s_outboundQueues[clientIndex];
-  bool subscriptionMatches     = requiredSubscription == nullptr;
+  bool queued               = false;
+  bool subscriptionMatches = requiredSubscription == nullptr;
   if (!subscriptionMatches) {
     for (int i = 0; i < DIRCON_MAX_CHARACTERISTICS; i++) {
       if (clientSubscriptions[clientIndex][i].active && clientSubscriptions[clientIndex][i].uuid == *requiredSubscription) {
@@ -504,6 +503,7 @@ bool DirConManager::queueOutboundFrame(size_t clientIndex, const uint8_t* data, 
   }
 
   if (clientActive[clientIndex] && subscriptionMatches) {
+    DirConOutboundQueue& outbound = s_outboundQueues[clientIndex];
     if (length > DIRCON_SEND_BUFFER_SIZE) {
       SS2K_LOG(DIRCON_LOG_TAG, "Cannot queue %u-byte frame for client %u; maximum is %u", static_cast<unsigned>(length), static_cast<unsigned>(clientIndex),
                DIRCON_SEND_BUFFER_SIZE);
@@ -570,7 +570,7 @@ void DirConManager::drainOutboundQueues() {
     } else if (outbound.count > 0) {
       DirConOutboundFrame& frame = outbound.frames[0];
       int socketFd                = dirConClients[clientIndex].fd();
-      ssize_t sent                = 0;
+      ssize_t sent;
 
       if (socketFd < 0) {
         shouldClose = true;
@@ -876,25 +876,6 @@ void DirConManager::broadcastNotification(const NimBLEUUID& characteristicUuid, 
   }
 }
 
-std::vector<NimBLECharacteristic*> DirConManager::getCharacteristics(const NimBLEUUID& serviceUuid) {
-  std::vector<NimBLECharacteristic*> characteristics;
-
-  NimBLEService* service = NimBLEDevice::getServer()->getServiceByUUID(serviceUuid);
-  if (service == nullptr) {
-    return characteristics;
-  }
-  for (const NimBLECharacteristic* characteristic : service->getCharacteristics()) {
-    if (characteristic != nullptr) {
-      characteristics.push_back(const_cast<NimBLECharacteristic*>(characteristic));
-    }
-  }
-
-  auto it = std::remove_if(characteristics.begin(), characteristics.end(), [](NimBLECharacteristic* c) { return c == nullptr; });
-  characteristics.erase(it, characteristics.end());
-
-  return characteristics;
-}
-
 NimBLECharacteristic* DirConManager::findCharacteristic(const NimBLEUUID& characteristicUuid) {
   for (size_t i = 0; i < registeredServiceCount; i++) {
     NimBLEService* service = NimBLEDevice::getServer()->getServiceByUUID(registeredServices[i].serviceUuid);
@@ -967,18 +948,6 @@ void DirConManager::removeSubscription(size_t clientIndex, const NimBLEUUID& cha
     }
   }
   xSemaphoreGive(s_outboundMutex);
-}
-
-void DirConManager::removeAllSubscriptions(size_t clientIndex) {
-  if (clientIndex >= DIRCON_MAX_CLIENTS) {
-    return;
-  }
-  xSemaphoreTake(s_outboundMutex, portMAX_DELAY);
-  for (int j = 0; j < DIRCON_MAX_CHARACTERISTICS; j++) {
-    clientSubscriptions[clientIndex][j].active = false;
-  }
-  xSemaphoreGive(s_outboundMutex);
-  SS2K_LOG(DIRCON_LOG_TAG, "Removed all subscriptions for client %d", clientIndex);
 }
 
 bool DirConManager::hasSubscription(size_t clientIndex, const NimBLEUUID& characteristicUuid) {

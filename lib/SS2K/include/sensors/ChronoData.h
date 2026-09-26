@@ -26,7 +26,6 @@ class ChronoData : public SensorData {
   void decode(uint8_t *data, size_t length);
 
  private:
-  bool hasData  = false;
   float cadence = nanf("");
   int power     = INT_MIN;
 };

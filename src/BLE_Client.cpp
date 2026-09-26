@@ -61,7 +61,7 @@ void SpinBLEClient::start() {
  * @param length Length of the data received.
  * @param isNotify Boolean indicating if the notification is a notify or indicate.
  */
-static void notifyCB(NimBLERemoteCharacteristic* pBLERemoteCharacteristic, uint8_t* pData, size_t length, bool isNotify) {
+static void notifyCB(NimBLERemoteCharacteristic* pBLERemoteCharacteristic, uint8_t* pData, size_t length, bool /*isNotify*/) {
   // Parse BLE shifter info.
   if (pBLERemoteCharacteristic->getRemoteService()->getUUID() == HID_SERVICE_UUID) {
     Serial.print(pData[0], HEX);
@@ -185,10 +185,9 @@ void bleClientTask(void* pvParameters) {
       SS2K_LOG(BLE_CLIENT_LOG_TAG, "Disconnecting all connected servers due to update.");
       for (auto& _BLEd : spinBLEClient.myBLEDevices) {  // loop through discovered devices
         if (_BLEd.connectedClientID != BLE_HS_CONN_HANDLE_NONE) {
-          if (_BLEd.advertisedDevice) {                                                                // is device registered?
-            if ((_BLEd.connectedClientID != BLE_HS_CONN_HANDLE_NONE) && (_BLEd.doConnect == false)) {  // client must not be in connection process
-              if (BLEDevice::getClientByPeerAddress(_BLEd.peerAddress)) {                              // nullptr check
-                NimBLEClient* pClient = NimBLEDevice::getClientByPeerAddress(_BLEd.peerAddress);
+          if (_BLEd.getAdvertisement()) {                                                              // is device registered?
+            if (!_BLEd.doConnect) {  // client must not be in connection process
+              if (NimBLEClient* pClient = NimBLEDevice::getClientByPeerAddress(_BLEd.peerAddress)) {
                 pClient->disconnect();
               }
             }
@@ -255,7 +254,7 @@ void bleClientTask(void* pvParameters) {
         } else {  // Startup Homing
           ss2k->goHome(false);
         }
-        rtConfig->setShifterPosition(SHIFTER_MIDDLE_POSITION); // Reset to middle position
+        // goHome() selects the calibrated gear or the unhomed Unlimited fallback.
         spinBLEServer.spinDownFlag = 0;
       }
     }
@@ -267,13 +266,13 @@ bool SpinBLEClient::connectToServer() {
   NimBLEUUID serviceUUID;
   NimBLEUUID charUUID;
 
-  const NimBLEAdvertisedDevice* myDevice = nullptr;
+  std::shared_ptr<const NimBLEAdvertisedDevice> myDevice;
   int device_number                      = -1;
 
   for (int i = 0; i < NUM_BLE_DEVICES; i++) {
     if (spinBLEClient.myBLEDevices[i].doConnect == true) {   // Client wants to be connected
-      if (spinBLEClient.myBLEDevices[i].advertisedDevice) {  // Client is assigned
-        myDevice = spinBLEClient.myBLEDevices[i].advertisedDevice;
+      myDevice = spinBLEClient.myBLEDevices[i].getAdvertisement();
+      if (myDevice) {  // Client is assigned
         SS2K_LOG(BLE_CLIENT_LOG_TAG, "Connecting slot %d", i);
         device_number = i;
         break;
@@ -294,7 +293,7 @@ bool SpinBLEClient::connectToServer() {
     String deviceName = myDevice->haveName() ? String(myDevice->getName().c_str()) : "Unknown";
     SS2K_LOG(BLE_CLIENT_LOG_TAG, "Getting service info for device: %s with %d services", deviceName.c_str(), myDevice->getServiceUUIDCount());
 
-    const BLEServiceInfo* serviceInfo = getDeviceServiceInfo(myDevice, deviceName);
+    const BLEServiceInfo* serviceInfo = getDeviceServiceInfo(myDevice.get(), deviceName);
     if (!serviceInfo) {
       SS2K_LOG(BLE_CLIENT_LOG_TAG, "No supported service UUID found for device: %s", deviceName.c_str());
       spinBLEClient.myBLEDevices[device_number].reset();
@@ -310,7 +309,7 @@ bool SpinBLEClient::connectToServer() {
     return false;
   }
 
-  SS2K_LOG(BLE_CLIENT_LOG_TAG, "Forming a connection to: %s", this->adevName2UniqueName(myDevice).c_str());
+  SS2K_LOG(BLE_CLIENT_LOG_TAG, "Forming a connection to: %s", this->adevName2UniqueName(myDevice.get()).c_str());
 
   NimBLEClient* pClient          = nullptr;
   auto handleFailedClientConnect = [&]() {
@@ -332,11 +331,11 @@ bool SpinBLEClient::connectToServer() {
   // Initial connection parameters: 30-60 ms interval, 0 latency, 5-second supervision timeout.
   pClient->setConnectionParams(connectionParams[0], connectionParams[1], connectionParams[2], connectionParams[3]);
   pClient->setConnectTimeout(10000);  // 10 seconds
-  if (!pClient->connect(myDevice, true, false, false)) {
+  if (!pClient->connect(myDevice.get(), true, false, false)) {
     return handleFailedClientConnect();
   }
 
-  SS2K_LOG(BLE_CLIENT_LOG_TAG, "Connected to: %s - %s RSSI %d", this->adevName2UniqueName(myDevice).c_str(), pClient->getPeerAddress().toString().c_str(), pClient->getRssi());
+  SS2K_LOG(BLE_CLIENT_LOG_TAG, "Connected to: %s - %s RSSI %d", this->adevName2UniqueName(myDevice.get()).c_str(), pClient->getPeerAddress().toString().c_str(), pClient->getRssi());
   if (serviceUUID == HID_SERVICE_UUID) {
     connectBLE_HID(pClient);
     SS2K_LOG(BLE_CLIENT_LOG_TAG, "Successful remote subscription.");
@@ -345,7 +344,7 @@ bool SpinBLEClient::connectToServer() {
   // Update the advertised device info
   rtConfig->resistance.setSimulate(true); // Mark as simulated data until we get a real value from the device
   spinBLEClient.myBLEDevices[device_number].doConnect = false;
-  spinBLEClient.myBLEDevices[device_number].set(myDevice, pClient->getConnHandle(), serviceUUID, charUUID);
+  spinBLEClient.myBLEDevices[device_number].set(myDevice.get(), pClient->getConnHandle(), serviceUUID, charUUID);
   spinBLEClient.myBLEDevices[device_number].peerAddress = pClient->getPeerAddress();
   removeDuplicates(pClient);
 
@@ -465,7 +464,7 @@ void ScanCallbacks::onResult(const NimBLEAdvertisedDevice* advertisedDevice) {
       SS2K_LOG(BLE_CLIENT_LOG_TAG, "Supported Device: %s with service %s", aDevName.c_str(), serviceInfo->name.c_str());
       // check to see if we're already connected to this device
       for (size_t i = 0; i < NUM_BLE_DEVICES; i++) {
-        if (spinBLEClient.myBLEDevices[i].advertisedDevice != nullptr) {
+        if (spinBLEClient.myBLEDevices[i].getAdvertisement()) {
           if (bleDeviceIdentifierEquals(aDevName.c_str(), spinBLEClient.myBLEDevices[i].uniqueName.c_str())) {
             SS2K_LOG(BLE_CLIENT_LOG_TAG, "%s already connected on slot %d", aDevName.c_str(), i);
             return;  // Already connected to this device
@@ -518,7 +517,7 @@ void ScanCallbacks::onResult(const NimBLEAdvertisedDevice* advertisedDevice) {
         // Check if slot is available or if this device is already assigned to this slot
         // For randomized addresses (Android devices), use uniqueName for comparison
         // For traditional devices, fall back to address comparison for backward compatibility
-        bool slotAvailable = (spinBLEClient.myBLEDevices[i].advertisedDevice == nullptr);
+        bool slotAvailable = !spinBLEClient.myBLEDevices[i].getAdvertisement();
         bool deviceMatches = false;
 
         if (!slotAvailable) {
@@ -557,9 +556,16 @@ void ScanCallbacks::onResult(const NimBLEAdvertisedDevice* advertisedDevice) {
  * of previously found devices, which might still be getting processed in the
  * onScanEnd callback. Without this delay, data could be getting read as it is deleted, causing a crash.
  *
- * @param duration The duration in seconds for which the scan should run
+ * @param duration The duration in milliseconds for which the scan should run
  */
 void SpinBLEClient::scanProcess(int duration) {
+  // A scan callback can queue a device after the task's connection pass.
+  // Give that connection priority over restarting discovery on this iteration.
+  for (const auto& device : myBLEDevices) {
+    if (device.doConnect) {
+      return;
+    }
+  }
   NimBLEScan* pBLEScan = NimBLEDevice::getScan();
 
   static bool waitForOnScanEndToComplete = false;
@@ -591,24 +597,23 @@ void ScanCallbacks::onScanEnd(const NimBLEScanResults& results, int reason) {
 
 // remove the last connected BLE Power Meter
 void SpinBLEClient::removeDuplicates(NimBLEClient* pClient) {
-  // BLEAddress thisAddress = pClient->getPeerAddress();
-  SpinBLEAdvertisedDevice tBLEd;
-  SpinBLEAdvertisedDevice oldBLEd;
+  const NimBLEAddress peerAddress = pClient->getPeerAddress();
+  NimBLEUUID serviceUUID;
   for (size_t i = 0; i < NUM_BLE_DEVICES; i++) {  // Disconnect oldest PM to avoid two connected.
-    tBLEd = this->myBLEDevices[i];
-    if (tBLEd.peerAddress == pClient->getPeerAddress()) {
+    if (this->myBLEDevices[i].peerAddress == peerAddress) {
+      serviceUUID = this->myBLEDevices[i].serviceUUID;
       break;
     }
   }
 
   for (size_t i = 0; i < NUM_BLE_DEVICES; i++) {  // Disconnect oldest PM to avoid two connected.
-    oldBLEd = this->myBLEDevices[i];
-    if (oldBLEd.advertisedDevice) {
-      if ((tBLEd.serviceUUID == oldBLEd.serviceUUID) && (tBLEd.peerAddress != oldBLEd.peerAddress)) {
-        if (BLEDevice::getClientByPeerAddress(oldBLEd.peerAddress)) {
-          if (BLEDevice::getClientByPeerAddress(oldBLEd.peerAddress)->isConnected()) {
-            SS2K_LOG(BLE_CLIENT_LOG_TAG, "%s Detected as a duplicate.  Disconnecting: %s", tBLEd.peerAddress.toString().c_str(), oldBLEd.peerAddress.toString().c_str());
-            NimBLEDevice::deleteClient(BLEDevice::getClientByPeerAddress(oldBLEd.peerAddress));
+    auto& oldBLEd = this->myBLEDevices[i];
+    if (oldBLEd.getAdvertisement()) {
+      if ((serviceUUID == oldBLEd.serviceUUID) && (peerAddress != oldBLEd.peerAddress)) {
+        if (NimBLEClient* oldClient = NimBLEDevice::getClientByPeerAddress(oldBLEd.peerAddress)) {
+          if (oldClient->isConnected()) {
+            SS2K_LOG(BLE_CLIENT_LOG_TAG, "%s Detected as a duplicate.  Disconnecting: %s", peerAddress.toString().c_str(), oldBLEd.peerAddress.toString().c_str());
+            NimBLEDevice::deleteClient(oldClient);
             oldBLEd.reset(true);
             return;
           }
@@ -629,6 +634,7 @@ void SpinBLEClient::resetDevices(NimBLEClient* pClient) {
 
 // Control a connected FTMS trainer. If no args are passed, treat it like an external stepper motor.
 void SpinBLEClient::FTMSControlPointWrite(const uint8_t* pData, int length) {
+  if (!pData || length <= 0 || length > 7) return;
   if (userConfig->getFTMSControlPointWrite()) {
     NimBLEClient* pClient = nullptr;
     uint8_t modData[7];
@@ -637,8 +643,9 @@ void SpinBLEClient::FTMSControlPointWrite(const uint8_t* pData, int length) {
     }
     for (int i = 0; i < NUM_BLE_DEVICES; i++) {
       if (myBLEDevices[i].isPostConnected && (myBLEDevices[i].serviceUUID == FITNESSMACHINESERVICE_UUID)) {
-        if (NimBLEDevice::getClientByPeerAddress(myBLEDevices[i].peerAddress)->getService(FITNESSMACHINESERVICE_UUID)) {
-          pClient = NimBLEDevice::getClientByPeerAddress(myBLEDevices[i].peerAddress);
+        NimBLEClient* candidate = NimBLEDevice::getClientByPeerAddress(myBLEDevices[i].peerAddress);
+        if (candidate && candidate->getService(FITNESSMACHINESERVICE_UUID)) {
+          pClient = candidate;
           break;
         }
       }
@@ -649,16 +656,20 @@ void SpinBLEClient::FTMSControlPointWrite(const uint8_t* pData, int length) {
       if (writeCharacteristic) {
         const int kLogBufCapacity = length + 40;
         char logBuf[kLogBufCapacity];
-        if (modData[0] == FitnessMachineControlPointProcedure::SetIndoorBikeSimulationParameters) {  // use virtual Shifting
-          int incline = ss2k->getTargetPosition() / userConfig->getInclineMultiplier();
-          put_le16s(&modData[3], static_cast<int16_t>(incline));
+        if (length == 7 && modData[0] == FitnessMachineControlPointProcedure::SetIndoorBikeSimulationParameters) {
+          // Use the same current terrain + gear target as the local motor,
+          // rather than the previous loop's target when a command has just arrived.
+          const float multiplier = userConfig->getInclineMultiplier();
+          const double incline = multiplier > 0 ? ss2k->simulationTargetPosition() / static_cast<double>(multiplier) : 0;
+          const int16_t encodedIncline = static_cast<int16_t>(std::max(-32768.0, std::min(32767.0, incline)));
+          put_le16s(&modData[3], encodedIncline);
           writeCharacteristic->writeValue(modData, length);
           logBufLength = ss2k_log_hex_to_buffer(modData, length, logBuf, 0, kLogBufCapacity);
           logBufLength += snprintf(logBuf + logBufLength, kLogBufCapacity - logBufLength, "-> Shifted Sim Data: %d", rtConfig->getShifterPosition());
         } else {
           writeCharacteristic->writeValue(modData, length);
           logBufLength = ss2k_log_hex_to_buffer(modData, length, logBuf, 0, kLogBufCapacity);
-          logBufLength += snprintf(logBuf + logBufLength, kLogBufCapacity - logBufLength, "-> Shifted ERG Data: %d", rtConfig->getShifterPosition());
+          logBufLength += snprintf(logBuf + logBufLength, kLogBufCapacity - logBufLength, "-> Forwarded FTMS Data: %d", rtConfig->getShifterPosition());
         }
         SS2K_LOG(BLE_CLIENT_LOG_TAG, "%s", logBuf);
       }
@@ -670,14 +681,13 @@ void SpinBLEClient::postConnect() {
   for (auto& _BLEd : spinBLEClient.myBLEDevices) {
     // Check that the device has been assigned and it hasn't been post connected.
     if ((_BLEd.connectedClientID != BLE_HS_CONN_HANDLE_NONE) && !_BLEd.isPostConnected) {
-      // Guard against stale / cleared advertisedDevice pointers (can happen after disconnect + erase())
-      if (_BLEd.advertisedDevice == nullptr) {
+      // A disconnect may have cleared the slot before post-connect setup.
+      const auto advertisement = _BLEd.getAdvertisement();
+      if (!advertisement) {
         SS2K_LOGW(BLE_CLIENT_LOG_TAG, "Skipping postConnect: null advertisedDevice (ConnID %d)", _BLEd.connectedClientID);
         continue;
       }
-      // Prefer the stored uniqueName (captured at discovery) to avoid dereferencing the NimBLEAdvertisedDevice
-      // unnecessarily (haveName()->findAdvField() has caused crashes when backing storage was freed).
-      String adevName = _BLEd.uniqueName.empty() ? this->adevName2UniqueName(_BLEd.advertisedDevice) : String(_BLEd.uniqueName.c_str());
+      String adevName = _BLEd.uniqueName.empty() ? this->adevName2UniqueName(advertisement.get()) : String(_BLEd.uniqueName.c_str());
       SS2K_LOG(BLE_CLIENT_LOG_TAG, "Post connecting: %s , ConnID %d, PrimaryChar %s", adevName.c_str(), _BLEd.connectedClientID, _BLEd.charUUID.toString().c_str());
       NimBLEClient* pClient = NimBLEDevice::getClientByPeerAddress(_BLEd.peerAddress);
       if (pClient) {
@@ -703,10 +713,11 @@ void SpinBLEClient::postConnect() {
           rtConfig->setMaxResistance(MAX_ECHELON_RESISTANCE);
         }
 
-        if (pClient->getService(FITNESSMACHINESERVICE_UUID)) {
+        NimBLERemoteService* fitnessService = pClient->getService(FITNESSMACHINESERVICE_UUID);
+        if (fitnessService) {
           SS2K_LOG(BLE_CLIENT_LOG_TAG, "Initializing FTMS on device: %s", _BLEd.uniqueName.c_str());
 
-          auto featuresCharacteristic = pClient->getService(FITNESSMACHINESERVICE_UUID)->getCharacteristic(FITNESSMACHINEFEATURE_UUID);
+          auto featuresCharacteristic = fitnessService->getCharacteristic(FITNESSMACHINEFEATURE_UUID);
           if (featuresCharacteristic == nullptr) {
             SS2K_LOG(BLE_CLIENT_LOG_TAG, "Failed to find FTMS features characteristic UUID: %s", FITNESSMACHINEFEATURE_UUID.toString().c_str());
           } else {
@@ -721,7 +732,7 @@ void SpinBLEClient::postConnect() {
                   SS2K_LOG(BLE_CLIENT_LOG_TAG, "FTMS Control Point StartOrResume not supported on: %s", _BLEd.uniqueName.c_str());
                 }
 
-                NimBLERemoteCharacteristic* writeCharacteristic = pClient->getService(FITNESSMACHINESERVICE_UUID)->getCharacteristic(FITNESSMACHINECONTROLPOINT_UUID);
+                NimBLERemoteCharacteristic* writeCharacteristic = fitnessService->getCharacteristic(FITNESSMACHINECONTROLPOINT_UUID);
                 if (writeCharacteristic == nullptr) {
                   SS2K_LOG(BLE_CLIENT_LOG_TAG, "Failed to find FTMS control characteristic UUID: %s, on %s", FITNESSMACHINECONTROLPOINT_UUID.toString().c_str(),
                            _BLEd.uniqueName.c_str());
@@ -739,7 +750,7 @@ void SpinBLEClient::postConnect() {
             }
           }
           // update resistance range if supported:
-          auto resistanceRangeCharacteristic = pClient->getService(FITNESSMACHINESERVICE_UUID)->getCharacteristic(FITNESSMACHINERESISTANCELEVELRANGE_UUID);
+          auto resistanceRangeCharacteristic = fitnessService->getCharacteristic(FITNESSMACHINERESISTANCELEVELRANGE_UUID);
           // Schwinn IC4 bikes don't transmit in the proper format, so we need to ignore this on bikes with names that start with "IC Bike"
           if (adevName.startsWith("IC Bike")) {
             SS2K_LOG(BLE_CLIENT_LOG_TAG, "Ignoring FTMS Resistance Range characteristic on IC Bike device: %s", _BLEd.uniqueName.c_str());
@@ -966,10 +977,10 @@ void SpinBLEClient::checkBLEReconnect() {
 }
 
 void SpinBLEClient::reconnectAllDevices() {
-  for (auto i : spinBLEClient.myBLEDevices) {
-    if (NimBLEDevice::getClientByHandle(i.connectedClientID)) {
-      if (NimBLEDevice::getClientByHandle(i.connectedClientID)->isConnected()) {
-        NimBLEDevice::getClientByHandle(i.connectedClientID)->disconnect();
+  for (auto& i : spinBLEClient.myBLEDevices) {
+    if (NimBLEClient* client = NimBLEDevice::getClientByHandle(i.connectedClientID)) {
+      if (client->isConnected()) {
+        client->disconnect();
         i.reset(true);
       }
     }
@@ -978,14 +989,11 @@ void SpinBLEClient::reconnectAllDevices() {
 
 // Poll BLE devices for battCharacteristic if available and read value.
 void SpinBLEClient::handleBattInfo(NimBLEClient* pClient, bool updateNow = false) {
-  static unsigned long last_battery_update = 0;
-  if (pClient->getService(BATTERYSERVICE_UUID) == nullptr) {
+  NimBLERemoteService* batteryService = pClient->getService(BATTERYSERVICE_UUID);
+  if (batteryService == nullptr) {
     return;
   }
-  if (pClient->getService(BATTERYSERVICE_UUID)->getCharacteristic(BATTERYCHARACTERISTIC_UUID) == nullptr) {
-    return;
-  }
-  BLERemoteCharacteristic* battCharacteristic = pClient->getService(BATTERYSERVICE_UUID)->getCharacteristic(BATTERYCHARACTERISTIC_UUID);
+  BLERemoteCharacteristic* battCharacteristic = batteryService->getCharacteristic(BATTERYCHARACTERISTIC_UUID);
   if (battCharacteristic != nullptr) {
     std::string value = battCharacteristic->readValue();
     rtConfig->batt.setValue((uint8_t)value[0]);
@@ -1082,7 +1090,9 @@ void SpinBLEAdvertisedDevice::set(const NimBLEAdvertisedDevice* device, int id, 
   }
   String adevName = spinBLEClient.adevName2UniqueName(device);
   SS2K_LOG(BLE_CLIENT_LOG_TAG, "Setting Device %s", adevName.c_str());
-  this->advertisedDevice = const_cast<const NimBLEAdvertisedDevice*>(device);
+  const auto advertisement = std::make_shared<const NimBLEAdvertisedDevice>(*device);
+  std::atomic_store(&this->advertisedDevice, advertisement);
+  device                = advertisement.get();
   this->peerAddress      = device->getAddress();
   // Set the unique name for stable device identification
   this->uniqueName        = adevName.c_str();
@@ -1159,7 +1169,7 @@ void SpinBLEAdvertisedDevice::set(const NimBLEAdvertisedDevice* device, int id, 
  */
 void SpinBLEAdvertisedDevice::clearState(bool resetAdvertisedDevice) {
   if (resetAdvertisedDevice) {
-    advertisedDevice = nullptr;
+    std::atomic_store(&advertisedDevice, std::shared_ptr<const NimBLEAdvertisedDevice>{});
     peerAddress      = NimBLEAddress();  // zero / cleared
     this->uniqueName.clear();            // Clear the unique name
   }

@@ -58,7 +58,7 @@ nav a:hover{text-decoration:underline}
 .settings-grid{display:grid;gap:2rem;padding:1rem 0;grid-template-columns:repeat(auto-fit,minmax(300px,1fr));max-width:100%;margin:0 auto}
 .settings-section{background:rgba(255,255,255,.1);border-radius:var(--radius-md);padding:1.5rem;margin-bottom:.5rem}
 .setting-group{margin-bottom:1.5rem;background:var(--bg-overlay);border-radius:6px;padding:0.75rem;box-shadow:var(--shadow-sm);border:1px solid var(--border);overflow:hidden;box-sizing:border-box}
-.setting-group input[type="password"],.setting-group input[type="text"]{width:100%;padding:.75rem;background:rgba(255,255,255,.219);border:1px solid rgba(255,255,255,.2);border-radius:var(--radius-sm);color:var(--text);font-size:1rem;box-sizing:border-box}
+.setting-group input[type="number"],.setting-group input[type="password"],.setting-group input[type="text"]{width:100%;padding:.75rem;background:rgba(255,255,255,.219);border:1px solid rgba(255,255,255,.2);border-radius:var(--radius-sm);color:var(--text);font-size:1rem;box-sizing:border-box}
 .slider-container{flex:1;display:flex;flex-direction:column;align-items:center;gap:.25rem;width:100%;max-width:260px;margin:0 auto;box-sizing:border-box}
 .slider-container input[type="range"]{width:100%;max-width:100%}
 .value-display{display:flex;align-items:center;justify-content:center;margin-bottom:0.5rem}
@@ -74,7 +74,9 @@ nav a:hover{text-decoration:underline}
 .warning-button,.status-message.error{background:#dc3545;color:var(--text)}
 .warning-button:hover{background:#c82333}
 .button-container{text-align:center;margin-top:2rem}
-.device-select{width:100%;font-size:1rem;cursor:pointer}
+.device-select{width:100%;max-width:100%;box-sizing:border-box;font-size:1rem;cursor:pointer}
+.groupset-gearing{font-weight:600;margin-bottom:.5rem}
+.groupset-description{font-style:italic;line-height:1.5}
 .device-select:hover{background:rgba(255,255,255,.15)}
 .device-select option{background:var(--bg-dark);color:var(--text);padding:.5rem}
 .scan-section{margin-top:3rem;text-align:center}

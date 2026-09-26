@@ -23,10 +23,7 @@ class BLE_OpenBikeControl_Service {
   void handleButtonStateSubscription(uint16_t subValue);
 
  private:
-  NimBLEService *pOpenBikeControlService;
   NimBLECharacteristic *buttonStateCharacteristic;
-  NimBLECharacteristic *hapticFeedbackCharacteristic;
-  NimBLECharacteristic *appInformationCharacteristic;
   unsigned long _lastClientActivityMs;
 
   static void setupMDNS();

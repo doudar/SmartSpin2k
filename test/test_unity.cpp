@@ -36,6 +36,14 @@ void setup() {
   // Start Unity
   UNITY_BEGIN();
 
+  RUN_TEST(TestThermalSafety::test_tmc_cooldown_and_recovery);
+  RUN_TEST(TestThermalSafety::test_tmc_missing_samples_and_timer_wrap);
+  RUN_TEST(TestThermalSafety::test_tmc_uart_probe_while_disabled);
+  RUN_TEST(TestThermalSafety::test_tmc_uart_probe_rejects_invalid_responses);
+  RUN_TEST(TestThermalSafety::test_s3_thresholds_and_hysteresis);
+  RUN_TEST(TestThermalSafety::test_s3_failed_sensor_preserves_protection);
+  RUN_TEST(TestThermalSafety::test_combined_limits_and_setting_changes);
+
   // FitnessMachineIndoorBike Tests
   {
     test_fitnessMachineIndoorBikeData test;
@@ -110,12 +118,48 @@ void setup() {
   // BLE protocol encode/decode round-trip tests
   {
     TestBleWireRoundTrip test;
+    RUN_TEST(test.test_factory_preserves_cached_parser_state);
+    RUN_TEST(test.test_nimble_uuid_comparison_and_rendering);
     RUN_TEST(test.test_dircon_uuid_round_trip);
     RUN_TEST(test.test_all_custom_characteristic_formats);
     RUN_TEST(test.test_ftms_round_trip);
     RUN_TEST(test.test_csc_round_trip);
     RUN_TEST(test.test_heart_rate_round_trip);
     RUN_TEST(test.test_zwift_round_trip);
+  }
+
+  {
+    TestFtmsHoming test;
+    RUN_TEST(test.test_repeatable_startup);
+    RUN_TEST(test.test_both_ends_and_legacy);
+    RUN_TEST(test.test_missing_stuck_and_skipped_reports);
+    RUN_TEST(test.test_abort_and_feedback);
+    RUN_TEST(test.test_measurement_value_timer);
+    RUN_TEST(test.test_report_published_during_read);
+    RUN_TEST(test.test_wrong_direction_stops_motor);
+    RUN_TEST(test.test_delayed_crossing_after_stop);
+    RUN_TEST(test.test_stationary_reading_confirmation);
+    RUN_TEST(test.test_adjacent_boundary_noise);
+    RUN_TEST(test.test_shifted_crossing_retries);
+    RUN_TEST(test.test_responsive_retries_until_deadline);
+    RUN_TEST(test.test_accelerated_probe_repeatability);
+    RUN_TEST(test.test_one_second_startup_check);
+    RUN_TEST(test.test_wide_resistance_four);
+    RUN_TEST(test.test_calibrated_startup_and_map);
+    RUN_TEST(test.test_stationary_drift_guard);
+    RUN_TEST(test.test_sparse_noisy_observations);
+    RUN_TEST(test.test_manual_knob_resync);
+  }
+
+  {
+    TestVirtualGearing test;
+    RUN_TEST(test.test_unlimited_default_and_wire);
+    RUN_TEST(test.test_ratio_api);
+    RUN_TEST(test.test_offset_normalization);
+    RUN_TEST(test.test_duplicate_and_identical_ratios);
+    RUN_TEST(test.test_profile_bounds_and_scaling);
+    RUN_TEST(test.test_offset_overflow);
+    RUN_TEST(test.test_packet_validation);
   }
 
   UNITY_END();
@@ -127,7 +171,7 @@ void loop() {
 
 // For native testing
 #ifndef ARDUINO
-int main(int argc, char** argv) {
+int main() {
   // Create test/output directory if it doesn't exist for native builds
   const char* dir_path = "test/output";
 // Attempt to create the directory.

@@ -6,11 +6,11 @@
  */
 
 #include <unity.h>
-#include <Arduino.h>
+#include <cstdlib>
+#include <string>
+
 #include "BLE_Device_Identity.h"
 #include "test.h"
-#include "settings.h"
-#include <string>
 
 // Test helper function to create a mock address string and test the randomization detection
 // Since we can't easily mock NimBLEAdvertisedDevice, we'll test the logic indirectly
@@ -116,7 +116,7 @@ void TestAdevName2UniqueName::test_random_address_pattern_detection() {
     for (size_t i = 0; i < sizeof(testCases) / sizeof(testCases[0]); i++) {
         // Parse first byte
         char firstByteStr[3] = {testCases[i].address[0], testCases[i].address[1], '\0'};
-        int firstByte = strtol(firstByteStr, nullptr, 16);
+        int firstByte = std::strtol(firstByteStr, nullptr, 16);
         bool isRandom = (firstByte & 0x02) != 0;
         
         TEST_ASSERT_EQUAL_MESSAGE(testCases[i].shouldBeRandom, isRandom, testCases[i].description);
