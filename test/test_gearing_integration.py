@@ -6,7 +6,6 @@ The native suite separately exercises the FTMS search and thermal policies.
 
 from pathlib import Path
 import json
-import math
 import re
 import shutil
 import subprocess
@@ -253,16 +252,16 @@ int main() {
 
   // Actual FTMS spindown mode, for every shipped profile and both home paths.
   /* SHIPPED PROFILES */
-  const uint16_t* profiles[] = {nullptr, road, mtb, gravel};
-  const int counts[] = {0,24,12,13};
-  const int starts[] = {8,8,4,4};
-  for (int profile = 0; profile < 4; ++profile) {
+  const uint16_t* profiles[] = {nullptr, road, mtb, gravel, allrounder, nullptr};
+  const int counts[] = {0,24,12,13,24,24};
+  const int starts[] = {8,8,4,4,8,8};
+  for (int profile = 0; profile < 6; ++profile) {
     reset();
     config.setShiftStep(1200);
-    assert(config.setGearRatios(profiles[profile], counts[profile]));
+    assert(profile == 5 ? config.setGearPreset(1) : config.setGearTeeth(profiles[profile], counts[profile]));
     controller.resetStartingGear();
     initializeStartupPosition();
-    const int startupPosition = config.getGearRatios().offsetSteps(starts[profile], 1200);
+    const int startupPosition = config.getGearProfile().offsetSteps(starts[profile], 1200);
     assertGear(starts[profile]);
     assert(motor.commands == 0 && motor.pos == startupPosition);
     controller.FTMSModeShiftModifier();
@@ -272,14 +271,14 @@ int main() {
       for (bool full : {false, true}) {
         reset(ftms);
         config.setShiftStep(1200);
-        assert(config.setGearRatios(profiles[profile], counts[profile]));
+        assert(profile == 5 ? config.setGearPreset(1) : config.setGearTeeth(profiles[profile], counts[profile]));
         runtime.setFTMSMode(FitnessMachineControlPointProcedure::SpinDownControl);
         runtime.setTargetIncline(7484); // Old recovered position must not become terrain.
         controller.goHome(full);
         assertGear(starts[profile]);
         assert(runtime.getFTMSMode() == FitnessMachineControlPointProcedure::SetIndoorBikeSimulationParameters);
         assert(runtime.getTargetIncline() == 0);
-        const int expected = config.getGearRatios().offsetSteps(starts[profile], 1200);
+        const int expected = config.getGearProfile().offsetSteps(starts[profile], 1200);
         controller.FTMSModeShiftModifier();
         controller.moveStepper();
         assert(motor.pos == expected && motor.pos < 10000);
@@ -298,11 +297,11 @@ int main() {
     controller.moveStepper();
     assert(motor.pos == 9000 && runtime.getTargetIncline() == 9000);
   }
-  const uint16_t ratios[] = {1000,1100,1200,1300,1400,1500,1600,1700,1800,1900,2000,2100};
+  const uint16_t ratios[] = {1010,1110,1210,1310,1410,1510,1610,1710,1810,1910,2010,2110};
   for (bool ftms : {false, true}) {
     for (bool bounded : {false, true}) {
       reset(ftms);
-      if (bounded) config.setGearRatios(ratios, 12);
+      if (bounded) config.setGearTeeth(ratios, 12);
       // A shift pending before homing is not a cancellation.
       runtime.setShifterPosition(3);
       controller.goHome(true);
@@ -318,11 +317,11 @@ int main() {
   }
   // Uneven ratio gaps must use the selected gear's actual ratio offset,
   // not one third of travel or the recovered FTMS sample position.
-  const uint16_t uneven[] = {1000,1100,1400,1500,1600,1800,1900,2000,2200,2300,2400,2500,2700};
+  const uint16_t uneven[] = {1010,1110,1410,1510,1610,1810,1910,2010,2210,2310,2410,2510,2710};
   for (bool full : {false, true}) {
     reset(true);
     config.setShiftStep(1200);
-    config.setGearRatios(uneven, 13);
+    config.setGearTeeth(uneven, 13);
     controller.goHome(true);
     metadataPresent = true;
     runtime.setShifterPosition(9);
@@ -486,7 +485,7 @@ int main() {
   // Failed/aborted FTMS homing starts a fresh, rideable Unlimited session.
   for (bool abort : {false, true}) {
     reset(true);
-    config.setGearRatios(ratios, 12);
+    config.setGearTeeth(ratios, 12);
     config.setHMin(0);
     config.setPTab4Pwr(true);
     runtime.setFTMSMode(FitnessMachineControlPointProcedure::SpinDownControl);
@@ -498,7 +497,7 @@ int main() {
     assertGear(0);
     assert(saved == 0 && table.resets == 0 && table.saves == 0);
     assert(config.getHMin() == 0 && config.getHMax() == 20000);
-    assert(config.getGearRatios().count == 12 && config.getPTab4Pwr());
+    assert(config.getGearProfile().count == 12 && config.getPTab4Pwr());
     assert(controller.activeGearRatios().unlimited() && !controller.usePowerTableForPower());
     assert(runtime.getMinStep() == -DEFAULT_STEPPER_TRAVEL && runtime.getMaxStep() == DEFAULT_STEPPER_TRAVEL);
     assert(runtime.getFTMSMode() == FitnessMachineControlPointProcedure::SetIndoorBikeSimulationParameters);
@@ -571,7 +570,7 @@ int main() {
   for (int failure = 0; failure < 5; ++failure) {
     reset();
     config.setHMin(0);
-    config.setGearRatios(ratios, 12);
+    config.setGearTeeth(ratios, 12);
     runtime.setFTMSMode(FitnessMachineControlPointProcedure::SpinDownControl);
     failedMechanicalEnd = failure;
     if (failure == 2) currentBoard.homingSupported = false;
@@ -617,7 +616,7 @@ int main() {
   assert(spinBLEClient.forwardedTarget == 700);
 
   // Ratio targets still pass through final motor clamps and the thermal gate.
-  config.setGearRatios(ratios, 12);
+  config.setGearTeeth(ratios, 12);
   runtime.setShifterPosition(12);
   controller.FTMSModeShiftModifier();
   assert(controller.simulationTargetPosition() == 799);
@@ -633,11 +632,11 @@ int main() {
         preset_pattern = r"chainrings: (\[[^\]]*\]),\s*cassette: (\[[^\]]*\])"
         presets = re.findall(preset_pattern, (ROOT / "data/settings.html").read_text(encoding="utf-8"))
         self.assertEqual(presets, re.findall(preset_pattern, (ROOT / "data_s3/settings.html").read_text(encoding="utf-8")))
-        self.assertEqual(len(presets), 4)
+        self.assertEqual(len(presets), 5)
         declarations = []
-        for name, (fronts, rears) in zip(("road", "mtb", "gravel"), presets[1:]):
-            ratios = sorted(math.floor(f / r * 1000 + 0.5) for f in json.loads(fronts) for r in json.loads(rears))
-            declarations.append("const uint16_t " + name + "[] = {" + ",".join(map(str, ratios)) + "};")
+        for name, (fronts, rears) in zip(("road", "mtb", "gravel", "allrounder"), presets[1:]):
+            teeth = [f * 100 + r for f in json.loads(fronts) for r in json.loads(rears)]
+            declarations.append("const uint16_t " + name + "[] = {" + ",".join(map(str, teeth)) + "};")
         harness = harness.replace("/* SHIPPED PROFILES */", "\n".join(declarations))
         harness = harness.replace("/* CONTROLLER */", function(header, "class SS2K {"))
         harness = harness.replace("/* FIRMWARE */", production)

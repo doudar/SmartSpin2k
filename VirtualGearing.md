@@ -8,7 +8,7 @@ retain precedence.
 
 ## Unlimited (default)
 
-An empty `gearRatios` array (`[]`) selects Unlimited, the default for new/reset
+An empty `gearTeeth` array (`[]`) with `gearPreset: 0` selects Unlimited, the default for new/reset
 settings and older configurations without a gear profile. Each shift moves by
 `shiftStep`, and the logical shift position can go positive or negative without
 a groupset limit. Startup assigns the existing knob position to gear 8 by setting
@@ -18,7 +18,8 @@ starting gear is 8, with a physical target of `8 * shiftStep` above calibrated z
 FTMS homing moves directly from the recovered position to that target through
 normal motor control; it does not assign gear 8 to the search endpoint.
 Saved homing bounds alone do not count as a successful home this boot.
-Motor travel limits remain active. An existing saved groupset is retained when upgrading.
+Motor travel limits remain active. Ratio-only test profiles are no longer supported;
+configurations without a tooth profile or named preset use Unlimited.
 
 ```
 gearOffset = shifterPosition * shiftStep
@@ -53,7 +54,8 @@ offset; later stationary FTMS corrections retain their coordinate-only behavior.
 Successful FTMS spindown also clears its procedure opcode to simulation mode and
 zeros incline before selecting the gear. Otherwise local ratio gearing is
 bypassed and the recovered position can incorrectly become a terrain offset.
-Regression coverage includes Unlimited (8), Road (8), MTB (4), and Gravel (4).
+Regression cases include Unlimited (8), Road (8), MTB (4), Gravel (4), Zwift
+Mixed Terrain (8), and Zwift All-Rounder (8).
 Duplicate ratios share an offset and zero gaps do not count toward the
 median. An all-identical profile has zero shift offset in every gear.
 
@@ -77,22 +79,38 @@ The firmware-hosted groupset selector provides:
 - Standard Road Compact: 50/34T | 11–34T, 24 sorted ratios.
 - MTB 1x12 – Wide Range: 32T | 10–52T, 12 ratios.
 - Gravel 1x13 – Optimized XPLR: 42T | 10–46T, 13 ratios.
+- Zwift Mixed Terrain 1x24: the exact 24 virtual ratios from Zwift's installed
+  `GEAR24MAN.xml`, starting at gear 8 (1.68).
+- Zwift All-Rounder: 48/35T | 10–33T, 24 sorted tooth combinations. The cassette
+  is 10, 11, 12, 13, 14, 15, 17, 19, 21, 24, 28, 33T.
 
-Custom arrays remain selectable as “Current custom groupset” and are preserved
-when saving other settings. A bounded profile is 2–26 sorted uint16 ratios, scaled by
-1000, each from 500 to 6000. `userConfig.gearRatios` persists this compact array;
-no preset names or descriptions are stored. Validation and median calculation
-finish before the complete profile is published under a short critical section.
+Tooth-based groupsets store 2–26 unique tooth pairs as `front * 100 + rear`: `5332` means
+53x32. Both tooth counts must be 1–99 and the rounded ratio must remain 500–6000
+in thousandths. Firmware sorts by that ratio, breaking equal-ratio ties by the
+packed pair. Ratios are derived once for the existing motor mapping, so shift
+spacing and startup behavior remain unchanged. Equal ratios from different tooth
+pairs remain distinct gears with the same motor offset.
 
-HTTP `/send_settings` accepts `gearRatios` as a JSON integer array and `shiftStep`
-through its existing field. Invalid profiles return HTTP 400 without replacing
-the current profile. Old saved rider weight fields are ignored and disappear on
-resave. The experimental rider-weight custom ID 0x33 is retired, not reused.
+Persistence and config/all-settings responses include `gearPreset` and
+`gearTeeth`. Preset 0 uses the tooth array (empty means Unlimited); preset 1 selects
+the built-in Zwift Mixed Terrain ratios and stores an empty tooth array. Mixed
+Terrain has no real tooth combinations in Zwift; the profile represents a single
+24-gear rear axis without inventing teeth. No arbitrary or legacy ratio-array input is
+supported. Validation and median calculation finish before publication under a
+short critical section. Both bounded formats use the same motor mapping above.
 
-Custom characteristic 0x34 retains metadata/indexed reads and atomic profile
-writes. See [CustomCharacteristic.md](CustomCharacteristic.md) for byte formats.
-To select Unlimited, write `02 34 00`; metadata reads return `80 34 00`, and
-indexed reads return an error because there are no stored ratios.
+HTTP `/send_settings` accepts `gearTeeth` as a packed-pair JSON array and
+`gearPreset` as 0 or 1, and `shiftStep` through its existing field. Submit either
+`gearTeeth` or `gearPreset` in one request, not both. A tooth-array write exits
+the built-in preset. Invalid profiles return HTTP 400 without
+replacing the current profile. Old saved rider weight fields are ignored and
+disappear on resave. The experimental rider-weight custom ID 0x33 is retired.
+
+Custom characteristic 0x34 provides metadata/indexed reads and atomic tooth-pair
+profile writes; 0x35 selects/reads the named preset. Tooth reads return an error
+while Mixed Terrain is selected. See [CustomCharacteristic.md](CustomCharacteristic.md) for byte
+formats. To select Unlimited, write `02 34 00`; metadata reads return `80 34 00`,
+and indexed reads return an error because there are no stored pairs.
 A full 26-gear write requires MTU 58; metadata and indexed reads fit MTU 23.
 Save BLE/DirCon changes with command `02 18`; web settings save automatically.
 

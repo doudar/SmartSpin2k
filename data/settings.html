@@ -75,7 +75,7 @@
         tooltipText: 'DNS Name the device will use on the network.',
         defaultValue: 'loading'
       },
-      gearRatios: {
+      gearTeeth: {
         type: 'groupset',
         title: 'Simulated Groupset'
       },
@@ -207,11 +207,27 @@
         description: 'Tighter cassette steps tailored for high-speed gravel racing.',
         chainrings: [42],
         cassette: [10, 11, 12, 13, 15, 17, 19, 21, 24, 28, 32, 38, 46]
+      },
+      {
+        name: 'Mixed Terrain 1x24',
+        gearing: '0.75–5.49 ratio range',
+        description: 'Good Mixed Terrain Gearset.',
+        preset: 1,
+        count: 24
+      },
+      {
+        name: 'All-Rounder',
+        gearing: '48/35T | 10–33T',
+        description: 'All-Rounder.',
+        chainrings: [48, 35],
+        cassette: [10, 11, 12, 13, 14, 15, 17, 19, 21, 24, 28, 33]
       }
-    ].map(preset => ({
-      ...preset,
-      ratios: preset.chainrings.flatMap(front => preset.cassette.map(rear => Math.round(front / rear * 1000))).sort((a, b) => a - b)
-    }));
+    ].map(preset => {
+      const ratio = pair => Math.round(Math.floor(pair / 100) / (pair % 100) * 1000);
+      const teeth = (preset.chainrings || []).flatMap(front => preset.cassette.map(rear => front * 100 + rear))
+        .sort((a, b) => ratio(a) - ratio(b) || a - b);
+      return {...preset, teeth, value: preset.preset ? String(preset.preset) : JSON.stringify(teeth)};
+    });
 
     function createGroupsetSetting(id, config) {
       return `<div class="setting-group">
@@ -219,7 +235,7 @@
         <select id="${id}" name="${id}" class="device-select" aria-describedby="groupsetGearing groupsetDescription" disabled
           onchange="updateGroupsetDescription(); sendSetting(this)">
           <option value="" disabled selected>Loading groupset…</option>
-          ${groupsetPresets.map(preset => `<option value="${JSON.stringify(preset.ratios)}">${preset.name}</option>`).join('')}
+          ${groupsetPresets.map(preset => `<option value="${preset.value}">${preset.name}</option>`).join('')}
         </select>
         <p id="groupsetGearing" class="groupset-gearing"></p>
         <p id="groupsetDescription" class="groupset-description" aria-live="polite"></p>
@@ -227,9 +243,11 @@
     }
 
     function updateGroupsetDescription() {
-      const value = document.getElementById('gearRatios').value;
-      const preset = groupsetPresets.find(preset => JSON.stringify(preset.ratios) === value);
-      const count = value ? JSON.parse(value).length : 0;
+      const select = document.getElementById('gearTeeth');
+      const value = select.value;
+      const preset = groupsetPresets.find(preset => preset.value === value);
+      const count = preset?.count || (value ? JSON.parse(value).length : 0);
+      select.name = preset?.preset ? 'gearPreset' : 'gearTeeth';
       document.getElementById('groupsetGearing').textContent = preset
         ? (count ? `${preset.gearing} · ${count} virtual gears` : preset.gearing)
         : (count ? `${count} virtual gears` : '');
@@ -238,17 +256,19 @@
         : 'Your saved custom gearing is retained. Choose a preset to replace it.';
     }
 
-    function loadGroupset(ratios) {
-      const select = document.getElementById('gearRatios');
-      const value = JSON.stringify(ratios);
+    function loadGroupset(teeth, preset = 0) {
+      const select = document.getElementById('gearTeeth');
+      const value = preset ? String(preset) : JSON.stringify(teeth || []);
       const oldCustom = select.querySelector('[data-custom]');
       if (oldCustom) oldCustom.remove();
-      if (!groupsetPresets.some(preset => JSON.stringify(preset.ratios) === value)) {
+      if (!groupsetPresets.some(preset => preset.value === value)) {
         const option = new Option('Current custom groupset', value);
         option.dataset.custom = 'true';
         select.appendChild(option);
+        option.selected = true;
+      } else {
+        select.value = value;
       }
-      select.value = value;
       updateGroupsetDescription();
     }
 
@@ -393,12 +413,12 @@
       xhttp.onreadystatechange = function () {
         if (this.readyState == 4 && this.status == 200) {
           var obj = JSON.parse(this.responseText);
-          document.getElementById('gearRatios').disabled = false;
+          document.getElementById('gearTeeth').disabled = false;
           for (const key in obj) {
             const el = document.getElementById(key);
             if (el) {
-              if (key === 'gearRatios') {
-                loadGroupset(obj[key]);
+              if (key === 'gearTeeth') {
+                loadGroupset(obj[key], obj.gearPreset);
               } else if (el.type === 'checkbox') {
                 el.checked = !!obj[key];
               } else {

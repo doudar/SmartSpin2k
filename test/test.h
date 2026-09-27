@@ -127,6 +127,8 @@ class TestBleWireRoundTrip {
 
 class TestVirtualGearing {
  public:
+  static void test_tooth_pairs_and_selection();
+  static void test_tooth_packet_validation();
   static void test_unlimited_default_and_wire();
   static void test_ratio_api();
   static void test_offset_normalization();

@@ -158,7 +158,7 @@ class RuntimeParameters {
 
 class userParameters {
  private:
-  VirtualGearing::Gears gearRatios;
+  VirtualGearing::Gears gearProfile;
 #ifndef PLATFORMIO_ENV_NATIVE
   mutable portMUX_TYPE gearMutex = portMUX_INITIALIZER_UNLOCKED;
 #endif
@@ -190,29 +190,38 @@ class userParameters {
   String foundDevices          = "";
 
  public:
-  VirtualGearing::Gears getGearRatios() const {
+  VirtualGearing::Gears getGearProfile() const {
 #ifndef PLATFORMIO_ENV_NATIVE
     portENTER_CRITICAL(&gearMutex);
 #endif
-    const VirtualGearing::Gears copy = gearRatios;
+    const VirtualGearing::Gears copy = gearProfile;
 #ifndef PLATFORMIO_ENV_NATIVE
     portEXIT_CRITICAL(&gearMutex);
 #endif
     return copy;
   }
-  bool setGearRatios(const uint16_t* values, size_t count) {
+  bool setGearTeeth(const uint16_t* values, size_t count) {
     VirtualGearing::Gears next;
     if (!next.assign(values, count)) return false;
+    setGearProfile(next);
+    return true;
+  }
+  void setGearProfile(const VirtualGearing::Gears& next) {
 #ifndef PLATFORMIO_ENV_NATIVE
     portENTER_CRITICAL(&gearMutex);
 #endif
-    gearRatios = next;
+    gearProfile = next;
 #ifndef PLATFORMIO_ENV_NATIVE
     portEXIT_CRITICAL(&gearMutex);
 #endif
+  }
+  bool setGearTeethJSON(const String& json);
+  bool setGearPreset(uint16_t id) {
+    VirtualGearing::Gears next;
+    if (!next.assignPreset(id)) return false;
+    setGearProfile(next);
     return true;
   }
-  bool setGearRatiosJSON(const String& json);
 
   void setFirmwareUpdateURL(String fURL) { firmwareUpdateURL = fURL; }
   const char* getFirmwareUpdateURL() { return firmwareUpdateURL.c_str(); }

@@ -152,6 +152,8 @@ void setup() {
 
   {
     TestVirtualGearing test;
+    RUN_TEST(test.test_tooth_pairs_and_selection);
+    RUN_TEST(test.test_tooth_packet_validation);
     RUN_TEST(test.test_unlimited_default_and_wire);
     RUN_TEST(test.test_ratio_api);
     RUN_TEST(test.test_offset_normalization);

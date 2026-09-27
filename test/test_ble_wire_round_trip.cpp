@@ -146,7 +146,7 @@ void TestBleWireRoundTrip::test_dircon_uuid_round_trip(void) {
 void TestBleWireRoundTrip::test_all_custom_characteristic_formats(void) {
   unsigned formatCounts[CustomUnknown + 1] = {0};
 
-  for (uint8_t id = BLE_firmwareUpdateURL; id <= BLE_gearRatios; ++id) {
+  for (uint8_t id = BLE_firmwareUpdateURL; id <= BLE_gearPreset; ++id) {
     const CustomCharacteristicValueFormat format = customCharacteristicValueFormat(id);
     // 0x33 was the retired experimental rider-weight field. Keep the wire ID
     // reserved so a future field cannot accidentally reinterpret old writes.
@@ -208,7 +208,7 @@ void TestBleWireRoundTrip::test_all_custom_characteristic_formats(void) {
       }
       case CustomBooleanWriteStringRead:
         break;
-      case CustomGearRatios: {
+      case CustomGearTeeth: {
         uint8_t value[3] = {0, 0, 0};
         put_le16(value + 1, 4545);
         TEST_ASSERT_EQUAL_UINT16(4545, get_le16(value + 1));
@@ -225,7 +225,7 @@ void TestBleWireRoundTrip::test_all_custom_characteristic_formats(void) {
 
   TEST_ASSERT_EQUAL_UINT(6, formatCounts[CustomAction]);
   TEST_ASSERT_EQUAL_UINT(11, formatCounts[CustomBoolean]);
-  TEST_ASSERT_EQUAL_UINT(14, formatCounts[CustomUnsigned16]);
+  TEST_ASSERT_EQUAL_UINT(15, formatCounts[CustomUnsigned16]);
   TEST_ASSERT_EQUAL_UINT(3, formatCounts[CustomSigned16]);
   TEST_ASSERT_EQUAL_UINT(3, formatCounts[CustomSigned32]);
   TEST_ASSERT_EQUAL_UINT(9, formatCounts[CustomString]);
@@ -233,7 +233,7 @@ void TestBleWireRoundTrip::test_all_custom_characteristic_formats(void) {
   TEST_ASSERT_EQUAL_UINT(1, formatCounts[CustomSettingsSnapshot]);
   TEST_ASSERT_EQUAL_UINT(1, formatCounts[CustomScanResultStream]);
   TEST_ASSERT_EQUAL_UINT(1, formatCounts[CustomBooleanWriteStringRead]);
-  TEST_ASSERT_EQUAL_UINT(1, formatCounts[CustomGearRatios]);
+  TEST_ASSERT_EQUAL_UINT(1, formatCounts[CustomGearTeeth]);
 }
 
 void TestBleWireRoundTrip::test_ftms_round_trip(void) {

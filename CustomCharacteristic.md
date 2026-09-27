@@ -95,7 +95,8 @@ From BLE_common.h
 |BLE_hardwareVersion       |0x2F   |str  |Read-only detected hardware revision                |
 |BLE_BLELogging            |0x30   |bool/str|Write: enable/disable BLE log streaming. Read: returns last log message|
 |BLE_allSettings           |0x31   |JSON |Read-only chunked snapshot of all user settings         |
-|BLE_gearRatios            |0x34   |array|Atomic gear profile write; metadata/indexed reads     |
+|BLE_gearTeeth             |0x34   |array|Packed front/rear tooth pairs; metadata/indexed reads |
+|BLE_gearPreset            |0x35   |uint16|0 = tooth profile/Unlimited, 1 = Zwift Mixed Terrain 1x24 |
 
 *syncMode will disable the movement of the stepper motor by forcing stepperPosition = targetPosition prior to the motor control. While this mode is enabled, it allows the client to set parameters like incline and shifterPosition without moving the motor from it's current position. Once the parameters are set, this mode should be turned back off and SS2K will resume normal operation.
 
@@ -146,36 +147,54 @@ shifting. Shift Amount sets the motor distance for the median positive ratio gap
 See [VirtualGearing.md](VirtualGearing.md). The experimental rider-weight ID 0x33
 is retired and returns an unsupported/error response; it must not be reused.
 
-### Gear ratios (`0x34`)
+### Gear tooth pairs (`0x34`)
 
-Store each effective chainring/sprocket ratio multiplied by 1000 in an unsigned
-LE16. Supply zero values for Unlimited (default), or 2–26 values, each 500–6000,
-in nondecreasing order. An entire profile
-is validated before replacing the live array; rejected writes leave it unchanged.
-Duplicate ratios are allowed for overlapping double-chainring combinations.
+Store each pair as `front * 100 + rear` in an unsigned LE16 (`5332` = 53x32).
+Supply zero pairs for Unlimited (default), or 2–26 unique pairs. Both tooth
+counts must be 1–99 and their rounded ratio must be 500–6000 in thousandths.
+Firmware sorts by ratio, breaking ties by packed pair. Distinct pairs with equal
+ratios remain separate gears with the same motor offset. The complete profile
+is validated before replacement; invalid or truncated writes leave it unchanged.
+Writing a tooth array also sets `gearPreset` to 0. While preset 1 is selected,
+both metadata and indexed tooth reads return `FF 34` because it has no tooth pairs.
 
 - Unlimited: write `02 34 00`; success/metadata response `80 34 00`. Indexed reads
-  return `FF 34`. JSON stores `gearRatios: []`; fixed Shift Amount spacing applies.
-- Write: `02 34 <count u8> <ratio0 LE16> ... <ratioN LE16>`.
+  return `FF 34`. JSON stores `gearTeeth: []`; fixed Shift Amount spacing applies.
+- Write: `02 34 <count u8> <pair0 LE16> ... <pairN LE16>`.
 - Success: `80 34 <count>`. Failure: `FF 34`.
 - Metadata read: `01 34`; response: `80 34 <count>`.
 - Indexed read: `01 34 <zero-based index>`; response:
-  `80 34 <count> <index> <ratio LE16>`. Out-of-range indexes return `FF 34`.
-- Changed-value notification: `80 34 <count>`, including edits that keep the count
-  unchanged. Refresh via indexed reads or the chunked all-settings snapshot.
+  `80 34 <count> <index> <pair LE16>`. Out-of-range indexes return `FF 34`.
+- Changed-value notification: `80 34 <count>`, including edits that keep the
+  count or ratios unchanged. Refresh indexed reads or the all-settings snapshot.
 - A 26-gear write is 55 bytes, requiring ATT MTU **58 or larger** for a single
-  normal BLE write. Negotiate MTU before writing the full profile. Reads,
-  notifications and all-settings snapshots work at MTU 23. DirCon has no ATT limit.
-- Example profile `[1000,1500,2000]`: write `02 34 03 E8 03 DC 05 D0 07`;
-  success `80 34 03`. Read index 1 with `01 34 01`; response
-  `80 34 03 01 DC 05`.
+  normal BLE write. Reads, notifications and all-settings snapshots work at
+  MTU 23. DirCon has no ATT limit.
+- Example: `02 34 02 C7 14 D4 14` submits 53x19 and 53x32; success `80 34 02`.
+  After sorting, reading index 0 with `01 34 00` returns `80 34 02 00 D4 14`.
 
-After updating the profile over BLE/DirCon, send the existing save command
-`02 18` to persist it. Firmware-hosted web settings save automatically. JSON uses
-`gearRatios` as the scaled integer array. In local simulation/inclination modes,
-`BLE_shifterPosition` uses **1-based** gear numbers for bounded profiles and an
-unbounded signed shift count for Unlimited (start at 0 unhomed, 8 homed). Bounded
-profiles start at one-third of their gear count, rounded down with a minimum of 1.
-Indexed ratio reads use
-**0-based** indexes. Bounded gear 1 is the zero shift offset; travel limits still apply.
-No companion-app changes are included here.
+After updating over BLE/DirCon, send the existing save command `02 18` to persist
+it. Firmware-hosted web settings save automatically. Persistence and config
+snapshots include `gearPreset` and `gearTeeth`; arbitrary ratio-only test profiles
+are not supported.
+In local simulation/inclination modes, `BLE_shifterPosition` uses **1-based**
+gear numbers for bounded profiles and an unbounded signed shift count for
+Unlimited (startup and successful homing select gear 8). Bounded profiles start
+at one-third of their gear count, rounded down with a minimum of 1. Indexed pair
+reads use **0-based** indexes. Bounded gear 1 is the zero shift offset; travel
+limits still apply. No companion-app changes are included here.
+
+### Named gear preset (`0x35`)
+
+- Read: `01 35`; response `80 35 <preset LE16>`.
+- Select Zwift Mixed Terrain 1x24: `02 35 01 00`; response `80 35 01 00`.
+- Select Unlimited: `02 35 00 00`; response `80 35 00 00`. To select a bounded
+  tooth profile instead, write its pairs through 0x34.
+- Unknown preset IDs or invalid lengths return `FF 35` without changing the profile.
+- Every profile change notifies `80 35 <preset LE16>`; tooth profiles also notify
+  0x34 metadata. Reading value 0 alone does not distinguish Unlimited from a
+  bounded tooth profile: read 0x34 as well.
+
+Preset 1 persists as `gearPreset: 1` and `gearTeeth: []`. Its exact 24 ratios are
+built into firmware; it reports one rear gear axis, starts at gear 8, and uses
+the same median-gap Shift Amount mapping as tooth profiles. Save with `02 18`.

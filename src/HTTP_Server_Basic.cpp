@@ -886,8 +886,15 @@ void HTTP_Server::settingsProcessor() {
   bool wasSettingsUpdate = false;
   bool reboot            = false;
   // Reject malformed new settings before applying any part of this request.
-  if (server.hasArg("gearRatios") && !userConfig->setGearRatiosJSON(server.arg("gearRatios"))) {
-    server.send(400, "text/plain", "Supply [] for unlimited gears, or 2 to 26 sorted ratios from 500 to 6000 (ratio x 1000).");
+  if (server.hasArg("gearPreset")) {
+    const String preset = server.arg("gearPreset");
+    if (server.hasArg("gearTeeth") || (preset != "0" && preset != "1") || !userConfig->setGearPreset(preset.toInt())) {
+      server.send(400, "text/plain", "Select gearPreset 0 (Unlimited) or 1 (Zwift Mixed Terrain), or supply gearTeeth separately.");
+      return;
+    }
+  }
+  if (server.hasArg("gearTeeth") && !userConfig->setGearTeethJSON(server.arg("gearTeeth"))) {
+    server.send(400, "text/plain", "Supply [] for unlimited, or 2 to 26 unique front*100+rear tooth pairs, with teeth 1-99 and ratios 0.5-6.");
     return;
   }
   if (!server.arg("ssid").isEmpty()) {

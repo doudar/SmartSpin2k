@@ -24,7 +24,7 @@ void SS2K::resetStartingGear() {
 }
 
 VirtualGearing::Gears SS2K::activeGearRatios() const {
-  return homingFallback ? VirtualGearing::Gears{} : userConfig->getGearRatios();
+  return homingFallback ? VirtualGearing::Gears{} : userConfig->getGearProfile();
 }
 
 bool SS2K::usePowerTableForPower() const {

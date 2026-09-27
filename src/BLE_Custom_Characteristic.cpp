@@ -455,7 +455,7 @@ void BLE_ss2kCustomCharacteristic::process(const std::string& rxValue, uint16_t 
       case CustomBooleanWriteStringRead:
         requiredLength = 3;
         break;
-      case CustomGearRatios:
+      case CustomGearTeeth:
         requiredLength = 3;
         break;
       case CustomPowerTableRow:
@@ -1139,29 +1139,41 @@ void BLE_ss2kCustomCharacteristic::process(const std::string& rxValue, uint16_t 
       }
       break;
 
-    case BLE_gearRatios: {
+    case BLE_gearTeeth: {
       returnLength = 2;
       if (rxValue[0] == cc_write) {
         VirtualGearing::Gears next;
-        if (next.decode(pData + 2, rxValue.size() - 2) && userConfig->setGearRatios(next.ratios, next.count)) {
+        if (next.decode(pData + 2, rxValue.size() - 2)) {
+          userConfig->setGearProfile(next);
           returnValue[0] = cc_success;
           returnValue[2] = next.count;
           returnLength   = 3;
         }
       } else if (rxValue[0] == cc_read && (rxValue.size() == 2 || rxValue.size() == 3)) {
-        const VirtualGearing::Gears gears = userConfig->getGearRatios();
+        const VirtualGearing::Gears gears = userConfig->getGearProfile();
         // A metadata read/changed notification fits every ATT MTU. Indexed
-        // reads return one ratio; BLE_allSettings returns the complete array.
-        if (rxValue.size() == 2 || pData[2] < gears.count) {
+        // reads return one tooth pair; BLE_allSettings returns the complete array.
+        if (gears.preset == VirtualGearing::CUSTOM_TEETH && (rxValue.size() == 2 || pData[2] < gears.count)) {
           returnValue[0] = cc_success;
           returnValue[2] = gears.count;
           returnLength   = 3;
           if (rxValue.size() == 3) {
             returnValue[3] = pData[2];
-            put_le16(&returnValue[4], gears.ratios[pData[2]]);
+            put_le16(&returnValue[4], gears.teeth[pData[2]]);
             returnLength = 6;
           }
         }
+      }
+      break;
+    }
+
+    case BLE_gearPreset: {
+      returnLength = 2;
+      if ((rxValue[0] == cc_read && rxValue.size() == 2) ||
+          (rxValue[0] == cc_write && rxValue.size() == 4 && userConfig->setGearPreset(get_le16(pData + 2)))) {
+        returnValue[0] = cc_success;
+        put_le16(&returnValue[2], userConfig->getGearProfile().preset);
+        returnLength = 4;
       }
       break;
     }
@@ -1195,10 +1207,11 @@ void BLE_ss2kCustomCharacteristic::parseNemit() {
   static userParameters _oldParams;
   static RuntimeParameters _oldRTParams;
 
-  const VirtualGearing::Gears gears = userConfig->getGearRatios();
-  if (!(gears == _oldParams.getGearRatios())) {
-    _oldParams.setGearRatios(gears.ratios, gears.count);
-    BLE_ss2kCustomCharacteristic::notify(BLE_gearRatios);
+  const VirtualGearing::Gears gears = userConfig->getGearProfile();
+  if (!(gears == _oldParams.getGearProfile())) {
+    _oldParams.setGearProfile(gears);
+    BLE_ss2kCustomCharacteristic::notify(BLE_gearPreset);
+    if (gears.preset == VirtualGearing::CUSTOM_TEETH) BLE_ss2kCustomCharacteristic::notify(BLE_gearTeeth);
     return;
   }
 
