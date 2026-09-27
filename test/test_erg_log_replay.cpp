@@ -233,21 +233,21 @@ void TestErgLogReplay::test_table_position_confidence(void) {
 
   TEST_ASSERT_FALSE(confidence.trusted());
   TEST_ASSERT_EQUAL_UINT8(0, confidence.score());
-  for (int hit = 0; hit < ErgControl::TableConfidence::TRUST_SCORE; ++hit) confidence.update(true);
+  for (int hit = 0; hit < ErgControl::TABLE_CONFIDENCE_TRUST_SCORE; ++hit) confidence.update(true);
   TEST_ASSERT_TRUE(confidence.trusted());
-  TEST_ASSERT_EQUAL_UINT8(ErgControl::TableConfidence::TRUST_SCORE, confidence.score());
+  TEST_ASSERT_EQUAL_UINT8(ErgControl::TABLE_CONFIDENCE_TRUST_SCORE, confidence.score());
 
   // Trust is hysteretic: isolated misses do not disable a proven table. Keep
   // applying misses until the configured revoke threshold is reached.
-  const int missesToRevoke = (ErgControl::TableConfidence::TRUST_SCORE - ErgControl::TableConfidence::REVOKE_SCORE + ErgControl::TableConfidence::MISS_PENALTY - 1) /
-                             ErgControl::TableConfidence::MISS_PENALTY;
+  const int missesToRevoke = (ErgControl::TABLE_CONFIDENCE_TRUST_SCORE - ErgControl::TABLE_CONFIDENCE_REVOKE_SCORE + ErgControl::TABLE_CONFIDENCE_MISS_PENALTY - 1) /
+                             ErgControl::TABLE_CONFIDENCE_MISS_PENALTY;
   for (int miss = 1; miss < missesToRevoke; ++miss) {
     confidence.update(false);
     TEST_ASSERT_TRUE(confidence.trusted());
   }
   confidence.update(false);
   TEST_ASSERT_FALSE(confidence.trusted());
-  TEST_ASSERT_EQUAL_UINT8(ErgControl::TableConfidence::REVOKE_SCORE, confidence.score());
+  TEST_ASSERT_EQUAL_UINT8(ErgControl::TABLE_CONFIDENCE_REVOKE_SCORE, confidence.score());
 
   TEST_ASSERT_TRUE(ErgControl::positionMatchesPowerWindow(1000, 900, 1100, 10));
   TEST_ASSERT_TRUE(ErgControl::positionMatchesPowerWindow(1110, 1100, 900, 10));
@@ -285,10 +285,13 @@ void TestErgLogReplay::test_table_position_confidence(void) {
   TEST_ASSERT_EQUAL_INT(20, ErgControl::approachingError(20, -15));
   TEST_ASSERT_EQUAL_INT(-20, ErgControl::approachingError(-20, 15));
 
-  TEST_ASSERT_FALSE(ErgControl::tableSeekExceededPowerLimit(340, 360, true));
-  TEST_ASSERT_TRUE(ErgControl::tableSeekExceededPowerLimit(340, 361, true));
-  TEST_ASSERT_FALSE(ErgControl::tableSeekExceededPowerLimit(170, 130, false));
-  TEST_ASSERT_TRUE(ErgControl::tableSeekExceededPowerLimit(170, 129, false));
+  // Equality stays inside each configured margin; one watt beyond releases control.
+  const int highLimit = 340 + ErgControl::TABLE_SEEK_INCREASE_OVERSHOOT_WATTS;
+  const int lowLimit  = 170 - ErgControl::TABLE_SEEK_DECREASE_UNDERSHOOT_WATTS;
+  TEST_ASSERT_FALSE(ErgControl::tableSeekExceededPowerLimit(340, highLimit, true));
+  TEST_ASSERT_TRUE(ErgControl::tableSeekExceededPowerLimit(340, highLimit + 1, true));
+  TEST_ASSERT_FALSE(ErgControl::tableSeekExceededPowerLimit(170, lowLimit, false));
+  TEST_ASSERT_TRUE(ErgControl::tableSeekExceededPowerLimit(170, lowLimit - 1, false));
 
   PTData table;
   RideReplaySummary tableSummary;

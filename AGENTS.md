@@ -427,6 +427,8 @@ Tooth profiles persist `gearTeeth` pairs (`front * 100 + rear`, 5332 = 53x32) wi
 
 Primary files: `include/ERG_Mode.h`, `src/ERG_Mode.cpp`.
 
+Controller/helper tuning constants live in categorized sections in `include/ERG_Mode_Settings.h`, included by both `ERG_Mode.h` and `ERG_Mode_Utils.h`. Keep tuning values there and helper logic in `ERG_Mode_Utils.h`; shared device defaults, ERG feature switches, `ERG_MODE_PID_WINDOW`, and power-table dimensions remain in `settings.h`.
+
 `moveStepper()` calls `prepareMode()` before interpreting an ERG target: carry the actual motor position into `targetIncline` so a SIM grade cannot become an unintended motor command. Reset transient controller state on mode changes.
 
 `ErgMode::runERG()` is called from the main maintenance loop. It:

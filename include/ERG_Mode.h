@@ -7,30 +7,12 @@
 
 #pragma once
 
-#include "settings.h"
+#include "ERG_Mode_Settings.h"
 #include "SmartSpin_parameters.h"
 #include "ERG_Mode_Utils.h"
 
 #define ERG_MODE_LOG_CSV_TAG "ERG_Mode_CSV"
 #define ERG_MODE_LOG_TAG     "ERG_Mode"
-#define ERG_MODE_DELAY       700
-
-constexpr int ERG_MODE_LOG_INTERVAL_MS         = 2000;
-constexpr int ERG_TABLE_POSITION_PADDING_STEPS = static_cast<int>(TABLE_DIVISOR);
-constexpr int ERG_TABLE_SETTLED_POSITION_STEPS = static_cast<int>(TABLE_DIVISOR);
-constexpr int ERG_TABLE_STABLE_CADENCE_DELTA   = 2;
-constexpr int ERG_TABLE_STABLE_WATTS_DELTA     = ERG_MODE_PID_WINDOW / 2;
-constexpr int ERG_TABLE_STABLE_READINGS        = 3;
-constexpr int ERG_TABLE_SETTLE_TIMEOUT_MS      = 5000;
-constexpr int ERG_TABLE_MOVE_TIMEOUT_MS        = 10000;
-constexpr uint32_t ERG_FEEDBACK_SETTLE_MS      = 2500;
-constexpr uint32_t ERG_FEEDBACK_TIMEOUT_MS     = 5000;
-constexpr uint32_t ERG_FEEDBACK_MAX_AGE_MS     = 1500;
-constexpr int ERG_FEEDBACK_HIGH_OVERSHOOT_WATTS = ERG_MODE_PID_WINDOW;
-constexpr int ERG_FEEDBACK_WORSENING_WATTS      = 30;
-
-constexpr int ERG_TABLE_CORRECTION_WATTS       = ERG_MODE_PID_WINDOW;
-constexpr int ERG_TABLE_CADENCE_SEEK_RPM       = POWERTABLE_CAD_INCREMENT;
 
 struct Mode {
   static const int MAINTAIN   = 0;
