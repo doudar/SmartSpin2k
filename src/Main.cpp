@@ -331,6 +331,9 @@ void SS2K::maintenanceLoop(void*) {
 
     // be quiet while updating via BLE
     if (!ss2k->isUpdating) {
+      // Drain deferred BLE settings callbacks before shift/motor processing,
+      // without waiting for the periodic telemetry timer or using nimble_host.
+      ss2kCustomCharacteristic.processPendingEvents();
       static unsigned long bleTimer = millis();
       // 500ms
       if ((millis() - bleTimer) > BLE_NOTIFY_DELAY) {

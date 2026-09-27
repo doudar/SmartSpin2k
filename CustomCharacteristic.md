@@ -132,6 +132,13 @@ All-settings snapshot (BLE or DirCon):
 
 The client validates that it received chunks `0` through `chunk count - 1`, concatenates the bytes after each header, and parses the result as JSON. If the connection closes or a chunk is missing, discard the partial snapshot and issue the read command again. Unknown JSON properties should be ignored so newly added settings remain backward compatible. The snapshot includes sensitive settings such as the Wi-Fi password, consistent with the existing individual password read command.
 
+BLE requests and snapshot acknowledgments are queued for the maintenance task;
+an ATT write completion does not mean the settings operation has completed. Wait
+for the custom-characteristic response before sending the next request. A bounded
+queue logs overflow and drops excess events. Disconnects invalidate queued work,
+and a snapshot accepts acknowledgments only from its connection/session. Snapshot
+transfers expire after five seconds without progress. The wire format is unchanged.
+
 ## Virtual gearing settings (firmware API)
 
 Gear profiles are persisted on both targets and used for ratio-based stepper

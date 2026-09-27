@@ -183,6 +183,7 @@ void SpinBLEServer::update() {
   cyclingPowerService.update();
   cyclingSpeedCadenceService.update();
   fitnessMachineService.update();
+  // DirCon snapshot pacing only; deferred BLE callbacks run in the fast loop.
   ss2kCustomCharacteristic.update();
   // zwiftService.update();
   // OpenBikeControl sends event-driven notifications from shift handlers.
@@ -249,6 +250,7 @@ void SpinBLEServer::updateWheelAndCrankRev() {
 
 // Creating Server Connection Callbacks
 void MyServerCallbacks::onConnect(NimBLEServer* pServer, NimBLEConnInfo& connInfo) {
+  BLE_ss2kCustomCharacteristic::onConnect(connInfo.getConnHandle());
   SS2K_LOG(BLE_SERVER_LOG_TAG, "Bluetooth Remote Client Connected: %s Connected Clients: %d", connInfo.getAddress().toString().c_str(), pServer->getConnectedCount());
   BLERequestMtuExchange(connInfo.getConnHandle());
 
@@ -261,6 +263,7 @@ void MyServerCallbacks::onConnect(NimBLEServer* pServer, NimBLEConnInfo& connInf
 }
 
 void MyServerCallbacks::onDisconnect(NimBLEServer* pServer, NimBLEConnInfo& connInfo, int reason) {
+  BLE_ss2kCustomCharacteristic::onDisconnect(connInfo.getConnHandle());
   SS2K_LOG(BLE_SERVER_LOG_TAG, "Bluetooth Remote Client Disconnected. Reason: %d (%s) Remaining Clients: %d", reason, NimBLEUtils::returnCodeToString(reason),
            pServer->getConnectedCount());
   BLEFirmwareUpdateOnDisconnect(connInfo.getConnHandle());

@@ -91,6 +91,7 @@ This characteristic allows for reading and writing various user configuration pa
 #include "DirConManager.h"
 #include "ByteUtils.h"
 #include "ScanResultProtocol.h"
+#include "CustomCharacteristicEvents.h"
 #include <algorithm>
 #include <vector>
 
@@ -109,11 +110,13 @@ struct SettingsSnapshotTransfer {
   uint16_t chunk             = 0;
   uint16_t chunkCount        = 0;
   uint16_t connHandle        = BLE_HS_CONN_HANDLE_NONE;
+  uint64_t session           = 0;
   unsigned long lastActivity = 0;
   bool active                = false;
 };
 
 SettingsSnapshotTransfer settingsSnapshot;
+CustomCharacteristicEvents<CONFIG_BT_NIMBLE_MAX_CONNECTIONS> bleEvents;
 SettingsSnapshotTransfer dirConSettingsSnapshot;
 uint16_t scanResultId       = 0;
 uint16_t scanResultSequence = 0;
@@ -294,6 +297,29 @@ void BLE_ss2kCustomCharacteristic::setupService(NimBLEServer* pServer) {
   });
 }
 
+void BLE_ss2kCustomCharacteristic::processPendingEvents() {
+  // Keep parsing, JSON serialization and indication sends off nimble_host.
+  // Snapshot state is owned by this maintenance task, including acknowledgments.
+  if (settingsSnapshot.active &&
+      (!bleEvents.connected(settingsSnapshot.connHandle, settingsSnapshot.session) ||
+       millis() - settingsSnapshot.lastActivity > SETTINGS_SNAPSHOT_TIMEOUT_MILLIS)) {
+    resetSettingsSnapshot();
+  }
+  decltype(bleEvents)::Event event;
+  for (size_t i = 0; i < decltype(bleEvents)::CAPACITY && bleEvents.pop(event); ++i) {
+    if (event.isStatus) {
+      if (settingsSnapshot.active && event.peer == settingsSnapshot.connHandle && event.session == settingsSnapshot.session) {
+        handleSettingsSnapshotStatus(smartSpin2kCharacteristic, event.status);
+      }
+    } else {
+      process(event.value, event.peer, event.mtu);
+      if (settingsSnapshot.active && settingsSnapshot.connHandle == event.peer && !settingsSnapshot.session) settingsSnapshot.session = event.session;
+    }
+  }
+  const unsigned dropped = bleEvents.takeDropped();
+  if (dropped) SS2K_LOGW(CUSTOM_CHAR_LOG_TAG, "BLE settings event queue full; dropped %u event(s)", dropped);
+}
+
 void BLE_ss2kCustomCharacteristic::update() {
   if (!dirConSettingsSnapshot.active) return;
 
@@ -312,28 +338,29 @@ void BLE_ss2kCustomCharacteristic::update() {
 }
 
 void ss2kCustomCharacteristicCallbacks::onWrite(NimBLECharacteristic* pCharacteristic, NimBLEConnInfo& connInfo) {
-  std::string rxValue = pCharacteristic->getValue();
-  // SS2K_LOG(CUSTOM_CHAR_LOG_TAG, "Write from %s", connInfo.getAddress().toString().c_str());
-  BLE_ss2kCustomCharacteristic::process(rxValue, connInfo.getConnHandle(), connInfo.getMTU());
+  decltype(bleEvents)::Event event;
+  event.peer = connInfo.getConnHandle();
+  event.mtu = connInfo.getMTU();
+  event.value = pCharacteristic->getValue();
+  bleEvents.push(std::move(event));
 }
+
+void BLE_ss2kCustomCharacteristic::onConnect(uint16_t connHandle) { bleEvents.connect(connHandle); }
+void BLE_ss2kCustomCharacteristic::onDisconnect(uint16_t connHandle) { bleEvents.disconnect(connHandle); }
 
 void ss2kCustomCharacteristicCallbacks::onSubscribe(NimBLECharacteristic* pCharacteristic, NimBLEConnInfo& connInfo, uint16_t subValue) {
   SS2K_LOG(CUSTOM_CHAR_LOG_TAG, "Subscribe from %s", connInfo.getAddress().toString().c_str());
   NimBLEDevice::setMTU(515);
 }
-void ss2kCustomCharacteristicCallbacks::onStatus(NimBLECharacteristic* pCharacteristic, int code) {
-// loop through and accumulate the data into a C++ string
-#ifdef CUSTOM_CHAR_DEBUG
-  std::string characteristicValue = pCharacteristic->getValue();
-  std::string logValue;
-  for (size_t i = 0; i < characteristicValue.length(); ++i) {
-    char buf[4];
-    snprintf(buf, sizeof(buf), "%02x ", (unsigned char)characteristicValue[i]);
-    logValue += buf;
-  }
-  SS2K_LOG(CUSTOM_CHAR_LOG_TAG, "%s -> %s", pCharacteristic->getUUID().toString().c_str(), logValue.c_str());
-#endif
-  handleSettingsSnapshotStatus(pCharacteristic, code);
+void ss2kCustomCharacteristicCallbacks::onStatus(NimBLECharacteristic* pCharacteristic, NimBLEConnInfo& connInfo, int code) {
+  // Notifications also produce status 0; only indication completion/failure can
+  // advance a snapshot. The connection identifies whose acknowledgment it is.
+  if (code == 0) return;
+  decltype(bleEvents)::Event event;
+  event.peer = connInfo.getConnHandle();
+  event.isStatus = true;
+  event.status = code;
+  bleEvents.push(std::move(event));
 }
 
 void BLE_ss2kCustomCharacteristic::notify(char _item, int tableRow) {
@@ -392,10 +419,15 @@ void BLE_ss2kCustomCharacteristic::process(const std::string& rxValue, uint16_t 
   const uint8_t* pData = reinterpret_cast<const uint8_t*>(rxValue.data());
 
 #ifdef CUSTOM_CHAR_DEBUG
-#define LOG_BUF_APPEND(...) logBufLength += snprintf(logBuf + logBufLength, kLogBufCapacity - logBufLength, __VA_ARGS__)
+#define LOG_BUF_APPEND(...) do { \
+  const int remaining = kLogBufCapacity - logBufLength; \
+  const int written = snprintf(logBuf + logBufLength, remaining, __VA_ARGS__); \
+  if (written > 0) logBufLength += std::min(written, remaining - 1); \
+} while (0)
   int length                = rxValue.length();
-  const int kLogBufCapacity = (rxValue.length() * 2) + 60;  // needs to be bigger than the largest message.
-  char logBuf[kLogBufCapacity];
+  const int kLogBufCapacity = (rxValue.length() * 3) + 60;  // Hex bytes include a separating space.
+  std::vector<char> logStorage(kLogBufCapacity);
+  char* logBuf = logStorage.data();
   int logBufLength = ss2k_log_hex_to_buffer(pData, length, logBuf, 0, kLogBufCapacity);
 #else
 #define LOG_BUF_APPEND(...)
@@ -1146,13 +1178,11 @@ void BLE_ss2kCustomCharacteristic::process(const std::string& rxValue, uint16_t 
   if (returnString == "") {
     pCharacteristic->setValue(returnValue.data(), returnLength);
   } else {  // Need to send a string instead
-    uint8_t returnChar[returnString.length() + 2];
-    returnChar[0] = cc_success;
-    returnChar[1] = rxValue[1];
-    for (int i = 0; i < returnString.length(); i++) {
-      returnChar[i + 2] = returnString[i];
-    }
-    pCharacteristic->setValue(returnChar, returnString.length() + 2);
+    returnValue.resize(returnString.length() + 2);
+    returnValue[0] = cc_success;
+    returnValue[1] = rxValue[1];
+    std::copy(returnString.begin(), returnString.end(), returnValue.begin() + 2);
+    pCharacteristic->setValue(returnValue.data(), returnValue.size());
   }
 
   if (indicateResponse) {

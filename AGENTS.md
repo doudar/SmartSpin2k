@@ -353,6 +353,8 @@ The giant switch in `BLE_ss2kCustomCharacteristic::process()` maps variable IDs 
 
 `parseNemit()` compares current config/runtime values against static old copies and sends one notification per call for changed values. Some changes, like `hMin`/`hMax`, trigger `userConfig->saveToLittleFS()`. Turning `pTab4Pwr` on sets `spinBLEServer.spinDownFlag = 1` to trigger homing.
 
+Custom-characteristic BLE writes and indication-status callbacks enqueue work for `processPendingEvents()` on the fast maintenance pass, before motor dispatch, retaining the firmware-update quiet gate. Drain at most the bounded queue capacity per pass. `update()` on the periodic BLE server pass only paces DirCon settings snapshot chunks. Do not run the settings switch/JSON serialization or send the next snapshot chunk inside `nimble_host`: its 4 KB stack overflowed during a custom indication. Connection generation tokens discard stale queued work, and snapshot acknowledgments must match the owning connection. DirCon calls the shared processor directly from maintenance. Variable-length response/debug buffers belong on the heap. `test/test_custom_characteristic_events.py` covers deferred callbacks, queue bounds, peer isolation and handle reuse.
+
 When adding a custom characteristic variable:
 
 1. Add/confirm the ID in `include/BLE_Custom_Characteristic.h`.
