@@ -97,7 +97,7 @@ struct Remote {
   bool isConnected() { return connected; }
   void sendShiftUp() {}
   void sendShiftDown() {}
-} zwiftService, openBikeControlService;
+} openBikeControlService;
 struct BLE_ss2kCustomCharacteristic { static void notify(int) {} };
 constexpr int BLE_shifterPosition = 6;
 constexpr int LOG_INTERVAL = 1000;
@@ -200,7 +200,7 @@ void reset(bool ftms = false) {
   stepper = &motor;
   safetyReady = searchSucceeds = true;
   abortSearch = false;
-  zwiftService.connected = openBikeControlService.connected = false;
+  openBikeControlService.connected = false;
   saved = pauses = 0;
   fullSearches = recoveries = mapSearches = 0;
   metadataPresent = false;

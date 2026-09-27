@@ -58,6 +58,7 @@ Important timing/network notes:
 
 - pioarduino firmware/filesystem builds and USB flashing are supported from the Codex environment when the local toolchain is available. Local builds normally finish in under five minutes.
 - Locate an attached ESP32-S3's current USB CDC port with `pio device list` (typically `/dev/cu.usbmodem*` on macOS or `COM*` on Windows). A debug build (`S3debug`, with `__DEBUG__` and `SERIAL_CUSTOM_CHARACTERISTIC`) can be observed with `pio device monitor -p <port>`. Serial monitoring is read-only, while uploading a debug build is an explicit device mutation and should only be done when the task authorizes it.
+- Anthony prefers no application/flash backup before uploads; skip backups unless he explicitly requests one. Still verify device identity and the active slot, and preserve NVS/LittleFS with application-only flashing.
 - When testing attached hardware, do not switch the development machine's WiFi connection to the SmartSpin2k access point: that network has no internet access, while builds and tooling may require internet service. Communicate with the device over USB unless the user explicitly directs otherwise. Preserve the device's stored WiFi/LittleFS/NVS settings by preferring application-partition-only flashing (S3 app offset `0x60000`).
 - First pioarduino builds/tests may download missing ESP32 platforms and toolchains and therefore take longer than normal.
 - In restricted environments, pioarduino can fail on network downloads. If that happens, report it rather than trying to fake validation.
@@ -307,7 +308,7 @@ The primary BLE advertisement carries the current WiFi IPv4 address in versioned
 The device name and 128-bit SmartSpin2k service UUID are kept in the scan response to stay within the legacy advertisement size limit.
 IP changes rebuild the complete advertisement and scan-response payloads before advertising restarts; NimBLE's manufacturer-data setter appends fields and must not be used alone to replace the previous IP.
 
-Zwift/OpenBikeControl services exist but are currently commented out in regular BLE advertising/setup; DirCon and the source files still matter.
+The unused Wattbike and old Zwift services, protocol header, UUIDs, and call sites have been removed. OpenBikeControl setup remains commented out. The new Zwift trainer/controller integration is isolated on `codex/zwift-integration`.
 
 `SpinBLEServer::update()` refreshes wheel/crank revolution counters, then calls service `update()` methods. The FTMS service also processes pending writes.
 

@@ -88,7 +88,6 @@ class MyCharacteristicCallbacks : public NimBLECharacteristicCallbacks {
 };
 
 extern SpinBLEServer spinBLEServer;
-// extern BLE_Wattbike_Service wattbikeService;
 
 void startBLEServer();
 void refreshBLEAdvertisementIp();

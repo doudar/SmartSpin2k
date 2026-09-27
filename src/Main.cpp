@@ -23,9 +23,7 @@
 #include "BLE_Definitions.h"
 #include <Constants.h>
 #include "settings.h"
-// #include "BLE_Wattbike_Service.h"
 #include "BLE_Fitness_Machine_Service.h"
-#include "BLE_Zwift_Service.h"
 #include "BLE_OpenBikeControl_Service.h"
 #include "DirConManager.h"
 #include "ThermalSafety.h"
@@ -349,7 +347,6 @@ void SS2K::maintenanceLoop(void*) {
         ss2k->moveStepper();
         ergMode->runERG();
       }
-      // wattbikeService.parseNemit();
 
       // if this hardware version has serial pins, check and process their data.
       // only do this every AUX_SERIAL_DELAY
@@ -367,8 +364,6 @@ void SS2K::maintenanceLoop(void*) {
 
     // send BLE notification for any userConfig values that changed.
     BLE_ss2kCustomCharacteristic::parseNemit();
-    // Update Zwift Gear UI if shift happened
-
     httpServer.webClientUpdate();
     // Update DirCon protocol
     DirConManager::update();
@@ -539,7 +534,7 @@ void SS2K::FTMSModeShiftModifier() {
       legacyShifterPosition = lastShifterPosition;
       const VirtualGearing::Gears gears = activeGearRatios();
       rtConfig->setShifterPosition(gears.clampGear(localGear));
-    } else if (!zwiftService.isConnected() && !openBikeControlService.isConnected()) {
+    } else if (!openBikeControlService.isConnected()) {
       rtConfig->setShifterPosition(legacyShifterPosition);
     }
     lastShifterPosition = rtConfig->getShifterPosition();
@@ -556,22 +551,7 @@ void SS2K::FTMSModeShiftModifier() {
   int shiftDelta = rtConfig->getShifterPosition() - ss2k->lastShifterPosition;
   if (shiftDelta) {  // Shift detected
     ss2k->setLEDEnabled(true);
-    // When Zwift virtual shifting is active, forward shifts to Zwift
-    // instead of handling them internally. Zwift sends gear changes
-    // back via the custom trainer protocol which we already handle.
-    // This needs to be moved so shift blocking/knob crashing prevention is enforced.
-    // Keeping here for now for development/testing purposes
-
     int absDelta = abs(shiftDelta);
-    if (zwiftService.isConnected()) {
-      for (int i = 0; i < absDelta; i++) {
-        if (shiftDelta > 0) {
-          zwiftService.sendShiftUp();
-        } else {
-          zwiftService.sendShiftDown();
-        }
-      }
-    }
     if (openBikeControlService.isConnected()) {
       for (int i = 0; i < absDelta; i++) {
         if (shiftDelta > 0) {

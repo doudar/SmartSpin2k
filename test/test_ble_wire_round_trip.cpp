@@ -18,7 +18,6 @@
 #include "Constants.h"
 #include "DirConUUIDCodec.h"
 #include "ScanResultProtocol.h"
-#include "Zwift_Protocol_Messages.h"
 #include "sensors/CscSensorData.h"
 #include "sensors/FitnessMachineIndoorBikeData.h"
 #include "sensors/HeartRateData.h"
@@ -307,26 +306,4 @@ void TestBleWireRoundTrip::test_heart_rate_round_trip(void) {
   HeartRateData decoded;
   decoded.decode(payload, sizeof(payload));
   TEST_ASSERT_EQUAL_INT(187, decoded.getHeartRate());
-}
-
-void TestBleWireRoundTrip::test_zwift_round_trip(void) {
-  const uint64_t unsignedValues[] = {0, 1, 127, 128, 16384, 0xFFFFFFFFULL, UINT64_MAX};
-  for (size_t i = 0; i < sizeof(unsignedValues) / sizeof(unsignedValues[0]); ++i) {
-    uint8_t bytes[10] = {0};
-    const size_t encodedLength = ZwiftProtocol::encodeUleb128(unsignedValues[i], bytes);
-    uint64_t decoded           = 0;
-    TEST_ASSERT_EQUAL_UINT(encodedLength, ZwiftProtocol::uleb128Length(unsignedValues[i]));
-    TEST_ASSERT_EQUAL_UINT(encodedLength, ZwiftProtocol::decodeUleb128(bytes, encodedLength, &decoded));
-    TEST_ASSERT_EQUAL_UINT64(unsignedValues[i], decoded);
-  }
-
-  const int64_t signedValues[] = {0, 1, -1, 123456, -123456, INT32_MAX, INT32_MIN};
-  for (size_t i = 0; i < sizeof(signedValues) / sizeof(signedValues[0]); ++i) {
-    uint8_t bytes[10]         = {0};
-    const uint64_t wireValue  = ZwiftProtocol::encodeZigZag64(signedValues[i]);
-    const size_t encodedLength = ZwiftProtocol::encodeUleb128(wireValue, bytes);
-    uint64_t decodedWire      = 0;
-    TEST_ASSERT_EQUAL_UINT(encodedLength, ZwiftProtocol::decodeUleb128(bytes, encodedLength, &decodedWire));
-    TEST_ASSERT_EQUAL_INT64(signedValues[i], ZwiftProtocol::decodeZigZag64(decodedWire));
-  }
 }

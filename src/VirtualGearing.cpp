@@ -6,7 +6,6 @@
  */
 
 #include "Main.h"
-#include "BLE_Zwift_Service.h"
 #include "BLE_OpenBikeControl_Service.h"
 #include <cmath>
 
@@ -34,7 +33,7 @@ bool SS2K::usePowerTableForPower() const {
 
 bool SS2K::localGearingSelected() const {
   const uint8_t mode = rtConfig->getFTMSMode();
-  return !externalControl && !zwiftService.isConnected() && !openBikeControlService.isConnected() &&
+  return !externalControl && !openBikeControlService.isConnected() &&
          (mode == 0 || mode == FitnessMachineControlPointProcedure::SetTargetInclination || mode == FitnessMachineControlPointProcedure::SetIndoorBikeSimulationParameters);
 }
 

@@ -21,7 +21,6 @@
 #include "BLE_Fitness_Machine_Service.h"
 #include "BLE_Custom_Characteristic.h"
 #include "BLE_Device_Information_Service.h"
-#include "BLE_Zwift_Service.h"
 #include "BLE_OpenBikeControl_Service.h"
 
 // BLE Server Settings
@@ -35,9 +34,7 @@ BLE_Heart_Service heartService;
 BLE_Fitness_Machine_Service fitnessMachineService;
 BLE_ss2kCustomCharacteristic ss2kCustomCharacteristic;
 BLE_Device_Information_Service deviceInformationService;
-BLE_Zwift_Service zwiftService;
 BLE_OpenBikeControl_Service openBikeControlService;
-// BLE_Wattbike_Service wattbikeService;
 // BLE_SB20_Service sb20Service;
 
 namespace {
@@ -135,16 +132,12 @@ void startBLEServer() {
   fitnessMachineService.setupService(spinBLEServer.pServer, &chrCallbacks);
   ss2kCustomCharacteristic.setupService(spinBLEServer.pServer);
   deviceInformationService.setupService(spinBLEServer.pServer);
-  // zwiftService.setupService(spinBLEServer.pServer);
   // openBikeControlService.setupService(spinBLEServer.pServer);
-  // uncoment to enable as controller. Zwift won't pair as ct and controller at the same time.
-  // pAdvertising->addServiceUUID(ZWIFT_RIDE_CUSTOM_SERVICE_UUID);
   // pAdvertising->addServiceUUID(OPENBIKECONTROL_SERVICE_UUID);
   if (!configureBLEAdvertisement(pAdvertising)) {
     SS2K_LOGE(BLE_SERVER_LOG_TAG, "Unable to configure BLE advertisement data");
   }
 
-  // wattbikeService.setupService(spinBLEServer.pServer);  // No callback needed
   // sb20Service.begin();
   BLEFirmwareSetup(spinBLEServer.pServer);
 
@@ -185,9 +178,7 @@ void SpinBLEServer::update() {
   fitnessMachineService.update();
   // DirCon snapshot pacing only; deferred BLE callbacks run in the fast loop.
   ss2kCustomCharacteristic.update();
-  // zwiftService.update();
   // OpenBikeControl sends event-driven notifications from shift handlers.
-  // wattbikeService.parseNemit();  // Changed from update() to parseNemit()
   // sb20Service.notify();
 }
 

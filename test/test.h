@@ -123,7 +123,6 @@ class TestBleWireRoundTrip {
   static void test_ftms_round_trip(void);
   static void test_csc_round_trip(void);
   static void test_heart_rate_round_trip(void);
-  static void test_zwift_round_trip(void);
 };
 
 class TestVirtualGearing {

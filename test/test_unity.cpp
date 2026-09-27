@@ -125,7 +125,6 @@ void setup() {
     RUN_TEST(test.test_ftms_round_trip);
     RUN_TEST(test.test_csc_round_trip);
     RUN_TEST(test.test_heart_rate_round_trip);
-    RUN_TEST(test.test_zwift_round_trip);
   }
 
   {
