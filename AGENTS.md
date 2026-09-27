@@ -508,6 +508,7 @@ Flow:
 Persistence:
 
 - `_manageSaveState()` loads/saves `POWER_TABLE_FILENAME`.
+- Saved-table initialization is attempted once per homed coordinate session, including missing/invalid files. `_hasBeenLoadedThisSession` means RAM initialization is complete, not that disk loading succeeded; failed loads keep RAM learning active and use the normal save interval. `clearRuntime(true)` explicitly permits another load. `test/test_ftms_metadata.py` covers missing/invalid saves, bounded retries, later learning/persistence, and read-only homing initialization.
 - Watts-table saving/loading requires `rtConfig->homed`; FTMS metadata is read separately before homing.
 - File format starts with `TABLE_VERSION`, saved reading quality, and saved homed state, then table entries.
 - `_save()` refuses empty saves unless valid FTMS calibration metadata exists; complete files replace saves through a temporary-file rename.

@@ -291,8 +291,13 @@ bool PowerTable::_manageSaveState(bool /*canSkipReliabilityChecks*/, bool allowS
   if (!rtConfig->getHomed()) {
     return false;
   }
-  // Check if the table has been loaded in this session
+  // Attempt saved-table initialization once per coordinate session. A missing
+  // or unusable file leaves the RAM table available for learning; retrying it
+  // every ERG pass only repeats failed empty saves. clearRuntime(true) permits
+  // another load after an explicit coordinate recovery.
   if (!this->_hasBeenLoadedThisSession) {
+    this->_hasBeenLoadedThisSession = true;
+    lastSaveTime = millis();
     SS2K_LOG(POWERTABLE_LOG_TAG, "Loading Power Table....");
     File file = LittleFS.open(POWER_TABLE_FILENAME, FILE_READ);
     if (!file) {
@@ -361,9 +366,6 @@ bool PowerTable::_manageSaveState(bool /*canSkipReliabilityChecks*/, bool allowS
     ++positionEpoch;
     SS2K_LOG(POWERTABLE_LOG_TAG, "Loaded values directly");
     file.close();
-
-    // set the flag so it isn't loaded again this session.
-    this->_hasBeenLoadedThisSession = true;
   }
 
   // Implement saving on a timer

@@ -16,6 +16,7 @@
 class PowerTable {
  public:
   bool saveFlag                  = false;
+  // RAM table is initialized for this coordinate session, even if no saved table could be loaded.
   bool _hasBeenLoadedThisSession = false;
 
   PTData ptData;

@@ -26,14 +26,17 @@ class TestFtmsMetadata(unittest.TestCase):
 #include <vector>
 #include "FtmsCalibration.h"
 using String = std::string;
-#define SS2K_LOG(...) ((void)0)
+std::vector<std::string> logs;
+template<class... T> void record(const char* format, T...) { logs.emplace_back(format); }
+#define SS2K_LOG(tag, ...) record(__VA_ARGS__)
 #define POWERTABLE_CAD_SIZE 2
 #define POWERTABLE_WATT_SIZE 3
 #define TABLE_VERSION 6
 #define POWER_TABLE_SAVE_INTERVAL 600000
 #define POWER_TABLE_FILENAME "/ptab"
 constexpr int FILE_READ = 0, FILE_WRITE = 1;
-unsigned long millis() { return 1; }
+unsigned long clockMs = 1;
+unsigned long millis() { return clockMs; }
 struct SerialStub { template<class... T> void printf(const char*, T...) {} } Serial;
 using Bytes = std::vector<uint8_t>;
 int writeBudget = -1;
@@ -62,7 +65,10 @@ struct File {
 };
 struct Filesystem {
   std::map<String, std::shared_ptr<Bytes>> files;
+  int reads = 0, writes = 0;
   File open(const String& name, int mode) {
+    if (mode == FILE_READ) ++reads;
+    else ++writes;
     if (mode == FILE_WRITE) files[name] = std::make_shared<Bytes>();
     auto found = files.find(name);
     File file;
@@ -267,6 +273,76 @@ int main() {
   assert(emptyBoot.reset());
   assert(!LittleFS.exists(POWER_TABLE_FILENAME) && !emptyBoot.ftmsCalibration.valid());
   assert(!emptyBoot.loadFtmsCalibration());
+
+  // A homed session with a missing or invalid saved table must not reopen it
+  // and attempt an empty save on every 700 ms ERG pass. Run past the save
+  // interval to verify periodic persistence remains bounded too.
+  for (bool invalidFile : {false, true}) {
+    LittleFS.files.clear();
+    if (invalidFile) LittleFS.files[POWER_TABLE_FILENAME] = std::make_shared<Bytes>(invalid);
+    PowerTable fresh;
+    runtime.homed = false;
+    const int readsBefore = LittleFS.reads;
+    assert(!fresh._manageSaveState());
+    assert(!fresh._hasBeenLoadedThisSession && LittleFS.reads == readsBefore);
+    runtime.homed = true;
+    clockMs = POWER_TABLE_SAVE_INTERVAL * 3UL;
+    logs.clear();
+    assert(!fresh._manageSaveState());
+    assert(fresh._hasBeenLoadedThisSession);
+    assert(LittleFS.reads == readsBefore + 1);
+    assert(fresh.ptHelpers.getTotalReadings(fresh.ptData) == 0 && fresh.positionEpoch == 0);
+    const int writesBefore = LittleFS.writes;
+    const size_t initialLogs = logs.size();
+    for (unsigned long elapsed = 700; elapsed <= POWER_TABLE_SAVE_INTERVAL; elapsed += 700) {
+      clockMs = POWER_TABLE_SAVE_INTERVAL * 3UL + elapsed;
+      assert(fresh._manageSaveState());
+    }
+    assert(LittleFS.reads == readsBefore + 1 && LittleFS.writes == writesBefore);
+    assert(logs.size() == initialLogs);
+    clockMs = POWER_TABLE_SAVE_INTERVAL * 4UL + 1;
+    assert(fresh._manageSaveState());
+    assert(logs.size() == initialLogs + 1); // One periodic empty-save refusal, not a reload loop.
+    const size_t periodicLogs = logs.size();
+    for (int pass = 0; pass < 10; ++pass) { clockMs += 700; assert(fresh._manageSaveState()); }
+    assert(logs.size() == periodicLogs && LittleFS.reads == readsBefore + 1);
+
+    // Learning can populate the same RAM table and save it on the next normal
+    // interval. A failed atomic replacement preserves both RAM and the old file.
+    auto& learned = fresh.ptData.tableRow[0].tableEntry[0];
+    learned.targetPosition = 456;
+    learned.readings = 4;
+    failRename = true;
+    clockMs += POWER_TABLE_SAVE_INTERVAL + 1;
+    assert(fresh._manageSaveState());
+    assert(learned.targetPosition == 456 && learned.readings == 4);
+    assert(LittleFS.reads == readsBefore + 1);
+    if (invalidFile) assert(*LittleFS.files[POWER_TABLE_FILENAME] == invalid);
+    else assert(!LittleFS.exists(POWER_TABLE_FILENAME));
+    failRename = false;
+    clockMs += POWER_TABLE_SAVE_INTERVAL + 1;
+    assert(fresh._manageSaveState());
+    assert(LittleFS.exists(POWER_TABLE_FILENAME));
+
+    // Explicit recovery starts a new load attempt and restores the learned save.
+    fresh.clearRuntime(true);
+    assert(!fresh._hasBeenLoadedThisSession);
+    assert(fresh._manageSaveState(false, false));
+    assert(fresh.ptData.tableRow[0].tableEntry[0].targetPosition == 456);
+    assert(fresh.ptData.tableRow[0].tableEntry[0].readings == 4);
+  }
+
+  // Homing's read-only initialization must also finish after a missing file,
+  // without trying to write; valid new metadata is persisted by its explicit save.
+  LittleFS.files.clear();
+  PowerTable missingLoadOnly;
+  missingLoadOnly.ftmsCalibration = makeMap();
+  const int readsBefore = LittleFS.reads, writesBefore = LittleFS.writes;
+  assert(!missingLoadOnly._manageSaveState(false, false));
+  assert(missingLoadOnly._hasBeenLoadedThisSession && missingLoadOnly.ftmsCalibration.valid());
+  for (int pass = 0; pass < 10; ++pass) assert(missingLoadOnly._manageSaveState(false, false));
+  assert(LittleFS.reads == readsBefore + 1 && LittleFS.writes == writesBefore);
+  assert(missingLoadOnly._save());
 }
 '''
         compiler = shutil.which("g++")
