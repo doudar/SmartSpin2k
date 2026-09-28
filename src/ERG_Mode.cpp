@@ -123,15 +123,6 @@ void ErgMode::runERG() {
     powerTable->processPowerValue(powerBuffer, rtConfig->cad.getValue(), rtConfig->watts, collectionAllowed() && !ss2k->usePowerTableForPower());
 
     if (rtConfig->cad.getValue() > MIN_ERG_CADENCE / 2) {
-      const bool hasConnectedPowerMeter = spinBLEClient.connectedPM;
-      const bool simulationRunning      = rtConfig->watts.getTarget() || rtConfig->watts.getSimulate();
-
-      // compute ERG
-      if ((rtConfig->getFTMSMode() == FitnessMachineControlPointProcedure::SetTargetPower) && (hasConnectedPowerMeter || simulationRunning) && !isTableSeeking() &&
-          !feedbackWaiting) {
-        this->computeErg();
-      }
-
       // Set Min and Max Stepper positions
       if (loopCounter > 50) {
         loopCounter = 0;
@@ -150,6 +141,19 @@ void ErgMode::runERG() {
       userConfig->saveToLittleFS();
     }
     loopCounter++;
+  }
+
+  // Handle new power reports and changed targets as soon as they are visible.
+  // computeErg() deduplicates sensor samples and target values, so this event
+  // gate preserves one correction per observation without waiting for the
+  // slower table-collection cadence above.
+  const auto powerSample    = rtConfig->watts.getValueSample();
+  const bool newPowerSample = prevWatts.getValueSample().timestamp != powerSample.timestamp;
+  const bool targetChanged  = prevWatts.getTarget() != rtConfig->watts.getTarget();
+  if (rtConfig->cad.getValue() > MIN_ERG_CADENCE / 2 && (newPowerSample || targetChanged) &&
+      rtConfig->getFTMSMode() == FitnessMachineControlPointProcedure::SetTargetPower && (spinBLEClient.connectedPM || rtConfig->watts.getTarget() || rtConfig->watts.getSimulate()) &&
+      !isTableSeeking() && !feedbackWaiting) {
+    computeErg();
   }
 
   if (ss2k->usePowerTableForPower()) {
@@ -584,8 +588,13 @@ void ErgMode::_handleTrustedTableSeek() {
       _stopTrustedTableSeek("cadence lookup failed", false, true);
       return;
     }
+    const bool followsCadenceDirection = (cadence > tableSeekCadence && cadencePosition <= tableSeekPosition) ||
+                                         (cadence < tableSeekCadence && cadencePosition >= tableSeekPosition);
     tableSeekCadence = cadence;
-    if (abs(cadencePosition - tableSeekPosition) > ERG_TABLE_POSITION_PADDING_STEPS) {
+    // More cadence needs less brake position at a fixed watt target. Sparse
+    // edge extrapolation can violate that physical relationship; ignore those
+    // feed-forward updates and let measured power feedback correct the seek.
+    if (followsCadenceDirection && abs(cadencePosition - tableSeekPosition) > ERG_TABLE_POSITION_PADDING_STEPS) {
       tableSeekPosition      = cadencePosition;
       tableSeekState         = TableSeekState::MOVING;
       tableSeekStableMatches = 0;

@@ -112,16 +112,16 @@ constexpr int MIN_SCHEDULE_WATTS = 30;
 // Lower bound for table-derived gain as a fraction of fallback gain before blending.
 constexpr double TABLE_GAIN_MIN_FALLBACK_RATIO = 0.5;
 // Upper bound for table-derived gain as a multiple of fallback gain before blending.
-constexpr double TABLE_GAIN_MAX_FALLBACK_RATIO = 1.25;
+constexpr double TABLE_GAIN_MAX_FALLBACK_RATIO = 2.0;
 // Weight of bounded table gain when blending with fallback gain (0 = fallback, 1 = table).
 // Used by blendedTableGain() during ERG proportional control when a usable table slope is available.
-constexpr double TABLE_GAIN_BLEND = 0.75;
+constexpr double TABLE_GAIN_BLEND = .5;
 // Minimum final gain as a fraction of the configured ERG sensitivity.
-constexpr double GAIN_MIN_SENSITIVITY_RATIO = 0.25;
+constexpr double GAIN_MIN_SENSITIVITY_RATIO = .5;
 // Maximum final gain as a multiple of the configured ERG sensitivity.
 constexpr double GAIN_MAX_SENSITIVITY_RATIO = 4.0;
 // Divide the table's steps-per-watt slope times sensitivity by this to obtain control gain.
-constexpr double SLOPE_CONTROL_DIVISOR = 10.0;
+constexpr double SLOPE_CONTROL_DIVISOR = 5.0;
 // ******************************************************************************
 
 // ******************************************************************************
@@ -132,9 +132,9 @@ constexpr double SLOPE_CONTROL_DIVISOR = 10.0;
 // Absolute control errors below this threshold use the small-error gain multiplier.
 constexpr int SMALL_ERROR_WATTS = 20;
 // While maintaining, errors at least SMALL_ERROR_WATTS but below this threshold use the medium-error multiplier.
-constexpr int MEDIUM_ERROR_WATTS = 50;
+constexpr int MEDIUM_ERROR_WATTS = 40;
 // While maintaining, errors above this threshold use the large-error multiplier.
-constexpr int LARGE_ERROR_WATTS = 50;
+constexpr int LARGE_ERROR_WATTS = 60;
 // Scale gain near the target or whenever the controller has not yet entered MAINTAIN mode.
 constexpr double SMALL_ERROR_GAIN_MULTIPLIER = 0.90;
 // Scale gain for medium errors while maintaining to soften corrections as power approaches the target.

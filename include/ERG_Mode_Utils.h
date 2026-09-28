@@ -184,13 +184,13 @@ inline double errorScheduledGain(double gain, int error, bool maintaining) {
   return gain;
 }
 
-// Reduce error by two seconds of projected power change when the trend approaches the target at least 2 W/s.
+// Reduce error by 1.5 seconds of projected power change when the trend approaches the target at least 2 W/s.
 // Called at the start of _inSetpointState() before choosing a table correction or calculating proportional gain and movement.
 // Brake an approach already visible in fresh meter reports. This never
 // reverses the requested correction and has no steady-error dead band.
 inline int approachingError(int error, double wattsPerSecond) {
   if (error * wattsPerSecond <= 0 || std::abs(wattsPerSecond) < 2.0) return error;
-  const double remaining = std::max(0.0, std::abs(static_cast<double>(error)) - std::abs(wattsPerSecond) * 2.0);
+  const double remaining = std::max(0.0, std::abs(static_cast<double>(error)) - std::abs(wattsPerSecond) * 1.5);
   return static_cast<int>(std::round(error < 0 ? -remaining : remaining));
 }
 
