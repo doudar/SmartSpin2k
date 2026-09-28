@@ -1,0 +1,133 @@
+{
+  "bike": {
+    "position_knots": [
+      0,
+      6000,
+      8000,
+      10000,
+      12000,
+      14000,
+      16000,
+      18000,
+      20000,
+      24482
+    ],
+    "watts_at_80rpm": [
+      0,
+      23.43102633024972,
+      30.205542983775036,
+      64.01337391541917,
+      123.54432267450241,
+      189.40622743931186,
+      284.40907188025204,
+      413.77933813788474,
+      514.4721236278851,
+      945.4629853544773
+    ],
+    "cadence_exponent": 1.7614167093513402,
+    "lag_s": 0.7754499480433025,
+    "delay_s": 1.117460704267879,
+    "sample_period_s": 1.0,
+    "noise_w": 8.096509811914622,
+    "noise_correlation_s": 1.5124234341042593,
+    "min_position": 0,
+    "max_position": 24482,
+    "backlash_steps": 0
+  },
+  "identification": {
+    "training_end_s": 2546.6642500000003,
+    "training_fraction": 0.65,
+    "optimizer_success": true,
+    "optimizer_message": "`ftol` termination condition is satisfied.",
+    "training": {
+      "samples": 2534,
+      "mae_w": 9.742230623272208,
+      "rmse_w": 14.033325775949548,
+      "bias_w": -0.7600405375706235,
+      "p95_absolute_error_w": 27.997000629375087,
+      "within_20w_fraction": 0.8816101026045777
+    },
+    "holdout": {
+      "samples": 1354,
+      "mae_w": 11.211081603292046,
+      "rmse_w": 15.946507211655382,
+      "bias_w": 2.4178269365429608,
+      "p95_absolute_error_w": 31.282075478449325,
+      "within_20w_fraction": 0.8626292466765141
+    },
+    "holdout_after_motor_changes": {
+      "samples": 813,
+      "mae_w": 13.378911739425687,
+      "rmse_w": 18.626632902817253,
+      "bias_w": 2.2275063989835577,
+      "p95_absolute_error_w": 36.404458113181356,
+      "within_20w_fraction": 0.7945879458794588
+    },
+    "zero_lag_holdout": {
+      "samples": 1354,
+      "mae_w": 13.298467553547232,
+      "rmse_w": 23.308696157313143,
+      "bias_w": 1.7740791519634425,
+      "p95_absolute_error_w": 49.147012358080005,
+      "within_20w_fraction": 0.8323485967503693
+    },
+    "fit_power_holdout": {
+      "samples": 1354,
+      "mae_w": 12.063437566646932,
+      "rmse_w": 19.2527748620191,
+      "bias_w": 2.2280189601766387,
+      "p95_absolute_error_w": 38.196814133270564,
+      "within_20w_fraction": 0.8478581979320532
+    },
+    "training_position_range": [
+      6292.0,
+      18881.0
+    ],
+    "training_cadence_range": [
+      56.0,
+      114.0
+    ],
+    "stationary_variation": {
+      "samples": 1629,
+      "robust_sigma_w": 8.096509811914622,
+      "lag_one_correlation": 0.5148728728558757,
+      "note": "Effective variation, including model error; not isolated meter noise."
+    },
+    "limitations": [
+      "Chronological holdout is from the same ride, not an independent ride.",
+      "One-second logs cannot identify subsecond motor travel or uniquely separate meter and bike lag.",
+      "Rider load response, backlash and endstop torque are configurable assumptions, not calibrated measurements.",
+      "Unobserved positions/cadences are extrapolation; physical bounds are assumed."
+    ]
+  },
+  "alignment": {
+    "fit_start_device_seconds": 969.586,
+    "power_correlation": 0.9970897154416937,
+    "overlap_records": 3917,
+    "alignment_score": 54.707939749808524,
+    "log_samples": 3899,
+    "fit_samples": 3955,
+    "duration_s": 3917.945,
+    "max_log_gap_s": 1.3510000000001128,
+    "fit_median_interval_s": 1.0,
+    "log_median_interval_s": 1.0040000000002465
+  },
+  "rider": {
+    "preferred_cadence": 89.0,
+    "variation_rpm": 7.939809090658015,
+    "correlation_s": 78.62880383910593,
+    "response_s": 2.0,
+    "fatigue_rpm_per_hour": 3.0,
+    "load_droop_rpm_per_100w": 1.5
+  },
+  "rider_identification": {
+    "training_cadence_median_rpm": 89.0,
+    "training_cadence_std_rpm": 7.939809090658015,
+    "lag_one_correlation": 0.9873123183801336,
+    "note": "Cadence distribution and autocorrelation estimated from training data. Intentional changes are mixed with wander; load response and fatigue remain assumptions."
+  },
+  "sources": {
+    "log_sha256": "06db7a6739a5fdac1a8466d3d4cec1196276c8762e71f9edc29a711816262241",
+    "fit_sha256": "c56e4417a5ffdd47c38d2bd46cb589e9f53b30265240373f5517e46ef135d409"
+  }
+}

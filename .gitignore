@@ -5,6 +5,8 @@
 .idea/
 test/tmp_pio_test_transport.cpp
 test/output/
+scripts/erg_sim/__pycache__/
+test/__pycache__/
 data/config.txt
 include/telegram_token.h
 Errors
@@ -26,4 +28,3 @@ dependencies.lock.*
 *.map
 graphify-out/
 output/
-

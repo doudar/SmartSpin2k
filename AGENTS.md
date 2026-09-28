@@ -36,6 +36,7 @@ The commands remain `pio` and `platformio`; configuration remains in `platformio
 - Build ESP32-S3 firmware: `pio run --environment S3release`
 - Build filesystem: `pio run --target buildfs`
 - Run native tests: `pio test --environment native`
+- Native local builds/tests run the ERG regression through `extra_scripts = post:scripts/erg_sim/native_hook.py`; install simulator requirements into pioarduino's Python environment. The hook runs even on an up-to-date build, fails on simulator failure/missing dependencies, and saves graphs/grades under `test/output/erg_regression/`. It skips GitHub Actions; standalone Python discovery skips this optional suite if its dependencies are absent.
 - Run motor integration regressions (requires `g++` on PATH): `python -B -m unittest discover -s test -p "test_*.py"`. These exercise production homing/gear orchestration and TMC recovery with fake peripherals.
 - Static analysis: `pio check -e debug`
 - Pre-commit checks: `pre-commit run --all-files`
@@ -68,7 +69,7 @@ Native tests cover sensor parsing, BLE device-name stability logic, firmware-upd
 
 - Native Arduino types/timing come from the repository-owned `lib/ArduinoCompat`; the suite does not use ArduinoFake. Keep this shim and test filesystem setup portable across Apple Clang/POSIX and Windows native toolchains.
 - Multi-byte protocol fields use `lib/SS2K/include/ByteUtils.h`, which wraps the platform `os/endian.h` implementation and adds explicit signed helpers such as `get_le16s()`/`put_le32s()`. ArduinoCompat supplies `os/endian.h` for native tests; do not add another endian implementation.
-- `test/data/active_ride_log.txt` is the single real-world fixture for power-table and ERG tests. Each test replays it independently through `test/test_data_helpers.h`; generated tables and audit reports belong under ignored `test/output/`.
+- `test/data/active_ride_log.txt` is the shared native power-table/ERG fixture, replayed independently through `test/test_data_helpers.h`. `test/data/erg_reference_20260927.csv` is the separate sanitized FIT/log reference for the Python bike simulator; generated tables, plots and audit reports belong under ignored `test/output/`.
 
 - `src/Power_Table.cpp` or `src/PowerTable_Helpers.cpp`, run `pio test -e native`.
 - `lib/SS2K/src/sensors/*`, run the native tests for sensor parsing.
@@ -424,6 +425,10 @@ Stepper safety:
 Tooth profiles persist `gearTeeth` pairs (`front * 100 + rear`, 5332 = 53x32) with `gearPreset: 0`; an empty array selects Unlimited. Named `gearPreset: 1` selects the exact Zwift Mixed Terrain 1x24 ratios with no fabricated teeth and an empty persisted tooth array. Both bounded formats use the existing median-gap motor mapping. Arbitrary/legacy ratio-array profiles are unsupported. Custom ID 0x34 accepts pairs using count/LE16 writes and metadata/indexed reads; writing pairs exits the named preset, while tooth reads during preset 1 return an error. ID 0x35 reads/selects the preset as LE16 (writing 0 selects Unlimited). Profile changes notify 0x35 plus 0x34 when tooth-based. Full 26-gear BLE writes need MTU >=58; reads fit MTU 23. HTTP accepts either gear field per request; keep both web trees synchronized. The web also supplies Zwift All-Rounder 48/35 x 10–33 as ordinary tooth pairs. ID 0x33 is retired. See `VirtualGearing.md` and `CustomCharacteristic.md`; run native tests and both firmware/filesystem builds for changes unless the user requests otherwise.
 
 ## ERG Mode
+
+`scripts/erg_sim/` runs a fitted Python rider/bike through a native bridge compiling production ERG, table learning, motor dispatch and endstop search. Install its `requirements.txt`, then `python -m scripts.erg_sim run --ftp 305` or `python -B -m unittest discover -s test -p test_erg_simulator.py`. The regression runs the complete supplied `Random_Attacks.zwo` and saves grades plus overlaid power/cadence/workout charts under `test/output/erg_regression/`. The bike receives only motor pulses; feedback is sampled power/cadence/load. `--speed 0/1/20` selects unlimited/real/20x wall pacing without changing simulated time. Keep the chronological plant holdout distinct from closed-loop controller accuracy; torque/backlash and unobserved operating ranges are not hardware-calibrated. See `scripts/erg_sim/README.md`.
+
+The simulator defaults to the versioned `Random_Attacks.cadence.json` callouts, gradual drift and timed sag/recovery; cadence is independent of ERG output for comparable tuning runs. Keep its newline-normalized workout hash and duration checks intact. `--rider-mode stochastic` retains the original stress rider. Each run exports the native controller's final RAM table as `learned.ptab`/CSV/JSON; `power_table.png` plots power-versus-position curves colored by cadence, with stored knots marked and learning progress underneath. Export is read-only telemetry, never a plant-derived table injected into firmware.
 
 Primary files: `include/ERG_Mode.h`, `src/ERG_Mode.cpp`.
 

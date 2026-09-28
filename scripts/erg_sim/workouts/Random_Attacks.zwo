@@ -1,0 +1,32 @@
+<workout_file>
+    <author>GCN</author>
+    <name>Random attacks</name>
+    <description>To prep you for the random nature of bike racing, here are a bunch of attack simulations of random length and intensities.  Go for it!  
+Warm up for 10minutes with 3 x 1 minute fast pedaling drills &gt;110rpm. 
+
+Then ride at tempo pace and complete the hard hills!
+Cool-down</description>
+    <sportType>bike</sportType>
+    <tags>
+        <tag name="INTERVALS"/>
+    </tags>
+    <workout>
+        <Warmup Duration="600" PowerLow="0.25" PowerHigh="0.75"/>
+        <IntervalsT Repeat="3" OnDuration="60" OffDuration="60" OnPower="0.75" OffPower="0.5"/>
+        <SteadyState Duration="60" Power="1.25"/>
+        <SteadyState Duration="120" Power="0.81"/>
+        <SteadyState Duration="138" Power="1.09"/>
+        <SteadyState Duration="72" Power="0.93"/>
+        <SteadyState Duration="47" Power="1.5"/>
+        <Ramp Duration="213" PowerLow="1" PowerHigh="1.2"/>
+        <SteadyState Duration="60" Power="0.87"/>
+        <SteadyState Duration="60" Power="1.35"/>
+        <SteadyState Duration="300" Power="0.76"/>
+        <Ramp Duration="154" PowerLow="1" PowerHigh="1.2"/>
+        <Ramp Duration="295" PowerLow="0.65" PowerHigh="1.1"/>
+        <SteadyState Duration="300" Power="0.65"/>
+        <SteadyState Duration="133" Power="1.35"/>
+        <Ramp Duration="323" PowerLow="0.89" PowerHigh="1.3"/>
+        <Cooldown Duration="480" PowerLow="0.75" PowerHigh="0.25"/>
+    </workout>
+</workout_file>
