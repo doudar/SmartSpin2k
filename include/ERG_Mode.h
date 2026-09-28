@@ -40,6 +40,7 @@ class ErgMode {
     tableSeekStableMisses    = 0;
     tableSeekPidSeedValid    = false;
     feedbackWaiting          = false;
+    tableCorrectionNeedsProgress = false;
     confidenceWattsTimestamp = 0;
     confidenceCadence        = 0;
     confidenceWasHomed       = false;
@@ -76,6 +77,8 @@ class ErgMode {
   bool tableSeekPidSeedValid             = false;
   int32_t tableSeekPidSeedPosition       = 0;
   bool feedbackWaiting                   = false;
+  // A table move must demonstrate progress before another can interrupt proportional recovery.
+  bool tableCorrectionNeedsProgress      = false;
   bool feedbackMotorSettled              = false;
   bool feedbackIncreasing                = false;
   int feedbackTargetWatts                = 0;

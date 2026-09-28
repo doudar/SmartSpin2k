@@ -59,6 +59,10 @@ constexpr int ERG_TABLE_MOVE_TIMEOUT_MS = 10000;
 constexpr uint32_t ERG_FEEDBACK_SETTLE_MS = 2500;
 // Maximum post-settlement wait for power response; also added to the movement timeout for the overall feedback deadline.
 constexpr uint32_t ERG_FEEDBACK_TIMEOUT_MS = 5000;
+// Minimum measured improvement after a table move to permit another table correction and its acquisition pause.
+constexpr int ERG_FEEDBACK_MIN_RESPONSE_WATTS = 5;
+// Also require this fraction of the starting watt error (1/4 = 25%); insufficient progress hands the residual to proportional control.
+constexpr int ERG_FEEDBACK_RESPONSE_DIVISOR = 4;
 // Maximum age of a usable power sample for corrections, seeks, confidence scoring, and response-trend tracking.
 constexpr uint32_t ERG_FEEDBACK_MAX_AGE_MS = 1500;
 // ******************************************************************************
@@ -78,7 +82,8 @@ constexpr int ERG_FEEDBACK_WORSENING_WATTS = 30;
 // Table correction and cadence seek triggers
 // Selects when maintenance can use a relative table correction or a cadence seek.
 // ******************************************************************************
-// Trend-adjusted error must exceed this magnitude before maintenance tries a relative table correction.
+// Trend-adjusted error must exceed this magnitude before maintenance tries a relative table correction, provided the previous move made progress.
+// A quiet return inside this measured-error window also re-arms table correction after proportional recovery.
 constexpr int ERG_TABLE_CORRECTION_WATTS = ERG_MODE_PID_WINDOW;
 // Cadence change from the last reference that can start a trusted maintenance seek; in-flight seeks track smaller changes too.
 constexpr int ERG_TABLE_CADENCE_SEEK_RPM = POWERTABLE_CAD_INCREMENT;

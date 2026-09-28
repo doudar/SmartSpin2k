@@ -66,13 +66,13 @@ struct PowerTable {
   bool saveFlag=false, _hasBeenLoadedThisSession=true;
   bool saveSucceeds=true;
   int saves=0;
-  int lookupResult=11866, cadenceSlope=0, samples=0, loads=0;
+  int lookupResult=11866, cadenceSlope=0, wattSlope=12, samples=0, loads=0;
   bool lookupErgSlope(int, int, double&, PowerTableSlopeStatus::Value* status) {
     *status=PowerTableSlopeStatus::InsufficientRows;return false;
   }
   int lookup(int watts,int cadence) {
     if(failHighCadence && cadence>=100) return RETURN_ERROR;
-    return surface ? helpers.lookup(watts,cadence,ptData) : sloped ? lookupResult+(watts-155)*12+(cadence-94)*cadenceSlope : lookupResult;
+    return surface ? helpers.lookup(watts,cadence,ptData) : sloped ? lookupResult+(watts-155)*wattSlope+(cadence-94)*cadenceSlope : lookupResult;
   }
   bool hasErgSeekSupport() { return !surface || helpers.hasErgSeekSupport(ptData); }
   int lookupWatts(int,int) { return 155; }
@@ -194,9 +194,14 @@ int main(int argc,char** argv) {
       step(3200,438);assert(rtConfig->getTargetIncline()<firstRetreat);
       assert(logged("power rose after reduction"));
       const int secondRetreat=rtConfig->getTargetIncline();
-      step(3900,450); // The second move has just settled.
-      step(4600,490); // Delayed watts are still rising; do not stack a third move.
-      assert(rtConfig->getTargetIncline()==secondRetreat);
+      step(3900,450);
+      step(4600,490);
+      // The failed table retreat hands off to bounded proportional updates,
+      // without stacking another table-sized move or acquisition pause.
+      assert(rtConfig->getTargetIncline()<secondRetreat);
+      int waits=0;
+      for(const auto& entry:logs)if(entry.find("ERG feedback wait:")!=std::string::npos)++waits;
+      assert(waits==1);
       int earlyReleases=0;
       for(const auto& entry:logs)if(entry.find("power rose after reduction")!=std::string::npos)++earlyReleases;
       assert(earlyReleases==1);
@@ -492,6 +497,79 @@ int main(int argc,char** argv) {
     // this case does not yet meet the ten-second target-change requirement.
     assert(settled>=0 && settled<=15.0); assert(std::abs(reported-200)<10);
     assert(logged("now trusted")); assert(logged("(extrapolated)")); assert(logged("Table feedback correction"));
+  } else if(scenario=="trusted_miss_recovery") {
+    setup(155,155); userConfig->setERGSensitivity(3);
+    table.sloped=true; table.lookupResult=motor.current; table.cadenceSlope=-100;
+    for(int t=1000;t<=26000;t+=1000)step(t,155);
+    assert(logged("now trusted"));
+    rtConfig->watts.setTarget(335);step(27000,155);
+    for(int t=28000;t<=32000;t+=1000)step(t,255);
+    assert(logged("power stabilized outside prediction window"));
+    int previous=rtConfig->getTargetIncline();
+    rtConfig->cad.setValue(88); // Would otherwise start another upward seek.
+    for(int t=33000;t<=38000;t+=1000) {
+      step(t,255); assert(!controller.isTableSeeking());
+      assert(rtConfig->getTargetIncline()>previous); previous=rtConfig->getTargetIncline();
+    }
+    assert(!logged("ERG feedback wait:"));
+    rtConfig->watts.setTarget(460); step(39000,255);
+    assert(controller.isTableSeeking()); // A new requested target can use the table again.
+  } else if(scenario=="stalled_under" || scenario=="stalled_over") {
+    const bool under=scenario=="stalled_under";
+    const int watts=under?255:525, target=under?335:460, direction=under?1:-1;
+    setup(watts,target); userConfig->setERGSensitivity(3); table.sloped=true;
+    step(1000,watts); step(2000,watts);
+    const int seekPosition=rtConfig->getTargetIncline();
+    for(int t=3000;t<7000;t+=1000) {
+      step(t,watts); assert(rtConfig->getTargetIncline()==seekPosition);
+    }
+    step(7000,watts);
+    assert(logged("insufficient power response; using proportional recovery"));
+    int previous=rtConfig->getTargetIncline();
+    for(int t=8000;t<=13000;t+=1000) {
+      step(t,watts);
+      const int position=rtConfig->getTargetIncline();
+      assert((position-previous)*direction>0); previous=position;
+    }
+    int waits=0;
+    for(const auto& entry:logs)if(entry.find("ERG feedback wait:")!=std::string::npos)++waits;
+    assert(waits==1);
+    rtConfig->watts.setTarget(target); step(13700,watts,true,false);
+    assert(rtConfig->getTargetIncline()==previous); // A target write is not new power.
+    step(16000,watts,true,false);
+    assert(rtConfig->getTargetIncline()==previous); // Stale power still cannot move.
+    step(17000,target); step(18000,target); // Settle back at target to re-arm.
+    step(19000,watts);
+    waits=0;
+    for(const auto& entry:logs)if(entry.find("ERG feedback wait:")!=std::string::npos)++waits;
+    assert(waits==2);
+  } else if(scenario.find("miscalibrated_")==0) {
+    // A shallow new table underestimates travel by 3x. Real power is delayed
+    // and smoothed; both undershoot and overshoot use the default sensitivity.
+    const bool under=scenario.find("under")!=std::string::npos;
+    const int start=under?255:525, target=under?335:460;
+    setup(start,target); userConfig->setERGSensitivity(3);
+    table.sloped=true; table.wattSlope=4;
+    const int delayMs=std::stoi(scenario.substr(scenario.find_last_of('_')+1));
+    std::deque<double> delayed(delayMs/10+1,start);
+    double position=motor.current, reported=start, peakError=0;
+    int lastOutside=0;
+    for(int elapsed=0;elapsed<60000;elapsed+=10) {
+      clockMs=1000+elapsed;
+      motor.target=std::clamp(static_cast<int32_t>(rtConfig->getTargetIncline()),rtConfig->getMinStep(),rtConfig->getMaxStep());
+      position+=std::clamp(motor.target-position,-35.0,35.0);
+      motor.current=std::lround(position); motor.stepperIsRunning=motor.current!=motor.target;
+      delayed.push_back(start+(position-10083)/12);
+      const double old=delayed.front(); delayed.pop_front(); reported+=(old-reported)*0.01;
+      if(elapsed%1000==0) {
+        rtConfig->watts.setValue(std::lround(reported));
+        if(std::abs(reported-target)>10) lastOutside=elapsed/1000;
+        peakError=std::max(peakError,under?reported-target:target-reported);
+      }
+      controller.runERG();
+    }
+    printf("%s: settled %ds, opposite overshoot %.1fW, final %.1fW\n",scenario.c_str(),lastOutside+1,peakError,reported); fflush(stdout);
+    assert(lastOutside+1<=30); assert(peakError<30); assert(std::abs(reported-target)<10);
   } else if(scenario.find("simulation_")==0) {
     setup(); rtConfig->setHomed(true);
     if(scenario.find("missing")!=std::string::npos) table.lookupResult=RETURN_ERROR;
@@ -564,6 +642,15 @@ class TestErgFeedback(unittest.TestCase):
         for delay in (1000,2000,3000):
             with self.subTest(delay=delay):
                 subprocess.run([str(self.exe), "surface_"+str(delay)], check=True)
+
+    def test_failed_table_moves_keep_correcting(self):
+        subprocess.run([str(self.exe), "trusted_miss_recovery"], check=True)
+        for side in ("under", "over"):
+            with self.subTest(side=side):
+                subprocess.run([str(self.exe), "stalled_"+side], check=True)
+            for delay in (1000, 2000, 3000):
+                with self.subTest(side=side, delay=delay):
+                    subprocess.run([str(self.exe), f"miscalibrated_{side}_{delay}"], check=True)
 
     def test_upload_continues_during_homing(self):
         for scenario in ("upload_home", "upload_save_failure", "upload_full_home"):

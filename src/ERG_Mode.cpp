@@ -38,6 +38,7 @@ void ErgMode::prepareMode() {
   wasErgMode      = active;
   tableSeekState  = TableSeekState::INACTIVE;
   feedbackWaiting = tableSeekPidSeedValid = false;
+  tableCorrectionNeedsProgress             = false;
   mode                                    = Mode::MAINTAIN;
   cadenceReference                        = 0;
   responseTimestamp                       = 0;
@@ -210,9 +211,10 @@ void ErgMode::computeErg() {
   const int target         = rtConfig->watts.getTarget();
   const int cadence        = rtConfig->cad.getValue();
   const bool targetChanged = this->prevWatts.getTarget() != target;
+  if (targetChanged) tableCorrectionNeedsProgress = false;
   if (rtConfig->getHomed() && targetChanged && (abs(this->prevWatts.getTarget() - target) > ERG_MODE_PID_WINDOW || _tableTargetIsTrusted(target, cadence))) {
     result = _setPointChangeState();
-  } else if (rtConfig->getHomed() && cadenceReference > MIN_ERG_CADENCE && abs(cadence - cadenceReference) >= ERG_TABLE_CADENCE_SEEK_RPM &&
+  } else if (!tableCorrectionNeedsProgress && rtConfig->getHomed() && cadenceReference > MIN_ERG_CADENCE && abs(cadence - cadenceReference) >= ERG_TABLE_CADENCE_SEEK_RPM &&
              _tableTargetIsTrusted(target, cadence)) {
     // Preserve the correction already learned by feedback. A cadence change
     // needs the difference between two table positions, not a new absolute
@@ -311,6 +313,7 @@ int32_t ErgMode::_setPointChangeState() {
 }
 
 void ErgMode::_startFeedbackWait() {
+  tableCorrectionNeedsProgress = true;
   if (!isTableSeeking() && !feedbackWaiting) controlMinimum = controlMaximum = ss2k->getCurrentPosition();
   feedbackWaiting      = true;
   feedbackMotorSettled = false;
@@ -369,13 +372,14 @@ void ErgMode::_handleFeedbackWait() {
       // target/config writes must not count as new power feedback.
       if (fresh && static_cast<int32_t>(sample.timestamp - feedbackSettledAt) >= static_cast<int32_t>(ERG_FEEDBACK_SETTLE_MS)) {
         const int response        = feedbackIncreasing ? sample.value - feedbackStartWatts : feedbackStartWatts - sample.value;
-        const int minimumResponse = std::max(5, std::abs(feedbackTargetWatts - feedbackStartWatts) / 4);
+        const int minimumResponse = std::max(ERG_FEEDBACK_MIN_RESPONSE_WATTS, std::abs(feedbackTargetWatts - feedbackStartWatts) / ERG_FEEDBACK_RESPONSE_DIVISOR);
         if (response < minimumResponse && std::abs(sample.value - feedbackTargetWatts) > ERG_MODE_PID_WINDOW && now - feedbackSettledAt < ERG_FEEDBACK_TIMEOUT_MS) return;
         // A report that is still moving strongly toward the request is not a
         // settled residual. Let that response finish before adding another
         // table-sized correction, bounded by the normal feedback deadline.
         if ((feedbackTargetWatts - sample.value) * responseTrend > 0 && std::abs(responseTrend) >= 2.0 && now - feedbackSettledAt < ERG_FEEDBACK_TIMEOUT_MS) return;
-        reason = "power acquisition complete";
+        tableCorrectionNeedsProgress = response < minimumResponse;
+        reason                       = tableCorrectionNeedsProgress ? "insufficient power response; using proportional recovery" : "power acquisition complete";
       } else if (now - feedbackSettledAt >= ERG_FEEDBACK_TIMEOUT_MS) {
         reason   = "power feedback timeout";
         timedOut = true;
@@ -483,6 +487,7 @@ unsigned long ErgMode::_trustedTableMoveDeadline(int32_t position) const {
 }
 
 void ErgMode::_startTrustedTableSeek(int32_t position) {
+  tableCorrectionNeedsProgress = true;
   if (!isTableSeeking() && !feedbackWaiting) controlMinimum = controlMaximum = ss2k->getCurrentPosition();
   _trackControlMove(position);
   tableSeekState          = TableSeekState::MOVING;
@@ -666,11 +671,11 @@ int32_t ErgMode::_inSetpointState() {
   const int measuredError = target - watts;
   int error               = ErgControl::approachingError(measuredError, responseTrend);
 
-  // Use the forward surface as a distance estimate even where the stricter
-  // derivative lookup has no local measured segment. Referencing actual power
-  // cancels a constant position offset and lets a missed seek recover in one
-  // substantial correction instead of many tiny fallback-gain movements.
-  if (abs(error) > ERG_TABLE_CORRECTION_WATTS) {
+  // A table move must earn another acquisition pause by producing a meaningful
+  // power response. After a miss, use fresh-sample proportional control until
+  // power settles back inside the target window (or a new target is requested).
+  if (abs(measuredError) <= ERG_TABLE_CORRECTION_WATTS && std::abs(responseTrend) < 2.0) tableCorrectionNeedsProgress = false;
+  if (!tableCorrectionNeedsProgress && abs(error) > ERG_TABLE_CORRECTION_WATTS) {
     const int32_t correction = _tableCorrection(target - error, target, rtConfig->cad.getValue());
     if (correction != RETURN_ERROR) {
       mode                  = Mode::MAINTAIN;
