@@ -84,7 +84,7 @@ constexpr int ERG_FEEDBACK_WORSENING_WATTS = 30;
 // ******************************************************************************
 // Trend-adjusted error must exceed this magnitude before maintenance tries a relative table correction, provided the previous move made progress.
 // A quiet return inside this measured-error window also re-arms table correction after proportional recovery.
-constexpr int ERG_TABLE_CORRECTION_WATTS = ERG_MODE_PID_WINDOW;
+constexpr int ERG_TABLE_CORRECTION_WATTS = 44;
 // Cadence change from the last reference that can start a trusted maintenance seek; in-flight seeks track smaller changes too.
 constexpr int ERG_TABLE_CADENCE_SEEK_RPM = POWERTABLE_CAD_INCREMENT;
 // ******************************************************************************
@@ -115,7 +115,7 @@ constexpr double TABLE_GAIN_MIN_FALLBACK_RATIO = 0.5;
 constexpr double TABLE_GAIN_MAX_FALLBACK_RATIO = 1.25;
 // Weight of bounded table gain when blending with fallback gain (0 = fallback, 1 = table).
 // Used by blendedTableGain() during ERG proportional control when a usable table slope is available.
-constexpr double TABLE_GAIN_BLEND = 0.5;
+constexpr double TABLE_GAIN_BLEND = 0.75;
 // Minimum final gain as a fraction of the configured ERG sensitivity.
 constexpr double GAIN_MIN_SENSITIVITY_RATIO = 0.25;
 // Maximum final gain as a multiple of the configured ERG sensitivity.
@@ -130,13 +130,13 @@ constexpr double SLOPE_CONTROL_DIVISOR = 10.0;
 // Uses trend-adjusted error; outside MAINTAIN, the small-error multiplier applies.
 // ******************************************************************************
 // Absolute control errors below this threshold use the small-error gain multiplier.
-constexpr int SMALL_ERROR_WATTS = 10;
+constexpr int SMALL_ERROR_WATTS = 20;
 // While maintaining, errors at least SMALL_ERROR_WATTS but below this threshold use the medium-error multiplier.
 constexpr int MEDIUM_ERROR_WATTS = 50;
 // While maintaining, errors above this threshold use the large-error multiplier.
-constexpr int LARGE_ERROR_WATTS = 100;
+constexpr int LARGE_ERROR_WATTS = 50;
 // Scale gain near the target or whenever the controller has not yet entered MAINTAIN mode.
-constexpr double SMALL_ERROR_GAIN_MULTIPLIER = 0.50;
+constexpr double SMALL_ERROR_GAIN_MULTIPLIER = 0.90;
 // Scale gain for medium errors while maintaining to soften corrections as power approaches the target.
 constexpr double MEDIUM_ERROR_GAIN_MULTIPLIER = 0.75;
 // Scale gain for large errors while maintaining to strengthen corrections far from the target.
