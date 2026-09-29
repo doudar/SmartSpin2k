@@ -75,7 +75,7 @@ constexpr uint32_t ERG_FEEDBACK_MAX_AGE_MS = 1500;
 // Required watts above target for the worsening-reduction early retry.
 constexpr int ERG_FEEDBACK_HIGH_OVERSHOOT_WATTS = ERG_MODE_PID_WINDOW;
 // Required rise above the reduction's starting power for the same early retry.
-constexpr int ERG_FEEDBACK_WORSENING_WATTS = 30;
+constexpr int ERG_FEEDBACK_WORSENING_WATTS = 25;
 // ******************************************************************************
 
 // ******************************************************************************

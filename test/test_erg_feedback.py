@@ -360,9 +360,11 @@ int main(int argc,char** argv) {
     rtConfig->watts.setTarget(175); step(27000,155);
     assert(controller.isTableSeeking()); assert(controller.collectionAllowed());
     if(scenario=="growing_seek_collection") {
-      table.lookupResult+=40;rtConfig->cad.setValue(95);step(28000,170);
+      // Falling cadence requires rising resistance; increasing cadence would
+      // correctly reject these upward retargets as physically inconsistent.
+      table.lookupResult+=40;rtConfig->cad.setValue(93);step(28000,170);
       assert(controller.collectionAllowed());
-      table.lookupResult+=40;rtConfig->cad.setValue(96);step(29000,170);
+      table.lookupResult+=40;rtConfig->cad.setValue(92);step(29000,170);
       assert(!controller.collectionAllowed()); // Individually small retargets cannot reset the origin.
     } else {
       step(28000,168); assert(controller.collectionAllowed());
@@ -373,7 +375,9 @@ int main(int argc,char** argv) {
   } else if(scenario=="cadence_feedback_reference") {
     setup(155,155);table.sloped=true;table.lookupResult=motor.current;
     for(int t=1000;t<=26000;t+=1000)step(t,155);
-    step(27000,196);step(28000,196);
+    // A 45 W residual crosses the 44 W table-correction threshold, starting
+    // the acquisition whose cadence reference this scenario checks.
+    step(27000,200);step(28000,200);
     rtConfig->cad.setValue(100);step(29000,180);step(30000,160);step(31000,155);
     assert(logged("power acquisition complete"));
     assert(!controller.isTableSeeking()); // Acquired feedback already includes the new cadence.
