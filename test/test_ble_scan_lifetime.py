@@ -111,10 +111,14 @@ int main() {
   auto attempt = slot.getAdvertisement();
   slot.set(nullptr);
   assert(slot.getAdvertisement() == attempt);
+  slot.isGrupetto = true;
   slot.reset(false);
+  assert(!slot.isGrupetto);
   assert(slot.getAdvertisement() == attempt);
   // An in-flight attempt retains the data across a full reset.
+  slot.isGrupetto = true;
   slot.reset(true);
+  assert(!slot.isGrupetto);
   assert(!slot.getAdvertisement());
   assert(attempt->payload[0] == 0x16);
   assert(attempt->name == "CAD-BLE0418789 B1");

@@ -16,10 +16,12 @@
 SensorDataFactory sensorDataFactory;
 
 void collectAndSet(const NimBLEUUID& charUUID, const NimBLEUUID& serviceUUID, const std::string& uniqueName, uint8_t* pData, size_t length) {
+  bool isGrupetto = false;
   // Update the timestamp for disconnect detection
   for (size_t i = 0; i < NUM_BLE_DEVICES; i++) {
     if (spinBLEClient.myBLEDevices[i].uniqueName == uniqueName) {
       spinBLEClient.myBLEDevices[i].lastDataUpdateTime = millis();
+      isGrupetto = spinBLEClient.myBLEDevices[i].isGrupetto;
       break;
     }
   }
@@ -98,13 +100,9 @@ void collectAndSet(const NimBLEUUID& charUUID, const NimBLEUUID& serviceUUID, co
     SENSOR_LOG_APPEND(" SD(%.2f)", fmodf(sensorData->getSpeed(), 1000.0));
   }
 
-  if (sensorData->hasResistance() && uniqueName.starts_with("Grupetto")) { // Blacklist everything not Grupetto. 
-    if (charUUID == PELOTON_DATA_UUID) {
-      // Peloton connected but using BLE Power Meter. So skip resistance for UUID's that aren't Peloton.
-    } else {
+  if (sensorData->hasResistance() && isGrupetto) {  // Grupetto resistance feedback enables FTMS homing.
       rtConfig->resistance.setValue(sensorData->getResistance(), false);  // Publish value and real-data flag together.
       SENSOR_LOG_APPEND(" RS(%d)", sensorData->getResistance() % 1000);
-    }
   }
 
   // adding incline so that i can plot it

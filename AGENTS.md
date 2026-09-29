@@ -262,6 +262,7 @@ Key functions:
 - `SpinBLEClient::postConnect()`: completes service subscriptions, reads FTMS resistance range, starts FTMS training where needed, drains notification queues. Notification setup discovers only the characteristics the firmware consumes so large remote GATT tables do not exhaust the classic ESP32 heap. HID is the exception because remotes can expose multiple Report characteristics with the same UUID.
 - `SpinBLEClient::checkBLEReconnect()`: sets `doScan` when configured devices are missing.
 - `SpinBLEClient::adevName2UniqueName()`: stable names for saved device preferences. Public/static random addresses get address suffix; private random addresses prefer manufacturer-data suffix or base name.
+- FTMS post-connect reads Device Information's Manufacturer Name (`0x180A`/`0x2A29`). `Grupetto` sets a per-slot flag so name-locked Peloton tablets can supply real resistance and use FTMS homing. The name-prefix fallback remains; identifiers are unchanged and the flag clears on disconnect.
 
 `BLEServices::SUPPORTED_SERVICES` maps service UUIDs to the characteristic UUIDs this firmware expects. If adding sensor support, update this list, `SensorDataFactory`, and tests if parsing is involved.
 The service table has one shared definition in `src/BLE_Common.cpp`; keep it out of the header to avoid allocating a separate vector and service-name strings in every translation unit.

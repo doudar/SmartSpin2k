@@ -147,6 +147,7 @@ class SpinBLEAdvertisedDevice {
   bool isCSC           = false;
   bool isCT            = false;
   bool isRemote        = false;
+  bool isGrupetto      = false;
   bool doConnect       = false;
   bool isPostConnected = false;
   unsigned long lastDataUpdateTime = 0;  // Reset disconnect detection timestamp

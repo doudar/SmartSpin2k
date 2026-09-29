@@ -715,6 +715,9 @@ void SpinBLEClient::postConnect() {
 
         NimBLERemoteService* fitnessService = pClient->getService(FITNESSMACHINESERVICE_UUID);
         if (fitnessService) {
+          // Name-locked Peloton tablets identify Grupetto through Device Information.
+          const std::string manufacturer = pClient->getValue(DEVICE_INFORMATION_SERVICE_UUID, MANUFACTURER_NAME_UUID);
+          _BLEd.isGrupetto = (manufacturer == "Grupetto");
           SS2K_LOG(BLE_CLIENT_LOG_TAG, "Initializing FTMS on device: %s", _BLEd.uniqueName.c_str());
 
           auto featuresCharacteristic = fitnessService->getCharacteristic(FITNESSMACHINEFEATURE_UUID);
@@ -1181,6 +1184,7 @@ void SpinBLEAdvertisedDevice::clearState(bool resetAdvertisedDevice) {
   isCSC              = false;
   isCT               = false;
   isRemote           = false;
+  isGrupetto         = false;
   doConnect          = false;
   isPostConnected    = false;
   batt               = Measurement();
