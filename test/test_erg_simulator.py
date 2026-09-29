@@ -140,12 +140,12 @@ class TestWorkoutAndGrades(unittest.TestCase):
 
     def test_supplied_zwo_target_schedule(self):
         workout = Workout.load(HERE/"workouts/Random_Attacks.zwo", 305)
-        self.assertEqual(workout.duration, 3715)
+        self.assertEqual(workout.duration, 4525)
         self.assertEqual(workout.at(0)[0], 76)
         self.assertEqual(workout.at(300)[0], 152)
         self.assertEqual(workout.at(660)[0], 152)
         self.assertEqual(workout.at(960)[0], 381)
-        self.assertEqual(workout.at(3715)[0], 76)
+        self.assertEqual(workout.at(4525)[0], 76)
 
     def test_thresholds_count_strict_exceedances_and_episodes(self):
         # Errors 10, 11, 21, 5, 100, 101 W with unequal report intervals.
@@ -202,7 +202,7 @@ class TestProductionBikeLoop(unittest.TestCase):
         self.assertEqual(supported, trace[-1, 7])
         self.assertTrue(any(p == -32768 and n == 0 for p, n in cells))
         self.assertGreater((output/"power_table.png").stat().st_size, 1000)
-        self.assertEqual(len(trace), 3715)
+        self.assertEqual(len(trace), 4525)
         self.assertGreater(trace[-1, 7], 12)  # Production table actually learned.
         self.assertTrue(np.all((trace[:, 4] >= 0) & (trace[:, 4] <= 24482)))
         self.assertGreater(np.std(trace[:, 3]), 4)  # A rider, not fixed cadence.

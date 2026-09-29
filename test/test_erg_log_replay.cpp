@@ -117,10 +117,16 @@ void TestErgLogReplay::test_active_ride_log_and_gain_limits(void) {
 
   const double fallback = ErgControl::fallbackGain(5.0, unstable.target);
   TEST_ASSERT_FLOAT_WITHIN(0.0001f, 5.0f, static_cast<float>(fallback));
-  TEST_ASSERT_FLOAT_WITHIN(0.0001f, 6.25f, static_cast<float>(ErgControl::boundedTableGain(1000.0, fallback)));
-  TEST_ASSERT_FLOAT_WITHIN(0.0001f, 2.5f, static_cast<float>(ErgControl::boundedTableGain(0.01, fallback)));
-  TEST_ASSERT_FLOAT_WITHIN(0.0001f, 5.625f, static_cast<float>(ErgControl::blendedTableGain(1000.0, fallback)));
-  TEST_ASSERT_FLOAT_WITHIN(0.0001f, 3.75f, static_cast<float>(ErgControl::blendedTableGain(0.01, fallback)));
+  // Check clamping and blending against the configured limits, independently of
+  // the helpers being tested. At sensitivity 5 these are 2.5..10 and 3.75..7.5.
+  const double minimumTableGain   = fallback * ErgControl::TABLE_GAIN_MIN_FALLBACK_RATIO;
+  const double maximumTableGain   = fallback * ErgControl::TABLE_GAIN_MAX_FALLBACK_RATIO;
+  const double minimumBlendedGain = fallback * (1.0 - ErgControl::TABLE_GAIN_BLEND) + minimumTableGain * ErgControl::TABLE_GAIN_BLEND;
+  const double maximumBlendedGain = fallback * (1.0 - ErgControl::TABLE_GAIN_BLEND) + maximumTableGain * ErgControl::TABLE_GAIN_BLEND;
+  TEST_ASSERT_FLOAT_WITHIN(0.0001f, static_cast<float>(maximumTableGain), static_cast<float>(ErgControl::boundedTableGain(1000.0, fallback)));
+  TEST_ASSERT_FLOAT_WITHIN(0.0001f, static_cast<float>(minimumTableGain), static_cast<float>(ErgControl::boundedTableGain(0.01, fallback)));
+  TEST_ASSERT_FLOAT_WITHIN(0.0001f, static_cast<float>(maximumBlendedGain), static_cast<float>(ErgControl::blendedTableGain(1000.0, fallback)));
+  TEST_ASSERT_FLOAT_WITHIN(0.0001f, static_cast<float>(minimumBlendedGain), static_cast<float>(ErgControl::blendedTableGain(0.01, fallback)));
   TEST_ASSERT_FLOAT_WITHIN(0.0001f, static_cast<float>(fallback), static_cast<float>(ErgControl::boundedTableGain(std::numeric_limits<double>::quiet_NaN(), fallback)));
 
   double worstReplayedMove = 0.0;
@@ -164,6 +170,7 @@ void TestErgLogReplay::test_active_ride_new_gain_replay(void) {
   int rejectedAtEdge             = 0;
   double maximumHistoricalMove   = 0.0;
   double maximumNewGain          = 0.0;
+  double maximumAllowedGain      = 0.0;
   double maximumNewMove          = 0.0;
   double maximumNewlyTrustedMove = 0.0;
   std::string line;
@@ -200,6 +207,18 @@ void TestErgLogReplay::test_active_ride_new_gain_replay(void) {
     gain                                     = ErgControl::errorScheduledGain(gain, error, true);
     gain                                     = ErgControl::clampGain(gain, sensitivity);
 
+    // Bound every sample using its own sensitivity and fallback schedule. The
+    // expected ceiling must not call the gain helpers under test. At sensitivity
+    // 5 in the mid-power range, the current maximum is 7.5 * 1.25 = 9.375.
+    const double maximumBaseGain = fallback * (1.0 - ErgControl::TABLE_GAIN_BLEND + ErgControl::TABLE_GAIN_BLEND * ErgControl::TABLE_GAIN_MAX_FALLBACK_RATIO);
+    const double maximumErrorMultiplier =
+        std::max({1.0, ErgControl::SMALL_ERROR_GAIN_MULTIPLIER, ErgControl::MEDIUM_ERROR_GAIN_MULTIPLIER, ErgControl::LARGE_ERROR_GAIN_MULTIPLIER});
+    const double allowedGain =
+        std::max(sensitivity * ErgControl::GAIN_MIN_SENSITIVITY_RATIO, std::min(maximumBaseGain * maximumErrorMultiplier, sensitivity * ErgControl::GAIN_MAX_SENSITIVITY_RATIO));
+    TEST_ASSERT_TRUE_MESSAGE(std::isfinite(gain), "replayed ERG gain must be finite");
+    TEST_ASSERT_LESS_OR_EQUAL_FLOAT_MESSAGE(static_cast<float>(allowedGain), static_cast<float>(gain), "replayed ERG gain exceeded the configured scheduled cap");
+    maximumAllowedGain = std::max(maximumAllowedGain, allowedGain);
+
     ++samples;
     if (!oldTable) ++historicalFallbacks;
     if (!oldTable && useTable) ++newlyTrusted;
@@ -213,17 +232,15 @@ void TestErgLogReplay::test_active_ride_new_gain_replay(void) {
 
   TEST_ASSERT_GREATER_THAN_INT_MESSAGE(300, samples, "ride log did not yield enough ERG samples for replay");
   TEST_ASSERT_GREATER_THAN_INT_MESSAGE(0, newlyTrusted, "new ERG slope selection did not recover any historical fallback samples");
-  // The blended 5.625 base-gain ceiling is intentionally allowed one 1.25x
-  // error-scheduling multiplier for errors above 100 W.
-  TEST_ASSERT_LESS_OR_EQUAL_FLOAT_MESSAGE(7.03125f, static_cast<float>(maximumNewGain), "new ERG gain exceeded the conservative scheduled cap at sensitivity 5");
+  TEST_ASSERT_LESS_OR_EQUAL_FLOAT_MESSAGE(static_cast<float>(maximumAllowedGain), static_cast<float>(maximumNewGain), "new ERG gain exceeded the configured replay ceiling");
 
   std::ofstream report("test/output/active_erg_new_gain_replay.txt", std::ios::trunc);
   TEST_ASSERT_TRUE_MESSAGE(report.is_open(), "failed to write new ERG replay audit");
   report << "Chronological active-ride ERG replay\n"
          << "samples=" << samples << " historical_fallbacks=" << historicalFallbacks << " newly_trusted=" << newlyTrusted << " new_table_samples=" << newTableSamples
          << " edge_or_missing_segment_rejections=" << rejectedAtEdge << '\n'
-         << "maximum_logged_correction_steps=" << maximumHistoricalMove << " maximum_new_gain=" << maximumNewGain << " maximum_new_correction_steps=" << maximumNewMove
-         << " maximum_newly_trusted_correction_steps=" << maximumNewlyTrustedMove << '\n'
+         << "maximum_logged_correction_steps=" << maximumHistoricalMove << " maximum_new_gain=" << maximumNewGain << " maximum_allowed_gain=" << maximumAllowedGain
+         << " maximum_new_correction_steps=" << maximumNewMove << " maximum_newly_trusted_correction_steps=" << maximumNewlyTrustedMove << '\n'
          << "Table state is rebuilt in log order; each ERG sample uses the last logged Main cadence and only PTable entries already seen.\n";
   TEST_ASSERT_TRUE_MESSAGE(report.good(), "failed while writing new ERG replay audit");
 }

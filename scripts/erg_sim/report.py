@@ -4,20 +4,43 @@ import json
 from pathlib import Path
 
 
+def _metric(value, unit="W", decimals=1):
+    return "n/a" if value is None else f"{value:.{decimals}f}{' ' if unit else ''}{unit}"
+
+
+def _score_lines(score):
+    lines = [f"Maximum absolute error: **{_metric(score['max_absolute_error_w'])}**. "
+             f"95th percentile: **{_metric(score['p95_absolute_error_w'])}**. "
+             f"Mean absolute error: **{_metric(score['mae_w'])}**.", "",
+             "| Strictly over | Samples | Episodes | Seconds | Time | Longest episode |",
+             "|---|---:|---:|---:|---:|---:|"]
+    for threshold, values in score["deviations_over_w"].items():
+        percent = "n/a" if values['percent_time'] is None else f"{values['percent_time']:.2f}%"
+        lines.append(f"| {threshold} W | {values['samples']} | {values['episodes']} | {values['seconds']:.1f} | {percent} | {values['longest_episode_s']:.1f} s |")
+    return lines
+
+
 def save_run(output, trace, report, metadata):
     output = Path(output)
     (output/"score.json").write_text(json.dumps({"run": metadata, "score": report}, indent=2), encoding="utf-8")
     text = ["# ERG simulator result", "", f"Workout: {metadata.get('workout', 'reference replay')}", "",
-            f"FTP: {metadata.get('ftp_w', 'n/a')} W; duration: {report['duration_s']/60:.1f} min; seed: {metadata['seed']}.", "",
-            f"Maximum absolute error: **{report['max_absolute_error_w']:.1f} W**. "
-            f"95th percentile: **{report['p95_absolute_error_w']:.1f} W**. "
-            f"Mean absolute error: **{report['mae_w']:.1f} W**.", "",
-            "| Strictly over | Samples | Episodes | Seconds | Time | Longest episode |",
-            "|---|---:|---:|---:|---:|---:|"]
-    for threshold, values in report["deviations_over_w"].items():
-        text.append(f"| {threshold} W | {values['samples']} | {values['episodes']} | {values['seconds']:.1f} | {values['percent_time']:.2f}% | {values['longest_episode_s']:.1f} s |")
+            f"FTP: {metadata.get('ftp_w', 'n/a')} W; duration: {report['duration_s']/60:.1f} min; seed: {metadata['seed']}.", ""]
+    tracking = report.get("after_interval_grace")
+    if tracking is not None:
+        text += [f"## Tracking after a {tracking['grace_s']:g}-second settling allowance", "",
+                 f"The headline errors and table count reports **at least {tracking['grace_s']:g} seconds after each interval starts**, "
+                 "including workout start and ramp starts. Ramp watt updates do not restart this allowance.", "",
+                 f"Scored: **{tracking['samples']} reports / {tracking['scored_seconds']:.1f} seconds**; "
+                 f"excluded: {tracking['excluded_samples']} reports / {tracking['excluded_seconds']:.1f} seconds. "
+                 "Time percentages use the scored duration. Excluded gaps split episodes; held samples stop at the next interval.", ""]
+        if not tracking["samples"]:
+            text += ["No reports remain after the settling allowance; tracking error metrics are unavailable.", ""]
+        text += _score_lines(tracking)
+        text += ["", "## Full workout — no settling allowance", "",
+                 "These comparison metrics include every report and remain the basis for the existing regression limits.", ""]
+    text += _score_lines(report)
     text += ["", "Counts are one per sensor report, not per firmware tick. Episodes group adjacent reports; durations use sample-and-hold. "
-             "All warmup/ramp/transition errors count in the full-workout grade. The JSON also contains signed peaks, RMS error, "
+             "The plots retain the complete power and error traces. The JSON also contains signed peaks, RMS error, "
              "steady tracking, and time to stay within 20 W for five seconds after each large transition.", "",
              "The firmware starts with an empty power table and learns during the ride. "
              "Cadence variability and assumed mechanical limits are configurable. This is software simulation, not hardware validation."]
@@ -44,10 +67,13 @@ def plot_run(output, trace, title="Random Attacks — production ERG + simulated
     fig = plt.figure(figsize=(16, 7.5), facecolor=background)
     fig.suptitle(title, x=.065, y=.965, ha="left", color=text, fontsize=17, fontweight="bold")
     duration = workout.duration if workout is not None else trace[-1, 0]+1
+    tracking = score.get("after_interval_grace") if score else None
+    displayed_score = tracking if tracking is not None else score
+    error_suffix = f" ({tracking['grace_s']:g}s+)" if tracking is not None else ""
     summary = [("DURATION", f"{int(duration)//60}:{int(duration)%60:02d}"), ("FTP", f"{ftp:g} W"),
                ("AVG POWER", f"{np.mean(trace[:, 2]):.0f} W"), ("AVG CADENCE", f"{np.mean(trace[:, 3]):.0f} RPM"),
-               ("95% ABS ERROR", f"{score['p95_absolute_error_w']:.0f} W" if score else "—"),
-               ("MAX ABS ERROR", f"{score['max_absolute_error_w']:.0f} W" if score else "—")]
+               ("95% ABS ERROR"+error_suffix, _metric(displayed_score['p95_absolute_error_w'], decimals=0) if displayed_score else "—"),
+               ("MAX ABS ERROR"+error_suffix, _metric(displayed_score['max_absolute_error_w'], decimals=0) if displayed_score else "—")]
     for i, (label, value) in enumerate(summary):
         x = .065+i*.147
         fig.add_artist(FancyBboxPatch((x, .805), .136, .105, boxstyle="round,pad=.008,rounding_size=.009",
@@ -101,7 +127,8 @@ def plot_run(output, trace, title="Random Attacks — production ERG + simulated
                        loc="lower center", bbox_to_anchor=(.5, 1.025), ncol=4, frameon=False, fontsize=10)
     for label in legend.get_texts(): label.set_color(text)
     rider_label = "fixed interval cadence" if cadence_path.exists() else "recorded or stochastic cadence"
-    fig.text(.065, .038, f"Production SmartSpin2k ERG  /  fitted bike + {rider_label}  /  raw 1 Hz feedback", color="#8da5b7", fontsize=9)
+    score_note = f"  /  error scores exclude first {tracking['grace_s']:g}s of each interval" if tracking is not None else ""
+    fig.text(.065, .038, f"Production SmartSpin2k ERG  /  fitted bike + {rider_label}  /  raw 1 Hz feedback"+score_note, color="#8da5b7", fontsize=9)
     fig.savefig(Path(output)/"response.png", dpi=160, facecolor=background)
     fig.savefig(Path(output)/"response.svg", facecolor=background)
     plt.close(fig)
@@ -114,7 +141,7 @@ def plot_run(output, trace, title="Random Attacks — production ERG + simulated
     axes[0].set(ylabel="Power (W)", title=title); axes[0].legend()
     axes[1].plot(t, trace[:, 2]-trace[:, 1], color="#b64a31", linewidth=.7)
     for band in (20, -20): axes[1].axhline(band, color="gray", linestyle="--", linewidth=.6)
-    axes[1].set(ylabel="Error (W)")
+    axes[1].set(ylabel="Error (W)", title="Full error trace — includes interval settling")
     axes[2].plot(t, trace[:, 3], color="#2b8756", linewidth=.8)
     axes[2].set(ylabel="Cadence (RPM)", xlabel="Simulation time (min)")
     for ax in axes: ax.grid(alpha=.2)

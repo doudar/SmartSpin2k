@@ -52,8 +52,8 @@ python -B -m unittest discover -s test -p test_erg_simulator.py
 
 The default is the supplied `workouts/Random_Attacks.zwo`, FTP **305 W**, seed 27,
 the fixed interval cadence plan beside the workout, and the fitted bike from
-`profiles/ride_20260927.json`. The whole 3,715-second workout runs
-in roughly 6 seconds on the development machine, plus compilation/plotting.
+`profiles/ride_20260927.json`. The whole 4,525-second workout (75:25) runs
+in roughly 8 seconds on the development machine, plus compilation/plotting.
 
 ```sh
 # Run against wall time; 20 means twenty simulated seconds per real second.
@@ -112,10 +112,24 @@ deviations **over 10, 20, 30, 50, and 100 W**. Each threshold reports:
 
 - Number of sensor samples over the threshold (normally one per second).
 - Number of distinct contiguous episodes.
-- Total duration, percentage of workout time, and longest episode.
+- Total duration, percentage of scored time, and longest episode.
 
-No warmup, ramp, or transition is omitted from the overall score. Requested
-workout watts are the reference even if firmware clamps the target. An additional
+The report's headline grades and chart score cards allow **3 seconds to settle at
+the start of each interval**, including workout start and ramp starts. Reports
+at exactly interval start + 3 seconds count. The allowance follows workout
+segment boundaries, so individual ramp watt updates do not restart it. Max,
+MAE, percentiles and every threshold column use the same eligible reports.
+Held durations stop at the next interval, excluded gaps split episodes, and
+percentages use scored time. Coverage and excluded samples/seconds are explicit;
+workouts with no eligible reports show unavailable metrics instead of zero error.
+
+A second full-workout section retains every report, including transitions.
+`score.json` keeps these unfiltered metrics at the original `score` keys and
+adds the headline metrics under `score.after_interval_grace`. Existing regression
+limits continue checking the unfiltered score. The power/error curves retain all
+samples. This reporting allowance does not change the controller or simulation.
+
+Requested workout watts are the reference even if firmware clamps the target. An additional
 steady score covers constant segments after their first 15 seconds. For each
 target jump of at least 20 W, the report measures time until power remains within
 20 W for five seconds; `null` means it did not settle before the next segment.
@@ -163,9 +177,9 @@ The effective bike model is:
 
 ## Repeatable cadence scenario
 
-The default `planned` rider uses `workouts/Random_Attacks.cadence.json`. All 22
-expanded intervals have explicit cadence callouts. Original ZWO powers and
-durations remain unchanged:
+The default `planned` rider uses `workouts/Random_Attacks.cadence.json`. All 40
+expanded intervals have explicit cadence callouts. The original 22 intervals retain
+their powers, durations, and callouts; two blocks add 810 seconds of small steps:
 
 - Warmup gradually builds from 60 to 90 RPM.
 - Three fast-pedaling drills target 110 RPM, with recovery callouts around 85–95 RPM.
@@ -179,6 +193,31 @@ durations remain unchanged:
   includes values up to 10 RPM; validation accepts 0–30 RPM. A 35-second hold follows
   before the next sag. These are explicit scenario assumptions, not new fitted
   physiological measurements.
+- After the first hard attack, nine 45-second holds use a 200 W base at 90 RPM:
+  200, 210, 200, 230, 200, 220, 200, 240, 200 W at FTP 305.
+- Before cooldown, nine 45-second holds use a 300 W base at 85 RPM:
+  300, 260, 300, 280, 300, 270, 300, 290, 300 W at FTP 305.
+- These add sixteen transitions: four each of magnitude 10, 20, 30, and 40 W,
+  including both directions. Cadence callouts stay constant within each block,
+  with the existing smooth drift and no added sag, so cadence changes do not mask
+  the small target changes. ZWO powers scale with FTP; the stated watt differences
+  apply at FTP 305. Each block begins with a separate 45-second baseline hold.
+
+The small-step expansion changes the scenario baseline. Compare controller
+settings on the same expanded workout and cadence fingerprint; its lower overall
+MAE cannot be treated as an improvement over the shorter original workout.
+The standard transition grade uses a 20 W minimum jump and a +/-20 W window,
+so it does not score the 10 W steps. For small-step tuning, also inspect first-ten-
+second MAE and time within +/-10 W for five consecutive reports, including all
+sixteen added steps. Keep the existing overall grading limits unchanged.
+
+The September 28 independent ride supported retaining the current delayed power
+response model. Its roughly one-second status logs do not expose fresh-sample
+timestamps well enough to distinguish new equal readings from held readings or
+identify transport jitter separately from power-estimator lag. No new delay,
+dropout, backlash, or noise parameters were fitted from that ride. The observed
+app reconnect/SIM-mode switch is outside the bike physics model. Use the existing
+`--lag-scale` and `--seed` options for robustness comparisons.
 
 Cadence transitions begin when the interval changes and are limited to 1.5 RPM/s
 up and 2 RPM/s down, with a smooth arrival. Every callout, drift, and sag depends

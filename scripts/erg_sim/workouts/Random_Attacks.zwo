@@ -5,6 +5,7 @@
 Warm up for 10minutes with 3 x 1 minute fast pedaling drills &gt;110rpm. 
 
 Then ride at tempo pace and complete the hard hills!
+Added small-step control checks: two 6:45 blocks with 10, 20, 30 and 40 W changes at FTP 305.
 Cool-down</description>
     <sportType>bike</sportType>
     <tags>
@@ -14,6 +15,16 @@ Cool-down</description>
         <Warmup Duration="600" PowerLow="0.25" PowerHigh="0.75"/>
         <IntervalsT Repeat="3" OnDuration="60" OffDuration="60" OnPower="0.75" OffPower="0.5"/>
         <SteadyState Duration="60" Power="1.25"/>
+        <!-- Small steps: 200 W base, +10/+30/+20/+40 W and returns at FTP 305. -->
+        <SteadyState Duration="45" Power="0.655737705" Cadence="90"/>
+        <SteadyState Duration="45" Power="0.688524590" Cadence="90"/>
+        <SteadyState Duration="45" Power="0.655737705" Cadence="90"/>
+        <SteadyState Duration="45" Power="0.754098361" Cadence="90"/>
+        <SteadyState Duration="45" Power="0.655737705" Cadence="90"/>
+        <SteadyState Duration="45" Power="0.721311475" Cadence="90"/>
+        <SteadyState Duration="45" Power="0.655737705" Cadence="90"/>
+        <SteadyState Duration="45" Power="0.786885246" Cadence="90"/>
+        <SteadyState Duration="45" Power="0.655737705" Cadence="90"/>
         <SteadyState Duration="120" Power="0.81"/>
         <SteadyState Duration="138" Power="1.09"/>
         <SteadyState Duration="72" Power="0.93"/>
@@ -27,6 +38,16 @@ Cool-down</description>
         <SteadyState Duration="300" Power="0.65"/>
         <SteadyState Duration="133" Power="1.35"/>
         <Ramp Duration="323" PowerLow="0.89" PowerHigh="1.3"/>
+        <!-- Small steps: 300 W base, -40/-20/-30/-10 W and returns at FTP 305. -->
+        <SteadyState Duration="45" Power="0.983606557" Cadence="85"/>
+        <SteadyState Duration="45" Power="0.852459016" Cadence="85"/>
+        <SteadyState Duration="45" Power="0.983606557" Cadence="85"/>
+        <SteadyState Duration="45" Power="0.918032787" Cadence="85"/>
+        <SteadyState Duration="45" Power="0.983606557" Cadence="85"/>
+        <SteadyState Duration="45" Power="0.885245902" Cadence="85"/>
+        <SteadyState Duration="45" Power="0.983606557" Cadence="85"/>
+        <SteadyState Duration="45" Power="0.950819672" Cadence="85"/>
+        <SteadyState Duration="45" Power="0.983606557" Cadence="85"/>
         <Cooldown Duration="480" PowerLow="0.75" PowerHigh="0.25"/>
     </workout>
 </workout_file>
