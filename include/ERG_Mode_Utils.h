@@ -17,6 +17,97 @@
 
 namespace ErgControl {
 
+// Estimate row spacing from nearby pairs of measured cells at equal watts.
+// A robust median of pairwise slopes allows gradual widening with power.
+// Reject crossing rows and bound the result by the observed median spacing.
+inline bool measuredCadenceSlope(const PTData& table, int watts, int cadence, double& slope) {
+  constexpr int capacity     = CADENCE_CURVE_MAX_PAIRS;
+  double distances[capacity] = {}, slopes[capacity] = {}, powers[capacity] = {};
+  int count = 0;
+  for (int row = 1; row < POWERTABLE_CAD_SIZE; ++row) {
+    for (int column = 1; column < POWERTABLE_WATT_SIZE; ++column) {
+      const auto& lower = table.tableRow[row - 1].tableEntry[column];
+      const auto& upper = table.tableRow[row].tableEntry[column];
+      if (lower.readings < 2 || upper.readings < 2 || lower.targetPosition == INT16_MIN || upper.targetPosition == INT16_MIN || upper.targetPosition >= lower.targetPosition) {
+        continue;
+      }
+      const double distance = std::abs(column * POWERTABLE_WATT_INCREMENT - watts) / static_cast<double>(POWERTABLE_WATT_INCREMENT) +
+                              CADENCE_CURVE_DISTANCE_WEIGHT * std::abs(MINIMUM_TABLE_CAD + (row - 0.5) * POWERTABLE_CAD_INCREMENT - cadence) / POWERTABLE_CAD_INCREMENT;
+      int slot              = 0;
+      while (slot < count && distances[slot] <= distance) ++slot;
+      if (slot >= capacity) continue;
+      for (int index = std::min(count, capacity - 1); index > slot; --index) {
+        distances[index] = distances[index - 1];
+        slopes[index]    = slopes[index - 1];
+        powers[index]    = powers[index - 1];
+      }
+      distances[slot] = distance;
+      slopes[slot]    = (upper.targetPosition - lower.targetPosition) * static_cast<double>(TABLE_DIVISOR) / POWERTABLE_CAD_INCREMENT;
+      powers[slot]    = column * POWERTABLE_WATT_INCREMENT;
+      count           = std::min(count + 1, capacity);
+    }
+  }
+  if (count < CADENCE_CURVE_MIN_PAIRS) return false;
+  double changes[capacity * (capacity - 1) / 2] = {};
+  int changeCount                               = 0;
+  for (int first = 0; first < count; ++first) {
+    for (int second = first + 1; second < count; ++second) {
+      if (powers[first] != powers[second]) changes[changeCount++] = (slopes[first] - slopes[second]) / (powers[first] - powers[second]);
+    }
+  }
+  double widening = 0;
+  if (changeCount >= CADENCE_CURVE_MIN_PAIRS) {
+    std::sort(changes, changes + changeCount);
+    widening = std::min(0.0, changes[changeCount / 2]);
+  }
+  double adjusted[capacity] = {};
+  for (int index = 0; index < count; ++index) adjusted[index] = slopes[index] + widening * (watts - powers[index]);
+  std::sort(slopes, slopes + count);
+  std::sort(adjusted, adjusted + count);
+  // Slopes are negative: the maximum magnitude is the lower numeric bound.
+  slope = std::max(CADENCE_CURVE_MAX_SPACING_RATIO * slopes[count / 2], std::min(CADENCE_CURVE_MIN_SPACING_RATIO * slopes[count / 2], adjusted[count / 2]));
+  return true;
+}
+
+// Extend the closest measured power curve using the observed cadence spacing.
+inline int32_t constrainedTablePosition(const PTData& table, int watts, int cadence) {
+  double cadenceSlope;
+  if (!measuredCadenceSlope(table, watts, cadence, cadenceSlope)) return RETURN_ERROR;
+  double bestDistance = std::numeric_limits<double>::max();
+  double result       = 0;
+  for (int row = 0; row < POWERTABLE_CAD_SIZE; ++row) {
+    int lower = -1, upper = -1, previous = -1, last = -1;
+    for (int column = 0; column < POWERTABLE_WATT_SIZE; ++column) {
+      const auto& entry = table.tableRow[row].tableEntry[column];
+      if (entry.readings < 2 || entry.targetPosition == INT16_MIN) continue;
+      const int columnWatts = column * POWERTABLE_WATT_INCREMENT;
+      if (columnWatts <= watts) lower = column;
+      if (columnWatts >= watts && upper < 0) upper = column;
+      previous = last;
+      last     = column;
+    }
+    if (lower < 0 || previous < 0) continue;
+    if (upper < 0) {
+      lower = previous;
+      upper = last;
+    }
+    const auto& first  = table.tableRow[row].tableEntry[lower];
+    const auto& second = table.tableRow[row].tableEntry[upper];
+    if (upper != lower && second.targetPosition <= first.targetPosition) continue;
+    const double fraction = upper == lower ? 0 : static_cast<double>(watts - lower * POWERTABLE_WATT_INCREMENT) / ((upper - lower) * POWERTABLE_WATT_INCREMENT);
+    const double position = (first.targetPosition + fraction * (second.targetPosition - first.targetPosition)) * TABLE_DIVISOR;
+    const int rowCadence  = MINIMUM_TABLE_CAD + row * POWERTABLE_CAD_INCREMENT;
+    const double distance = CADENCE_CURVE_EXTRAPOLATION_WEIGHT * std::max(0, watts - last * POWERTABLE_WATT_INCREMENT) / POWERTABLE_WATT_INCREMENT +
+                            std::abs(rowCadence - cadence) / static_cast<double>(POWERTABLE_CAD_INCREMENT);
+    if (distance < bestDistance) {
+      bestDistance = distance;
+      result       = position + cadenceSlope * (cadence - rowCadence);
+    }
+  }
+  if (bestDistance == std::numeric_limits<double>::max() || result <= INT32_MIN || result >= INT32_MAX) return RETURN_ERROR;
+  return static_cast<int32_t>(std::round(result));
+}
+
 // Runtime validation is deliberately independent of TableEntry::readings:
 // sample count describes how the table was built, while this score describes
 // how accurately the completed surface predicts the bike right now.

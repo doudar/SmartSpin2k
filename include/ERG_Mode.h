@@ -27,28 +27,29 @@ class ErgMode {
   void computeErg();
   // Called after reading actual motor position, before interpreting targetIncline.
   void prepareMode();
-  bool collectionAllowed() const {
-    return !(isTableSeeking() || feedbackWaiting) || controlMaximum - static_cast<int64_t>(controlMinimum) < POWER_SAMPLE_POSITION_SPAN;
-  }
+  bool collectionAllowed() const { return !(isTableSeeking() || feedbackWaiting) || controlMaximum - static_cast<int64_t>(controlMinimum) < POWER_SAMPLE_POSITION_SPAN; }
   void _writeLog(float currentIncline, float newIncline, int currentSetPoint, int newSetPoint, int currentWatts, int newWatts, int currentCadence, int newCadence);
   bool isTableSeeking() const { return tableSeekState != TableSeekState::INACTIVE; }
   void resetTableConfidence() {
     tableConfidence.reset();
-    tableSeekState           = TableSeekState::INACTIVE;
-    mode                     = Mode::MAINTAIN;
-    tableSeekStableMatches   = 0;
-    tableSeekStableMisses    = 0;
-    tableSeekPidSeedValid    = false;
-    feedbackWaiting          = false;
+    tableSeekState               = TableSeekState::INACTIVE;
+    tableSeekFirstArrivalValid   = false;
+    mode                         = Mode::MAINTAIN;
+    tableSeekStableMatches       = 0;
+    tableSeekStableMisses        = 0;
+    tableSeekPidSeedValid        = false;
+    feedbackWaiting              = false;
     tableCorrectionNeedsProgress = false;
-    confidenceWattsTimestamp = 0;
-    confidenceCadence        = 0;
-    confidenceWasHomed       = false;
-    confidenceSettledAt      = 0;
-    cadenceReference         = 0;
-    responseTimestamp        = 0;
-    responseTrend            = 0;
-    feedbackEarlyRetreatTarget = INT32_MIN;
+    confidenceWattsTimestamp     = 0;
+    confidenceCadence            = 0;
+    confidenceWasHomed           = false;
+    confidenceSettledAt          = 0;
+    cadenceReference             = 0;
+    responseTimestamp            = 0;
+    responseTrend                = 0;
+    responsePreviousTrend        = 0;
+    transitionTarget             = INT32_MIN;
+    feedbackEarlyRetreatTarget   = INT32_MIN;
   }
 
  private:
@@ -59,6 +60,8 @@ class ErgMode {
   };
 
   int mode = Mode::MAINTAIN;
+  // Target to restore after a cadence stop; it belongs to this ERG session.
+  int pausedTargetWatts = 0;
   Measurement prevWatts;
   Measurement prevCadence;
   ErgControl::TableConfidence tableConfidence;
@@ -78,26 +81,32 @@ class ErgMode {
   int32_t tableSeekPidSeedPosition       = 0;
   bool feedbackWaiting                   = false;
   // A table move must demonstrate progress before another can interrupt proportional recovery.
-  bool tableCorrectionNeedsProgress      = false;
-  bool feedbackMotorSettled              = false;
-  bool feedbackIncreasing                = false;
-  int feedbackTargetWatts                = 0;
-  int feedbackStartWatts                 = 0;
-  int feedbackEarlyRetreatTarget         = INT32_MIN;
-  uint32_t feedbackStartedAt             = 0;
-  uint32_t feedbackSettledAt             = 0;
-  uint32_t confidenceSettledAt           = 0;
-  int32_t confidencePosition             = 0;
-  int cadenceReference                   = 0;
-  uint32_t tableSeekStartedAt            = 0;
-  int32_t tableSeekOffset                = 0;
-  uint32_t tableSeekArrivedAt            = 0;
-  uint32_t responseTimestamp             = 0;
-  int responseWatts                      = 0;
-  double responseTrend                   = 0;
-  bool wasErgMode                        = false;
-  int32_t controlMinimum                 = 0;
-  int32_t controlMaximum                 = 0;
+  bool tableCorrectionNeedsProgress = false;
+  bool feedbackMotorSettled         = false;
+  bool feedbackIncreasing           = false;
+  int feedbackTargetWatts           = 0;
+  int feedbackStartWatts            = 0;
+  int feedbackEarlyRetreatTarget    = INT32_MIN;
+  uint32_t feedbackStartedAt        = 0;
+  uint32_t feedbackSettledAt        = 0;
+  uint32_t confidenceSettledAt      = 0;
+  int32_t confidencePosition        = 0;
+  int cadenceReference              = 0;
+  uint32_t tableSeekStartedAt       = 0;
+  int32_t tableSeekOffset           = 0;
+  uint32_t tableSeekArrivedAt       = 0;
+  bool tableSeekFirstArrivalValid   = false;
+  uint32_t tableSeekFirstArrivedAt  = 0;
+  int tableSeekStartWatts           = 0;
+  int tableSeekStartCadence         = 0;
+  uint32_t responseTimestamp        = 0;
+  int responseWatts                 = 0;
+  double responseTrend              = 0;
+  double responsePreviousTrend      = 0;
+  int transitionTarget              = INT32_MIN;
+  bool wasErgMode                   = false;
+  int32_t controlMinimum            = 0;
+  int32_t controlMaximum            = 0;
 
   // calculate incline if setpoint (from Zwift) changes
   int32_t _setPointChangeState();
@@ -114,6 +123,7 @@ class ErgMode {
   bool _tableTargetIsTrusted(int watts, int cadence) const;
   bool _tableTargetIsWithinMeasuredBounds(int watts, int cadence) const;
   bool _tableTargetIsUsable(int watts, int cadence) const;
+  int32_t _constrainedTablePosition(int watts, int cadence) const;
   void _scoreTable(int watts, int cadence, bool accurate);
   void _startTrustedTableSeek(int32_t position);
   void _handleTrustedTableSeek();

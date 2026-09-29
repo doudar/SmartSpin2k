@@ -16,9 +16,9 @@
 
 // ******************************************************************************
 // Control cadence and logging
-// Paces normal ERG corrections and diagnostics; seek/wait checks run every ERG pass.
+// Paces table housekeeping; fresh sensor reports drive ordinary ERG corrections.
 // ******************************************************************************
-// Milliseconds between normal ERG updates; also sets the per-correction motor travel cap from stepper speed.
+// Milliseconds between table housekeeping passes; also sets the per-correction motor travel cap from stepper speed.
 #define ERG_MODE_DELAY 700
 // Minimum interval between proportional-control diagnostic log entries.
 constexpr int ERG_MODE_LOG_INTERVAL_MS = 2000;
@@ -83,13 +83,25 @@ constexpr int ERG_FEEDBACK_WORSENING_WATTS = 30;
 // Selects when maintenance can use a relative table correction or a cadence seek.
 // ******************************************************************************
 // Trend-adjusted error must exceed this magnitude before maintenance tries a relative table correction, provided the previous move made progress.
-// A quiet return inside this measured-error window also re-arms table correction after proportional recovery.
+// A quiet return inside ERG_MODE_PID_WINDOW re-arms table correction after proportional recovery.
 constexpr int ERG_TABLE_CORRECTION_WATTS = 44;
 // Cadence change from the last reference that can start a trusted maintenance seek; in-flight seeks track smaller changes too.
 constexpr int ERG_TABLE_CADENCE_SEEK_RPM = POWERTABLE_CAD_INCREMENT;
+// Blend the measured cadence-curve estimate with the normal forward lookup.
+constexpr double ERG_TABLE_CURVE_BLEND = 0.5;
 // ******************************************************************************
 
 namespace ErgControl {
+
+// Constrain incomplete cadence curves from nearby, reliable row pairs. These
+// limits bound extrapolation relative to the measured median spacing; they do
+// not fill or modify the learned table.
+constexpr int CADENCE_CURVE_MAX_PAIRS               = 9;
+constexpr int CADENCE_CURVE_MIN_PAIRS               = 3;
+constexpr double CADENCE_CURVE_DISTANCE_WEIGHT      = 0.25;
+constexpr double CADENCE_CURVE_MIN_SPACING_RATIO    = 0.5;
+constexpr double CADENCE_CURVE_MAX_SPACING_RATIO    = 2.0;
+constexpr double CADENCE_CURVE_EXTRAPOLATION_WEIGHT = 2.0;
 
 // ******************************************************************************
 // Fallback gain scheduling by operating power
@@ -152,6 +164,10 @@ constexpr double LARGE_ERROR_GAIN_MULTIPLIER = 1.25;
 constexpr int TABLE_SEEK_INCREASE_OVERSHOOT_WATTS = ERG_MODE_PID_WINDOW;
 // End a decreasing seek or feedback wait early when power falls below target by more than this margin, allowing corrective control.
 constexpr int TABLE_SEEK_DECREASE_UNDERSHOOT_WATTS = ERG_MODE_PID_WINDOW;
+// A sustained trend through the target permits early braking of a table move.
+constexpr double ERG_TRANSIENT_BRAKING_SECONDS = 1.0;
+constexpr double ERG_TRANSIENT_MIN_TREND_WPS   = 10.0;
+constexpr int ERG_TRANSIENT_APPROACH_WATTS     = 60;
 // ******************************************************************************
 
 // ******************************************************************************
