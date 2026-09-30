@@ -119,7 +119,6 @@ struct PowerTable {
   bool saveFlag = false;
   FtmsCalibration::Map ftmsCalibration;
   FtmsCalibration::Map savedCalibration;
-  bool ftmsPositionUncertain = false;
   uint32_t positionEpoch = 0;
   bool _hasBeenLoadedThisSession = false;
   int resets = 0, saves = 0;
@@ -474,10 +473,9 @@ int main() {
     clockMs += 1000;
     runtime.resistance.setValue(32, false);
     controller.syncFtmsPosition();
-    if (second == 5) assert(table.ftmsPositionUncertain);
   }
   assert(std::abs(motor.pos - 7440) <= 1 && controller.getTargetPosition() == motor.pos);
-  assert(motor.commands == commandsBeforeReseat && !table.ftmsPositionUncertain);
+  assert(motor.commands == commandsBeforeReseat);
   assertGear(6);
   controller.moveStepper();
   assert(std::abs(motor.pos - 7440) <= 1); // Half-level map positions truncate to whole steps.

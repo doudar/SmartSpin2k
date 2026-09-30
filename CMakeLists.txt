@@ -7,6 +7,9 @@ endif()
 # Keep component-manager locks target-specific so ESP32 and ESP32-S3 builds can
 # coexist without rewriting one another's dependency target.
 idf_build_set_property(DEPENDENCIES_LOCK dependencies.lock.${IDF_TARGET})
+# Arduino WebServer/HTTPClient and the custom BLE settings service handle HTTP
+# and provisioning. These optional IDF stacks have no firmware consumers.
+set(EXCLUDE_COMPONENTS esp_local_ctrl esp_http_server esp_https_server mqtt protocomm wifi_provisioning)
 project(SmartSpin2k)
 include_directories(
         ${PROJECT_SOURCE_DIR}/include

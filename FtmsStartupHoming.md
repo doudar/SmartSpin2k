@@ -169,9 +169,8 @@ that find no discrepancy do not consume that interval, and brief driver-lock
 interruptions do not continually postpone it. Update position, target, and
 relevant ERG/gear offsets together without issuing a motor command.
 
-The log also shows a watts entry being averaged at P9100 after the manual change.
-Pause collection while a position discrepancy awaits confirmation/cooldown,
-clear its pending buffer, and resume after coordinates agree. Corrections still
+Power-table collection continues while a position discrepancy awaits
+confirmation or cooldown. Only applied corrections
 advance `positionEpoch` to prevent mixing pre/post-correction samples. Already
 learned entries are not retroactively changed.
 

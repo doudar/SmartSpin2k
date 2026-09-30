@@ -112,7 +112,6 @@ struct Map {
 class DriftGuard {
  public:
   enum class State { Ineligible, Stale, Settling, OutsideMap, Deadband, ConfirmingOffset, Cooldown, Corrected };
-  bool uncertain() const { return uncertain_; }
   const char* reason() const {
     switch (state_) {
       case State::Ineligible: return "motion/control interlock";
@@ -126,15 +125,13 @@ class DriftGuard {
     }
     return "unknown";
   }
-  void interrupt() { tracking_ = false; uncertain_ = false; state_ = State::Ineligible; }
+  void interrupt() { tracking_ = false; state_ = State::Ineligible; }
   // Feed every maintenance pass. Interruptions discard stationary evidence,
   // but do not restart the minute timer or forget a recently applied correction.
   int correction(const Map& map, uint32_t now, uint32_t sampleTime, int resistance, int32_t position, bool eligible) {
     if (!eligible || resistance < 0 || resistance > 100 || position <= 0 || position >= map.maximum) { interrupt(); return 0; }
     if (now - sampleTime > FRESH_MS) { interrupt(); state_ = State::Stale; return 0; }
     int32_t center, uncertainty;
-    uncertain_ = map.estimateForSync(2 * resistance, center, uncertainty) &&
-                 (static_cast<int64_t>(center) - position > uncertainty || static_cast<int64_t>(position) - center > uncertainty);
     if (!tracking_ || resistance < high_ - 1 || resistance > low_ + 1 ||
         static_cast<int64_t>(position) - position_ > 5 || static_cast<int64_t>(position_) - position > 5) {
       tracking_ = true;
@@ -157,8 +154,7 @@ class DriftGuard {
     const int resistance2 = static_cast<int>((2 * sum_ + reports_ / 2) / reports_);
     if (!map.estimateForSync(resistance2, center, uncertainty)) { state_ = State::OutsideMap; return 0; }
     int64_t error = static_cast<int64_t>(center) - position;
-    if (error <= uncertainty && error >= -uncertainty) { uncertain_ = false; state_ = State::Deadband; return 0; }
-    uncertain_ = true;
+    if (error <= uncertainty && error >= -uncertainty) { state_ = State::Deadband; return 0; }
     // A lifted/reseated knob can create a larger offset without moving the
     // stepper. Confirm it longer, then rebase to the map instead of rejecting
     // it forever or spending many minutes correcting 100 steps at a time.
@@ -170,12 +166,11 @@ class DriftGuard {
     lastCorrection_ = now;
     haveCorrection_ = true;
     tracking_ = false;
-    uncertain_ = false;
     state_ = State::Corrected;
     return static_cast<int>(error); // Both coordinates are positive, bounded int32 values.
   }
  private:
-  bool tracking_ = false, haveCorrection_ = false, uncertain_ = false;
+  bool tracking_ = false, haveCorrection_ = false;
   State state_ = State::Ineligible;
   uint32_t since_ = 0, lastCorrection_ = 0, timestamp_ = 0, sum_ = 0;
   int low_ = 0, high_ = 0;

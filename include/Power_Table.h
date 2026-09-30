@@ -23,7 +23,6 @@ class PowerTable {
   PTHelpers ptHelpers;
   FtmsCalibration::Map ftmsCalibration;
   uint32_t positionEpoch     = 0;
-  bool ftmsPositionUncertain = false;
   // Metadata can be read before homing; watts remain gated on a known origin.
   bool loadFtmsCalibration();
 

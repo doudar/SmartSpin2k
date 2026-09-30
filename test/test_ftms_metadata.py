@@ -116,7 +116,6 @@ struct PowerTable {
   Data ptData;
   Helpers ptHelpers;
   FtmsCalibration::Map ftmsCalibration;
-  bool ftmsPositionUncertain = false;
   bool saveFlag = false;
   bool _hasBeenLoadedThisSession = false;
   uint32_t positionEpoch = 0;
@@ -242,10 +241,10 @@ int main() {
   // Fallback learning uses a clean in-memory table and never opens/replaces the
   // saved calibration, even when its temporary table has more readings.
   runtime.homed = false;
-  migrated.ftmsPositionUncertain = migrated.saveFlag = true;
+  migrated.saveFlag = true;
   const uint32_t oldEpoch = migrated.positionEpoch;
   migrated.clearRuntime();
-  assert(migrated.positionEpoch == oldEpoch + 1 && !migrated.ftmsPositionUncertain && !migrated.saveFlag);
+  assert(migrated.positionEpoch == oldEpoch + 1 && !migrated.saveFlag);
   assert(!migrated.ftmsCalibration.valid() && migrated._hasBeenLoadedThisSession);
   assert(migrated.ptHelpers.getTotalReadings(migrated.ptData) == 0);
   assert(config.minimum == 0 && config.maximum == 30000);

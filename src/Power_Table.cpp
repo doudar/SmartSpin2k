@@ -54,9 +54,9 @@ void PowerTable::processPowerValue(PowerBuffer& buffer, int cadence, const Measu
     resetCollection("coordinate epoch changed");
     buffer.positionEpoch = positionEpoch;
   }
-  if (!learningAllowed || ftmsPositionUncertain || sample.simulate || !ptHelpers.cadenceIsWithinTable(cadence) || sample.value <= 10 ||
+  if (!learningAllowed || sample.simulate || !ptHelpers.cadenceIsWithinTable(cadence) || sample.value <= 10 ||
       sample.value >= POWERTABLE_WATT_SIZE * POWERTABLE_WATT_INCREMENT || static_cast<uint32_t>(now - sample.timestamp) > POWER_SAMPLE_MAX_AGE_MS) {
-    resetCollection(!learningAllowed ? "controller acquisition or table-derived power" : ftmsPositionUncertain ? "uncertain coordinates" :
+    resetCollection(!learningAllowed ? "controller acquisition or table-derived power" :
                     sample.simulate ? "simulated power" : !ptHelpers.cadenceIsWithinTable(cadence) ? "cadence outside learning range" :
                     static_cast<uint32_t>(now - sample.timestamp) > POWER_SAMPLE_MAX_AGE_MS ? "stale power" : "power outside learning range");
     return;
@@ -468,7 +468,6 @@ bool PowerTable::_save() {
 
 // Start a new coordinate session without modifying the persisted calibration.
 void PowerTable::clearRuntime(bool allowSavedTableLoad) {
-  ftmsPositionUncertain = false;
   ftmsCalibration = FtmsCalibration::Map{};
   _hasBeenLoadedThisSession = !allowSavedTableLoad;
   saveFlag = false;

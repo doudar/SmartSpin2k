@@ -13,6 +13,7 @@ import socket
 import datetime
 import re
 import urllib.request
+from contextlib import redirect_stdout
 from pathlib import Path
 import sys
 
@@ -134,7 +135,7 @@ def extract_certificates_from_mozilla(target_org=None, target_cn=None):
         cert_url = "https://curl.se/ca/cacert.pem"
         print(f"Downloading certificates from {cert_url}...")
         
-        with urllib.request.urlopen(cert_url) as response:
+        with urllib.request.urlopen(cert_url, timeout=30) as response:
             cert_bundle = response.read().decode('utf-8')
             
             # Find all certificates in the bundle
@@ -381,50 +382,22 @@ def main():
     """
     Update the checked-in certificate for a subsequent firmware build.
     """
-    # Save the original print function
-    original_print = print
-    
-    # Override the print function in our modules to send everything to stderr
-    def safe_print(*args, **kwargs):
-        if 'file' not in kwargs:
-            kwargs['file'] = sys.stderr
-        original_print(*args, **kwargs)
-    
-    # Replace print in global scope
-    builtins = sys.modules['builtins']
-    setattr(builtins, 'print', safe_print)
-    
     try:
         log_to_stderr("\nRunning cert_updater.py to update GitHub SSL certificate...")
-        
         cert_file = Path(CERT_FILE_PATH)
-        
-        if cert_file.exists():
-            log_to_stderr(f"Certificate file exists at {CERT_FILE_PATH}")
-            log_to_stderr(f"File size: {cert_file.stat().st_size} bytes")
-        else:
-            log_to_stderr(f"Certificate file does not exist at {CERT_FILE_PATH}")
-            log_to_stderr("Will create certificate file")
-        
-        # Update the certificate
-        result = update_ca_certificate(is_quiet=False)
-        
-        if cert_file.exists():
-            log_to_stderr(f"Certificate file updated successfully at {CERT_FILE_PATH}")
-            log_to_stderr(f"File size: {cert_file.stat().st_size} bytes")
-        else:
-            log_to_stderr(f"WARNING: Certificate file could not be created at {CERT_FILE_PATH}")
-        
-        # Reset print back to original
-        setattr(builtins, 'print', original_print)
-        
+        with redirect_stdout(sys.stderr):
+            result = update_ca_certificate(is_quiet=False)
+        if not result or not cert_file.is_file() or cert_file.stat().st_size == 0:
+            log_to_stderr(
+                f"ERROR: GitHub TLS certificate refresh failed for {GITHUB_HOST}. "
+                f"Could not validate and save {CERT_FILE_PATH}; see the errors above. "
+                "Firmware release must not proceed with an unverified certificate."
+            )
+            return 1
+        log_to_stderr(f"GitHub TLS certificate validated and ready at {CERT_FILE_PATH} (updated or already current).")
         return 0
     except Exception as e:
-        log_to_stderr(f"ERROR in cert_updater.py: {e}")
-        
-        # Reset print back to original
-        setattr(builtins, 'print', original_print)
-        
+        log_to_stderr(f"ERROR: GitHub TLS certificate refresh failed: {e}. Firmware release must not proceed.")
         return 1
 
 if __name__ == "__main__":

@@ -10,6 +10,7 @@
 #include <NimBLEDevice.h>
 #include <NimBLEScan.h>
 #include <memory>
+#include <mutex>
 #include <Arduino.h>
 #include <queue>
 #include <vector>
@@ -127,13 +128,23 @@ class SpinBLEAdvertisedDevice {
   // Scan restarts delete NimBLE's results. Keep an immutable, owned snapshot;
   // shared ownership also keeps it alive while a connection attempt uses it.
   std::shared_ptr<const NimBLEAdvertisedDevice> advertisedDevice;
+  mutable std::mutex advertisementMutex;
+
+  void storeAdvertisement(std::shared_ptr<const NimBLEAdvertisedDevice> advertisement) {
+    std::lock_guard<std::mutex> lock(advertisementMutex);
+    // Release the previous snapshot after unlocking, when the parameter dies.
+    advertisedDevice.swap(advertisement);
+  }
 
   void clearState(bool resetAdvertisedDevice);
 
  public:
   SpinBLEAdvertisedDevice() { clearState(true); }
 
-  std::shared_ptr<const NimBLEAdvertisedDevice> getAdvertisement() const { return std::atomic_load(&advertisedDevice); }
+  std::shared_ptr<const NimBLEAdvertisedDevice> getAdvertisement() const {
+    std::lock_guard<std::mutex> lock(advertisementMutex);
+    return advertisedDevice;
+  }
   NimBLEAddress peerAddress;
 
   std::string uniqueName = "";  // Stable identifier using adevName2UniqueName()

@@ -31,6 +31,7 @@ class TestBleScanLifetime(unittest.TestCase):
 #include <cstdint>
 #include <cstring>
 #include <memory>
+#include <mutex>
 #include <string>
 #include <thread>
 #include <vector>
@@ -163,8 +164,13 @@ int main() {
             cpp = directory / "regression.cpp"
             executable = directory / "regression.exe"
             cpp.write_text(harness, encoding="utf-8")
-            subprocess.run([compiler, "-std=c++17", "-pthread", "-Wall", "-Wextra", str(cpp), "-o", str(executable)], check=True)
-            subprocess.run([str(executable)], check=True)
+            for standard in ("c++17", "c++23"):
+                with self.subTest(standard=standard):
+                    subprocess.run(
+                        [compiler, f"-std={standard}", "-pthread", "-Wall", "-Wextra", "-Werror=deprecated-declarations", str(cpp), "-o", str(executable)],
+                        check=True,
+                    )
+                    subprocess.run([str(executable)], check=True)
 
 
 if __name__ == "__main__":

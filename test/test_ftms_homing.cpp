@@ -792,13 +792,11 @@ void TestFtmsHoming::test_manual_knob_resync() {
       int resistance = time < 130000 ? 48 : (time < 158000 ? 38 + (time / 1000) % 2 : (time == 158000 ? 37 : (time == 159000 ? 33 : 32)));
       int correction = guard.correction(map, time, time, resistance, position, true);
       if (time < 160000) TEST_ASSERT_EQUAL_INT(0, correction);
-      if (time == 165000) TEST_ASSERT_TRUE(guard.uncertain());
       if (correction) { position += correction; correctedAt = time; }
     }
     TEST_ASSERT_INT32_WITHIN(1, 7440, position); // Half-level coordinates truncate to whole steps.
     TEST_ASSERT_GREATER_OR_EQUAL_UINT32(169000, correctedAt);
     TEST_ASSERT_LESS_OR_EQUAL_UINT32(190000, correctedAt);
-    TEST_ASSERT_FALSE(guard.uncertain());
     int32_t center, uncertainty;
     TEST_ASSERT_TRUE(map.estimateForSync(64, center, uncertainty));
     TEST_ASSERT_INT32_WITHIN(1, 7440, center);
@@ -806,8 +804,7 @@ void TestFtmsHoming::test_manual_knob_resync() {
     TEST_ASSERT_FALSE(map.estimateForSync(142, center, uncertainty));
     TEST_ASSERT_FALSE(map.estimateHalf(60, center, uncertainty)); // Strict interpolation stays within measured support.
   }
-  // Once the average is within deadband, an individual edge of adjacent
-  // jitter must not keep suspending otherwise valid watts collection.
+  // Adjacent jitter whose average is within deadband must not trigger correction.
   FtmsCalibration::Map jitterMap;
   jitterMap.source = 1;
   jitterMap.maximum = 30000;
@@ -815,7 +812,6 @@ void TestFtmsHoming::test_manual_knob_resync() {
   FtmsCalibration::DriftGuard jitterGuard;
   for (uint32_t t = 0; t <= 20000; t += 1000) {
     TEST_ASSERT_EQUAL_INT(0, jitterGuard.correction(jitterMap, t, t, 50 + (t / 1000) % 2, 14850, true));
-    if (t >= 10000) TEST_ASSERT_FALSE(jitterGuard.uncertain());
   }
   // Interrupting observation restarts confirmation, not the correction timer.
   FtmsCalibration::Map map;

@@ -8,6 +8,7 @@
 Import("env")
 
 from pathlib import Path
+from SCons.Script import COMMAND_LINE_TARGETS
 
 
 # The S3 has a much larger filesystem partition and keeps its web assets
@@ -17,14 +18,13 @@ if env.subst("$PIOENV") in ("S3release", "S3debug"):
 
 
 # Work around intermittent malformed x509_crt_bundle.S generation.
-# Removing stale generated files before each build avoids carrying
-# corrupted artifacts between runs.
-build_dir = Path(env.subst("$BUILD_DIR"))
-for file_name in ("x509_crt_bundle", "x509_crt_bundle.S"):
-    generated = build_dir / file_name
-    if generated.exists():
-        generated.unlink()
-        print(f"[pre_build_cleanup] removed stale {generated}")
-
-# Keep build deterministic for generated asm artifacts.
-env.SetOption("num_jobs", 1)
+# These are generated ESP-IDF artifacts, not include/cert.h. The GitHub CA
+# certificate is refreshed only by the release workflow (cert_updater.py).
+# Leave artifacts alone during IDE inspection and let clean remove its own files.
+if not env.IsIntegrationDump() and not env.IsCleanTarget() and "envdump" not in COMMAND_LINE_TARGETS:
+    build_dir = Path(env.subst("$BUILD_DIR"))
+    for file_name in ("x509_crt_bundle", "x509_crt_bundle.S"):
+        generated = build_dir / file_name
+        if generated.exists():
+            generated.unlink()
+            print(f"[pre_build_cleanup] removed stale {generated}")

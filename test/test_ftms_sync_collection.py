@@ -89,19 +89,29 @@ int main(int argc, char** argv) {
     assert(commits==1); assert(table.ptData.tableRow[4].tableEntry[7].targetPosition==1500);
     for(int i=0;i<POWER_SAMPLES;++i)feed(); assert(commits==2);
   } else if(scenario=="motion" || scenario=="pending_motion" || scenario=="cadence" || scenario=="power_spike" || scenario=="gap" || scenario=="stop" ||
-            scenario=="blocked" || scenario=="ftms" || scenario=="epoch" || scenario=="simulated") {
+            scenario=="blocked" || scenario=="epoch" || scenario=="simulated") {
     for(int i=0;i<POWER_SAMPLES+1;++i)feed(); assert(buffer.getReadings()==POWER_SAMPLES-1);
     if(scenario=="motion")motor.current=motor.target=15500;
     if(scenario=="pending_motion")motor.target=15500;
     if(scenario=="gap")clockMs+=3000;
-    if(scenario=="ftms")table.ftmsPositionUncertain=true;
     if(scenario=="epoch")++table.positionEpoch;
     if(scenario=="simulated")rtConfig->watts.setSimulate(true);
     feed(scenario!="gap",scenario=="power_spike"?300:210,scenario=="stop"?0:scenario=="cadence"?85:80,scenario!="blocked");
     assert(buffer.getReadings()==0 && commits==0);
-    table.ftmsPositionUncertain=false;rtConfig->watts.setSimulate(false);motor.current=motor.target=16000;
+    rtConfig->watts.setSimulate(false);motor.current=motor.target=16000;
     for(int i=0;i<POWER_SAMPLES+2;++i)feed();
     assert(commits==1 && table.ptData.tableRow[4].tableEntry[7].targetPosition==1600);
+  } else if(scenario=="ftms") {
+    // A discrepancy awaiting stationary confirmation must not block learning.
+    table.ftmsCalibration.source=1; table.ftmsCalibration.maximum=30000;
+    for(int i=0;i<FtmsCalibration::COUNT;++i)
+      table.ftmsCalibration.position[i]=table.ftmsCalibration.level2[i]*150;
+    FtmsCalibration::DriftGuard guard;
+    for(int i=0;i<8;++i) {
+      assert(guard.correction(table.ftmsCalibration,clockMs,clockMs,48,motor.current,true)==0);
+      feed();
+    }
+    assert(commits>0 && table.positionEpoch==0);
   } else if(scenario=="poll_700ms") {
     clockMs=0;
     for(int t=0;t<=14000;t+=100) {

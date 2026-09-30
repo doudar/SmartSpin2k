@@ -1094,7 +1094,7 @@ void SpinBLEAdvertisedDevice::set(const NimBLEAdvertisedDevice* device, int id, 
   String adevName = spinBLEClient.adevName2UniqueName(device);
   SS2K_LOG(BLE_CLIENT_LOG_TAG, "Setting Device %s", adevName.c_str());
   const auto advertisement = std::make_shared<const NimBLEAdvertisedDevice>(*device);
-  std::atomic_store(&this->advertisedDevice, advertisement);
+  storeAdvertisement(advertisement);
   device                = advertisement.get();
   this->peerAddress      = device->getAddress();
   // Set the unique name for stable device identification
@@ -1172,7 +1172,7 @@ void SpinBLEAdvertisedDevice::set(const NimBLEAdvertisedDevice* device, int id, 
  */
 void SpinBLEAdvertisedDevice::clearState(bool resetAdvertisedDevice) {
   if (resetAdvertisedDevice) {
-    std::atomic_store(&advertisedDevice, std::shared_ptr<const NimBLEAdvertisedDevice>{});
+    storeAdvertisement({});
     peerAddress      = NimBLEAddress();  // zero / cleared
     this->uniqueName.clear();            // Clear the unique name
   }

@@ -23,6 +23,8 @@ C/Users/
 /managed_components
 dependencies.lock
 dependencies.lock.*
+/sdkconfig.old
+/sdkconfig.*.old
 .vscode/settings.json
 .clangd
 *.map

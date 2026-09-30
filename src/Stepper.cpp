@@ -714,7 +714,6 @@ void SS2K::syncFtmsPosition() {
                         powerTable->ftmsCalibration.matches(FtmsCalibration::identity(userConfig->getConnectedPowerMeter(), userConfig->getStepperDir()),
                                                             userConfig->getHMax());
   const int delta = guard.correction(powerTable->ftmsCalibration, now, sample.timestamp, sample.value, current, eligible);
-  powerTable->ftmsPositionUncertain = guard.uncertain();
   static uint32_t lastSyncLog = 0;
   if (!delta && rtConfig->getHomed() && powerTable->ftmsCalibration.valid() && now - lastSyncLog >= FtmsCalibration::INTERVAL_MS) {
     lastSyncLog = now;
@@ -956,7 +955,6 @@ void SS2K::goHome(bool bothDirections) {
   if (bothDirections) {
     powerTable->clearRuntime(userConfig->getPTab4Pwr());
   } else {
-    powerTable->ftmsPositionUncertain = false;
     ++powerTable->positionEpoch;
   }
   ergMode->resetTableConfidence();
