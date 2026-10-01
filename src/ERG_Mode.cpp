@@ -44,6 +44,7 @@ void ErgMode::prepareMode() {
   mode                                    = Mode::MAINTAIN;
   cadenceReference                        = 0;
   responseTimestamp                       = 0;
+  responsePreviousFresh                   = false;
   responseTrend                           = 0;
   responsePreviousTrend                   = 0;
   transitionTarget                        = INT32_MIN;
@@ -783,7 +784,11 @@ int32_t ErgMode::_inSetpointState() {
   // A table move must earn another acquisition pause by producing a meaningful
   // power response. After a miss, use fresh-sample proportional control until
   // power settles back inside the target window (or a new target is requested).
-  if (!tableCorrectionNeedsProgress && abs(measuredError) > ERG_TABLE_CORRECTION_WATTS && abs(error) > ERG_TABLE_CORRECTION_WATTS && error * measuredError > 0) {
+  // A single report beyond the limit is usually a pedaling disturbance (standing, shifting position) that has
+  // already passed by the next report, so the previous fresh report must agree.
+  const int previousError = target - responsePreviousWatts;
+  if (!tableCorrectionNeedsProgress && abs(measuredError) > ERG_TABLE_CORRECTION_WATTS && abs(error) > ERG_TABLE_CORRECTION_WATTS && error * measuredError > 0 &&
+      responsePreviousFresh && abs(previousError) > ERG_TABLE_CORRECTION_WATTS && previousError * measuredError > 0) {
     const int tableError     = measuredError > 0 ? std::min(measuredError, error) : std::max(measuredError, error);
     const int32_t correction = _tableCorrection(target - tableError, target, rtConfig->cad.getValue());
     if (correction != RETURN_ERROR) {
@@ -886,6 +891,8 @@ void ErgMode::_observePowerResponse() {
   }
   const uint32_t elapsed = sample.timestamp - responseTimestamp;
   responsePreviousTrend  = responseTrend;
+  responsePreviousFresh  = responseTimestamp != 0 && elapsed <= ERG_FEEDBACK_MAX_AGE_MS;
+  responsePreviousWatts  = responseWatts;
   responseTrend          = responseTimestamp != 0 && elapsed >= 500 && elapsed <= ERG_FEEDBACK_MAX_AGE_MS ? (sample.value - responseWatts) * 1000.0 / elapsed : 0;
   responseTimestamp      = sample.timestamp;
   responseWatts          = sample.value;

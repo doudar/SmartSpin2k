@@ -9,6 +9,7 @@
 // build time; no copied ERG, learning, motor-dispatch, or stall decisions.
 #include <algorithm>
 #include <cmath>
+#include <climits>
 #include <cstdarg>
 #include <cstdio>
 #include <cstdlib>
