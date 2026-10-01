@@ -375,10 +375,10 @@ int main(int argc,char** argv) {
   } else if(scenario=="cadence_feedback_reference") {
     setup(155,155);table.sloped=true;table.lookupResult=motor.current;
     for(int t=1000;t<=26000;t+=1000)step(t,155);
-    // A 45 W residual crosses the 44 W table-correction threshold, starting
-    // the acquisition whose cadence reference this scenario checks.
-    step(27000,200);step(28000,200);
-    rtConfig->cad.setValue(100);step(29000,180);step(30000,160);step(31000,155);
+    // Two consecutive 45 W residuals cross the 44 W table-correction threshold,
+    // starting the acquisition whose cadence reference this scenario checks.
+    step(27000,200);step(28000,200);step(29000,200);
+    rtConfig->cad.setValue(100);step(30000,180);step(31000,160);step(32000,155);
     assert(logged("power acquisition complete"));
     assert(!controller.isTableSeeking()); // Acquired feedback already includes the new cadence.
   } else if(scenario=="trusted_cadence_amend" || scenario=="unusable_cadence_wait" || scenario=="trusted_seek_safety") {
@@ -441,6 +441,27 @@ int main(int argc,char** argv) {
     assert(logged("now trusted"));
     rtConfig->watts.setTarget(175);step(56000,165);
     assert(controller.isTableSeeking());
+  } else if(scenario=="pedal_spike") {
+    // Trusted table at a steady target: a one-report surge (rider shifting on the
+    // saddle) must not trigger a table-sized reduction; a persistent one does.
+    setup(200,200);table.surface=true;rtConfig->cad.setValue(90);
+    for(int cad:{75,100})for(int watts:{90,180,270}) {
+      auto& entry=table.ptData.tableRow[(cad-60)/5].tableEntry[watts/30];
+      entry.targetPosition=std::lround((10000+(watts*90.0/cad-100)*20)/10);entry.readings=3;
+    }
+    motor.current=motor.target=table.lookup(200,90);rtConfig->setTargetIncline(motor.current);
+    for(int t=1000;t<=26000;t+=1000)step(t,200);
+    assert(logged("now trusted"));
+    const int before=motor.current;
+    const int maxChange=std::lround(userConfig->getStepperSpeed()*ERG_MODE_DELAY/1000.0);
+    step(27000,280);
+    assert(!logged("Table feedback correction"));assert(!logged("ERG feedback wait:"));
+    assert(rtConfig->getTargetIncline()>=before-maxChange); // Proportional response only.
+    step(28000,200);step(29000,200);
+    assert(!logged("Table feedback correction"));
+    for(int t=30000;t<=40000;t+=1000)step(t,200);
+    step(41000,280);step(42000,280);
+    assert(logged("Table feedback correction"));assert(logged("ERG feedback wait:"));
   } else if(scenario=="opposed_cadence") {
     setup(200,200);table.surface=true;rtConfig->cad.setValue(90);
     for(int cad:{75,100})for(int watts:{90,180,270}) {
@@ -546,6 +567,10 @@ int main(int argc,char** argv) {
     step(19000,watts);
     waits=0;
     for(const auto& entry:logs)if(entry.find("ERG feedback wait:")!=std::string::npos)++waits;
+    assert(waits==1); // One report beyond the limit is not yet persistent.
+    step(20000,watts);
+    waits=0;
+    for(const auto& entry:logs)if(entry.find("ERG feedback wait:")!=std::string::npos)++waits;
     assert(waits==2);
   } else if(scenario.find("miscalibrated_")==0) {
     // A shallow new table underestimates travel by 3x. Real power is delayed
@@ -638,7 +663,7 @@ class TestErgFeedback(unittest.TestCase):
                          "clamped_move", "clock_wrap", "trusted_seek", "trusted_seek_late_uptime", "simulation_1000", "simulation_2000", "simulation_3000",
                          "simulation_missing_2000", "trust_transients", "stale_seek", "seek_deadline", "sparse_seventy", "extrapolated_cadence",
                          "mode_entry", "stale_partial_motion", "small_seek_collection", "growing_seek_collection", "cadence_feedback_reference",
-                         "trusted_cadence_amend", "unusable_cadence_wait", "trusted_seek_safety", "fresh_table_gate", "opposed_cadence"]:
+                         "trusted_cadence_amend", "unusable_cadence_wait", "trusted_seek_safety", "fresh_table_gate", "opposed_cadence", "pedal_spike"]:
             with self.subTest(scenario=scenario):
                 subprocess.run([str(self.exe), scenario], check=True)
 
