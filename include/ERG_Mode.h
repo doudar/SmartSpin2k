@@ -46,6 +46,7 @@ class ErgMode {
     confidenceSettledAt          = 0;
     cadenceReference             = 0;
     responseTimestamp            = 0;
+    responsePreviousFresh        = false;
     responseTrend                = 0;
     responsePreviousTrend        = 0;
     transitionTarget             = INT32_MIN;
@@ -101,6 +102,8 @@ class ErgMode {
   int tableSeekStartCadence         = 0;
   uint32_t responseTimestamp        = 0;
   int responseWatts                 = 0;
+  int responsePreviousWatts         = 0;
+  bool responsePreviousFresh        = false;
   double responseTrend              = 0;
   double responsePreviousTrend      = 0;
   int transitionTarget              = INT32_MIN;
