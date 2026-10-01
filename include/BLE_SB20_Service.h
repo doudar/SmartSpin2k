@@ -34,6 +34,4 @@ private:
     BLEService *pService;
     BLECharacteristic *pCharacteristic;
     SB20Data currentData;
-    bool deviceConnected;
-    
 };

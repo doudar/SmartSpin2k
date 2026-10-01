@@ -27,13 +27,11 @@ static const char ACTIVE_POWER_TABLE_PREDICTION_AUDIT_PATH[] = "test/output/acti
 static const int STATUS_SETTLED_POSITION_TOLERANCE_STEPS = 50;
 
 struct RideReplaySummary {
-  int lines;
   int entries;
   int invalidEntries;
 };
 
 struct StatusReplaySummary {
-  int lines;
   int statusSamples;
   int invalidSamples;
   int acceptedSamples;
@@ -61,7 +59,7 @@ struct PowerTableValidationSummary {
 };
 
 inline bool replayRideLog(const std::string& filePath, PTData& ptData, RideReplaySummary& summary) {
-  summary = {0, 0, 0};
+  summary = {0, 0};
   std::ifstream rideLog(filePath);
   if (!rideLog.is_open()) return false;
 
@@ -71,7 +69,6 @@ inline bool replayRideLog(const std::string& filePath, PTData& ptData, RideRepla
   std::string line;
   std::smatch match;
   while (std::getline(rideLog, line)) {
-    ++summary.lines;
     if (!std::regex_search(line, match, entryPattern)) {
       if (line.find("(PTable): Averaged Entry:") != std::string::npos) ++summary.invalidEntries;
       continue;
@@ -105,7 +102,7 @@ inline bool replayActiveRideLog(PTData& ptData, RideReplaySummary& summary) {
 
 inline bool replayStatusLog(const std::string& filePath, PTData& ptData, StatusReplaySummary& summary,
                             std::vector<StatusPowerSample>* acceptedSamples = nullptr) {
-  summary = {0, 0, 0, 0, 0, 0, 0, 0};
+  summary = {0, 0, 0, 0, 0, 0, 0};
   std::ifstream rideLog(filePath);
   if (!rideLog.is_open()) return false;
 
@@ -120,7 +117,6 @@ inline bool replayStatusLog(const std::string& filePath, PTData& ptData, StatusR
   bool powerConnected = false;
   bool cadenceConnected = false;
   while (std::getline(rideLog, line)) {
-    ++summary.lines;
     if (std::regex_search(line, match, devicePattern)) {
       powerConnected = std::stoi(match[1].str()) != 0;
       cadenceConnected = std::stoi(match[2].str()) != 0;

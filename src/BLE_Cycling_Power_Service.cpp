@@ -9,7 +9,8 @@
 #include "ByteUtils.h"
 #include <Constants.h>
 
-BLE_Cycling_Power_Service::BLE_Cycling_Power_Service() : pPowerMonitor(nullptr), cyclingPowerFeatureCharacteristic(nullptr), sensorLocationCharacteristic(nullptr) {}
+BLE_Cycling_Power_Service::BLE_Cycling_Power_Service()
+    : pPowerMonitor(nullptr), cyclingPowerMeasurementCharacteristic(nullptr), cyclingPowerFeatureCharacteristic(nullptr), sensorLocationCharacteristic(nullptr) {}
 void BLE_Cycling_Power_Service::setupService(NimBLEServer *pServer, MyCharacteristicCallbacks *chrCallbacks) {
   // Power Meter service setup
   pPowerMonitor                         = spinBLEServer.pServer->createService(CYCLINGPOWERSERVICE_UUID);
@@ -34,10 +35,7 @@ void BLE_Cycling_Power_Service::update() {
   int power     = rtConfig->watts.getValue();
   float cadence = rtConfig->cad.getValue();
 
-  CyclingPowerMeasurement cpm;
-
-  // Clear all flags initially
-  memset(&cpm.flags, 0, sizeof(cpm.flags));
+  CyclingPowerMeasurement cpm{};
 
   // Set flags based on available data
   cpm.flags.crankRevolutionDataPresent = 1;  // Crank Revolution Data Present

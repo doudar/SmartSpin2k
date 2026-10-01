@@ -20,6 +20,5 @@ class BLE_Cycling_Speed_Cadence {
   BLEService *pCyclingSpeedCadenceService;
   BLECharacteristic *cscMeasurement;
   BLECharacteristic *cscFeature;
-  BLECharacteristic *cscControlPoint;
   byte cscFeatureBytes[2] = {0, 0};
 };

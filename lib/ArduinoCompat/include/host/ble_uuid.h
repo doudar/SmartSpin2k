@@ -34,8 +34,6 @@
 extern "C" {
 #endif
 
-struct os_mbuf;
-
 /** Type of UUID */
 enum {
     /** 16-bit UUID (BT SIG assigned) */

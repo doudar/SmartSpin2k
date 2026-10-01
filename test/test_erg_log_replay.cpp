@@ -7,6 +7,7 @@
 
 #include <unity.h>
 
+#include <algorithm>
 #include <cmath>
 #include <fstream>
 #include <limits>
@@ -22,7 +23,6 @@
 namespace {
 
 struct ErgSample {
-  int timestamp;
   int watts;
   int target;
   double gain;
@@ -30,8 +30,6 @@ struct ErgSample {
 
 struct ErgInterval {
   int target;
-  int start;
-  int end;
   double sensitivity;
   std::vector<ErgSample> samples;
 };
@@ -81,16 +79,12 @@ void TestErgLogReplay::test_active_ride_log_and_gain_limits(void) {
     }
 
     if (std::regex_search(line, match, targetPattern)) {
-      const int timestamp = std::stoi(match[1].str());
-      if (!intervals.empty()) intervals.back().end = timestamp;
-      intervals.push_back({std::stoi(match[2].str()), timestamp, timestamp, sensitivity, {}});
+      intervals.push_back({std::stoi(match[2].str()), sensitivity, {}});
       continue;
     }
 
     if (!intervals.empty() && std::regex_search(line, match, samplePattern)) {
-      const int timestamp = std::stoi(match[1].str());
-      intervals.back().samples.push_back({timestamp, std::stoi(match[2].str()), std::stoi(match[3].str()), std::stod(match[4].str())});
-      intervals.back().end = timestamp;
+      intervals.back().samples.push_back({std::stoi(match[2].str()), std::stoi(match[3].str()), std::stod(match[4].str())});
     }
   }
 
@@ -123,10 +117,16 @@ void TestErgLogReplay::test_active_ride_log_and_gain_limits(void) {
 
   const double fallback = ErgControl::fallbackGain(5.0, unstable.target);
   TEST_ASSERT_FLOAT_WITHIN(0.0001f, 5.0f, static_cast<float>(fallback));
-  TEST_ASSERT_FLOAT_WITHIN(0.0001f, 6.25f, static_cast<float>(ErgControl::boundedTableGain(1000.0, fallback)));
-  TEST_ASSERT_FLOAT_WITHIN(0.0001f, 2.5f, static_cast<float>(ErgControl::boundedTableGain(0.01, fallback)));
-  TEST_ASSERT_FLOAT_WITHIN(0.0001f, 5.625f, static_cast<float>(ErgControl::blendedTableGain(1000.0, fallback)));
-  TEST_ASSERT_FLOAT_WITHIN(0.0001f, 3.75f, static_cast<float>(ErgControl::blendedTableGain(0.01, fallback)));
+  // Check clamping and blending against the configured limits, independently of
+  // the helpers being tested. At sensitivity 5 these are 2.5..10 and 3.75..7.5.
+  const double minimumTableGain   = fallback * ErgControl::TABLE_GAIN_MIN_FALLBACK_RATIO;
+  const double maximumTableGain   = fallback * ErgControl::TABLE_GAIN_MAX_FALLBACK_RATIO;
+  const double minimumBlendedGain = fallback * (1.0 - ErgControl::TABLE_GAIN_BLEND) + minimumTableGain * ErgControl::TABLE_GAIN_BLEND;
+  const double maximumBlendedGain = fallback * (1.0 - ErgControl::TABLE_GAIN_BLEND) + maximumTableGain * ErgControl::TABLE_GAIN_BLEND;
+  TEST_ASSERT_FLOAT_WITHIN(0.0001f, static_cast<float>(maximumTableGain), static_cast<float>(ErgControl::boundedTableGain(1000.0, fallback)));
+  TEST_ASSERT_FLOAT_WITHIN(0.0001f, static_cast<float>(minimumTableGain), static_cast<float>(ErgControl::boundedTableGain(0.01, fallback)));
+  TEST_ASSERT_FLOAT_WITHIN(0.0001f, static_cast<float>(maximumBlendedGain), static_cast<float>(ErgControl::blendedTableGain(1000.0, fallback)));
+  TEST_ASSERT_FLOAT_WITHIN(0.0001f, static_cast<float>(minimumBlendedGain), static_cast<float>(ErgControl::blendedTableGain(0.01, fallback)));
   TEST_ASSERT_FLOAT_WITHIN(0.0001f, static_cast<float>(fallback), static_cast<float>(ErgControl::boundedTableGain(std::numeric_limits<double>::quiet_NaN(), fallback)));
 
   double worstReplayedMove = 0.0;
@@ -170,6 +170,7 @@ void TestErgLogReplay::test_active_ride_new_gain_replay(void) {
   int rejectedAtEdge             = 0;
   double maximumHistoricalMove   = 0.0;
   double maximumNewGain          = 0.0;
+  double maximumAllowedGain      = 0.0;
   double maximumNewMove          = 0.0;
   double maximumNewlyTrustedMove = 0.0;
   std::string line;
@@ -206,6 +207,18 @@ void TestErgLogReplay::test_active_ride_new_gain_replay(void) {
     gain                                     = ErgControl::errorScheduledGain(gain, error, true);
     gain                                     = ErgControl::clampGain(gain, sensitivity);
 
+    // Bound every sample using its own sensitivity and fallback schedule. The
+    // expected ceiling must not call the gain helpers under test. At sensitivity
+    // 5 in the mid-power range, the current maximum is 7.5 * 1.25 = 9.375.
+    const double maximumBaseGain = fallback * (1.0 - ErgControl::TABLE_GAIN_BLEND + ErgControl::TABLE_GAIN_BLEND * ErgControl::TABLE_GAIN_MAX_FALLBACK_RATIO);
+    const double maximumErrorMultiplier =
+        std::max({1.0, ErgControl::SMALL_ERROR_GAIN_MULTIPLIER, ErgControl::MEDIUM_ERROR_GAIN_MULTIPLIER, ErgControl::LARGE_ERROR_GAIN_MULTIPLIER});
+    const double allowedGain =
+        std::max(sensitivity * ErgControl::GAIN_MIN_SENSITIVITY_RATIO, std::min(maximumBaseGain * maximumErrorMultiplier, sensitivity * ErgControl::GAIN_MAX_SENSITIVITY_RATIO));
+    TEST_ASSERT_TRUE_MESSAGE(std::isfinite(gain), "replayed ERG gain must be finite");
+    TEST_ASSERT_LESS_OR_EQUAL_FLOAT_MESSAGE(static_cast<float>(allowedGain), static_cast<float>(gain), "replayed ERG gain exceeded the configured scheduled cap");
+    maximumAllowedGain = std::max(maximumAllowedGain, allowedGain);
+
     ++samples;
     if (!oldTable) ++historicalFallbacks;
     if (!oldTable && useTable) ++newlyTrusted;
@@ -219,17 +232,15 @@ void TestErgLogReplay::test_active_ride_new_gain_replay(void) {
 
   TEST_ASSERT_GREATER_THAN_INT_MESSAGE(300, samples, "ride log did not yield enough ERG samples for replay");
   TEST_ASSERT_GREATER_THAN_INT_MESSAGE(0, newlyTrusted, "new ERG slope selection did not recover any historical fallback samples");
-  // The blended 5.625 base-gain ceiling is intentionally allowed one 1.25x
-  // error-scheduling multiplier for errors above 100 W.
-  TEST_ASSERT_LESS_OR_EQUAL_FLOAT_MESSAGE(7.03125f, static_cast<float>(maximumNewGain), "new ERG gain exceeded the conservative scheduled cap at sensitivity 5");
+  TEST_ASSERT_LESS_OR_EQUAL_FLOAT_MESSAGE(static_cast<float>(maximumAllowedGain), static_cast<float>(maximumNewGain), "new ERG gain exceeded the configured replay ceiling");
 
   std::ofstream report("test/output/active_erg_new_gain_replay.txt", std::ios::trunc);
   TEST_ASSERT_TRUE_MESSAGE(report.is_open(), "failed to write new ERG replay audit");
   report << "Chronological active-ride ERG replay\n"
          << "samples=" << samples << " historical_fallbacks=" << historicalFallbacks << " newly_trusted=" << newlyTrusted << " new_table_samples=" << newTableSamples
          << " edge_or_missing_segment_rejections=" << rejectedAtEdge << '\n'
-         << "maximum_logged_correction_steps=" << maximumHistoricalMove << " maximum_new_gain=" << maximumNewGain << " maximum_new_correction_steps=" << maximumNewMove
-         << " maximum_newly_trusted_correction_steps=" << maximumNewlyTrustedMove << '\n'
+         << "maximum_logged_correction_steps=" << maximumHistoricalMove << " maximum_new_gain=" << maximumNewGain << " maximum_allowed_gain=" << maximumAllowedGain
+         << " maximum_new_correction_steps=" << maximumNewMove << " maximum_newly_trusted_correction_steps=" << maximumNewlyTrustedMove << '\n'
          << "Table state is rebuilt in log order; each ERG sample uses the last logged Main cadence and only PTable entries already seen.\n";
   TEST_ASSERT_TRUE_MESSAGE(report.good(), "failed while writing new ERG replay audit");
 }
@@ -239,21 +250,21 @@ void TestErgLogReplay::test_table_position_confidence(void) {
 
   TEST_ASSERT_FALSE(confidence.trusted());
   TEST_ASSERT_EQUAL_UINT8(0, confidence.score());
-  for (int hit = 0; hit < ErgControl::TableConfidence::TRUST_SCORE; ++hit) confidence.update(true);
+  for (int hit = 0; hit < ErgControl::TABLE_CONFIDENCE_TRUST_SCORE; ++hit) confidence.update(true);
   TEST_ASSERT_TRUE(confidence.trusted());
-  TEST_ASSERT_EQUAL_UINT8(ErgControl::TableConfidence::TRUST_SCORE, confidence.score());
+  TEST_ASSERT_EQUAL_UINT8(ErgControl::TABLE_CONFIDENCE_TRUST_SCORE, confidence.score());
 
   // Trust is hysteretic: isolated misses do not disable a proven table. Keep
   // applying misses until the configured revoke threshold is reached.
-  const int missesToRevoke = (ErgControl::TableConfidence::TRUST_SCORE - ErgControl::TableConfidence::REVOKE_SCORE + ErgControl::TableConfidence::MISS_PENALTY - 1) /
-                             ErgControl::TableConfidence::MISS_PENALTY;
+  const int missesToRevoke = (ErgControl::TABLE_CONFIDENCE_TRUST_SCORE - ErgControl::TABLE_CONFIDENCE_REVOKE_SCORE + ErgControl::TABLE_CONFIDENCE_MISS_PENALTY - 1) /
+                             ErgControl::TABLE_CONFIDENCE_MISS_PENALTY;
   for (int miss = 1; miss < missesToRevoke; ++miss) {
     confidence.update(false);
     TEST_ASSERT_TRUE(confidence.trusted());
   }
   confidence.update(false);
   TEST_ASSERT_FALSE(confidence.trusted());
-  TEST_ASSERT_EQUAL_UINT8(ErgControl::TableConfidence::REVOKE_SCORE, confidence.score());
+  TEST_ASSERT_EQUAL_UINT8(ErgControl::TABLE_CONFIDENCE_REVOKE_SCORE, confidence.score());
 
   TEST_ASSERT_TRUE(ErgControl::positionMatchesPowerWindow(1000, 900, 1100, 10));
   TEST_ASSERT_TRUE(ErgControl::positionMatchesPowerWindow(1110, 1100, 900, 10));
@@ -283,17 +294,21 @@ void TestErgLogReplay::test_table_position_confidence(void) {
   TEST_ASSERT_TRUE(syntheticBounds.contains(200, 80));
   TEST_ASSERT_FALSE(syntheticBounds.contains(89, 80));
   TEST_ASSERT_FALSE(syntheticBounds.contains(200, 91));
-  TEST_ASSERT_EQUAL_INT(10, ErgControl::TABLE_SEEK_CADENCE_MARGIN_RPM);
-  TEST_ASSERT_TRUE(syntheticBounds.containsWithCadenceMargin(200, 60, ErgControl::TABLE_SEEK_CADENCE_MARGIN_RPM));
-  TEST_ASSERT_TRUE(syntheticBounds.containsWithCadenceMargin(200, 100, ErgControl::TABLE_SEEK_CADENCE_MARGIN_RPM));
-  TEST_ASSERT_FALSE(syntheticBounds.containsWithCadenceMargin(200, 59, ErgControl::TABLE_SEEK_CADENCE_MARGIN_RPM));
-  TEST_ASSERT_FALSE(syntheticBounds.containsWithCadenceMargin(200, 101, ErgControl::TABLE_SEEK_CADENCE_MARGIN_RPM));
-  TEST_ASSERT_FALSE(syntheticBounds.containsWithCadenceMargin(301, 80, ErgControl::TABLE_SEEK_CADENCE_MARGIN_RPM));
 
-  TEST_ASSERT_FALSE(ErgControl::tableSeekExceededPowerLimit(340, 360, true));
-  TEST_ASSERT_TRUE(ErgControl::tableSeekExceededPowerLimit(340, 361, true));
-  TEST_ASSERT_FALSE(ErgControl::tableSeekExceededPowerLimit(170, 130, false));
-  TEST_ASSERT_TRUE(ErgControl::tableSeekExceededPowerLimit(170, 129, false));
+  TEST_ASSERT_EQUAL_INT(10, ErgControl::approachingError(10, 0));
+  TEST_ASSERT_EQUAL_INT(-10, ErgControl::approachingError(-10, 0));
+  TEST_ASSERT_EQUAL_INT(0, ErgControl::approachingError(20, 15));
+  TEST_ASSERT_EQUAL_INT(0, ErgControl::approachingError(-20, -15));
+  TEST_ASSERT_EQUAL_INT(20, ErgControl::approachingError(20, -15));
+  TEST_ASSERT_EQUAL_INT(-20, ErgControl::approachingError(-20, 15));
+
+  // Equality stays inside each configured margin; one watt beyond releases control.
+  const int highLimit = 340 + ErgControl::TABLE_SEEK_INCREASE_OVERSHOOT_WATTS;
+  const int lowLimit  = 170 - ErgControl::TABLE_SEEK_DECREASE_UNDERSHOOT_WATTS;
+  TEST_ASSERT_FALSE(ErgControl::tableSeekExceededPowerLimit(340, highLimit, true));
+  TEST_ASSERT_TRUE(ErgControl::tableSeekExceededPowerLimit(340, highLimit + 1, true));
+  TEST_ASSERT_FALSE(ErgControl::tableSeekExceededPowerLimit(170, lowLimit, false));
+  TEST_ASSERT_TRUE(ErgControl::tableSeekExceededPowerLimit(170, lowLimit - 1, false));
 
   PTData table;
   RideReplaySummary tableSummary;

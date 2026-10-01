@@ -13,17 +13,17 @@ class HeartRateData : public SensorData {
  public:
   HeartRateData() : SensorData("HRS(HRM)") {}
 
-  bool hasHeartRate();
-  bool hasCadence();
-  bool hasPower();
-  bool hasSpeed();
-  bool hasResistance();
-  int getHeartRate();
-  float getCadence();
-  int getPower();
-  float getSpeed();
-  int getResistance();
-  void decode(uint8_t *data, size_t length);
+  bool hasHeartRate() override;
+  bool hasCadence() override;
+  bool hasPower() override;
+  bool hasSpeed() override;
+  bool hasResistance() override;
+  int getHeartRate() override;
+  float getCadence() override;
+  int getPower() override;
+  float getSpeed() override;
+  int getResistance() override;
+  void decode(uint8_t *data, size_t length) override;
 
  private:
   int heartrate = INT_MIN;

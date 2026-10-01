@@ -12,7 +12,6 @@
 #define HTTP_SERVER_LOG_TAG "HTTP_Server"
 
 class HTTP_Server {
- private:
  public:
   bool internetConnection;
 
@@ -32,6 +31,7 @@ class HTTP_Server {
 
 // wifi Function
 void startWifi();
+void updateWifi();
 void stopWifi();
 
 

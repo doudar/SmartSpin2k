@@ -5,6 +5,8 @@
 .idea/
 test/tmp_pio_test_transport.cpp
 test/output/
+scripts/erg_sim/__pycache__/
+test/__pycache__/
 data/config.txt
 include/telegram_token.h
 Errors
@@ -21,7 +23,10 @@ C/Users/
 /managed_components
 dependencies.lock
 dependencies.lock.*
+/sdkconfig.old
+/sdkconfig.*.old
 .vscode/settings.json
+.clangd
 *.map
 graphify-out/
-
+output/

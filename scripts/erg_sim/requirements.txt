@@ -1,0 +1,4 @@
+numpy>=1.26,<3
+scipy>=1.11,<2
+fitdecode>=0.11,<0.12
+matplotlib>=3.8,<4

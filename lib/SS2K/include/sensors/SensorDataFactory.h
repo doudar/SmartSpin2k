@@ -9,23 +9,24 @@
 
 #include <memory>
 #include <NimBLEUUID.h>
+#include <string>
+#include <utility>
 #include <vector>
 #include "sensors/SensorData.h"
-#include "settings.h"
 
 class SensorDataFactory {
  public:
-  SensorDataFactory() {}
+  SensorDataFactory() = default;
 
-  std::shared_ptr<SensorData> getSensorData(NimBLEUUID characteristicUUID, std::string& uniqueName, uint8_t *data, size_t length);
+  std::shared_ptr<SensorData> getSensorData(const NimBLEUUID& characteristicUUID, const std::string& uniqueName, uint8_t *data, size_t length);
 
  private:
   class KnownDevice {
    public:
-    KnownDevice(const NimBLEUUID characteristicUUID, const std::string& uniqueName, std::shared_ptr<SensorData> sensorData)
-        : characteristicId(characteristicUUID), uniqueName(uniqueName), sensorData(sensorData) {}
+    KnownDevice(const NimBLEUUID& characteristicUUID, const std::string& uniqueName, std::shared_ptr<SensorData> sensorData)
+        : characteristicId(characteristicUUID), uniqueName(uniqueName), sensorData(std::move(sensorData)) {}
     std::shared_ptr<SensorData> decode(uint8_t *data, size_t length);
-    bool isSameDeviceCharacteristic(const NimBLEUUID characteristicUUID, const std::string& uniqueName);
+    bool isSameDeviceCharacteristic(const NimBLEUUID& characteristicUUID, const std::string& uniqueName) const;
 
    private:
     NimBLEUUID characteristicId;
@@ -50,6 +51,6 @@ class SensorDataFactory {
     virtual void decode(uint8_t *data, size_t length);
   };
 
-  std::vector<KnownDevice *> knownDevices;
+  std::vector<KnownDevice> knownDevices;
   static std::shared_ptr<SensorData> NULL_SENSOR_DATA;
 };

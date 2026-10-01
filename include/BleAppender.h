@@ -9,7 +9,6 @@
 
 #include "LogAppender.h"
 #include <string>
-#include <queue>
 
 class BleAppender : public ILogAppender {
  public:
@@ -19,6 +18,6 @@ class BleAppender : public ILogAppender {
 
  private:
   static const size_t MAX_MESSAGE_SIZE = 500;  // MTU-safe size
-  std::queue<std::string> messageQueue;
-  void appendMessage(const char *message);
+  // A synchronous handoff to the custom characteristic, not a replay queue.
+  std::string pendingMessage;
 };

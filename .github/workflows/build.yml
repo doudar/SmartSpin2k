@@ -62,7 +62,11 @@ jobs:
       - name: Check pre-commit hooks
         uses: pre-commit/action@v3.0.1
       - name: Refresh GitHub TLS certificate
-        run: python cert_updater.py
+        run: |
+          if ! python cert_updater.py; then
+            echo "::error file=cert_updater.py::GitHub TLS certificate refresh failed. Firmware build and release stopped; inspect the certificate updater output above."
+            exit 1
+          fi
       - name: Build firmware
         run: platformio run -e release
       - name: Build filesystem

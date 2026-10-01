@@ -294,7 +294,7 @@ void TestActiveRideTable::test_active_table_transient_power_estimation(void) {
   std::ifstream input(ACTIVE_RIDE_LOG_PATH);
   TEST_ASSERT_TRUE_MESSAGE(input.is_open(), "active ride log must be available for transient power analysis");
   const std::regex statusPattern(
-      R"(\[([0-9]+)\]\[E\]\(Main\): W=(-?[0-9]+) C=(-?[0-9]+) H=-?[0-9]+ G=-?[0-9]+ R=-?[0-9]+ P=(-?[0-9]+)->(-?[0-9]+))");
+      R"(\[([0-9]+)\]\[E\]\(Main\): W=(-?[0-9]+) C=(-?[0-9]+) H=-?[0-9]+ G=-?[0-9]+ R=-?[0-9]+ P=(-?[0-9]+)->-?[0-9]+)");
   const std::regex devicePattern(R"(\[[0-9]+\]\[E\]\(Main\): DEV PM=([0-9]+) CAD=([0-9]+) HRM=[0-9]+)");
 
   struct Sample {

@@ -12,7 +12,7 @@ BLE_Heart_Service::BLE_Heart_Service() : pHeartService(nullptr), heartRateMeasur
 
 void BLE_Heart_Service::setupService(NimBLEServer *pServer, MyCharacteristicCallbacks *chrCallbacks) {
   // HEART RATE MONITOR SERVICE SETUP
-  pHeartService                      = spinBLEServer.pServer->createService(HEARTSERVICE_UUID);
+  pHeartService                      = pServer->createService(HEARTSERVICE_UUID);
   heartRateMeasurementCharacteristic = pHeartService->createCharacteristic(HEARTCHARACTERISTIC_UUID, NIMBLE_PROPERTY::READ | NIMBLE_PROPERTY::NOTIFY);
   byte heartRateMeasurement[2]       = {0x00, 0x00};
   heartRateMeasurementCharacteristic->setValue(heartRateMeasurement, 2);
@@ -36,7 +36,8 @@ void BLE_Heart_Service::deinit() {
 
 void BLE_Heart_Service::update() {
 
-  byte heartRateMeasurement[2] = {0x00, (byte)rtConfig->hr.getValue()};
+  const int heartRate          = rtConfig->hr.getValue();
+  byte heartRateMeasurement[2] = {0x00, (byte)heartRate};
   // Notify the cycling power measurement characteristic
   // Need to set the value before notifying so that read works correctly.
   heartRateMeasurementCharacteristic->setValue(heartRateMeasurement, 2);
@@ -47,5 +48,5 @@ void BLE_Heart_Service::update() {
   char logBuf[kLogBufCapacity];
   const size_t heartRateMeasurementLength = sizeof(heartRateMeasurement) / sizeof(heartRateMeasurement[0]);
   logCharacteristic(logBuf, kLogBufCapacity, heartRateMeasurement, heartRateMeasurementLength, HEARTSERVICE_UUID, heartRateMeasurementCharacteristic->getUUID(),
-                    "HRS(HRM)[ HR(%d) ]", rtConfig->hr.getValue() % 1000);
+                    "HRS(HRM)[ HR(%d) ]", heartRate % 1000);
 }

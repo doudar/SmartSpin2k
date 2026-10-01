@@ -5,7 +5,8 @@
  * SPDX-License-Identifier: GPL-2.0-only
  */
 
-#include "ByteUtils.h"
+#include <cmath>
+
 #include "sensors/PelotonData.h"
 #include "Constants.h"
 
@@ -33,7 +34,7 @@ int PelotonData::getResistance() { return this->resistance; }
 //                         1: 2:  3:      4:
 // 1:data type 2:length 3:data 4:checksum
 
-void PelotonData::decode(uint8_t *data, size_t length) {
+void PelotonData::decode(uint8_t *data, size_t) {
   float value                  = 0.0;
   const uint8_t payload_length = data[2];
   for (uint8_t i = 2 + payload_length; i > 2; i--) {

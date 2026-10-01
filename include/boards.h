@@ -25,7 +25,6 @@ class Board {
   int auxSerialTxPin;
   int auxSerialRxPin;
   int ledPin;
-  int pwrScaler;
   float rSense;
   bool homingSupported;
   float homingSensitivityScaler;
@@ -56,8 +55,7 @@ class Boards {
     rev3.auxSerialTxPin     = 17;
     rev3.auxSerialRxPin     = 18;
     rev3.ledPin             = 2;
-    rev3.pwrScaler          = 12;
-    rev3.rSense             = 0.04f;
+    rev3.rSense             = 0.08f;
     rev3.homingSupported    = true;
     rev3.homingSensitivityScaler = 1.6f;
 #else
@@ -76,7 +74,6 @@ class Boards {
     rev1.auxSerialTxPin     = 0;
     rev1.auxSerialRxPin     = 0;
     rev1.ledPin             = 2;
-    rev1.pwrScaler          = 31;
     rev1.rSense             = 0.08f;
     rev1.homingSupported    = false;
     rev1.homingSensitivityScaler = 1.0f;
@@ -95,7 +92,6 @@ class Boards {
     rev2.auxSerialTxPin     = 21;
     rev2.auxSerialRxPin     = 22;
     rev2.ledPin             = 2;
-    rev2.pwrScaler          = 12;
     rev2.rSense             = 0.08f;
     rev2.homingSupported    = true;
     rev2.homingSensitivityScaler = 1.0f;

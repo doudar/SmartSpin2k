@@ -149,6 +149,18 @@ void TestPTLookupResistance::test_erg_slope_quality(void) {
   TEST_ASSERT_TRUE_MESSAGE(replayActiveRideLog(activeTable, summary), "active ride log could not be opened for slope-quality test");
   TEST_ASSERT_FALSE_MESSAGE(helpers.lookupSlope(385, 93, stepsPerWatt, activeTable), "385 W at 93 RPM must reject extrapolated active-log edge data");
   TEST_ASSERT_FALSE_MESSAGE(helpers.lookupSlope(385, 94, stepsPerWatt, activeTable), "385 W at 94 RPM must reject extrapolated active-log edge data");
-  TEST_ASSERT_TRUE_MESSAGE(helpers.lookupErgSlope(340, 101, stepsPerWatt, activeTable),
-                           "340 W at 101 RPM should use its two nearby measured 330--360 W segments");
+  // The shorter learning history exposes unequal edge slopes in this replay
+  // (14 versus 29 stored units over 30W); do not relax the 2x quality guard.
+  PowerTableSlopeStatus::Value status;
+  TEST_ASSERT_FALSE(helpers.lookupErgSlope(340, 101, stepsPerWatt, activeTable, &status));
+  TEST_ASSERT_EQUAL_INT(PowerTableSlopeStatus::InconsistentRows, status);
+
+  PTData measuredEdge;
+  for (int row = 8; row <= 9; ++row) {
+    for (int col = 11; col <= 12; ++col) {
+      measuredEdge.tableRow[row].tableEntry[col].targetPosition = 1400 - (row - 8) * 100 + (col - 11) * 30;
+      measuredEdge.tableRow[row].tableEntry[col].readings       = 4;
+    }
+  }
+  TEST_ASSERT_TRUE_MESSAGE(helpers.lookupErgSlope(340, 101, stepsPerWatt, measuredEdge), "340 W at 101 RPM should use consistent measured 330--360 W segments");
 }

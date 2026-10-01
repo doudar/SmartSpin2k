@@ -4,11 +4,13 @@
  *
  * SPDX-License-Identifier: GPL-2.0-only
  */
-#include <NimBLEDevice.h>
-#include <Arduino.h>
-#include <Main.h>
 
 #pragma once
 
+#include <NimBLEDevice.h>
 
-void collectAndSet(NimBLEUUID charUUID, NimBLEUUID serviceUUID, std::string& uniqueName, uint8_t *pData, size_t length);
+#include <cstddef>
+#include <cstdint>
+#include <string>
+
+void collectAndSet(const NimBLEUUID& charUUID, const NimBLEUUID& serviceUUID, const std::string& uniqueName, uint8_t* pData, size_t length);

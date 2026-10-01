@@ -14,13 +14,73 @@
 #include "sdkconfig.h"
 #if defined(CONFIG_BT_ENABLED)
 
-#include "NimBLEUtils.h"
 #include "NimBLEUUID.h"
 #include "NimBLELog.h"
 
 #include <algorithm>
+#include <cstdio>
 
 static const char* LOG_TAG = "NimBLEUUID";
+
+/*
+ * ArduinoCompat provides the NimBLE host UUID declarations, but native tests
+ * do not link the NimBLE host library. Keep these two small host helpers here
+ * so NimBLEUUID has the same comparison and rendering behavior on the host.
+ */
+extern "C" int ble_uuid_cmp(const ble_uuid_t* uuid1, const ble_uuid_t* uuid2) {
+    if (uuid1 == nullptr || uuid2 == nullptr) {
+        return uuid1 == uuid2 ? 0 : 1;
+    }
+
+    if (uuid1->type != uuid2->type) {
+        return static_cast<int>(uuid1->type) - static_cast<int>(uuid2->type);
+    }
+
+    switch (uuid1->type) {
+        case BLE_UUID_TYPE_16: {
+            const uint16_t lhs = BLE_UUID16(uuid1)->value;
+            const uint16_t rhs = BLE_UUID16(uuid2)->value;
+            return static_cast<int>(lhs) - static_cast<int>(rhs);
+        }
+        case BLE_UUID_TYPE_32: {
+            const uint32_t lhs = BLE_UUID32(uuid1)->value;
+            const uint32_t rhs = BLE_UUID32(uuid2)->value;
+            return lhs == rhs ? 0 : (lhs < rhs ? -1 : 1);
+        }
+        case BLE_UUID_TYPE_128:
+            return memcmp(BLE_UUID128(uuid1)->value, BLE_UUID128(uuid2)->value, sizeof(BLE_UUID128(uuid1)->value));
+        default:
+            return 1;
+    }
+}
+
+extern "C" char* ble_uuid_to_str(const ble_uuid_t* uuid, char* dst) {
+    if (uuid == nullptr || dst == nullptr) {
+        return dst;
+    }
+
+    switch (uuid->type) {
+        case BLE_UUID_TYPE_16:
+            snprintf(dst, BLE_UUID_STR_LEN, "0x%04" PRIx16, BLE_UUID16(uuid)->value);
+            break;
+        case BLE_UUID_TYPE_32:
+            snprintf(dst, BLE_UUID_STR_LEN, "0x%08" PRIx32, BLE_UUID32(uuid)->value);
+            break;
+        case BLE_UUID_TYPE_128: {
+            const uint8_t* value = BLE_UUID128(uuid)->value;
+            snprintf(dst, BLE_UUID_STR_LEN,
+                     "%02x%02x%02x%02x-%02x%02x-%02x%02x-%02x%02x-%02x%02x%02x%02x%02x%02x", value[15], value[14],
+                     value[13], value[12], value[11], value[10], value[9], value[8], value[7], value[6], value[5],
+                     value[4], value[3], value[2], value[1], value[0]);
+            break;
+        }
+        default:
+            dst[0] = '\0';
+            break;
+    }
+
+    return dst;
+}
 
 
 /**
@@ -162,9 +222,7 @@ NimBLEUUID::NimBLEUUID(uint32_t first, uint16_t second, uint16_t third, uint64_t
 /**
  * @brief Creates an empty UUID.
  */
-NimBLEUUID::NimBLEUUID() {
-    m_valueSet = false;
-} // NimBLEUUID
+NimBLEUUID::NimBLEUUID() = default;
 
 
 /**

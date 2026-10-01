@@ -14,9 +14,15 @@
 class BLE_ss2kCustomCharacteristic {
  public:
   void setupService(NimBLEServer *pServer);
+  // Fast maintenance pass: bounded BLE write/status queue and snapshot timeout.
+  void processPendingEvents();
+  // Periodic server pass: pace DirCon settings snapshot chunks.
   void update();
-  // Used internally for notify and onWrite Callback.
-  static void process(std::string rxValue, uint16_t connHandle = BLE_HS_CONN_HANDLE_NONE, uint16_t mtu = 23, bool indicateResponse = true);
+  static void onConnect(uint16_t connHandle);
+  static void onDisconnect(uint16_t connHandle);
+  // Runs from maintenance/DirCon; BLE callbacks enqueue requests for processPendingEvents().
+  static void process(const std::string& rxValue, uint16_t connHandle = BLE_HS_CONN_HANDLE_NONE, uint16_t mtu = 23,
+                      bool indicateResponse = true);
   // Custom Characteristic value that needs to be notified
   static void notify(char _item, int tableRow = -1);
   static void beginScanResults();
@@ -26,13 +32,15 @@ class BLE_ss2kCustomCharacteristic {
   static void parseNemit();
 
  private:
-  NimBLEService *pSmartSpin2kService;
-  NimBLECharacteristic *smartSpin2kCharacteristic;
+  NimBLEService *pSmartSpin2kService = nullptr;
+  NimBLECharacteristic *smartSpin2kCharacteristic = nullptr;
   uint8_t ss2kCustomCharacteristicValue[3] = {0x00, 0x00, 0x00};
 };
+
+extern BLE_ss2kCustomCharacteristic ss2kCustomCharacteristic;
 
 class ss2kCustomCharacteristicCallbacks : public NimBLECharacteristicCallbacks {
   void onWrite(NimBLECharacteristic* pCharacteristic, NimBLEConnInfo& connInfo) override;
   void onSubscribe(NimBLECharacteristic* pCharacteristic, NimBLEConnInfo& connInfo, uint16_t subValue) override;
-  void onStatus(NimBLECharacteristic* pCharacteristic, int code) override;
+  void onStatus(NimBLECharacteristic* pCharacteristic, NimBLEConnInfo& connInfo, int code) override;
 };

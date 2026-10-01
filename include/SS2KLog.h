@@ -73,7 +73,7 @@ class LogHandler {
   SemaphoreHandle_t _logBufferMutex;
   std::vector<ILogAppender *> _appenders;
 
-  char _logLevelToLetter(esp_log_level_t level);
+  static char _logLevelToLetter(esp_log_level_t level);
 };
 
 extern LogHandler logHandler;

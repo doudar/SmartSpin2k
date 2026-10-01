@@ -73,18 +73,16 @@ void FitnessMachineIndoorBikeData::decode(uint8_t *data, size_t length) {
   for (int typeIndex = Types::InstantaneousSpeed; typeIndex <= Types::RemainingTime; typeIndex++) {
     if (bitRead(flags, flagBitIndices[typeIndex]) == flagEnabledValues[typeIndex]) {
       uint8_t byteSize = byteSizes[typeIndex];
-      if (byteSize > 0) {
-        int value = data[dataIndex];
-        for (int dataOffset = 1; dataOffset < byteSize; dataOffset++) {
-          uint8_t dataByte = data[dataIndex + dataOffset];
-          value |= (dataByte << (dataOffset * 8));
-        }
-        dataIndex += byteSize;
-        value             = convert(value, byteSize, signedFlags[typeIndex]);
-        double_t result   = std::round(value * resolutions[typeIndex] * 10.0) / 10.0;
-        values[typeIndex] = result;
-        continue;
+      int value        = data[dataIndex];
+      for (int dataOffset = 1; dataOffset < byteSize; dataOffset++) {
+        uint8_t dataByte = data[dataIndex + dataOffset];
+        value |= (dataByte << (dataOffset * 8));
       }
+      dataIndex += byteSize;
+      value             = convert(value, byteSize, signedFlags[typeIndex]);
+      double_t result   = std::round(value * resolutions[typeIndex] * 10.0) / 10.0;
+      values[typeIndex] = result;
+      continue;
     }
     values[typeIndex] = nanf("");
   }

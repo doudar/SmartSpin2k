@@ -180,7 +180,6 @@ size_t DirConMessage::parse(uint8_t* data, size_t len, uint8_t sequenceNumber) {
       if (!this->Length) {
         this->Request = this->isRequest(sequenceNumber);
       } else if ((this->Length % 16) == 0) {
-        this->AdditionalUUIDs.clear();
         size_t index = 0;
         while (this->Length >= index + 16) {
           // Parse UUID with consistent byte order
@@ -204,8 +203,6 @@ size_t DirConMessage::parse(uint8_t* data, size_t len, uint8_t sequenceNumber) {
         if (this->Length == 16) {
           this->Request = this->isRequest(sequenceNumber);
         } else if ((this->Length - 16) % 17 == 0) {
-          this->AdditionalUUIDs.clear();
-          this->AdditionalData.clear();
           size_t index = 16;
           while (this->Length >= index + 17) {
             // Ensure consistent byte order for characteristic UUIDs
@@ -234,7 +231,6 @@ size_t DirConMessage::parse(uint8_t* data, size_t len, uint8_t sequenceNumber) {
         if (this->Length == 16) {
           this->Request = this->isRequest(sequenceNumber);
         } else {
-          this->AdditionalData.clear();
           for (size_t dataIndex = 0; dataIndex < (this->Length - 16); dataIndex++) {
             this->AdditionalData.push_back((uint8_t)data[DIRCON_MESSAGE_HEADER_LENGTH + dataIndex + 16]);
             parsedBytes += 1;
@@ -253,7 +249,6 @@ size_t DirConMessage::parse(uint8_t* data, size_t len, uint8_t sequenceNumber) {
         this->UUID = DirConUUIDCodec::fromBytes(data + DIRCON_MESSAGE_HEADER_LENGTH);
         parsedBytes += 16;
         this->Request = this->isRequest(sequenceNumber);
-        this->AdditionalData.clear();
         for (size_t dataIndex = 0; dataIndex < (this->Length - 16); dataIndex++) {
           this->AdditionalData.push_back((uint8_t)data[DIRCON_MESSAGE_HEADER_LENGTH + dataIndex + 16]);
           parsedBytes += 1;
@@ -273,7 +268,6 @@ size_t DirConMessage::parse(uint8_t* data, size_t len, uint8_t sequenceNumber) {
 
         // Payload (if any) follows the UUID; typical CCCD is 1-2 bytes
         size_t payloadLen = this->Length - 16;
-        this->AdditionalData.clear();
         if (payloadLen > 0) {
           this->Request = true;
           for (size_t i = 0; i < payloadLen; ++i) {
@@ -296,7 +290,6 @@ size_t DirConMessage::parse(uint8_t* data, size_t len, uint8_t sequenceNumber) {
         // Update UNSOLICITED_CHARACTERISTIC_NOTIFICATION UUID parsing
         this->UUID = DirConUUIDCodec::fromBytes(data + DIRCON_MESSAGE_HEADER_LENGTH);
         parsedBytes += 16;
-        this->AdditionalData.clear();
         for (size_t dataIndex = 0; dataIndex < (this->Length - 16); dataIndex++) {
           this->AdditionalData.push_back((uint8_t)data[DIRCON_MESSAGE_HEADER_LENGTH + dataIndex + 16]);
           parsedBytes += 1;
@@ -318,7 +311,6 @@ size_t DirConMessage::parse(uint8_t* data, size_t len, uint8_t sequenceNumber) {
       SS2K_LOG(DIRCON_LOG_TAG, "Error parsing DirCon message: Unknown identifier %d. Full message (%zu bytes): %s", this->Identifier, frameLength, hexBuf);
       this->Identifier = DIRCON_MSGID_ERROR;
       return frameLength;
-      break;
   }
 
   return parsedBytes;

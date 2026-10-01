@@ -18,7 +18,7 @@
 #endif
 
 namespace {
-constexpr int MAX_MONOTONIC_PASSES = 20;
+constexpr int MAX_MONOTONIC_PASSES = 64;
 constexpr int MAX_PAVA_ENTRIES =
     POWERTABLE_WATT_SIZE > POWERTABLE_CAD_SIZE ? POWERTABLE_WATT_SIZE : POWERTABLE_CAD_SIZE;
 constexpr int MAX_ESTIMATED_POWER_WATTS = 4000;
@@ -102,7 +102,7 @@ bool slopesAgree(double first, double second) {
   return std::max(first, second) <= std::min(first, second) * MAX_LOCAL_SLOPE_RATIO;
 }
 
-bool getObservedWattBounds(int cad, PTData& ptData, int& minimumWatts, int& maximumWatts) {
+bool getObservedWattBounds(int cad, const PTData& ptData, int& minimumWatts, int& maximumWatts) {
   minimumWatts = MAX_ESTIMATED_POWER_WATTS;
   maximumWatts = 0;
   bool found   = false;
@@ -145,8 +145,8 @@ bool enforceMonotonicEntries(TableEntry* const entries[], int entryCount, bool i
   int blockCount = 0;
 
   for (int i = 0; i < entryCount; ++i) {
-    blockPosition[blockCount] = entries[i]->targetPosition;
-    blockWeight[blockCount]   = entries[i]->readings;
+    blockPosition[blockCount] = entries[i]->learningPosition;
+    blockWeight[blockCount]   = std::min<int>(entries[i]->readings, POWER_TABLE_HISTORY);
     blockStart[blockCount]    = i;
     blockEnd[blockCount]      = i;
     ++blockCount;
@@ -170,10 +170,10 @@ bool enforceMonotonicEntries(TableEntry* const entries[], int entryCount, bool i
 
   bool changed = false;
   for (int block = 0; block < blockCount; ++block) {
-    const int16_t correctedPosition = static_cast<int16_t>(round(blockPosition[block]));
+    const float correctedPosition = blockPosition[block];
     for (int i = blockStart[block]; i <= blockEnd[block]; ++i) {
-      if (entries[i]->targetPosition != correctedPosition) {
-        entries[i]->targetPosition = correctedPosition;
+      if (entries[i]->learningPosition != correctedPosition) {
+        entries[i]->learningPosition = correctedPosition;
         changed                    = true;
       }
     }
@@ -182,103 +182,74 @@ bool enforceMonotonicEntries(TableEntry* const entries[], int entryCount, bool i
 }
 }  // namespace
 
-
-/**
- * @brief Enters a new data point and then enforces monotonicity on the whole table.
- * * This function first calculates the running average for the given data point.
- * Then, it calls the PAVA helper functions to ensure resistance does not fall
- * as power rises or rise as cadence increases.
- * * @param ptData The main power table data structure.
- * @param index The watt and cadence index for the new data point.
- * @param pos The measured targetPosition for this data point.
- */
-void PTHelpers::enterData(PTData& ptData, ptIndex index, int pos) {
-  // Reference to the specific table entry for cleaner code
-  TableEntry& entry = ptData.tableRow[index.cadIndex].tableEntry[index.wattIndex];
-
-  bool moveTable = false;
+// Online weighted monotonic fitting. The previous fitted surface is the prior,
+// so repeated evidence moves an entire conflicting block instead of being
+// vetoed or forever averaged against an immutable neighboring raw observation.
+uint16_t PTHelpers::enterData(PTData& ptData, ptIndex index, float pos) {
+  if (index.cadIndex < 0 || index.cadIndex >= POWERTABLE_CAD_SIZE || index.wattIndex < 0 || index.wattIndex >= POWERTABLE_WATT_SIZE || !std::isfinite(pos) || pos <= INT16_MIN ||
+      pos > INT16_MAX)
+    return 0;
   clean(ptData);
-
-  // Get the topmost value in the column
-
-  if (entry.readings == 0) {  // if first reading in this entry
-    entry.readings = 1;  // The common increment below marks this first measured entry as reliable (2).
-    SS2K_LOG(PTDATA_LOG_TAG, "New entry recorded (%d)(%d)(%d)", index.cadIndex, index.wattIndex, pos);
-  } else {  // Average and update the readings.
-    // Use floating point for accuracy in averaging
-    float current_total_pos = (float)entry.targetPosition * entry.readings;
-    float new_avg_pos       = (pos + current_total_pos) / (entry.readings + 1.0f);
-    pos                     = (int16_t)new_avg_pos;
-
-    SS2K_LOG(PTDATA_LOG_TAG, "Existing entry averaged (%d)(%d)(%d), readings(%d)", index.cadIndex, index.wattIndex, pos, entry.readings);
-  }
-
-  // Get the value to the left of the new entry
-  for (int i = index.wattIndex - 1; i > 0; i--) {
-    if (ptData.tableRow[index.cadIndex].tableEntry[i].targetPosition > pos) {
-      SS2K_LOG(PTDATA_LOG_TAG, "Greater Left Found %d, %d, tp%d", index.cadIndex, i, ptData.tableRow[index.cadIndex].tableEntry[i].targetPosition);
-      ptData.tableRow[index.cadIndex].tableEntry[i].readings--;
-      moveTable = true;
-      break;
+  for (auto& row : ptData.tableRow) {
+    for (auto& cell : row.tableEntry) {
+      // Loading/importing a cell invalidates the fractional prior. Also detect
+      // direct coordinate edits used by calibration and native fixtures.
+      if (cell.publishedPosition != cell.targetPosition) cell.learningPosition = cell.targetPosition;
     }
   }
-
-  // get the value below the new entry
-  for (int j = index.cadIndex + 1; j < POWERTABLE_CAD_SIZE - 1; j++) {
-    if (ptData.tableRow[j].tableEntry[index.wattIndex].targetPosition > pos) {
-      SS2K_LOG(PTDATA_LOG_TAG, "Greater Down Found %d, %d, tp%d", j, index.wattIndex, ptData.tableRow[j].tableEntry[index.wattIndex].targetPosition);
-      ptData.tableRow[j].tableEntry[index.wattIndex].readings--;
-      moveTable = true;
-      break;
-    }
+  TableEntry& entry = ptData.tableRow[index.cadIndex].tableEntry[index.wattIndex];
+  if (entry.readings == 0) {
+    entry.learningPosition = pos;
+    entry.targetPosition   = static_cast<int16_t>(std::round(pos));
+    entry.readings         = 2;
+  } else {
+    const float history = std::min<int>(entry.readings, POWER_TABLE_HISTORY);
+    entry.learningPosition += (pos - entry.learningPosition) / (history + 1.0f);
+    if (entry.readings < MAX_NEIGHBOR_WEIGHT) ++entry.readings;
   }
 
-  // get the value to the right of the entry
-  for (int i = index.wattIndex + 1; i < POWERTABLE_WATT_SIZE - 1; i++) {
-    if (ptData.tableRow[index.cadIndex].tableEntry[i].targetPosition != INT16_MIN && ptData.tableRow[index.cadIndex].tableEntry[i].targetPosition < pos) {
-      SS2K_LOG(PTDATA_LOG_TAG, "Lower Right Found %d, %d, tp%d", index.cadIndex, i, ptData.tableRow[index.cadIndex].tableEntry[i].targetPosition);
-      ptData.tableRow[index.cadIndex].tableEntry[i].readings--;
-      moveTable = true;
-      break;
-    }
-  }
-
-  // get the value above the entry
-  for (int j = index.cadIndex - 1; j > 0; j--) {
-    if (ptData.tableRow[j].tableEntry[index.wattIndex].targetPosition != INT16_MIN && ptData.tableRow[j].tableEntry[index.wattIndex].targetPosition < pos) {
-      SS2K_LOG(PTDATA_LOG_TAG, "Lower Up Found %d, %d, tp%d", j, index.wattIndex, ptData.tableRow[j].tableEntry[index.wattIndex].targetPosition);
-      ptData.tableRow[j].tableEntry[index.wattIndex].readings--;
-      moveTable = true;
-      break;
-    }
-  }
-
-  if (moveTable) {
-    return;
-  }
-
-  entry.targetPosition = pos;  // Update the target position with the new average
-  // Increment readings, capping at the max value.
-  if (entry.readings < MAX_NEIGHBOR_WEIGHT && !moveTable) {
-    entry.readings++;
-  }
-
-  // Row and column constraints can disturb one another, so alternate them
-  // until neither changes. The cap protects the firmware from pathological
-  // input while being comfortably larger than this 10x30 table requires.
   bool changed = false;
-  int pass      = 0;
+  int pass     = 0;
   do {
     const bool powerChanged   = enforceMonotonicAcrossPower(ptData);
     const bool cadenceChanged = enforceMonotonicAcrossCadence(ptData);
     changed = powerChanged || cadenceChanged;
-    ++pass;
-    SS2K_LOG(PTDATA_LOG_TAG, "Monotonic pass %d: power %d, cadence %d", pass, powerChanged, cadenceChanged);
-  } while (changed && pass < MAX_MONOTONIC_PASSES);
+  } while (++pass < MAX_MONOTONIC_PASSES && changed);
 
   if (changed) {
-    SS2K_LOG(PTDATA_LOG_TAG, "Monotonic constraints reached the %d-pass safety limit", MAX_MONOTONIC_PASSES);
+    // Bounded completion for pathological sparse grids / floating point tails.
+    // This traversal follows both constraint directions and guarantees a valid
+    // surface without deleting cells or unbounded work in the maintenance task.
+    for (int row = POWERTABLE_CAD_SIZE - 1; row >= 0; --row) {
+      float left = INT16_MIN;
+      for (int col = 0; col < POWERTABLE_WATT_SIZE; ++col) {
+        auto& cell = ptData.tableRow[row].tableEntry[col];
+        if (cell.readings < 2) continue;
+        cell.learningPosition = std::max(cell.learningPosition, left);
+        for (int below = row + 1; below < POWERTABLE_CAD_SIZE; ++below) {
+          const auto& neighbor = ptData.tableRow[below].tableEntry[col];
+          if (neighbor.readings >= 2) {
+            cell.learningPosition = std::max(cell.learningPosition, neighbor.learningPosition);
+            break;
+          }
+        }
+        left = cell.learningPosition;
+      }
+    }
+    SS2K_LOG(PTDATA_LOG_TAG, "Monotonic fit completed with bounded envelope after %d passes", pass);
   }
+  uint16_t changedRows = 1u << index.cadIndex;
+  for (int row = 0; row < POWERTABLE_CAD_SIZE; ++row) {
+    for (auto& cell : ptData.tableRow[row].tableEntry) {
+      if (cell.readings < 2) continue;
+      const int16_t fitted = static_cast<int16_t>(std::round(cell.learningPosition));
+      if (fitted != cell.targetPosition) changedRows |= 1u << row;
+      cell.targetPosition = cell.publishedPosition = fitted;
+    }
+  }
+  SS2K_LOG(PTDATA_LOG_TAG, "Fitted entry (%d)(%d): observed %.2f, fitted %.2f, readings %d, rows 0x%x", index.cadIndex, index.wattIndex, pos, entry.learningPosition,
+           entry.readings, changedRows);
+  return changedRows;
 }
 
 // Calculate index in the table for the given watts and cadence
@@ -297,7 +268,21 @@ bool PTHelpers::cadenceIsWithinTable(int cad) {
 }
 
 
-int32_t PTHelpers::lookup(int watts, int cad, PTData& ptData) {
+bool PTHelpers::hasErgSeekSupport(const PTData& ptData) {
+  // Three watt anchors in each of two cadence rows give the forward seek
+  // more than one local segment and an independently learned cadence trend.
+  int supportedRows = 0;
+  for (const auto& row : ptData.tableRow) {
+    int reliablePoints = 0;
+    for (const auto& entry : row.tableEntry) {
+      if (entry.targetPosition != INT16_MIN && entry.readings >= 2 && ++reliablePoints >= 3) break;
+    }
+    if (reliablePoints >= 3 && ++supportedRows >= 2) return true;
+  }
+  return false;
+}
+
+int32_t PTHelpers::lookup(int watts, int cad, const PTData& ptData) {
   if (cad <= 0 || watts < 0) return RETURN_ERROR;
 
   float rowPosition[POWERTABLE_CAD_SIZE];
@@ -400,13 +385,11 @@ int32_t PTHelpers::lookup(int watts, int cad, PTData& ptData) {
 
   int lowerRow = 0;
   int upperRow = 1;
-  if (cad > rowCadence[0]) {
-    for (int i = 1; i < validRows; i++) {
-      if (cad <= rowCadence[i]) {
-        lowerRow = i - 1;
-        upperRow = i;
-        break;
-      }
+  for (int i = 1; i < validRows; i++) {
+    if (cad <= rowCadence[i]) {
+      lowerRow = i - 1;
+      upperRow = i;
+      break;
     }
   }
 
@@ -416,7 +399,7 @@ int32_t PTHelpers::lookup(int watts, int cad, PTData& ptData) {
   return storedPositionToSteps(position);
 }
 
-bool PTHelpers::lookupSlope(int watts, int cad, double& stepsPerWatt, PTData& ptData, PowerTableSlopeStatus::Value* status) {
+bool PTHelpers::lookupSlope(int watts, int cad, double& stepsPerWatt, const PTData& ptData, PowerTableSlopeStatus::Value* status) {
   stepsPerWatt = 0.0;
   const auto setStatus = [status](PowerTableSlopeStatus::Value value) {
     if (status != nullptr) *status = value;
@@ -511,7 +494,7 @@ bool PTHelpers::lookupSlope(int watts, int cad, double& stepsPerWatt, PTData& pt
   return trusted;
 }
 
-bool PTHelpers::lookupErgSlope(int watts, int cad, double& stepsPerWatt, PTData& ptData, PowerTableSlopeStatus::Value* status) {
+bool PTHelpers::lookupErgSlope(int watts, int cad, double& stepsPerWatt, const PTData& ptData, PowerTableSlopeStatus::Value* status) {
   stepsPerWatt = 0.0;
   const auto setStatus = [status](PowerTableSlopeStatus::Value value) {
     if (status != nullptr) *status = value;
@@ -588,7 +571,7 @@ bool PTHelpers::lookupErgSlope(int watts, int cad, double& stepsPerWatt, PTData&
 }
 
 // returns the total number of readings in the power table
-int PTHelpers::getTotalReadings(PTData& ptData) {
+int PTHelpers::getTotalReadings(const PTData& ptData) {
   int totalReadings = 0;
   for (int i = 0; i < POWERTABLE_CAD_SIZE; i++) {
     for (int j = 0; j < POWERTABLE_WATT_SIZE; j++) {
@@ -601,7 +584,7 @@ int PTHelpers::getTotalReadings(PTData& ptData) {
 // Invert the cadence-blended forward surface. Inverting each cadence row
 // independently makes nearly-flat row segments explode during extrapolation
 // and creates discontinuities as cadence crosses a row boundary.
-int32_t PTHelpers::invertForwardSurface(int cad, int32_t targetPosition, PTData& ptData) {
+int32_t PTHelpers::invertForwardSurface(int cad, int32_t targetPosition, const PTData& ptData) {
   if (cad <= 0) return 0;
 
   int observedMinimumWatts;
@@ -683,7 +666,7 @@ int32_t PTHelpers::invertForwardSurface(int cad, int32_t targetPosition, PTData&
   return static_cast<int32_t>(std::round(watts));
 }
 
-int32_t PTHelpers::lookupWatts(int cad, int32_t targetPosition, PTData& ptData) {
+int32_t PTHelpers::lookupWatts(int cad, int32_t targetPosition, const PTData& ptData) {
   if (cad <= 0) return 0;
 
   // Invert at the table cadence knots, then apply a cumulative monotonic
@@ -767,16 +750,15 @@ bool PTHelpers::enforceMonotonicAcrossPower(PTData& ptData) {
 void PTHelpers::clean(PTData& ptData) {
   int removed = 0;
 
-  // Remove inferred/invalid entries and negative positions.
+  // Unhomed sessions use a relative origin, so negative positions are valid.
   for (int i = 0; i < POWERTABLE_CAD_SIZE; i++) {
     for (int j = 0; j < POWERTABLE_WATT_SIZE; j++) {
       //human readings are 2+
-      if (ptData.tableRow[i].tableEntry[j].readings < 2 || ptData.tableRow[i].tableEntry[j].targetPosition < 0) {
+      if (ptData.tableRow[i].tableEntry[j].readings < 2 || ptData.tableRow[i].tableEntry[j].targetPosition == INT16_MIN) {
         if (ptData.tableRow[i].tableEntry[j].targetPosition != INT16_MIN) {
           removed++;
         }
-        ptData.tableRow[i].tableEntry[j].targetPosition = INT16_MIN;
-        ptData.tableRow[i].tableEntry[j].readings       = 0;
+        ptData.tableRow[i].tableEntry[j] = TableEntry{};
       }
     }
   }

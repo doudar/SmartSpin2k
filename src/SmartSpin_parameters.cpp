@@ -47,6 +47,8 @@ JsonDocument doc;
 
 // Default Values
 void userParameters::setDefaults() {
+  const VirtualGearing::Gears defaults;
+  setGearProfile(defaults);
   firmwareUpdateURL     = FW_UPDATEURL;
   deviceName            = DEVICE_NAME;
   shiftStep             = DEFAULT_SHIFT_STEP;
@@ -87,6 +89,12 @@ String userParameters::returnJSON() {
   doc["firmwareVersion"]       = FIRMWARE_VERSION;
   doc["deviceName"]            = deviceName;
   doc["shiftStep"]             = shiftStep;
+  const VirtualGearing::Gears gears = getGearProfile();
+  doc["gearPreset"] = gears.preset;
+  JsonArray teeth = doc["gearTeeth"].to<JsonArray>();
+  if (gears.preset == VirtualGearing::CUSTOM_TEETH) {
+    for (size_t i = 0; i < gears.count; ++i) teeth.add(gears.teeth[i]);
+  }
   doc["stepperPower"]          = stepperPower;
   doc["stepperSpeed"]          = stepperSpeed;
   doc["stealthChop"]           = stealthChop;
@@ -139,6 +147,12 @@ void userParameters::saveToLittleFS() {
   doc["firmwareUpdateURL"]     = firmwareUpdateURL;
   doc["deviceName"]            = deviceName;
   doc["shiftStep"]             = shiftStep;
+  const VirtualGearing::Gears gears = getGearProfile();
+  doc["gearPreset"] = gears.preset;
+  JsonArray profile = doc["gearTeeth"].to<JsonArray>();
+  if (gears.preset == VirtualGearing::CUSTOM_TEETH) {
+    for (size_t i = 0; i < gears.count; ++i) profile.add(gears.teeth[i]);
+  }
   doc["stepperPower"]          = stepperPower;
   doc["stepperSpeed"]          = stepperSpeed;
   doc["stealthChop"]           = stealthChop;
@@ -192,6 +206,14 @@ JsonDocument doc;
   if (error) {
     SS2K_LOG(CONFIG_LOG_TAG, "Failed to deserialize. Using defaults");
     return;
+  }
+
+  if (doc["gearPreset"].is<uint16_t>() && doc["gearPreset"].as<uint16_t>() != VirtualGearing::CUSTOM_TEETH) {
+    setGearPreset(doc["gearPreset"].as<uint16_t>());
+  } else if (doc["gearTeeth"].is<JsonArray>()) {
+    String teeth;
+    serializeJson(doc["gearTeeth"], teeth);
+    setGearTeethJSON(teeth);
   }
 
   // Copy values from the JsonDocument to the Config
@@ -268,4 +290,20 @@ void userParameters::printFile() {
 
   // Close the file
   file.close();
+}
+
+// JSON and binary profiles share the same whole-array validation.
+bool userParameters::setGearTeethJSON(const String& json) {
+  if (json.length() > 256) return false;
+  JsonDocument doc;
+  if (deserializeJson(doc, json) || !doc.is<JsonArray>()) return false;
+  JsonArray array = doc.as<JsonArray>();
+  if (array.size() == 1 || array.size() > VirtualGearing::MAX_GEARS) return false;
+  uint16_t values[VirtualGearing::MAX_GEARS];
+  size_t i = 0;
+  for (JsonVariant value : array) {
+    if (!value.is<uint16_t>()) return false;
+    values[i++] = value.as<uint16_t>();
+  }
+  return setGearTeeth(values, i);
 }

@@ -5,6 +5,7 @@
  * SPDX-License-Identifier: GPL-2.0-only
  */
 
+#include <algorithm>
 #include <cmath>
 #include "Constants.h"
 #include "sensors/SensorDataFactory.h"
@@ -17,45 +18,45 @@
 #include "sensors/CscSensorData.h"
 #include "sensors/ChronoData.h"
 
-std::shared_ptr<SensorData> SensorDataFactory::getSensorData(const NimBLEUUID characteristicUUID, std::string& uniqueName, uint8_t *data, size_t length) {
-  for (auto &it : SensorDataFactory::knownDevices) {
-    if (it->isSameDeviceCharacteristic(characteristicUUID, uniqueName)) {
-      return it->decode(data, length);
-    }
+std::shared_ptr<SensorData> SensorDataFactory::getSensorData(const NimBLEUUID& characteristicUUID, const std::string& uniqueName, uint8_t *data, size_t length) {
+  const auto knownDevice = std::find_if(knownDevices.begin(), knownDevices.end(), [&](const KnownDevice& device) {
+    return device.isSameDeviceCharacteristic(characteristicUUID, uniqueName);
+  });
+  if (knownDevice != knownDevices.end()) {
+    return knownDevice->decode(data, length);
   }
 
-  std::shared_ptr<SensorData> sensorData = NULL_SENSOR_DATA;
+  std::shared_ptr<SensorData> sensorData;
   if (characteristicUUID == CYCLINGPOWERMEASUREMENT_UUID) {
-    sensorData = std::shared_ptr<SensorData>(new CyclePowerData());
+    sensorData = std::make_shared<CyclePowerData>();
   } else if (characteristicUUID == HEARTCHARACTERISTIC_UUID) {
-    sensorData = std::shared_ptr<SensorData>(new HeartRateData());
+    sensorData = std::make_shared<HeartRateData>();
   } else if (characteristicUUID == FITNESSMACHINEINDOORBIKEDATA_UUID) {
-    sensorData = std::shared_ptr<SensorData>(new FitnessMachineIndoorBikeData());
+    sensorData = std::make_shared<FitnessMachineIndoorBikeData>();
   } else if (characteristicUUID == FLYWHEEL_UART_SERVICE_UUID) {
-    sensorData = std::shared_ptr<SensorData>(new FlywheelData());
+    sensorData = std::make_shared<FlywheelData>();
   } else if (characteristicUUID == ECHELON_DATA_UUID) {
-    sensorData = std::shared_ptr<SensorData>(new EchelonData());
+    sensorData = std::make_shared<EchelonData>();
   } else if (characteristicUUID == CHRONO_DATA_UUID) {
-    sensorData = std::shared_ptr<SensorData>(new ChronoData());
+    sensorData = std::make_shared<ChronoData>();
   } else if (characteristicUUID == PELOTON_DATA_UUID) {
-    sensorData = std::shared_ptr<SensorData>(new PelotonData());
+    sensorData = std::make_shared<PelotonData>();
   } else if (characteristicUUID == CSCMEASUREMENT_UUID) {
-    sensorData = std::shared_ptr<SensorData>(new CscSensorData());
+    sensorData = std::make_shared<CscSensorData>();
   } else {
     return NULL_SENSOR_DATA;
   }
 
-  KnownDevice *knownDevice = new KnownDevice(characteristicUUID, uniqueName, sensorData);
-  SensorDataFactory::knownDevices.push_back(knownDevice);
-  return knownDevice->decode(data, length);
+  knownDevices.emplace_back(characteristicUUID, uniqueName, std::move(sensorData));
+  return knownDevices.back().decode(data, length);
 }
 
 std::shared_ptr<SensorData> SensorDataFactory::KnownDevice::decode(uint8_t *data, size_t length) {
-  this->sensorData->decode(data, length);
-  return this->sensorData;
+  sensorData->decode(data, length);
+  return sensorData;
 }
 
-bool SensorDataFactory::KnownDevice::isSameDeviceCharacteristic(const NimBLEUUID characteristicUUID, const std::string& uniqueName) {
+bool SensorDataFactory::KnownDevice::isSameDeviceCharacteristic(const NimBLEUUID& characteristicUUID, const std::string& uniqueName) const {
   return this->characteristicId == characteristicUUID && this->uniqueName == uniqueName;
 }
 
@@ -81,4 +82,4 @@ int SensorDataFactory::NullData::getResistance() { return INT_MIN; }
 
 void SensorDataFactory::NullData::decode(uint8_t *data, size_t length) {}
 
-std::shared_ptr<SensorData> SensorDataFactory::NULL_SENSOR_DATA = std::shared_ptr<SensorData>(new NullData());
+std::shared_ptr<SensorData> SensorDataFactory::NULL_SENSOR_DATA = std::make_shared<NullData>();

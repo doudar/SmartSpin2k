@@ -17,7 +17,7 @@ class SensorData {
   /**
    * @brief Constructor
    */
-  explicit SensorData(std::string id) : id(id) {}
+  explicit SensorData(const std::string& id) : id(id) {}
 
   /**
    * @brief Get the Id.

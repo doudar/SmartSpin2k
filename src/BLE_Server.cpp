@@ -8,15 +8,12 @@
 #include "Main.h"
 #include "SS2KLog.h"
 #include "BLE_Common.h"
-#include <ArduinoJson.h>
 #include <Constants.h>
 #include <NimBLEDevice.h>
 #include <NimBLEUtils.h>
 #include <WiFi.h>
 #include <host/ble_gatt.h>
-#include <cmath>
 #include <cstring>
-#include <limits>
 #include <string>
 #include "BLE_Cycling_Speed_Cadence.h"
 #include "BLE_Cycling_Power_Service.h"
@@ -24,7 +21,6 @@
 #include "BLE_Fitness_Machine_Service.h"
 #include "BLE_Custom_Characteristic.h"
 #include "BLE_Device_Information_Service.h"
-#include "BLE_Zwift_Service.h"
 #include "BLE_OpenBikeControl_Service.h"
 
 // BLE Server Settings
@@ -38,9 +34,7 @@ BLE_Heart_Service heartService;
 BLE_Fitness_Machine_Service fitnessMachineService;
 BLE_ss2kCustomCharacteristic ss2kCustomCharacteristic;
 BLE_Device_Information_Service deviceInformationService;
-BLE_Zwift_Service zwiftService;
 BLE_OpenBikeControl_Service openBikeControlService;
-// BLE_Wattbike_Service wattbikeService;
 // BLE_SB20_Service sb20Service;
 
 namespace {
@@ -138,16 +132,12 @@ void startBLEServer() {
   fitnessMachineService.setupService(spinBLEServer.pServer, &chrCallbacks);
   ss2kCustomCharacteristic.setupService(spinBLEServer.pServer);
   deviceInformationService.setupService(spinBLEServer.pServer);
-  // zwiftService.setupService(spinBLEServer.pServer);
   // openBikeControlService.setupService(spinBLEServer.pServer);
-  // uncoment to enable as controller. Zwift won't pair as ct and controller at the same time.
-  // pAdvertising->addServiceUUID(ZWIFT_RIDE_CUSTOM_SERVICE_UUID);
   // pAdvertising->addServiceUUID(OPENBIKECONTROL_SERVICE_UUID);
   if (!configureBLEAdvertisement(pAdvertising)) {
     SS2K_LOGE(BLE_SERVER_LOG_TAG, "Unable to configure BLE advertisement data");
   }
 
-  // wattbikeService.setupService(spinBLEServer.pServer);  // No callback needed
   // sb20Service.begin();
   BLEFirmwareSetup(spinBLEServer.pServer);
 
@@ -186,10 +176,9 @@ void SpinBLEServer::update() {
   cyclingPowerService.update();
   cyclingSpeedCadenceService.update();
   fitnessMachineService.update();
+  // DirCon snapshot pacing only; deferred BLE callbacks run in the fast loop.
   ss2kCustomCharacteristic.update();
-  // zwiftService.update();
   // OpenBikeControl sends event-driven notifications from shift handlers.
-  // wattbikeService.parseNemit();  // Changed from update() to parseNemit()
   // sb20Service.notify();
 }
 
@@ -252,6 +241,7 @@ void SpinBLEServer::updateWheelAndCrankRev() {
 
 // Creating Server Connection Callbacks
 void MyServerCallbacks::onConnect(NimBLEServer* pServer, NimBLEConnInfo& connInfo) {
+  BLE_ss2kCustomCharacteristic::onConnect(connInfo.getConnHandle());
   SS2K_LOG(BLE_SERVER_LOG_TAG, "Bluetooth Remote Client Connected: %s Connected Clients: %d", connInfo.getAddress().toString().c_str(), pServer->getConnectedCount());
   BLERequestMtuExchange(connInfo.getConnHandle());
 
@@ -264,6 +254,7 @@ void MyServerCallbacks::onConnect(NimBLEServer* pServer, NimBLEConnInfo& connInf
 }
 
 void MyServerCallbacks::onDisconnect(NimBLEServer* pServer, NimBLEConnInfo& connInfo, int reason) {
+  BLE_ss2kCustomCharacteristic::onDisconnect(connInfo.getConnHandle());
   SS2K_LOG(BLE_SERVER_LOG_TAG, "Bluetooth Remote Client Disconnected. Reason: %d (%s) Remaining Clients: %d", reason, NimBLEUtils::returnCodeToString(reason),
            pServer->getConnectedCount());
   BLEFirmwareUpdateOnDisconnect(connInfo.getConnHandle());
@@ -274,7 +265,7 @@ void MyServerCallbacks::onMTUChange(uint16_t MTU, NimBLEConnInfo& connInfo) {
   SS2K_LOG(BLE_SERVER_LOG_TAG, "ATT MTU updated to %u for connection %u", MTU, connInfo.getConnHandle());
 }
 
-bool MyServerCallbacks::onConnParamsUpdateRequest(uint16_t handle, const ble_gap_upd_params* params) {
+bool MyServerCallbacks::onConnParamsUpdateRequest(uint16_t handle, const ble_gap_upd_params*) {
   SS2K_LOG(BLE_SERVER_LOG_TAG, "Updated Server Connection Parameters for handle: %d", handle);
   return true;
 }
@@ -285,7 +276,7 @@ void MyCharacteristicCallbacks::onRead(NimBLECharacteristic* pCharacteristic, Ni
   SS2K_LOG(BLE_SERVER_LOG_TAG, "Read from %s by client: %s", pCharacteristic->getUUID().toString().c_str(), connInfo.getAddress().toString().c_str());
 }
 
-void MyCharacteristicCallbacks::onWrite(NimBLECharacteristic* pCharacteristic, NimBLEConnInfo& connInfo) {
+void MyCharacteristicCallbacks::onWrite(NimBLECharacteristic* pCharacteristic, NimBLEConnInfo&) {
   if (pCharacteristic->getUUID() == FITNESSMACHINECONTROLPOINT_UUID) {
     spinBLEServer.writeCache.push(pCharacteristic->getValue());
   } else {
@@ -293,7 +284,7 @@ void MyCharacteristicCallbacks::onWrite(NimBLECharacteristic* pCharacteristic, N
   }
 }
 
-void MyCharacteristicCallbacks::onStatus(NimBLECharacteristic* pCharacteristic, int code) {
+void MyCharacteristicCallbacks::onStatus(NimBLECharacteristic* pCharacteristic, int) {
 // loop through and accumulate the data into a C++ string
 // only used for extensive logging.
 #ifndef DEBUG_BLE_TX_RX
@@ -312,7 +303,6 @@ void MyCharacteristicCallbacks::onStatus(NimBLECharacteristic* pCharacteristic, 
 
 void MyCharacteristicCallbacks::onSubscribe(NimBLECharacteristic* pCharacteristic, NimBLEConnInfo& connInfo, uint16_t subValue) {
   String str       = "Client ID: ";
-  NimBLEUUID pUUID = pCharacteristic->getUUID();
   str += connInfo.getConnHandle();
   str += " Address: ";
   str += connInfo.getAddress().toString().c_str();
@@ -346,7 +336,7 @@ void logCharacteristic(char* buffer, const size_t bufferCapacity, const byte* da
   bufferLength += snprintf(buffer + bufferLength, bufferCapacity - bufferLength, "-> %s | %s | ", serviceUUID.toString().c_str(), charUUID.toString().c_str());
   va_list args;
   va_start(args, format);
-  bufferLength += vsnprintf(buffer + bufferLength, bufferCapacity - bufferLength, format, args);
+  vsnprintf(buffer + bufferLength, bufferCapacity - bufferLength, format, args);
   va_end(args);
 
   SS2K_LOG(BLE_SERVER_LOG_TAG, "%s", buffer);
