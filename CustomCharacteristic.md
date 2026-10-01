@@ -96,7 +96,7 @@ From BLE_common.h
 |BLE_BLELogging            |0x30   |bool/str|Write: enable/disable BLE log streaming. Read: returns last log message|
 |BLE_allSettings           |0x31   |JSON |Read-only chunked snapshot of all user settings         |
 |BLE_gearTeeth             |0x34   |array|Packed front/rear tooth pairs; metadata/indexed reads |
-|BLE_gearPreset            |0x35   |uint16|0 = tooth profile/Unlimited, 1 = Zwift Mixed Terrain 1x24 |
+|BLE_gearPreset            |0x35   |uint16|0 = tooth profile/Unlimited, 1 = Mixed Terrain 1x24 |
 
 *syncMode will disable the movement of the stepper motor by forcing stepperPosition = targetPosition prior to the motor control. While this mode is enabled, it allows the client to set parameters like incline and shifterPosition without moving the motor from it's current position. Once the parameters are set, this mode should be turned back off and SS2K will resume normal operation.
 
@@ -187,7 +187,7 @@ limits still apply. No companion-app changes are included here.
 ### Named gear preset (`0x35`)
 
 - Read: `01 35`; response `80 35 <preset LE16>`.
-- Select Zwift Mixed Terrain 1x24: `02 35 01 00`; response `80 35 01 00`.
+- Select Mixed Terrain 1x24: `02 35 01 00`; response `80 35 01 00`.
 - Select Unlimited: `02 35 00 00`; response `80 35 00 00`. To select a bounded
   tooth profile instead, write its pairs through 0x34.
 - Unknown preset IDs or invalid lengths return `FF 35` without changing the profile.

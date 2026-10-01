@@ -16,7 +16,7 @@
 namespace VirtualGearing {
 constexpr size_t MAX_GEARS = 26;
 constexpr uint8_t CUSTOM_TEETH = 0;
-constexpr uint8_t ZWIFT_MIXED_TERRAIN = 1;
+constexpr uint8_t MIXED_TERRAIN_1X24 = 1;
 
 // Tooth pairs are front * 100 + rear (5332 = 53x32). The named virtual preset
 // supplies ratios without teeth. Both use thousandths for the motor mapping.
@@ -49,14 +49,14 @@ struct Gears {
 
   bool assignPreset(uint16_t id) {
     if (id == CUSTOM_TEETH) return assign(nullptr, 0);
-    if (id != ZWIFT_MIXED_TERRAIN) return false;
+    if (id != MIXED_TERRAIN_1X24) return false;
     Gears next;
-    // Exact decimal ratios from Zwift's gearing/GEAR24MAN.xml (2026-09-26).
+    // Built-in 24-gear mixed-terrain ratio table (0.75-5.49).
     // A synthetic 1x24 cassette has no physical tooth pairs to invent/store.
     static const uint16_t mixed[] = {750, 870, 990, 1110, 1230, 1380, 1530, 1680, 1860, 2040, 2220, 2400,
                                     2610, 2820, 3030, 3240, 3490, 3740, 3990, 4240, 4540, 4840, 5140, 5490};
     next.count = sizeof(mixed) / sizeof(mixed[0]);
-    next.preset = ZWIFT_MIXED_TERRAIN;
+    next.preset = MIXED_TERRAIN_1X24;
     std::copy(mixed, mixed + next.count, next.ratios);
     next.updateSpacing();
     *this = next;
@@ -110,7 +110,7 @@ struct Gears {
   Selection selection(int gear) const {
     Selection selected;
     if (gear < 1 || gear > count) return selected;
-    if (preset == ZWIFT_MIXED_TERRAIN) {
+    if (preset == MIXED_TERRAIN_1X24) {
       selected.front = selected.frontCount = 1;
       selected.rear = gear;
       selected.rearCount = count;

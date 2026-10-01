@@ -72,9 +72,9 @@ int main() {
   }
   assert(!restored.setGearTeethJSON("[1000,1500,2000]"));
   assert(restored.getGearProfile()==original);
-  assert(config.setGearPreset(VirtualGearing::ZWIFT_MIXED_TERRAIN));
+  assert(config.setGearPreset(VirtualGearing::MIXED_TERRAIN_1X24));
   config.saveToLittleFS(); restored.loadFromLittleFS();
-  assert(restored.getGearProfile().preset==VirtualGearing::ZWIFT_MIXED_TERRAIN);
+  assert(restored.getGearProfile().preset==VirtualGearing::MIXED_TERRAIN_1X24);
   assert(restored.getGearProfile().count==24 && restored.getGearProfile().ratios[7]==1680);
   assert(!deserializeJson(api,restored.returnJSON()));
   assert(api["gearPreset"]==1 && api["gearTeeth"].size()==0 && api["gearRatios"].isNull());

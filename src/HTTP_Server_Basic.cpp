@@ -889,7 +889,7 @@ void HTTP_Server::settingsProcessor() {
   if (server.hasArg("gearPreset")) {
     const String preset = server.arg("gearPreset");
     if (server.hasArg("gearTeeth") || (preset != "0" && preset != "1") || !userConfig->setGearPreset(preset.toInt())) {
-      server.send(400, "text/plain", "Select gearPreset 0 (Unlimited) or 1 (Zwift Mixed Terrain), or supply gearTeeth separately.");
+      server.send(400, "text/plain", "Select gearPreset 0 (Unlimited) or 1 (Mixed Terrain 1x24), or supply gearTeeth separately.");
       return;
     }
   }

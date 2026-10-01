@@ -54,8 +54,8 @@ offset; later stationary FTMS corrections retain their coordinate-only behavior.
 Successful FTMS spindown also clears its procedure opcode to simulation mode and
 zeros incline before selecting the gear. Otherwise local ratio gearing is
 bypassed and the recovered position can incorrectly become a terrain offset.
-Regression cases include Unlimited (8), Road (8), MTB (4), Gravel (4), Zwift
-Mixed Terrain (8), and Zwift All-Rounder (8).
+Regression cases include Unlimited (8), Road (8), MTB (4), Gravel (4), Mixed
+Terrain 1x24 (8), and All-Rounder (8).
 Duplicate ratios share an offset and zero gaps do not count toward the
 median. An all-identical profile has zero shift offset in every gear.
 
@@ -79,9 +79,9 @@ The firmware-hosted groupset selector provides:
 - Standard Road Compact: 50/34T | 11–34T, 24 sorted ratios.
 - MTB 1x12 – Wide Range: 32T | 10–52T, 12 ratios.
 - Gravel 1x13 – Optimized XPLR: 42T | 10–46T, 13 ratios.
-- Zwift Mixed Terrain 1x24: the exact 24 virtual ratios from Zwift's installed
-  `GEAR24MAN.xml`, starting at gear 8 (1.68).
-- Zwift All-Rounder: 48/35T | 10–33T, 24 sorted tooth combinations. The cassette
+- Mixed Terrain 1x24: built-in 24-gear mixed-terrain ratio table (0.75–5.49),
+  starting at gear 8 (1.68).
+- All-Rounder: 48/35T | 10–33T, 24 sorted tooth combinations. The cassette
   is 10, 11, 12, 13, 14, 15, 17, 19, 21, 24, 28, 33T.
 
 Tooth-based groupsets store 2–26 unique tooth pairs as `front * 100 + rear`: `5332` means
@@ -93,8 +93,8 @@ pairs remain distinct gears with the same motor offset.
 
 Persistence and config/all-settings responses include `gearPreset` and
 `gearTeeth`. Preset 0 uses the tooth array (empty means Unlimited); preset 1 selects
-the built-in Zwift Mixed Terrain ratios and stores an empty tooth array. Mixed
-Terrain has no real tooth combinations in Zwift; the profile represents a single
+the built-in Mixed Terrain 1x24 ratios and stores an empty tooth array. Mixed
+Terrain 1x24 has no real tooth combinations; the profile represents a single
 24-gear rear axis without inventing teeth. No arbitrary or legacy ratio-array input is
 supported. Validation and median calculation finish before publication under a
 short critical section. Both bounded formats use the same motor mapping above.

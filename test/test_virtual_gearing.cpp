@@ -61,7 +61,7 @@ void TestVirtualGearing::test_tooth_pairs_and_selection() {
   TEST_ASSERT_TRUE(gears.assign(nullptr, 0));
   TEST_ASSERT_EQUAL_UINT8(0, gears.selection(1).frontCount);
   TEST_ASSERT_EQUAL_INT(0, gears.closestGear(16800, 8));
-  TEST_ASSERT_TRUE(gears.assignPreset(VirtualGearing::ZWIFT_MIXED_TERRAIN));
+  TEST_ASSERT_TRUE(gears.assignPreset(VirtualGearing::MIXED_TERRAIN_1X24));
   const uint16_t mixed[] = {750,870,990,1110,1230,1380,1530,1680,1860,2040,2220,2400,
                             2610,2820,3030,3240,3490,3740,3990,4240,4540,4840,5140,5490};
   TEST_ASSERT_EQUAL_UINT8(24, gears.count);
