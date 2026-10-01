@@ -11,6 +11,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 - Restore thermal current limits and motor inhibition immediately when homing exits, including early returns and previously latched thermal/sensor faults.
+- ERG table feedback corrections now require two consecutive power reports beyond the correction threshold, so single-report pedaling spikes no longer cause large resistance drops.
 
 ### Hardware
 
