@@ -330,7 +330,7 @@ int main(int argc,char** argv) {
       rtConfig->watts.setTarget(310); step(27000,155);
       for(int t=28000;t<=38000;t+=1000) {
         // Changing the lookup result emulates moving table/cadence targets.
-        table.lookupResult+=20; rtConfig->cad.setValue(t%2000?94:95); step(t,310);
+        table.lookupResult+=20; rtConfig->cad.setValue(t%2000?92:96); step(t,310);
       }
       assert(logged("overall seek timeout"));
     }
@@ -472,6 +472,30 @@ int main(int argc,char** argv) {
     for(int t=1000;t<=26000;t+=1000)step(t,200);
     const int before=motor.current;rtConfig->cad.setValue(100);step(27000,160);
     assert(rtConfig->getTargetIncline()>before); // Never lower resistance when already 40 W below target.
+  } else if(scenario=="cadence_surge") {
+    // A 9 RPM surge (often caused by the previous resistance drop) is compensated
+    // by at most ERG_CADENCE_COMPENSATION_MAX_RPM; power feedback corrects the
+    // remainder. 1 RPM jitter does not compensate at all. 25 W under target keeps the
+    // maintenance cadence seek from taking over, so proportional feedback runs.
+    setup(200,200);table.surface=true;rtConfig->cad.setValue(90);
+    for(int cad:{80,85,90,95,100})for(int watts:{90,180,270}) {
+      auto& entry=table.ptData.tableRow[(cad-60)/5].tableEntry[watts/30];
+      entry.targetPosition=std::lround((10000+(watts*90.0/cad-100)*20)/10);entry.readings=3;
+    }
+    motor.current=motor.target=table.lookup(200,90);rtConfig->setTargetIncline(motor.current);
+    for(int t=1000;t<=26000;t+=1000)step(t,200);
+    assert(logged("now trusted"));
+    rtConfig->cad.setValue(91);step(27000,200);
+    assert(!logged("Cadence compensation"));
+    rtConfig->cad.setValue(99);step(28000,175);
+    assert(logged("90 -> 99rpm, applied +3rpm"));
+    step(29000,175);
+    assert(!logged("93 -> 99rpm")); // The move refreshed the reference; no second feed-forward.
+    // A slow 1 RPM-per-report drift accumulates across power-feedback moves until it reaches the deadband.
+    rtConfig->cad.setValue(100);step(30000,175);
+    assert(!logged("99 -> 100rpm"));
+    rtConfig->cad.setValue(101);step(31000,175);
+    assert(logged("99 -> 101rpm, applied +2rpm"));
   } else if(scenario.find("surface_")==0) {
     // Only two widely separated cadence rows, no samples above 270 W.
     // Both the production forward lookup and production controller run here.
@@ -663,7 +687,7 @@ class TestErgFeedback(unittest.TestCase):
                          "clamped_move", "clock_wrap", "trusted_seek", "trusted_seek_late_uptime", "simulation_1000", "simulation_2000", "simulation_3000",
                          "simulation_missing_2000", "trust_transients", "stale_seek", "seek_deadline", "sparse_seventy", "extrapolated_cadence",
                          "mode_entry", "stale_partial_motion", "small_seek_collection", "growing_seek_collection", "cadence_feedback_reference",
-                         "trusted_cadence_amend", "unusable_cadence_wait", "trusted_seek_safety", "fresh_table_gate", "opposed_cadence", "pedal_spike"]:
+                         "trusted_cadence_amend", "unusable_cadence_wait", "trusted_seek_safety", "fresh_table_gate", "opposed_cadence", "pedal_spike", "cadence_surge"]:
             with self.subTest(scenario=scenario):
                 subprocess.run([str(self.exe), scenario], check=True)
 
