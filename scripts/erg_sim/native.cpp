@@ -102,7 +102,11 @@ PowerTable table;
 PowerTable* powerTable = &table;
 ErgMode controller;
 ErgMode* ergMode = &controller;
-bool PowerTable::_manageSaveState(bool, bool) { _hasBeenLoadedThisSession=true; return true; }
+bool PowerTable::_manageSaveState(bool, bool) {
+  // Production gate: unhomed sessions never load or save, and retry each pass.
+  if (!rtConfig->getHomed()) return false;
+  _hasBeenLoadedThisSession=true; return true;
+}
 bool PowerTable::_save() { return true; }
 void PowerTable::toLog() {}
 struct Driver {
@@ -137,14 +141,22 @@ int main() {
     std::istringstream input(line);
     char op; input >> op;
     if (op == 'I') {
-      int pos, lo, hi, speed, minWatts; double sensitivity;
-      if (initialized || !(input >> pos >> lo >> hi >> speed >> sensitivity >> minWatts)) return 2;
+      int pos, lo, hi, speed, minWatts, maxWatts, shiftStep, homed; double sensitivity;
+      if (initialized || !(input >> pos >> lo >> hi >> speed >> sensitivity >> minWatts >> maxWatts >> shiftStep >> homed)) return 2;
       initialized = true;
       userConfig->setERGSensitivity(sensitivity); userConfig->setStepperSpeed(speed);
-      userConfig->setShiftStep(1000); userConfig->setMinWatts(minWatts); userConfig->setMaxWatts(2000);
-      userConfig->setHMin(lo); userConfig->setHMax(hi); userConfig->setStepperDir(false);
+      userConfig->setShiftStep(shiftStep); userConfig->setMinWatts(minWatts); userConfig->setMaxWatts(maxWatts);
+      userConfig->setStepperDir(false);
       userConfig->setStepperPower(900); userConfig->setHomingSensitivity(10);
-      rtConfig->setMinStep(lo); rtConfig->setMaxStep(hi); rtConfig->setHomed(true);
+      if (homed) {
+        userConfig->setHMin(lo); userConfig->setHMax(hi);
+        rtConfig->setMinStep(lo); rtConfig->setMaxStep(hi); rtConfig->setHomed(true);
+      } else {
+        // Never calibrated (or failed homing): no saved travel, provisional
+        // +/-DEFAULT_STEPPER_TRAVEL until setStepperMinMax() learns watt bounds.
+        userConfig->setHMin(INT32_MIN); userConfig->setHMax(INT32_MIN);
+        rtConfig->setMinStep(INT32_MIN); rtConfig->setMaxStep(INT32_MIN); rtConfig->setHomed(false);
+      }
       rtConfig->setFTMSMode(FitnessMachineControlPointProcedure::SetTargetPower);
       motor.setCurrentPosition(pos); motor.speed = speed;
       ss2k->currentPosition = ss2k->targetPosition = pos;
@@ -164,7 +176,8 @@ int main() {
       int cells = 0;
       for (const auto& row:table.ptData.tableRow) for (const auto& cell:row.tableEntry) cells += cell.readings >= 2;
       std::cout << "T " << pulses << ' ' << motor.getCurrentPosition() << ' ' << motor.target << ' '
-                << cells << ' ' << controller.isTableSeeking() << ' ' << rtConfig->watts.getTarget() << '\n' << std::flush;
+                << cells << ' ' << controller.isTableSeeking() << ' ' << rtConfig->watts.getTarget() << ' '
+                << rtConfig->getMinStep() << ' ' << rtConfig->getMaxStep() << '\n' << std::flush;
     } else if (op == 'P') {
       // Read-only final RAM snapshot: never send the plant curve into learning.
       std::cout << "P " << TABLE_VERSION << ' ' << table.ptHelpers.getTotalReadings(table.ptData) << ' ' << rtConfig->getHomed() << ' '

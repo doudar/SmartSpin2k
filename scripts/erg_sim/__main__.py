@@ -1,7 +1,7 @@
 """python -m scripts.erg_sim {fit,run,validate} --help"""
 
 import argparse
-from dataclasses import asdict
+from dataclasses import asdict, replace
 import json
 import hashlib
 from pathlib import Path
@@ -14,7 +14,7 @@ from .model import BikeConfig, RiderConfig
 from .reference import first_erg_section, import_reference, load_reference
 from .report import plot_reference, plot_run, save_run
 from .runner import run
-from .scoring import grade
+from .scoring import grade, travel_summary
 from .workout import Workout
 
 HERE = Path(__file__).resolve().parent
@@ -22,6 +22,27 @@ HERE = Path(__file__).resolve().parent
 
 def write_json(path, data):
     Path(path).write_text(json.dumps(data, indent=2)+'\n', encoding="utf-8")
+
+
+def add_setup_arguments(parser):
+    parser.add_argument("--min-watts", type=int, default=50, help="user minimum brake watts (firmware default 50)")
+    parser.add_argument("--max-watts", type=int, default=1000, help="user maximum brake watts (firmware default 1000)")
+    parser.add_argument("--shift-step", type=int, default=1000)
+
+
+def setup(args):
+    values = dict(min_watts=args.min_watts, max_watts=args.max_watts, shift_step=args.shift_step)
+    if isinstance(getattr(args, "homing", None), str):
+        values["homed"] = args.homing == "homed"
+    return values
+
+
+def resolve_start(spec, profile, cfg):
+    if spec == "profile": return profile.get("start_position", 7433)
+    if spec == "min": return cfg.min_position
+    if spec == "max": return cfg.max_position
+    if spec == "mid": return (cfg.min_position+cfg.max_position)/2
+    return int(spec)
 
 
 def main():
@@ -48,6 +69,38 @@ def main():
     sim.add_argument("--lag-scale", type=float, default=1, help="scale both fitted delay and lag for robustness testing")
     sim.add_argument("--output", type=Path, default=ROOT/"test/output/erg_sim")
     sim.add_argument("--no-plot", action="store_true")
+    add_setup_arguments(sim)
+    sim.add_argument("--homing", choices=("homed", "unhomed"), default="homed",
+                     help="homed: saved 0..max travel; unhomed: never calibrated, limits learned from min/max watts")
+    sim.add_argument("--start-position", default="profile",
+                     help="physical start: steps, 'profile' (profile start_position or 7433), 'min', 'max', or 'mid'")
+    sim.add_argument("--firmware-position", type=int, default=None,
+                     help="unhomed boot coordinate; default is the Unlimited start gear, 8 x shift step")
+    sim.add_argument("--exe", type=Path, default=None, help="reuse an already built native bridge")
+    sim.add_argument("--floor-watts", type=float, default=None,
+                     help="bike power at minimum resistance and 80 RPM (scales with cadence^1.5); default: profile value or 0")
+    imp = sub.add_parser("import-ptab", help="convert a learned power-table CSV export into a bike profile")
+    imp.add_argument("table", type=Path)
+    imp.add_argument("--name", required=True, help="profile name, e.g. bowflex_c6")
+    imp.add_argument("--hmax", type=int, default=None, help="override physical maximum (full-scale steps)")
+    imp.add_argument("--base-profile", type=Path, default=HERE/"profiles/ride_20260927.json",
+                     help="source of lag, delay, noise and rider parameters")
+    imp.add_argument("--output", type=Path, default=HERE/"profiles")
+    matrix = sub.add_parser("matrix", help="run bikes x homed/unhomed x physical start positions and summarize")
+    matrix.add_argument("--profiles", type=Path, nargs="+", default=None, help="default: every profile in profiles/")
+    matrix.add_argument("--workout", type=Path, default=HERE/"workouts/Random_Attacks.zwo")
+    matrix.add_argument("--ftp", type=float, default=305)
+    matrix.add_argument("--seeds", type=int, nargs="+", default=[27])
+    matrix.add_argument("--sensitivity", type=float, default=5)
+    matrix.add_argument("--starts", nargs="+", default=["profile", "min", "max"],
+                        help="unhomed physical starts; homed runs always use the profile start")
+    matrix.add_argument("--homing", nargs="+", choices=("homed", "unhomed"), default=["homed", "unhomed"])
+    matrix.add_argument("--floors", type=float, nargs="+", default=[0, 40],
+                        help="minimum-resistance power at 80 RPM to test; 0 keeps the table's 0 W minimum stop")
+    matrix.add_argument("--jobs", type=int, default=4)
+    matrix.add_argument("--plot", action="store_true", help="write charts for every run (slower)")
+    matrix.add_argument("--output", type=Path, default=ROOT/"test/output/erg_matrix")
+    add_setup_arguments(matrix)
     validate = sub.add_parser("validate", help="evaluate stored fit and close the loop on the first continuous recorded ERG interval")
     validate.add_argument("--reference", type=Path, default=ROOT/"test/data/erg_reference_20260927.csv")
     validate.add_argument("--profile", type=Path, default=HERE/"profiles/ride_20260927.json")
@@ -78,6 +131,7 @@ def main():
     elif args.command == "run":
         profile = json.loads(args.profile.read_text(encoding="utf-8"))
         cfg = BikeConfig(**profile["bike"])
+        if args.floor_watts is not None: cfg = replace(cfg, floor_watts_at_80rpm=args.floor_watts)
         if not np.isfinite(args.lag_scale) or args.lag_scale < 0: parser.error("lag-scale must be finite and nonnegative")
         cfg.delay_s *= args.lag_scale; cfg.lag_s *= args.lag_scale
         rider = RiderConfig(**profile.get("rider", {}))
@@ -87,15 +141,31 @@ def main():
         if args.variation is not None: rider.variation_rpm = args.variation
         rider.__post_init__()
         workout = Workout.load(args.workout, args.ftp)
-        exe = build(args.output/"native")
+        exe = args.exe or build(args.output/"native")
+        start = resolve_start(args.start_position, profile, cfg)
         trace, metadata = run(workout, cfg, exe, args.output, seed=args.seed, speed=args.speed, tick_ms=args.tick_ms,
-                              sensitivity=args.sensitivity, rider_config=rider, rider_mode=args.rider_mode)
+                              sensitivity=args.sensitivity, rider_config=rider, rider_mode=args.rider_mode,
+                              initial_position=start, firmware_position=args.firmware_position, **setup(args))
         metadata.update(workout=args.workout.name, ftp_w=args.ftp, profile=str(args.profile), bike=asdict(cfg))
         scores = grade(trace, workout.duration, workout)
+        scores["travel"] = travel_summary(trace, workout.duration, cfg.min_position, cfg.max_position)
         save_run(args.output, trace, scores, metadata)
-        if not args.no_plot: plot_run(args.output, trace, f"{args.workout.stem} — FTP {args.ftp:g} W, seed {args.seed}", workout=workout, ftp=args.ftp, score=scores)
+        if not args.no_plot:
+            plot_run(args.output, trace, f"{args.workout.stem} — {profile.get('name', args.profile.stem)}, {metadata['homing']}, FTP {args.ftp:g} W, seed {args.seed}",
+                     workout=workout, ftp=args.ftp, score=scores, travel=(cfg.min_position, cfg.max_position))
         print((args.output/"report.md").read_text(encoding="utf-8"))
         print(f"Simulated {workout.duration:.0f}s in {metadata['wall_seconds']:.2f}s. Results: {args.output}")
+    elif args.command == "import-ptab":
+        from .bikes import profile_from_ptab
+        base = json.loads(args.base_profile.read_text(encoding="utf-8"))
+        profile = profile_from_ptab(args.table, base, hmax=args.hmax, name=args.name)
+        args.output.mkdir(parents=True, exist_ok=True)
+        write_json(args.output/f"{args.name}.json", profile)
+        print(json.dumps({k: profile[k] for k in ("name", "start_position", "source", "physical_watts_at_travel_limits")}, indent=2))
+    elif args.command == "matrix":
+        from .matrix import run_matrix
+        profiles = args.profiles or sorted((HERE/"profiles").glob("*.json"))
+        run_matrix(profiles, args, setup(args))
     else:
         data = load_reference(args.reference)
         profile = json.loads(args.profile.read_text(encoding="utf-8"))

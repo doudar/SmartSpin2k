@@ -55,13 +55,16 @@ inline unsigned long millis() { return clockMs; }
 
 
 class Bridge:
-    def __init__(self, exe, log, position=7433, lo=0, hi=24482, speed=3500, sensitivity=5, min_watts=50):
+    def __init__(self, exe, log, position=7433, lo=0, hi=24482, speed=3500, sensitivity=5, min_watts=50,
+                 max_watts=2000, shift_step=1000, homed=True):
         self.log = Path(log).open("w", encoding="utf-8")
         self.process = subprocess.Popen([str(exe)], stdin=subprocess.PIPE, stdout=subprocess.PIPE,
                                         stderr=self.log, text=True, bufsize=1)
         self.now_ms = 1000
         try:
-            if self.exchange(f"I {round(position)} {round(lo)} {round(hi)} {speed} {sensitivity} {min_watts}") != ["I", "1"]:
+            # lo/hi are saved homing limits; unhomed sessions ignore them.
+            if self.exchange(f"I {round(position)} {round(lo)} {round(hi)} {speed} {sensitivity} {min_watts} "
+                             f"{max_watts} {shift_step} {int(homed)}") != ["I", "1"]:
                 raise RuntimeError("Bridge protocol version mismatch")
         except BaseException:
             self.close()
@@ -77,7 +80,7 @@ class Bridge:
 
     def tick(self, now_ms, watts, cadence, fresh, target=-1, load=0):
         row = self.exchange(f"T {now_ms} {watts} {cadence} {int(fresh)} {target} {load}")
-        if row[0] != "T" or len(row) != 7:
+        if row[0] != "T" or len(row) != 9:
             raise RuntimeError(f"Malformed bridge reply: {row}")
         self.now_ms = now_ms
         return tuple(map(int, row[1:]))
