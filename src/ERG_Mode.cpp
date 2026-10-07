@@ -649,12 +649,12 @@ void ErgMode::_handleTrustedTableSeek() {
     return;
   }
 
-  // Recalculate the feed-forward position as cadence changes. Only move for
-  // a physically meaningful difference, but remember every cadence update so
-  // single-RPM sensor jitter cannot accumulate into command chatter. Power
-  // measured while the motor is moving can lag the new cadence and position;
-  // it must not turn a valid feed-forward adjustment into a PID handoff.
-  if (targetAmended || cadence != tableSeekCadence) {
+  // Recalculate the feed-forward position as cadence changes. Changes inside
+  // the deadband accumulate against the last followed cadence, so jitter does
+  // not move the motor while a slow drift is still followed. Power measured
+  // while the motor is moving can lag the new cadence and position; it must
+  // not turn a valid feed-forward adjustment into a PID handoff.
+  if (targetAmended || abs(cadence - tableSeekCadence) >= ERG_CADENCE_FOLLOW_DEADBAND_RPM) {
     if (!_tableTargetIsTrusted(tableSeekTargetWatts, cadence)) {
       _stopTrustedTableSeek("cadence lookup is no longer usable", true, true);
       return;
@@ -835,14 +835,18 @@ int32_t ErgMode::_inSetpointState() {
   float newIncline  = ss2k->getCurrentPosition() + PID_output;
   const int cadence = rtConfig->cad.getValue();
   double cadenceSlope;
-  if (target == prevWatts.getTarget() && cadenceReference > MIN_ERG_CADENCE && cadence != cadenceReference && tableConfidence.trusted() &&
-      ErgControl::measuredCadenceSlope(powerTable->ptData, target, cadence, cadenceSlope)) {
-    const double cadenceMove = cadenceSlope * (cadence - cadenceReference);
+  if (target == prevWatts.getTarget() && cadenceReference > MIN_ERG_CADENCE && abs(cadence - cadenceReference) >= ERG_CADENCE_FOLLOW_DEADBAND_RPM &&
+      tableConfidence.trusted() && ErgControl::measuredCadenceSlope(powerTable->ptData, target, cadence, cadenceSlope)) {
+    // Cap the compensation: a surge that the last resistance drop caused would otherwise remove more resistance at once.
+    // _updateValues() refreshes the reference after a move, so power feedback corrects the remainder.
+    const int cadenceDelta   = std::max(-ERG_CADENCE_COMPENSATION_MAX_RPM, std::min(ERG_CADENCE_COMPENSATION_MAX_RPM, cadence - cadenceReference));
+    const double cadenceMove = cadenceSlope * cadenceDelta;
     const bool diverging     = measuredError * sustainedTrend < 0 && std::abs(sustainedTrend) >= ErgControl::ERG_TRANSIENT_MIN_TREND_WPS;
     if ((abs(measuredError) <= ErgControl::ERG_TRANSIENT_APPROACH_WATTS && !diverging) || cadenceMove * measuredError >= 0) {
       newIncline += cadenceMove;
-      // Consume the cadence change even if feedback exactly cancels its move.
-      cadenceReference = cadence;
+      SS2K_LOG(ERG_MODE_LOG_TAG, "Cadence compensation: %d -> %drpm, applied %+drpm, %+.0f steps", cadenceReference, cadence, cadenceDelta, cadenceMove);
+      // Consume the applied cadence change even if feedback exactly cancels its move.
+      cadenceReference += cadenceDelta;
     }
   }
   newIncline = std::max(static_cast<float>(ss2k->getCurrentPosition() - maxChange), std::min(static_cast<float>(ss2k->getCurrentPosition() + maxChange), newIncline));
@@ -901,7 +905,12 @@ void ErgMode::_observePowerResponse() {
 
 void ErgMode::_updateValues(float newIncline) {
   if (isTableSeeking() || feedbackWaiting) _trackControlMove(static_cast<int32_t>(newIncline));
-  if (!isTableSeeking() && static_cast<int32_t>(newIncline) != ss2k->getCurrentPosition()) cadenceReference = rtConfig->cad.getValue();
+  // A move refreshes the cadence reference, except for changes still inside the deadband: those must accumulate
+  // so a slow 1 RPM-per-report drift is still compensated once it reaches the deadband.
+  const int cadence = rtConfig->cad.getValue();
+  if (!isTableSeeking() && static_cast<int32_t>(newIncline) != ss2k->getCurrentPosition() && abs(cadence - cadenceReference) >= ERG_CADENCE_FOLLOW_DEADBAND_RPM) {
+    cadenceReference = cadence;
+  }
   rtConfig->setTargetIncline(newIncline);
   _writeLog(ss2k->getCurrentPosition(), newIncline, this->prevWatts.getTarget(), rtConfig->watts.getTarget(), this->prevWatts.getValue(), rtConfig->watts.getValue(),
             this->prevCadence.getValue(), rtConfig->cad.getValue());
