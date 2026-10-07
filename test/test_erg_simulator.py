@@ -28,7 +28,7 @@ from scripts.erg_sim.power_table import read_ptab
 from scripts.erg_sim.reference import first_erg_section, load_reference
 from scripts.erg_sim.report import plot_run, save_run
 from scripts.erg_sim.runner import run
-from scripts.erg_sim.scoring import grade
+from scripts.erg_sim.scoring import grade, travel_summary
 from scripts.erg_sim.workout import Segment, Workout
 
 HERE = ROOT/"scripts/erg_sim"
@@ -65,6 +65,39 @@ class TestBikePhysics(unittest.TestCase):
         self.assertEqual(bike.position, 1200)
         bike.advance(.3, .1, -100, 80)
         self.assertEqual(bike.position, 1150)
+
+    def test_table_surface_inverts_rows_trims_clamps_and_bounds_cadence(self):
+        surface = {"cadences": [60, 80, 100], "watts": [0, 100, 200, 300, 400, 500],
+                   "positions": [[1000, 3000, 5000, 7000, 7010, 7020],   # clamp tail after 300 W
+                                 [1000, 2500, 4000, 5500, 7000, 8500],
+                                 [1000, 2000, 2100, 2200, 2300, 2400]]}  # implausible 4x cadence gain
+        cfg = BikeConfig(surface=surface, max_position=10000, noise_w=0)
+        self.assertAlmostEqual(equilibrium(cfg, 4000, 80), 200, delta=1)
+        self.assertEqual(equilibrium(cfg, 500, 80), 0)  # Below the 0 W anchor.
+        # The 60 RPM tail is extrapolated from credible columns, not 10 steps per 100 W.
+        self.assertLess(equilibrium(cfg, 8000, 60), 500)
+        for position in (3000, 6000, 8000):
+            ratio = equilibrium(cfg, position, 100)/equilibrium(cfg, position, 80)
+            self.assertLessEqual(ratio, 1.25**2.5+1e-6)
+            self.assertGreaterEqual(ratio, 1.25-1e-6)
+        for rpm in (55, 70, 90, 110):
+            values = [equilibrium(cfg, p, rpm) for p in range(0, 10001, 250)]
+            self.assertTrue(all(b >= a for a, b in zip(values, values[1:])))
+        floored = replace(cfg, floor_watts_at_80rpm=40)
+        self.assertAlmostEqual(equilibrium(floored, 0, 80), 40)
+        self.assertAlmostEqual(equilibrium(floored, 4000, 80), 200, delta=1)
+
+    def test_imported_bike_profiles(self):
+        from scripts.erg_sim.bikes import load_ptab, travel_max
+        travel = {"bowflex_c6": 32029, "peloton": 29725, "yesoul_gm1": 43750}
+        for name, maximum in travel.items():
+            profile = json.loads((HERE/f"profiles/{name}.json").read_text(encoding="utf-8"))
+            self.assertEqual(travel_max(load_ptab(HERE/f"profiles/tables/{name}.ptab"))[0], maximum)
+            cfg = BikeConfig(**profile["bike"])
+            self.assertEqual((cfg.min_position, cfg.max_position), (0, maximum))
+            self.assertAlmostEqual(equilibrium(cfg, profile["start_position"], 80), 100, delta=10)
+            values = [equilibrium(cfg, p, 80) for p in range(0, maximum, 500)]
+            self.assertTrue(all(b >= a for a, b in zip(values, values[1:])))
 
     def test_chronological_holdout_and_lag_identification(self):
         data = load_reference(ROOT/"test/data/erg_reference_20260927.csv")
@@ -263,6 +296,27 @@ class TestProductionBikeLoop(unittest.TestCase):
         delayed, _ = run(workout, replace(cfg, lag_s=3, delay_s=3, noise_w=0), self.exe, self.folder/"delayed")
         self.assertGreater(np.mean(np.abs(instant[:, 2]-delayed[:, 2])), 20)
         self.assertFalse(np.array_equal(instant[:, 6], delayed[:, 6]))
+
+    def test_unhomed_low_target_winds_into_stop_but_homed_clamps(self):
+        # A 40 W floor makes 30 W at 100 RPM (raised to minWatts 50 while
+        # unhomed) unreachable. Unhomed firmware has no limits yet and keeps
+        # counting pulses into the minimum stop; homed travel stops at hMin.
+        workout = Workout([Segment(60, 120, 120, 85), Segment(300, 30, 30, 100)])
+        cfg = replace(BikeConfig(**PROFILE["bike"]), floor_watts_at_80rpm=40)
+        unhomed, meta = run(workout, cfg, self.exe, self.folder/"unhomed", homed=False)
+        homed, _ = run(workout, cfg, self.exe, self.folder/"homed")
+        self.assertEqual(meta["firmware_start_steps"], 8000)
+        self.assertEqual(unhomed[0, 10], -200000000)
+        self.assertEqual(unhomed[0, 11], 200000000)
+        self.assertEqual(unhomed[-1, 4], 0)
+        self.assertLess(unhomed[-1, 12], -500)  # Firmware coordinate drifted below the stop.
+        self.assertTrue(np.all(homed[:, 12] == 0))
+        self.assertTrue(np.all(homed[:, 6] >= 0))
+        travel = travel_summary(unhomed, workout.duration, cfg.min_position, cfg.max_position)
+        self.assertGreater(travel["seconds_at_min_stop"], 10)
+        self.assertEqual(travel["lost_pulses_max_abs"], -unhomed[:, 12].min())
+        with Bridge(self.exe, self.folder/"unhomed_snapshot.log", homed=False) as bridge:
+            self.assertEqual(bridge.power_table()["homed"], 0)
 
     def test_production_stallguard_detects_both_physical_stops(self):
         for forward in (False, True):

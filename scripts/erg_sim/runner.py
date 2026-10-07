@@ -14,9 +14,23 @@ from .cadence import PlannedRider
 from .power_table import save_table
 
 
+UNLIMITED_START_GEAR = 8
+
+
 def run(workout, config, exe, output, *, seed=27, speed=0, tick_ms=20, sensitivity=5,
         initial_position=7433, rider_config=None, cadence_trace=None, initial_power=None,
-        rider_mode="planned", progress=None, sleep=time.sleep, monotonic=time.monotonic):
+        rider_mode="planned", progress=None, sleep=time.sleep, monotonic=time.monotonic,
+        homed=True, firmware_position=None, min_watts=50, max_watts=1000, shift_step=1000):
+    """initial_position is the bike's physical position (0 = minimum stop).
+
+    Homed firmware shares that coordinate. Unhomed firmware boots at the
+    Unlimited start-gear coordinate (8 x shiftStep) wherever the knob really
+    is, with no travel limits until setStepperMinMax() learns them from
+    min/max watts. Pulses past a physical stop are lost by the bike but still
+    counted by the firmware, so its coordinate drifts like a skipping motor.
+    """
+    if firmware_position is None:
+        firmware_position = initial_position if homed else UNLIMITED_START_GEAR*shift_step
     if speed < 0 or not math.isfinite(speed):
         raise ValueError("Speed must be zero (unlimited) or a finite positive multiplier")
     if tick_ms < 1 or tick_ms > 100 or 1000 % tick_ms:
@@ -33,9 +47,11 @@ def run(workout, config, exe, output, *, seed=27, speed=0, tick_ms=20, sensitivi
     cadence = float(cadence_trace[0, 1]) if cadence_trace is not None else rider.cadence
     bike = Bike(config, initial_position, cadence, seed+1, initial_power)
     rows, cadence_rows, fresh, previous_target = [], [], True, None
+    start_offset = round(firmware_position)-bike.position
     started = monotonic()
-    with Bridge(exe, output/"firmware.log", position=initial_position, lo=config.min_position,
-                hi=config.max_position, sensitivity=sensitivity) as bridge:
+    with Bridge(exe, output/"firmware.log", position=firmware_position, lo=config.min_position,
+                hi=config.max_position, sensitivity=sensitivity, min_watts=min_watts, max_watts=max_watts,
+                shift_step=shift_step, homed=homed) as bridge:
         for stamp in range(0, math.ceil(workout.duration*1000), tick_ms):
             now = stamp/1000
             watts, cue = workout.at(now)
@@ -43,9 +59,12 @@ def run(workout, config, exe, output, *, seed=27, speed=0, tick_ms=20, sensitivi
             # from the bike; no measured position, target watts, or table oracle.
             command = watts if watts != previous_target else -1
             result = bridge.tick(1000+stamp, bike.power, bike.cadence, fresh, command, bike.load)
-            pulses, counter, target, cells, seeking, effective_target = result
+            pulses, counter, target, cells, seeking, effective_target, min_step, max_step = result
             if fresh:
-                rows.append((now, watts, bike.power, bike.cadence, bike.position, counter, target, cells, seeking, effective_target))
+                # bike.position has not yet received this tick's pulses; align the counter with it.
+                lost = (counter-pulses-bike.position)-start_offset
+                rows.append((now, watts, bike.power, bike.cadence, bike.position, counter, target, cells, seeking, effective_target,
+                             min_step, max_step, lost))
                 if planned:
                     callout, desired, index = rider.plan.at(now)
                     cadence_rows.append((now, index, callout, desired, bike.cadence))
@@ -73,12 +92,16 @@ def run(workout, config, exe, output, *, seed=27, speed=0, tick_ms=20, sensitivi
     else:
         for name in ("cadence.csv", "cadence_plan.json"):
             (output/name).unlink(missing_ok=True)
-    fields = ["time_s", "target_w", "power_w", "cadence_rpm", "physical_steps", "motor_steps", "command_steps", "learned_cells", "table_seeking", "effective_target_w"]
+    fields = ["time_s", "target_w", "power_w", "cadence_rpm", "physical_steps", "motor_steps", "command_steps", "learned_cells", "table_seeking", "effective_target_w",
+              "min_step", "max_step", "lost_pulses"]
     with (output/"trace.csv").open("w", newline="", encoding="utf-8") as f:
         writer = csv.writer(f); writer.writerow(fields); writer.writerows(rows)
     metadata = {"seed": seed, "wall_seconds": monotonic()-started, "simulation_seconds": workout.duration,
                 "requested_speed": speed, "tick_ms": tick_ms, "sensitivity": sensitivity,
                 "initial_position_steps": initial_position, "initial_table": "empty; production online learning enabled",
+                "homing": "homed" if homed else "unhomed", "firmware_start_steps": firmware_position,
+                "physical_travel_steps": [config.min_position, config.max_position],
+                "min_watts": min_watts, "max_watts": max_watts, "shift_step": shift_step,
                 "rider": rider.plan.data if planned else asdict(rider_config),
                 "cadence_source": "recorded trace" if cadence_trace is not None else "fixed interval plan" if planned else "seeded stochastic rider",
                 "cadence_plan_sha256": rider.plan.sha256 if planned else None,
