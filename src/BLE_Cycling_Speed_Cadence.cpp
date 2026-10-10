@@ -53,6 +53,6 @@ void BLE_Cycling_Speed_Cadence::update() {
   char logBuf[kLogBufCapacity];
 
   logCharacteristic(logBuf, kLogBufCapacity, byteArray.data(), byteArrayLength, CSCSERVICE_UUID, cscMeasurement->getUUID(),
-                    "CSC(CSM)[ WheelRev(%lu) WheelTime(%u) CrankRev(%u) CrankTime(%u) ]", spinBLEClient.cscCumulativeWheelRev, spinBLEClient.cscLastWheelEvtTime,
+                    "CSC(CSM)[ WheelRev(%lu) WheelTime(%u) CrankRev(%u) CrankTime(%u) ]", static_cast<unsigned long>(spinBLEClient.cscCumulativeWheelRev), spinBLEClient.cscLastWheelEvtTime,
                     spinBLEClient.cscCumulativeCrankRev, spinBLEClient.cscLastCrankEvtTime);
 }

@@ -41,6 +41,36 @@ def _error_summary(times, error, dt):
             "bias_w": float(np.average(error, weights=dt)) if seconds else None, "deviations_over_w": thresholds}
 
 
+PROVISIONAL_TRAVEL = 200000000  # DEFAULT_STEPPER_TRAVEL
+
+
+def travel_summary(trace, duration, min_position, max_position):
+    """Physical-stop contact, lost pulses, and when watt-derived limits engaged.
+
+    Columns: 4 physical, 5 firmware counter, 6 commanded, 10/11 firmware min/max,
+    12 lost pulses (counted by the firmware while the bike sat against a stop).
+    """
+    dt = np.diff(np.r_[trace[:, 0], duration])
+    physical, counter, command = trace[:, 4], trace[:, 5], trace[:, 6]
+    offset = counter-physical
+    lost = trace[:, 12] if trace.shape[1] > 12 else offset-offset[0]
+    command_physical = command-offset
+    beyond = np.maximum(np.maximum(command_physical-max_position, min_position-command_physical), 0)
+    at_min, at_max = physical <= min_position+1, physical >= max_position-1
+    result = {"lost_pulses_max_abs": float(np.abs(lost).max()), "lost_pulses_final": float(lost[-1]),
+              "seconds_at_min_stop": float(dt[at_min].sum()), "seconds_at_max_stop": float(dt[at_max].sum()),
+              "max_command_beyond_stop_steps": float(beyond.max())}
+    if trace.shape[1] > 11:
+        lo, hi = trace[:, 10], trace[:, 11]
+        bounded_lo, bounded_hi = lo > -PROVISIONAL_TRAVEL, hi < PROVISIONAL_TRAVEL
+        first = lambda mask: float(trace[np.argmax(mask), 0]) if mask.any() else None
+        # Express the firmware limits on the physical axis using the current offset.
+        result.update(first_min_limit_s=first(bounded_lo), first_max_limit_s=first(bounded_hi),
+                      final_min_limit_physical=float(lo[-1]-offset[-1]) if bounded_lo[-1] else None,
+                      final_max_limit_physical=float(hi[-1]-offset[-1]) if bounded_hi[-1] else None)
+    return result
+
+
 def grade(trace, duration, workout=None, *, interval_grace_s=INTERVAL_GRACE_S):
     if len(trace) < 2 or duration <= trace[-1, 0]:
         raise ValueError("Grading needs increasing samples and the complete workout duration")

@@ -31,7 +31,7 @@ void BLE_Cycling_Power_Service::setupService(NimBLEServer *pServer, MyCharacteri
   DirConManager::registerService(pPowerMonitor->getUUID());
 }
 
-void BLE_Cycling_Power_Service::update() {
+bool BLE_Cycling_Power_Service::update() {
   int power     = rtConfig->watts.getValue();
   float cadence = rtConfig->cad.getValue();
 
@@ -46,7 +46,7 @@ void BLE_Cycling_Power_Service::update() {
   cpm.cumulativeCrankRevolutions = spinBLEClient.cscCumulativeCrankRev;
   cpm.lastCrankEventTime         = spinBLEClient.cscLastCrankEvtTime;
   cpm.cumulativeWheelRevolutions = spinBLEClient.cscCumulativeWheelRev;
-  cpm.lastWheelEventTime         = spinBLEClient.cscLastWheelEvtTime;
+  cpm.lastWheelEventTime         = spinBLEClient.cpsLastWheelEvtTime;
 
   CyclingPowerMeasurement::Buffer byteArray;
   const size_t byteArrayLength = cpm.toByteArray(byteArray);
@@ -54,14 +54,18 @@ void BLE_Cycling_Power_Service::update() {
   // Notify the cycling power measurement characteristic
   // Need to set the value before notifying so that read works correctly.
   cyclingPowerMeasurementCharacteristic->setValue(byteArray.data(), byteArrayLength);
-  cyclingPowerMeasurementCharacteristic->notify();
+  const bool sent = cyclingPowerMeasurementCharacteristic->notify();
 
   // Also notify DirCon TCP clients
   DirConManager::notifyCharacteristic(NimBLEUUID(CYCLINGPOWERSERVICE_UUID), cyclingPowerMeasurementCharacteristic->getUUID(), byteArray.data(), byteArrayLength);
 
+  static uint32_t lastLog = 0;
+  if (uint32_t(millis() - lastLog) < BLE_NOTIFY_DELAY) return sent;
+  lastLog = millis();
   const int kLogBufCapacity = 150;
   char logBuf[kLogBufCapacity];
 
   logCharacteristic(logBuf, kLogBufCapacity, byteArray.data(), byteArrayLength, CYCLINGPOWERSERVICE_UUID, cyclingPowerMeasurementCharacteristic->getUUID(),
                     "CPS(CPM)[ CD(%.2f) PW(%d) ]", cadence > 0 ? fmodf(cadence, 1000.0) : 0, power % 10000);
+  return sent;
 }

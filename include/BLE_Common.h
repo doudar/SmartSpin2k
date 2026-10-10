@@ -9,6 +9,7 @@
 
 #include <NimBLEDevice.h>
 #include <NimBLEScan.h>
+#include <atomic>
 #include <memory>
 #include <mutex>
 #include <Arduino.h>
@@ -51,6 +52,7 @@ void setupBLE();
 extern TaskHandle_t BLEClientTask;
 // ***********************Common**********************************
 void BLECommunications();
+void BLEProcessSensorData();
 
 // Get service info for a supported device
 const BLEServiceInfo* getDeviceServiceInfo(const NimBLEAdvertisedDevice* advertisedDevice, const String& deviceName = "");
@@ -60,13 +62,14 @@ class MyServerCallbacks : public NimBLEServerCallbacks {
   void onConnect(NimBLEServer* pServer, NimBLEConnInfo& connInfo);
   void onDisconnect(NimBLEServer* pServer, NimBLEConnInfo& connInfo, int reason) override;
   void onMTUChange(uint16_t MTU, NimBLEConnInfo& connInfo);
-  bool onConnParamsUpdateRequest(uint16_t handle, const ble_gap_upd_params* params);
+  void onConnParamsUpdate(NimBLEConnInfo& connInfo) override;
 };
 
 // TODO add the rest of the server to this class
 class SpinBLEServer {
  private:
   void updateWheelAndCrankRev();
+  std::atomic<uint32_t> powerSampleSequence{0};
   // Helper Function to clean up the BLE Services
 
  public:
@@ -75,6 +78,8 @@ class SpinBLEServer {
   void notifyShift();
   double calculateSpeed();
   void update();
+  void updatePowerTelemetry();
+  void notePowerSample() { powerSampleSequence.fetch_add(1); }
   int connectedClientCount();
   // Queue to store writes to any of the callbacks to the server
   std::queue<std::string> writeCache;
@@ -178,10 +183,11 @@ class SpinBLEClient {
   boolean connectedSpeed         = false;
   boolean connectedRemote        = false;
   boolean doScan                 = true; //Set to true so there's an initial scan on startup
-  long int cscCumulativeCrankRev = 0;
-  double cscLastCrankEvtTime     = 0.0;
-  long int cscCumulativeWheelRev = 0;
-  double cscLastWheelEvtTime     = 0.0;
+  uint16_t cscCumulativeCrankRev = 0;
+  uint16_t cscLastCrankEvtTime   = 0;
+  uint32_t cscCumulativeWheelRev = 0;
+  uint16_t cscLastWheelEvtTime   = 0;
+  uint16_t cpsLastWheelEvtTime   = 0;  // CPS uses 1/2048 s; CSC uses 1/1024 s.
 
   BLERemoteCharacteristic* pRemoteCharacteristic = nullptr;
 
@@ -189,6 +195,7 @@ class SpinBLEClient {
 
   void start();
   bool connectToServer();
+  std::atomic<bool> connectionSetupActive{false};
   // Check for duplicate services of BLEClient and remove the previously
   // connected one.
   void removeDuplicates(NimBLEClient* pClient);
@@ -196,7 +203,6 @@ class SpinBLEClient {
   void postConnect();
   void FTMSControlPointWrite(const uint8_t* pData, int length);
   void connectBLE_HID(NimBLEClient* pClient);
-  void keepAliveBLE_HID(NimBLEClient* pClient);
   void handleBattInfo(NimBLEClient* pClient, bool updateNow);
   // Instead of using this directly, set the .doScan flag to start a scan.
   void scanProcess(int duration = DEFAULT_SCAN_DURATION);

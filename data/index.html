@@ -94,16 +94,37 @@
   </div>
 
   <script>
+    // Keep one read in flight; stalled requests must not accumulate retries.
+    let pageReadPending = false;
+    async function fetchPageData(url) {
+      if (pageReadPending) return null;
+      pageReadPending = true;
+      const controller = new AbortController();
+      const timeout = setTimeout(() => controller.abort(), 5000);
+      try {
+        const response = await fetch(url, { signal: controller.signal, cache: 'no-store' });
+        if (!response.ok) throw new Error(`Request failed (${response.status})`);
+        return await response.json();
+      } catch (error) {
+        const indicator = document.getElementById('loadingWatermark');
+        if (indicator) indicator.textContent = 'Connection slow — retrying…';
+        throw error;
+      } finally {
+        clearTimeout(timeout);
+        pageReadPending = false;
+      }
+    }
+
     function requestConfigValues() {
-      fetch('/configJSON')
-        .then(response => response.json())
+      fetchPageData('/configJSON')
         .then(data => {
+          if (!data) return;
           document.getElementById("firmwareVersion").textContent = data.firmwareVersion;
         })
         .catch(error => console.error('Error:', error));
     }
 
-    window.addEventListener('load', () => {
+    window.addEventListener('DOMContentLoaded', () => {
       requestConfigValues();
     });
 

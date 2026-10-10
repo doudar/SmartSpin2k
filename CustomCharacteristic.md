@@ -198,3 +198,9 @@ limits still apply. No companion-app changes are included here.
 Preset 1 persists as `gearPreset: 1` and `gearTeeth: []`. Its exact 24 ratios are
 built into firmware; it reports one rear gear axis, starts at gear 8, and uses
 the same median-gap Shift Amount mapping as tooth profiles. Save with `02 18`.
+
+### BLE traffic scheduling
+
+BLE log streaming (`0x30`) remains indication-compatible. It is best effort: the firmware keeps the newest pending line per peer, sends at most one log every 250 ms, and drops lines older than one second. Logs pause during sensor connection setup, scanning, and settings snapshots. Control/settings indications take priority and wait for the previous indication acknowledgment on that connection. Log text is truncated to the peer's negotiated ATT payload.
+
+Scan-result notifications (`0x32`) are delivered from a bounded queue, one fragment per 20 ms, with independent peer progress and bounded retries on buffer pressure. Begin/device/end ordering and the existing wire format are unchanged. Under sustained overload, device records can be dropped; sequence gaps and the end record's sequence count identify an incomplete result set. A new scan waits for the previous result queue to drain.

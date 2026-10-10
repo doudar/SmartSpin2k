@@ -32,7 +32,7 @@ class CustomCharacteristicEvents {
     std::lock_guard<std::mutex> lock(mutex);
     for (auto& slot : peers) {
       if (slot.peer == peer) {
-        slot.session = ++generation;
+        slot = {peer, ++generation};
         return;
       }
     }
@@ -55,6 +55,13 @@ class CustomCharacteristicEvents {
     if (!event.session) return false;
     // Leave one slot for an acknowledgment when writes arrive in a burst.
     if (count >= (event.isStatus ? CAPACITY : CAPACITY - 1)) {
+      // One indication can be outstanding per peer. Preserve its completion even
+      // when writes and other peers' ACKs fill the main callback queue.
+      if (event.isStatus) {
+        for (size_t i = 0; i < peers.size(); ++i) {
+          if (peers[i].peer == event.peer) { completions[i] = std::move(event); return true; }
+        }
+      }
       ++dropped;
       return false;
     }
@@ -65,6 +72,13 @@ class CustomCharacteristicEvents {
 
   bool pop(Event& event) {
     std::lock_guard<std::mutex> lock(mutex);
+    // Overflow ACKs get priority so continuous writes cannot starve completion.
+    for (auto& completion : completions) {
+      if (!completion.session) continue;
+      event = std::move(completion);
+      completion = {};
+      if (event.session == sessionFor(event.peer)) return true;
+    }
     while (count) {
       event = std::move(events[head]);
       head = (head + 1) % CAPACITY;
@@ -79,6 +93,18 @@ class CustomCharacteristicEvents {
     return session && session == sessionFor(peer);
   }
 
+  struct Peer { uint16_t peer = UINT16_MAX; uint64_t session = 0; uint16_t mtu = 23, subscription = 0; };
+
+  std::array<Peer, PeerCount> recipients() {
+    std::lock_guard<std::mutex> lock(mutex);
+    return peers;
+  }
+
+  void subscribe(uint16_t peer, uint16_t mtu, uint16_t subscription) {
+    std::lock_guard<std::mutex> lock(mutex);
+    for (auto& slot : peers) if (slot.peer == peer) { slot.mtu = mtu; slot.subscription = subscription; }
+  }
+
   unsigned takeDropped() {
     std::lock_guard<std::mutex> lock(mutex);
     const unsigned result = dropped;
@@ -87,7 +113,6 @@ class CustomCharacteristicEvents {
   }
 
  private:
-  struct Peer { uint16_t peer = UINT16_MAX; uint64_t session = 0; };
   uint64_t sessionFor(uint16_t peer) const {
     for (const auto& slot : peers) if (slot.peer == peer) return slot.session;
     return 0;
@@ -95,6 +120,7 @@ class CustomCharacteristicEvents {
   std::mutex mutex;
   std::array<Peer, PeerCount> peers{};
   std::array<Event, CAPACITY> events{};
+  std::array<Event, PeerCount> completions{};
   size_t head = 0, count = 0;
   uint64_t generation = 0;
   unsigned dropped = 0;

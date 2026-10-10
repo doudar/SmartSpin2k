@@ -92,6 +92,8 @@ This characteristic allows for reading and writing various user configuration pa
 #include "ByteUtils.h"
 #include "ScanResultProtocol.h"
 #include "CustomCharacteristicEvents.h"
+#include "BleTxScheduler.h"
+#include <deque>
 #include <algorithm>
 #include <vector>
 
@@ -118,50 +120,109 @@ struct SettingsSnapshotTransfer {
 SettingsSnapshotTransfer settingsSnapshot;
 CustomCharacteristicEvents<CONFIG_BT_NIMBLE_MAX_CONNECTIONS> bleEvents;
 SettingsSnapshotTransfer dirConSettingsSnapshot;
-uint16_t scanResultId       = 0;
-uint16_t scanResultSequence = 0;
+using Tx = BleTxScheduler<CONFIG_BT_NIMBLE_MAX_CONNECTIONS>;
+Tx bleTx;
 
-void resetSettingsSnapshot() { settingsSnapshot = SettingsSnapshotTransfer(); }
+bool queueIndication(const uint8_t* data, size_t length, uint16_t handle, Tx::Kind kind) {
+  bool queued = false;
+  for (const auto& peer : bleEvents.recipients()) {
+    // Preserve the established custom protocol: some companion clients enable
+    // notifications (CCCD 1) but receive/acknowledge our indication replies.
+    // NimBLE historically sends indications to either subscribed peer type.
+    if (!peer.session || !(peer.subscription & 3) || (handle != BLE_HS_CONN_HANDLE_NONE && handle != peer.peer)) continue;
+    const uint16_t mtu = NimBLEDevice::getServer()->getPeerMTU(peer.peer);
+    const size_t limit = kind == Tx::Kind::Log ? (mtu > 3 ? mtu - 3 : 20) : length;
+    queued |= bleTx.enqueue({peer.peer, peer.session, std::vector<uint8_t>(data, data + std::min(length, limit)), kind, millis()});
+  }
+  return queued;
+}
 
-void sendScanResultPayload(ScanResultProtocol::Event event, uint16_t sequence, const std::vector<uint8_t>& payload = {}) {
-  NimBLEServer* server = NimBLEDevice::getServer();
-  if (server == nullptr) return;
-  NimBLEService* service = server->getServiceByUUID(SMARTSPIN2K_SERVICE_UUID);
-  if (service == nullptr) return;
-  NimBLECharacteristic* characteristic = service->getCharacteristic(SMARTSPIN2K_CHARACTERISTIC_UUID);
-  if (characteristic == nullptr) return;
+void queueCharacteristic(NimBLECharacteristic* characteristic, uint16_t handle, Tx::Kind kind = Tx::Kind::Response) {
+  const auto value = characteristic->getValue();
+  queueIndication(value.data(), value.size(), handle, kind);
+}
 
-  // Fragment independently for every BLE peer because negotiated MTUs can
-  // differ. This keeps even the 23-byte minimum MTU valid without retaining a
-  // scan-wide JSON document in firmware memory.
-  for (const uint16_t connHandle : server->getPeerDevices()) {
-    const uint16_t mtu             = server->getPeerMTU(connHandle);
-    const size_t attPayload        = mtu > 3 ? mtu - 3 : 20;
-    const size_t fragmentMax       = attPayload > ScanResultProtocol::HEADER_LENGTH ? attPayload - ScanResultProtocol::HEADER_LENGTH : 1;
-    const size_t fragmentCountSize = payload.empty() ? 1 : (payload.size() + fragmentMax - 1) / fragmentMax;
-    if (fragmentCountSize > UINT8_MAX) {
-      SS2K_LOGE(CUSTOM_CHAR_LOG_TAG, "Scan result %u requires too many fragments", static_cast<unsigned>(sequence));
+struct ScanDelivery {
+  ScanResultProtocol::Event event;
+  uint16_t id, sequence;
+  std::vector<uint8_t> payload;
+  decltype(bleEvents.recipients()) peers;
+  uint32_t queued;
+};
+std::mutex scanDeliveryMutex;
+std::deque<ScanDelivery> scanDeliveries;
+std::atomic<bool> scanDeliveryActive{false};
+uint16_t scanResultId = 0, scanResultSequence = 0;
+constexpr size_t SCAN_QUEUE_CAPACITY = 32;
+
+// Called with scanDeliveryMutex held. Reserve a slot for End even under overload.
+void queueScanResult(ScanResultProtocol::Event event, uint16_t sequence, std::vector<uint8_t> payload = {}) {
+  if (scanDeliveries.size() >= (event == ScanResultProtocol::Event::Device ? SCAN_QUEUE_CAPACITY - 1 : SCAN_QUEUE_CAPACITY)) return;
+  scanDeliveries.push_back({event, scanResultId, sequence, std::move(payload), bleEvents.recipients(), millis()});
+}
+
+void resetSettingsSnapshot() {
+  bleTx.cancelSnapshots();
+  settingsSnapshot = SettingsSnapshotTransfer();
+}
+
+void pumpScanResults(NimBLECharacteristic* characteristic) {
+  static ScanDelivery current{};
+  static size_t peerIndex = 0;
+  static std::array<uint8_t, CONFIG_BT_NIMBLE_MAX_CONNECTIONS> fragments{};
+  static std::array<uint32_t, CONFIG_BT_NIMBLE_MAX_CONNECTIONS> failures{};
+  static std::array<bool, CONFIG_BT_NIMBLE_MAX_CONNECTIONS> finished{};
+  static uint32_t lastAttempt = 0;
+  const uint32_t now = millis();
+  if (uint32_t(now - lastAttempt) < 20) return;
+  if (!scanDeliveryActive) {
+    {
+      std::lock_guard<std::mutex> lock(scanDeliveryMutex);
+      if (scanDeliveries.empty()) return;
+      current = std::move(scanDeliveries.front());
+      scanDeliveries.pop_front();
+      scanDeliveryActive = true;
+    }
+    peerIndex = 0;
+    fragments.fill(0);
+    failures.fill(0);
+    finished.fill(false);
+    // TCP delivery also runs on maintenance, never inside nimble_host.
+    auto packet = ScanResultProtocol::makePacket(current.event, current.id, current.sequence, 0, 1, current.payload.data(), current.payload.size());
+    DirConManager::notifyCharacteristic(SMARTSPIN2K_SERVICE_UUID, SMARTSPIN2K_CHARACTERISTIC_UUID, packet.data(), packet.size());
+  }
+  // Expire stale device records, but always give Begin/End a delivery opportunity.
+  if (current.event == ScanResultProtocol::Event::Device && uint32_t(now - current.queued) > 15000) {
+    scanDeliveryActive = false;
+    return;
+  }
+  for (size_t i = 0; i < current.peers.size(); ++i) {
+    const size_t index = peerIndex;
+    peerIndex = (peerIndex + 1) % current.peers.size();
+    const auto& peer = current.peers[index];
+    if (finished[index]) continue;
+    if (!(peer.subscription & 3) || !bleEvents.connected(peer.peer, peer.session) ||
+        (failures[index] && uint32_t(now - failures[index]) >= 500)) {
+      finished[index] = true;
       continue;
     }
-
-    const uint8_t fragmentCount = static_cast<uint8_t>(fragmentCountSize);
-    for (uint8_t fragment = 0; fragment < fragmentCount; ++fragment) {
-      const size_t offset         = fragment * fragmentMax;
-      const size_t length         = payload.empty() ? 0 : std::min(fragmentMax, payload.size() - offset);
-      std::vector<uint8_t> packet = ScanResultProtocol::makePacket(event, scanResultId, sequence, fragment, fragmentCount, length == 0 ? nullptr : payload.data() + offset, length);
-      if (!characteristic->notify(packet.data(), packet.size(), connHandle)) {
-        SS2K_LOGW(CUSTOM_CHAR_LOG_TAG, "Failed to send scan result %u fragment %u/%u", static_cast<unsigned>(sequence), static_cast<unsigned>(fragment + 1),
-                  static_cast<unsigned>(fragmentCount));
-        break;
-      }
+    const size_t maximum = std::max<size_t>(1, (peer.mtu > 3 ? peer.mtu - 3 : 20) - ScanResultProtocol::HEADER_LENGTH);
+    const size_t count = std::max<size_t>(1, (current.payload.size() + maximum - 1) / maximum);
+    if (count > UINT8_MAX) { finished[index] = true; continue; }
+    const size_t offset = fragments[index] * maximum;
+    const size_t length = std::min(maximum, current.payload.size() - offset);
+    auto packet = ScanResultProtocol::makePacket(current.event, current.id, current.sequence, fragments[index], count,
+                                                 length ? current.payload.data() + offset : nullptr, length);
+    lastAttempt = now;
+    if (characteristic->notify(packet.data(), packet.size(), peer.peer)) {
+      failures[index] = 0;
+      if (++fragments[index] == count) finished[index] = true;
+    } else if (!failures[index]) {
+      failures[index] = now;
     }
+    return; // One fragment per pass; round-robin peers so a slow app cannot block another.
   }
-
-  // DirCon is a framed TCP transport and does not need ATT fragmentation.
-  if (payload.size() <= UINT8_MAX) {
-    std::vector<uint8_t> packet = ScanResultProtocol::makePacket(event, scanResultId, sequence, 0, 1, payload.data(), payload.size());
-    DirConManager::notifyCharacteristic(service->getUUID(), characteristic->getUUID(), packet.data(), packet.size());
-  }
+  scanDeliveryActive = false;
 }
 
 std::vector<uint8_t> makeSettingsSnapshotChunk(SettingsSnapshotTransfer& snapshot) {
@@ -187,7 +248,7 @@ bool sendNextSettingsSnapshotChunk(NimBLECharacteristic* characteristic) {
   const uint16_t chunkNumber  = settingsSnapshot.chunk;
   std::vector<uint8_t> packet = makeSettingsSnapshotChunk(settingsSnapshot);
 
-  if (!characteristic->indicate(packet.data(), packet.size(), settingsSnapshot.connHandle)) {
+  if (!queueIndication(packet.data(), packet.size(), settingsSnapshot.connHandle, Tx::Kind::Snapshot)) {
     SS2K_LOGE(CUSTOM_CHAR_LOG_TAG, "Failed to send settings snapshot chunk %u/%u", static_cast<unsigned>(chunkNumber + 1), static_cast<unsigned>(settingsSnapshot.chunkCount));
     resetSettingsSnapshot();
     return false;
@@ -308,7 +369,9 @@ void BLE_ss2kCustomCharacteristic::processPendingEvents() {
   decltype(bleEvents)::Event event;
   for (size_t i = 0; i < decltype(bleEvents)::CAPACITY && bleEvents.pop(event); ++i) {
     if (event.isStatus) {
-      if (settingsSnapshot.active && event.peer == settingsSnapshot.connHandle && event.session == settingsSnapshot.session) {
+      Tx::Kind kind;
+      const bool completed = bleTx.complete(event.peer, event.session, kind);
+      if (completed && kind == Tx::Kind::Snapshot && settingsSnapshot.active && event.peer == settingsSnapshot.connHandle && event.session == settingsSnapshot.session) {
         handleSettingsSnapshotStatus(smartSpin2kCharacteristic, event.status);
       }
     } else {
@@ -316,6 +379,12 @@ void BLE_ss2kCustomCharacteristic::processPendingEvents() {
       if (settingsSnapshot.active && settingsSnapshot.connHandle == event.peer && !settingsSnapshot.session) settingsSnapshot.session = event.session;
     }
   }
+  const bool connecting = spinBLEClient.connectionSetupActive.load();
+  bleTx.pump(millis(), rtConfig->getBleLogEnabled() && !connecting && !NimBLEDevice::getScan()->isScanning() && !settingsSnapshot.active,
+             [](uint16_t peer, uint64_t session) { return bleEvents.connected(peer, session); },
+             [this](const Tx::Packet& packet) { return smartSpin2kCharacteristic->indicate(packet.data.data(), packet.data.size(), packet.peer); });
+  // Scan delivery retains a regular budget even while sensor setup is in progress.
+  pumpScanResults(smartSpin2kCharacteristic);
   const unsigned dropped = bleEvents.takeDropped();
   if (dropped) SS2K_LOGW(CUSTOM_CHAR_LOG_TAG, "BLE settings event queue full; dropped %u event(s)", dropped);
 }
@@ -349,7 +418,9 @@ void BLE_ss2kCustomCharacteristic::onConnect(uint16_t connHandle) { bleEvents.co
 void BLE_ss2kCustomCharacteristic::onDisconnect(uint16_t connHandle) { bleEvents.disconnect(connHandle); }
 
 void ss2kCustomCharacteristicCallbacks::onSubscribe(NimBLECharacteristic* pCharacteristic, NimBLEConnInfo& connInfo, uint16_t subValue) {
-  SS2K_LOG(CUSTOM_CHAR_LOG_TAG, "Subscribe from %s", connInfo.getAddress().toString().c_str());
+  bleEvents.subscribe(connInfo.getConnHandle(), connInfo.getMTU(), subValue);
+  SS2K_LOG(CUSTOM_CHAR_LOG_TAG, "Subscribe from %s conn=%u CCCD=%u MTU=%u", connInfo.getAddress().toString().c_str(),
+           connInfo.getConnHandle(), subValue, connInfo.getMTU());
   NimBLEDevice::setMTU(515);
 }
 void ss2kCustomCharacteristicCallbacks::onStatus(NimBLECharacteristic* pCharacteristic, NimBLEConnInfo& connInfo, int code) {
@@ -381,21 +452,31 @@ void BLE_ss2kCustomCharacteristic::notify(char _item, int tableRow) {
   DirConManager::notifyCharacteristic(service->getUUID(), characteristic->getUUID(), value.data(), value.size());
 }
 
+bool BLE_ss2kCustomCharacteristic::scanResultsPending() {
+  std::lock_guard<std::mutex> lock(scanDeliveryMutex);
+  return scanDeliveryActive || !scanDeliveries.empty();
+}
+
 void BLE_ss2kCustomCharacteristic::beginScanResults() {
+  std::lock_guard<std::mutex> lock(scanDeliveryMutex);
   ++scanResultId;
   if (scanResultId == 0) ++scanResultId;
   scanResultSequence = 0;
-  sendScanResultPayload(ScanResultProtocol::Event::Begin, 0);
+  queueScanResult(ScanResultProtocol::Event::Begin, 0);
 }
 
 void BLE_ss2kCustomCharacteristic::notifyScanResult(const String& name, const NimBLEUUID& serviceUuid) {
+  std::lock_guard<std::mutex> lock(scanDeliveryMutex);
   const std::string uuid          = serviceUuid.toString();
   const std::vector<uint8_t> body = ScanResultProtocol::makeDeviceBody(uuid, std::string(name.c_str(), name.length()));
-  sendScanResultPayload(ScanResultProtocol::Event::Device, scanResultSequence, body);
+  if (body.size() <= 512) queueScanResult(ScanResultProtocol::Event::Device, scanResultSequence, body);
   ++scanResultSequence;
 }
 
-void BLE_ss2kCustomCharacteristic::endScanResults() { sendScanResultPayload(ScanResultProtocol::Event::End, scanResultSequence); }
+void BLE_ss2kCustomCharacteristic::endScanResults() {
+  std::lock_guard<std::mutex> lock(scanDeliveryMutex);
+  queueScanResult(ScanResultProtocol::Event::End, scanResultSequence);
+}
 
 void BLE_ss2kCustomCharacteristic::process(const std::string& rxValue, uint16_t connHandle, uint16_t mtu, bool indicateResponse) {
   // Find the Characteristic
@@ -470,7 +551,7 @@ void BLE_ss2kCustomCharacteristic::process(const std::string& rxValue, uint16_t 
 
   if (rxValue.length() < requiredLength) {
     pCharacteristic->setValue(returnValue.data(), 2);
-    if (indicateResponse) pCharacteristic->indicate(connHandle);
+    if (indicateResponse) queueCharacteristic(pCharacteristic, connHandle);
     return;
   }
 
@@ -1198,7 +1279,7 @@ void BLE_ss2kCustomCharacteristic::process(const std::string& rxValue, uint16_t 
   }
 
   if (indicateResponse) {
-    pCharacteristic->indicate(connHandle);
+    queueCharacteristic(pCharacteristic, connHandle, rxValue[1] == BLE_BLELogging ? Tx::Kind::Log : Tx::Kind::Response);
   }
 }
 

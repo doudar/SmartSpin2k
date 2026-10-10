@@ -332,6 +332,7 @@ void SS2K::maintenanceLoop(void*) {
       // Drain deferred BLE settings callbacks before shift/motor processing,
       // without waiting for the periodic telemetry timer or using nimble_host.
       ss2kCustomCharacteristic.processPendingEvents();
+      BLEProcessSensorData();
       static unsigned long bleTimer = millis();
       // 500ms
       if ((millis() - bleTimer) > BLE_NOTIFY_DELAY) {
@@ -340,6 +341,7 @@ void SS2K::maintenanceLoop(void*) {
         webSocketAppender.Loop();
         bleTimer = millis();
       }
+      spinBLEServer.updatePowerTelemetry();
       // Don't do these if updating and in spindown mode.
       if (!spinBLEServer.spinDownFlag) {
         // Clamp/interpret a shift before it can command motor movement.
@@ -363,10 +365,10 @@ void SS2K::maintenanceLoop(void*) {
     ss2k->handleShiftButtons();
 
     // send BLE notification for any userConfig values that changed.
-    BLE_ss2kCustomCharacteristic::parseNemit();
+    if (!ss2k->isUpdating) BLE_ss2kCustomCharacteristic::parseNemit();
     httpServer.webClientUpdate();
     // Update DirCon protocol
-    DirConManager::update();
+    if (!ss2k->isUpdating) DirConManager::update();
     ss2k->updateLED();
     // If we're in ERG mode, modify shift commands to inc/dec the target watts instead.
 
@@ -416,7 +418,7 @@ void SS2K::maintenanceLoop(void*) {
     }
 
     // Handle a flag set to reset SmartSpin2k to defaults
-    if (ss2k->resetDefaultsFlag) {
+    if (ss2k->resetDefaultsFlag && !ss2k->isUpdating) {
       LittleFS.format();
       userConfig->setDefaults();
       powerTable->reset();
@@ -426,7 +428,7 @@ void SS2K::maintenanceLoop(void*) {
     }
 
     // required to set a flag instead of directly calling the function for saving from BLE_Custom Characteristic.
-    if (ss2k->saveFlag) {
+    if (ss2k->saveFlag && !ss2k->isUpdating) {
       ss2k->saveFlag = false;
       userConfig->saveToLittleFS();
     }

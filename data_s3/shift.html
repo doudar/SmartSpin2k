@@ -16,7 +16,7 @@
     </header>
 
     <main>
-      <div id="loadingWatermark" class="watermark" aria-hidden="true">Loading</div>
+      <div id="loadingWatermark" class="watermark" role="status" aria-live="polite">Connecting…</div>
       <h1 class="brand">Web Shifter</h1>
 
       <div class="shifter-container">
@@ -66,18 +66,40 @@
       }
     }
 
+    // Keep one read in flight; stalled requests must not accumulate retries.
+    let pageReadPending = false;
+    async function fetchPageData(url) {
+      if (pageReadPending) return null;
+      pageReadPending = true;
+      const controller = new AbortController();
+      const timeout = setTimeout(() => controller.abort(), 5000);
+      try {
+        const response = await fetch(url, { signal: controller.signal, cache: 'no-store' });
+        if (!response.ok) throw new Error(`Request failed (${response.status})`);
+        return await response.json();
+      } catch (error) {
+        const indicator = document.getElementById('loadingWatermark');
+        if (indicator) indicator.textContent = 'Connection slow — retrying…';
+        throw error;
+      } finally {
+        clearTimeout(timeout);
+        pageReadPending = false;
+      }
+    }
+
     function requestConfigValues() {
-      fetch('/runtimeConfigJSON')
-        .then(response => response.json())
+      if (document.hidden) return;
+      fetchPageData('/runtimeConfigJSON')
         .then(data => {
+          if (!data) return;
           shiftBox.value = data.shifterPosition;
           document.getElementById('loadingWatermark')?.remove();
         })
         .catch(() => startUpdate());
     }
 
-    window.addEventListener('load', () => {
-      setTimeout(requestConfigValues, 500);
+    window.addEventListener('DOMContentLoaded', () => {
+      requestConfigValues();
       startUpdate();
     });
   </script>

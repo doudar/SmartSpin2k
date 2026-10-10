@@ -305,8 +305,9 @@ class userParameters {
   int getHomingSensitivity() { return homingSensitivity; }
 
   void setDefaults();
-  String returnJSON();
+  String returnJSON(bool includePassword = true);
   void saveToLittleFS();
+  bool saveToLittleFSChecked();
   void loadFromLittleFS();
   void printFile();
 };

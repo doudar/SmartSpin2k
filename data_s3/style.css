@@ -116,7 +116,9 @@ input:focus+.slider{box-shadow:0 0 0 3px rgba(42,157,244,.4)}
 .status-message{padding:1rem;margin:1rem 0;border-radius:var(--radius-sm);animation:.3s fadeIn}
 .status-message.success{background:#28a745;color:var(--text)}
 .note{font-style:italic;color:rgba(255,255,255,.8);font-size:.9rem;margin-top:1rem}
-.watermark{position:fixed;top:50%;left:50%;transform:translate(-50%,-50%) rotate(45deg);font-size:5rem;color:rgba(255,255,255,.2);pointer-events:none;z-index:0}
+.watermark{position:fixed;top:1rem;right:1rem;max-width:calc(100vw - 2rem);padding:.55rem .85rem;border:1px solid var(--border);border-radius:var(--radius-md);background:var(--bg-dark);box-shadow:var(--shadow-sm);font-size:.875rem;color:var(--text-secondary);pointer-events:none;z-index:20;opacity:0;animation:loading-reveal .15s .15s forwards}
+@keyframes loading-reveal{to{opacity:1}}
+@media(prefers-reduced-motion:reduce){.watermark{animation:none;opacity:1}}
 footer{margin-top:2rem;padding:1rem 0;border-top:1px solid var(--border);display:flex;justify-content:space-between;align-items:center}
 .dev-links{display:flex;align-items:center;gap:1rem}
 .dev-link{color:var(--text-secondary);font-size:.9rem}

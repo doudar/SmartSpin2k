@@ -35,6 +35,8 @@ class TestBleScanLifetime(unittest.TestCase):
 #include <string>
 #include <thread>
 #include <vector>
+uint32_t clockNow = 0;
+uint32_t millis() { return clockNow; }
 using String = std::string;
 using BLEUUID = int;
 using NimBLEUUID = int;
@@ -68,11 +70,15 @@ struct NimBLEClient {
 };
 struct NimBLEScan {
   bool scanning = false, succeed = true;
-  int starts = 0;
+  int starts = 0, window = 0;
+  void setInterval(int) {}
+  void setWindow(int value) { window = value; }
   bool isScanning() const { return scanning; }
   bool start(int, bool, bool) { ++starts; return succeed; }
 } scanner;
+struct NimBLEServer { int getConnectedCount() { return 0; } } server;
 struct NimBLEDevice {
+  static NimBLEServer* getServer() { return &server; }
   static NimBLEClient* getClientByPeerAddress(NimBLEAddress) { return nullptr; }
   static NimBLEScan* getScan() { return &scanner; }
 };
@@ -82,6 +88,7 @@ struct UserConfig {
 } config;
 UserConfig* userConfig = &config;
 struct BLE_ss2kCustomCharacteristic {
+  static bool scanResultsPending() { return false; }
   static void beginScanResults() {}
   static void endScanResults() {}
 };
@@ -150,12 +157,24 @@ int main() {
   assert(scanner.starts == 0);
   assert(spinBLEClient.doScan);
   slot.doConnect = false;
+  slot.connectedClientID = 42;
+  slot.isPostConnected = false;
   spinBLEClient.scanProcess(5000);
+  assert(scanner.starts == 0); // Discovery cannot interrupt GATT setup.
+  slot.isPostConnected = true;
+  spinBLEClient.scanProcess(5000);
+  assert(scanner.window == 12);
   assert(scanner.starts == 1);
   assert(!spinBLEClient.doScan);
   scanner.succeed = false;
   spinBLEClient.scanProcess(5000);
   assert(spinBLEClient.doScan);
+  int starts = scanner.starts;
+  spinBLEClient.scanProcess(5000);
+  assert(scanner.starts == starts); // Failed starts back off instead of flooding the controller.
+  clockNow = 1000;
+  spinBLEClient.scanProcess(5000);
+  assert(scanner.starts == starts + 1);
 }
 '''.replace("/* SLOT */", slot_class).replace("/* METHODS */", methods)
 

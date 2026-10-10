@@ -83,10 +83,17 @@ constexpr int ERG_FEEDBACK_WORSENING_WATTS = 25;
 // Selects when maintenance can use a relative table correction or a cadence seek.
 // ******************************************************************************
 // Trend-adjusted error must exceed this magnitude before maintenance tries a relative table correction, provided the previous move made progress.
+// The previous fresh report must also exceed it in the same direction, so one-report pedaling spikes stay on proportional control.
 // A quiet return inside ERG_MODE_PID_WINDOW re-arms table correction after proportional recovery.
 constexpr int ERG_TABLE_CORRECTION_WATTS = 44;
 // Cadence change from the last reference that can start a trusted maintenance seek; in-flight seeks track smaller changes too.
 constexpr int ERG_TABLE_CADENCE_SEEK_RPM = POWERTABLE_CAD_INCREMENT;
+// Cadence change from the reference before a trusted seek or proportional feedback compensates; smaller changes accumulate.
+// Keeps 1 RPM sensor/rider jitter from moving the motor.
+constexpr int ERG_CADENCE_FOLLOW_DEADBAND_RPM = 2;
+// Maximum cadence change proportional feedback compensates in one update; power feedback corrects any remainder.
+// A surge caused by a resistance drop must not immediately remove more resistance.
+constexpr int ERG_CADENCE_COMPENSATION_MAX_RPM = 3;
 // Blend the measured cadence-curve estimate with the normal forward lookup.
 constexpr double ERG_TABLE_CURVE_BLEND = 0.5;
 // ******************************************************************************

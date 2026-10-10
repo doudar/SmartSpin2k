@@ -25,7 +25,7 @@ class TestGearStorage(unittest.TestCase):
         source = (ROOT / "src/SmartSpin_parameters.cpp").read_text(encoding="utf-8")
         production = "\n".join(function(source, signature) for signature in (
             "void userParameters::setDefaults(", "String userParameters::returnJSON(",
-            "void userParameters::saveToLittleFS(", "void userParameters::loadFromLittleFS(",
+            "void userParameters::saveToLittleFS(", "bool userParameters::saveToLittleFSChecked(", "void userParameters::loadFromLittleFS(",
             "bool userParameters::setGearTeethJSON(",
         ))
         harness = r'''
@@ -35,22 +35,39 @@ class TestGearStorage(unittest.TestCase):
 #include "SmartSpin_parameters.h"
 #define SS2K_LOG(...) ((void)0)
 #define FILE_WRITE 1
-std::string fileContents;
+#include <map>
+#include <mutex>
+#include <algorithm>
+std::map<std::string,std::string> files;
+std::string &fileContents=files[configFILENAME];
+bool failWrite=false, failRename=false;
+int writes=0;
 struct File {
+  std::string *data=nullptr;
   size_t position=0;
-  bool valid=true;
-  operator bool() const { return valid; }
-  int read() { return position < fileContents.size() ? static_cast<unsigned char>(fileContents[position++]) : -1; }
+  operator bool() const { return data; }
+  size_t size() const { return data ? data->size() : 0; }
+  int read() { return data && position < data->size() ? static_cast<unsigned char>((*data)[position++]) : -1; }
   size_t readBytes(char* out,size_t length) {
-    size_t n=0; while(n<length && position<fileContents.size()) out[n++]=fileContents[position++]; return n;
+    size_t n=0; int c; while(n<length && (c=read())>=0) out[n++]=c; return n;
   }
-  size_t write(uint8_t c) { fileContents.push_back(c); return 1; }
-  size_t write(const uint8_t* data,size_t length) { fileContents.append(reinterpret_cast<const char*>(data),length); return length; }
+  size_t write(const uint8_t* bytes,size_t length) {
+    ++writes; if(failWrite) length/=2; data->append(reinterpret_cast<const char*>(bytes),length); return length;
+  }
+  void flush() {}
   void close() {}
 };
 struct MemoryFS {
-  void remove(const char*) { fileContents.clear(); }
-  File open(const char*,int mode=0) { File file; file.valid=mode || !fileContents.empty(); return file; }
+  void remove(const String &path) { files.erase(path.c_str()); }
+  File open(const String &path,const char *mode="r") {
+    auto found=files.find(path.c_str());
+    if(mode[0]=='w') { files[path.c_str()].clear(); return {&files[path.c_str()]}; }
+    return {found==files.end() ? nullptr : &found->second};
+  }
+  bool rename(const String &from,const String &to) {
+    if(failRename) return false;
+    files[to.c_str()]=files[from.c_str()]; files.erase(from.c_str()); return true;
+  }
 } LittleFS;
 PRODUCTION
 int main() {
@@ -59,6 +76,15 @@ int main() {
   assert(config.setGearTeethJSON("[5319,3432,5332,3419]"));
   const auto original=config.getGearProfile();
   config.saveToLittleFS();
+  int written=writes;
+  assert(config.saveToLittleFSChecked() && writes==written);
+  const std::string old=fileContents;
+  config.setPassword("private password");
+  failWrite=true; assert(!config.saveToLittleFSChecked() && fileContents==old); failWrite=false;
+  failRename=true; assert(!config.saveToLittleFSChecked() && fileContents==old); failRename=false;
+  assert(config.saveToLittleFSChecked());
+  JsonDocument publicApi; assert(!deserializeJson(publicApi,config.returnJSON(false)));
+  assert(publicApi["password"].isNull() && publicApi["passwordConfigured"]==true);
   JsonDocument saved; assert(!deserializeJson(saved,fileContents));
   assert(saved["gearTeeth"].size()==4 && saved["gearRatios"].isNull());
   restored.loadFromLittleFS();

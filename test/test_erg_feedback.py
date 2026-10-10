@@ -330,7 +330,7 @@ int main(int argc,char** argv) {
       rtConfig->watts.setTarget(310); step(27000,155);
       for(int t=28000;t<=38000;t+=1000) {
         // Changing the lookup result emulates moving table/cadence targets.
-        table.lookupResult+=20; rtConfig->cad.setValue(t%2000?94:95); step(t,310);
+        table.lookupResult+=20; rtConfig->cad.setValue(t%2000?92:96); step(t,310);
       }
       assert(logged("overall seek timeout"));
     }
@@ -362,9 +362,10 @@ int main(int argc,char** argv) {
     if(scenario=="growing_seek_collection") {
       // Falling cadence requires rising resistance; increasing cadence would
       // correctly reject these upward retargets as physically inconsistent.
-      table.lookupResult+=40;rtConfig->cad.setValue(93);step(28000,170);
+      const int retargetSteps=POWER_SAMPLE_POSITION_SPAN/2;
+      table.lookupResult+=retargetSteps;rtConfig->cad.setValue(94-ERG_CADENCE_FOLLOW_DEADBAND_RPM);step(28000,170);
       assert(controller.collectionAllowed());
-      table.lookupResult+=40;rtConfig->cad.setValue(92);step(29000,170);
+      table.lookupResult+=retargetSteps;rtConfig->cad.setValue(94-2*ERG_CADENCE_FOLLOW_DEADBAND_RPM);step(29000,170);
       assert(!controller.collectionAllowed()); // Individually small retargets cannot reset the origin.
     } else {
       step(28000,168); assert(controller.collectionAllowed());
@@ -375,10 +376,10 @@ int main(int argc,char** argv) {
   } else if(scenario=="cadence_feedback_reference") {
     setup(155,155);table.sloped=true;table.lookupResult=motor.current;
     for(int t=1000;t<=26000;t+=1000)step(t,155);
-    // A 45 W residual crosses the 44 W table-correction threshold, starting
-    // the acquisition whose cadence reference this scenario checks.
-    step(27000,200);step(28000,200);
-    rtConfig->cad.setValue(100);step(29000,180);step(30000,160);step(31000,155);
+    // Two consecutive 45 W residuals cross the 44 W table-correction threshold,
+    // starting the acquisition whose cadence reference this scenario checks.
+    step(27000,200);step(28000,200);step(29000,200);
+    rtConfig->cad.setValue(100);step(30000,180);step(31000,160);step(32000,155);
     assert(logged("power acquisition complete"));
     assert(!controller.isTableSeeking()); // Acquired feedback already includes the new cadence.
   } else if(scenario=="trusted_cadence_amend" || scenario=="unusable_cadence_wait" || scenario=="trusted_seek_safety") {
@@ -441,6 +442,27 @@ int main(int argc,char** argv) {
     assert(logged("now trusted"));
     rtConfig->watts.setTarget(175);step(56000,165);
     assert(controller.isTableSeeking());
+  } else if(scenario=="pedal_spike") {
+    // Trusted table at a steady target: a one-report surge (rider shifting on the
+    // saddle) must not trigger a table-sized reduction; a persistent one does.
+    setup(200,200);table.surface=true;rtConfig->cad.setValue(90);
+    for(int cad:{75,100})for(int watts:{90,180,270}) {
+      auto& entry=table.ptData.tableRow[(cad-60)/5].tableEntry[watts/30];
+      entry.targetPosition=std::lround((10000+(watts*90.0/cad-100)*20)/10);entry.readings=3;
+    }
+    motor.current=motor.target=table.lookup(200,90);rtConfig->setTargetIncline(motor.current);
+    for(int t=1000;t<=26000;t+=1000)step(t,200);
+    assert(logged("now trusted"));
+    const int before=motor.current;
+    const int maxChange=std::lround(userConfig->getStepperSpeed()*ERG_MODE_DELAY/1000.0);
+    step(27000,280);
+    assert(!logged("Table feedback correction"));assert(!logged("ERG feedback wait:"));
+    assert(rtConfig->getTargetIncline()>=before-maxChange); // Proportional response only.
+    step(28000,200);step(29000,200);
+    assert(!logged("Table feedback correction"));
+    for(int t=30000;t<=40000;t+=1000)step(t,200);
+    step(41000,280);step(42000,280);
+    assert(logged("Table feedback correction"));assert(logged("ERG feedback wait:"));
   } else if(scenario=="opposed_cadence") {
     setup(200,200);table.surface=true;rtConfig->cad.setValue(90);
     for(int cad:{75,100})for(int watts:{90,180,270}) {
@@ -451,6 +473,30 @@ int main(int argc,char** argv) {
     for(int t=1000;t<=26000;t+=1000)step(t,200);
     const int before=motor.current;rtConfig->cad.setValue(100);step(27000,160);
     assert(rtConfig->getTargetIncline()>before); // Never lower resistance when already 40 W below target.
+  } else if(scenario=="cadence_surge") {
+    // A 9 RPM surge (often caused by the previous resistance drop) is compensated
+    // by at most ERG_CADENCE_COMPENSATION_MAX_RPM; power feedback corrects the
+    // remainder. 1 RPM jitter does not compensate at all. 25 W under target keeps the
+    // maintenance cadence seek from taking over, so proportional feedback runs.
+    setup(200,200);table.surface=true;rtConfig->cad.setValue(90);
+    for(int cad:{80,85,90,95,100})for(int watts:{90,180,270}) {
+      auto& entry=table.ptData.tableRow[(cad-60)/5].tableEntry[watts/30];
+      entry.targetPosition=std::lround((10000+(watts*90.0/cad-100)*20)/10);entry.readings=3;
+    }
+    motor.current=motor.target=table.lookup(200,90);rtConfig->setTargetIncline(motor.current);
+    for(int t=1000;t<=26000;t+=1000)step(t,200);
+    assert(logged("now trusted"));
+    rtConfig->cad.setValue(91);step(27000,200);
+    assert(!logged("Cadence compensation"));
+    rtConfig->cad.setValue(99);step(28000,175);
+    assert(logged("90 -> 99rpm, applied +3rpm"));
+    step(29000,175);
+    assert(!logged("93 -> 99rpm")); // The move refreshed the reference; no second feed-forward.
+    // A slow 1 RPM-per-report drift accumulates across power-feedback moves until it reaches the deadband.
+    rtConfig->cad.setValue(100);step(30000,175);
+    assert(!logged("99 -> 100rpm"));
+    rtConfig->cad.setValue(101);step(31000,175);
+    assert(logged("99 -> 101rpm, applied +2rpm"));
   } else if(scenario.find("surface_")==0) {
     // Only two widely separated cadence rows, no samples above 270 W.
     // Both the production forward lookup and production controller run here.
@@ -546,6 +592,10 @@ int main(int argc,char** argv) {
     step(19000,watts);
     waits=0;
     for(const auto& entry:logs)if(entry.find("ERG feedback wait:")!=std::string::npos)++waits;
+    assert(waits==1); // One report beyond the limit is not yet persistent.
+    step(20000,watts);
+    waits=0;
+    for(const auto& entry:logs)if(entry.find("ERG feedback wait:")!=std::string::npos)++waits;
     assert(waits==2);
   } else if(scenario.find("miscalibrated_")==0) {
     // A shallow new table underestimates travel by 3x. Real power is delayed
@@ -638,7 +688,7 @@ class TestErgFeedback(unittest.TestCase):
                          "clamped_move", "clock_wrap", "trusted_seek", "trusted_seek_late_uptime", "simulation_1000", "simulation_2000", "simulation_3000",
                          "simulation_missing_2000", "trust_transients", "stale_seek", "seek_deadline", "sparse_seventy", "extrapolated_cadence",
                          "mode_entry", "stale_partial_motion", "small_seek_collection", "growing_seek_collection", "cadence_feedback_reference",
-                         "trusted_cadence_amend", "unusable_cadence_wait", "trusted_seek_safety", "fresh_table_gate", "opposed_cadence"]:
+                         "trusted_cadence_amend", "unusable_cadence_wait", "trusted_seek_safety", "fresh_table_gate", "opposed_cadence", "pedal_spike", "cadence_surge"]:
             with self.subTest(scenario=scenario):
                 subprocess.run([str(self.exe), scenario], check=True)
 

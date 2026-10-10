@@ -1,0 +1,16 @@
+{
+  "description": "Travel-limit stress: targets below the minimum-resistance floor, low-cadence efforts above the bike's maximum, and a pedaling stop. Absolute watts; FTP is ignored.",
+  "segments": [
+    {"duration_s": 300, "watts": 120, "cadence_rpm": 85},
+    {"duration_s": 180, "watts": 40, "cadence_rpm": 100},
+    {"duration_s": 120, "watts": 200, "cadence_rpm": 90},
+    {"duration_s": 60, "watts": 200, "cadence_rpm": 0},
+    {"duration_s": 120, "watts": 200, "cadence_rpm": 90},
+    {"duration_s": 30, "watts": 650, "cadence_rpm": 60},
+    {"duration_s": 180, "watts": 150, "cadence_rpm": 85},
+    {"duration_s": 30, "watts": 650, "cadence_rpm": 60},
+    {"duration_s": 300, "watts": 180, "cadence_rpm": 90},
+    {"duration_s": 120, "watts": 30, "cadence_rpm": 95},
+    {"duration_s": 300, "watts": 200, "cadence_rpm": 90}
+  ]
+}

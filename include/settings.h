@@ -133,8 +133,11 @@ const char* const DEFAULT_PASSWORD = "password";
 
 // Reconnect tries removed: connections now always instantiate a new NimBLEClient
 
-// loop speed for the SmartSpin2k BLE communications
+// Baseline telemetry / BLE housekeeping; fresh power may accelerate CPS and FTMS.
 #define BLE_NOTIFY_DELAY 503
+#define BLE_POWER_NOTIFY_MAX_INTERVAL 1100
+#define BLE_POWER_NOTIFY_MIN_INTERVAL 200  // 5 Hz maximum, including heartbeat sends
+#define BLE_SENSOR_PACKETS_PER_PASS 4     // Per device; preserve parser order while bounding maintenance work
 
 // loop speed for the SmartSpin2k BLE Client reconnect
 #define BLE_CLIENT_DELAY 101
@@ -225,15 +228,24 @@ constexpr const char* ANY  = "any";
 // Number of similar power samples to take before writing to the Power Table
 #define POWER_SAMPLES 3
 
-// Persisted reliability count; independent of the shorter learning history.
+// Maximum persisted reading count per cell; reliability stops increasing at this cap.
 #define MAX_NEIGHBOR_WEIGHT 20
-// Learning history is deliberately shorter than the persisted reliability count.
+// Cap historical weight when averaging/fitting positions; at the cap, each new observation contributes 1 / (history + 1).
 #define POWER_TABLE_HISTORY         4
+// Maximum power-report age and gap between reports in ms; exceeding either restarts acquisition.
 #define POWER_SAMPLE_MAX_AGE_MS     1500
-#define POWER_SAMPLE_MIN_SPACING_MS 750
+// Minimum time in ms between accepted power samples within one learning window.
+#define POWER_SAMPLE_MIN_SPACING_MS 475
+// Stable motor/cadence dwell in ms before accepting samples; consecutive stable windows need no extra dwell.
 #define POWER_SAMPLE_SETTLE_MS      2000
-#define POWER_SAMPLE_POSITION_SPAN  100
+// Maximum position spread during acquisition and pending target travel, in full motor steps (before TABLE_DIVISOR scaling).
+#define POWER_SAMPLE_POSITION_SPAN  250
+// Maximum cadence spread (highest minus lowest RPM) during acquisition; exceeding it restarts settling.
 #define POWER_SAMPLE_CADENCE_SPAN   3
+// Minimum allowed peak-to-peak power spread in watts; the percentage allowance can raise this limit.
+#define POWER_SAMPLE_WATT_SPAN_MIN  20
+// Allowed peak-to-peak power spread as a percentage of the midpoint of the lowest/highest watts, subject to the watt floor.
+#define POWER_SAMPLE_WATT_SPAN_PERCENT 20
 
 // How often in ms to save the power table if no new data is added and user is pedaling.
 #define POWER_TABLE_SAVE_INTERVAL 240000

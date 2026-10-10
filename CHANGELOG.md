@@ -10,7 +10,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Added
 
 ### Changed
+
+### Hardware
+
+
+## [26.10.1]
+
+### Added
+
+### Changed
 - Restore thermal current limits and motor inhibition immediately when homing exits, including early returns and previously latched thermal/sensor faults.
+- ERG table feedback corrections now require two consecutive power reports beyond the correction threshold, so single-report pedaling spikes no longer cause large resistance drops.
+- ERG cadence following ignores 1 RPM cadence jitter, and proportional cadence compensation applies at most 3 RPM per update (logged), so a cadence surge cannot remove a large amount of resistance at once.
 
 ### Hardware
 

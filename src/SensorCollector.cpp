@@ -91,6 +91,8 @@ void collectAndSet(const NimBLEUUID& charUUID, const NimBLEUUID& serviceUUID, co
         rtConfig->watts.setValue(0);
         SENSOR_LOG_APPEND(" PW IGNORED");
       }
+      // Count accepted samples, including repeated watts and real zero power.
+      if (power >= 0 && power < 3000) spinBLEServer.notePowerSample();
     }
   }
 
