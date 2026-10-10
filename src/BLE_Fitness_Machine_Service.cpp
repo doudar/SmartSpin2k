@@ -68,10 +68,9 @@ void BLE_Fitness_Machine_Service::setupService(NimBLEServer *pServer, MyCharacte
   });
 }
 
-void BLE_Fitness_Machine_Service::update() {
+bool BLE_Fitness_Machine_Service::update() {
   std::vector<uint8_t> ftmsIndoorBikeData;
 
-  this->processFTMSWrite();
 
   // Calculate Speed for FTMS
   int speedFtmsUnit = 0;
@@ -134,17 +133,21 @@ void BLE_Fitness_Machine_Service::update() {
   // Notify the cycling power measurement characteristic
   // Need to set the value before notifying so that read works correctly.
   fitnessMachineIndoorBikeData->setValue(ftmsIndoorBikeData.data(), ftmsIndoorBikeData.size());
-  fitnessMachineIndoorBikeData->notify();
+  const bool sent = fitnessMachineIndoorBikeData->notify();
 
   // Also notify DirCon TCP clients about Indoor Bike Data
   DirConManager::notifyCharacteristic(NimBLEUUID(FITNESSMACHINESERVICE_UUID), fitnessMachineIndoorBikeData->getUUID(), ftmsIndoorBikeData.data(), ftmsIndoorBikeData.size());
 
+  static uint32_t lastLog = 0;
+  if (uint32_t(millis() - lastLog) < BLE_NOTIFY_DELAY) return sent;
+  lastLog = millis();
   const int kLogBufCapacity = 200;  // Data(30), Sep(data/2), Arrow(3), CharId(37), Sep(3), CharId(37), Sep(3), Name(10), Prefix(2), HR(7), SEP(1), CD(10), SEP(1), PW(8),
                                     // SEP(1), SD(7), Suffix(2), Nul(1), rounded up
   char logBuf[kLogBufCapacity];
   logCharacteristic(logBuf, kLogBufCapacity, ftmsIndoorBikeData.data(), ftmsIndoorBikeData.size(), FITNESSMACHINESERVICE_UUID, fitnessMachineIndoorBikeData->getUUID(),
                     "FTMS(IBD)[ HR(%d) CD(%.2f) PW(%d) SD(%.2f) ]", rtConfig->hr.getValue() % 1000, fmodf(rtConfig->cad.getValue(), 1000.0), rtConfig->watts.getValue() % 10000,
                     fmodf((float)speedFtmsUnit / 100.0, 1000.0));
+  return sent;
 }
 
 // The things that happen when we receive a FitnessMachineControlPointProcedure from a Client.

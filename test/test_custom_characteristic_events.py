@@ -80,7 +80,9 @@ int main() {
 
   for (unsigned i = 0; i < 8; ++i) callback.onWrite(&characteristic, first);
   callback.onStatus(&characteristic, second, 14); // Reserved acknowledgment slot.
+  callback.onStatus(&characteristic, first, 14); // Per-peer fallback also preserves this ACK.
   assert(bleEvents.takeDropped() == 1 && bleEvents.takeDropped() == 0);
+  assert(bleEvents.pop(event) && event.isStatus && event.peer == 1 && event.status == 14);
   for (unsigned i = 0; i < 7; ++i) assert(bleEvents.pop(event) && !event.isStatus);
   assert(bleEvents.pop(event) && event.isStatus && event.peer == 2 && event.status == 14);
   assert(!bleEvents.pop(event));

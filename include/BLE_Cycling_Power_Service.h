@@ -14,7 +14,7 @@ class BLE_Cycling_Power_Service {
  public:
   BLE_Cycling_Power_Service();
   void setupService(NimBLEServer *pServer, MyCharacteristicCallbacks *chrCallbacks);
-  void update();
+  bool update();  // False when the BLE stack rejects a telemetry send.
 
  private:
   BLEService *pPowerMonitor;

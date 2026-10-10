@@ -145,30 +145,31 @@
       });
     }
 
-    function requestConfigValues() {
-      if (updatePending) return;
-
+    async function requestValues(url, group) {
+      if (updatePending || document.hidden) return;
       updatePending = true;
-      fetch('/configJSON')
-        .then(response => response.json())
-        .then(data => {
-          updateValuesFromJson(data, 'settings');
-        })
-        .catch(error => console.error('Error:', error))
-        .finally(() => updatePending = false);
+      const controller = new AbortController();
+      const timeout = setTimeout(() => controller.abort(), 5000);
+      try {
+        const response = await fetch(url, {signal: controller.signal, cache: 'no-store'});
+        if (!response.ok) throw new Error(`Request failed (${response.status})`);
+        updateValuesFromJson(await response.json(), group);
+      } catch (error) {
+        console.error('Status read failed:', error);
+      } finally {
+        clearTimeout(timeout);
+        updatePending = false;
+      }
     }
+    function requestConfigValues() { return requestValues('/configJSON', 'settings'); }
+    function requestRuntimeValues() { return requestValues('/runtimeConfigJSON', 'runtime'); }
 
-    function requestRuntimeValues() {
-      if (updatePending) return;
-
-      updatePending = true;
-      fetch('/runtimeConfigJSON')
-        .then(response => response.json())
-        .then(data => {
-          updateValuesFromJson(data, 'runtime');
-        })
-        .catch(error => console.error('Error:', error))
-        .finally(() => updatePending = false);
+    let logRenderTimer;
+    function renderLogs() {
+      logRenderTimer = undefined;
+      const debugElement = document.getElementById('debug');
+      debugElement.textContent = logEntries.join('\n');
+      if (document.getElementById('follow').checked) debugElement.scrollTop = debugElement.scrollHeight;
     }
 
     function setupLogging() {
@@ -195,15 +196,8 @@
           lastLogMessageTime = Date.now();
           logEntries.push(evt.data);
 
-          if (logEntries.length > maxLogentries) {
-            logEntries = logEntries.slice(1, logEntries.length - 10);
-          }
-
-          debugElement.innerHTML = logEntries.join("<br>");
-
-          if (followElement.checked) {
-            debugElement.scrollTop = debugElement.scrollHeight - debugElement.clientHeight;
-          }
+          if (logEntries.length > maxLogentries) logEntries.splice(0, logEntries.length - maxLogentries);
+          if (!logRenderTimer) logRenderTimer = setTimeout(renderLogs, 100);
         };
       } catch (e) {
         console.error("Could not connect to Websocket.", e);
@@ -214,16 +208,15 @@
       }
     }
 
-    window.addEventListener('load', () => {
-      requestConfigValues();
+    window.addEventListener('DOMContentLoaded', () => {
+      requestConfigValues().then(requestRuntimeValues);
       setupLogging();
-      setTimeout(requestRuntimeValues, 200);
       startUpdate();
     });
 
     document.getElementById('saveLogButton').addEventListener('click', () => {
       const debugElement = document.getElementById('debug');
-      logContent = debugElement.textContent;
+      let logContent = logEntries.join('\n');
       logContent = logContent.replace(/(\[\s*\d+\])/g, '\n$1');
       const blob = new Blob([logContent], { type: 'text/plain' });
       const url = URL.createObjectURL(blob);

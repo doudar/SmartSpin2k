@@ -22,6 +22,8 @@
 #include "BLE_Custom_Characteristic.h"
 #include "BLE_Device_Information_Service.h"
 #include "BLE_OpenBikeControl_Service.h"
+#include "AdaptiveTelemetry.h"
+#include "CyclingRevolutions.h"
 
 // BLE Server Settings
 SpinBLEServer spinBLEServer;
@@ -173,13 +175,26 @@ void SpinBLEServer::update() {
   spinBLEServer.updateWheelAndCrankRev();
   // update the BLE information on the server
   heartService.update();
-  cyclingPowerService.update();
   cyclingSpeedCadenceService.update();
-  fitnessMachineService.update();
+  fitnessMachineService.processFTMSWrite();
   // DirCon snapshot pacing only; deferred BLE callbacks run in the fast loop.
   ss2kCustomCharacteristic.update();
   // OpenBikeControl sends event-driven notifications from shift handlers.
   // sb20Service.notify();
+}
+
+void SpinBLEServer::updatePowerTelemetry() {
+  if (ss2k->isUpdating) return;
+  static AdaptiveTelemetry schedule(BLE_POWER_NOTIFY_MAX_INTERVAL, BLE_POWER_NOTIFY_MIN_INTERVAL);
+  const uint32_t sequence = powerSampleSequence.load();
+  const bool constrained = spinBLEClient.connectionSetupActive.load() || NimBLEDevice::getScan()->isScanning();
+  if (!schedule.due(millis(), sequence, constrained)) return;
+  updateWheelAndCrankRev();
+  // Both publishers run even if one fails. A failed attempt backs off rather than
+  // replaying old samples, and baseline sends share the same 5 Hz ceiling.
+  const bool powerSent = cyclingPowerService.update();
+  const bool ftmsSent = fitnessMachineService.update();
+  schedule.attempted(millis(), sequence, powerSent && ftmsSent);
 }
 
 double SpinBLEServer::calculateSpeed() {
@@ -215,33 +230,22 @@ double SpinBLEServer::calculateSpeed() {
 }
 
 void SpinBLEServer::updateWheelAndCrankRev() {
-  float wheelSize     = 2.127;  // 700cX28 circumference, typical in meters
-  float wheelSpeedMps = 0.0;
-  if (rtConfig->getSimulatedSpeed() > 5) {
-    wheelSpeedMps = rtConfig->getSimulatedSpeed() / 3.6;
-  } else {
-    wheelSpeedMps = this->calculateSpeed() / 3.6;  // covert km/h to m/s
-  }
-
-  // Calculate wheel revolutions per minute
-  float wheelRpm = (wheelSpeedMps / wheelSize) * 60;
-  if (wheelRpm > 0) {
-    double wheelRevPeriod = (60 * 1024) / wheelRpm;
-    spinBLEClient.cscCumulativeWheelRev++;                // Increment cumulative wheel revolutions
-    spinBLEClient.cscLastWheelEvtTime += wheelRevPeriod;  // Convert RPM to time, ensuring no division by zero
-  }
-
-  float cadence = rtConfig->cad.getValue();
-  if (cadence > 0) {
-    float crankRevPeriod = (60 * 1024) / cadence;
-    spinBLEClient.cscCumulativeCrankRev++;
-    spinBLEClient.cscLastCrankEvtTime += crankRevPeriod;
-  }
+  static CyclingRevolutions wheel, crank;
+  const double speedKph = rtConfig->getSimulatedSpeed() > 5 ? rtConfig->getSimulatedSpeed() : calculateSpeed();
+  const uint32_t now = millis();
+  wheel.update(now, speedKph / 3.6 / 2.127 * 60.0);
+  crank.update(now, rtConfig->cad.getValue());
+  spinBLEClient.cscCumulativeWheelRev = wheel.count();
+  spinBLEClient.cscLastWheelEvtTime = wheel.eventTime(1024);
+  spinBLEClient.cpsLastWheelEvtTime = wheel.eventTime(2048);
+  spinBLEClient.cscCumulativeCrankRev = static_cast<uint16_t>(crank.count());
+  spinBLEClient.cscLastCrankEvtTime = crank.eventTime(1024);
 }
 
 // Creating Server Connection Callbacks
 void MyServerCallbacks::onConnect(NimBLEServer* pServer, NimBLEConnInfo& connInfo) {
   BLE_ss2kCustomCharacteristic::onConnect(connInfo.getConnHandle());
+  onConnParamsUpdate(connInfo);
   SS2K_LOG(BLE_SERVER_LOG_TAG, "Bluetooth Remote Client Connected: %s Connected Clients: %d", connInfo.getAddress().toString().c_str(), pServer->getConnectedCount());
   BLERequestMtuExchange(connInfo.getConnHandle());
 
@@ -265,9 +269,9 @@ void MyServerCallbacks::onMTUChange(uint16_t MTU, NimBLEConnInfo& connInfo) {
   SS2K_LOG(BLE_SERVER_LOG_TAG, "ATT MTU updated to %u for connection %u", MTU, connInfo.getConnHandle());
 }
 
-bool MyServerCallbacks::onConnParamsUpdateRequest(uint16_t handle, const ble_gap_upd_params*) {
-  SS2K_LOG(BLE_SERVER_LOG_TAG, "Updated Server Connection Parameters for handle: %d", handle);
-  return true;
+void MyServerCallbacks::onConnParamsUpdate(NimBLEConnInfo& connInfo) {
+  SS2K_LOG(BLE_SERVER_LOG_TAG, "App link conn=%u interval=%.2f ms latency=%u timeout=%u ms", connInfo.getConnHandle(),
+           connInfo.getConnInterval() * 1.25, connInfo.getConnLatency(), connInfo.getConnTimeout() * 10);
 }
 
 // END SERVER CALLBACKS

@@ -25,6 +25,7 @@ class BLE_ss2kCustomCharacteristic {
                       bool indicateResponse = true);
   // Custom Characteristic value that needs to be notified
   static void notify(char _item, int tableRow = -1);
+  static bool scanResultsPending();
   static void beginScanResults();
   static void notifyScanResult(const String& name, const NimBLEUUID& serviceUuid);
   static void endScanResults();

@@ -16,12 +16,12 @@
     </header>
 
     <main>
-      <div id="loadingWatermark" class="watermark">Loading</div>
+      <div id="loadingWatermark" class="watermark" role="status" aria-live="polite">Connecting…</div>
       <h1 class="brand">Settings</h1>
       
       <div id="saveStatus" class="status-message"></div>
       
-      <form action="/send_settings">
+      <form action="/send_settings" method="post">
         <div id="settingsContainer" class="settings-grid">
           <!-- Settings will be generated here by JavaScript -->
         </div>
@@ -288,7 +288,7 @@
       if (isPassword) {
         html += `
           <div class="input-group" style="padding: 0.5rem;">
-            <input type="${isPassword ? 'password' : 'text'}" id="${id}" name="${id}" value="${config.defaultValue}" />
+            <input type="${isPassword ? 'password' : 'text'}" id="${id}" name="${id}" value="" placeholder="Leave blank to keep existing password" />
             <label style="display: flex; align-items: center; gap: 0.5rem; margin-top: 0.5rem;">
               <input type="checkbox" id="showpassword" name="showpassword" onclick="toggleShowPassword()">
               Show Password
@@ -370,6 +370,9 @@
     }
 
     let debounceTimer;
+    let saveInFlight = false;
+    let settingsLoaded = false;
+    const dirtySettings = new Map();
     const saveStatus = document.getElementById('saveStatus');
     const confirmDialog = document.getElementById('confirmDialog');
 
@@ -391,30 +394,53 @@
         .catch(error => showSaveStatus('Failed to reset settings', 'error'));
     }
 
+    let saveStatusTimer;
     function showSaveStatus(message, type = 'info') {
+      clearTimeout(saveStatusTimer);
       saveStatus.textContent = message;
       saveStatus.className = `status-message ${type}`;
-      setTimeout(() => {
+      if (type !== 'error') saveStatusTimer = setTimeout(() => {
         saveStatus.textContent = '';
         saveStatus.className = 'status-message';
       }, 3000);
     }
 
+    let configRetryTimer;
     function startConfigUpdate() {
-      setTimeout(() => {
-        if (document.getElementById('ssid').value === 'loading') {
-          requestConfigValues();
-        }
-      }, 1500);
+      clearTimeout(configRetryTimer);
+      configRetryTimer = setTimeout(requestConfigValues, 1000);
+    }
+
+    // Keep one read in flight; stalled requests must not accumulate retries.
+    let pageReadPending = false;
+    async function fetchPageData(url) {
+      if (pageReadPending) return null;
+      pageReadPending = true;
+      const controller = new AbortController();
+      const timeout = setTimeout(() => controller.abort(), 5000);
+      try {
+        const response = await fetch(url, { signal: controller.signal, cache: 'no-store' });
+        if (!response.ok) throw new Error(`Request failed (${response.status})`);
+        return await response.json();
+      } catch (error) {
+        const indicator = document.getElementById('loadingWatermark');
+        if (indicator) indicator.textContent = 'Connection slow — retrying…';
+        throw error;
+      } finally {
+        clearTimeout(timeout);
+        pageReadPending = false;
+      }
     }
 
     function requestConfigValues() {
-      var xhttp = new XMLHttpRequest();
-      xhttp.onreadystatechange = function () {
-        if (this.readyState == 4 && this.status == 200) {
-          var obj = JSON.parse(this.responseText);
+      clearTimeout(configRetryTimer);
+      fetchPageData('/configJSON')
+        .then(obj => {
+          if (!obj) return;
+          settingsLoaded = true;
           document.getElementById('gearTeeth').disabled = false;
           for (const key in obj) {
+            if (key === 'password') continue;
             const el = document.getElementById(key);
             if (el) {
               if (key === 'gearTeeth') {
@@ -435,16 +461,15 @@
           if (loadingWatermark) {
             loadingWatermark.remove();
           }
-        } else {
+        })
+        .catch(error => {
+          console.error('Settings load failed:', error);
           startConfigUpdate();
-        }
-      };
-      xhttp.open("GET", "/configJSON", true);
-      xhttp.send();
+        });
     }
 
     function updateSlider(x, valueElement) {
-      valueElement.innerHTML = x;
+      valueElement.textContent = x;
     }
 
     function updateSliderAndSend(element, valueElement) {
@@ -464,52 +489,64 @@
       input.type = input.type === 'password' ? 'text' : 'password';
     }
 
-    function sendSetting(element) {
-      clearTimeout(debounceTimer);
-      debounceTimer = setTimeout(() => {
-        const params = new URLSearchParams();
-        
-        if (element.type === 'checkbox') {
-          if (element.checked) params.append(element.name, 'true');
-        } else {
-          params.append(element.name, element.value);
-        }
-
-        // Marks this as a settings-page update so omitted checkboxes are saved as false.
-        params.set('shiftStep', document.getElementById('shiftStep').value);
-        
-        const toggleIds = Object.entries(settingsConfig)
-          .filter(([_, config]) => config.type === 'toggle')
-          .map(([id, _]) => id);
-        
-        toggleIds.forEach(id => {
-          if (document.getElementById(id).checked) {
-            params.append(id, 'true');
-          }
-        });
-        
-        fetch('/send_settings?' + params.toString(), { method: 'GET' })
-          .then(async response => {
-            if (!response.ok) throw new Error(await response.text());
-            showSaveStatus('Settings saved', 'success');
-          })
-          .catch(error => showSaveStatus(error.message || 'Failed to save settings', 'error'));
-      }, 300);
+    function queueSetting(element) {
+      if (!settingsLoaded || element.disabled || !element.name || element.name === 'showpassword') return;
+      if (element.name === 'password' && !element.value) return;
+      // The groupset selector can switch between two mutually exclusive fields.
+      if (element.name === 'gearPreset') dirtySettings.delete('gearTeeth');
+      if (element.name === 'gearTeeth') dirtySettings.delete('gearPreset');
+      dirtySettings.set(element.name, element.type === 'checkbox' ? String(element.checked) : element.value);
     }
 
-    window.addEventListener('load', () => {
+    function sendSetting(element) {
+      queueSetting(element);
+      clearTimeout(debounceTimer);
+      debounceTimer = setTimeout(flushSettings, 300);
+    }
+
+    async function flushSettings() {
+      clearTimeout(debounceTimer);
+      if (saveInFlight || !dirtySettings.size) return;
+      const batch = new Map(dirtySettings);
+      dirtySettings.clear();
+      saveInFlight = true;
+      const controller = new AbortController();
+      const timeout = setTimeout(() => controller.abort(), 8000);
+      let saved = false;
+      showSaveStatus('Saving…');
+      try {
+        const response = await fetch('/send_settings', {
+          method: 'POST', body: new URLSearchParams(batch), signal: controller.signal
+        });
+        if (!response.ok) throw new Error(await response.text());
+        saved = true;
+        if (batch.has('password')) {
+          const input = document.getElementById('password');
+          if (input.value === batch.get('password')) input.value = '';
+        }
+        if (!dirtySettings.size) showSaveStatus('Settings saved', 'success');
+      } catch (error) {
+        // Preserve newer edits, and let Save retry after an uncertain/failed response.
+        for (const [key, value] of batch) {
+          const alternate = key === 'gearPreset' ? 'gearTeeth' : key === 'gearTeeth' ? 'gearPreset' : null;
+          if (!dirtySettings.has(key) && (!alternate || !dirtySettings.has(alternate))) dirtySettings.set(key, value);
+        }
+        showSaveStatus('Save not confirmed. Press Save to retry. ' + error.message, 'error');
+      } finally {
+        clearTimeout(timeout);
+        saveInFlight = false;
+      }
+      if (saved && dirtySettings.size) flushSettings();
+    }
+
+    window.addEventListener('DOMContentLoaded', () => {
       generateSettings();
-      startConfigUpdate();
+      requestConfigValues();
       document.querySelector('form').addEventListener('submit', async event => {
         event.preventDefault();
-        const params = new URLSearchParams(new FormData(event.target));
-        try {
-          const response = await fetch('/send_settings?' + params.toString());
-          if (!response.ok) throw new Error(await response.text());
-          showSaveStatus('Settings saved', 'success');
-        } catch (error) {
-          showSaveStatus(error.message, 'error');
-        }
+        if (!event.target.reportValidity()) return;
+        for (const element of event.target.elements) queueSetting(element);
+        flushSettings();
       });
     });
   </script>

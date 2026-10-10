@@ -14,7 +14,7 @@ class BLE_Fitness_Machine_Service {
  public:
   BLE_Fitness_Machine_Service();
   void setupService(NimBLEServer *pServer, MyCharacteristicCallbacks *chrCallbacks);
-  void update();
+  bool update();  // False when the BLE stack rejects a telemetry send.
   bool spinDown(uint8_t response);
   void processFTMSWrite();
   

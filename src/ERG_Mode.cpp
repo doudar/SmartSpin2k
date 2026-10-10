@@ -209,7 +209,8 @@ void ErgMode::computeErg() {
   const auto powerSample = rtConfig->watts.getValueSample();
   if ((this->prevWatts.getValueSample().timestamp == powerSample.timestamp && this->prevWatts.getTarget() == rtConfig->watts.getTarget()) || powerSample.value < 0 ||
       static_cast<uint32_t>(millis()) - powerSample.timestamp > ERG_FEEDBACK_MAX_AGE_MS) {
-    SS2K_LOG(ERG_MODE_LOG_TAG, "Watts previously processed.");
+    // Expected on repeated checks, especially while a changed target waits for
+    // fresh power. Keep this fast-path rejection silent.
     return;
   }
 

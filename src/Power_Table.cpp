@@ -38,13 +38,18 @@ int PowerBuffer::getReadings() {
 void PowerTable::processPowerValue(PowerBuffer& buffer, int cadence, const Measurement& watts, bool learningAllowed) {
   const auto sample  = watts.getValueSample();
   const uint32_t now = millis();  // Read after the snapshot to avoid unsigned age underflow.
-  const auto resetCollection = [&](const char* reason) {
+  const auto resetCollection = [&](const char* reason, bool restartSettleWait = true) {
     // Report lost acquisition windows, not every disabled 700 ms poll.
     if (buffer.stable) {
-      SS2K_LOG(POWERTABLE_LOG_TAG, "Collection reset: %s, samples=%d, positionSpan=%ld, cadenceSpan=%d", reason, buffer.getReadings(),
-               static_cast<long>(buffer.maximumPosition - buffer.minimumPosition), buffer.maximumCadence - buffer.minimumCadence);
+      SS2K_LOG(POWERTABLE_LOG_TAG, "Collection reset: %s, samples=%d, positionSpan=%ld, cadenceSpan=%d, restartSettleWait=%d", reason, buffer.getReadings(),
+               static_cast<long>(buffer.maximumPosition - buffer.minimumPosition), buffer.maximumCadence - buffer.minimumCadence, restartSettleWait);
     }
-    buffer.reset();
+    if (restartSettleWait) {
+      buffer.reset();
+    } else {
+      // Preserve settling time and accumulated motion/cadence spans.
+      buffer.clearSamples();
+    }
   };
   const bool fresh   = !buffer.seenReport || sample.timestamp != buffer.lastReport;
   const bool gap     = buffer.seenReport && static_cast<uint32_t>(sample.timestamp - buffer.lastReport) > POWER_SAMPLE_MAX_AGE_MS;
@@ -97,9 +102,11 @@ void PowerTable::processPowerValue(PowerBuffer& buffer, int cadence, const Measu
     minimumWatts = std::min(minimumWatts, entry.watts);
     maximumWatts = std::max(maximumWatts, entry.watts);
   }
-  if (maximumWatts - minimumWatts > std::max(20, (maximumWatts + minimumWatts) * 15 / 200)) {
-    resetCollection("power span");
-    return;
+  const int allowedWattSpan = std::max(POWER_SAMPLE_WATT_SPAN_MIN, (maximumWatts + minimumWatts) * POWER_SAMPLE_WATT_SPAN_PERCENT / 200);
+  if (maximumWatts - minimumWatts > allowedWattSpan) {
+    // Power noise does not invalidate the motor/cadence settling guard. Start
+    // another window with this fresh sample; still require three similar reports.
+    resetCollection("power span", false);
   }
   buffer.set(buffer.getReadings(), sample.value, cadence, position);
   buffer.lastAccepted = sample.timestamp;

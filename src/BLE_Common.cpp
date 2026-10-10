@@ -55,6 +55,19 @@ const BLEServiceInfo* getDeviceServiceInfo(const NimBLEAdvertisedDevice* adverti
   return nullptr;
 }
 
+// Fast maintenance path: bounded, ordered input processing, without discovery,
+// keepalives, disconnect checks, advertising, or outgoing notification bursts.
+void BLEProcessSensorData() {
+  for (auto& device : spinBLEClient.myBLEDevices) {
+    if (device.connectedClientID == BLE_HS_CONN_HANDLE_NONE || device.doConnect || !device.getAdvertisement() || device.serviceUUID == HID_SERVICE_UUID) continue;
+    for (unsigned i = 0; i < BLE_SENSOR_PACKETS_PER_PASS; ++i) {
+      NotifyData data = device.dequeueData();
+      if (!data.length) break;
+      collectAndSet(data.charUUID, data.serviceUUID, device.uniqueName, data.data, data.length);
+    }
+  }
+}
+
 void BLECommunications() {
   // **********************************Client***************************************
   for (auto& _BLEd : spinBLEClient.myBLEDevices) {  // loop through discovered devices
@@ -75,22 +88,7 @@ void BLECommunications() {
               }
               // Handle BLE HID Remotes
               if (_BLEd.serviceUUID == HID_SERVICE_UUID) {
-                spinBLEClient.keepAliveBLE_HID(pClient);  // keep alive doesn't seem to help
                 continue;                                 // There is not data that needs to be dequeued for the remote, so got to the next device.
-              }
-              // Dequeue sensor data we stored during notifications
-              while (pdTRUE) {
-                NotifyData incomingNotifyData = _BLEd.dequeueData();
-                if (incomingNotifyData.length == 0) {
-                  break;
-                }
-                size_t length = incomingNotifyData.length;
-                uint8_t pData[length];
-
-                for (size_t i = 0; i < length; i++) {
-                  pData[i] = incomingNotifyData.data[i];
-                }
-                collectAndSet(incomingNotifyData.charUUID, incomingNotifyData.serviceUUID, _BLEd.uniqueName, pData, length);
               }
             } else if (!pClient->isConnected()) {  // This is a workaround for a bug in NimBLE where onDisconnect() is not called automatically.
               MyClientCallback workaroundCallback;

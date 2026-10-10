@@ -88,7 +88,7 @@ int main(int argc, char** argv) {
     for(int i=0;i<POWER_SAMPLES+2;++i)feed();
     assert(commits==1); assert(table.ptData.tableRow[4].tableEntry[7].targetPosition==1500);
     for(int i=0;i<POWER_SAMPLES;++i)feed(); assert(commits==2);
-  } else if(scenario=="motion" || scenario=="pending_motion" || scenario=="cadence" || scenario=="power_spike" || scenario=="gap" || scenario=="stop" ||
+  } else if(scenario=="motion" || scenario=="pending_motion" || scenario=="cadence" || scenario=="gap" || scenario=="stop" ||
             scenario=="blocked" || scenario=="epoch" || scenario=="simulated") {
     for(int i=0;i<POWER_SAMPLES+1;++i)feed(); assert(buffer.getReadings()==POWER_SAMPLES-1);
     if(scenario=="motion")motor.current=motor.target=15500;
@@ -96,11 +96,37 @@ int main(int argc, char** argv) {
     if(scenario=="gap")clockMs+=3000;
     if(scenario=="epoch")++table.positionEpoch;
     if(scenario=="simulated")rtConfig->watts.setSimulate(true);
-    feed(scenario!="gap",scenario=="power_spike"?300:210,scenario=="stop"?0:scenario=="cadence"?85:80,scenario!="blocked");
+    feed(scenario!="gap",210,scenario=="stop"?0:scenario=="cadence"?85:80,scenario!="blocked");
     assert(buffer.getReadings()==0 && commits==0);
     rtConfig->watts.setSimulate(false);motor.current=motor.target=16000;
     for(int i=0;i<POWER_SAMPLES+2;++i)feed();
     assert(commits==1 && table.ptData.tableRow[4].tableEntry[7].targetPosition==1600);
+  } else if(scenario=="high_power_noise") {
+    feed(true,600); feed(true,600);
+    feed(true,550); feed(true,650); feed(true,600);
+    assert(commits==1 && buffer.getReadings()==0);
+    assert(table.ptData.tableRow[4].tableEntry[20].targetPosition==1500);
+  } else if(scenario=="power_spike") {
+    feed(); feed(); feed(); feed(); assert(buffer.getReadings()==2);
+    const auto settled=buffer.stableSince;
+    feed(true,420); assert(commits==0 && buffer.getReadings()==1);
+    feed(); assert(commits==0 && buffer.getReadings()==1);
+    assert(buffer.stable && buffer.stableSince==settled);
+    feed(); assert(commits==0); feed(); assert(commits==1);
+    assert(table.ptData.tableRow[4].tableEntry[7].targetPosition==1500);
+  } else if(scenario=="power_restart_motion") {
+    feed(); feed(); feed();
+    motor.current=motor.target=15060; feed(true,420);
+    assert(buffer.getReadings()==1);
+    motor.current=motor.target=15120; feed(true,420);
+    assert(commits==0 && buffer.getReadings()==0); // Restart must not erase cumulative travel.
+  } else if(scenario=="power_span_boundary" || scenario=="low_power_floor") {
+    const bool low=scenario=="low_power_floor";
+    const int lower=low?50:540, upper=low?70:660;
+    feed(true,lower); feed(true,lower); feed(true,lower); feed(true,upper);
+    assert(buffer.getReadings()==2 && commits==0);
+    feed(true,upper+1); // Just outside max(20 W, 20% of midpoint).
+    assert(buffer.getReadings()==1 && commits==0);
   } else if(scenario=="ftms") {
     // A discrepancy awaiting stationary confirmation must not block learning.
     table.ftmsCalibration.source=1; table.ftmsCalibration.maximum=30000;
@@ -203,7 +229,7 @@ class TestPowerTableLearning(unittest.TestCase):
                             "-I"+str(ROOT / "include"), "-I"+str(ROOT / "lib/SS2K/include"),
                             "-I"+str(ROOT / "lib/ArduinoCompat/include"), str(cpp),
                             str(ROOT / "src/PowerTable_Helpers.cpp"), "-o", str(exe)], check=True)
-            for scenario in ("duplicates", "fresh_equal", "wrap", "motion", "pending_motion", "cadence", "power_spike",
+            for scenario in ("high_power_noise", "power_restart_motion", "power_span_boundary", "low_power_floor", "duplicates", "fresh_equal", "wrap", "motion", "pending_motion", "cadence", "power_spike",
                              "gap", "stop", "blocked", "ftms", "epoch", "simulated", "poll_700ms", "small_moves", "cumulative_small_moves", "burst", "up", "down", "fraction",
                              "interior", "edge", "power_neighbor", "outlier", "grid", "grid_cadence", "bootstrap", "bootstrap_exact",
                              "anchor_epoch", "import", "random_surface", "notify_neighbors"):

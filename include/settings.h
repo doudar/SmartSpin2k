@@ -133,8 +133,11 @@ const char* const DEFAULT_PASSWORD = "password";
 
 // Reconnect tries removed: connections now always instantiate a new NimBLEClient
 
-// loop speed for the SmartSpin2k BLE communications
+// Baseline telemetry / BLE housekeeping; fresh power may accelerate CPS and FTMS.
 #define BLE_NOTIFY_DELAY 503
+#define BLE_POWER_NOTIFY_MAX_INTERVAL 1100
+#define BLE_POWER_NOTIFY_MIN_INTERVAL 200  // 5 Hz maximum, including heartbeat sends
+#define BLE_SENSOR_PACKETS_PER_PASS 4     // Per device; preserve parser order while bounding maintenance work
 
 // loop speed for the SmartSpin2k BLE Client reconnect
 #define BLE_CLIENT_DELAY 101
@@ -234,6 +237,9 @@ constexpr const char* ANY  = "any";
 #define POWER_SAMPLE_SETTLE_MS      2000
 #define POWER_SAMPLE_POSITION_SPAN  100
 #define POWER_SAMPLE_CADENCE_SPAN   3
+// Peak-to-peak power spread: retain the low-power floor and scale with effort.
+#define POWER_SAMPLE_WATT_SPAN_MIN  20
+#define POWER_SAMPLE_WATT_SPAN_PERCENT 20
 
 // How often in ms to save the power table if no new data is added and user is pedaling.
 #define POWER_TABLE_SAVE_INTERVAL 240000

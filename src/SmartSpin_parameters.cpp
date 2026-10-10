@@ -11,6 +11,9 @@
 
 #include <ArduinoJson.h>
 #include <LittleFS.h>
+#include <mutex>
+#include <algorithm>
+#include <cstring>
 
 String RuntimeParameters::returnJSON() {
   // Allocate a temporary JsonDocument
@@ -78,7 +81,7 @@ void userParameters::setDefaults() {
 
 //---------------------------------------------------------------------------------
 //-- return all config as one a single JSON string
-String userParameters::returnJSON() {
+String userParameters::returnJSON(bool includePassword) {
   // Allocate a temporary JsonDocument
   // Don't forget to change the capacity to match your requirements.
   // Use arduinojson.org/assistant to compute the capacity.
@@ -103,7 +106,8 @@ String userParameters::returnJSON() {
   doc["ERGSensitivity"]        = ERGSensitivity;
   doc["autoUpdate"]            = autoUpdate;
   doc["ssid"]                  = ssid;
-  doc["password"]              = password;
+  if (includePassword) doc["password"] = password;
+  else doc["passwordConfigured"] = password.length() != 0;
   doc["connectedPowerMeter"]   = connectedPowerMeter;
   doc["connectedHeartMonitor"] = connectedHeartMonitor;
   doc["connectedRemote"]       = connectedRemote;
@@ -125,17 +129,12 @@ String userParameters::returnJSON() {
 
 //-- Saves all parameters to LittleFS
 void userParameters::saveToLittleFS() {
-  // Delete existing file, otherwise the configuration is appended to the file
-  LittleFS.remove(configFILENAME);
+  if (!saveToLittleFSChecked()) SS2K_LOG(CONFIG_LOG_TAG, "Configuration save failed; previous file retained");
+}
 
-  // Open file for writing
-  SS2K_LOG(CONFIG_LOG_TAG, "Writing File: %s", configFILENAME);
-  File file = LittleFS.open(configFILENAME, FILE_WRITE);
-  if (!file) {
-    SS2K_LOG(CONFIG_LOG_TAG, "Failed to create file");
-    return;
-  }
-
+bool userParameters::saveToLittleFSChecked() {
+  static std::mutex saveMutex;
+  std::lock_guard<std::mutex> lock(saveMutex);
   // Allocate a temporary JsonDocument
   // Don't forget to change the capacity to match your requirements.
   // Use arduinojson.org/assistant to compute the capacity.
@@ -176,12 +175,40 @@ void userParameters::saveToLittleFS() {
   doc["hMax"]          = hMax;
   doc["homingSensitivity"]     = homingSensitivity;
 
-  // Serialize JSON to file
-  if (serializeJson(doc, file) == 0) {
-    SS2K_LOG(CONFIG_LOG_TAG, "Failed to write to file");
-  }
-  // Close the file
+  if (doc.overflowed()) return false;
+  String encoded;
+  if (serializeJson(doc, encoded) != measureJson(doc)) return false;
+  auto matches = [&encoded](File& input) {
+    if (!input || input.size() != encoded.length()) return false;
+    char buffer[128];
+    for (size_t offset = 0; offset < encoded.length();) {
+      const size_t count = std::min(sizeof(buffer), encoded.length() - offset);
+      if (input.readBytes(buffer, count) != count || memcmp(buffer, encoded.c_str() + offset, count) != 0) return false;
+      offset += count;
+    }
+    return true;
+  };
+  File previous = LittleFS.open(configFILENAME, "r");
+  const bool unchanged = matches(previous);
+  previous.close();
+  if (unchanged) return true;
+
+  const String temporary = String(configFILENAME) + ".tmp";
+  File file = LittleFS.open(temporary, "w");
+  if (!file) return false;
+  const size_t written = file.write(reinterpret_cast<const uint8_t*>(encoded.c_str()), encoded.length());
+  file.flush();
   file.close();
+  // Verify persisted bytes before replacing the working configuration.
+  File verify = LittleFS.open(temporary, "r");
+  const bool valid = written == encoded.length() && matches(verify);
+  verify.close();
+  if (!valid || !LittleFS.rename(temporary, configFILENAME)) {
+    LittleFS.remove(temporary);
+    return false;
+  }
+  SS2K_LOG(CONFIG_LOG_TAG, "Configuration saved");
+  return true;
 }
 
 // Loads the JSON configuration from a file into a userParameters Object

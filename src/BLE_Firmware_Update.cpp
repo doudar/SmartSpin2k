@@ -1,3 +1,4 @@
+#include "FirmwareUpdateOwner.h"
 /*
  * Copyright (C) 2020  Anthony Doud & Joel Baranick
  * All rights reserved
@@ -192,6 +193,7 @@ void failTransfer(BleFirmwareUpdate::Error error, const char* message, esp_err_t
   if (ss2k != nullptr) ss2k->isUpdating = false;
   publishStatus(notify ? transfer.connectionHandle : BLE_HS_CONN_HANDLE_NONE, notify);
   if (ss2k != nullptr) ss2k->rebootFlag = true;
+  FirmwareUpdateOwner::release(FirmwareUpdateOwner::Owner::Ble);
 }
 
 bool ownsTransfer(uint16_t connectionHandle) {
@@ -263,7 +265,7 @@ void startTransfer(const uint8_t* data, size_t length, NimBLEConnInfo& connInfo)
     publishTransientError(connInfo.getConnHandle(), BleFirmwareUpdate::Error::InvalidStartPacket);
     return;
   }
-  if (transfer.active || (ss2k != nullptr && ss2k->rebootFlag)) {
+  if (transfer.active || (ss2k != nullptr && ss2k->rebootFlag) || !FirmwareUpdateOwner::acquire(FirmwareUpdateOwner::Owner::Ble)) {
     publishTransientError(connInfo.getConnHandle(), BleFirmwareUpdate::Error::Busy);
     return;
   }

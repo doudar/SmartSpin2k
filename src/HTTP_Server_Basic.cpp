@@ -12,12 +12,12 @@
 #include "SS2KLog.h"
 #include "DirConManager.h"
 #include "FirmwareImageValidation.h"
-#include <WebServer.h>
-#include <HTTPClient.h>
+#include "NativeHttpServer.h"
+#include "FirmwareUpdateOwner.h"
+#include <esp_http_client.h>
 #include <LittleFS.h>
 #include <ESPmDNS.h>
 #include <WiFi.h>
-#include <WiFiClientSecure.h>
 #include <DNSServer.h>
 #include <ArduinoJson.h>
 #include <BLE_Custom_Characteristic.h>
@@ -32,7 +32,12 @@ IPAddress myIP;
 const byte DNS_PORT = 53;
 DNSServer dnsServer;
 HTTP_Server httpServer;
-WebServer server(80);
+NativeHttpServer server;
+using NativeUpload = NativeHttpServer::Upload;
+constexpr auto UPLOAD_FILE_START = NativeHttpServer::UPLOAD_FILE_START;
+constexpr auto UPLOAD_FILE_WRITE = NativeHttpServer::UPLOAD_FILE_WRITE;
+constexpr auto UPLOAD_FILE_END = NativeHttpServer::UPLOAD_FILE_END;
+constexpr auto UPLOAD_FILE_ABORTED = NativeHttpServer::UPLOAD_FILE_ABORTED;
 
 // Helper functions for build version management
 String readStoredBuildVersion() {
@@ -123,10 +128,10 @@ bool remountFilesystem() {
 }
 
 void rejectFirmwareUpload(const char* message, esp_err_t error = ESP_OK) {
+  server.rejectUpload();
   otaUploadRejected = true;
   otaUploadError    = message;
   abortFirmwareUpload();
-  ss2k->isUpdating = false;
   if (error == ESP_OK) {
     SS2K_LOGE(HTTP_SERVER_LOG_TAG, "%s", message);
   } else {
@@ -141,7 +146,7 @@ bool beginFirmwareUpload() {
     return false;
   }
 
-  // WebServer does not expose the file size until UPLOAD_FILE_END. Incremental
+  // Multipart file size is known at the final boundary. Incremental
   // erase avoids both a full-partition erase here and Arduino Update's 4 KiB
   // heap buffer, which can exhaust fragmented RAM on the classic ESP32.
   const esp_err_t result = esp_ota_begin(otaFirmwarePartition, OTA_WITH_SEQUENTIAL_WRITES, &otaFirmwareHandle);
@@ -185,10 +190,10 @@ bool finishFirmwareUpload() {
 }
 
 void rejectFilesystemUpload(const char* message, esp_err_t error = ESP_OK) {
+  server.rejectUpload();
   otaUploadRejected = true;
   otaUploadError    = message;
   resetFilesystemUpload();
-  ss2k->isUpdating = false;
   if (error == ESP_OK) {
     SS2K_LOGE(HTTP_SERVER_LOG_TAG, "%s", message);
   } else {
@@ -254,17 +259,49 @@ bool finishFilesystemUpload(size_t uploadedSize) {
   return true;
 }
 
-bool beginHttpRequest(HTTPClient& request, NetworkClient& client, const String& url) {
-  request.setConnectTimeout(3000);
-  request.setTimeout(5000);
-  if (request.begin(client, url)) return true;
-  SS2K_LOGE(HTTP_SERVER_LOG_TAG, "Unable to initialize HTTP request for %s", url.c_str());
-  return false;
-}
+// Download into a staging file; callers install it only after validation.
+bool downloadWebFile(const String& url, const String& destination) {
+  LittleFS.remove(destination);
+  esp_http_client_config_t config = {};
+  config.url = url.c_str();
+  config.cert_pem = rootCACertificate;
+  config.timeout_ms = 5000;
+  config.buffer_size = 1024;
+  config.disable_auto_redirect = true;
+  esp_http_client_handle_t client = esp_http_client_init(&config);
+  if (client == nullptr) {
+    SS2K_LOGE(HTTP_SERVER_LOG_TAG, "Unable to initialize HTTP request for %s", url.c_str());
+    return false;
+  }
 
-int beginHttpGet(HTTPClient& request, NetworkClient& client, const String& url) {
-  if (!beginHttpRequest(request, client, url)) return HTTPC_ERROR_CONNECTION_REFUSED;
-  return request.GET();
+  const esp_err_t result = esp_http_client_open(client, 0);
+  const int64_t length = result == ESP_OK ? esp_http_client_fetch_headers(client) : -1;
+  const int status = esp_http_client_get_status_code(client);
+  bool success = false;
+  size_t bytesWritten = 0;
+  if (result == ESP_OK && length >= 0 && status == 200) {
+    File file = LittleFS.open(destination, FILE_WRITE, true);
+    if (file) {
+      char buffer[1024];
+      int received;
+      while ((received = esp_http_client_read(client, buffer, sizeof(buffer))) > 0) {
+        const size_t written = file.write(reinterpret_cast<const uint8_t*>(buffer), received);
+        bytesWritten += written;
+        if (written != static_cast<size_t>(received)) break;
+      }
+      // A short write, timeout, or incomplete chunked/Content-Length body must
+      // never become an installed asset, even if some bytes arrived successfully.
+      success = received == 0 && esp_http_client_is_complete_data_received(client);
+      file.close();
+    }
+  }
+  esp_http_client_cleanup(client);
+  if (!success) {
+    LittleFS.remove(destination);
+    SS2K_LOGE(HTTP_SERVER_LOG_TAG, "Download failed: %s (HTTP %d, open %s, %u bytes written)", url.c_str(), status, esp_err_to_name(result),
+              static_cast<unsigned>(bytesWritten));
+  }
+  return success;
 }
 
 bool filesystemIndexExists() {
@@ -535,7 +572,9 @@ void stopWifi() {
 }
 
 void HTTP_Server::start() {
-  server.enableCORS(true);
+  static bool routesRegistered = false;
+  if (routesRegistered) { server.begin(); return; }
+  routesRegistered = true;
   server.onNotFound(handleIndexFile);
 
   /***************************Begin Handlers*******************/
@@ -555,6 +594,7 @@ void HTTP_Server::start() {
   server.on("/hrtowatts.html", handleLittleFSFile);
   server.on("/favicon.ico", handleLittleFSFile);
   server.on("/send_settings", settingsProcessor);
+  server.on("/send_settings", HTTP_POST, settingsProcessor);
   server.on("/jquery.js.gz", handleLittleFSFile);
 
   server.on("/BLEScan", []() {
@@ -582,7 +622,7 @@ void HTTP_Server::start() {
     SS2K_LOG(HTTP_SERVER_LOG_TAG, "Rebooting from Web Request");
     String response = "Rebooting....<script> setTimeout(\"location.href = '/index.html';\",500); </script>";
     server.send(200, "text/html", response);
-    ss2k->rebootFlag = true;
+    server.rebootAfterResponse();
   });
 
   server.on("/hrslider", []() {
@@ -682,7 +722,7 @@ void HTTP_Server::start() {
 
   server.on("/configJSON", []() {
     String tString;
-    tString = userConfig->returnJSON();
+    tString = userConfig->returnJSON(false);
     server.send(200, "text/plain", tString);
   });
 
@@ -693,13 +733,10 @@ void HTTP_Server::start() {
   });
 
   server.on("/login", HTTP_GET, []() {
-    server.sendHeader("Connection", "close");
     server.send(200, "text/html", OTALoginIndex);
   });
 
   server.on("/OTAIndex", HTTP_GET, []() {
-    ss2k->stopTasks();
-    server.sendHeader("Connection", "close");
     server.send(200, "text/html", OTAServerIndex);
   });
 
@@ -708,9 +745,10 @@ void HTTP_Server::start() {
       // This is the onComplete callback. It is executed ONLY after the upload is fully finished.
       // This is the correct and only place to send the final response to the client.
       []() {
-        server.sendHeader("Connection", "close");
         if (otaUploadRejected) {
           if (otaFilesystemUpload) remountFilesystem();
+          ss2k->isUpdating = false;
+          FirmwareUpdateOwner::release(FirmwareUpdateOwner::Owner::Web);
           server.send(400, "text/plain", otaUploadError.isEmpty() ? String("Wrong image filename. Expected ") + FW_BINFILE + " or " + FS_BINFILE + "."
                                                                    : otaUploadError);
           return;
@@ -718,6 +756,7 @@ void HTTP_Server::start() {
         if (otaFilesystemUpload) {
           if (!remountFilesystem()) {
             ss2k->isUpdating = false;
+            FirmwareUpdateOwner::release(FirmwareUpdateOwner::Owner::Web);
             server.send(500, "text/plain", "Uploaded filesystem could not be mounted.");
             return;
           }
@@ -725,21 +764,16 @@ void HTTP_Server::start() {
           SS2K_LOG(HTTP_SERVER_LOG_TAG, "Settings saved to the uploaded LittleFS image");
         }
         server.send(200, "text/plain", "OK");
-        if (otaFilesystemUpload) {
-          // Reboot directly because active HTTP handlers and assets came from the
-          // filesystem that was just replaced.
-          delay(500);
-          ESP.restart();
-        } else {
-          // Firmware uploads can use the normal cooperative reboot path.
-          ss2k->rebootFlag = true;
-        }
+        server.rebootAfterResponse();
       },
       // This is the onUpload callback. It handles the file data as it arrives.
       // It should not send any response to the client.
       []() {
-        HTTPUpload &upload = server.upload();
+        NativeUpload &upload = server.upload();
         if (upload.status == UPLOAD_FILE_START) {
+          if (ss2k->isUpdating || ss2k->rebootFlag || !FirmwareUpdateOwner::acquire(FirmwareUpdateOwner::Owner::Web)) { server.rejectUpload(); return; }
+          server.acceptUpload();
+          ss2k->isUpdating = true;
           otaUploadRejected    = false;
           otaFilesystemUpload = upload.filename == FS_BINFILE;
           resetFirmwareUploadValidation();
@@ -761,9 +795,9 @@ void HTTP_Server::start() {
               if (otaFirmwareHeaderLength == sizeof(otaFirmwareHeader)) {
                 const FirmwareImageHeaderValidation validation = validateFirmwareImageHeader(otaFirmwareHeader, otaFirmwareHeaderLength);
                 if (validation.result != FirmwareImageHeaderResult::Valid) {
+                  server.rejectUpload();
                   otaUploadRejected = true;
                   otaUploadError    = String("Rejected firmware image: ") + firmwareImageHeaderResultName(validation.result) + ".";
-                  ss2k->isUpdating  = false;
                   SS2K_LOGE(HTTP_SERVER_LOG_TAG, "Rejected uploaded firmware image: %s (expected chip 0x%04x, image chip 0x%04x)",
                             firmwareImageHeaderResultName(validation.result), CONFIG_IDF_FIRMWARE_CHIP_ID, static_cast<uint16_t>(validation.imageChipId));
                   return;
@@ -783,17 +817,17 @@ void HTTP_Server::start() {
             // DO NOT send a response here.
             if (otaUploadRejected) {
               abortFirmwareUpload();
-              ss2k->isUpdating = false;
             } else if (!otaFirmwareUpdateBegun) {
               otaUploadRejected = true;
               if (otaUploadError.isEmpty()) otaUploadError = "Firmware image header is incomplete.";
-              ss2k->isUpdating = false;
             } else if (finishFirmwareUpload()) {
               SS2K_LOG(HTTP_SERVER_LOG_TAG, "Firmware Upload Finished Successfully.");
             }
             // The reboot will be triggered in the onComplete handler after the response.
           } else if (upload.status == UPLOAD_FILE_ABORTED) {
             rejectFirmwareUpload("Firmware upload was aborted.");
+            ss2k->isUpdating = false;
+            FirmwareUpdateOwner::release(FirmwareUpdateOwner::Owner::Web);
           }
         } else if (upload.filename == FS_BINFILE) {
           if (upload.status == UPLOAD_FILE_START) {
@@ -809,8 +843,14 @@ void HTTP_Server::start() {
           } else if (upload.status == UPLOAD_FILE_ABORTED) {
             rejectFilesystemUpload("Filesystem upload was aborted.");
             remountFilesystem();
+            ss2k->isUpdating = false;
+            FirmwareUpdateOwner::release(FirmwareUpdateOwner::Owner::Web);
           }
+        } else if (upload.status == UPLOAD_FILE_ABORTED) {
+          ss2k->isUpdating = false;
+          FirmwareUpdateOwner::release(FirmwareUpdateOwner::Owner::Web);
         } else if (upload.status == UPLOAD_FILE_START) {
+          server.rejectUpload();
           otaUploadRejected = true;
           otaUploadError    = String("Wrong upload filename. Expected ") + FW_BINFILE + " or " + FS_BINFILE + ".";
           SS2K_LOG(HTTP_SERVER_LOG_TAG, "Rejected upload %s; expected %s or %s", upload.filename.c_str(), FW_BINFILE, FS_BINFILE);
@@ -820,17 +860,16 @@ void HTTP_Server::start() {
   /********************************************End Server
    * Handlers*******************************/
 
-  server.begin();
-  server.enableDelay(false);
-  SS2K_LOG(HTTP_SERVER_LOG_TAG, "HTTP server started");
+  if (server.begin()) { SS2K_LOG(HTTP_SERVER_LOG_TAG, "ESP-IDF HTTP server started"); }
+  else { SS2K_LOGE(HTTP_SERVER_LOG_TAG, "ESP-IDF HTTP server failed to start"); }
 }
 
 void HTTP_Server::webClientUpdate() {
+  server.processPending();
   static unsigned long int _webClientTimer = millis();
   if (millis() - _webClientTimer > WEBSERVER_DELAY) {
     _webClientTimer                = millis();
     static unsigned long mDnsTimer = millis();  // NOLINT: There is no overload in String for uint64_t
-    server.handleClient();
     if (WiFi.getMode() != WIFI_MODE_STA) {
       dnsServer.processNextRequest();
     }
@@ -850,9 +889,7 @@ void HTTP_Server::handleBTScanner() {
 void HTTP_Server::handleIndexFile() {
   String filename = LittleFS.exists("/index.html.gz") ? "/index.html.gz" : "/index.html";
   if (LittleFS.exists(filename)) {
-    File file = LittleFS.open(filename, FILE_READ);
-    server.streamFile(file, "text/html");
-    file.close();
+    server.sendFile(filename, "text/html");
     SS2K_LOG(HTTP_SERVER_LOG_TAG, "Served %s", filename.c_str());
   } else {
     SS2K_LOG(HTTP_SERVER_LOG_TAG, "%s not found. Sending builtin Index.html", filename.c_str());
@@ -866,9 +903,7 @@ void HTTP_Server::handleLittleFSFile() {
     filename += ".gz";
   }
   if (LittleFS.exists(filename)) {
-    File file = LittleFS.open(filename, FILE_READ);
-    server.streamFile(file, contentTypeForPath(filename));
-    file.close();
+    server.sendFile(filename, contentTypeForPath(filename).c_str());
     SS2K_LOG(HTTP_SERVER_LOG_TAG, "Served %s", filename.c_str());
   } else if (!filesystemIndexExists()) {
     SS2K_LOG(HTTP_SERVER_LOG_TAG, "%s not found and no filesystem. Sending builtin index.html", filename.c_str());
@@ -885,6 +920,11 @@ void HTTP_Server::settingsProcessor() {
   bool wasBTUpdate       = false;
   bool wasSettingsUpdate = false;
   bool reboot            = false;
+  // Credentials belong in the POST body, never in URL/history query strings.
+  if (!server.arg("password").isEmpty() && !server.isPost()) {
+    server.send(400, "text/plain", "Password changes require a POST body.");
+    return;
+  }
   // Reject malformed new settings before applying any part of this request.
   if (server.hasArg("gearPreset")) {
     const String preset = server.arg("gearPreset");
@@ -904,7 +944,6 @@ void HTTP_Server::settingsProcessor() {
   }
   if (!server.arg("password").isEmpty()) {
     tString = server.arg("password");
-    tString.trim();
     userConfig->setPassword(tString);
   }
   if (!server.arg("deviceName").isEmpty()) {
@@ -944,32 +983,29 @@ void HTTP_Server::settingsProcessor() {
       userConfig->setERGSensitivity(ERGSensitivity);
     }
   }
-  if (!server.arg("stepperDir").isEmpty()) {
-    userConfig->setStepperDir(true);
-  } else if (wasSettingsUpdate) {
+  if (server.hasArg("stepperDir")) {
+    userConfig->setStepperDir(server.arg("stepperDir") == "true" || (!server.isPost() && !server.arg("stepperDir").isEmpty()));
+  } else if (wasSettingsUpdate && !server.isPost()) {
     userConfig->setStepperDir(false);
   }
-  if (!server.arg("shifterDir").isEmpty()) {
-    userConfig->setShifterDir(true);
-  } else if (wasSettingsUpdate) {
+  if (server.hasArg("shifterDir")) {
+    userConfig->setShifterDir((server.arg("shifterDir") == "true" || (!server.isPost() && !server.arg("shifterDir").isEmpty())));
+  } else if (wasSettingsUpdate && !server.isPost()) {
     userConfig->setShifterDir(false);
   }
-  if (!server.arg("udpLogEnabled").isEmpty()) {
-    userConfig->setUdpLogEnabled(true);
-  } else if (wasSettingsUpdate) {
+  if (server.hasArg("udpLogEnabled")) {
+    userConfig->setUdpLogEnabled((server.arg("udpLogEnabled") == "true" || (!server.isPost() && !server.arg("udpLogEnabled").isEmpty())));
+  } else if (wasSettingsUpdate && !server.isPost()) {
     userConfig->setUdpLogEnabled(false);
   }
-  if (!server.arg("pTab4Pwr").isEmpty()) {
-    userConfig->setPTab4Pwr(true);
-  } else if (wasSettingsUpdate) {
+  if (server.hasArg("pTab4Pwr")) {
+    userConfig->setPTab4Pwr((server.arg("pTab4Pwr") == "true" || (!server.isPost() && !server.arg("pTab4Pwr").isEmpty())));
+  } else if (wasSettingsUpdate && !server.isPost()) {
     userConfig->setPTab4Pwr(false);
   }
-  if (!server.arg("stealthChop").isEmpty()) {
-    userConfig->setStealthChop(true);
-    ss2k->updateStealthChop();
-  } else if (wasSettingsUpdate) {
-    userConfig->setStealthChop(false);
-    ss2k->updateStealthChop();
+  if (server.hasArg("stealthChop") || (wasSettingsUpdate && !server.isPost())) {
+    const bool enabled = (server.arg("stealthChop") == "true" || (!server.isPost() && !server.arg("stealthChop").isEmpty()));
+    if (enabled != userConfig->getStealthChop()) { userConfig->setStealthChop(enabled); ss2k->updateStealthChop(); }
   }
   if (!server.arg("inclineMultiplier").isEmpty()) {
     float inclineMultiplier = server.arg("inclineMultiplier").toFloat();
@@ -1038,13 +1074,17 @@ void HTTP_Server::settingsProcessor() {
         "setTimeout(\"location.href = '/index.html';\",1000);</script></html>";
   }
   SS2K_LOG(HTTP_SERVER_LOG_TAG, "Config Updated From Web");
-  ss2k->saveFlag = true;
+  if (!userConfig->saveToLittleFSChecked()) {
+    server.send(500, "text/plain", "Settings applied temporarily, but storage failed. Please retry saving.");
+    return;
+  }
+  if (server.isPost()) { server.send(200, "application/json", "{\"saved\":true}"); return; }
   if (reboot) {
     response +=
         "Please wait while your settings are saved and SmartSpin2k reboots.</h2></body><script> "
         "setTimeout(\"location.href = '/bluetoothscanner.html';\",5000);</script></html>";
     server.send(200, "text/html", response);
-    ss2k->rebootFlag = true;
+    server.rebootAfterResponse();
   }
   server.send(200, "text/html", response);
 }
@@ -1052,11 +1092,13 @@ void HTTP_Server::settingsProcessor() {
 void HTTP_Server::stop() {
   SS2K_LOG(HTTP_SERVER_LOG_TAG, "Stopping Http Server");
   server.stop();
-  server.close();
+  if (FirmwareUpdateOwner::current == FirmwareUpdateOwner::Owner::Web) {
+    abortFirmwareUpload();
+    remountFilesystem();
+    ss2k->isUpdating = false;
+    FirmwareUpdateOwner::release(FirmwareUpdateOwner::Owner::Web);
+  }
 }
-
-// github fingerprint
-// 70:94:DE:DD:E6:C4:69:48:3A:92:70:A1:48:56:78:2D:18:64:E0:B7
 
 bool HTTP_Server::syncWebServerFiles() {
   if (!filesystemNeedsRepair()) {
@@ -1084,33 +1126,25 @@ bool HTTP_Server::syncWebServerFiles() {
     return false;
   }
 
-  // HTTPClient keeps a non-owning pointer to the network client. Declare the
-  // network client first so HTTPClient is destroyed before its transport.
-  WiFiClientSecure localClient;
-  HTTPClient http;
-  localClient.setCACert(rootCACertificate);
-  localClient.setHandshakeTimeout(20);
   SS2K_LOG(HTTP_SERVER_LOG_TAG, "Repairing missing web filesystem files");
-
-  int httpCode = beginHttpGet(http, localClient, DATA_UPDATEURL DATA_FILELIST);
-  JsonDocument doc;
-  if (httpCode == HTTP_CODE_OK) {
-    DeserializationError error = deserializeJson(doc, http.getStream());
-    if (error) {
-      SS2K_LOG(HTTP_SERVER_LOG_TAG, "Failed to read file list");
-      http.end();
-      return false;
-    }
-    httpServer.internetConnection = true;
-  } else {
-    SS2K_LOG(HTTP_SERVER_LOG_TAG, "error downloading %s %d (%s)", DATA_FILELIST, httpCode, HTTPClient::errorToString(httpCode).c_str());
+  const String temporaryManifest = String(DATA_FILELIST) + ".download";
+  if (!downloadWebFile(DATA_UPDATEURL DATA_FILELIST, temporaryManifest)) {
     httpServer.internetConnection = false;
+    return false;
   }
-  http.end();
-  if (httpCode != HTTP_CODE_OK) return false;
+  JsonDocument doc;
+  File manifest = LittleFS.open(temporaryManifest, FILE_READ);
+  DeserializationError error = deserializeJson(doc, manifest);
+  manifest.close();
+  if (error) {
+    LittleFS.remove(temporaryManifest);
+    SS2K_LOGE(HTTP_SERVER_LOG_TAG, "Failed to read file list: %s", error.c_str());
+    return false;
+  }
 
   JsonArray files = doc.as<JsonArray>();
   if (files.isNull() || (!manifestContains(files, "/index.html.gz") && !manifestContains(files, "/index.html"))) {
+    LittleFS.remove(temporaryManifest);
     SS2K_LOG(HTTP_SERVER_LOG_TAG, "Filesystem file list is invalid or has no index page");
     return false;
   }
@@ -1128,66 +1162,32 @@ bool HTTP_Server::syncWebServerFiles() {
 
     downloadedFile = true;
     SS2K_LOG(HTTP_SERVER_LOG_TAG, "Downloading web file: %s", fileName.c_str());
-    httpCode = beginHttpGet(http, localClient, DATA_UPDATEURL + fileName);
-    if (httpCode == HTTP_CODE_OK) {
-      const String temporaryFileName = fileName + ".download";
-      LittleFS.remove(temporaryFileName);
-      File file = LittleFS.open(temporaryFileName, FILE_WRITE, true);
-      if (!file) {
-        SS2K_LOG(HTTP_SERVER_LOG_TAG, "Failed to create temporary file for %s", fileName.c_str());
-        filesystemUpdateSucceeded = false;
-        http.end();
-        continue;
-      }
-      int bytesWritten = http.writeToStream(&file);
-      file.close();
-      if (bytesWritten < 0) {
-        LittleFS.remove(temporaryFileName);
-        SS2K_LOG(HTTP_SERVER_LOG_TAG, "Error writing %s (%d)", fileName.c_str(), bytesWritten);
-        httpServer.internetConnection = false;
-        filesystemUpdateSucceeded = false;
-      } else if (!LittleFS.rename(temporaryFileName, fileName)) {
-        LittleFS.remove(temporaryFileName);
-        SS2K_LOGE(HTTP_SERVER_LOG_TAG, "Unable to install downloaded file %s", fileName.c_str());
-        filesystemUpdateSucceeded = false;
-      } else {
-        if (fileName.endsWith(".gz")) {
-          String uncompressedName = fileName.substring(0, fileName.length() - 3);
-          LittleFS.remove(uncompressedName);
-        }
-        SS2K_LOG(HTTP_SERVER_LOG_TAG, "Created: %s (%d bytes)", fileName.c_str(), bytesWritten);
-        httpServer.internetConnection = true;
-      }
-    } else {
-      SS2K_LOG(HTTP_SERVER_LOG_TAG, "Error downloading %s %d (%s)", fileName.c_str(), httpCode, HTTPClient::errorToString(httpCode).c_str());
+    const String temporaryFileName = fileName + ".download";
+    if (!downloadWebFile(DATA_UPDATEURL + fileName, temporaryFileName)) {
       httpServer.internetConnection = false;
       filesystemUpdateSucceeded = false;
+    } else if (!LittleFS.rename(temporaryFileName, fileName)) {
+      LittleFS.remove(temporaryFileName);
+      SS2K_LOGE(HTTP_SERVER_LOG_TAG, "Unable to install downloaded file %s", fileName.c_str());
+      filesystemUpdateSucceeded = false;
+    } else {
+      if (fileName.endsWith(".gz")) {
+        String uncompressedName = fileName.substring(0, fileName.length() - 3);
+        LittleFS.remove(uncompressedName);
+      }
+      SS2K_LOG(HTTP_SERVER_LOG_TAG, "Created: %s", fileName.c_str());
+      httpServer.internetConnection = true;
     }
-    http.end();
   }
 
   if (!filesystemUpdateSucceeded || !filesystemIndexExists()) {
+    LittleFS.remove(temporaryManifest);
     SS2K_LOGW(HTTP_SERVER_LOG_TAG, "Web filesystem repair incomplete");
     return false;
   }
 
   // Install the fetched manifest only after every missing asset is present.
   // This keeps the next boot's local completeness check independent of TLS.
-  const String temporaryManifest = String(DATA_FILELIST) + ".download";
-  LittleFS.remove(temporaryManifest);
-  File manifest = LittleFS.open(temporaryManifest, FILE_WRITE, true);
-  if (!manifest) {
-    SS2K_LOGE(HTTP_SERVER_LOG_TAG, "Unable to create temporary web filesystem manifest");
-    return false;
-  }
-  const size_t manifestBytes = serializeJson(doc, manifest);
-  manifest.close();
-  if (manifestBytes == 0) {
-    LittleFS.remove(temporaryManifest);
-    SS2K_LOGE(HTTP_SERVER_LOG_TAG, "Unable to write web filesystem manifest");
-    return false;
-  }
-
   LittleFS.remove(DATA_FILELIST);
   if (!LittleFS.rename(temporaryManifest, DATA_FILELIST)) {
     LittleFS.remove(temporaryManifest);

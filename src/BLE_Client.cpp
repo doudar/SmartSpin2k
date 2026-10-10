@@ -87,7 +87,9 @@ static bool subscribeToCharacteristic(NimBLEClient* pClient, NimBLERemoteService
 
   // Ask NimBLE for only the characteristic we consume. Discovering every characteristic
   // caches a heap object for each one and can exhaust the classic ESP32 heap on large GATT tables.
+  const uint32_t discoveryStarted = millis();
   NimBLERemoteCharacteristic* pChr = pSvc->getCharacteristic(characteristicUUID);
+  const uint32_t discoveryMs = millis() - discoveryStarted;
   if (!pChr) {
     SS2K_LOG(BLE_CLIENT_LOG_TAG, "Characteristic %s not found in %s", characteristicUUID.toString().c_str(), service.name.c_str());
     return false;
@@ -100,12 +102,14 @@ static bool subscribeToCharacteristic(NimBLEClient* pClient, NimBLERemoteService
   }
 
   const bool wantNotify = pChr->canNotify();
+  const uint32_t subscribeStarted = millis();
   if (!pChr->subscribe(wantNotify, notifyCB)) {
     SS2K_LOG(BLE_CLIENT_LOG_TAG, "Failed to subscribe to %s %s (handle %d)", service.name.c_str(), pChr->getUUID().toString().c_str(), pChr->getHandle());
     return false;
   }
 
-  SS2K_LOG(BLE_CLIENT_LOG_TAG, "Subscribed to %s %s handle: %d", service.name.c_str(), pChr->getUUID().toString().c_str(), pChr->getHandle());
+  SS2K_LOG(BLE_CLIENT_LOG_TAG, "Subscribed to %s %s handle: %d (discovery %lu ms, subscribe %lu ms)", service.name.c_str(), pChr->getUUID().toString().c_str(), pChr->getHandle(),
+           static_cast<unsigned long>(discoveryMs), static_cast<unsigned long>(millis() - subscribeStarted));
   return true;
 }
 
@@ -114,19 +118,29 @@ static bool subscribeToCharacteristic(NimBLEClient* pClient, NimBLERemoteService
  *
  * @param pClient Pointer to the connected NimBLE client.
  */
+// Service discovery is completed once, before any subscriptions. A cache-only
+// lookup avoids repeated ATT probes (including UUID fallback) for absent services.
+static NimBLERemoteService* cachedService(NimBLEClient* client, const NimBLEUUID& uuid) {
+  for (auto* service : client->getServices(false)) {
+    if (service->getUUID() == uuid) return service;
+  }
+  return nullptr;
+}
+
 bool subscribeToAllNotifications(NimBLEClient* pClient) {
   bool isSubscribed = false;
+  const uint32_t started = millis();
   if (!pClient || !pClient->isConnected()) {
     SS2K_LOG(BLE_CLIENT_LOG_TAG, "Client not connected for notifications");
     return false;
   }  // The Issue with Echelon is that there are multiple services
   for (const auto& service : BLEServices::SUPPORTED_SERVICES) {
     // Re-check connection health before each service to prevent racing with a disconnect
-    if (!pClient->isConnected()) {
-      SS2K_LOGW(BLE_CLIENT_LOG_TAG, "Aborting subscription loop: client disconnected mid-iteration");
-      break;
+    if (!pClient->isConnected() || uint32_t(millis() - started) > 15000) {
+      SS2K_LOGW(BLE_CLIENT_LOG_TAG, "Aborting subscription loop: disconnected or setup deadline exceeded");
+      return false;
     }
-    NimBLERemoteService* pSvc = pClient->getService(service.serviceUUID);
+    NimBLERemoteService* pSvc = cachedService(pClient, service.serviceUUID);
     if (pSvc) {
       SS2K_LOG(BLE_CLIENT_LOG_TAG, "Found %s", service.name.c_str());
 
@@ -146,7 +160,25 @@ bool subscribeToAllNotifications(NimBLEClient* pClient) {
       }
     }
   }
+  SS2K_LOG(BLE_CLIENT_LOG_TAG, "Subscription setup conn=%u took %lu ms", pClient->getConnHandle(), static_cast<unsigned long>(millis() - started));
   return isSubscribed;
+}
+
+static void logClientConnectionChanges() {
+  struct Previous { uint16_t handle = BLE_HS_CONN_HANDLE_NONE, interval = 0, latency = 0, timeout = 0; };
+  static Previous previous[NUM_BLE_DEVICES];
+  for (unsigned i = 0; i < NUM_BLE_DEVICES; ++i) {
+    const auto handle = spinBLEClient.myBLEDevices[i].connectedClientID;
+    auto* client = handle == BLE_HS_CONN_HANDLE_NONE ? nullptr : NimBLEDevice::getClientByHandle(handle);
+    if (!client || !client->isConnected()) { previous[i] = Previous{}; continue; }
+    const auto info = client->getConnInfo();
+    auto& old = previous[i];
+    if (old.handle != handle || old.interval != info.getConnInterval() || old.latency != info.getConnLatency() || old.timeout != info.getConnTimeout()) {
+      SS2K_LOG(BLE_CLIENT_LOG_TAG, "Sensor link conn=%u interval=%.2f ms latency=%u timeout=%u ms", handle,
+               info.getConnInterval() * 1.25, info.getConnLatency(), info.getConnTimeout() * 10);
+      old = {static_cast<uint16_t>(handle), info.getConnInterval(), info.getConnLatency(), info.getConnTimeout()};
+    }
+  }
 }
 
 // BLE Client loop task.
@@ -203,39 +235,55 @@ void bleClientTask(void* pvParameters) {
       SS2K_LOG(BLE_CLIENT_LOG_TAG, "Update complete, re-enabling BLE scanning.");
     }
 
-    // Post connect previously connected clients. This needs to be before connect, as it takes a while to complete the connection (let it loop once.)
+    // Finish setup before allowing discovery or low-priority BLE logs.
+    spinBLEClient.connectionSetupActive = true;
     spinBLEClient.postConnect();
 
     // Connect BLE Servers to this client
+    static uint32_t lastFailedAttempt = 0;
+    static bool retryCooling = false;
     for (int x = 0; x < NUM_BLE_DEVICES; x++) {
+      if (retryCooling && uint32_t(millis() - lastFailedAttempt) < BLE_RECONNECT_SCAN_INTERVAL) break;
+      retryCooling = false;
       if (spinBLEClient.myBLEDevices[x].doConnect == true) {
         // stop in process scans
         NimBLEScan* pBLEScan = NimBLEDevice::getScan();
         if (pBLEScan->isScanning()) {
           SS2K_LOG(BLE_CLIENT_LOG_TAG, "Stopping scan before connecting %s on slot %d ...", spinBLEClient.myBLEDevices[x].uniqueName.c_str(), x);
-          while (pBLEScan->isScanning()) {
+          const uint32_t stopStarted = millis();
+          while (pBLEScan->isScanning() && uint32_t(millis() - stopStarted) < 1000) {
             pBLEScan->stop();
             delay(100);
           }
         }
+        if (pBLEScan->isScanning()) {
+          lastFailedAttempt = millis();
+          retryCooling = true;
+          break;
+        }
         SS2K_LOG(BLE_CLIENT_LOG_TAG, "Connecting %s on slot %d ...", spinBLEClient.myBLEDevices[x].uniqueName.c_str(), x);
         if (spinBLEClient.connectToServer()) {
+          spinBLEClient.postConnect();
           SS2K_LOG(BLE_CLIENT_LOG_TAG, "We are now connected to %s", spinBLEClient.myBLEDevices[x].uniqueName.c_str());
         } else {
+          lastFailedAttempt = millis();
+          retryCooling = true;
           SS2K_LOG(BLE_CLIENT_LOG_TAG, "%s connection failed", spinBLEClient.myBLEDevices[x].uniqueName.c_str());
         }
       }
     }
 
+    logClientConnectionChanges();
+    spinBLEClient.connectionSetupActive = false;
+
     // Scan for BLE devices that we should connect to this client
     static unsigned long scanDelay = millis();
     if (((millis() - scanDelay) > BLE_RECONNECT_SCAN_INTERVAL)) {
       spinBLEClient.checkBLEReconnect();
-      if (spinBLEClient.doScan) {
-        spinBLEClient.scanProcess(DEFAULT_SCAN_DURATION);
-      }
       scanDelay = millis();
     }
+    // User-requested scans and deferred scans should not wait another eight seconds.
+    if (spinBLEClient.doScan) spinBLEClient.scanProcess(DEFAULT_SCAN_DURATION);
 
     // Spin Down process for the Server. It's here because it needs to be non-blocking for the maintenance loop.
     // Checking for cadence also so that we don't home when nobody is around.
@@ -321,7 +369,7 @@ bool SpinBLEClient::connectToServer() {
   // Always create a brand-new client for each connection attempt.
   if (NimBLEDevice::getCreatedClientCount() >= MYNEWT_VAL(BLE_MAX_CONNECTIONS)) {
     Serial.println("Max clients reached - no more connections available");
-    return false;
+    return handleFailedClientConnect();
   }
 
   pClient = NimBLEDevice::createClient();
@@ -336,6 +384,14 @@ bool SpinBLEClient::connectToServer() {
   }
 
   SS2K_LOG(BLE_CLIENT_LOG_TAG, "Connected to: %s - %s RSSI %d", this->adevName2UniqueName(myDevice.get()).c_str(), pClient->getPeerAddress().toString().c_str(), pClient->getRssi());
+  const uint32_t discoveryStarted = millis();
+  const auto& services = pClient->getServices(true);
+  SS2K_LOG(BLE_CLIENT_LOG_TAG, "Service discovery conn=%u: %u services in %lu ms", pClient->getConnHandle(), static_cast<unsigned>(services.size()),
+           static_cast<unsigned long>(millis() - discoveryStarted));
+  if (!pClient->isConnected() || services.empty()) {
+    if (pClient->isConnected()) pClient->disconnect();
+    return handleFailedClientConnect();
+  }
   if (serviceUUID == HID_SERVICE_UUID) {
     connectBLE_HID(pClient);
     SS2K_LOG(BLE_CLIENT_LOG_TAG, "Successful remote subscription.");
@@ -559,10 +615,14 @@ void ScanCallbacks::onResult(const NimBLEAdvertisedDevice* advertisedDevice) {
  * @param duration The duration in milliseconds for which the scan should run
  */
 void SpinBLEClient::scanProcess(int duration) {
+  static bool startFailed = false;
+  static uint32_t lastStartFailure = 0;
+  if (startFailed && uint32_t(millis() - lastStartFailure) < 1000) return;
+
   // A scan callback can queue a device after the task's connection pass.
   // Give that connection priority over restarting discovery on this iteration.
   for (const auto& device : myBLEDevices) {
-    if (device.doConnect) {
+    if (device.doConnect || (device.connectedClientID != BLE_HS_CONN_HANDLE_NONE && !device.isPostConnected)) {
       return;
     }
   }
@@ -578,6 +638,14 @@ void SpinBLEClient::scanProcess(int duration) {
     return;
   }
 
+  if (BLE_ss2kCustomCharacteristic::scanResultsPending()) return;
+
+  // Keep discovery responsive while leaving more airtime for established links.
+  bool hasConnections = NimBLEDevice::getServer()->getConnectedCount() != 0;
+  for (const auto& device : myBLEDevices) hasConnections |= device.connectedClientID != BLE_HS_CONN_HANDLE_NONE;
+  pBLEScan->setInterval(49);
+  pBLEScan->setWindow(hasConnections ? 12 : 33);
+
   this->doScan = false;  // Confirming we started the requested scan.
 
   SS2K_LOG(BLE_CLIENT_LOG_TAG, "Scanning for BLE servers and putting them into a list...");
@@ -586,7 +654,11 @@ void SpinBLEClient::scanProcess(int duration) {
   if (!pBLEScan->start(duration, false, true)) {
     BLE_ss2kCustomCharacteristic::endScanResults();
     this->doScan = true;
+    startFailed = true;
+    lastStartFailure = millis();
     SS2K_LOGE(BLE_CLIENT_LOG_TAG, "Unable to start BLE scan");
+  } else {
+    startFailed = false;
   }
 }
 
@@ -685,16 +757,19 @@ void SpinBLEClient::postConnect() {
       const auto advertisement = _BLEd.getAdvertisement();
       if (!advertisement) {
         SS2K_LOGW(BLE_CLIENT_LOG_TAG, "Skipping postConnect: null advertisedDevice (ConnID %d)", _BLEd.connectedClientID);
+        if (auto* client = NimBLEDevice::getClientByHandle(_BLEd.connectedClientID)) client->disconnect();
+        _BLEd.reset();
         continue;
       }
       String adevName = _BLEd.uniqueName.empty() ? this->adevName2UniqueName(advertisement.get()) : String(_BLEd.uniqueName.c_str());
       SS2K_LOG(BLE_CLIENT_LOG_TAG, "Post connecting: %s , ConnID %d, PrimaryChar %s", adevName.c_str(), _BLEd.connectedClientID, _BLEd.charUUID.toString().c_str());
       NimBLEClient* pClient = NimBLEDevice::getClientByPeerAddress(_BLEd.peerAddress);
       if (pClient) {
-        BLEDevice::getServer()->updateConnParams(pClient->getConnHandle(), connectionParams[0], connectionParams[1], connectionParams[2], connectionParams[3]);
-        _BLEd.isPostConnected = subscribeToAllNotifications(pClient);
-        if (!_BLEd.isPostConnected) {
+        const bool subscribed = subscribeToAllNotifications(pClient);
+        if (!subscribed) {
           SS2K_LOG(BLE_CLIENT_LOG_TAG, "Failed to subscribe to notifications for %s", adevName.c_str());
+          pClient->disconnect();
+          _BLEd.reset();
           return;
         }
         spinBLEClient.handleBattInfo(pClient, false);
@@ -713,7 +788,7 @@ void SpinBLEClient::postConnect() {
           rtConfig->setMaxResistance(MAX_ECHELON_RESISTANCE);
         }
 
-        NimBLERemoteService* fitnessService = pClient->getService(FITNESSMACHINESERVICE_UUID);
+        NimBLERemoteService* fitnessService = cachedService(pClient, FITNESSMACHINESERVICE_UUID);
         if (fitnessService) {
           // Name-locked Peloton tablets identify Grupetto through Device Information.
           const std::string manufacturer = pClient->getValue(DEVICE_INFORMATION_SERVICE_UUID, MANUFACTURER_NAME_UUID);
@@ -800,6 +875,18 @@ void SpinBLEClient::postConnect() {
             SS2K_LOG(BLE_CLIENT_LOG_TAG, "FTMS Resistance Range characteristic unavailable or unreadable");
           }
         }
+        if (pClient->isConnected()) {
+          _BLEd.isPostConnected = true;
+          const auto info = pClient->getConnInfo();
+          // Avoid negotiating during discovery. Retain acceptable sensor-selected
+          // parameters and make at most one best-effort request after setup.
+          if (info.getConnInterval() < connectionParams[0] || info.getConnInterval() > connectionParams[1]) {
+            const bool requested = pClient->updateConnParams(connectionParams[0], connectionParams[1], connectionParams[2], connectionParams[3]);
+            SS2K_LOG(BLE_CLIENT_LOG_TAG, "Post-setup interval request conn=%u: %s", pClient->getConnHandle(), requested ? "submitted" : "failed");
+          }
+        }
+      } else {
+        _BLEd.reset();
       }
     }
   }
@@ -909,26 +996,6 @@ void SpinBLEClient::connectBLE_HID(NimBLEClient* pClient) {
   }
   Serial.println("Done with this device!");
   return;  // true;
-}
-
-void SpinBLEClient::keepAliveBLE_HID(NimBLEClient* pClient) {
-  static int intervalTimer = millis();
-  if ((millis() - intervalTimer) < 6000) {
-    return;
-  }
-  NimBLERemoteService* pSvc        = nullptr;
-  NimBLERemoteCharacteristic* pChr = nullptr;
-  pSvc                             = pClient->getService(HID_SERVICE_UUID);
-  if (pSvc) { /** make sure it's not null */
-    pChr = pSvc->getCharacteristic(HID_REPORT_MAP_UUID);
-    if (pChr) {
-      SS2K_LOG(BLE_CLIENT_LOG_TAG, "BLE HID Keep Alive");
-      pClient->setConnectionParams(12, 12, 0, 3200);
-      intervalTimer = millis();
-    } else {
-      SS2K_LOG(BLE_CLIENT_LOG_TAG, "Keep Alive failed");
-    }
-  }
 }
 
 void SpinBLEClient::checkBLEReconnect() {
