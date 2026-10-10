@@ -190,8 +190,9 @@ void SpinBLEServer::updatePowerTelemetry() {
   const bool constrained = spinBLEClient.connectionSetupActive.load() || NimBLEDevice::getScan()->isScanning();
   if (!schedule.due(millis(), sequence, constrained)) return;
   updateWheelAndCrankRev();
-  // Both publishers run even if one fails. A failed attempt backs off rather than
-  // replaying old samples, and baseline sends share the same 5 Hz ceiling.
+  // Both publishers run even if one fails. Our NimBLE fork treats a broadcast
+  // with no subscribers as successful, so only actual send failures back off.
+  // Keep both updates for characteristic values and DirCon-only recipients.
   const bool powerSent = cyclingPowerService.update();
   const bool ftmsSent = fitnessMachineService.update();
   schedule.attempted(millis(), sequence, powerSent && ftmsSent);
