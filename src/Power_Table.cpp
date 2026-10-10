@@ -71,7 +71,9 @@ void PowerTable::processPowerValue(PowerBuffer& buffer, int cadence, const Measu
   const int32_t position = ss2k->getCurrentPosition();
   // Pending substantial travel also excludes delayed power before motion starts.
   if (std::abs(static_cast<int64_t>(ss2k->getTargetPosition()) - position) > POWER_SAMPLE_POSITION_SPAN) {
-    resetCollection("pending travel exceeds 100 steps");
+    char reason[80];
+    snprintf(reason, sizeof(reason), "pending travel exceeds %d steps", POWER_SAMPLE_POSITION_SPAN);
+    resetCollection(reason);
     return;
   }
   if (buffer.stable) {
@@ -79,9 +81,11 @@ void PowerTable::processPowerValue(PowerBuffer& buffer, int cadence, const Measu
     buffer.maximumPosition = std::max(buffer.maximumPosition, position);
     buffer.minimumCadence  = std::min(buffer.minimumCadence, cadence);
     buffer.maximumCadence  = std::max(buffer.maximumCadence, cadence);
-    if (static_cast<int64_t>(buffer.maximumPosition) - buffer.minimumPosition > POWER_SAMPLE_POSITION_SPAN)
-      resetCollection("position span exceeds 100 steps");
-    else if (buffer.maximumCadence - buffer.minimumCadence > POWER_SAMPLE_CADENCE_SPAN)
+    if (static_cast<int64_t>(buffer.maximumPosition) - buffer.minimumPosition > POWER_SAMPLE_POSITION_SPAN) {
+      char reason[80];
+      snprintf(reason, sizeof(reason), "position span exceeds %d steps", POWER_SAMPLE_POSITION_SPAN);
+      resetCollection(reason);
+    } else if (buffer.maximumCadence - buffer.minimumCadence > POWER_SAMPLE_CADENCE_SPAN)
       resetCollection("cadence span");
   }
   if (!buffer.stable) {

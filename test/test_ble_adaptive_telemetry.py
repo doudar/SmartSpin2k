@@ -313,6 +313,7 @@ int main() {
         methods = function(collector, "void collectAndSet(") + "\n" + function(common, "void BLEProcessSensorData()")
         self.compile_and_run(r'''
 #include <cassert>
+#include <cstdint>
 #include <cstring>
 #include <cmath>
 #include <deque>

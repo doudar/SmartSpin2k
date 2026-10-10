@@ -362,9 +362,10 @@ int main(int argc,char** argv) {
     if(scenario=="growing_seek_collection") {
       // Falling cadence requires rising resistance; increasing cadence would
       // correctly reject these upward retargets as physically inconsistent.
-      table.lookupResult+=40;rtConfig->cad.setValue(93);step(28000,170);
+      const int retargetSteps=POWER_SAMPLE_POSITION_SPAN/2;
+      table.lookupResult+=retargetSteps;rtConfig->cad.setValue(94-ERG_CADENCE_FOLLOW_DEADBAND_RPM);step(28000,170);
       assert(controller.collectionAllowed());
-      table.lookupResult+=40;rtConfig->cad.setValue(92);step(29000,170);
+      table.lookupResult+=retargetSteps;rtConfig->cad.setValue(94-2*ERG_CADENCE_FOLLOW_DEADBAND_RPM);step(29000,170);
       assert(!controller.collectionAllowed()); // Individually small retargets cannot reset the origin.
     } else {
       step(28000,168); assert(controller.collectionAllowed());

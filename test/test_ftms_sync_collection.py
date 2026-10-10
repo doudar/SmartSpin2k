@@ -116,9 +116,9 @@ int main(int argc, char** argv) {
     assert(table.ptData.tableRow[4].tableEntry[7].targetPosition==1500);
   } else if(scenario=="power_restart_motion") {
     feed(); feed(); feed();
-    motor.current=motor.target=15060; feed(true,420);
+    motor.current=motor.target=15000+POWER_SAMPLE_POSITION_SPAN/2+1; feed(true,420);
     assert(buffer.getReadings()==1);
-    motor.current=motor.target=15120; feed(true,420);
+    motor.current=motor.target=15000+POWER_SAMPLE_POSITION_SPAN+2; feed(true,420);
     assert(commits==0 && buffer.getReadings()==0); // Restart must not erase cumulative travel.
   } else if(scenario=="power_span_boundary" || scenario=="low_power_floor") {
     const bool low=scenario=="low_power_floor";
@@ -147,15 +147,15 @@ int main(int argc, char** argv) {
     }
     assert(commits==13/POWER_SAMPLES && buffer.getReadings()==13%POWER_SAMPLES);
   } else if(scenario=="cumulative_small_moves") {
-    for(int i=0;i<4;++i) {motor.current+=40;motor.target=motor.current;feed();}
-    assert(commits==0 && buffer.getReadings()==0); // 120-step span resets the partial window.
+    for(int i=0;i<4;++i) {motor.current+=POWER_SAMPLE_POSITION_SPAN/3+1;motor.target=motor.current;feed();}
+    assert(commits==0 && buffer.getReadings()==0); // Cumulative travel beyond the span resets the partial window.
     for(int i=0;i<POWER_SAMPLES+1;++i)feed();assert(commits==1);
   } else if(scenario=="small_moves") {
     for(int i=0;i<POWER_SAMPLES+2;++i) {motor.current+=10; motor.target=motor.current+20;feed();}
     assert(commits==1); assert(table.ptData.tableRow[4].tableEntry[7].targetPosition==1500+(POWER_SAMPLES+5)/2);
   } else if(scenario=="burst") {
     for(int i=0;i<3;++i)feed();assert(buffer.getReadings()==1);
-    for(int i=0;i<5;++i){clockMs+=100;rtConfig->watts.setValue(210);table.processPowerValue(buffer,80,rtConfig->watts);}
+    for(int i=0;i<5;++i){clockMs+=POWER_SAMPLE_MIN_SPACING_MS/6;rtConfig->watts.setValue(210);table.processPowerValue(buffer,80,rtConfig->watts);}
     assert(buffer.getReadings()==1 && commits==0);
   } else if(scenario=="up" || scenario=="down" || scenario=="fraction") {
     seed(table,4,8,1500);
