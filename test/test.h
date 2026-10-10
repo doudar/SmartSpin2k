@@ -33,6 +33,14 @@ class test_cyclePowerData {
   static void test_parses_speed(void);
 };
 
+class TestPelotonData {
+ public:
+  static void test_packet_freshness();
+  static void test_immediate_feedback_and_stops();
+  static void test_fast_reports_have_no_history_lag();
+  static void test_invalid_packets_do_not_refresh_or_pollute();
+};
+
 class TestErgLogReplay {
  public:
   static void test_active_ride_log_and_gain_limits(void);

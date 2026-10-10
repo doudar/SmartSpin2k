@@ -16,10 +16,15 @@
 
 // ******************************************************************************
 // Control cadence and logging
-// Paces table housekeeping; fresh sensor reports drive ordinary ERG corrections.
+// Paces table housekeeping and bounds correction frequency for fast sensors.
 // ******************************************************************************
 // Milliseconds between table housekeeping passes; also sets the per-correction motor travel cap from stepper speed.
 #define ERG_MODE_DELAY 700
+// Minimum spacing of ordinary feedback corrections, using the latest raw report.
+// Changed targets and active seek/wait safety checks remain immediate.
+constexpr uint32_t ERG_FEEDBACK_INTERVAL_MS = 700;
+// Retain a trend anchor across faster reports instead of zeroing the derivative.
+constexpr uint32_t ERG_TREND_INTERVAL_MS = 500;
 // Minimum interval between proportional-control diagnostic log entries.
 constexpr int ERG_MODE_LOG_INTERVAL_MS = 2000;
 // ******************************************************************************

@@ -26,9 +26,10 @@ class PelotonData : public SensorData {
   void decode(uint8_t *data, size_t length) override;
 
  private:
-  bool hasData  = false;
-  float cadence = nanf("");
-  int power     = INT_MIN;
-  int resistance = INT_MIN;
+  bool receivedCadence = false;
+  bool receivedPower   = false;
+  float cadence        = nanf("");
+  int power            = INT_MIN;
+  int resistance       = INT_MIN;
   bool receivedResistance = false;
 };

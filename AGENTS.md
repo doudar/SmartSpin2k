@@ -230,6 +230,7 @@ Important gates in `collectAndSet()`:
 - Cadence accepts 1-249 RPM, otherwise sets cadence to 0.
 - Power is multiplied by `userConfig->getPowerCorrectionFactor()` and accepted from 1-2999 W.
 - Peloton cadence/power can be ignored when an external BLE power meter is configured.
+- Peloton parser freshness is per packet: cadence/resistance packets must not refresh held watts. Publish current power/cadence without rolling averages; three-second smoothing delayed ERG feedback. Invalid frames/ranges do not refresh measurements. ERG limits correction frequency rather than adding sensor lag.
 - If `userConfig->getPTab4Pwr()` is true, real sensor power does not overwrite watts because watts are derived from the power table.
 - Resistance is currently accepted only from Grupetto devices; other sensor names are filtered out.
 - Real resistance clears `rtConfig->resistance.simulate`.
@@ -483,7 +484,7 @@ Controller/helper tuning constants live in categorized sections in `include/ERG_
 - Blends a trusted ERG table gain 50/50 with the watt-scheduled fallback gain and bounds raw table gain to 0.5-2.0x fallback before blending. This deliberately favors stable convergence over aggressive corrections. Fallback log lines include the rejected-slope reason.
 - Scales gain by watt error size.
 - Caps movement by stepper speed and `ERG_MODE_DELAY`.
-- Normal PID corrections never start a feedback wait, even for large errors; sensitivity, the stepper-speed cap, power trend and fresh-sample deduplication govern them. Corrections follow fresh power events; table housekeeping runs every 700 ms. Table-driven moves still acquire motor/power response before another table correction. A cadence-stop target belongs to the current ERG session and is cleared on mode changes. `python -B -m unittest discover -s test -p test_erg_feedback.py` exercises production orchestration and forward lookup with fake peripherals: sparse 60/100 RPM rows, requests beyond recorded watts, 1 Hz delayed power, cadence changes, trust retention/revocation, and stale/time-out paths. Simulated settling is not hardware validation; unexpected plant changes can still exceed the ten-second target.
+- Normal PID corrections never start a feedback wait, even for large errors; sensitivity, the stepper-speed cap, power trend and fresh-sample deduplication govern them. Ordinary feedback consumes the latest raw power at most every `ERG_FEEDBACK_INTERVAL_MS` (700 ms); changed targets bypass this limit and active seek/wait safety still observes every pass. Trend anchors span at least `ERG_TREND_INTERVAL_MS` (500 ms), so faster reports cannot disable braking. Table housekeeping runs separately every 700 ms. Table-driven moves still acquire motor/power response before another table correction. A cadence-stop target belongs to the current ERG session and is cleared on mode changes. `python -B -m unittest discover -s test -p test_erg_feedback.py` exercises production orchestration and forward lookup with fake peripherals, including 10/30/100 ms reports, timer wrap, sparse rows, delayed power, cadence changes, trust, and stale/time-out paths. Simulated settling is not hardware validation; unexpected plant changes can still exceed the ten-second target.
 
 ## Power Table
 

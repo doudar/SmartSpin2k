@@ -12,9 +12,9 @@
 
 bool PelotonData::hasHeartRate() { return false; }
 
-bool PelotonData::hasCadence() { return this->hasData; }
+bool PelotonData::hasCadence() { return receivedCadence; }
 
-bool PelotonData::hasPower() { return this->hasData; }
+bool PelotonData::hasPower() { return receivedPower; }
 
 bool PelotonData::hasSpeed() { return false; }
 
@@ -34,31 +34,39 @@ int PelotonData::getResistance() { return this->resistance; }
 //                         1: 2:  3:      4:
 // 1:data type 2:length 3:data 4:checksum
 
-void PelotonData::decode(uint8_t *data, size_t) {
-  float value                  = 0.0;
+void PelotonData::decode(uint8_t *data, size_t length) {
+  // The factory caches this parser. Only the current packet can mark a value
+  // fresh; otherwise cadence/resistance traffic republishes held watts to ERG.
+  receivedCadence = receivedPower = receivedResistance = false;
+  if (data == nullptr || length < 4 || data[0] != PELOTON_HEADER) return;
   const uint8_t payload_length = data[2];
-  for (uint8_t i = 2 + payload_length; i > 2; i--) {
-    // -30 = Convert from ASCII to numeric
-    uint8_t next_digit = data[i] - 0x30;
-    // Check for overflow
+  if (payload_length == 0 || length < static_cast<size_t>(payload_length) + 4) return;
+  uint8_t checksum = 0;
+  for (size_t i = 0; i < static_cast<size_t>(payload_length) + 3; ++i) checksum += data[i];
+  if (checksum != data[3 + payload_length]) return;
+
+  uint32_t value = 0;
+  for (size_t i = 2 + static_cast<size_t>(payload_length); i > 2; i--) {
+    if (data[i] < '0' || data[i] > '9') return;
+    const uint8_t next_digit = data[i] - '0';
     if (value > 6553 || (value == 6553 && next_digit > 5)) {
       return;
     }
     value = value * 10 + next_digit;
   }
-  hasData = true;
   switch (data[1]) {
     case PELOTON_POW_ID:
-      if (value >= 0) {
-        power = std::round(value / 10);
-      } else {
-        power = 0;
-      }
-
+      // Publish current feedback without a rolling average: extra sensor lag
+      // hides the motor response. ERG owns the correction-rate limit.
+      if (value >= 30000) return;
+      power = std::lround(value / 10.0f);
+      receivedPower = true;
       break;
 
     case PELOTON_CAD_ID:
+      if (value >= 250) return;
       cadence = value;
+      receivedCadence = true;
       break;
 
     case PELOTON_RES_ID:
@@ -67,13 +75,10 @@ void PelotonData::decode(uint8_t *data, size_t) {
       break;
 
     case PELOTON_RES_ID2:
-      //resistance = -99; //send an error because the table lookup hasn't been implemented yet. 
+      // Alternate resistance encoding is not implemented.
       break;
 
     default:
       break;
-      //   cadence = nanf("");
-      //   power   = INT_MIN;
-      //   hasData = false;
   }
 }

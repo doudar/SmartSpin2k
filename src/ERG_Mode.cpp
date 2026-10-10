@@ -49,6 +49,7 @@ void ErgMode::prepareMode() {
   responsePreviousTrend                   = 0;
   transitionTarget                        = INT32_MIN;
   feedbackEarlyRetreatTarget              = INT32_MIN;
+  feedbackUpdateValid                     = false;
   prevWatts.setTarget(0);
   ergTimer = millis();
   if (active) {
@@ -149,8 +150,8 @@ void ErgMode::runERG() {
 
   // Handle new power reports and changed targets as soon as they are visible.
   // computeErg() deduplicates sensor samples and target values, so this event
-  // gate preserves one correction per observation without waiting for the
-  // slower table-collection cadence above.
+  // gate consumes each observation at most once. computeErg() also limits
+  // correction frequency, independently of table housekeeping.
   const auto powerSample    = rtConfig->watts.getValueSample();
   const bool newPowerSample = prevWatts.getValueSample().timestamp != powerSample.timestamp;
   const bool targetChanged  = prevWatts.getTarget() != rtConfig->watts.getTarget();
@@ -213,6 +214,11 @@ void ErgMode::computeErg() {
     SS2K_LOG(ERG_MODE_LOG_TAG, "Watts previously processed.");
     return;
   }
+
+  const uint32_t now = millis();
+  if (feedbackUpdateValid && prevWatts.getTarget() == rtConfig->watts.getTarget() && now - feedbackUpdatedAt < ERG_FEEDBACK_INTERVAL_MS) return;
+  feedbackUpdatedAt   = now;
+  feedbackUpdateValid = true;
 
 #ifdef ERG_MODE_USE_POWER_TABLE
   const int target         = rtConfig->watts.getTarget();
@@ -894,10 +900,13 @@ void ErgMode::_observePowerResponse() {
     return;
   }
   const uint32_t elapsed = sample.timestamp - responseTimestamp;
+  // Fast reports must not continually replace the anchor and disable braking.
+  // Keep raw measurements available to seek safety and use a spaced pair for trend.
+  if (responseTimestamp != 0 && elapsed < ERG_TREND_INTERVAL_MS) return;
   responsePreviousTrend  = responseTrend;
   responsePreviousFresh  = responseTimestamp != 0 && elapsed <= ERG_FEEDBACK_MAX_AGE_MS;
   responsePreviousWatts  = responseWatts;
-  responseTrend          = responseTimestamp != 0 && elapsed >= 500 && elapsed <= ERG_FEEDBACK_MAX_AGE_MS ? (sample.value - responseWatts) * 1000.0 / elapsed : 0;
+  responseTrend          = responseTimestamp != 0 && elapsed <= ERG_FEEDBACK_MAX_AGE_MS ? (sample.value - responseWatts) * 1000.0 / elapsed : 0;
   responseTimestamp      = sample.timestamp;
   responseWatts          = sample.value;
 }

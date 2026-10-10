@@ -51,6 +51,7 @@ class ErgMode {
     responsePreviousTrend        = 0;
     transitionTarget             = INT32_MIN;
     feedbackEarlyRetreatTarget   = INT32_MIN;
+    feedbackUpdateValid         = false;
   }
 
  private:
@@ -108,6 +109,8 @@ class ErgMode {
   double responsePreviousTrend      = 0;
   int transitionTarget              = INT32_MIN;
   bool wasErgMode                   = false;
+  bool feedbackUpdateValid          = false;
+  uint32_t feedbackUpdatedAt        = 0;
   int32_t controlMinimum            = 0;
   int32_t controlMaximum            = 0;
 
