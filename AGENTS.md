@@ -81,6 +81,7 @@ Formatting:
 
 - `.clang-format` is based on Google style, keeps include order, uses 180 column limit, and aligns consecutive macros/assignments.
 - Existing C++ is mixed Arduino/ESP-IDF style. Prefer local patterns over broad refactors.
+- Avoid `Arduino.h` unless necessary. Sensor parsers use `std::chrono::steady_clock` for timing, keeping the core library portable without Arduino dependencies.
 
 ## Global State Model
 
@@ -230,7 +231,7 @@ Important gates in `collectAndSet()`:
 - Cadence accepts 1-249 RPM, otherwise sets cadence to 0.
 - Power is multiplied by `userConfig->getPowerCorrectionFactor()` and accepted from 1-2999 W.
 - Peloton cadence/power can be ignored when an external BLE power meter is configured.
-- Peloton parser freshness is per packet: cadence/resistance packets must not refresh held watts. Publish current power/cadence without rolling averages; three-second smoothing delayed ERG feedback. Invalid frames/ranges do not refresh measurements. ERG limits correction frequency rather than adding sensor lag.
+- Wired Peloton averages fresh samples independently over nonoverlapping one-second windows, publishing available fields together on the next valid packet. Boundary packets start the next window; empty fields never refresh held values. Windows reaching two seconds are discarded after gaps. Invalid frames/ranges do not contribute or trigger publication. Preserve raw tenths of watts until averaging. Wired resistance remains filtered out by the collector; only Grupetto supplies runtime resistance. This intentionally adds about half a second of averaging lag under steady sampling; native Peloton tests cover window boundaries, stops, gaps and timer wrap.
 - If `userConfig->getPTab4Pwr()` is true, real sensor power does not overwrite watts because watts are derived from the power table.
 - Resistance is currently accepted only from Grupetto devices; other sensor names are filtered out.
 - Real resistance clears `rtConfig->resistance.simulate`.

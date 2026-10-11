@@ -6,6 +6,7 @@
  */
 
 #include <cmath>
+#include <chrono>
 
 #include "sensors/PelotonData.h"
 #include "Constants.h"
@@ -35,8 +36,12 @@ int PelotonData::getResistance() { return this->resistance; }
 // 1:data type 2:length 3:data 4:checksum
 
 void PelotonData::decode(uint8_t *data, size_t length) {
-  // The factory caches this parser. Only the current packet can mark a value
-  // fresh; otherwise cadence/resistance traffic republishes held watts to ERG.
+  const auto now = std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::steady_clock::now().time_since_epoch()).count();
+  decode(data, length, static_cast<uint32_t>(now));
+}
+
+void PelotonData::decode(uint8_t *data, size_t length, uint32_t now) {
+  // Fresh flags describe one completed window, never held values from it.
   receivedCadence = receivedPower = receivedResistance = false;
   if (data == nullptr || length < 4 || data[0] != PELOTON_HEADER) return;
   const uint8_t payload_length = data[2];
@@ -54,31 +59,47 @@ void PelotonData::decode(uint8_t *data, size_t length) {
     }
     value = value * 10 + next_digit;
   }
+  Accumulator* destination = nullptr;
   switch (data[1]) {
     case PELOTON_POW_ID:
-      // Publish current feedback without a rolling average: extra sensor lag
-      // hides the motor response. ERG owns the correction-rate limit.
       if (value >= 30000) return;
-      power = std::lround(value / 10.0f);
-      receivedPower = true;
+      destination = &pendingPower;
       break;
 
     case PELOTON_CAD_ID:
       if (value >= 250) return;
-      cadence = value;
-      receivedCadence = true;
+      destination = &pendingCadence;
       break;
 
     case PELOTON_RES_ID:
-      resistance = value;
-      receivedResistance = true;
+      if (value > 100) return;
+      destination = &pendingResistance;
       break;
 
     case PELOTON_RES_ID2:
       // Alternate resistance encoding is not implemented.
-      break;
+      return;
 
     default:
-      break;
+      return;
   }
+
+  const uint32_t elapsed = now - windowStart;
+  if (!collecting || elapsed >= averageWindowMs) {
+    // The next valid packet closes [start, start + 1 s), then belongs to the
+    // next window. Discard an old window after a gap instead of reviving it.
+    if (collecting && elapsed < 2 * averageWindowMs) {
+      receivedPower = pendingPower.count != 0;
+      receivedCadence = pendingCadence.count != 0;
+      receivedResistance = pendingResistance.count != 0;
+      if (receivedPower) power = std::lround(pendingPower.average() / 10.0f);
+      if (receivedCadence) cadence = pendingCadence.average();
+      if (receivedResistance) resistance = std::lround(pendingResistance.average());
+    }
+    pendingPower = pendingCadence = pendingResistance = {};
+    windowStart = now;
+    collecting = true;
+  }
+  // Keep wire precision until publication; each field has its own denominator.
+  destination->add(value);
 }

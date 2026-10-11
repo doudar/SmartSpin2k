@@ -35,9 +35,9 @@ class test_cyclePowerData {
 
 class TestPelotonData {
  public:
-  static void test_packet_freshness();
-  static void test_immediate_feedback_and_stops();
-  static void test_fast_reports_have_no_history_lag();
+  static void test_window_averages_and_boundaries();
+  static void test_independent_counts_precision_and_stops();
+  static void test_gap_wrap_and_device_isolation();
   static void test_invalid_packets_do_not_refresh_or_pollute();
 };
 
