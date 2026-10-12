@@ -161,6 +161,38 @@ class Bridge:
         table["cells"] = [values[i:i+2] for i in range(0, len(values), 2)]
         return table
 
+    def load_power_table(self, snapshot):
+        """Load one initial saved-table analog into RAM before ride activity.
+
+        Use a separately recorded production-learned snapshot for ride tests.
+        This setup seam never reads the plant, cannot update a running ride,
+        and does not exercise flash persistence or coordinate normalization.
+        """
+        keys = ("version", "quality", "homed", "rows", "columns", "cadence_min", "cadence_increment", "watt_increment", "position_divisor")
+        if not isinstance(snapshot, dict) or any(key not in snapshot for key in (*keys, "cells")):
+            raise ValueError("Incomplete initial power-table snapshot")
+        if any(type(snapshot[key]) is not int for key in keys):
+            raise ValueError("Power-table metadata must be integers")
+        current = self.power_table()
+        if any(snapshot[key] != current[key] for key in keys if key != "quality"):
+            raise ValueError("Power-table version, grid or homing state does not match firmware")
+        cells = snapshot["cells"]
+        if not isinstance(cells, (list, tuple)) or len(cells) != current["rows"] * current["columns"]:
+            raise ValueError("Power-table cell count does not match grid")
+        values = []
+        for cell in cells:
+            if not isinstance(cell, (list, tuple)) or len(cell) != 2 or any(type(x) is not int for x in cell):
+                raise ValueError("Each power-table cell requires integer position/readings")
+            position, readings = cell
+            if not (-32768 <= position <= 32767 and 0 <= readings <= 127) or ((position == -32768) != (readings == 0)):
+                raise ValueError("Invalid power-table position, readings or empty-cell sentinel")
+            values.extend(cell)
+        if snapshot["quality"] != sum(cells[i][1] for i in range(len(cells))):
+            raise ValueError("Power-table quality must equal the recorded reading count")
+        payload = [snapshot[key] for key in keys] + values
+        if self.exchange("U " + " ".join(map(str, payload))) != ["U", "1"]:
+            raise RuntimeError("Initial power-table import rejected: already loaded or ride activity has started")
+
     def close(self):
         if self.process.poll() is None:
             try:

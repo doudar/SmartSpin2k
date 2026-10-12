@@ -42,6 +42,28 @@ and evaluator; this firmware checkout supplies the thin native adapter. The
 legacy integrated simulator remains for compatibility. No production `develop`
 changes are required.
 
+## Initial learned-table state
+
+`Bridge.load_power_table(snapshot)` accepts one snapshot in the exact
+`Bridge.power_table()` format after bridge initialization and before the first
+sensor packet, time tick or homing operation. Import is atomic and checks table
+version, grid, homed flag, integer storage ranges, empty-cell sentinels and the
+summed reading count. A second import or mid-ride update is rejected natively,
+even if a caller bypasses the Python API.
+
+This is a test-only RAM analog of restoring saved cells, not a test of LittleFS,
+flash wear, saved-file repair or homing-coordinate normalization. Runtime-only
+learning fields start fresh, as in the production saved-cell load path. Snapshot
+provenance must establish matching coordinate origins and travel calibration;
+the schema does not contain enough information to verify those itself.
+
+Ride experiments must use cells learned in a separate production-controller
+training session, with the same immutable snapshot for both revisions. Empty,
+partial and fully learned refer to declared coverage of the intended riding
+range; do not fabricate a perfect map or fill unobserved cells from the plant.
+Synthetic snapshots in `test_power_table_import.py` test only the import/storage
+contract and are not ride-performance or physical-calibration evidence.
+
 ## Immutable baseline and repeatability
 
 The develop baseline is pinned to

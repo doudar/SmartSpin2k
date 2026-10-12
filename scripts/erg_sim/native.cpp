@@ -16,6 +16,7 @@
 #include <iostream>
 #include <sstream>
 #include <string>
+#include <vector>
 #include "ERG_Mode.h"
 #include "Power_Table.h"
 #include "BLE_Definitions.h"
@@ -149,7 +150,7 @@ void delay(int ms) {
 
 int main() {
   std::string line;
-  bool initialized = false;
+  bool initialized = false, rideStarted = false, tableImported = false;
   while (std::getline(std::cin, line)) {
     std::istringstream input(line);
     char op; input >> op;
@@ -206,6 +207,7 @@ int main() {
         payload.push_back(value);
       }
       if (op == 'B') {
+        rideStarted = true;
         const bool accepted = virtualBleNotify(characteristic, payload);
         std::cout << "B " << accepted << "\n" << std::flush;
       } else {
@@ -217,6 +219,7 @@ int main() {
     }
 #endif
     else if (op == 'T') {
+      rideStarted = true;
       uint32_t now; int watts, cadence, fresh, target; double load;
       if (!(input >> now >> watts >> cadence >> fresh >> target >> load) || now < clockMs || now-clockMs > 1000) return 2;
       const int pulses = motor.advance(now-clockMs); clockMs = now;
@@ -238,6 +241,39 @@ int main() {
       std::cout << "T " << pulses << ' ' << motor.getCurrentPosition() << ' ' << motor.target << ' '
                 << cells << ' ' << controller.isTableSeeking() << ' ' << rtConfig->watts.getTarget() << ' '
                 << rtConfig->getMinStep() << ' ' << rtConfig->getMaxStep() << '\n' << std::flush;
+    } else if (op == 'U') {
+      // Test-only initial saved-table analog. No mid-ride table/oracle feedback.
+      // Fresh TableEntry runtime fields match the production disk-load path;
+      // this does not test LittleFS, coordinate normalization or persistence.
+      long long version, quality, homed, rows, columns, cadMin, cadStep, wattStep, divisor;
+      bool valid = !rideStarted && !tableImported &&
+          static_cast<bool>(input >> version >> quality >> homed >> rows >> columns >> cadMin >> cadStep >> wattStep >> divisor);
+      valid = valid && version == TABLE_VERSION && rows == POWERTABLE_CAD_SIZE && columns == POWERTABLE_WATT_SIZE &&
+          cadMin == MINIMUM_TABLE_CAD && cadStep == POWERTABLE_CAD_INCREMENT && wattStep == POWERTABLE_WATT_INCREMENT &&
+          divisor == TABLE_DIVISOR && homed == static_cast<int>(rtConfig->getHomed()) && quality >= 0;
+      PTData staged;
+      long long total = 0;
+      if (valid) {
+        for (auto& row : staged.tableRow) for (auto& cell : row.tableEntry) {
+          long long position = 0, readings = 0;
+          if (!(input >> position >> readings) || position < INT16_MIN || position > INT16_MAX || readings < 0 || readings > INT8_MAX ||
+              ((position == INT16_MIN) != (readings == 0))) {
+            valid = false;
+            continue;
+          }
+          cell.targetPosition = static_cast<int16_t>(position);
+          cell.readings = static_cast<int8_t>(readings);
+          total += readings;
+        }
+      }
+      std::string extra;
+      valid = valid && total == quality && !(input >> extra);
+      if (valid) {
+        table.clearRuntime();
+        table.ptData = staged;
+        tableImported = true;
+      }
+      std::cout << "U " << valid << '\n' << std::flush;
     } else if (op == 'P') {
       // Read-only final RAM snapshot: never send the plant curve into learning.
       std::cout << "P " << TABLE_VERSION << ' ' << table.ptHelpers.getTotalReadings(table.ptData) << ' ' << rtConfig->getHomed() << ' '
@@ -247,6 +283,7 @@ int main() {
         std::cout << ' ' << cell.targetPosition << ' ' << static_cast<int>(cell.readings);
       std::cout << '\n' << std::flush;
     } else if (op == 'H') {
+      rideStarted = true;
       int forward; if (!(input >> forward)) return 2;
       const bool found = ss2k->_findEndStop(forward != 0);
       std::cout << "H " << found << ' ' << clockMs << ' ' << motor.getCurrentPosition() << '\n' << std::flush;
