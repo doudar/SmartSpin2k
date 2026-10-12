@@ -16,8 +16,8 @@ try:
     import matplotlib
     import fitdecode
 except ModuleNotFoundError as exc:
-    # Optional for generic integration discovery (including existing CI). The
-    # local native hook checks dependencies first and fails with setup guidance.
+    # Optional for ordinary local discovery. CI and the local native hook
+    # require dependencies explicitly and fail with setup guidance.
     raise unittest.SkipTest("Install scripts/erg_sim/requirements.txt to run the ERG simulator") from exc
 
 from scripts.erg_sim.bridge import ROOT, Bridge, build

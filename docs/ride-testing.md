@@ -135,3 +135,23 @@ retain their behavior. This is a software-state regression, not a claim about
 physical motor motion or radio disconnect scheduling. Transport ownership,
 malformed firmware packets and actual HTTP settings persistence remain next-phase
 gaps.
+
+## CI host coverage
+
+Every PR runs the native safety/protocol suite and the complete Python behavior
+suite on Linux, including simulator and ArduinoJson persistence dependencies.
+The CI runner treats skipped tests as failures; documented expected failures
+remain visible, and unexpected successes fail until their markers are removed.
+The paired ride matrix remains a separate Linux job with failure artifacts.
+
+Windows/macOS run a small compiled packet-ingress/FTMS and asynchronous counter
+smoke suite when scripts, tests, native compatibility shims, host dependencies,
+PlatformIO configuration or workflow files change. The detector checks both sides
+of renames and deletions, treats unavailable history conservatively as changed,
+and runs all hosts on manual dispatch. Firmware-only or documentation-only PRs
+do not repeat host portability checks. Linux remains unconditional.
+
+Host tests do not compile or validate ESP32 targets. The existing independent
+`build.yml` develop release workflow is unchanged and still builds classic
+ESP32/S3 firmware and both filesystem images. It runs on develop pushes, not
+ordinary PRs. No release, merge or deployment is performed by these host checks.

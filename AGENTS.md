@@ -37,6 +37,7 @@ The commands remain `pio` and `platformio`; configuration remains in `platformio
 - Build filesystem: `pio run --target buildfs`
 - Run native tests: `pio test --environment native`
 - Native local builds/tests run the ERG regression through `extra_scripts = post:scripts/erg_sim/native_hook.py`; install simulator requirements into pioarduino's Python environment. The hook runs even on an up-to-date build, fails on simulator failure/missing dependencies, and saves graphs/grades under `test/output/erg_regression/`. It skips GitHub Actions; standalone Python discovery skips this optional suite if its dependencies are absent.
+- CI runs full native/Python behavior on Linux for every PR via `scripts/ci_host_tests.py`; dependencies are installed and skips fail. Windows/macOS run compiled packet and async IO smoke only for host-tooling changes (manual dispatch checks all hosts). ESP32/S3 release compilation remains separate in `build.yml`.
 - Run motor integration regressions (requires `g++` on PATH): `python -B -m unittest discover -s test -p "test_*.py"`. These exercise production homing/gear orchestration and TMC recovery with fake peripherals.
 - Static analysis: `pio check -e debug`
 - Pre-commit checks: `pre-commit run --all-files`
