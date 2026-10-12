@@ -226,8 +226,8 @@ void BLE_Fitness_Machine_Service::processFTMSWrite() {
         } break;
 
         case FitnessMachineControlPointProcedure::SetTargetPower: {
-          rtConfig->setFTMSMode((uint8_t)rxValue[0]);
           if (spinBLEClient.connectedPM || rtConfig->watts.getSimulate() || spinBLEClient.connectedCD) {
+            rtConfig->setFTMSMode((uint8_t)rxValue[0]);
             returnValue[2] = FitnessMachineControlPointResultCode::Success;  // 0x01;
             rtConfig->watts.setTarget(get_le16s(&pData[1]));
             logBufLength += snprintf(logBuf + logBufLength, kLogBufCapacity - logBufLength, "-> ERG Mode Target: %d Current: %d Incline: %2f", rtConfig->watts.getTarget(),

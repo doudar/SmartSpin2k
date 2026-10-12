@@ -140,6 +140,32 @@ int main() {
 '''
 
 
+REJECTED_ERG_SCENARIO = SCENARIOS[:SCENARIOS.index("int main()")] + r'''
+int main() {
+  config.setPowerCorrectionFactor(1.0f);
+  expect({0x05, 0x2c, 0x01}); // Leave an earlier 300 W ERG target behind.
+  expect({0x11, 0, 0, 0x0c, 0xfe, 0x28, 0x33});
+  spinBLEClient.connectedPM = false;
+  spinBLEClient.connectedCD = false;
+  runtime.watts.setSimulate(false);
+  const auto forwarded = spinBLEClient.forwarded;
+  const auto statuses = fitnessMachineService.status.notifications.size();
+  const auto training = fitnessMachineService.trainingStatus.notifications.size();
+  expect({0x05, 0xc8, 0x00}, 2); // Firmware rejects unsupported ERG.
+  assert(runtime.watts.getTarget() == 300);
+  assert(runtime.getTargetIncline() == -500);
+  assert(spinBLEClient.forwarded == forwarded);
+  // Rejected commands retain the existing generic status response, rather than
+  // announcing TargetPowerChanged or WattControl. Status policy is unchanged.
+  assert((fitnessMachineService.status.value == std::vector<uint8_t>{FitnessMachineStatus::ReservedForFutureUse}));
+  assert((fitnessMachineService.trainingStatus.value == std::vector<uint8_t>{0, FitnessMachineTrainingStatus::Other}));
+  assert(fitnessMachineService.status.notifications.size() == statuses + 1);
+  assert(fitnessMachineService.trainingStatus.notifications.size() == training + 1);
+  assert(runtime.getFTMSMode() == FitnessMachineControlPointProcedure::SetIndoorBikeSimulationParameters);
+}
+'''
+
+
 class TestFtmsModeTransitions(unittest.TestCase):
     def run_harness(self, implementation, scenarios=SCENARIOS):
         compiler = shutil.which("g++")
@@ -164,42 +190,46 @@ class TestFtmsModeTransitions(unittest.TestCase):
         result = self.run_harness(implementation)
         self.assertEqual(result.returncode, 0, result.stderr)
 
-    def setUp(self):
-        if self._testMethodName != "test_rejected_erg_request_preserves_active_simulation_mode":
-            return
-        # Compile and verify the specific failure in setUp, outside the expected
-        # failure wrapper, so build errors or unrelated assertions remain errors.
-        # Known production defect: SetTargetPower in processFTMSWrite assigns
-        # FTMSMode before checking whether a usable power/cadence source exists.
-        # Keep the desired behavior executable until that ordering is fixed.
+    def test_rejected_erg_request_preserves_active_simulation_mode(self):
+        _, implementation = prepare(None, ROOT)
+        result = self.run_harness(implementation, REJECTED_ERG_SCENARIO)
+        self.assertEqual(result.returncode, 0, result.stderr)
+
+    def test_each_available_power_source_accepts_erg_request(self):
         _, implementation = prepare(None, ROOT)
         scenario = SCENARIOS[:SCENARIOS.index("int main()")] + r'''
 int main() {
-  config.setPowerCorrectionFactor(1.0f);
-  expect({0x05, 0x2c, 0x01}); // Leave an earlier 300 W ERG target behind.
-  expect({0x11, 0, 0, 0x0c, 0xfe, 0x28, 0x33});
-  spinBLEClient.connectedPM = false;
-  spinBLEClient.connectedCD = false;
-  runtime.watts.setSimulate(false);
-  const auto forwards = spinBLEClient.forwarded.size();
-  expect({0x05, 0xc8, 0x00}, 2); // Firmware rejects unsupported ERG.
-  assert(runtime.watts.getTarget() == 300);
-  assert(spinBLEClient.forwarded.size() == forwards);
-  fprintf(stderr, "Rejected ERG: active mode=%u, expected SIM=17, held target=%d W\n",
-          unsigned(runtime.getFTMSMode()), runtime.watts.getTarget());
-  assert(runtime.getFTMSMode() == FitnessMachineControlPointProcedure::SetIndoorBikeSimulationParameters);
+  config.setPowerCorrectionFactor(1.25f);
+  for (int source = 0; source < 3; ++source) {
+    expect({0x11, 0, 0, 0x0c, 0xfe, 0x28, 0x33});
+    spinBLEClient.connectedPM = source == 0;
+    runtime.watts.setSimulate(source == 1);
+    spinBLEClient.connectedCD = source == 2;
+    const auto forwards = spinBLEClient.forwarded.size();
+    expect({0x05, 0x2c, 0x01});
+    mode(0x05, FitnessMachineTrainingStatus::WattControl);
+    assert(runtime.watts.getTarget() == 300);
+    assert((fitnessMachineService.status.value == std::vector<uint8_t>{0x08, 0x2c, 0x01}));
+    assert(spinBLEClient.forwarded.size() == forwards + 1);
+    assert((spinBLEClient.forwarded.back() == std::vector<uint8_t>{0x05, 0xf0, 0x00}));
+  }
 }
 '''
-        self.rejected_result = self.run_harness(implementation, scenario)
-        if self.rejected_result.returncode != 0:
-            self.assertIn("Rejected ERG: active mode=5, expected SIM=17, held target=300 W", self.rejected_result.stderr)
-            self.assertIn("runtime.getFTMSMode() == FitnessMachineControlPointProcedure::SetIndoorBikeSimulationParameters",
-                          self.rejected_result.stderr)
-            self.assertIn("assertion", self.rejected_result.stderr.lower())
+        result = self.run_harness(implementation, scenario)
+        self.assertEqual(result.returncode, 0, result.stderr)
 
-    @unittest.expectedFailure
-    def test_rejected_erg_request_preserves_active_simulation_mode(self):
-        self.assertEqual(self.rejected_result.returncode, 0, self.rejected_result.stderr)
+    def test_detects_mode_change_before_rejection_mutation(self):
+        _, implementation = prepare(None, ROOT)
+        original = '''          if (spinBLEClient.connectedPM || rtConfig->watts.getSimulate() || spinBLEClient.connectedCD) {
+            rtConfig->setFTMSMode((uint8_t)rxValue[0]);'''
+        replacement = '''          rtConfig->setFTMSMode((uint8_t)rxValue[0]);
+          if (spinBLEClient.connectedPM || rtConfig->watts.getSimulate() || spinBLEClient.connectedCD) {'''
+        self.assertEqual(implementation.count(original), 1)
+        result = self.run_harness(implementation.replace(original, replacement), REJECTED_ERG_SCENARIO)
+        self.assertNotEqual(result.returncode, 0, "Behavioral checks missed rejected-command mode mutation")
+        self.assertIn("runtime.getFTMSMode() == FitnessMachineControlPointProcedure::SetIndoorBikeSimulationParameters",
+                      result.stderr)
+        self.assertIn("assertion", result.stderr.lower())
 
     def test_detects_lost_mode_and_unsigned_downhill_mutations(self):
         _, implementation = prepare(None, ROOT)

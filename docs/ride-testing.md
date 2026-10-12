@@ -120,19 +120,18 @@ A short recording preflight must succeed before collecting a longer ride. The
 procedure covers serial/UDP capture, settings provenance, secret redaction and
 independent holdout labeling without requiring a firmware change.
 
-## Known FTMS mode-transition defect
+## FTMS mode-transition regression
 
 `test/test_ftms_mode_transitions.py` executes repeated and interrupted ERG, SIM,
 inclination and resistance commands through the production queue processor.
 Deliberate lost-mode and unsigned-downhill mutations must be detected.
 
-One explicit expected failure preserves a desired behavior that current firmware
-violates: after a 300 W ERG target and a SIM command, loss of both power/cadence
-source flags makes a new 200 W ERG command return unsupported, but it still
-switches the mode to ERG and retains the old 300 W target. `SetTargetPower` assigns
-mode before checking source availability. This is a software-state reproduction,
-not proof that a physical bike applies 300 W. No production fix is included.
-Compiler failures and unrelated assertions are outside the expected-failure
-wrapper; fixing the behavior will create an unexpected success until the marker
-is removed. Transport ownership, malformed firmware packets and actual HTTP
-settings persistence remain next-phase gaps.
+It also covers a rejected ERG request after SIM mode: with neither a connected
+power/cadence source nor simulated watts, an unsupported new target must leave
+the prior mode, incline and watts target intact and must not forward a target.
+The production fix moves only the mode assignment inside the existing accepted
+source gate. Accepted power-meter, cadence-source and simulated-watts paths
+retain their behavior. This is a software-state regression, not a claim about
+physical motor motion or radio disconnect scheduling. Transport ownership,
+malformed firmware packets and actual HTTP settings persistence remain next-phase
+gaps.
