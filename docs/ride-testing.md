@@ -113,22 +113,26 @@ training envelope. Reuse those claims only at their actual scope. The model's
 lag mixes mechanical response and power-estimator lag; noise includes rider/model
 error. Learned bike-table profiles are scenarios, not proof of physical fidelity.
 
-Minimum useful new collection (not needed to execute software tests):
+Use the [collectable capture procedure](https://github.com/doudar/smartspin2k-simulator/blob/main/docs/capture-procedure.md)
+before requesting a ride. Normal firmware exposes status/command-processing logs,
+not raw BLE callback arrival times, queue-loss counts or physical knob motion.
+A short recording preflight must succeed before collecting a longer ride. The
+procedure covers serial/UDP capture, settings provenance, secret redaction and
+independent holdout labeling without requiring a firmware change.
 
-- One independent ride on an identified bike and power source, with exact firmware
-  commit/build, ERG sensitivity, power correction, motor direction/speed and
-  initial calibration state. Export the starting power table if used.
-- Monotonic high-resolution timestamps for every received raw BLE sensor packet
-  (including equal consecutive readings), requested FTMS target, and externally
-  observed knob/STEP-DIR motion. Ordinary 1 Hz status logs cannot separate held
-  values, estimator lag and transport arrival jitter.
-- About 15–20 minutes: stable cadence 60/80/100 RPM at several safe resistance
-  levels, modest ±20/±50 W target steps at steady cadence, a gentle ramp, then
-  cadence changes at constant target. Include a few resistance reversals to
-  estimate backlash. Avoid unsafe sprint/endstop experiments.
-- Keep a separate segment or second ride entirely out of fitting. Remove identity,
-  GPS, wall-clock date and unrelated health data before committing any fixture.
+## Known FTMS mode-transition defect
 
-A counter of commanded STEP pulses validates the firmware's electrical output
-boundary but does not measure motor slip. An actual shaft/knob encoder is stronger
-physical evidence. Treat these as different validation levels in bench metadata.
+`test/test_ftms_mode_transitions.py` executes repeated and interrupted ERG, SIM,
+inclination and resistance commands through the production queue processor.
+Deliberate lost-mode and unsigned-downhill mutations must be detected.
+
+One explicit expected failure preserves a desired behavior that current firmware
+violates: after a 300 W ERG target and a SIM command, loss of both power/cadence
+source flags makes a new 200 W ERG command return unsupported, but it still
+switches the mode to ERG and retains the old 300 W target. `SetTargetPower` assigns
+mode before checking source availability. This is a software-state reproduction,
+not proof that a physical bike applies 300 W. No production fix is included.
+Compiler failures and unrelated assertions are outside the expected-failure
+wrapper; fixing the behavior will create an unexpected success until the marker
+is removed. Transport ownership, malformed firmware packets and actual HTTP
+settings persistence remain next-phase gaps.
