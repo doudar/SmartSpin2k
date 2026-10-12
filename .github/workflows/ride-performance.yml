@@ -19,19 +19,33 @@ jobs:
   paired-controller-performance:
     runs-on: ubuntu-latest
     timeout-minutes: 20
+    env:
+      SS2K_BASELINE_SELECTION: ${{ github.workspace }}/baseline-selection.json
     steps:
       - uses: actions/checkout@v7
         with:
           path: candidate
           ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          persist-credentials: false
       - uses: actions/checkout@v7
         with:
-          ref: 082d1ee26ddb009d5132547087f77be03d1b0ab7
-          path: baseline
+          repository: doudar/smartspin2k-simulator
+          ref: e045a5daed80e1f0c8102e9b14c3a4632f0a9f0f
+          path: simulator
+          persist-credentials: false
       - uses: actions/setup-python@v7
         with:
           python-version: '3.11'
-      - run: python -m pip install 'numpy>=1.26,<3'
+      - name: Resolve current develop once for this experiment
+        id: baseline
+        run: PYTHONPATH=simulator python -m ss2k_sim.baseline --output baseline-selection.json --github-output
+      - uses: actions/checkout@v7
+        with:
+          repository: doudar/SmartSpin2k
+          ref: ${{ steps.baseline.outputs.sha }}
+          path: baseline
+          persist-credentials: false
+      - run: python -m pip install -e ./simulator
       - name: Verify evaluator rejects degraded rides and transport contracts
         working-directory: candidate
         run: |
@@ -39,9 +53,14 @@ jobs:
           python -B -m unittest discover -s test -p test_packet_ride.py
           python -B -m unittest discover -s test -p 'test_virtual_*.py'
           python -B -m unittest discover -s test -p 'test_bike_*.py'
-      - name: Compare production controller to pinned develop
-        working-directory: candidate
-        run: python -m scripts.erg_sim.compare --baseline-root ../baseline --output test/output/paired --seeds 7
+      - name: Compare production controller to resolved develop
+        run: python -m ss2k_sim compare --firmware-root candidate --candidate-root candidate --baseline-root baseline --output candidate/test/output/paired --seeds 7
+      - name: Preserve exact baseline resolution
+        if: always()
+        uses: actions/upload-artifact@v6
+        with:
+          name: baseline-selection-${{ github.sha }}
+          path: baseline-selection.json
       - name: Preserve every result, including failures
         if: always()
         uses: actions/upload-artifact@v6
