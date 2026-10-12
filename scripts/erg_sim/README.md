@@ -1,3 +1,5 @@
+> Coverage notice: this is a native controller/component simulator, not BLE/DirCon end-to-end firmware testing. See [ride testing](../../docs/ride-testing.md) for pinned comparisons and the real-BLE bench path.
+
 # ERG rider/bike simulator
 
 Runs the actual SmartSpin2k ERG controller against a Python bike, with simulated

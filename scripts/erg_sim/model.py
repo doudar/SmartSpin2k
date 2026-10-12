@@ -169,6 +169,25 @@ class Bike:
         self.random = random.Random(seed)
         self.noise = 0.0
         self.last_report = 0.0
+        # Continuous estimator output, before acquisition/delivery clocks.
+        self.delayed_power = self.filtered
+        self.sample_random = random.Random(seed)
+        self.sample_noise = 0.0
+        self.last_acquisition = 0.0
+
+    def sample_power(self, now):
+        """Acquire the continuous delayed estimator at this sensor clock.
+
+        This is separate from the legacy fixed-rate self.power reporting path.
+        Noise evolves in elapsed seconds, not according to plant integration ticks.
+        """
+        if not math.isfinite(now) or now < self.last_acquisition:
+            raise ValueError("Power acquisition clock must be finite and monotonic")
+        cfg = self.config
+        rho = math.exp(-(now-self.last_acquisition)/cfg.noise_correlation_s) if cfg.noise_correlation_s > 0 else 0
+        self.sample_noise = rho*self.sample_noise + cfg.noise_w*math.sqrt(1-rho*rho)*self.sample_random.gauss(0, 1)
+        self.last_acquisition = now
+        return max(0, round(self.delayed_power+self.sample_noise))
 
     def advance(self, now, dt, pulses, cadence):
         cfg = self.config
@@ -193,6 +212,7 @@ class Bike:
         a, b = self.history[0], self.history[min(1, len(self.history)-1)]
         f = max(0, min(1, (delayed_t-a[0])/(b[0]-a[0]))) if b[0] > a[0] else 0
         delayed = a[1] + f*(b[1]-a[1])
+        self.delayed_power = delayed
         fresh = now+1e-9 >= self.next_report
         if fresh:
             self.next_report = (math.floor((now+1e-9)/cfg.sample_period_s)+1)*cfg.sample_period_s

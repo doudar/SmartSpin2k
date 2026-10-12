@@ -38,8 +38,13 @@ RuntimeParameters* rtConfig = &runtime;
 userParameters config;
 userParameters* userConfig = &config;
 void userParameters::saveToLittleFS() {}
+#ifdef SS2K_PACKET_INGRESS
+/* VIRTUAL_BLE_DECLARATIONS */
+/* VIRTUAL_FTMS_DECLARATIONS */
+#else
 struct { bool connectedPM = true; } spinBLEClient;
 struct { int spinDownFlag = 0; } spinBLEServer;
+#endif
 struct { int dirPin = 0; float homingSensitivityScaler = 1; } currentBoard;
 struct { bool exists(const char*) { return false; } bool remove(const char*) { return true; } } LittleFS;
 int commits = 0;
@@ -83,6 +88,7 @@ struct SS2K {
   int32_t currentPosition = 0, targetPosition = 0;
   int lastShifterPosition = 0;
   bool stepperIsRunning = false, resetPowerTableFlag = false;
+  bool isUpdating = false;
   bool externalControl = false, syncMode = false, pelotonIsConnected = false, homingFallback = false;
   int32_t getCurrentPosition() { return currentPosition; }
   int32_t getTargetPosition() { return targetPosition; }
@@ -114,9 +120,16 @@ struct Driver {
   int SG_RESULT() { return std::lround(300-290*constrain(load, 0.0, 1.0)); }
 } driverObject;
 Driver* driver = &driverObject;
+#ifndef SS2K_PACKET_INGRESS
 struct { void spinDown(int) {} } fitnessMachineService;
+#endif
 constexpr int LOG_INTERVAL = 1000;
 struct HomingSgBaseline { int threshold; int sensitivity; };
+#ifdef SS2K_PACKET_INGRESS
+/* VIRTUAL_BLE_IMPLEMENTATION */
+/* VIRTUAL_FTMS_IMPLEMENTATION */
+#endif
+
 /* PRODUCTION_TABLE */
 /* PRODUCTION_ERG */
 /* PRODUCTION_STEPPER */
@@ -162,14 +175,61 @@ int main() {
       ss2k->currentPosition = ss2k->targetPosition = pos;
       rtConfig->setTargetIncline(pos);
       table.clearRuntime();
+#ifdef SS2K_PACKET_INGRESS
+      userConfig->setPowerCorrectionFactor(1);
+      virtualBleConnect("cps_csc");
+#endif
       std::cout << "I 1\n" << std::flush;
     } else if (!initialized) return 2;
+#ifdef SS2K_PACKET_INGRESS
+    else if (op == 'X') {
+      disconnectVirtualBle();
+      std::cout << "X 1\n" << std::flush;
+    } else if (op == 'C') {
+      virtualBleConnect("cps_csc");
+      std::cout << "C 1\n" << std::flush;
+    }
+    else if (op == 'S') {
+      std::cout << "S " << virtualBleStats.attempted << ' ' << virtualBleStats.accepted << ' '
+                << virtualBleStats.rejected << ' ' << virtualBleStats.queueDropped << ' '
+                << virtualBleStats.processed << ' ' << virtualBleStats.bytes << ' '
+                << rtConfig->watts.getValue() << ' ' << rtConfig->cad.getValue() << '\n' << std::flush;
+    }
+    else if (op == 'B' || op == 'F') {
+      unsigned characteristic = 0; std::string hex;
+      if (op == 'B' && !(input >> std::hex >> characteristic)) return 2;
+      if (!(input >> hex) || hex.size()%2) return 2;
+      std::vector<uint8_t> payload;
+      for (size_t i=0; i<hex.size(); i+=2) {
+        unsigned value; std::istringstream byte(hex.substr(i, 2));
+        if (!(byte >> std::hex >> value)) return 2;
+        payload.push_back(value);
+      }
+      if (op == 'B') {
+        const bool accepted = virtualBleNotify(characteristic, payload);
+        std::cout << "B " << accepted << "\n" << std::flush;
+      } else {
+        auto reply = virtualFtmsWrite(payload);
+        std::cout << "F";
+        for (auto byte: reply) std::cout << ' ' << static_cast<unsigned>(byte);
+        std::cout << '\n' << std::flush;
+      }
+    }
+#endif
     else if (op == 'T') {
       uint32_t now; int watts, cadence, fresh, target; double load;
       if (!(input >> now >> watts >> cadence >> fresh >> target >> load) || now < clockMs || now-clockMs > 1000) return 2;
       const int pulses = motor.advance(now-clockMs); clockMs = now;
-      if (fresh) { rtConfig->watts.setValue(watts, false); rtConfig->cad.setValue(cadence, false); }
+#ifdef SS2K_PACKET_INGRESS
+      // No watts/cadence or target scalar crosses this firmware boundary.
+      if (fresh || watts || cadence || target != -1) return 2;
+      pollVirtualBle();
+#else
+      // Deliberate component seam: not a transport-integrated firmware test.
+      if (fresh & 1) rtConfig->watts.setValue(watts, false);
+      if (fresh & 2) rtConfig->cad.setValue(cadence, false);
       if (target >= 0) rtConfig->watts.setTarget(target);
+#endif
       driver->load = load;
       ss2k->moveStepper();
       controller.runERG();
