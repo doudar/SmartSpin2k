@@ -41,7 +41,7 @@ jobs:
           python -B -m unittest discover -s test -p 'test_bike_*.py'
       - name: Compare production controller to pinned develop
         working-directory: candidate
-        run: python -m scripts.erg_sim.compare --baseline-root ../baseline --output test/output/paired
+        run: python -m scripts.erg_sim.compare --baseline-root ../baseline --output test/output/paired --seeds 7
       - name: Preserve every result, including failures
         if: always()
         uses: actions/upload-artifact@v6
