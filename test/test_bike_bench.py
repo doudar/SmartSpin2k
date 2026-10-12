@@ -136,6 +136,7 @@ class CaptureSocketTests(unittest.IsolatedAsyncioTestCase):
     async def test_real_stream_parser_net_counts_and_eof_failure(self):
         release = asyncio.Event()
         complete = asyncio.Event()
+        observed = asyncio.Event()
         async def producer(reader, writer):
             try:
                 writer.write(frame().encode())
@@ -143,7 +144,7 @@ class CaptureSocketTests(unittest.IsolatedAsyncioTestCase):
                 await release.wait()
                 writer.write(frame(2, 10000, 20, 2).encode())
                 await writer.drain()
-                await asyncio.sleep(.01)
+                await observed.wait()
             finally:
                 writer.close()
                 await writer.wait_closed()
@@ -154,14 +155,20 @@ class CaptureSocketTests(unittest.IsolatedAsyncioTestCase):
             async with MotorCapture(f'tcp://127.0.0.1:{port}') as capture:
                 self.assertEqual(capture.consume()[0], 0)
                 release.set()
-                await asyncio.sleep(.005)
+                async def received_second_frame():
+                    while capture.validator.samples < 2:
+                        capture.snapshot()
+                        await asyncio.sleep(0)
+                await asyncio.wait_for(received_second_frame(), 1)
                 self.assertEqual(capture.consume()[0], 18)
+                observed.set()
                 await complete.wait()
-                await asyncio.sleep(.005)
+                await asyncio.wait_for(capture.task, 1)
                 with self.assertRaises(CaptureError):
                     capture.snapshot()
         finally:
             release.set()
+            observed.set()
             server.close()
             await server.wait_closed()
 

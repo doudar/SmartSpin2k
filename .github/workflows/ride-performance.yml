@@ -23,6 +23,7 @@ jobs:
       - uses: actions/checkout@v7
         with:
           path: candidate
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
       - uses: actions/checkout@v7
         with:
           ref: 082d1ee26ddb009d5132547087f77be03d1b0ab7
