@@ -96,7 +96,7 @@ int main(int argc, char** argv) {
     if(scenario=="gap")clockMs+=3000;
     if(scenario=="epoch")++table.positionEpoch;
     if(scenario=="simulated")rtConfig->watts.setSimulate(true);
-    feed(scenario!="gap",scenario=="power_spike"?300:210,scenario=="stop"?0:scenario=="cadence"?85:80,scenario!="blocked");
+    feed(scenario!="gap",scenario=="power_spike"?300:210,scenario=="stop"?0:scenario=="cadence"?80+POWER_SAMPLE_CADENCE_SPAN+1:80,scenario!="blocked");
     assert(buffer.getReadings()==0 && commits==0);
     rtConfig->watts.setSimulate(false);motor.current=motor.target=16000;
     for(int i=0;i<POWER_SAMPLES+2;++i)feed();
@@ -121,8 +121,10 @@ int main(int argc, char** argv) {
     }
     assert(commits==13/POWER_SAMPLES && buffer.getReadings()==13%POWER_SAMPLES);
   } else if(scenario=="cumulative_small_moves") {
-    for(int i=0;i<4;++i) {motor.current+=40;motor.target=motor.current;feed();}
-    assert(commits==0 && buffer.getReadings()==0); // 120-step span resets the partial window.
+    // Each move stays inside the span, but three of them (1.2x the span) reset the partial window.
+    const int move=POWER_SAMPLE_POSITION_SPAN*2/5;
+    for(int i=0;i<4;++i) {motor.current+=move;motor.target=motor.current;feed();}
+    assert(commits==0 && buffer.getReadings()==0);
     for(int i=0;i<POWER_SAMPLES+1;++i)feed();assert(commits==1);
   } else if(scenario=="small_moves") {
     for(int i=0;i<POWER_SAMPLES+2;++i) {motor.current+=10; motor.target=motor.current+20;feed();}

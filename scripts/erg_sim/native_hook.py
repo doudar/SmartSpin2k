@@ -30,7 +30,7 @@ def run_erg(source, target, env):
 
 # A default alias runs even when the binary is up to date. __test depends on
 # these same defaults, so VS Code's native Test action also runs the simulator.
-# Keep this local: the existing GitHub workflow needs no simulator dependencies.
+# Keep this hook local: GitHub runs the full Python suite explicitly once.
 if not env.IsIntegrationDump() and os.environ.get("GITHUB_ACTIONS") != "true":
     ride = env.Alias("erg_sim", list(DEFAULT_TARGETS),
                      env.VerboseAction(run_erg, "Running ERG workout regression (FTP 305 W)..."))

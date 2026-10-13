@@ -61,6 +61,11 @@ void setup() {
     RUN_TEST(test.test_parses_speed);
   }
 
+  RUN_TEST(TestPelotonData::test_window_averages_and_boundaries);
+  RUN_TEST(TestPelotonData::test_independent_counts_precision_and_stops);
+  RUN_TEST(TestPelotonData::test_gap_wrap_and_device_isolation);
+  RUN_TEST(TestPelotonData::test_invalid_packets_do_not_refresh_or_pollute);
+
   // Power Table Lookup Tests
   {
     TestPTLookupResistance forwardLookupTests;

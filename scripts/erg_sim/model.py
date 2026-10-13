@@ -19,8 +19,22 @@ class BikeConfig:
     min_position: float = 0
     max_position: float = 24482
     backlash_steps: float = 0
+    # Optional measured watts(position, cadence) surface from a learned power
+    # table: {"cadences": [...], "watts": [...], "positions": [[full-scale steps per watt column], ...]}.
+    # When present it replaces position_knots/watts_at_80rpm/cadence_exponent.
+    surface: dict = None
+    # Minimum-resistance power (belt/bearing/flywheel losses plus the weakest
+    # magnet setting). Learned tables extrapolate 0 W at the minimum stop, which
+    # no real bike produces; a floor makes low ERG targets genuinely unreachable.
+    floor_watts_at_80rpm: float = 0
+    floor_cadence_exponent: float = 1.5
 
     def __post_init__(self):
+        if not (math.isfinite(self.floor_watts_at_80rpm) and self.floor_watts_at_80rpm >= 0 and
+                math.isfinite(self.floor_cadence_exponent) and self.floor_cadence_exponent > 0):
+            raise ValueError("Power floor must be finite and nonnegative")
+        if self.surface is not None:
+            self._grid = _surface_grid(self.surface, self.max_position)
         if len(self.position_knots) != len(self.watts_at_80rpm) or len(self.position_knots) < 2:
             raise ValueError("Bike curve needs matching position/watt knots")
         if any(b <= a for a, b in zip(self.position_knots, self.position_knots[1:])):
@@ -43,9 +57,96 @@ def interpolate(x, xs, ys):
     return ys[i] + (ys[i+1]-ys[i]) * (x-xs[i])/(xs[i+1]-xs[i])
 
 
+SURFACE_POSITION_STEP = 10
+SURFACE_MAX_CADENCE = 180
+CADENCE_EXPONENT_BOUNDS = (1.0, 2.5)
+
+
+def _surface_grid(surface, max_position):
+    """Precompute watts on a position x integer-RPM grid from table rows.
+
+    Each row maps watt columns to positions. High-watt tails where positions
+    creep by under a quarter of the row's median column spacing (including
+    exact plateaus) are clamp/monotonic-enforcement artifacts, not resistance
+    data: they are dropped and the average slope of the last three credible
+    columns continues instead. Below a row's 0 W anchor the bike makes 0 W.
+    Rows are then bounded against the ~80 RPM row by cadence exponents 1..2.5.
+    Between rows cadence interpolates linearly; outside the rows the nearest
+    pair's local exponent (same bounds) extrapolates.
+    """
+    import numpy as np
+    cadences = np.asarray(surface["cadences"], float)
+    watts = np.asarray(surface["watts"], float)
+    rows = np.asarray(surface["positions"], float)
+    if rows.shape != (len(cadences), len(watts)) or len(cadences) < 2 or np.any(np.diff(cadences) <= 0) or np.any(np.diff(watts) <= 0):
+        raise ValueError("Surface needs increasing cadences/watts and one position per cell")
+    grid_positions = np.arange(0, max_position+SURFACE_POSITION_STEP, SURFACE_POSITION_STEP, dtype=float)
+    by_row = np.empty((len(cadences), len(grid_positions)))
+    for r, row in enumerate(rows):
+        if np.any(np.diff(row) < 0): raise ValueError("Surface rows must be nondecreasing in position")
+        steps = np.diff(row)
+        small = steps < .25*np.median(steps[steps > 0])
+        end = len(row)
+        while end > 2 and small[end-2]: end -= 1
+        x, y = row[:end], watts[:end]
+        keep = np.r_[True, np.diff(x) > 0]
+        x, y = x[keep], y[keep]
+        if len(x) < 2: raise ValueError("Surface row needs two distinct positions")
+        tail = max(0, len(x)-4)
+        slope = (y[-1]-y[tail])/(x[-1]-x[tail])
+        values = np.interp(grid_positions, x, y, left=0.0)
+        beyond = grid_positions > x[-1]
+        values[beyond] = y[-1]+slope*(grid_positions[beyond]-x[-1])
+        by_row[r] = values
+    # Extrapolated high-watt cells can disagree wildly between cadence rows
+    # (e.g. 4x power for 25% more RPM). Bound every row against the row nearest
+    # 80 RPM with cadence exponents 1..2.5, the plausible eddy-brake range.
+    anchor = int(np.argmin(np.abs(cadences-80)))
+    for r, rpm in enumerate(cadences):
+        ratio = rpm/cadences[anchor]
+        a, b = by_row[anchor]*ratio**CADENCE_EXPONENT_BOUNDS[0], by_row[anchor]*ratio**CADENCE_EXPONENT_BOUNDS[1]
+        by_row[r] = np.clip(by_row[r], np.minimum(a, b), np.maximum(a, b))
+    def exponent(lo, hi, c_lo, c_hi):
+        with np.errstate(divide="ignore", invalid="ignore"):
+            k = np.log(hi/lo)/np.log(c_hi/c_lo)
+        return np.where((lo > 1) & (hi > 1) & np.isfinite(k), np.clip(k, *CADENCE_EXPONENT_BOUNDS), 1.5)
+    k_low = exponent(by_row[0], by_row[1], cadences[0], cadences[1])
+    k_high = exponent(by_row[-2], by_row[-1], cadences[-2], cadences[-1])
+    grid = np.empty((SURFACE_MAX_CADENCE+1, len(grid_positions)))
+    for rpm in range(SURFACE_MAX_CADENCE+1):
+        if rpm <= cadences[0]:
+            grid[rpm] = by_row[0]*(rpm/cadences[0])**k_low
+        elif rpm >= cadences[-1]:
+            grid[rpm] = by_row[-1]*(rpm/cadences[-1])**k_high
+        else:
+            i = int(np.searchsorted(cadences, rpm))-1
+            f = (rpm-cadences[i])/(cadences[i+1]-cadences[i])
+            grid[rpm] = by_row[i]+f*(by_row[i+1]-by_row[i])
+    return np.maximum(grid, 0).tolist()
+
+
+def _surface_watts(grid, position, cadence):
+    rows = len(grid)-1
+    c = max(0.0, min(float(rows), cadence))
+    ci = min(int(c), rows-1); cf = c-ci
+    columns = len(grid[0])-1
+    p = max(0.0, min(float(columns), position/SURFACE_POSITION_STEP))
+    pi = min(int(p), columns-1); pf = p-pi
+    a, b = grid[ci], grid[ci+1]
+    low = a[pi]+pf*(a[pi+1]-a[pi])
+    high = b[pi]+pf*(b[pi+1]-b[pi])
+    return low+cf*(high-low)
+
+
 def equilibrium(config, position, cadence):
-    watts = max(0, interpolate(position, config.position_knots, config.watts_at_80rpm))
-    return watts * (max(0, cadence)/80)**config.cadence_exponent
+    cadence = max(0, cadence)
+    if config.surface is not None:
+        watts = _surface_watts(config._grid, position, cadence)
+    else:
+        watts = max(0, interpolate(position, config.position_knots, config.watts_at_80rpm)) * (cadence/80)**config.cadence_exponent
+    if config.floor_watts_at_80rpm:
+        watts = max(watts, config.floor_watts_at_80rpm*(cadence/80)**config.floor_cadence_exponent)
+    return watts
 
 
 class Bike:
@@ -68,6 +169,25 @@ class Bike:
         self.random = random.Random(seed)
         self.noise = 0.0
         self.last_report = 0.0
+        # Continuous estimator output, before acquisition/delivery clocks.
+        self.delayed_power = self.filtered
+        self.sample_random = random.Random(seed)
+        self.sample_noise = 0.0
+        self.last_acquisition = 0.0
+
+    def sample_power(self, now):
+        """Acquire the continuous delayed estimator at this sensor clock.
+
+        This is separate from the legacy fixed-rate self.power reporting path.
+        Noise evolves in elapsed seconds, not according to plant integration ticks.
+        """
+        if not math.isfinite(now) or now < self.last_acquisition:
+            raise ValueError("Power acquisition clock must be finite and monotonic")
+        cfg = self.config
+        rho = math.exp(-(now-self.last_acquisition)/cfg.noise_correlation_s) if cfg.noise_correlation_s > 0 else 0
+        self.sample_noise = rho*self.sample_noise + cfg.noise_w*math.sqrt(1-rho*rho)*self.sample_random.gauss(0, 1)
+        self.last_acquisition = now
+        return max(0, round(self.delayed_power+self.sample_noise))
 
     def advance(self, now, dt, pulses, cadence):
         cfg = self.config
@@ -92,6 +212,7 @@ class Bike:
         a, b = self.history[0], self.history[min(1, len(self.history)-1)]
         f = max(0, min(1, (delayed_t-a[0])/(b[0]-a[0]))) if b[0] > a[0] else 0
         delayed = a[1] + f*(b[1]-a[1])
+        self.delayed_power = delayed
         fresh = now+1e-9 >= self.next_report
         if fresh:
             self.next_report = (math.floor((now+1e-9)/cfg.sample_period_s)+1)*cfg.sample_period_s

@@ -24,11 +24,27 @@ class PelotonData : public SensorData {
   float getSpeed() override;
   int getResistance() override;
   void decode(uint8_t *data, size_t length) override;
+  // Explicit clock keeps window boundaries and timer rollover deterministic in tests.
+  void decode(uint8_t *data, size_t length, uint32_t now);
 
  private:
-  bool hasData  = false;
-  float cadence = nanf("");
-  int power     = INT_MIN;
-  int resistance = INT_MIN;
+  static constexpr uint32_t averageWindowMs = 1000;
+  struct Accumulator {
+    uint64_t sum   = 0;
+    uint32_t count = 0;
+    void add(uint32_t value) {
+      sum += value;
+      ++count;
+    }
+    float average() const { return static_cast<float>(sum) / count; }
+  };
+  Accumulator pendingPower, pendingCadence, pendingResistance;
+  uint32_t windowStart = 0;
+  bool collecting = false;
+  bool receivedCadence = false;
+  bool receivedPower   = false;
+  float cadence        = nanf("");
+  int power            = INT_MIN;
+  int resistance       = INT_MIN;
   bool receivedResistance = false;
 };

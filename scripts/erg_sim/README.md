@@ -1,3 +1,5 @@
+> Coverage notice: this is a native controller/component simulator, not BLE/DirCon end-to-end firmware testing. See [ride testing](../../docs/ride-testing.md) for pinned comparisons and the real-BLE bench path.
+
 # ERG rider/bike simulator
 
 Runs the actual SmartSpin2k ERG controller against a Python bike, with simulated
@@ -76,6 +78,65 @@ held sensor reports. Repeated equal watts still constitute fresh reports.
 The runner rebuilds its native executable on every invocation so edits to
 `src/ERG_Mode.cpp`, its settings/helpers, power-table learning, or motor dispatch
 are actually tested. It does not build ESP32 firmware or alter controller code.
+
+## Other bikes, unhomed sessions, and travel limits
+
+Many riders never calibrate. Unhomed firmware gets none of the table-driven ERG
+paths (seeks, cadence compensation, table corrections and trust all require
+`homed`), never loads or saves its table, boots at the Unlimited start-gear
+coordinate (`8 x shiftStep`) wherever the knob physically is, and has no travel
+limits (+/-200,000,000 steps) until `setStepperMinMax()` derives them from the
+learned table at `minWatts`/`maxWatts` (90 RPM). The simulator models this:
+
+```sh
+python -m scripts.erg_sim run --profile scripts/erg_sim/profiles/bowflex_c6.json --homing unhomed --start-position min
+python -m scripts.erg_sim run --workout scripts/erg_sim/workouts/Edge_Cases.json --homing unhomed --floor-watts 40
+python -m scripts.erg_sim matrix --jobs 8                     # every profile x homed/unhomed x starts x floors
+python -m scripts.erg_sim matrix --workout scripts/erg_sim/workouts/Edge_Cases.json --plot
+```
+
+- `--homing unhomed` runs the production unhomed path. `--start-position` sets the
+  physical start (`profile`, `min`, `max`, `mid` or steps); unhomed firmware still
+  boots at `8 x --shift-step` unless `--firmware-position` is given.
+- `--min-watts`/`--max-watts` are the user brake-watt settings (firmware defaults
+  50/1000). They only affect unhomed sessions, where they bound travel.
+- Pulses past a physical stop are lost by the bike but still counted by the
+  firmware, as with a skipping motor. `trace.csv` adds `min_step`, `max_step` and
+  exact `lost_pulses`; the report, the score's `travel` key and the fourth
+  diagnostics panel show stop contact, lost pulses and when limits were learned,
+  all on the physical axis.
+- `--floor-watts` sets minimum-resistance power at 80 RPM (scaled by cadence^1.5).
+  Learned tables extrapolate 0 W at the minimum stop, which no real bike makes; a
+  floor makes low targets unreachable, which is what drives the knob into a stop.
+- `workouts/Edge_Cases.json` combines targets below the floor, 650 W efforts at
+  60 RPM, and a pedaling stop. Random Attacks never asks for unreachable power.
+
+**Bike profiles from power tables.** `bowflex_c6`, `peloton` and `yesoul_gm1` are
+imported from learned table CSV exports in `profiles/tables/`:
+
+```sh
+python -m scripts.erg_sim import-ptab scripts/erg_sim/profiles/tables/bowflex_c6.ptab --name bowflex_c6
+```
+
+Rows are inverted into a watts(position, cadence) surface. Stored positions are
+multiplied by `TABLE_DIVISOR`; the physical maximum is the `HMax` metadata, except
+that an `HMax` equal to the stored clamp value is read as stored units (the Yesoul
+export: 4,375 -> 43,750 steps). Clamp tails (positions creeping less than a quarter
+of the row's median column spacing) are dropped and the last credible slope
+continues. Rows are bounded against the 80 RPM row with cadence exponents 1–2.5,
+because extrapolated high-watt cells can otherwise claim 4x power for 25% more
+RPM. Dynamics (lag, delay, noise) come from the fitted ride profile. The CSV has
+no reading weights, so measured and extrapolated cells are indistinguishable:
+these profiles are plausible bike shapes for robustness comparisons, not
+identified plants. All three tables were learned with a power meter. The Bowflex
+and Peloton rides cover nearly the full resistance range; the Yesoul ride stops
+well short of maximum resistance, so its high-resistance region and maximum-stop
+behavior come from firmware extrapolation and are the least reliable. The Peloton
+profile models a Peloton without resistance
+feedback (power meter or cadence sensor only), which uses StallGuard calibration
+when homed and min/max-watt limits when not. Peloton setups with a Grupetto or
+aux-serial resistance feed take the separate FTMS-homing and resistance-limit paths
+instead, which this simulator does not model.
 
 ## Output and grading
 
