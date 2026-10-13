@@ -10,6 +10,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Added
 
 ### Changed
+- Improve high-power ERG acquisition and delayed-response braking, guard unsupported seek offsets and amended-seek handoffs, and anchor weak-row extrapolation to measured edges. Add compiled behavioral regression coverage for high targets and their low-power recoveries; hardware validation remains required.
+
+### Hardware
+
+
+## [26.10.13]
+
+### Added
+
+### Changed
 
 ### Hardware
 

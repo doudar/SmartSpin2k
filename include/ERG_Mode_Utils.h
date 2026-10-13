@@ -212,6 +212,39 @@ inline RecordedTableBounds recordedTableBounds(const PTData& table) {
   return bounds;
 }
 
+// Require interpolation support in every cadence row that contributes to a
+// forward lookup. Global watt/cadence bounds alone can hide an unmeasured hole
+// when only a distant row contains high-power samples. Exact cadence anchors
+// use that row alone; an in-between request requires both adjacent valid rows.
+inline bool hasLocalMeasuredPowerSupport(const PTData& table, int watts, int cadence) {
+  if (watts < 0 || cadence <= 0) return false;
+  int lowerRow = -1;
+  int upperRow = -1;
+  bool supported[POWERTABLE_CAD_SIZE] = {};
+  for (int row = 0; row < POWERTABLE_CAD_SIZE; ++row) {
+    const int rowCadence = MINIMUM_TABLE_CAD + row * POWERTABLE_CAD_INCREMENT;
+    const int64_t requestedTorque = static_cast<int64_t>(watts) * rowCadence;
+    int count = 0;
+    int lower = -1;
+    int upper = -1;
+    for (int column = 0; column < POWERTABLE_WATT_SIZE; ++column) {
+      const auto& entry = table.tableRow[row].tableEntry[column];
+      if (entry.targetPosition == INT16_MIN || entry.readings < 2) continue;
+      ++count;
+      const int64_t measuredTorque = static_cast<int64_t>(column) * POWERTABLE_WATT_INCREMENT * cadence;
+      if (measuredTorque <= requestedTorque) lower = column;
+      if (measuredTorque >= requestedTorque && upper < 0) upper = column;
+    }
+    // A one-point row is ignored by the forward lookup too.
+    if (count < 2) continue;
+    supported[row] = lower >= 0 && upper >= 0 &&
+                     table.tableRow[row].tableEntry[lower].targetPosition <= table.tableRow[row].tableEntry[upper].targetPosition;
+    if (rowCadence <= cadence) lowerRow = row;
+    if (rowCadence >= cadence && upperRow < 0) upperRow = row;
+  }
+  return lowerRow >= 0 && upperRow >= 0 && supported[lowerRow] && supported[upperRow];
+}
+
 // Check whether the actual position lies between either ordering of the endpoints plus padding; reject negative padding.
 // Used by _positionPredictionIsAccurate() to compare motor position with the table's watt-tolerance window when evaluating table confidence.
 inline bool positionMatchesPowerWindow(int32_t actualPosition, int32_t lowPosition, int32_t highPosition, int32_t padding) {
@@ -256,7 +289,7 @@ inline double boundedTableGain(double localGain, double fallback) {
 
 // Blend bounded table gain with fallback gain using the configured table weight.
 // Called by scheduledErgGain() on the ERG proportional-control path when lookupErgSlope() succeeds at the target watts and current cadence.
-// If the slope lookup fails, that caller uses fallback gain directly; successful blends precede error scheduling and final sensitivity clamps.
+// If the slope lookup fails, that caller uses fallback gain directly; successful blends precede error scheduling and sensitivity clamps.
 inline double blendedTableGain(double localGain, double fallback) {
   const double bounded = boundedTableGain(localGain, fallback);
   return fallback + (bounded - fallback) * TABLE_GAIN_BLEND;
@@ -265,8 +298,8 @@ inline double blendedTableGain(double localGain, double fallback) {
 // Scale gain by absolute control error and whether the controller is maintaining the target.
 // Used by _inSetpointState() on the proportional-control path after any table correction is unavailable or skipped.
 // The error has already been reduced for an approaching power trend; gain comes from the table slope or fallback schedule.
-// Non-MAINTAIN mode always uses the small-error multiplier; in MAINTAIN, errors from 50 through 100 W leave gain unchanged.
-// The caller then applies any low-watt adjustment and the separate sensitivity-based minimum/maximum gain clamp.
+// Non-MAINTAIN mode always uses the small-error multiplier; MAINTAIN uses the configured error tiers.
+// For attenuating high-target tiers the caller floors the base gain before this schedule; other tiers and low targets retain final min/max clamping.
 inline double errorScheduledGain(double gain, int error, bool maintaining) {
   const int absoluteError = std::abs(error);
   if (absoluteError < SMALL_ERROR_WATTS || !maintaining) return gain * SMALL_ERROR_GAIN_MULTIPLIER;
@@ -286,7 +319,7 @@ inline int approachingError(int error, double wattsPerSecond) {
 }
 
 // Clamp final gain to the configured minimum and maximum multiples of sanitized ERG sensitivity.
-// Called by _inSetpointState() after error scheduling and any low-watt adjustment, just before multiplying gain by control error.
+// Called before attenuating high-target scheduling, or after scheduling/low-watt adjustment for other tiers and low targets.
 inline double clampGain(double gain, double sensitivity) {
   sensitivity              = sanitizeSensitivity(sensitivity);
   const double minimumGain = sensitivity * GAIN_MIN_SENSITIVITY_RATIO;

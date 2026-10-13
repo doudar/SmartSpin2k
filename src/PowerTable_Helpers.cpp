@@ -34,6 +34,109 @@ int32_t storedPositionToSteps(float storedPosition) {
   return static_cast<int32_t>(std::round(steps));
 }
 
+// Raw, continuous piecewise-linear response of one measured cadence row.
+// Weak extrapolation is repaired only by lookup(), never recursively here.
+struct RowPosition {
+  float position = 0.0f;
+  float edgeWatts = 0.0f;
+  float edgePosition = 0.0f;
+  int8_t flatExtrapolation = 0;
+  bool canDonate = false;
+};
+
+bool lookupRowPosition(const TableRow& samples, float rowTargetWatts, RowPosition& result) {
+  int reliableSamples = 0;
+  int16_t minimumPosition = INT16_MAX;
+  int16_t maximumPosition = INT16_MIN;
+  bool monotone = true;
+  for (int col = 0; col < POWERTABLE_WATT_SIZE; col++) {
+    const TableEntry& entry = samples.tableEntry[col];
+    if (entry.targetPosition != INT16_MIN && entry.readings >= 2) {
+      reliableSamples++;
+      if (entry.targetPosition < maximumPosition) monotone = false;
+      minimumPosition = std::min(minimumPosition, entry.targetPosition);
+      maximumPosition = std::max(maximumPosition, entry.targetPosition);
+    }
+  }
+  // A lone point establishes no watt-to-position slope and can introduce a
+  // discontinuity when mixed with complete neighboring rows.
+  if (reliableSamples < 2) return false;
+  result.canDonate = monotone && maximumPosition - minimumPosition >= MIN_EXTRAPOLATION_POSITION_SPAN;
+
+  int below = -1;
+  int above = -1;
+  int first = -1;
+  int second = -1;
+  int penultimate = -1;
+  int last = -1;
+
+  for (int col = 0; col < POWERTABLE_WATT_SIZE; col++) {
+    const TableEntry& entry = samples.tableEntry[col];
+    if (entry.targetPosition == INT16_MIN || entry.readings < 2) continue;
+
+    if (first < 0) {
+      first = col;
+    } else if (second < 0) {
+      second = col;
+    }
+    penultimate = last;
+    last = col;
+
+    const int sampleWatts = col * POWERTABLE_WATT_INCREMENT;
+    if (sampleWatts <= rowTargetWatts) below = col;
+    if (sampleWatts >= rowTargetWatts && above < 0) above = col;
+  }
+
+  int lowerCol;
+  int upperCol;
+  if (below >= 0 && above >= 0 && below != above) {
+    lowerCol = below;
+    upperCol = above;
+  } else if (below >= 0 && above >= 0) {
+    result.position = samples.tableEntry[below].targetPosition;
+    return true;
+  } else if (below < 0 && first >= 0 && second >= 0) {
+    lowerCol = first;
+    upperCol = second;
+    // Avoid extrapolating a long distance from an almost-flat segment. Use
+    // the nearest sample that establishes a meaningful position span, or
+    // the farthest available sample when the whole end of the row is flat.
+    const int16_t firstPosition = samples.tableEntry[first].targetPosition;
+    for (int col = second; col < POWERTABLE_WATT_SIZE; ++col) {
+      const TableEntry& candidate = samples.tableEntry[col];
+      if (candidate.targetPosition == INT16_MIN || candidate.readings < 2) continue;
+      upperCol = col;
+      if (candidate.targetPosition - firstPosition >= MIN_EXTRAPOLATION_POSITION_SPAN) break;
+    }
+  } else if (above < 0 && penultimate >= 0 && last >= 0) {
+    lowerCol = penultimate;
+    upperCol = last;
+    const int16_t lastPosition = samples.tableEntry[last].targetPosition;
+    for (int col = penultimate; col >= 0; --col) {
+      const TableEntry& candidate = samples.tableEntry[col];
+      if (candidate.targetPosition == INT16_MIN || candidate.readings < 2) continue;
+      lowerCol = col;
+      if (lastPosition - candidate.targetPosition >= MIN_EXTRAPOLATION_POSITION_SPAN) break;
+    }
+  } else {
+    return false;
+  }
+
+  const float lowerWatts = lowerCol * POWERTABLE_WATT_INCREMENT;
+  const float upperWatts = upperCol * POWERTABLE_WATT_INCREMENT;
+  const float lowerPosition = samples.tableEntry[lowerCol].targetPosition;
+  const float upperPosition = samples.tableEntry[upperCol].targetPosition;
+  // The same minimum span used above to select extrapolation anchors also
+  // applies when the entire row is nearly flat. One stored position unit is
+  // not meaningful slope evidence for a distant recovery target.
+  const float positionSpan = upperPosition - lowerPosition;
+  result.flatExtrapolation = positionSpan >= 0 && positionSpan < MIN_EXTRAPOLATION_POSITION_SPAN ? (below < 0 ? -1 : above < 0 ? 1 : 0) : 0;
+  result.edgeWatts = below < 0 ? lowerWatts : upperWatts;
+  result.edgePosition = below < 0 ? lowerPosition : upperPosition;
+  result.position = lowerPosition + (rowTargetWatts - lowerWatts) * (upperPosition - lowerPosition) / (upperWatts - lowerWatts);
+  return true;
+}
+
 // Return the slope of the closest fully measured segment containing watts.
 // Unlike a centered +/- one-bin probe, this permits a target close to a
 // measured row edge while still refusing extrapolation beyond the table.
@@ -286,92 +389,61 @@ int32_t PTHelpers::lookup(int watts, int cad, const PTData& ptData) {
   if (cad <= 0 || watts < 0) return RETURN_ERROR;
 
   float rowPosition[POWERTABLE_CAD_SIZE];
+  float rowEdgeWatts[POWERTABLE_CAD_SIZE];
+  float rowEdgePosition[POWERTABLE_CAD_SIZE];
   int rowCadence[POWERTABLE_CAD_SIZE];
+  int8_t rowFlatExtrapolation[POWERTABLE_CAD_SIZE] = {};
+  bool rowHasPositionSpan[POWERTABLE_CAD_SIZE] = {};
   int validRows = 0;
 
-  // Determine the requested position independently in each cadence row. Use
-  // the surrounding reliable watt samples for interpolation, or the nearest
-  // two reliable samples for extrapolation beyond a row's measured range.
-  for (int row = 0; row < POWERTABLE_CAD_SIZE; row++) {
-    int reliableSamples = 0;
-    for (int col = 0; col < POWERTABLE_WATT_SIZE; col++) {
-      const TableEntry& entry = ptData.tableRow[row].tableEntry[col];
-      if (entry.targetPosition != INT16_MIN && entry.readings >= 2) reliableSamples++;
-    }
-    // A lone point establishes no watt-to-position slope and can introduce a
-    // discontinuity when mixed with complete neighboring rows.
-    if (reliableSamples < 2) continue;
-
+  // Compare equal-torque points independently in each measured cadence row.
+  for (int row = 0; row < POWERTABLE_CAD_SIZE; ++row) {
     const int sampleCadence = MINIMUM_TABLE_CAD + row * POWERTABLE_CAD_INCREMENT;
-    // Compare equal torque operating points between cadence rows. At a fixed
-    // resistance, power changes approximately in proportion to cadence.
-    const float rowTargetWatts = static_cast<float>(watts) * sampleCadence / cad;
-    int below = -1;
-    int above = -1;
-    int first = -1;
-    int second = -1;
-    int penultimate = -1;
-    int last = -1;
-
-    for (int col = 0; col < POWERTABLE_WATT_SIZE; col++) {
-      const TableEntry& entry = ptData.tableRow[row].tableEntry[col];
-      if (entry.targetPosition == INT16_MIN || entry.readings < 2) continue;
-
-      if (first < 0) {
-        first = col;
-      } else if (second < 0) {
-        second = col;
-      }
-      penultimate = last;
-      last = col;
-
-      const int sampleWatts = col * POWERTABLE_WATT_INCREMENT;
-      if (sampleWatts <= rowTargetWatts) below = col;
-      if (sampleWatts >= rowTargetWatts && above < 0) above = col;
-    }
-
-    int lowerCol;
-    int upperCol;
-    if (below >= 0 && above >= 0 && below != above) {
-      lowerCol = below;
-      upperCol = above;
-    } else if (below >= 0 && above >= 0) {
-      rowCadence[validRows] = sampleCadence;
-      rowPosition[validRows++] = ptData.tableRow[row].tableEntry[below].targetPosition;
-      continue;
-    } else if (below < 0 && first >= 0 && second >= 0) {
-      lowerCol = first;
-      upperCol = second;
-      // Avoid extrapolating a long distance from an almost-flat segment. Use
-      // the nearest sample that establishes a meaningful position span, or
-      // the farthest available sample when the whole end of the row is flat.
-      const int16_t firstPosition = ptData.tableRow[row].tableEntry[first].targetPosition;
-      for (int col = second; col < POWERTABLE_WATT_SIZE; ++col) {
-        const TableEntry& candidate = ptData.tableRow[row].tableEntry[col];
-        if (candidate.targetPosition == INT16_MIN || candidate.readings < 2) continue;
-        upperCol = col;
-        if (candidate.targetPosition - firstPosition >= MIN_EXTRAPOLATION_POSITION_SPAN) break;
-      }
-    } else if (above < 0 && penultimate >= 0 && last >= 0) {
-      lowerCol = penultimate;
-      upperCol = last;
-      const int16_t lastPosition = ptData.tableRow[row].tableEntry[last].targetPosition;
-      for (int col = penultimate; col >= 0; --col) {
-        const TableEntry& candidate = ptData.tableRow[row].tableEntry[col];
-        if (candidate.targetPosition == INT16_MIN || candidate.readings < 2) continue;
-        lowerCol = col;
-        if (lastPosition - candidate.targetPosition >= MIN_EXTRAPOLATION_POSITION_SPAN) break;
-      }
-    } else {
-      continue;
-    }
-
-    const float lowerWatts = lowerCol * POWERTABLE_WATT_INCREMENT;
-    const float upperWatts = upperCol * POWERTABLE_WATT_INCREMENT;
-    const float lowerPosition = ptData.tableRow[row].tableEntry[lowerCol].targetPosition;
-    const float upperPosition = ptData.tableRow[row].tableEntry[upperCol].targetPosition;
+    RowPosition result;
+    if (!lookupRowPosition(ptData.tableRow[row], static_cast<float>(watts) * sampleCadence / cad, result)) continue;
     rowCadence[validRows] = sampleCadence;
-    rowPosition[validRows++] = lowerPosition + (rowTargetWatts - lowerWatts) * (upperPosition - lowerPosition) / (upperWatts - lowerWatts);
+    rowPosition[validRows] = result.position;
+    rowEdgeWatts[validRows] = result.edgeWatts;
+    rowEdgePosition[validRows] = result.edgePosition;
+    rowFlatExtrapolation[validRows] = result.flatExtrapolation;
+    rowHasPositionSpan[validRows++] = result.canDonate;
+  }
+
+  // A flat or under-resolved row has no reliable extrapolation slope. Borrow
+  // an informative row's change, anchored at the measured edge. Borrowing an
+  // absolute position (even clamped to the edge) jumps at that boundary and
+  // can turn an ordinary 1 W ramp into a large unpaced controller command.
+  // Use a fixed set of monotone donors with a measured position span; other
+  // plateaus must not enter/leave that set at their own measured boundaries.
+  // All-flat-only tables retain their legacy forward and inverse fallback.
+  for (int row = 0; row < validRows; ++row) {
+    if (rowFlatExtrapolation[row] == 0) continue;
+    int lower = -1;
+    int upper = -1;
+    for (int candidate = 0; candidate < validRows; ++candidate) {
+      // A malformed/nonmonotone row can have a span elsewhere yet select
+      // flat extrapolation endpoints. It cannot donate to itself or others.
+      if (!rowHasPositionSpan[candidate] || rowFlatExtrapolation[candidate] != 0) continue;
+      if (rowCadence[candidate] <= rowCadence[row]) lower = candidate;
+      if (rowCadence[candidate] >= rowCadence[row] && upper < 0) upper = candidate;
+    }
+    if (lower < 0 && upper < 0) continue;
+    const auto donorDelta = [&](int donor) {
+      RowPosition edge;
+      const int sourceRow = (rowCadence[donor] - MINIMUM_TABLE_CAD) / POWERTABLE_CAD_INCREMENT;
+      const float edgeWatts = rowEdgeWatts[row] * rowCadence[donor] / rowCadence[row];
+      if (!lookupRowPosition(ptData.tableRow[sourceRow], edgeWatts, edge)) return 0.0f;
+      return rowPosition[donor] - edge.position;
+    };
+    float delta;
+    if (lower < 0 || upper < 0 || lower == upper) {
+      delta = donorDelta(lower >= 0 ? lower : upper);
+    } else {
+      const float fraction = static_cast<float>(rowCadence[row] - rowCadence[lower]) / (rowCadence[upper] - rowCadence[lower]);
+      const float lowerDelta = donorDelta(lower);
+      delta = lowerDelta + fraction * (donorDelta(upper) - lowerDelta);
+    }
+    rowPosition[row] = rowEdgePosition[row] + (rowFlatExtrapolation[row] < 0 ? std::min(0.0f, delta) : std::max(0.0f, delta));
   }
 
   if (validRows == 0) return RETURN_ERROR;
