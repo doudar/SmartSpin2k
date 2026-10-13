@@ -30,3 +30,7 @@ dependencies.lock.*
 *.map
 graphify-out/
 output/
+
+# Python test/simulator caches
+__pycache__/
+*.py[cod]

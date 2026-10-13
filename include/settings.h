@@ -232,8 +232,8 @@ constexpr const char* ANY  = "any";
 #define POWER_SAMPLE_MAX_AGE_MS     1500
 #define POWER_SAMPLE_MIN_SPACING_MS 750
 #define POWER_SAMPLE_SETTLE_MS      2000
-#define POWER_SAMPLE_POSITION_SPAN  100
-#define POWER_SAMPLE_CADENCE_SPAN   3
+#define POWER_SAMPLE_POSITION_SPAN  250
+#define POWER_SAMPLE_CADENCE_SPAN   5
 
 // How often in ms to save the power table if no new data is added and user is pedaling.
 #define POWER_TABLE_SAVE_INTERVAL 240000

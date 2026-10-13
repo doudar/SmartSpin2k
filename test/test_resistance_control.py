@@ -25,25 +25,31 @@ int main() {
   auto command = [&](int r, uint32_t t) { return control.update(9100, r, 50, t, t, 1200, 3); };
   assert(command(40, 0) > 9100);
   assert(command(54, 1000) < 9100); // First genuine overshoot, still return toward target.
-  assert(control.damping() == 0.5f);
   assert(command(46, 2000) > 9100);
-  assert(control.damping() == 1.0f);
   assert(command(49, 3000) == 9100); // Brake an approach before its next overshoot.
-  for (uint32_t t = 3010; t < 3500; t += 10) {
+  // Re-reading a sample must retain the same motor command.
+  for (uint32_t t = 3010; t < 3500; t += 10)
     assert(control.update(9100, 49, 50, 3000, t, 1200, 3) == 9100);
-    assert(control.damping() == 1.0f); // Re-reading a sample is not another overshoot.
-  }
   assert(command(49, 4000) > 9100); // No permanent stall when resistance stops changing.
   assert(command(50, 5000) == 9100);
-  for (uint32_t t = 6000; t < 30000; t += 1000) command(t % 2000 ? 46 : 54, t);
-  assert(control.damping() == 2.5f); // Bounded even with repeated crossings.
-  control.update(9100, 50, 60, 30000, 30000, 1200, 3);
-  assert(control.damping() == 0); // A new target starts with normal responsiveness.
+  for (uint32_t t = 6000; t < 30000; t += 1000) {
+    const int resistance = t % 2000 ? 46 : 54;
+    const int32_t next = command(resistance, t);
+    // Repeated crossings may brake a correction, never reverse it or amplify it.
+    const int32_t ordinary = ResistanceControl::target(9100, 50 - resistance, 1200, 3);
+    assert(next >= std::min(9100, ordinary) && next <= std::max(9100, ordinary));
+  }
+  // A changed target must respond as promptly as a newly started controller.
+  Controller fresh;
+  assert(control.update(9100, 50, 60, 30000, 30000, 1200, 3) ==
+         fresh.update(9100, 50, 60, 30000, 30000, 1200, 3));
 
   Controller noise;
   for (uint32_t t = 0; t < 30000; t += 1000) {
-    noise.update(9100, 48 + (t / 1000) % 5, 50, t, t, 1200, 3);
-    assert(noise.damping() == 0); // Quantization/noise around the target is not training.
+    const int resistance = 48 + (t / 1000) % 5;
+    // Small sensor jitter must not train away the normal response.
+    assert(noise.update(9100, resistance, 50, t, t, 1200, 3) ==
+           ResistanceControl::target(9100, 50 - resistance, 1200, 3));
   }
   Controller reverse;
   reverse.update(1000, 60, 50, 0, 0, 1200, 3);
@@ -54,8 +60,12 @@ int main() {
   assert(reverse.update(1000, 51, 50, 3000, 5000, 1200, 3) < 1000);
   Controller wrapped;
   wrapped.update(1000, 40, 50, UINT32_MAX - 500, UINT32_MAX - 500, 1200, 3);
-  wrapped.update(1000, 54, 50, 499, 499, 1200, 3);
-  assert(wrapped.damping() == 0.5f);
+  Controller unwrapped;
+  unwrapped.update(1000, 40, 50, 0, 0, 1200, 3);
+  assert(wrapped.update(1000, 54, 50, 499, 499, 1200, 3) ==
+         unwrapped.update(1000, 54, 50, 1000, 1000, 1200, 3));
+  assert(wrapped.update(1000, 49, 50, 1499, 1499, 1200, 3) ==
+         unwrapped.update(1000, 49, 50, 2000, 2000, 1200, 3));
   assert(ResistanceControl::target(INT32_MAX - 1, 50, 1200, 3) == INT32_MAX);
   assert(ResistanceControl::target(INT32_MIN + 1, -50, 1200, 3) == INT32_MIN);
   // Homing uses the same controller with measured travel, bounded per move.

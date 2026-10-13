@@ -2,25 +2,39 @@ name: native-tests
 
 on:
   pull_request:
-    paths-ignore:
-      - "Hardware/**"
   push:
     branches:
       - develop
-    paths-ignore:
-      - "Hardware/**"
+  workflow_dispatch:
+
+permissions:
+  contents: read
 
 jobs:
+  host-tooling-scope:
+    runs-on: ubuntu-latest
+    outputs:
+      tooling_changed: ${{ steps.scope.outputs.tooling_changed }}
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-python@v7
+        with:
+          python-version: "3.11"
+      - name: Detect host tooling changes (manual runs check all hosts)
+        id: scope
+        env:
+          BASE_SHA: ${{ github.event.pull_request.base.sha || github.event.before }}
+          HEAD_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
+        run: python scripts/ci_host_tests.py scope --base "$BASE_SHA" --head "$HEAD_SHA"
+
+  # Retain the existing Linux check name for branch-protection compatibility.
   native-tests:
     strategy:
-      fail-fast: false
       matrix:
-        os:
-          - ubuntu-latest
-          - macos-latest
-          - windows-latest
+        os: [ubuntu-latest]
     runs-on: ${{ matrix.os }}
-
     steps:
       - uses: actions/checkout@v7
       - uses: actions/setup-python@v7
@@ -28,9 +42,31 @@ jobs:
           python-version: "3.11"
       - name: Check SDK configuration alignment
         run: python scripts/check_sdkconfig.py
-      - name: Install pioarduino Core
-        run: python -m pip install -r requirements-ci.txt
-      - name: Run native tests
+      - name: Install complete host test dependencies
+        run: python -m pip install -r requirements-ci.txt -r scripts/erg_sim/requirements.txt -r scripts/bike_sim/requirements-ble.txt
+      - name: Install firmware-pinned ArduinoJson for persistence tests
+        shell: bash
+        run: |
+          spec=$(python -c 'import configparser; c=configparser.ConfigParser(); c.read("platformio.ini"); print(next(x.strip() for x in c["common"]["lib_deps"].splitlines() if "ArduinoJson" in x))')
+          mkdir -p .pio/libdeps/ci
+          platformio pkg install --global --storage-dir .pio/libdeps/ci --library "$spec"
+      - name: Run native safety and protocol tests
         run: platformio test -e native
-      - name: Run motor integration regressions
-        run: python -B -m unittest discover -s test -p "test_*.py"
+      - name: Run complete Python behavior suite (skips fail CI)
+        run: python -B scripts/ci_host_tests.py run --suite full
+
+  host-portability-smoke:
+    needs: host-tooling-scope
+    if: needs.host-tooling-scope.outputs.tooling_changed == 'true'
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [macos-latest, windows-latest]
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-python@v7
+        with:
+          python-version: "3.11"
+      - name: Smoke-test compiled packet adapters and asynchronous IO
+        run: python -B scripts/ci_host_tests.py run --suite smoke

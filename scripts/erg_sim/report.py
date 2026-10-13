@@ -39,6 +39,19 @@ def save_run(output, trace, report, metadata):
         text += ["", "## Full workout — no settling allowance", "",
                  "These comparison metrics include every report and remain the basis for the existing regression limits.", ""]
     text += _score_lines(report)
+    if "travel" in report:
+        tr = report["travel"]
+        steps = lambda value: "never" if value is None else f"{value:.0f} steps"
+        seconds = lambda value: "never" if value is None else f"{value:.0f} s"
+        text += ["", "## Travel and endstops", "",
+                 f"Homing: **{metadata.get('homing', 'homed')}**; physical start {metadata.get('initial_position_steps')} steps, "
+                 f"firmware start {metadata.get('firmware_start_steps')} steps; min/max watts {metadata.get('min_watts')}/{metadata.get('max_watts')}.", "",
+                 f"- Time against minimum / maximum stop: {tr['seconds_at_min_stop']:.0f} s / {tr['seconds_at_max_stop']:.0f} s",
+                 f"- Lost pulses (firmware counted, bike did not move): max {tr['lost_pulses_max_abs']:.0f}, final {tr['lost_pulses_final']:.0f}",
+                 f"- Largest command beyond a physical stop: {tr['max_command_beyond_stop_steps']:.0f} steps"]
+        if "first_min_limit_s" in tr:
+            text += [f"- Watt-derived min limit first set: {seconds(tr['first_min_limit_s'])}; final (physical axis): {steps(tr['final_min_limit_physical'])}",
+                     f"- Watt-derived max limit first set: {seconds(tr['first_max_limit_s'])}; final (physical axis): {steps(tr['final_max_limit_physical'])}"]
     text += ["", "Counts are one per sensor report, not per firmware tick. Episodes group adjacent reports; durations use sample-and-hold. "
              "The plots retain the complete power and error traces. The JSON also contains signed peaks, RMS error, "
              "steady tracking, and time to stay within 20 W for five seconds after each large transition.", "",
@@ -52,7 +65,7 @@ def save_run(output, trace, report, metadata):
     (output/"report.md").write_text('\n'.join(text)+'\n', encoding="utf-8")
 
 
-def plot_run(output, trace, title="Random Attacks — production ERG + simulated bike", *, workout=None, ftp=305, score=None):
+def plot_run(output, trace, title="Random Attacks — production ERG + simulated bike", *, workout=None, ftp=305, score=None, travel=None):
     import matplotlib
     matplotlib.use("Agg")
     import matplotlib.pyplot as plt
@@ -134,7 +147,8 @@ def plot_run(output, trace, title="Random Attacks — production ERG + simulated
     plt.close(fig)
 
     # Separate detail view for debugging changes that are hard to see at scale.
-    fig, axes = plt.subplots(3, 1, figsize=(15, 9), sharex=True, constrained_layout=True)
+    show_travel = travel is not None and trace.shape[1] > 11
+    fig, axes = plt.subplots(4 if show_travel else 3, 1, figsize=(15, 12 if show_travel else 9), sharex=True, constrained_layout=True)
     t = trace[:, 0]/60
     axes[0].plot(t, trace[:, 1], color="#222222", label="Workout target", linewidth=1.5)
     axes[0].plot(t, trace[:, 2], color="#187cba", label="Simulated reported power", linewidth=.8)
@@ -144,6 +158,22 @@ def plot_run(output, trace, title="Random Attacks — production ERG + simulated
     axes[1].set(ylabel="Error (W)", title="Full error trace — includes interval settling")
     axes[2].plot(t, trace[:, 3], color="#2b8756", linewidth=.8)
     axes[2].set(ylabel="Cadence (RPM)", xlabel="Simulation time (min)")
+    if show_travel:
+        # Everything on the bike's physical axis: firmware values shifted by the
+        # current (counter - physical) offset, which grows when pulses are lost.
+        lo, hi = travel
+        offset = trace[:, 5]-trace[:, 4]
+        span = hi-lo
+        view = lambda values: np.where(np.abs(values) < 2e8, np.clip(values-offset, lo-span, hi+span), np.nan)
+        axes[3].plot(t, trace[:, 4], color="#187cba", linewidth=.9, label="Physical position")
+        axes[3].plot(t, view(trace[:, 6]), color="#ac8537", linewidth=.6, alpha=.8, label="Commanded (physical equivalent)")
+        axes[3].plot(t, view(trace[:, 10]), color="#2b8756", linewidth=1, linestyle="--", label="Firmware min limit")
+        axes[3].plot(t, view(trace[:, 11]), color="#b64a31", linewidth=1, linestyle="--", label="Firmware max limit")
+        for stop in (lo, hi): axes[3].axhline(stop, color="black", linewidth=.8)
+        axes[3].set(ylabel="Steps", xlabel="Simulation time (min)", ylim=(lo-.25*span, hi+.25*span),
+                    title="Travel — black lines are physical stops; limits are absent until learned from min/max watts")
+        axes[3].legend(loc="upper right", fontsize=8)
+        axes[2].set(xlabel=None)
     for ax in axes: ax.grid(alpha=.2)
     fig.savefig(Path(output)/"diagnostics.png", dpi=140)
     plt.close(fig)

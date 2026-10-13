@@ -9,12 +9,14 @@
 // build time; no copied ERG, learning, motor-dispatch, or stall decisions.
 #include <algorithm>
 #include <cmath>
+#include <climits>
 #include <cstdarg>
 #include <cstdio>
 #include <cstdlib>
 #include <iostream>
 #include <sstream>
 #include <string>
+#include <vector>
 #include "ERG_Mode.h"
 #include "Power_Table.h"
 #include "BLE_Definitions.h"
@@ -37,8 +39,13 @@ RuntimeParameters* rtConfig = &runtime;
 userParameters config;
 userParameters* userConfig = &config;
 void userParameters::saveToLittleFS() {}
+#ifdef SS2K_PACKET_INGRESS
+/* VIRTUAL_BLE_DECLARATIONS */
+/* VIRTUAL_FTMS_DECLARATIONS */
+#else
 struct { bool connectedPM = true; } spinBLEClient;
 struct { int spinDownFlag = 0; } spinBLEServer;
+#endif
 struct { int dirPin = 0; float homingSensitivityScaler = 1; } currentBoard;
 struct { bool exists(const char*) { return false; } bool remove(const char*) { return true; } } LittleFS;
 int commits = 0;
@@ -82,6 +89,7 @@ struct SS2K {
   int32_t currentPosition = 0, targetPosition = 0;
   int lastShifterPosition = 0;
   bool stepperIsRunning = false, resetPowerTableFlag = false;
+  bool isUpdating = false;
   bool externalControl = false, syncMode = false, pelotonIsConnected = false, homingFallback = false;
   int32_t getCurrentPosition() { return currentPosition; }
   int32_t getTargetPosition() { return targetPosition; }
@@ -101,7 +109,11 @@ PowerTable table;
 PowerTable* powerTable = &table;
 ErgMode controller;
 ErgMode* ergMode = &controller;
-bool PowerTable::_manageSaveState(bool, bool) { _hasBeenLoadedThisSession=true; return true; }
+bool PowerTable::_manageSaveState(bool, bool) {
+  // Production gate: unhomed sessions never load or save, and retry each pass.
+  if (!rtConfig->getHomed()) return false;
+  _hasBeenLoadedThisSession=true; return true;
+}
 bool PowerTable::_save() { return true; }
 void PowerTable::toLog() {}
 struct Driver {
@@ -109,9 +121,16 @@ struct Driver {
   int SG_RESULT() { return std::lround(300-290*constrain(load, 0.0, 1.0)); }
 } driverObject;
 Driver* driver = &driverObject;
+#ifndef SS2K_PACKET_INGRESS
 struct { void spinDown(int) {} } fitnessMachineService;
+#endif
 constexpr int LOG_INTERVAL = 1000;
 struct HomingSgBaseline { int threshold; int sensitivity; };
+#ifdef SS2K_PACKET_INGRESS
+/* VIRTUAL_BLE_IMPLEMENTATION */
+/* VIRTUAL_FTMS_IMPLEMENTATION */
+#endif
+
 /* PRODUCTION_TABLE */
 /* PRODUCTION_ERG */
 /* PRODUCTION_STEPPER */
@@ -131,39 +150,130 @@ void delay(int ms) {
 
 int main() {
   std::string line;
-  bool initialized = false;
+  bool initialized = false, rideStarted = false, tableImported = false;
   while (std::getline(std::cin, line)) {
     std::istringstream input(line);
     char op; input >> op;
     if (op == 'I') {
-      int pos, lo, hi, speed, minWatts; double sensitivity;
-      if (initialized || !(input >> pos >> lo >> hi >> speed >> sensitivity >> minWatts)) return 2;
+      int pos, lo, hi, speed, minWatts, maxWatts, shiftStep, homed; double sensitivity;
+      if (initialized || !(input >> pos >> lo >> hi >> speed >> sensitivity >> minWatts >> maxWatts >> shiftStep >> homed)) return 2;
       initialized = true;
       userConfig->setERGSensitivity(sensitivity); userConfig->setStepperSpeed(speed);
-      userConfig->setShiftStep(1000); userConfig->setMinWatts(minWatts); userConfig->setMaxWatts(2000);
-      userConfig->setHMin(lo); userConfig->setHMax(hi); userConfig->setStepperDir(false);
+      userConfig->setShiftStep(shiftStep); userConfig->setMinWatts(minWatts); userConfig->setMaxWatts(maxWatts);
+      userConfig->setStepperDir(false);
       userConfig->setStepperPower(900); userConfig->setHomingSensitivity(10);
-      rtConfig->setMinStep(lo); rtConfig->setMaxStep(hi); rtConfig->setHomed(true);
+      if (homed) {
+        userConfig->setHMin(lo); userConfig->setHMax(hi);
+        rtConfig->setMinStep(lo); rtConfig->setMaxStep(hi); rtConfig->setHomed(true);
+      } else {
+        // Never calibrated (or failed homing): no saved travel, provisional
+        // +/-DEFAULT_STEPPER_TRAVEL until setStepperMinMax() learns watt bounds.
+        userConfig->setHMin(INT32_MIN); userConfig->setHMax(INT32_MIN);
+        rtConfig->setMinStep(INT32_MIN); rtConfig->setMaxStep(INT32_MIN); rtConfig->setHomed(false);
+      }
       rtConfig->setFTMSMode(FitnessMachineControlPointProcedure::SetTargetPower);
       motor.setCurrentPosition(pos); motor.speed = speed;
       ss2k->currentPosition = ss2k->targetPosition = pos;
       rtConfig->setTargetIncline(pos);
       table.clearRuntime();
+#ifdef SS2K_PACKET_INGRESS
+      userConfig->setPowerCorrectionFactor(1);
+      virtualBleConnect("cps_csc");
+#endif
       std::cout << "I 1\n" << std::flush;
     } else if (!initialized) return 2;
+#ifdef SS2K_PACKET_INGRESS
+    else if (op == 'X') {
+      disconnectVirtualBle();
+      std::cout << "X 1\n" << std::flush;
+    } else if (op == 'C') {
+      virtualBleConnect("cps_csc");
+      std::cout << "C 1\n" << std::flush;
+    }
+    else if (op == 'S') {
+      std::cout << "S " << virtualBleStats.attempted << ' ' << virtualBleStats.accepted << ' '
+                << virtualBleStats.rejected << ' ' << virtualBleStats.queueDropped << ' '
+                << virtualBleStats.processed << ' ' << virtualBleStats.bytes << ' '
+                << rtConfig->watts.getValue() << ' ' << rtConfig->cad.getValue() << '\n' << std::flush;
+    }
+    else if (op == 'B' || op == 'F') {
+      unsigned characteristic = 0; std::string hex;
+      if (op == 'B' && !(input >> std::hex >> characteristic)) return 2;
+      if (!(input >> hex) || hex.size()%2) return 2;
+      std::vector<uint8_t> payload;
+      for (size_t i=0; i<hex.size(); i+=2) {
+        unsigned value; std::istringstream byte(hex.substr(i, 2));
+        if (!(byte >> std::hex >> value)) return 2;
+        payload.push_back(value);
+      }
+      if (op == 'B') {
+        rideStarted = true;
+        const bool accepted = virtualBleNotify(characteristic, payload);
+        std::cout << "B " << accepted << "\n" << std::flush;
+      } else {
+        auto reply = virtualFtmsWrite(payload);
+        std::cout << "F";
+        for (auto byte: reply) std::cout << ' ' << static_cast<unsigned>(byte);
+        std::cout << '\n' << std::flush;
+      }
+    }
+#endif
     else if (op == 'T') {
+      rideStarted = true;
       uint32_t now; int watts, cadence, fresh, target; double load;
       if (!(input >> now >> watts >> cadence >> fresh >> target >> load) || now < clockMs || now-clockMs > 1000) return 2;
       const int pulses = motor.advance(now-clockMs); clockMs = now;
-      if (fresh) { rtConfig->watts.setValue(watts, false); rtConfig->cad.setValue(cadence, false); }
+#ifdef SS2K_PACKET_INGRESS
+      // No watts/cadence or target scalar crosses this firmware boundary.
+      if (fresh || watts || cadence || target != -1) return 2;
+      pollVirtualBle();
+#else
+      // Deliberate component seam: not a transport-integrated firmware test.
+      if (fresh & 1) rtConfig->watts.setValue(watts, false);
+      if (fresh & 2) rtConfig->cad.setValue(cadence, false);
       if (target >= 0) rtConfig->watts.setTarget(target);
+#endif
       driver->load = load;
       ss2k->moveStepper();
       controller.runERG();
       int cells = 0;
       for (const auto& row:table.ptData.tableRow) for (const auto& cell:row.tableEntry) cells += cell.readings >= 2;
       std::cout << "T " << pulses << ' ' << motor.getCurrentPosition() << ' ' << motor.target << ' '
-                << cells << ' ' << controller.isTableSeeking() << ' ' << rtConfig->watts.getTarget() << '\n' << std::flush;
+                << cells << ' ' << controller.isTableSeeking() << ' ' << rtConfig->watts.getTarget() << ' '
+                << rtConfig->getMinStep() << ' ' << rtConfig->getMaxStep() << '\n' << std::flush;
+    } else if (op == 'U') {
+      // Test-only initial saved-table analog. No mid-ride table/oracle feedback.
+      // Fresh TableEntry runtime fields match the production disk-load path;
+      // this does not test LittleFS, coordinate normalization or persistence.
+      long long version, quality, homed, rows, columns, cadMin, cadStep, wattStep, divisor;
+      bool valid = !rideStarted && !tableImported &&
+          static_cast<bool>(input >> version >> quality >> homed >> rows >> columns >> cadMin >> cadStep >> wattStep >> divisor);
+      valid = valid && version == TABLE_VERSION && rows == POWERTABLE_CAD_SIZE && columns == POWERTABLE_WATT_SIZE &&
+          cadMin == MINIMUM_TABLE_CAD && cadStep == POWERTABLE_CAD_INCREMENT && wattStep == POWERTABLE_WATT_INCREMENT &&
+          divisor == TABLE_DIVISOR && homed == static_cast<int>(rtConfig->getHomed()) && quality >= 0;
+      PTData staged;
+      long long total = 0;
+      if (valid) {
+        for (auto& row : staged.tableRow) for (auto& cell : row.tableEntry) {
+          long long position = 0, readings = 0;
+          if (!(input >> position >> readings) || position < INT16_MIN || position > INT16_MAX || readings < 0 || readings > INT8_MAX ||
+              ((position == INT16_MIN) != (readings == 0))) {
+            valid = false;
+            continue;
+          }
+          cell.targetPosition = static_cast<int16_t>(position);
+          cell.readings = static_cast<int8_t>(readings);
+          total += readings;
+        }
+      }
+      std::string extra;
+      valid = valid && total == quality && !(input >> extra);
+      if (valid) {
+        table.clearRuntime();
+        table.ptData = staged;
+        tableImported = true;
+      }
+      std::cout << "U " << valid << '\n' << std::flush;
     } else if (op == 'P') {
       // Read-only final RAM snapshot: never send the plant curve into learning.
       std::cout << "P " << TABLE_VERSION << ' ' << table.ptHelpers.getTotalReadings(table.ptData) << ' ' << rtConfig->getHomed() << ' '
@@ -173,6 +283,7 @@ int main() {
         std::cout << ' ' << cell.targetPosition << ' ' << static_cast<int>(cell.readings);
       std::cout << '\n' << std::flush;
     } else if (op == 'H') {
+      rideStarted = true;
       int forward; if (!(input >> forward)) return 2;
       const bool found = ss2k->_findEndStop(forward != 0);
       std::cout << "H " << found << ' ' << clockMs << ' ' << motor.getCurrentPosition() << '\n' << std::flush;

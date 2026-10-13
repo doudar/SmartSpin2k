@@ -33,6 +33,14 @@ class test_cyclePowerData {
   static void test_parses_speed(void);
 };
 
+class TestPelotonData {
+ public:
+  static void test_window_averages_and_boundaries();
+  static void test_independent_counts_precision_and_stops();
+  static void test_gap_wrap_and_device_isolation();
+  static void test_invalid_packets_do_not_refresh_or_pollute();
+};
+
 class TestErgLogReplay {
  public:
   static void test_active_ride_log_and_gain_limits(void);

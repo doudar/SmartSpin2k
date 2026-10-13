@@ -5,7 +5,7 @@
 # SPDX-License-Identifier: GPL-2.0-only
 #
 
-"""Check the shipped JavaScript presets against independent tooth/ratio fixtures."""
+"""Exercise groupset selection and saved custom gearing in both shipped web UIs."""
 from pathlib import Path
 import json
 import math
@@ -21,8 +21,12 @@ class TestGroupsetWeb(unittest.TestCase):
         node = shutil.which("node")
         if not node:
             self.skipTest("Node.js is required for web groupset tests")
-        html = (ROOT / "data/settings.html").read_text(encoding="utf-8")
-        self.assertEqual(html, (ROOT / "data_s3/settings.html").read_text(encoding="utf-8"))
+        for variant in ("data", "data_s3"):
+            with self.subTest(variant=variant):
+                self.check_groupsets(node, ROOT / variant / "settings.html")
+
+    def check_groupsets(self, node, page):
+        html = page.read_text(encoding="utf-8")
         presets = html[html.index("    const groupsetPresets ="):html.index("    function createGroupsetSetting")]
         helpers = html[html.index("    function updateGroupsetDescription"):html.index("    // Generate HTML for text input settings")]
         script = presets + helpers + r'''
@@ -40,37 +44,47 @@ global.Option = function(label,value) {
   this.value=value; this.dataset={};
   Object.defineProperty(this,'selected',{set:()=>{select.index=select.options.indexOf(this);}});
 };
-const text = {};
-global.document={getElementById:id=>id==='gearTeeth' ? select : text};
+const fields = {groupsetGearing: {}, groupsetDescription: {}};
+global.document={getElementById:id=>id==='gearTeeth' ? select : fields[id]};
+// Every shipped choice must round-trip saved settings and submit the right field.
+for (const preset of groupsetPresets) {
+  loadGroupset(preset.teeth, preset.preset || 0);
+  assert.equal(select.name, preset.preset ? 'gearPreset' : 'gearTeeth');
+  assert.equal(select.value, preset.value);
+  assert.equal(fields.groupsetDescription.textContent, preset.description);
+  const count = preset.count || preset.teeth.length;
+  assert.equal(fields.groupsetGearing.textContent,
+    count ? `${preset.gearing} · ${count} virtual gears` : preset.gearing);
+}
+// Custom gearing must survive loading without silently becoming a preset.
+const optionCount = select.options.length;
 loadGroupset([3434,3417]);
 assert.equal(select.name,'gearTeeth');
 assert.deepEqual(JSON.parse(select.value),[3434,3417]);
+assert.equal(select.options.length,optionCount + 1);
+assert.equal(fields.groupsetGearing.textContent,'2 virtual gears');
+assert.match(fields.groupsetDescription.textContent,/custom/i);
+// Loading another saved custom set replaces its option rather than accumulating it.
+loadGroupset([3630,3615,5012]);
+assert.deepEqual(JSON.parse(select.value),[3630,3615,5012]);
+assert.equal(select.options.length,optionCount + 1);
 loadGroupset([]);
 assert.equal(select.name,'gearTeeth');
 assert.equal(select.value,'[]');
-loadGroupset(groupsetPresets[1].teeth);
-assert.equal(select.name,'gearTeeth');
-assert.equal(select.index,1);
+assert.equal(select.options.length,optionCount);
+// Preset ID 1 is a persisted firmware protocol value, independent of menu order.
 loadGroupset([],1);
 assert.equal(select.name,'gearPreset');
 assert.equal(select.value,'1');
-assert.equal(select.index,4);
-loadGroupset(groupsetPresets[1].teeth);
-assert.equal(select.name,'gearTeeth');
-assert.equal(select.index,1);
+assert.equal(select.options.length,optionCount);
 console.log(JSON.stringify(groupsetPresets));
 '''
         result = subprocess.run([node, "-"], input=script, text=True, capture_output=True, check=True)
         actual = json.loads(result.stdout)
-        self.assertEqual(len(actual), 6)
-        self.assertEqual(actual[4]["preset"], 1)
-        self.assertEqual(actual[4]["count"], 24)
-        self.assertEqual(actual[4]["value"], "1")
-        self.assertEqual(actual[5]["chainrings"], [48, 35])
-        self.assertEqual(actual[5]["cassette"], [10, 11, 12, 13, 14, 15, 17, 19, 21, 24, 28, 33])
-        for preset in actual[:4] + actual[5:]:
+        self.assertTrue(actual, "The user must have groupset choices")
+        self.assertEqual(len({preset["value"] for preset in actual}), len(actual))
+        self.assertIn(1, [preset.get("preset") for preset in actual])
+        for preset in (preset for preset in actual if not preset.get("preset")):
             expected = [front * 100 + rear for front in preset["chainrings"] for rear in preset["cassette"]]
             expected.sort(key=lambda p: (math.floor((p // 100) / (p % 100) * 1000 + 0.5), p))
             self.assertEqual(preset["teeth"], expected)
-        self.assertEqual(actual[1]["teeth"][0], 3434)
-        self.assertEqual(actual[1]["teeth"][-1], 5011)
