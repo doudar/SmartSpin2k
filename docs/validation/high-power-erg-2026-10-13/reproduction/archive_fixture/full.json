@@ -1,0 +1,1779 @@
+{
+  "table": {
+    "version": 6,
+    "quality": 845,
+    "homed": 1,
+    "rows": 10,
+    "columns": 30,
+    "cadence_min": 60,
+    "cadence_increment": 5,
+    "watt_increment": 30,
+    "position_divisor": 10,
+    "cells": [
+      [
+        -32768,
+        0
+      ],
+      [
+        -32768,
+        0
+      ],
+      [
+        -32768,
+        0
+      ],
+      [
+        -32768,
+        0
+      ],
+      [
+        -32768,
+        0
+      ],
+      [
+        -32768,
+        0
+      ],
+      [
+        -32768,
+        0
+      ],
+      [
+        -32768,
+        0
+      ],
+      [
+        -32768,
+        0
+      ],
+      [
+        -32768,
+        0
+      ],
+      [
+        -32768,
+        0
+      ],
+      [
+        -32768,
+        0
+      ],
+      [
+        -32768,
+        0
+      ],
+      [
+        -32768,
+        0
+      ],
+      [
+        -32768,
+        0
+      ],
+      [
+        -32768,
+        0
+      ],
+      [
+        -32768,
+        0
+      ],
+      [
+        -32768,
+        0
+      ],
+      [
+        -32768,
+        0
+      ],
+      [
+        -32768,
+        0
+      ],
+      [
+        -32768,
+        0
+      ],
+      [
+        -32768,
+        0
+      ],
+      [
+        -32768,
+        0
+      ],
+      [
+        -32768,
+        0
+      ],
+      [
+        -32768,
+        0
+      ],
+      [
+        -32768,
+        0
+      ],
+      [
+        -32768,
+        0
+      ],
+      [
+        -32768,
+        0
+      ],
+      [
+        -32768,
+        0
+      ],
+      [
+        -32768,
+        0
+      ],
+      [
+        -32768,
+        0
+      ],
+      [
+        -32768,
+        0
+      ],
+      [
+        -32768,
+        0
+      ],
+      [
+        -32768,
+        0
+      ],
+      [
+        -32768,
+        0
+      ],
+      [
+        -32768,
+        0
+      ],
+      [
+        -32768,
+        0
+      ],
+      [
+        -32768,
+        0
+      ],
+      [
+        -32768,
+        0
+      ],
+      [
+        -32768,
+        0
+      ],
+      [
+        -32768,
+        0
+      ],
+      [
+        -32768,
+        0
+      ],
+      [
+        -32768,
+        0
+      ],
+      [
+        -32768,
+        0
+      ],
+      [
+        -32768,
+        0
+      ],
+      [
+        -32768,
+        0
+      ],
+      [
+        -32768,
+        0
+      ],
+      [
+        -32768,
+        0
+      ],
+      [
+        -32768,
+        0
+      ],
+      [
+        -32768,
+        0
+      ],
+      [
+        -32768,
+        0
+      ],
+      [
+        -32768,
+        0
+      ],
+      [
+        -32768,
+        0
+      ],
+      [
+        -32768,
+        0
+      ],
+      [
+        -32768,
+        0
+      ],
+      [
+        -32768,
+        0
+      ],
+      [
+        -32768,
+        0
+      ],
+      [
+        -32768,
+        0
+      ],
+      [
+        -32768,
+        0
+      ],
+      [
+        -32768,
+        0
+      ],
+      [
+        -32768,
+        0
+      ],
+      [
+        -32768,
+        0
+      ],
+      [
+        -32768,
+        0
+      ],
+      [
+        -32768,
+        0
+      ],
+      [
+        -32768,
+        0
+      ],
+      [
+        -32768,
+        0
+      ],
+      [
+        -32768,
+        0
+      ],
+      [
+        -32768,
+        0
+      ],
+      [
+        -32768,
+        0
+      ],
+      [
+        -32768,
+        0
+      ],
+      [
+        -32768,
+        0
+      ],
+      [
+        -32768,
+        0
+      ],
+      [
+        -32768,
+        0
+      ],
+      [
+        -32768,
+        0
+      ],
+      [
+        -32768,
+        0
+      ],
+      [
+        2038,
+        4
+      ],
+      [
+        2087,
+        10
+      ],
+      [
+        2125,
+        4
+      ],
+      [
+        -32768,
+        0
+      ],
+      [
+        -32768,
+        0
+      ],
+      [
+        -32768,
+        0
+      ],
+      [
+        -32768,
+        0
+      ],
+      [
+        -32768,
+        0
+      ],
+      [
+        -32768,
+        0
+      ],
+      [
+        -32768,
+        0
+      ],
+      [
+        -32768,
+        0
+      ],
+      [
+        -32768,
+        0
+      ],
+      [
+        -32768,
+        0
+      ],
+      [
+        -32768,
+        0
+      ],
+      [
+        -32768,
+        0
+      ],
+      [
+        -32768,
+        0
+      ],
+      [
+        -32768,
+        0
+      ],
+      [
+        -32768,
+        0
+      ],
+      [
+        1152,
+        2
+      ],
+      [
+        1234,
+        20
+      ],
+      [
+        1343,
+        20
+      ],
+      [
+        1429,
+        20
+      ],
+      [
+        1503,
+        20
+      ],
+      [
+        1573,
+        20
+      ],
+      [
+        1627,
+        16
+      ],
+      [
+        -32768,
+        0
+      ],
+      [
+        -32768,
+        0
+      ],
+      [
+        -32768,
+        0
+      ],
+      [
+        -32768,
+        0
+      ],
+      [
+        -32768,
+        0
+      ],
+      [
+        -32768,
+        0
+      ],
+      [
+        2022,
+        20
+      ],
+      [
+        2056,
+        20
+      ],
+      [
+        -32768,
+        0
+      ],
+      [
+        -32768,
+        0
+      ],
+      [
+        -32768,
+        0
+      ],
+      [
+        -32768,
+        0
+      ],
+      [
+        -32768,
+        0
+      ],
+      [
+        -32768,
+        0
+      ],
+      [
+        -32768,
+        0
+      ],
+      [
+        -32768,
+        0
+      ],
+      [
+        -32768,
+        0
+      ],
+      [
+        -32768,
+        0
+      ],
+      [
+        -32768,
+        0
+      ],
+      [
+        -32768,
+        0
+      ],
+      [
+        -32768,
+        0
+      ],
+      [
+        -32768,
+        0
+      ],
+      [
+        -32768,
+        0
+      ],
+      [
+        1099,
+        16
+      ],
+      [
+        1183,
+        20
+      ],
+      [
+        1287,
+        20
+      ],
+      [
+        1386,
+        20
+      ],
+      [
+        1450,
+        20
+      ],
+      [
+        1512,
+        20
+      ],
+      [
+        1578,
+        20
+      ],
+      [
+        -32768,
+        0
+      ],
+      [
+        -32768,
+        0
+      ],
+      [
+        -32768,
+        0
+      ],
+      [
+        -32768,
+        0
+      ],
+      [
+        -32768,
+        0
+      ],
+      [
+        1889,
+        2
+      ],
+      [
+        1934,
+        19
+      ],
+      [
+        1982,
+        14
+      ],
+      [
+        -32768,
+        0
+      ],
+      [
+        -32768,
+        0
+      ],
+      [
+        -32768,
+        0
+      ],
+      [
+        -32768,
+        0
+      ],
+      [
+        -32768,
+        0
+      ],
+      [
+        -32768,
+        0
+      ],
+      [
+        -32768,
+        0
+      ],
+      [
+        -32768,
+        0
+      ],
+      [
+        -32768,
+        0
+      ],
+      [
+        -32768,
+        0
+      ],
+      [
+        -32768,
+        0
+      ],
+      [
+        -32768,
+        0
+      ],
+      [
+        -32768,
+        0
+      ],
+      [
+        -32768,
+        0
+      ],
+      [
+        -32768,
+        0
+      ],
+      [
+        1052,
+        18
+      ],
+      [
+        1152,
+        18
+      ],
+      [
+        1231,
+        20
+      ],
+      [
+        1318,
+        20
+      ],
+      [
+        1390,
+        20
+      ],
+      [
+        1475,
+        20
+      ],
+      [
+        1515,
+        20
+      ],
+      [
+        -32768,
+        0
+      ],
+      [
+        -32768,
+        0
+      ],
+      [
+        -32768,
+        0
+      ],
+      [
+        -32768,
+        0
+      ],
+      [
+        -32768,
+        0
+      ],
+      [
+        -32768,
+        0
+      ],
+      [
+        1830,
+        20
+      ],
+      [
+        1888,
+        14
+      ],
+      [
+        -32768,
+        0
+      ],
+      [
+        -32768,
+        0
+      ],
+      [
+        -32768,
+        0
+      ],
+      [
+        -32768,
+        0
+      ],
+      [
+        -32768,
+        0
+      ],
+      [
+        -32768,
+        0
+      ],
+      [
+        -32768,
+        0
+      ],
+      [
+        -32768,
+        0
+      ],
+      [
+        -32768,
+        0
+      ],
+      [
+        -32768,
+        0
+      ],
+      [
+        -32768,
+        0
+      ],
+      [
+        -32768,
+        0
+      ],
+      [
+        -32768,
+        0
+      ],
+      [
+        -32768,
+        0
+      ],
+      [
+        -32768,
+        0
+      ],
+      [
+        1035,
+        19
+      ],
+      [
+        1116,
+        18
+      ],
+      [
+        1195,
+        20
+      ],
+      [
+        1262,
+        20
+      ],
+      [
+        1352,
+        20
+      ],
+      [
+        1420,
+        20
+      ],
+      [
+        1461,
+        17
+      ],
+      [
+        -32768,
+        0
+      ],
+      [
+        -32768,
+        0
+      ],
+      [
+        -32768,
+        0
+      ],
+      [
+        -32768,
+        0
+      ],
+      [
+        -32768,
+        0
+      ],
+      [
+        -32768,
+        0
+      ],
+      [
+        1762,
+        15
+      ],
+      [
+        1805,
+        17
+      ],
+      [
+        1842,
+        2
+      ],
+      [
+        -32768,
+        0
+      ],
+      [
+        -32768,
+        0
+      ],
+      [
+        -32768,
+        0
+      ],
+      [
+        -32768,
+        0
+      ],
+      [
+        -32768,
+        0
+      ],
+      [
+        -32768,
+        0
+      ],
+      [
+        -32768,
+        0
+      ],
+      [
+        -32768,
+        0
+      ],
+      [
+        -32768,
+        0
+      ],
+      [
+        -32768,
+        0
+      ],
+      [
+        -32768,
+        0
+      ],
+      [
+        -32768,
+        0
+      ],
+      [
+        -32768,
+        0
+      ],
+      [
+        -32768,
+        0
+      ],
+      [
+        1011,
+        18
+      ],
+      [
+        1093,
+        20
+      ],
+      [
+        1158,
+        20
+      ],
+      [
+        1225,
+        20
+      ],
+      [
+        1304,
+        18
+      ],
+      [
+        1357,
+        19
+      ],
+      [
+        1425,
+        20
+      ],
+      [
+        -32768,
+        0
+      ],
+      [
+        -32768,
+        0
+      ],
+      [
+        -32768,
+        0
+      ],
+      [
+        -32768,
+        0
+      ],
+      [
+        -32768,
+        0
+      ],
+      [
+        -32768,
+        0
+      ],
+      [
+        1701,
+        10
+      ],
+      [
+        1748,
+        15
+      ],
+      [
+        -32768,
+        0
+      ],
+      [
+        -32768,
+        0
+      ],
+      [
+        -32768,
+        0
+      ],
+      [
+        -32768,
+        0
+      ],
+      [
+        -32768,
+        0
+      ],
+      [
+        -32768,
+        0
+      ],
+      [
+        -32768,
+        0
+      ],
+      [
+        -32768,
+        0
+      ],
+      [
+        -32768,
+        0
+      ],
+      [
+        -32768,
+        0
+      ],
+      [
+        -32768,
+        0
+      ],
+      [
+        -32768,
+        0
+      ],
+      [
+        -32768,
+        0
+      ],
+      [
+        -32768,
+        0
+      ],
+      [
+        -32768,
+        0
+      ],
+      [
+        -32768,
+        0
+      ],
+      [
+        -32768,
+        0
+      ],
+      [
+        -32768,
+        0
+      ],
+      [
+        -32768,
+        0
+      ],
+      [
+        -32768,
+        0
+      ],
+      [
+        -32768,
+        0
+      ],
+      [
+        -32768,
+        0
+      ],
+      [
+        -32768,
+        0
+      ],
+      [
+        -32768,
+        0
+      ],
+      [
+        -32768,
+        0
+      ],
+      [
+        -32768,
+        0
+      ],
+      [
+        -32768,
+        0
+      ],
+      [
+        -32768,
+        0
+      ],
+      [
+        -32768,
+        0
+      ],
+      [
+        -32768,
+        0
+      ],
+      [
+        -32768,
+        0
+      ],
+      [
+        -32768,
+        0
+      ],
+      [
+        -32768,
+        0
+      ],
+      [
+        -32768,
+        0
+      ],
+      [
+        -32768,
+        0
+      ],
+      [
+        -32768,
+        0
+      ],
+      [
+        -32768,
+        0
+      ],
+      [
+        -32768,
+        0
+      ],
+      [
+        -32768,
+        0
+      ],
+      [
+        -32768,
+        0
+      ],
+      [
+        -32768,
+        0
+      ],
+      [
+        -32768,
+        0
+      ],
+      [
+        -32768,
+        0
+      ],
+      [
+        -32768,
+        0
+      ],
+      [
+        -32768,
+        0
+      ],
+      [
+        -32768,
+        0
+      ],
+      [
+        -32768,
+        0
+      ],
+      [
+        -32768,
+        0
+      ],
+      [
+        -32768,
+        0
+      ],
+      [
+        -32768,
+        0
+      ],
+      [
+        -32768,
+        0
+      ],
+      [
+        -32768,
+        0
+      ],
+      [
+        -32768,
+        0
+      ],
+      [
+        -32768,
+        0
+      ],
+      [
+        -32768,
+        0
+      ],
+      [
+        -32768,
+        0
+      ],
+      [
+        -32768,
+        0
+      ],
+      [
+        -32768,
+        0
+      ],
+      [
+        -32768,
+        0
+      ],
+      [
+        -32768,
+        0
+      ],
+      [
+        -32768,
+        0
+      ],
+      [
+        -32768,
+        0
+      ],
+      [
+        -32768,
+        0
+      ],
+      [
+        -32768,
+        0
+      ],
+      [
+        -32768,
+        0
+      ],
+      [
+        -32768,
+        0
+      ],
+      [
+        -32768,
+        0
+      ],
+      [
+        -32768,
+        0
+      ],
+      [
+        -32768,
+        0
+      ],
+      [
+        -32768,
+        0
+      ],
+      [
+        -32768,
+        0
+      ],
+      [
+        -32768,
+        0
+      ]
+    ]
+  },
+  "sha256": "5d7a6ac3a0c2dd77f01cae3a5e0b4902bdc4d8bb25a60649519b0da10fada31b",
+  "training_time_s": 5400,
+  "coordinate_reference": {
+    "homed": true,
+    "min_position": 0,
+    "max_position": 24482,
+    "position_divisor": 10
+  },
+  "training_seed": 7,
+  "training_sensitivity": 5,
+  "training_grid_watts": [
+    90,
+    120,
+    150,
+    180,
+    210,
+    240,
+    270,
+    480,
+    510
+  ],
+  "training_grid_cadences": [
+    75,
+    80,
+    85,
+    90,
+    95
+  ],
+  "firmware": {
+    "root": "/home/runner/work/smartspin2k-simulator/smartspin2k-simulator/baseline",
+    "commit": "082d1ee26ddb009d5132547087f77be03d1b0ab7",
+    "source_sha256": "d280e5504c9e91ef984e28085fe77c928fd2ff3c6dcb4db3518ad71e58297b51",
+    "dirty": false
+  },
+  "adapter": {
+    "firmware_root": "/home/runner/work/smartspin2k-simulator/smartspin2k-simulator/adapter",
+    "commit": "b776105cd1e3edb93a91bada3f27aaecc25533dc",
+    "dirty": true,
+    "sha256": "8b6b10d01534988b06185787ae374c5ba63c93c985de1ba68830c2cf8e184195",
+    "files": [
+      "bridge.py",
+      "native.cpp",
+      "virtual_ble.py",
+      "virtual_ble_facade.h",
+      "virtual_ble_runtime.inc",
+      "virtual_ftms.py",
+      "virtual_ftms.hpp"
+    ]
+  },
+  "baseline_selection": {
+    "repository": "https://github.com/doudar/SmartSpin2k.git",
+    "ref": "refs/heads/develop",
+    "commit": "082d1ee26ddb009d5132547087f77be03d1b0ab7",
+    "mode": "develop",
+    "resolved_at": "2026-10-12T21:40:17.264969+00:00"
+  },
+  "coverage": {
+    "supported_cells": 50,
+    "total_cells": 300,
+    "tested_range_supported": 45,
+    "tested_range_required": 45,
+    "fully_supported_tested_range": true,
+    "tested_range_cells": [
+      {
+        "cadence_rpm": 75,
+        "watts": 90,
+        "supported": true
+      },
+      {
+        "cadence_rpm": 75,
+        "watts": 120,
+        "supported": true
+      },
+      {
+        "cadence_rpm": 75,
+        "watts": 150,
+        "supported": true
+      },
+      {
+        "cadence_rpm": 75,
+        "watts": 180,
+        "supported": true
+      },
+      {
+        "cadence_rpm": 75,
+        "watts": 210,
+        "supported": true
+      },
+      {
+        "cadence_rpm": 75,
+        "watts": 240,
+        "supported": true
+      },
+      {
+        "cadence_rpm": 75,
+        "watts": 270,
+        "supported": true
+      },
+      {
+        "cadence_rpm": 75,
+        "watts": 480,
+        "supported": true
+      },
+      {
+        "cadence_rpm": 75,
+        "watts": 510,
+        "supported": true
+      },
+      {
+        "cadence_rpm": 80,
+        "watts": 90,
+        "supported": true
+      },
+      {
+        "cadence_rpm": 80,
+        "watts": 120,
+        "supported": true
+      },
+      {
+        "cadence_rpm": 80,
+        "watts": 150,
+        "supported": true
+      },
+      {
+        "cadence_rpm": 80,
+        "watts": 180,
+        "supported": true
+      },
+      {
+        "cadence_rpm": 80,
+        "watts": 210,
+        "supported": true
+      },
+      {
+        "cadence_rpm": 80,
+        "watts": 240,
+        "supported": true
+      },
+      {
+        "cadence_rpm": 80,
+        "watts": 270,
+        "supported": true
+      },
+      {
+        "cadence_rpm": 80,
+        "watts": 480,
+        "supported": true
+      },
+      {
+        "cadence_rpm": 80,
+        "watts": 510,
+        "supported": true
+      },
+      {
+        "cadence_rpm": 85,
+        "watts": 90,
+        "supported": true
+      },
+      {
+        "cadence_rpm": 85,
+        "watts": 120,
+        "supported": true
+      },
+      {
+        "cadence_rpm": 85,
+        "watts": 150,
+        "supported": true
+      },
+      {
+        "cadence_rpm": 85,
+        "watts": 180,
+        "supported": true
+      },
+      {
+        "cadence_rpm": 85,
+        "watts": 210,
+        "supported": true
+      },
+      {
+        "cadence_rpm": 85,
+        "watts": 240,
+        "supported": true
+      },
+      {
+        "cadence_rpm": 85,
+        "watts": 270,
+        "supported": true
+      },
+      {
+        "cadence_rpm": 85,
+        "watts": 480,
+        "supported": true
+      },
+      {
+        "cadence_rpm": 85,
+        "watts": 510,
+        "supported": true
+      },
+      {
+        "cadence_rpm": 90,
+        "watts": 90,
+        "supported": true
+      },
+      {
+        "cadence_rpm": 90,
+        "watts": 120,
+        "supported": true
+      },
+      {
+        "cadence_rpm": 90,
+        "watts": 150,
+        "supported": true
+      },
+      {
+        "cadence_rpm": 90,
+        "watts": 180,
+        "supported": true
+      },
+      {
+        "cadence_rpm": 90,
+        "watts": 210,
+        "supported": true
+      },
+      {
+        "cadence_rpm": 90,
+        "watts": 240,
+        "supported": true
+      },
+      {
+        "cadence_rpm": 90,
+        "watts": 270,
+        "supported": true
+      },
+      {
+        "cadence_rpm": 90,
+        "watts": 480,
+        "supported": true
+      },
+      {
+        "cadence_rpm": 90,
+        "watts": 510,
+        "supported": true
+      },
+      {
+        "cadence_rpm": 95,
+        "watts": 90,
+        "supported": true
+      },
+      {
+        "cadence_rpm": 95,
+        "watts": 120,
+        "supported": true
+      },
+      {
+        "cadence_rpm": 95,
+        "watts": 150,
+        "supported": true
+      },
+      {
+        "cadence_rpm": 95,
+        "watts": 180,
+        "supported": true
+      },
+      {
+        "cadence_rpm": 95,
+        "watts": 210,
+        "supported": true
+      },
+      {
+        "cadence_rpm": 95,
+        "watts": 240,
+        "supported": true
+      },
+      {
+        "cadence_rpm": 95,
+        "watts": 270,
+        "supported": true
+      },
+      {
+        "cadence_rpm": 95,
+        "watts": 480,
+        "supported": true
+      },
+      {
+        "cadence_rpm": 95,
+        "watts": 510,
+        "supported": true
+      }
+    ]
+  },
+  "training_segments": [
+    {
+      "duration_s": 120,
+      "start_w": 90,
+      "end_w": 90,
+      "cadence_rpm": 75
+    },
+    {
+      "duration_s": 120,
+      "start_w": 120,
+      "end_w": 120,
+      "cadence_rpm": 75
+    },
+    {
+      "duration_s": 120,
+      "start_w": 150,
+      "end_w": 150,
+      "cadence_rpm": 75
+    },
+    {
+      "duration_s": 120,
+      "start_w": 180,
+      "end_w": 180,
+      "cadence_rpm": 75
+    },
+    {
+      "duration_s": 120,
+      "start_w": 210,
+      "end_w": 210,
+      "cadence_rpm": 75
+    },
+    {
+      "duration_s": 120,
+      "start_w": 240,
+      "end_w": 240,
+      "cadence_rpm": 75
+    },
+    {
+      "duration_s": 120,
+      "start_w": 270,
+      "end_w": 270,
+      "cadence_rpm": 75
+    },
+    {
+      "duration_s": 120,
+      "start_w": 480,
+      "end_w": 480,
+      "cadence_rpm": 75
+    },
+    {
+      "duration_s": 120,
+      "start_w": 510,
+      "end_w": 510,
+      "cadence_rpm": 75
+    },
+    {
+      "duration_s": 120,
+      "start_w": 90,
+      "end_w": 90,
+      "cadence_rpm": 80
+    },
+    {
+      "duration_s": 120,
+      "start_w": 120,
+      "end_w": 120,
+      "cadence_rpm": 80
+    },
+    {
+      "duration_s": 120,
+      "start_w": 150,
+      "end_w": 150,
+      "cadence_rpm": 80
+    },
+    {
+      "duration_s": 120,
+      "start_w": 180,
+      "end_w": 180,
+      "cadence_rpm": 80
+    },
+    {
+      "duration_s": 120,
+      "start_w": 210,
+      "end_w": 210,
+      "cadence_rpm": 80
+    },
+    {
+      "duration_s": 120,
+      "start_w": 240,
+      "end_w": 240,
+      "cadence_rpm": 80
+    },
+    {
+      "duration_s": 120,
+      "start_w": 270,
+      "end_w": 270,
+      "cadence_rpm": 80
+    },
+    {
+      "duration_s": 120,
+      "start_w": 480,
+      "end_w": 480,
+      "cadence_rpm": 80
+    },
+    {
+      "duration_s": 120,
+      "start_w": 510,
+      "end_w": 510,
+      "cadence_rpm": 80
+    },
+    {
+      "duration_s": 120,
+      "start_w": 90,
+      "end_w": 90,
+      "cadence_rpm": 85
+    },
+    {
+      "duration_s": 120,
+      "start_w": 120,
+      "end_w": 120,
+      "cadence_rpm": 85
+    },
+    {
+      "duration_s": 120,
+      "start_w": 150,
+      "end_w": 150,
+      "cadence_rpm": 85
+    },
+    {
+      "duration_s": 120,
+      "start_w": 180,
+      "end_w": 180,
+      "cadence_rpm": 85
+    },
+    {
+      "duration_s": 120,
+      "start_w": 210,
+      "end_w": 210,
+      "cadence_rpm": 85
+    },
+    {
+      "duration_s": 120,
+      "start_w": 240,
+      "end_w": 240,
+      "cadence_rpm": 85
+    },
+    {
+      "duration_s": 120,
+      "start_w": 270,
+      "end_w": 270,
+      "cadence_rpm": 85
+    },
+    {
+      "duration_s": 120,
+      "start_w": 480,
+      "end_w": 480,
+      "cadence_rpm": 85
+    },
+    {
+      "duration_s": 120,
+      "start_w": 510,
+      "end_w": 510,
+      "cadence_rpm": 85
+    },
+    {
+      "duration_s": 120,
+      "start_w": 90,
+      "end_w": 90,
+      "cadence_rpm": 90
+    },
+    {
+      "duration_s": 120,
+      "start_w": 120,
+      "end_w": 120,
+      "cadence_rpm": 90
+    },
+    {
+      "duration_s": 120,
+      "start_w": 150,
+      "end_w": 150,
+      "cadence_rpm": 90
+    },
+    {
+      "duration_s": 120,
+      "start_w": 180,
+      "end_w": 180,
+      "cadence_rpm": 90
+    },
+    {
+      "duration_s": 120,
+      "start_w": 210,
+      "end_w": 210,
+      "cadence_rpm": 90
+    },
+    {
+      "duration_s": 120,
+      "start_w": 240,
+      "end_w": 240,
+      "cadence_rpm": 90
+    },
+    {
+      "duration_s": 120,
+      "start_w": 270,
+      "end_w": 270,
+      "cadence_rpm": 90
+    },
+    {
+      "duration_s": 120,
+      "start_w": 480,
+      "end_w": 480,
+      "cadence_rpm": 90
+    },
+    {
+      "duration_s": 120,
+      "start_w": 510,
+      "end_w": 510,
+      "cadence_rpm": 90
+    },
+    {
+      "duration_s": 120,
+      "start_w": 90,
+      "end_w": 90,
+      "cadence_rpm": 95
+    },
+    {
+      "duration_s": 120,
+      "start_w": 120,
+      "end_w": 120,
+      "cadence_rpm": 95
+    },
+    {
+      "duration_s": 120,
+      "start_w": 150,
+      "end_w": 150,
+      "cadence_rpm": 95
+    },
+    {
+      "duration_s": 120,
+      "start_w": 180,
+      "end_w": 180,
+      "cadence_rpm": 95
+    },
+    {
+      "duration_s": 120,
+      "start_w": 210,
+      "end_w": 210,
+      "cadence_rpm": 95
+    },
+    {
+      "duration_s": 120,
+      "start_w": 240,
+      "end_w": 240,
+      "cadence_rpm": 95
+    },
+    {
+      "duration_s": 120,
+      "start_w": 270,
+      "end_w": 270,
+      "cadence_rpm": 95
+    },
+    {
+      "duration_s": 120,
+      "start_w": 480,
+      "end_w": 480,
+      "cadence_rpm": 95
+    },
+    {
+      "duration_s": 120,
+      "start_w": 510,
+      "end_w": 510,
+      "cadence_rpm": 95
+    }
+  ],
+  "profile_sha256": "e4650c2aa1f59f8282207f5ac2c27dd6187265d2603defc3606edaa8d032dac8",
+  "provenance": "Unmodified production online learning from independently simulated CPS/CSC packets; no direct plant table injection"
+}

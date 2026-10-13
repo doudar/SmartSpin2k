@@ -1,0 +1,10 @@
+{
+  "published_commit": "809a7c9980a812874e03fe4b935f55bd560412c1",
+  "published_tree": "362ec247af1067b3d6ea5972c4550380b9c44b70",
+  "source_url": "https://api.github.com/repos/doudar/smartspin2k-simulator/git/commits/809a7c9980a812874e03fe4b935f55bd560412c1",
+  "source_html_url": "https://github.com/doudar/smartspin2k-simulator/commit/809a7c9980a812874e03fe4b935f55bd560412c1",
+  "executed_local_commit": "ae48c3dd04ad7896ad752eccbd6040e446b9dd21",
+  "executed_local_tree": "362ec247af1067b3d6ea5972c4550380b9c44b70",
+  "verification": "Read-only GitHub Git commit API confirms published tree equals local executed tree.",
+  "no_publication_performed": true
+}
