@@ -1,0 +1,16 @@
+{
+  "status": "PASS",
+  "phase_rows": 9576,
+  "paired_signal_phases": 4788,
+  "explicit_null_final_tails": 4937,
+  "aggregate_field_checks": 1024,
+  "independent_actual_extrema_checks": 19152,
+  "true_minima_above_target": 147,
+  "low_budget_rows": 1764,
+  "low_relative_failures": 12,
+  "low_absolute_failures": 355,
+  "duplicate_rows": 0,
+  "blank_tail_cells": 0,
+  "all_reproduction_hashes_verified": true,
+  "scope": "Independent export consistency checks; no raw simulation or firmware build."
+}

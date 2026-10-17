@@ -11,6 +11,7 @@
 #include <LittleFS.h>
 #include <algorithm>
 #include <cmath>
+#include <cstdio>
 
 void PowerBuffer::set(int i, int watts, int cadence, int32_t position) {
   powerEntry[i].readings       = 1;
@@ -41,10 +42,15 @@ void PowerTable::processPowerValue(PowerBuffer& buffer, int cadence, const Measu
   const auto resetCollection = [&](const char* reason) {
     // Report lost acquisition windows, not every disabled 700 ms poll.
     if (buffer.stable) {
-      SS2K_LOG(POWERTABLE_LOG_TAG, "Collection reset: %s, samples=%d, positionSpan=%ld, cadenceSpan=%d", reason, buffer.getReadings(),
-               static_cast<long>(buffer.maximumPosition - buffer.minimumPosition), buffer.maximumCadence - buffer.minimumCadence);
+      SS2K_LOG(POWERTABLE_LOG_TAG, "Collection reset: %s, samples=%d, positionSpan=%lld, cadenceSpan=%d", reason, buffer.getReadings(),
+               static_cast<long long>(buffer.maximumPosition) - buffer.minimumPosition, buffer.maximumCadence - buffer.minimumCadence);
     }
     buffer.reset();
+  };
+  const auto resetPositionCollection = [&](const char* reason, int64_t observed) {
+    char message[96];
+    snprintf(message, sizeof(message), "%s exceeds %d steps (actual=%lld)", reason, POWER_SAMPLE_POSITION_SPAN, static_cast<long long>(observed));
+    resetCollection(message);
   };
   const bool fresh   = !buffer.seenReport || sample.timestamp != buffer.lastReport;
   const bool gap     = buffer.seenReport && static_cast<uint32_t>(sample.timestamp - buffer.lastReport) > POWER_SAMPLE_MAX_AGE_MS;
@@ -65,8 +71,9 @@ void PowerTable::processPowerValue(PowerBuffer& buffer, int cadence, const Measu
 
   const int32_t position = ss2k->getCurrentPosition();
   // Pending substantial travel also excludes delayed power before motion starts.
-  if (std::abs(static_cast<int64_t>(ss2k->getTargetPosition()) - position) > POWER_SAMPLE_POSITION_SPAN) {
-    resetCollection("pending travel exceeds 100 steps");
+  const int64_t pendingTravel = std::abs(static_cast<int64_t>(ss2k->getTargetPosition()) - position);
+  if (pendingTravel > POWER_SAMPLE_POSITION_SPAN) {
+    resetPositionCollection("pending travel", pendingTravel);
     return;
   }
   if (buffer.stable) {
@@ -74,8 +81,9 @@ void PowerTable::processPowerValue(PowerBuffer& buffer, int cadence, const Measu
     buffer.maximumPosition = std::max(buffer.maximumPosition, position);
     buffer.minimumCadence  = std::min(buffer.minimumCadence, cadence);
     buffer.maximumCadence  = std::max(buffer.maximumCadence, cadence);
-    if (static_cast<int64_t>(buffer.maximumPosition) - buffer.minimumPosition > POWER_SAMPLE_POSITION_SPAN)
-      resetCollection("position span exceeds 100 steps");
+    const int64_t positionSpan = static_cast<int64_t>(buffer.maximumPosition) - buffer.minimumPosition;
+    if (positionSpan > POWER_SAMPLE_POSITION_SPAN)
+      resetPositionCollection("position span", positionSpan);
     else if (buffer.maximumCadence - buffer.minimumCadence > POWER_SAMPLE_CADENCE_SPAN)
       resetCollection("cadence span");
   }

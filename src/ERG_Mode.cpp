@@ -38,6 +38,7 @@ void ErgMode::prepareMode() {
   wasErgMode                 = active;
   tableSeekState             = TableSeekState::INACTIVE;
   tableSeekFirstArrivalValid = false;
+  tableSeekHadHighTarget     = false;
   pausedTargetWatts          = 0;
   feedbackWaiting = tableSeekPidSeedValid = false;
   tableCorrectionNeedsProgress            = false;
@@ -48,6 +49,10 @@ void ErgMode::prepareMode() {
   responseTrend                           = 0;
   responsePreviousTrend                   = 0;
   transitionTarget                        = INT32_MIN;
+  highPowerTransition                     = false;
+  boundedSeekTransition                   = false;
+  hasHighPowerRequest                     = false;
+  offsetSettledAt = offsetPosition = offsetCadence = 0;
   feedbackEarlyRetreatTarget              = INT32_MIN;
   feedbackUpdateValid                     = false;
   prevWatts.setTarget(0);
@@ -68,7 +73,14 @@ void ErgMode::runERG() {
   static PowerBuffer powerBuffer;
   static int loopCounter = 0;
 
+  _observeOffsetSettlement();
   _observePowerResponse();
+
+  // Record requested high-power history before active seek amendments or
+  // cadence pauses can bypass ordinary compute. Keep this independent of
+  // seek bookkeeping: low-only rides retain their original prediction gain.
+  if (rtConfig->getFTMSMode() == FitnessMachineControlPointProcedure::SetTargetPower && rtConfig->watts.getTarget() > ErgControl::HIGH_GAIN_WATTS)
+    hasHighPowerRequest = true;
 
   if (rtConfig->getFTMSMode() == FitnessMachineControlPointProcedure::SetTargetPower && rtConfig->cad.getValue() <= MIN_ERG_CADENCE) {
     if (rtConfig->watts.getTarget() != userConfig->getMinWatts()) {
@@ -225,11 +237,25 @@ void ErgMode::computeErg() {
   const int cadence        = rtConfig->cad.getValue();
   const bool targetChanged = this->prevWatts.getTarget() != target;
   const int targetDelta    = target - this->prevWatts.getTarget();
+  // A high-power interval and its immediate recovery share the stricter
+  // delayed-response guard. A target already amended by an active trusted
+  // seek belongs to that seek when it hands off to feedback. Other requests
+  // clear the prior transition context.
+  const bool amendedTrustedSeek = boundedSeekTransition && target == tableSeekTargetWatts;
+  if (targetChanged && !amendedTrustedSeek) {
+    // Active seeks can accept high ramp amendments before prevWatts is
+    // updated. Their following recovery still needs the high-source guards.
+    highPowerTransition = target > ErgControl::HIGH_GAIN_WATTS || prevWatts.getTarget() > ErgControl::HIGH_GAIN_WATTS ||
+                          (boundedSeekTransition && tableSeekHadHighTarget);
+    boundedSeekTransition = false;
+  }
   // Small ramp updates amend feed-forward without repeatedly correcting the
   // same held power report or restarting table acquisition.
   if (targetChanged && this->prevWatts.getTarget() > 0 && abs(targetDelta) < ERG_MODE_PID_WINDOW / 2 && cadence > MIN_ERG_CADENCE) {
     int32_t adjustment = 0;
-    if (rtConfig->getHomed() && _tableTargetIsTrusted(target, cadence)) {
+    // A seek has already followed its accepted amendment. Do not replay that
+    // feed-forward delta on handoff; feedback also covers sub-padding changes.
+    if (!amendedTrustedSeek && rtConfig->getHomed() && _tableTargetIsTrusted(target, cadence)) {
       const int32_t before = _constrainedTablePosition(this->prevWatts.getTarget(), cadence);
       const int32_t after  = _constrainedTablePosition(target, cadence);
       if (before != RETURN_ERROR && after != RETURN_ERROR && (static_cast<int64_t>(after) - before) * targetDelta > 0) adjustment = after - before;
@@ -304,7 +330,20 @@ int32_t ErgMode::_setPointChangeState() {
       const int32_t measuredPosition = _constrainedTablePosition(rtConfig->watts.getValue(), currentCadence);
       if (measuredPosition != RETURN_ERROR) {
         const int64_t anchored = static_cast<int64_t>(tableResult) + ss2k->getCurrentPosition() - measuredPosition;
-        if (anchored > rtConfig->getMinStep() && anchored < rtConfig->getMaxStep()) tableResult = static_cast<int32_t>(anchored);
+        // A high transition must not turn lagged power or an extrapolated
+        // source estimate into an aggressive calibration offset. In recovery,
+        // a measured low destination does not validate an unmeasured high
+        // source. Either sign of an unsupported source offset can leave the
+        // brake at the wrong recovery power, even when it shortens the move.
+        const bool sampleSettled = static_cast<int32_t>(rtConfig->watts.getValueSample().timestamp - offsetSettledAt) >= static_cast<int32_t>(ERG_FEEDBACK_SETTLE_MS);
+        const bool conservativeOffset = (anchored - tableResult) * (mode == Mode::INCREASING ? 1 : -1) <= 0;
+        const bool sourceMeasured = _tableTargetIsWithinMeasuredBounds(rtConfig->watts.getValue(), currentCadence) &&
+                                    ErgControl::hasLocalMeasuredPowerSupport(powerTable->ptData, rtConfig->watts.getValue(), currentCadence);
+        const bool highTransition = highPowerTransition || currentTarget > ErgControl::HIGH_GAIN_WATTS;
+        const bool offsetAllowed = !highTransition || (sourceMeasured && (!extrapolatedCurve || conservativeOffset || sampleSettled));
+        if (offsetAllowed && anchored > rtConfig->getMinStep() && anchored < rtConfig->getMaxStep()) {
+          tableResult = static_cast<int32_t>(anchored);
+        }
       }
     }
     const bool insideTravel      = tableResult > rtConfig->getMinStep() && tableResult < rtConfig->getMaxStep();
@@ -318,6 +357,15 @@ int32_t ErgMode::_setPointChangeState() {
 
   const int32_t relativeCorrection = _tableCorrection(rtConfig->watts.getValue(), currentTarget, currentCadence);
   if (relativeCorrection != RETURN_ERROR) {
+    const int32_t moveLimit = static_cast<int32_t>(userConfig->getStepperSpeed() * ERG_MODE_DELAY / 1000.0);
+    if (currentTarget > ErgControl::HIGH_GAIN_WATTS && std::abs(relativeCorrection - ss2k->getCurrentPosition()) >= moveLimit - 1) {
+      // A speed-clipped estimate covers only part of this large request. Do
+      // not wait for a fraction of the entire target jump after that partial
+      // move; keep normal fresh-sample pacing and let feedback own the climb.
+      SS2K_LOG(ERG_MODE_LOG_TAG, "Clipped high-power table estimate; using proportional transition");
+      tableCorrectionNeedsProgress = true;
+      return _inSetpointState();
+    }
     _startFeedbackWait();
     return relativeCorrection;
   }
@@ -500,6 +548,20 @@ void ErgMode::_scoreTable(int watts, int cadence, bool accurate) {
   }
 }
 
+// Observe movement independently of confidence scoring: a target change can
+// cancel a seek/acquisition wait and use an offset in this same runERG call.
+// Reusing confidenceSettledAt would miss movement while that scoring is paused.
+void ErgMode::_observeOffsetSettlement() {
+  const int32_t position = ss2k->getCurrentPosition();
+  const int cadence = rtConfig->cad.getValue();
+  if (ss2k->stepperIsRunning || abs(position - ss2k->getTargetPosition()) > ERG_TABLE_SETTLED_POSITION_STEPS ||
+      abs(position - offsetPosition) > ERG_TABLE_SETTLED_POSITION_STEPS || abs(cadence - offsetCadence) > ERG_TABLE_STABLE_CADENCE_DELTA) {
+    offsetSettledAt = millis();
+  }
+  offsetPosition = position;
+  offsetCadence = cadence;
+}
+
 void ErgMode::_updateTableConfidence() {
   if (!rtConfig->getHomed()) {
     if (confidenceWasHomed) resetTableConfidence();
@@ -552,11 +614,13 @@ unsigned long ErgMode::_trustedTableMoveDeadline(int32_t position) const {
 }
 
 void ErgMode::_startTrustedTableSeek(int32_t position) {
+  boundedSeekTransition = true;
   tableCorrectionNeedsProgress = true;
   if (!isTableSeeking() && !feedbackWaiting) controlMinimum = controlMaximum = ss2k->getCurrentPosition();
   _trackControlMove(position);
   tableSeekState             = TableSeekState::MOVING;
   tableSeekTargetWatts       = rtConfig->watts.getTarget();
+  tableSeekHadHighTarget     = tableSeekTargetWatts > ErgControl::HIGH_GAIN_WATTS;
   tableSeekCadence           = rtConfig->cad.getValue();
   tableSeekPosition          = position;
   tableSeekLastWatts         = INT32_MIN;
@@ -620,6 +684,7 @@ void ErgMode::_handleTrustedTableSeek() {
     return;
   }
   tableSeekTargetWatts = target;
+  tableSeekHadHighTarget = tableSeekHadHighTarget || target > ErgControl::HIGH_GAIN_WATTS;
 
   const int cadence = rtConfig->cad.getValue();
   if (cadence <= MIN_ERG_CADENCE) {
@@ -780,11 +845,33 @@ int32_t ErgMode::_inSetpointState() {
   const double sustainedTrend = responseTrend * responsePreviousTrend > 0 ? responseTrend : 0;
   if (abs(measuredError) <= ERG_MODE_PID_WINDOW && std::abs(responseTrend) < 2.0) {
     transitionTarget             = INT32_MIN;
+    boundedSeekTransition       = false;
+    if (target <= ErgControl::HIGH_GAIN_WATTS) highPowerTransition = false;
     tableCorrectionNeedsProgress = false;
   }
   if ((tableCorrectionNeedsProgress || transitionTarget == target) && (measuredError * sustainedTrend <= 0 || abs(measuredError) <= ErgControl::ERG_TRANSIENT_APPROACH_WATTS) &&
       std::abs(sustainedTrend) >= ErgControl::ERG_TRANSIENT_MIN_TREND_WPS) {
-    error = measuredError - static_cast<int>(std::round(sustainedTrend * ErgControl::ERG_TRANSIENT_BRAKING_SECONDS));
+    const int projectedError = measuredError - static_cast<int>(std::round(sustainedTrend * ErgControl::ERG_TRANSIENT_BRAKING_SECONDS));
+    // At a high target, a confirmed response moving away from the request
+    // retains nominal predictive authority without above-default amplification.
+    // Approaches and low recoveries retain their residual bound; zero measured
+    // residual holds still. After a high request, low trusted seeks retain
+    // nominal predictive braking without above-default amplification.
+    // Low-only sessions keep the original low-target prediction behavior.
+    error = projectedError;
+    if (target > ErgControl::HIGH_GAIN_WATTS && measuredError * sustainedTrend < 0) {
+      const double sensitivity = ErgControl::sanitizeSensitivity(userConfig->getERGSensitivity());
+      const double predictionScale = std::min(1.0, ERG_SENSITIVITY / sensitivity);
+      const int predictionLimit = std::max(abs(measuredError), static_cast<int>(std::round(std::abs(projectedError) * predictionScale)));
+      error = std::max(-predictionLimit, std::min(predictionLimit, projectedError));
+    } else if (highPowerTransition || target > ErgControl::HIGH_GAIN_WATTS) {
+      error = std::max(-abs(measuredError), std::min(abs(measuredError), projectedError));
+    } else if (hasHighPowerRequest && boundedSeekTransition) {
+      const double sensitivity = ErgControl::sanitizeSensitivity(userConfig->getERGSensitivity());
+      const double predictionScale = std::min(1.0, ERG_SENSITIVITY / sensitivity);
+      const int predictionLimit = std::max(abs(measuredError), static_cast<int>(std::round(std::abs(projectedError) * predictionScale)));
+      error = std::max(-predictionLimit, std::min(predictionLimit, projectedError));
+    }
   }
 
   // A table move must earn another acquisition pause by producing a meaningful
@@ -813,12 +900,30 @@ int32_t ErgMode::_inSetpointState() {
   double Kp                                = scheduledErgGain(configuredSensitivity, target, rtConfig->cad.getValue(), usedPowerTable, slopeStatus);
   const double controlSensitivity          = ErgControl::sanitizeSensitivity(configuredSensitivity);
 
+  // Without a target-local slope or a trusted feed-forward seek, do not
+  // suppress the whole climb using the distant target's fallback gain.
+  // Floor acquisition at nominal authority for the observed operating point,
+  // never entering the low-power boost. This floor does not scale up with
+  // above-default sensitivity and does not replace a larger existing gain.
+  if (target > ErgControl::HIGH_GAIN_WATTS && transitionTarget == target && !boundedSeekTransition && !usedPowerTable && measuredError > 0) {
+    const int operatingWatts = std::max(ErgControl::HIGH_GAIN_WATTS, std::min(target, watts));
+    const double nominalGain = ErgControl::fallbackGain(std::min(controlSensitivity, static_cast<double>(ERG_SENSITIVITY)), operatingWatts);
+    Kp = std::max(Kp, nominalGain);
+  }
+
+  // A final minimum would erase high-target error attenuation (e.g. 1000 W).
+  // Move that floor before attenuation only; ordinary/amplified error tiers
+  // and all low targets retain their previous minimum/maximum gain order.
+  const bool highTarget = target > ErgControl::HIGH_GAIN_WATTS;
+  const bool attenuatedHighTarget = highTarget && ErgControl::errorScheduledGain(1.0, error, mode == Mode::MAINTAIN) < 1.0;
+  if (attenuatedHighTarget) Kp = ErgControl::clampGain(Kp, controlSensitivity);
   Kp = ErgControl::errorScheduledGain(Kp, error, mode == Mode::MAINTAIN);
 
   if (watts < userConfig->getMinWatts()) {
     Kp = Kp * controlSensitivity;  // Increase gain at very low watts to prevent Zwift from timing out on an initial interval.
   }
-  Kp = ErgControl::clampGain(Kp, controlSensitivity);
+  // Keep the safety ceiling after both error scheduling and startup boost.
+  Kp = attenuatedHighTarget ? std::min(Kp, controlSensitivity * ErgControl::GAIN_MAX_SENSITIVITY_RATIO) : ErgControl::clampGain(Kp, controlSensitivity);
 
   mode = Mode::MAINTAIN;
 
@@ -847,6 +952,9 @@ int32_t ErgMode::_inSetpointState() {
     const int cadenceDelta   = std::max(-ERG_CADENCE_COMPENSATION_MAX_RPM, std::min(ERG_CADENCE_COMPENSATION_MAX_RPM, cadence - cadenceReference));
     const double cadenceMove = cadenceSlope * cadenceDelta;
     const bool diverging     = measuredError * sustainedTrend < 0 && std::abs(sustainedTrend) >= ErgControl::ERG_TRANSIENT_MIN_TREND_WPS;
+    // Delayed watts can still show a confirmed worsening residual. Do not
+    // add resistance into a growing overshoot (or remove it into a growing
+    // undershoot), even during a high-power request or its recovery.
     if ((abs(measuredError) <= ErgControl::ERG_TRANSIENT_APPROACH_WATTS && !diverging) || cadenceMove * measuredError >= 0) {
       newIncline += cadenceMove;
       SS2K_LOG(ERG_MODE_LOG_TAG, "Cadence compensation: %d -> %drpm, applied %+drpm, %+.0f steps", cadenceReference, cadence, cadenceDelta, cadenceMove);

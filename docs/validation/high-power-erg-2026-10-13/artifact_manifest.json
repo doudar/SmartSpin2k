@@ -1,0 +1,225 @@
+{
+  "status": "Complete synthetic validation and exact-source ESP32/S3 compilation evidence. Hardware verification remains outstanding.",
+  "publication_destination": "docs/validation/high-power-erg-2026-10-13",
+  "publication_allowlist": "public_file_allowlist.txt",
+  "source_sha256": "1c0f7bce6f69a353cdff73b85eb10a660b9f8f333f0f23589d9d0228b67d01e8",
+  "files": [
+    {
+      "path": "CSV_GUIDE.md",
+      "bytes": 2657,
+      "sha256": "fea188c58c48507d4b45e0305c39770bf1053ac3c8de20927e4ccbfd119f3069"
+    },
+    {
+      "path": "REPORT.md",
+      "bytes": 11568,
+      "sha256": "6c1203cc6302fd3d68147d4c982270bb9d5518455b1547e73bf37a886db6cf25"
+    },
+    {
+      "path": "REPRODUCE.md",
+      "bytes": 10498,
+      "sha256": "d6aeccb80d1152b5a2770afbcdba29083ee583b27f7bc58669ebc41e0f1f71a0"
+    },
+    {
+      "path": "aggregate_counts.csv",
+      "bytes": 13907,
+      "sha256": "fcd1f0aa8158ed8013a0560bcc47d426c2e89d7a5ae3a7eeb093780e3ef0855b"
+    },
+    {
+      "path": "all_diagnosed_phase_metrics.csv",
+      "bytes": 2433196,
+      "sha256": "f2c509d4143049a6306360e81bea1990262148d8ee8f83a3dc6039f0df404eb3"
+    },
+    {
+      "path": "all_paired_phase_changes.csv",
+      "bytes": 836073,
+      "sha256": "6c2b4e7b921e1c745b549b280e112341589144941f9c4c6661d2900f31918bd5"
+    },
+    {
+      "path": "build_config.json",
+      "bytes": 6676,
+      "sha256": "28b9e1563dd5c02069e806b453c418d37c4c121e82526324c7251fe5293c7964"
+    },
+    {
+      "path": "build_evidence.py",
+      "bytes": 24897,
+      "sha256": "836ba38754331c711f92a2c3a88bc20de2d0026fd5e2d913786a5071e1a37af8"
+    },
+    {
+      "path": "evidence_build_audit.json",
+      "bytes": 5474,
+      "sha256": "8406e43baaaedd824cb0873621af6fc8f48b1795993be784350c6fa6d50df6b3"
+    },
+    {
+      "path": "example_selection.json",
+      "bytes": 8807,
+      "sha256": "c4740fccc6171aa11fb4d1ae7ce45d5f775a426533ad759d5199ae47cb736584"
+    },
+    {
+      "path": "export_validation.json",
+      "bytes": 501,
+      "sha256": "91f241019c6c226fd69cc148e65b748cb6fed447d543b716b5c4fa985adec210"
+    },
+    {
+      "path": "final_review_metadata.json",
+      "bytes": 1271,
+      "sha256": "210af611bacd6f2d7b49df002c15a933ba902ca3c23c011a173c2f38b95fb2af"
+    },
+    {
+      "path": "firmware_build_identity.json",
+      "bytes": 4803,
+      "sha256": "3c7ea6bdd1e6b4bc5e8474e6dd206abddb1ba898cd5c968a7bc67c73652b64f7"
+    },
+    {
+      "path": "plots/example_01.png",
+      "bytes": 138681,
+      "sha256": "7ec8bf1de016c35b7dc578c62b66e2117373e8094e1a0b2494a00d28824d9352"
+    },
+    {
+      "path": "plots/example_02.png",
+      "bytes": 139878,
+      "sha256": "f7dc15e6fb876eff547c805170e9ed5fe7c646d8a5a8dcb20f7472f2f19d557a"
+    },
+    {
+      "path": "plots/example_03.png",
+      "bytes": 128877,
+      "sha256": "1c5000cd73e8c3b0d670bcf91aedcbcf6c1115e106b6a17eceac73639fd15dab"
+    },
+    {
+      "path": "plots/example_04.png",
+      "bytes": 125435,
+      "sha256": "f13afeec62a8c1b1e1885228b5e6f2d271cda74e760a93aa9c5b1daec46ff4f9"
+    },
+    {
+      "path": "plots/example_05.png",
+      "bytes": 123869,
+      "sha256": "c80dee5220673b838c845311d55d911e65c76ddc29a32acf4568e41d3108750c"
+    },
+    {
+      "path": "plots/final_tail_outcomes.png",
+      "bytes": 199934,
+      "sha256": "52a144a6d8be40674c66b93f946d97627e6e5ac4222f23a37b801c83bdc365f2"
+    },
+    {
+      "path": "plots/low_power_tradeoffs.png",
+      "bytes": 271085,
+      "sha256": "d9cf1fe3ba5b89f583492a10def7a672e758646c44b0cec090072877b826a423"
+    },
+    {
+      "path": "plots/recovery_distributions.png",
+      "bytes": 260877,
+      "sha256": "dd6e424d1abbf8ee2fa3b0338fa73395b08dd95fd957482324f2825fffc795d0"
+    },
+    {
+      "path": "plots/sprint_distributions.png",
+      "bytes": 260089,
+      "sha256": "9796652030b4682f9f1c073d7be575dd18200670faa4ede222827cd27fa04241"
+    },
+    {
+      "path": "preserved_budget_checks.json.gz",
+      "bytes": 385338,
+      "sha256": "b7c4498c062ed54513a74ba5a5780c0d30de4b1f66360ef7bdfc3a8e9d7bce4b"
+    },
+    {
+      "path": "public_file_allowlist.txt",
+      "bytes": 1121,
+      "sha256": "3aa7647ae891baa5d5f6a38e4c59f860959e0614acc91404c79060f72e32dcc2"
+    },
+    {
+      "path": "render_report.py",
+      "bytes": 13174,
+      "sha256": "ef088484fb66c6c546266f11dc811e1d6d88f788f97f16a09a80922e4f646fb2"
+    },
+    {
+      "path": "reproduction/archive_fixture/full.json",
+      "bytes": 23828,
+      "sha256": "aa9e49c300817de7df1b93694f5933e19f4c7db3d274c8d3c601b5165552d3b2"
+    },
+    {
+      "path": "reproduction/baseline-selection.json",
+      "bytes": 225,
+      "sha256": "af822d0296a301ed833a2b5d7733ac6918f568b98d45bc8bee91231808e3183a"
+    },
+    {
+      "path": "reproduction/cadence_stress.py",
+      "bytes": 16634,
+      "sha256": "4157659b27c5359bf59c45ede64a2f4df94902a495acb73e023f9d33682f9ed9"
+    },
+    {
+      "path": "reproduction/candidate-production.patch",
+      "bytes": 34272,
+      "sha256": "5ea8224d79247e8ccf8a1786c8a92bfa8d36c1d01185e868c86785d913642ca7"
+    },
+    {
+      "path": "reproduction/candidate-tests.patch",
+      "bytes": 88333,
+      "sha256": "031dbac6a3d0947fb7bb70091f90a9989275d3e562d4e74bdcb8e92b25d58a82"
+    },
+    {
+      "path": "reproduction/candidate_cadence_stress.py",
+      "bytes": 30541,
+      "sha256": "72e35354c862f15ef16817e207bb822ac20e269e3e7e687100c974e86d6df6da"
+    },
+    {
+      "path": "reproduction/candidate_timing_stress.py",
+      "bytes": 16763,
+      "sha256": "29f8ab4f0b1120ccf9231f2cbe62fd7aeb3f1574e8de175888882a3a4f0a2806"
+    },
+    {
+      "path": "reproduction/continue_extended_high_power.py",
+      "bytes": 12328,
+      "sha256": "38e746bd3bc750606d5cf2ab9ff78af8f710e5d251148808592b7acebb38fa39"
+    },
+    {
+      "path": "reproduction/extended_high_power.py",
+      "bytes": 31820,
+      "sha256": "74a0704c9fae9964c6344dce472cec214eb305c0a21d094f50bc84a9b13906c9"
+    },
+    {
+      "path": "reproduction/timing_stress.py",
+      "bytes": 13996,
+      "sha256": "8e6683cbbc2ede5476367452fd1ef8db6509787bf7a38ffba00127af5753fa6d"
+    },
+    {
+      "path": "reproduction_manifest.json",
+      "bytes": 1913,
+      "sha256": "316d9e4d0ba7c46f16dfb412e23c6f6b19001c151906b154bc9247d8ea7c3bc8"
+    },
+    {
+      "path": "simulator_publication_identity.json",
+      "bytes": 664,
+      "sha256": "31e3b572e0c56fc8362b6e71565f4f255555f70d77687c26d24244b01b02b9ad"
+    },
+    {
+      "path": "source_identity.json",
+      "bytes": 738,
+      "sha256": "d29b52b8cbe9a0543425564b04170a4580bc43c9461916fcd54755423a14ef3d"
+    },
+    {
+      "path": "test_evidence.py",
+      "bytes": 1758,
+      "sha256": "7b938286f546ed01f4f7f06d7a7f1b5cf206874147f3b9a25411ec460ce5de4b"
+    },
+    {
+      "path": "test_identity.json",
+      "bytes": 2560,
+      "sha256": "612266a77c27d6aecfb6783416367391c191af9db77a6f54ce65eb2fd0fae1a8"
+    },
+    {
+      "path": "verify_exports.py",
+      "bytes": 5125,
+      "sha256": "01486da7496f2575589bbf212fad8ecd6f562bcd309d7a7d0634c84e0b3070c8"
+    }
+  ],
+  "bytes_excluding_this_manifest": 5690184,
+  "png_count": 9,
+  "all_pngs_visually_reviewed": true,
+  "validation": {
+    "phase_rows": 9576,
+    "paired_signal_phases": 4788,
+    "actual_extrema_checks": 19152,
+    "literal_null_final_tails": 4937,
+    "reproduction_dependency_hashes_verified": true
+  },
+  "excluded": "Caches, Python bytecode, intermediate correction receipt, full historical matrices and archives, executables/binaries, and private ride evidence. The optional ZIP is a delivery convenience, not a file to copy into the repository.",
+  "manifest_self_hash": "Provided externally to avoid a circular hash."
+}

@@ -14,8 +14,9 @@ struct Probe {
   uint32_t ioin;
   bool crcError;
 
-  // TMC2209 IOIN.VERSION is 0x21, regardless of ENN or temperature.
-  bool valid() const { return !crcError && (ioin >> 24) == 0x21; }
+  // IOIN.VERSION is 0x20 for TMC2225/TMC2208 and 0x21 for TMC2209.
+  // GPIO input states do not affect UART availability.
+  bool valid() const { return !crcError && ((ioin >> 24) == 0x20 || (ioin >> 24) == 0x21); }
 };
 
 template <typename Driver>

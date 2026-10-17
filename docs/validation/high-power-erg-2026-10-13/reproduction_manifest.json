@@ -1,0 +1,55 @@
+{
+  "status": "Complete pinned synthetic runner, fixture and source/test patch dependencies; commands were documented, not executed by the evidence packaging step.",
+  "dependencies": [
+    {
+      "path": "reproduction/archive_fixture/full.json",
+      "sha256": "aa9e49c300817de7df1b93694f5933e19f4c7db3d274c8d3c601b5165552d3b2",
+      "bytes": 23828
+    },
+    {
+      "path": "reproduction/baseline-selection.json",
+      "sha256": "af822d0296a301ed833a2b5d7733ac6918f568b98d45bc8bee91231808e3183a",
+      "bytes": 225
+    },
+    {
+      "path": "reproduction/cadence_stress.py",
+      "sha256": "4157659b27c5359bf59c45ede64a2f4df94902a495acb73e023f9d33682f9ed9",
+      "bytes": 16634
+    },
+    {
+      "path": "reproduction/candidate-production.patch",
+      "sha256": "5ea8224d79247e8ccf8a1786c8a92bfa8d36c1d01185e868c86785d913642ca7",
+      "bytes": 34272
+    },
+    {
+      "path": "reproduction/candidate-tests.patch",
+      "sha256": "031dbac6a3d0947fb7bb70091f90a9989275d3e562d4e74bdcb8e92b25d58a82",
+      "bytes": 88333
+    },
+    {
+      "path": "reproduction/candidate_cadence_stress.py",
+      "sha256": "72e35354c862f15ef16817e207bb822ac20e269e3e7e687100c974e86d6df6da",
+      "bytes": 30541
+    },
+    {
+      "path": "reproduction/candidate_timing_stress.py",
+      "sha256": "29f8ab4f0b1120ccf9231f2cbe62fd7aeb3f1574e8de175888882a3a4f0a2806",
+      "bytes": 16763
+    },
+    {
+      "path": "reproduction/continue_extended_high_power.py",
+      "sha256": "38e746bd3bc750606d5cf2ab9ff78af8f710e5d251148808592b7acebb38fa39",
+      "bytes": 12328
+    },
+    {
+      "path": "reproduction/extended_high_power.py",
+      "sha256": "74a0704c9fae9964c6344dce472cec214eb305c0a21d094f50bc84a9b13906c9",
+      "bytes": 31820
+    },
+    {
+      "path": "reproduction/timing_stress.py",
+      "sha256": "8e6683cbbc2ede5476367452fd1ef8db6509787bf7a38ffba00127af5753fa6d",
+      "bytes": 13996
+    }
+  ]
+}

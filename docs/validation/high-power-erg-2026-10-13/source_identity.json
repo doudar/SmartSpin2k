@@ -1,0 +1,14 @@
+{
+  "source": {
+    "commit": "615fce5599f01fbe9459f59e924e7bb65c81a22b",
+    "source_sha256": "1c0f7bce6f69a353cdff73b85eb10a660b9f8f333f0f23589d9d0228b67d01e8",
+    "dirty": true
+  },
+  "files": {
+    "src/ERG_Mode.cpp": "69aa85732731c8bf8e64958977460d3d0dbbe86bb8710865e6485ae9430f6a1c",
+    "src/PowerTable_Helpers.cpp": "e51c62206ccd5eb3d2c24addd99c2f24c30ae82ca8fa02d057bf0eb75f8881dc",
+    "include/ERG_Mode.h": "b55e93cac0c574c1138cbd1c561aac679ffe7ebb571c62696021710a37fbef95",
+    "include/ERG_Mode_Utils.h": "c0566210d4c04eb7cfec61ce0ef03be7d1afbac6e015dfaa308b0e819f2ce6c8"
+  },
+  "status": "Frozen production patch for draft hardware validation. Universal performance acceptance and real-bike benefit are not established."
+}

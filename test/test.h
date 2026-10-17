@@ -53,6 +53,14 @@ class TestPTLookupResistance {
   static void test_cadence_collection_boundaries(void);
   static void test_active_ride_forward_lookup(void);
   static void test_erg_slope_quality(void);
+  static void test_flat_row_extrapolation_uses_informative_rows(void);
+  static void test_flat_row_preserves_measured_lookup_and_fallback(void);
+  static void test_flat_row_edges_remain_monotone(void);
+  static void test_flat_row_malformed_donor_is_not_reused(void);
+  static void test_near_flat_repair_uses_measured_edge(void);
+  static void test_near_flat_donor_threshold_and_fallback(void);
+  static void test_near_flat_continuity_and_inverse(void);
+  static void test_near_flat_rejects_malformed_donors(void);
 };
 
 class TestPTLookupWatts {
