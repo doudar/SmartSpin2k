@@ -72,6 +72,14 @@ void setup() {
     RUN_TEST(forwardLookupTests.test_cadence_collection_boundaries);
     RUN_TEST(forwardLookupTests.test_active_ride_forward_lookup);
     RUN_TEST(forwardLookupTests.test_erg_slope_quality);
+    RUN_TEST(forwardLookupTests.test_flat_row_extrapolation_uses_informative_rows);
+    RUN_TEST(forwardLookupTests.test_flat_row_preserves_measured_lookup_and_fallback);
+    RUN_TEST(forwardLookupTests.test_flat_row_edges_remain_monotone);
+    RUN_TEST(forwardLookupTests.test_flat_row_malformed_donor_is_not_reused);
+    RUN_TEST(forwardLookupTests.test_near_flat_repair_uses_measured_edge);
+    RUN_TEST(forwardLookupTests.test_near_flat_donor_threshold_and_fallback);
+    RUN_TEST(forwardLookupTests.test_near_flat_continuity_and_inverse);
+    RUN_TEST(forwardLookupTests.test_near_flat_rejects_malformed_donors);
     TestPTLookupWatts reverseLookupTests;
     RUN_TEST(reverseLookupTests.test_active_ride_reverse_lookup);
     RUN_TEST(reverseLookupTests.test_reverse_lookup_pathological_tables);

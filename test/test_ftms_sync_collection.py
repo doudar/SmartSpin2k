@@ -1,6 +1,7 @@
 """Exercise production power-table collection and fitting with fresh 1 Hz reports."""
 
 from pathlib import Path
+import re
 import shutil
 import subprocess
 import tempfile
@@ -23,12 +24,24 @@ HARNESS = r'''
 #include <algorithm>
 #include <cassert>
 #include <cmath>
+#include <cstdarg>
 #include <cstdio>
 #include <random>
 #include <string>
+#include <vector>
 #include "Power_Table.h"
 uint32_t clockMs = 1000;
-#define SS2K_LOG(...) ((void)0)
+std::vector<std::string> logs;
+void captureLog(const char*, const char* format, ...) __attribute__((format(printf, 2, 3)));
+void captureLog(const char*, const char* format, ...) {
+  char message[512];
+  va_list args; va_start(args, format);
+  const int length=vsnprintf(message, sizeof(message), format, args);
+  va_end(args);
+  assert(length>=0 && length<static_cast<int>(sizeof(message)));
+  logs.emplace_back(message);
+}
+#define SS2K_LOG(...) captureLog(__VA_ARGS__)
 RuntimeParameters runtime; RuntimeParameters* rtConfig = &runtime;
 userParameters config; userParameters* userConfig = &config;
 struct Motor {
@@ -77,7 +90,40 @@ int main(int argc, char** argv) {
     if(publish) rtConfig->watts.setValue(watts);
     table.processPowerValue(buffer,cadence,rtConfig->watts,allowed);
   };
-  if(scenario=="duplicates") {
+  if(scenario.rfind("gate_",0)==0) {
+    const bool pending=scenario.find("_pending_")!=std::string::npos;
+    const bool rejected=scenario.find("_reject")!=std::string::npos;
+    const bool extreme=scenario.find("_extreme")!=std::string::npos;
+    const int direction=scenario.find("_negative")!=std::string::npos?-1:1;
+    if(extreme)motor.current=motor.target=direction>0?INT32_MIN:INT32_MAX;
+    for(int i=0;i<POWER_SAMPLES+1;++i)feed();
+    assert(buffer.getReadings()==POWER_SAMPLES-1 && commits==0 && logs.empty());
+    const int64_t actual=extreme?static_cast<int64_t>(UINT32_MAX):POWER_SAMPLE_POSITION_SPAN+(rejected?1:0);
+    const int endpoint=extreme?(direction>0?INT32_MAX:INT32_MIN):motor.current+direction*static_cast<int>(actual);
+    if(pending)motor.target=endpoint;
+    else motor.current=motor.target=endpoint;
+    feed();
+    if(rejected) {
+      assert(buffer.getReadings()==0 && commits==0);
+      // Pending travel stops acquisition; a span violation begins a new window immediately.
+      assert(buffer.stable==!pending);
+      const std::string expected=std::string("Collection reset: ")+(pending?"pending travel":"position span")+
+        " exceeds "+std::to_string(POWER_SAMPLE_POSITION_SPAN)+" steps (actual="+std::to_string(actual)+"), samples="+
+        std::to_string(POWER_SAMPLES-1)+", positionSpan="+std::to_string(pending?0:actual)+", cadenceSpan=0";
+      assert(logs.size()==1 && logs[0]==expected);
+      puts(logs[0].c_str());
+      // Polling a discarded window must not repeat the diagnostic or reuse its samples.
+      for(int i=0;i<3;++i)table.processPowerValue(buffer,80,rtConfig->watts);
+      assert(logs.size()==1 && buffer.getReadings()==0 && commits==0);
+      if(extreme)return 0;
+      motor.target=motor.current;
+      for(int i=0;i<POWER_SAMPLES+2;++i)feed();
+      assert(commits==1);
+    } else {
+      assert(commits==1 && buffer.getReadings()==0 && buffer.stable);
+      for(const auto& message:logs)assert(message.find("Collection reset:")==std::string::npos);
+    }
+  } else if(scenario=="duplicates") {
     feed(); feed(); feed(); assert(buffer.getReadings()==1);
     for(int i=0;i<20;++i) {clockMs+=10;rtConfig->watts.setTarget(300);table.processPowerValue(buffer,80,rtConfig->watts);}
     assert(buffer.getReadings()==1 && commits==0);
@@ -91,8 +137,8 @@ int main(int argc, char** argv) {
   } else if(scenario=="motion" || scenario=="pending_motion" || scenario=="cadence" || scenario=="power_spike" || scenario=="gap" || scenario=="stop" ||
             scenario=="blocked" || scenario=="epoch" || scenario=="simulated") {
     for(int i=0;i<POWER_SAMPLES+1;++i)feed(); assert(buffer.getReadings()==POWER_SAMPLES-1);
-    if(scenario=="motion")motor.current=motor.target=15500;
-    if(scenario=="pending_motion")motor.target=15500;
+    if(scenario=="motion")motor.current=motor.target=15000+POWER_SAMPLE_POSITION_SPAN+1;
+    if(scenario=="pending_motion")motor.target=15000+POWER_SAMPLE_POSITION_SPAN+1;
     if(scenario=="gap")clockMs+=3000;
     if(scenario=="epoch")++table.positionEpoch;
     if(scenario=="simulated")rtConfig->watts.setSimulate(true);
@@ -188,7 +234,14 @@ int main(int argc, char** argv) {
 
 
 class TestPowerTableLearning(unittest.TestCase):
-    def test_collection_and_adaptation(self):
+    GATE_SCENARIOS = tuple(
+        f"gate_{gate}_{outcome}{direction}"
+        for gate in ("pending", "span")
+        for outcome in ("boundary", "reject", "reject_extreme")
+        for direction in ("", "_negative")
+    )
+
+    def run_scenarios(self, scenarios, position_span=None):
         source = (ROOT / "src/Power_Table.cpp").read_text(encoding="utf-8")
         production = "\n".join(function(source, signature) for signature in (
             "void PowerBuffer::set(", "void PowerBuffer::clearSamples(", "void PowerBuffer::reset(",
@@ -198,16 +251,34 @@ class TestPowerTableLearning(unittest.TestCase):
         with tempfile.TemporaryDirectory() as tmp:
             folder = Path(tmp)
             (folder / "Arduino.h").write_text(ARDUINO, encoding="utf-8")
+            headers = ROOT / "include"
+            if position_span is not None:
+                # Build against a genuinely changed settings header, with the same
+                # configuration visible to collection and the compiled table helpers.
+                headers = folder / "include"
+                shutil.copytree(ROOT / "include", headers)
+                settings = headers / "settings.h"
+                configured, count = re.subn(r"(?m)^(#define\s+POWER_SAMPLE_POSITION_SPAN\s+)\d+\b",
+                                            lambda match: match[1] + str(position_span),
+                                            settings.read_text(encoding="utf-8"))
+                self.assertEqual(count, 1)
+                settings.write_text(configured, encoding="utf-8")
             cpp = folder / "learning.cpp"
             exe = folder / "learning.exe"
             cpp.write_text(HARNESS.replace("/* PRODUCTION */", production), encoding="utf-8")
-            subprocess.run([compiler, "-std=c++17", "-DPLATFORMIO_ENV_NATIVE", "-I"+str(folder),
-                            "-I"+str(ROOT / "include"), "-I"+str(ROOT / "lib/SS2K/include"),
+            subprocess.run([compiler, "-std=c++17", "-Werror=format", "-DPLATFORMIO_ENV_NATIVE", "-I"+str(folder),
+                            "-I"+str(headers), "-I"+str(ROOT / "lib/SS2K/include"),
                             "-I"+str(ROOT / "lib/ArduinoCompat/include"), str(cpp),
                             str(ROOT / "src/PowerTable_Helpers.cpp"), "-o", str(exe)], check=True)
-            for scenario in ("duplicates", "fresh_equal", "wrap", "motion", "pending_motion", "cadence", "power_spike",
+            for scenario in scenarios:
+                with self.subTest(scenario=scenario, position_span=position_span):
+                    subprocess.run([str(exe), scenario], check=True)
+
+    def test_collection_and_adaptation(self):
+        self.run_scenarios(("duplicates", "fresh_equal", "wrap", "motion", "pending_motion", "cadence", "power_spike",
                              "gap", "stop", "blocked", "ftms", "epoch", "simulated", "poll_700ms", "small_moves", "cumulative_small_moves", "burst", "up", "down", "fraction",
                              "interior", "edge", "power_neighbor", "outlier", "grid", "grid_cadence", "bootstrap", "bootstrap_exact",
-                             "anchor_epoch", "import", "random_surface", "notify_neighbors"):
-                with self.subTest(scenario=scenario):
-                    subprocess.run([str(exe), scenario], check=True)
+                             "anchor_epoch", "import", "random_surface", "notify_neighbors") + self.GATE_SCENARIOS)
+
+    def test_configured_position_gate_diagnostics(self):
+        self.run_scenarios(self.GATE_SCENARIOS, position_span=137)

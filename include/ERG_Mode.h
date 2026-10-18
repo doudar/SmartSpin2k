@@ -34,6 +34,7 @@ class ErgMode {
     tableConfidence.reset();
     tableSeekState               = TableSeekState::INACTIVE;
     tableSeekFirstArrivalValid   = false;
+    tableSeekHadHighTarget       = false;
     mode                         = Mode::MAINTAIN;
     tableSeekStableMatches       = 0;
     tableSeekStableMisses        = 0;
@@ -50,6 +51,10 @@ class ErgMode {
     responseTrend                = 0;
     responsePreviousTrend        = 0;
     transitionTarget             = INT32_MIN;
+    highPowerTransition          = false;
+    boundedSeekTransition        = false;
+    hasHighPowerRequest          = false;
+    offsetSettledAt = offsetPosition = offsetCadence = 0;
     feedbackEarlyRetreatTarget   = INT32_MIN;
     feedbackUpdateValid         = false;
   }
@@ -69,6 +74,7 @@ class ErgMode {
   ErgControl::TableConfidence tableConfidence;
   TableSeekState tableSeekState          = TableSeekState::INACTIVE;
   int tableSeekTargetWatts               = 0;
+  bool tableSeekHadHighTarget             = false;
   int tableSeekCadence                   = 0;
   int tableSeekLastWatts                 = INT32_MIN;
   int tableSeekStableMatches             = 0;
@@ -108,6 +114,14 @@ class ErgMode {
   double responseTrend              = 0;
   double responsePreviousTrend      = 0;
   int transitionTarget              = INT32_MIN;
+  // High transitions bound the residual; low trusted seeks limit prediction
+  // to nominal sensitivity without changing ordinary proportional feedback.
+  bool highPowerTransition          = false;
+  bool boundedSeekTransition        = false;
+  bool hasHighPowerRequest          = false;
+  uint32_t offsetSettledAt           = 0;
+  int32_t offsetPosition             = 0;
+  int offsetCadence                  = 0;
   bool wasErgMode                   = false;
   bool feedbackUpdateValid          = false;
   uint32_t feedbackUpdatedAt        = 0;
@@ -124,6 +138,7 @@ class ErgMode {
   void _trackControlMove(int32_t position);
 
   void _updateTableConfidence();
+  void _observeOffsetSettlement();
   bool _positionPredictionIsAccurate(int watts, int cadence, int32_t actualPosition);
   bool _tableHasSeekSupport() const;
   bool _tableTargetIsTrusted(int watts, int cadence) const;

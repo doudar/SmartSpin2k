@@ -1,0 +1,139 @@
+{
+  "status": "ready_for_evidence",
+  "candidate_sha256": "1c0f7bce6f69a353cdff73b85eb10a660b9f8f333f0f23589d9d0228b67d01e8",
+  "baseline_commit": "615fce5599f01fbe9459f59e924e7bb65c81a22b",
+  "baseline_sha256": "8e046a40799492d4f26299040e5a13ea632747b7a696a018cdfddfca8d752fe7",
+  "simulator_package_sha256": "c84f685fe6c49b682ea1a61ec226b535bbb645a29d101c234bce146a8e0c12b7",
+  "profile_sha256": "e4650c2aa1f59f8282207f5ac2c27dd6187265d2603defc3606edaa8d032dac8",
+  "cohorts": [
+    {
+      "name": "short",
+      "expected_pairs": 90,
+      "manifest": "experiments/near_flat_anchored_5seeds/high_power.json",
+      "manifest_sha256": "89e08b91b5801dbf6924f0587523b4b18dbda80beef3d7b5af821c0d744fb2c9",
+      "audits": [
+        {
+          "path": "near_flat_anchored_short_review/review_manifest.json",
+          "sha256": "3c953057671fbbd0e28c519c8c7d96e73117d819b89a676899d78dea48ad0369",
+          "assertions": {
+            "status": "complete_independent_read_only_audit",
+            "cases": 90,
+            "source_fingerprint": "1c0f7bce6f69a353cdff73b85eb10a660b9f8f333f0f23589d9d0228b67d01e8",
+            "source_manifest_sha256": "89e08b91b5801dbf6924f0587523b4b18dbda80beef3d7b5af821c0d744fb2c9"
+          }
+        }
+      ],
+      "preparation_audit": {
+        "path": "near_flat_anchored_short_review/audit.json.gz",
+        "sha256": "fb42af5c7d945fc1d5a52f6ad34634a9e1a8318a1cc24db516757f6c667899a0"
+      },
+      "archive": "experiments/near_flat_anchored_5seeds.candidate-raw.tar.gz",
+      "archive_index": "experiments/near_flat_anchored_5seeds.candidate-raw.archive-index.json",
+      "archive_index_sha256": "9a3f15193069df7b82638081d699ada797be89c53b42e3f4d644aa3e07a0f159",
+      "extrema_audit": {
+        "path": "near_flat_anchored_short_review/audit.json.gz",
+        "sha256": "fb42af5c7d945fc1d5a52f6ad34634a9e1a8318a1cc24db516757f6c667899a0"
+      }
+    },
+    {
+      "name": "long",
+      "expected_pairs": 18,
+      "manifest": "experiments/near_flat_anchored_extended_90/extended_high_power.json",
+      "manifest_sha256": "a07cfd3a027eadf81a62e723a06ab44336eb7d5d89e0c4ec9a2c6273f283c88b",
+      "audits": [
+        {
+          "path": "experiments/near_flat_anchored_long_review/full_integrity_audit.json",
+          "sha256": "4a638b4504e23eb4d8a51fe12d1d1915b5f11bfd2ae67fa1a7c5b218f341113c",
+          "assertions": {
+            "status": "PASS",
+            "manifest_sha256": "a07cfd3a027eadf81a62e723a06ab44336eb7d5d89e0c4ec9a2c6273f283c88b"
+          }
+        },
+        {
+          "path": "experiments/near_flat_anchored_extended_90/continuation_integrity_audit.json",
+          "sha256": "aca301a674af711a22919bcc51919e8bd0a7771fd06f7781b24a3f2cbc187825",
+          "assertions": {
+            "status": "PASS",
+            "manifest_sha256": "a07cfd3a027eadf81a62e723a06ab44336eb7d5d89e0c4ec9a2c6273f283c88b"
+          }
+        },
+        {
+          "path": "experiments/near_flat_anchored_extended_90/low_power_phase_tail_audit.json.gz",
+          "sha256": "f25ccee613a5e58af981b5d9d830785dd1a17f9947caeaead273051e9801cf93",
+          "assertions": {
+            "status": "complete",
+            "audited_pairs": 18,
+            "source_manifest_sha256": "a07cfd3a027eadf81a62e723a06ab44336eb7d5d89e0c4ec9a2c6273f283c88b",
+            "independent_verification.all_response_field_checks_passed": true
+          }
+        }
+      ],
+      "supplemental_budget_files": [
+        {
+          "path": "experiments/near_flat_anchored_extended_90/all_low_phase_budget_comparisons.json",
+          "sha256": "5b1d24983bb3b367f6fc48d3e3642c41d171dd82536398e702b649ccf31f0d2a",
+          "expected_rows": 1764
+        }
+      ],
+      "archive": "experiments/near_flat_anchored_extended_90.candidate-raw.tar.gz",
+      "archive_index": "experiments/near_flat_anchored_extended_90.candidate-raw.archive-index.json",
+      "archive_index_sha256": "4cbbded81e54c63a03000b823b80b345c4468b301dac4dd053a306cb32edeb08",
+      "extrema_audit": {
+        "path": "experiments/near_flat_anchored_extended_90/low_power_phase_tail_audit.json.gz",
+        "sha256": "f25ccee613a5e58af981b5d9d830785dd1a17f9947caeaead273051e9801cf93"
+      }
+    },
+    {
+      "name": "cadence",
+      "expected_pairs": 36,
+      "manifest": "experiments/near_flat_anchored_cadence_stress/candidate_cadence_stress.json",
+      "manifest_sha256": "5e91658d04713b0be1e4ae90c3730672659e9086ef8de8f8a6572cf9170210ae",
+      "audits": [
+        {
+          "path": "near_flat_anchored_stress_review/cadence_summary.json",
+          "sha256": "13ea091c59f36bb703eba018d5a17c221fd02e8f110d9e970c6eb16244701a10",
+          "assertions": {
+            "status": "complete",
+            "pairs": 36,
+            "source_manifest_sha256": "5e91658d04713b0be1e4ae90c3730672659e9086ef8de8f8a6572cf9170210ae"
+          }
+        }
+      ],
+      "archive": "experiments/near_flat_anchored_cadence_stress.candidate-raw.tar.gz",
+      "archive_index": "experiments/near_flat_anchored_cadence_stress.candidate-raw.archive-index.json",
+      "archive_index_sha256": "649cfa6052748872939530694dfccfc4a5180f2fb6cbfbb3539b80148e456a1a",
+      "extrema_audit": {
+        "path": "near_flat_anchored_stress_review/cadence_audit.json.gz",
+        "sha256": "c2891b51b6dbaf29c7b3af6a56001fd12bfb650947ba88d37912cf51a1f87fe6"
+      }
+    },
+    {
+      "name": "timing",
+      "expected_pairs": 36,
+      "manifest": "experiments/near_flat_anchored_timing_stress/timing_stress.json",
+      "manifest_sha256": "9e2ae91fec45b9b1f8e457e92477d66765397136c96999ca71f15f19b6c691b9",
+      "audits": [
+        {
+          "path": "near_flat_anchored_stress_review/timing_summary.json",
+          "sha256": "5690a3111ec3ebc94a271b828069ea40bb89337502035390eeaa6c6e447c6e54",
+          "assertions": {
+            "status": "complete",
+            "pairs": 36,
+            "source_manifest_sha256": "9e2ae91fec45b9b1f8e457e92477d66765397136c96999ca71f15f19b6c691b9"
+          }
+        }
+      ],
+      "preparation_audit": {
+        "path": "near_flat_anchored_stress_review/timing_audit.json.gz",
+        "sha256": "4705792c357a46d8dc4817a88ae514e8bbd181d6e9541dac792ae2185dbba064"
+      },
+      "archive": "experiments/near_flat_anchored_timing_stress.candidate-raw.tar.gz",
+      "archive_index": "experiments/near_flat_anchored_timing_stress.candidate-raw.archive-index.json",
+      "archive_index_sha256": "d46041b3ca4ca51cacb897107ff03f6469ceb531c4be787dae14e411063526d1",
+      "extrema_audit": {
+        "path": "near_flat_anchored_stress_review/timing_audit.json.gz",
+        "sha256": "4705792c357a46d8dc4817a88ae514e8bbd181d6e9541dac792ae2185dbba064"
+      }
+    }
+  ]
+}

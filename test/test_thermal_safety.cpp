@@ -38,16 +38,26 @@ void TestThermalSafety::test_tmc_uart_probe_while_disabled() {
   TEST_ASSERT_TRUE(TmcUart::probe(driver).valid());
   driver.response = 0x21000000;
   TEST_ASSERT_TRUE(TmcUart::probe(driver).valid());
+  // TMC2225 uses version 0x20 and ENN at bit 4 rather than bit 0.
+  const uint32_t tmc2225Responses[] = {0x20000010, 0x20000000, 0x200003FF};
+  for (uint32_t response : tmc2225Responses) {
+    driver.response = response;
+    TEST_ASSERT_TRUE(TmcUart::probe(driver).valid());
+  }
 }
 
 void TestThermalSafety::test_tmc_uart_probe_rejects_invalid_responses() {
   IdentityDriver driver;
-  driver.responseCrcError = true;
-  TEST_ASSERT_FALSE(TmcUart::probe(driver).valid());
-  // A subsequent valid response recovers without recreating the driver.
-  driver.responseCrcError = false;
-  TEST_ASSERT_TRUE(TmcUart::probe(driver).valid());
-  const uint32_t invalidResponses[] = {0, 0xFFFFFFFF, 0x20000001};
+  const uint32_t validResponses[] = {0x21000001, 0x20000010};
+  for (uint32_t response : validResponses) {
+    driver.response = response;
+    driver.responseCrcError = true;
+    TEST_ASSERT_FALSE(TmcUart::probe(driver).valid());
+    // A subsequent valid response recovers without recreating the driver.
+    driver.responseCrcError = false;
+    TEST_ASSERT_TRUE(TmcUart::probe(driver).valid());
+  }
+  const uint32_t invalidResponses[] = {0, 0xFFFFFFFF, 0x19000001, 0x22000001};
   for (uint32_t invalid : invalidResponses) {
     driver.response = invalid;
     TEST_ASSERT_FALSE(TmcUart::probe(driver).valid());

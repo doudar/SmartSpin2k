@@ -1,0 +1,96 @@
+{
+  "status": "Both release builds passed; no flashing, deployment or release artifact publication",
+  "source": {
+    "baseline_commit": "615fce5599f01fbe9459f59e924e7bb65c81a22b",
+    "fingerprint_sha256": "1c0f7bce6f69a353cdff73b85eb10a660b9f8f333f0f23589d9d0228b67d01e8",
+    "production_files": {
+      "src/ERG_Mode.cpp": "69aa85732731c8bf8e64958977460d3d0dbbe86bb8710865e6485ae9430f6a1c",
+      "src/PowerTable_Helpers.cpp": "e51c62206ccd5eb3d2c24addd99c2f24c30ae82ca8fa02d057bf0eb75f8881dc",
+      "include/ERG_Mode.h": "b55e93cac0c574c1138cbd1c561aac679ffe7ebb571c62696021710a37fbef95",
+      "include/ERG_Mode_Utils.h": "c0566210d4c04eb7cfec61ce0ef03be7d1afbac6e015dfaa308b0e819f2ce6c8"
+    },
+    "tests": {
+      "test/test.h": "9786d59abfbd7a5a253c372886a0383e97ee3ff24c2d5583780338734c0f60e0",
+      "test/test_unity.cpp": "84525740dd592522a104196183712a45cf1e9f74ad90145d630395cf9fa3731c",
+      "test/test_pt_lookup_resistance.cpp": "dc34f97f178b1216b98669de553f6bec35d509f6a52dea399dd7ae6d9ca91c69",
+      "test/test_erg_feedback.py": "25b395e774c039c386f97bca61baaafe86912cddb9de76143469957032f44e87"
+    }
+  },
+  "toolchain": {
+    "pioarduino": "6.1.19",
+    "platform": "55.03.311",
+    "arduino": "3.3.11",
+    "espidf": "5.5.5",
+    "xtensa_gcc": "14.2.0+20260121",
+    "scons": "4.8.1"
+  },
+  "tracked_diff_after_builds": [
+    "include/ERG_Mode.h",
+    "include/ERG_Mode_Utils.h",
+    "src/ERG_Mode.cpp",
+    "src/PowerTable_Helpers.cpp",
+    "test/test.h",
+    "test/test_erg_feedback.py",
+    "test/test_pt_lookup_resistance.cpp",
+    "test/test_unity.cpp"
+  ],
+  "config_files": {
+    "platformio.ini": "7a11e8f0b419ab6209f8149f449cbfc9a0acc9fcaf71660e0be2a0b3d6530b3a",
+    "requirements-ci.txt": "f6b790ffb96e3aa2dcb9a24c7b6af776d500975f1db7b90c7132701925119845",
+    "sdkconfig": "62477466ba543e9019584cc00f8e393a32654a3e00c607a704ffc682de309805",
+    "sdkconfig.release": "62477466ba543e9019584cc00f8e393a32654a3e00c607a704ffc682de309805",
+    "sdkconfig.S3release": "7c37a812e62dee77748e8c12fea442a703829df4aa8bf4b736194d40239147fc",
+    "sdkconfig.defaults": "b0cbe46aa7304a8067a228d43425af41803ea0b997c769612f16801edd3524ed",
+    "sdkconfig.s3.defaults": "f51ac16d1e86dd5838caed0d7ddce6c09fc5f63bbf31ebfa7ac0949c1f079bc0"
+  },
+  "dependency_copy_manifest_sha256": "33e946452eadf8c701972eef8bd62c56e6a4e61a1b90e0fbcef797517cce9054",
+  "commands": [
+    "pio run --environment release",
+    "pio run --environment S3release"
+  ],
+  "builds": {
+    "release": {
+      "status": "SUCCESS (compile only)",
+      "duration_s": 109.12,
+      "ram_used_bytes": 66916,
+      "flash_used_bytes": 1339683,
+      "log": "near-flat-anchored-release-build.log",
+      "log_sha256": "b29517082588a42dbd8e1c5c843e16d889173eb779d75208a04ce5865995f7de",
+      "image": "firmware.bin",
+      "image_sha256": "48dc7d97a32545b8c40e740e697696e16589c3b2fb084ebc415571300a9b5fc8",
+      "image_bytes": 1340080,
+      "archive": "build_evidence/near-flat-anchored-release-build.tar.gz",
+      "archive_sha256": "5a7449a27897e264a0890c46ecde9db37a87c4015f1256195c23d9618c48b22e",
+      "verified_archive_members": 2813,
+      "archive_index_sha256": "5c12afb768957582e5a3886249f690fa100451d8460affb829f8f72974bd0bd9",
+      "warnings": [
+        "optional freertos-gdb installation did not complete; debugger setup unverified",
+        "git --unshallow attempted on complete repository",
+        "datetime.utcnow deprecation",
+        "FastAccelStepper deprecated GPIO APIs"
+      ]
+    },
+    "S3release": {
+      "status": "SUCCESS (compile only)",
+      "duration_s": 115.32,
+      "ram_used_bytes": 62064,
+      "flash_used_bytes": 1443607,
+      "log": "near-flat-anchored-s3-release-build.log",
+      "log_sha256": "e6ef9e8a95e17866cfb7c6307c5e93c580e32540a31603e9b6dd9c22c94992f2",
+      "image": "S3firmware.bin",
+      "image_sha256": "4f757da4678d263feac5043a03829b44609569cce055f6592918b6876257692f",
+      "image_bytes": 1444016,
+      "archive": "build_evidence/near-flat-anchored-S3release-build.tar.gz",
+      "archive_sha256": "c99c62214b2b4b387a027bb2fe90778d6b6dd691a4f5b7c62024b2272d3aa468",
+      "verified_archive_members": 2955,
+      "archive_index_sha256": "6bf3a7a35b739702d8f1a880083bf683b3d7ece5599232dea8dd8837ec619408",
+      "warnings": [
+        "optional freertos-gdb installation did not complete; debugger setup unverified",
+        "git --unshallow attempted on complete repository",
+        "datetime.utcnow deprecation",
+        "FastAccelStepper deprecated GPIO APIs"
+      ]
+    }
+  },
+  "scope": "Compiles use the exact frozen dirty production snapshot over the baseline with reviewed tests. Binaries are retained for byte verification only; they are not published releases. Host simulations and compile success do not establish hardware performance."
+}

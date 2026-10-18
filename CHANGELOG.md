@@ -10,6 +10,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Added
 
 ### Changed
+- Automatically include changelog highlights and linked commits since the previous release tag in release notes, alongside GitHub's PR list; retain the full change list when rebuilding the same day's release.
+- Report the configured power-table collection position limit and observed travel/span in reset diagnostics; preserve the 250-step gate and collection behavior.
+- Improve high-power ERG acquisition and delayed-response braking, guard unsupported seek offsets and amended-seek handoffs, and anchor weak-row extrapolation to measured edges. Add compiled behavioral regression coverage for high targets and their low-power recoveries; hardware validation remains required.
+
+### Hardware
+
+
+## [26.10.13]
+
+### Added
+
+### Changed
 
 ### Hardware
 
