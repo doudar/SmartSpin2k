@@ -127,6 +127,10 @@ class ErgMode {
   uint32_t feedbackUpdatedAt        = 0;
   int32_t controlMinimum            = 0;
   int32_t controlMaximum            = 0;
+  // Stepped-resistance steady-state hold: side and start of a persisting moderate error.
+  int steppedErrorSign              = 0;
+  uint32_t steppedErrorSince        = 0;
+  bool _steppedHold(int measuredError);
 
   // calculate incline if setpoint (from Zwift) changes
   int32_t _setPointChangeState();

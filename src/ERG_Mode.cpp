@@ -849,6 +849,7 @@ int32_t ErgMode::_inSetpointState() {
     if (target <= ErgControl::HIGH_GAIN_WATTS) highPowerTransition = false;
     tableCorrectionNeedsProgress = false;
   }
+  if (_steppedHold(measuredError)) return static_cast<int32_t>(rtConfig->getTargetIncline());
   if ((tableCorrectionNeedsProgress || transitionTarget == target) && (measuredError * sustainedTrend <= 0 || abs(measuredError) <= ErgControl::ERG_TRANSIENT_APPROACH_WATTS) &&
       std::abs(sustainedTrend) >= ErgControl::ERG_TRANSIENT_MIN_TREND_WPS) {
     const int projectedError = measuredError - static_cast<int>(std::round(sustainedTrend * ErgControl::ERG_TRANSIENT_BRAKING_SECONDS));
@@ -981,6 +982,30 @@ int32_t ErgMode::_inSetpointState() {
   }
 
   return newIncline;
+}
+
+bool ErgMode::_steppedHold(int measuredError) {
+  // Only bikes reporting real stepped resistance (Grupetto on a Peloton Bike+) qualify.
+  const auto resistance = rtConfig->resistance.getValueSample();
+  const bool stepped    = !resistance.simulate && resistance.timestamp != 0 && resistance.value > 0 &&
+                       static_cast<uint32_t>(millis()) - resistance.timestamp <= ERG_STEPPED_FEEDBACK_MAX_AGE_MS;
+  // Never hold while a transition, table move or recovery still owns the knob.
+  if (!stepped || transitionTarget != INT32_MIN || tableCorrectionNeedsProgress || abs(measuredError) >= ERG_STEPPED_IMMEDIATE_WATTS) {
+    steppedErrorSign = 0;
+    return false;
+  }
+  if (abs(measuredError) <= ERG_STEPPED_HOLD_WATTS) {
+    steppedErrorSign = 0;
+    return true;
+  }
+  const int sign     = measuredError > 0 ? 1 : -1;
+  const uint32_t now = millis();
+  if (sign != steppedErrorSign) {
+    steppedErrorSign  = sign;
+    steppedErrorSince = now;
+  }
+  if (now - steppedErrorSince < ERG_STEPPED_PERSIST_MS) return true;
+  return false;
 }
 
 int32_t ErgMode::_tableCorrection(int watts, int target, int cadence) {

@@ -222,6 +222,8 @@ int main() {
       rideStarted = true;
       uint32_t now; int watts, cadence, fresh, target; double load;
       if (!(input >> now >> watts >> cadence >> fresh >> target >> load) || now < clockMs || now-clockMs > 1000) return 2;
+      int resistance = -1;  // Optional Grupetto-style resistance feedback.
+      if (!(input >> resistance)) resistance = -1;
       const int pulses = motor.advance(now-clockMs); clockMs = now;
 #ifdef SS2K_PACKET_INGRESS
       // No watts/cadence or target scalar crosses this firmware boundary.
@@ -232,6 +234,7 @@ int main() {
       if (fresh & 1) rtConfig->watts.setValue(watts, false);
       if (fresh & 2) rtConfig->cad.setValue(cadence, false);
       if (target >= 0) rtConfig->watts.setTarget(target);
+      if ((fresh & 1) && resistance >= 0) rtConfig->resistance.setValue(resistance, false);
 #endif
       driver->load = load;
       ss2k->moveStepper();

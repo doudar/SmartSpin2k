@@ -28,6 +28,11 @@ class BikeConfig:
     # no real bike produces; a floor makes low ERG targets genuinely unreachable.
     floor_watts_at_80rpm: float = 0
     floor_cadence_exponent: float = 1.5
+    # Optional Peloton Bike+ style quantized resistance: the brake only moves
+    # in whole resistance levels of this many knob steps, with hysteresis
+    # (knob slack) between levels. 0 keeps the continuous brake.
+    resistance_step_steps: float = 0
+    resistance_hysteresis_steps: float = 0
 
     def __post_init__(self):
         if not (math.isfinite(self.floor_watts_at_80rpm) and self.floor_watts_at_80rpm >= 0 and
@@ -49,6 +54,8 @@ class BikeConfig:
             raise ValueError("Invalid lag, delay, noise, cadence exponent, or sample period")
         if self.min_position >= self.max_position:
             raise ValueError("Invalid physical travel")
+        if self.resistance_step_steps < 0 or self.resistance_hysteresis_steps < 0:
+            raise ValueError("Invalid resistance quantization")
 
 
 def interpolate(x, xs, ys):
@@ -174,6 +181,24 @@ class Bike:
         self.sample_random = random.Random(seed)
         self.sample_noise = 0.0
         self.last_acquisition = 0.0
+        step = config.resistance_step_steps
+        self.resistance = round(self.position/step) if step else -1
+        if step:
+            self.filtered = equilibrium(config, self.brake_position(), cadence) if initial_power is None else initial_power
+            self.power = round(self.filtered)
+
+    def brake_position(self):
+        """Physical brake position: the knob itself, or its whole resistance level."""
+        step = self.config.resistance_step_steps
+        if not step:
+            return self.position
+        level = self.position/step
+        band = 0.5 + self.config.resistance_hysteresis_steps/(2*step)
+        if level-self.resistance > band:
+            self.resistance = math.floor(level-band)+1
+        elif self.resistance-level > band:
+            self.resistance = math.ceil(level+band)-1
+        return self.resistance*step
 
     def sample_power(self, now):
         """Acquire the continuous delayed estimator at this sensor clock.
@@ -202,7 +227,7 @@ class Bike:
         self.position = max(cfg.min_position, min(cfg.max_position, requested))
         # Dimensionless opposing motor load. SG adapter is synthetic, not Nm.
         self.load = 1.0 if requested != self.position else 0.0
-        physical = equilibrium(cfg, self.position, cadence)
+        physical = equilibrium(cfg, self.brake_position(), cadence)
         alpha = 1.0 if cfg.lag_s == 0 else -math.expm1(-dt/cfg.lag_s)
         self.filtered += alpha*(physical-self.filtered)
         self.history.append((now, self.filtered, cadence))

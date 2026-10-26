@@ -103,6 +103,25 @@ constexpr int ERG_CADENCE_COMPENSATION_MAX_RPM = 3;
 constexpr double ERG_TABLE_CURVE_BLEND = 0.5;
 // ******************************************************************************
 
+// ******************************************************************************
+// Steady-state hold for bikes with stepped resistance (Peloton Bike+ via Grupetto)
+// The Bike+ brake moves in whole 1% levels (about 5-8 W at 160-220 W, 90 RPM), so
+// small knob corrections only creep toward the next level and then jump past the
+// target. When fresh Grupetto resistance feedback shows a stepped brake, hold the
+// knob after a transition settles, as Grupetto's own ERG does. Moderate errors
+// must persist before a correction; large errors are corrected immediately.
+// Transitions, table seeks and bikes without resistance feedback are unaffected.
+// ******************************************************************************
+// Hold the knob while power is within this many watts of target.
+constexpr int ERG_STEPPED_HOLD_WATTS = 4;
+// Errors at or above this many watts are corrected without waiting.
+constexpr int ERG_STEPPED_IMMEDIATE_WATTS = 10;
+// A moderate error must stay on one side of the target this long before correcting.
+constexpr uint32_t ERG_STEPPED_PERSIST_MS = 1500;
+// Resistance feedback older than this does not enable the hold.
+constexpr uint32_t ERG_STEPPED_FEEDBACK_MAX_AGE_MS = 3000;
+// ******************************************************************************
+
 namespace ErgControl {
 
 // Constrain incomplete cadence curves from nearby, reliable row pairs. These
