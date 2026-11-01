@@ -131,6 +131,7 @@ class ErgMode {
   int steppedErrorSign              = 0;
   uint32_t steppedErrorSince        = 0;
   bool _steppedHold(int measuredError);
+  bool _hasSteppedFeedback() const;
 
   // calculate incline if setpoint (from Zwift) changes
   int32_t _setPointChangeState();

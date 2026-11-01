@@ -951,7 +951,9 @@ int32_t ErgMode::_inSetpointState() {
     // Cap the compensation: a surge that the last resistance drop caused would otherwise remove more resistance at once.
     // _updateValues() refreshes the reference after a move, so power feedback corrects the remainder.
     const int cadenceDelta   = std::max(-ERG_CADENCE_COMPENSATION_MAX_RPM, std::min(ERG_CADENCE_COMPENSATION_MAX_RPM, cadence - cadenceReference));
-    const double cadenceMove = cadenceSlope * cadenceDelta;
+    // Stepped-resistance bikes apply half the move (see ERG_STEPPED_CADENCE_COMPENSATION_GAIN); others the full move.
+    const double cadenceGain = _hasSteppedFeedback() ? ERG_STEPPED_CADENCE_COMPENSATION_GAIN : 1.0;
+    const double cadenceMove = cadenceGain * cadenceSlope * cadenceDelta;
     const bool diverging     = measuredError * sustainedTrend < 0 && std::abs(sustainedTrend) >= ErgControl::ERG_TRANSIENT_MIN_TREND_WPS;
     // Delayed watts can still show a confirmed worsening residual. Do not
     // add resistance into a growing overshoot (or remove it into a growing
@@ -959,8 +961,12 @@ int32_t ErgMode::_inSetpointState() {
     if ((abs(measuredError) <= ErgControl::ERG_TRANSIENT_APPROACH_WATTS && !diverging) || cadenceMove * measuredError >= 0) {
       newIncline += cadenceMove;
       SS2K_LOG(ERG_MODE_LOG_TAG, "Cadence compensation: %d -> %drpm, applied %+drpm, %+.0f steps", cadenceReference, cadence, cadenceDelta, cadenceMove);
-      // Consume the applied cadence change even if feedback exactly cancels its move.
-      cadenceReference += cadenceDelta;
+      // Consume the applied part of the cadence change even if feedback exactly cancels its move. With the
+      // stepped half gain only half is consumed. The 1 RPM remainder of a 2-3 RPM change is inside the follow
+      // deadband, so it survives the move and is compensated on a later update if it persists; after a larger
+      // (capped) change _updateValues() refreshes the reference to the current cadence and power feedback
+      // corrects the rest (simulated Bike+, 3 seeds: mean error 7.79 W vs 7.96 W when consuming the full change).
+      cadenceReference += static_cast<int>(std::lround(cadenceGain * cadenceDelta));
     }
   }
   newIncline = std::max(static_cast<float>(ss2k->getCurrentPosition() - maxChange), std::min(static_cast<float>(ss2k->getCurrentPosition() + maxChange), newIncline));
@@ -984,11 +990,17 @@ int32_t ErgMode::_inSetpointState() {
   return newIncline;
 }
 
-bool ErgMode::_steppedHold(int measuredError) {
-  // Only bikes reporting real stepped resistance (Grupetto on a Peloton Bike+) qualify.
+// Fresh, real resistance-level feedback (Grupetto). This is "Grupetto feedback is present", not a measured
+// test that the brake is stepped: Grupetto on an original Peloton Bike also qualifies.
+bool ErgMode::_hasSteppedFeedback() const {
   const auto resistance = rtConfig->resistance.getValueSample();
-  const bool stepped    = !resistance.simulate && resistance.timestamp != 0 && resistance.value > 0 &&
-                       static_cast<uint32_t>(millis()) - resistance.timestamp <= ERG_STEPPED_FEEDBACK_MAX_AGE_MS;
+  return !resistance.simulate && resistance.timestamp != 0 && resistance.value > 0 &&
+         static_cast<uint32_t>(millis()) - resistance.timestamp <= ERG_STEPPED_FEEDBACK_MAX_AGE_MS;
+}
+
+bool ErgMode::_steppedHold(int measuredError) {
+  // Only bikes reporting real resistance levels through Grupetto qualify (see _hasSteppedFeedback()).
+  const bool stepped = _hasSteppedFeedback();
   // Never hold while a transition, table move or recovery still owns the knob.
   if (!stepped || transitionTarget != INT32_MIN || tableCorrectionNeedsProgress || abs(measuredError) >= ERG_STEPPED_IMMEDIATE_WATTS) {
     steppedErrorSign = 0;

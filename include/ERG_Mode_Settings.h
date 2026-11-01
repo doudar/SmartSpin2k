@@ -99,6 +99,11 @@ constexpr int ERG_CADENCE_FOLLOW_DEADBAND_RPM = 2;
 // Maximum cadence change proportional feedback compensates in one update; power feedback corrects any remainder.
 // A surge caused by a resistance drop must not immediately remove more resistance.
 constexpr int ERG_CADENCE_COMPENSATION_MAX_RPM = 3;
+// Fraction of the table-predicted cadence move applied by steady-state cadence compensation on bikes that
+// report stepped resistance (Grupetto on a Peloton Bike+). There a full move on a 2 RPM change crossed a whole
+// resistance level and overshot power by 12-18 W; half the move lets power feedback finish the correction.
+// Other bikes keep the full move (1.0).
+constexpr double ERG_STEPPED_CADENCE_COMPENSATION_GAIN = 0.5;
 // Blend the measured cadence-curve estimate with the normal forward lookup.
 constexpr double ERG_TABLE_CURVE_BLEND = 0.5;
 // ******************************************************************************
