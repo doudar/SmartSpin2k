@@ -1155,6 +1155,121 @@ int main(int argc,char** argv) {
     rtConfig->cad.setValue(80); table.lookupResult=12000;
     step(2200,198); assert(rtConfig->watts.getTarget()==310);
     step(2800,198); assert(rtConfig->getTargetIncline()>11866);
+  } else if(scenario=="cadence_coast_step") {
+    // A 1 s coast (cadence 0) is not a stop: ERG resumes at once, as before the spin-up hold.
+    beginSeek(); step(2000,198); rtConfig->cad.setValue(0);
+    step(2100,198); step(3000,198);
+    rtConfig->cad.setValue(80); table.lookupResult=12000;
+    step(3100,198); assert(rtConfig->watts.getTarget()==310);
+    step(3700,198); assert(rtConfig->getTargetIncline()>11866);
+    assert(!logged("holding resistance until cadence settles"));
+  } else if(scenario=="cadence_stop_real") {
+    // A real stop (2.5 s at 0 rpm) holds increases while the rider spins up, then seeks once at the settled cadence.
+    beginSeek(); step(2000,198); rtConfig->cad.setValue(0);
+    for(int t=2100;t<=4800;t+=300) step(t,30);
+    assert(logged("holding resistance until cadence settles"));
+    const float held=rtConfig->getTargetIncline();
+    table.lookupResult=12000;
+    int cadence=30;
+    for(int t=4900;t<=6100;t+=300) { cadence+=12; rtConfig->cad.setValue(cadence); step(t,60+cadence); assert(rtConfig->getTargetIncline()<=held); }
+    rtConfig->cad.setValue(85);
+    // The 2 s rolling window still holds the 78 rpm report from 5800 until 7800.
+    for(int t=6400;t<=7600;t+=300) { step(t,150); assert(rtConfig->getTargetIncline()<=held); }
+    assert(!logged("Spin-up complete"));
+    for(int t=7900;t<=9100;t+=300) step(t,150);
+    assert(logged("Spin-up complete at 85 rpm (stable)"));
+    assert(rtConfig->getTargetIncline()>held);
+    int completes=0; for(const auto& entry:logs) if(entry.find("Spin-up complete")!=std::string::npos) ++completes;
+    assert(completes==1);
+  } else if(scenario=="spinup_noisy_cadence") {
+    // Steady pedaling with +-4 RPM jitter (76-84) after a real stop still settles, well before the timeout.
+    beginSeek(); step(2000,198); rtConfig->cad.setValue(0);
+    for(int t=2100;t<=4800;t+=300) step(t,30);
+    table.lookupResult=12000;
+    const int noise[]={80,83,77,80,84,76,80,83,77,80,84,76,80,83,77,80,84,76,80,83,77};
+    int k=0; for(int t=4900;t<=9400;t+=300) { rtConfig->cad.setValue(noise[k++%21]); step(t,150); }
+    assert(logged("(stable)")); assert(!logged("(timeout)"));
+  } else if(scenario=="spinup_timeout") {
+    // Cadence that never settles ends the hold after ERG_SPINUP_MAX_MS, exactly once, then seeks.
+    beginSeek(); step(2000,198); rtConfig->cad.setValue(0);
+    for(int t=2100;t<=4800;t+=300) step(t,30);
+    const float held=rtConfig->getTargetIncline(); table.lookupResult=12000;
+    int k=0;
+    for(int t=4900;t<=10600;t+=300) { rtConfig->cad.setValue(k++%2 ? 60 : 95); step(t,150); assert(rtConfig->getTargetIncline()<=held); }
+    assert(!logged("Spin-up complete"));
+    for(int t=10900;t<=11800;t+=300) { rtConfig->cad.setValue(k++%2 ? 60 : 95); step(t,150); }
+    assert(logged("(timeout)"));
+    int completes=0; for(const auto& entry:logs) if(entry.find("Spin-up complete")!=std::string::npos) ++completes;
+    assert(completes==1);
+  } else if(scenario=="spinup_power_trend") {
+    // Cadence is steady but power is still rising with the spin-up: the hold waits for power to level off.
+    beginSeek(); step(2000,198); rtConfig->cad.setValue(0);
+    for(int t=2100;t<=4800;t+=300) step(t,30);
+    table.lookupResult=12000; rtConfig->cad.setValue(85);
+    int watts=60;
+    for(int t=4900;t<=8800;t+=300) { watts+=15; step(t,watts); }
+    assert(!logged("Spin-up complete"));
+    for(int t=9100;t<=12000;t+=300) step(t,watts);
+    assert(logged("Spin-up complete at 85 rpm"));
+  } else if(scenario=="spinup_lower_target") {
+    // Stopped during a hard target; the app lowers the target while the rider is stopped. On restart ERG eases
+    // straight toward the lower target (at the pre-stop cadence) instead of holding the hard position, and never
+    // adds resistance before the hold ends.
+    setup(196,310); table.sloped=true; table.wattSlope=12; table.cadenceSlope=-30; table.lookupResult=11866;
+    rtConfig->cad.setValue(85);
+    motor.current=motor.target=13996; rtConfig->setTargetIncline(13996);   // table position for 310 W at 85 rpm
+    for(int t=1000;t<=12000;t+=1000) step(t,308);
+    const float hard=rtConfig->getTargetIncline();
+    assert(hard>13000);
+    rtConfig->cad.setValue(0);
+    for(int t=12100;t<=15100;t+=300) step(t,40);
+    assert(logged("holding resistance until cadence settles"));
+    rtConfig->watts.setTarget(150);           // app lowers the target while stopped
+    for(int t=15400;t<=16000;t+=300) step(t,30);
+    rtConfig->cad.setValue(40); step(16300,60);
+    assert(logged("needs less resistance; easing"));
+    const float eased=rtConfig->getTargetIncline();
+    assert(eased<hard);
+    for(int t=16600;t<=17800;t+=300) { rtConfig->cad.setValue(60+(t-16600)/60); step(t,90); assert(rtConfig->getTargetIncline()<=eased); }
+  } else if(scenario=="spinup_target_change_during_hold") {
+    // A new target during the hold is not applied as an increase until the hold ends; then one seek.
+    beginSeek(); step(2000,198); rtConfig->cad.setValue(0);
+    for(int t=2100;t<=4800;t+=300) step(t,30);
+    const float held=rtConfig->getTargetIncline(); table.lookupResult=12000;
+    rtConfig->cad.setValue(85); step(4900,100);
+    rtConfig->watts.setTarget(250);
+    for(int t=5200;t<=6700;t+=300) { step(t,100); assert(rtConfig->getTargetIncline()<=held); }
+    for(int t=7000;t<=8200;t+=300) step(t,100);
+    assert(logged("Spin-up complete at 85 rpm (stable); seeking target 250w"));
+    assert(rtConfig->getTargetIncline()>held);
+  } else if(scenario=="spinup_mode_reset") {
+    // Leaving ERG clears an armed hold.
+    beginSeek(); step(2000,198); rtConfig->cad.setValue(0);
+    for(int t=2100;t<=4800;t+=300) step(t,30);
+    assert(logged("holding resistance until cadence settles"));
+    rtConfig->setFTMSMode(17); controller.prepareMode(); step(4900,30);
+    rtConfig->setFTMSMode(5); controller.prepareMode(); rtConfig->watts.setTarget(310);
+    rtConfig->cad.setValue(85); table.lookupResult=12000; logs.clear();
+    step(5000,150); step(5300,150);
+    assert(!logged("Spin-up complete"));
+    assert(rtConfig->getTargetIncline()>11866);
+  } else if(scenario=="stepped_feedback_gate") {
+    // 0001/0002 act only with fresh resistance-level feedback (Grupetto). Same ride, with and without it:
+    // a small (6 W) steady error is held for ERG_STEPPED_PERSIST_MS with feedback and corrected without it;
+    // feedback older than ERG_STEPPED_FEEDBACK_MAX_AGE_MS reverts to the ordinary behaviour.
+    float moved[3]={0,0,0};
+    for(int run=0;run<3;++run) {
+      logs.clear(); setup(305,310); rtConfig->cad.setValue(94);
+      auto feed=[&](uint32_t t){ if(run==1 || (run==2 && t<20000)) { clockMs=t; rtConfig->resistance.setValue(45,false); } };
+      for(uint32_t t=1000;t<=20000;t+=1000) { feed(t); step(t,310); }
+      for(uint32_t t=20300;t<=24000;t+=300) { feed(t); step(t,310); }     // run 2: feedback now stale (>3 s)
+      const float before=rtConfig->getTargetIncline();
+      feed(24300); step(24300,304); feed(24600); step(24600,304);
+      moved[run]=rtConfig->getTargetIncline()-before;
+    }
+    printf("stepped_feedback_gate: move without %.1f, with %.1f, stale %.1f\n",moved[0],moved[1],moved[2]); fflush(stdout);
+    assert(moved[1]==0);
+    assert(moved[0]==moved[2]);
   } else if(scenario=="mode_change") {
     setup(); controller.prepareMode(); step(1000,196); step(2000,198);
     rtConfig->setFTMSMode(17); controller.prepareMode(); step(2100,198);
@@ -1688,7 +1803,9 @@ class TestErgFeedback(unittest.TestCase):
 
     def test_production_erg_feedback_wait(self):
         for scenario in ["ride_handoff", "crossing_and_safety", "reduction_safety", "worsening_reduction", "ordinary_reduction",
-                         "new_target", "cadence_stop",
+                         "new_target", "cadence_stop", "cadence_coast_step", "cadence_stop_real", "spinup_noisy_cadence",
+                         "spinup_timeout", "spinup_power_trend", "spinup_lower_target", "spinup_target_change_during_hold",
+                         "spinup_mode_reset", "stepped_feedback_gate",
                          "mode_change", "missing_feedback", "movement_timeout", "no_table", "pid_no_wait_decrease", "small_error",
                          "clamped_move", "clock_wrap", "trusted_seek", "trusted_seek_late_uptime", "simulation_1000", "simulation_2000", "simulation_3000",
                          "simulation_missing_2000", "trust_transients", "stale_seek", "seek_deadline", "sparse_seventy", "extrapolated_cadence",

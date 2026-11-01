@@ -100,6 +100,22 @@ class ErgMode {
   uint32_t confidenceSettledAt      = 0;
   int32_t confidencePosition        = 0;
   int cadenceReference              = 0;
+  // Spin-up after a real stop (see ERG_SPINUP_* in ERG_Mode_Settings.h).
+  uint32_t spinUpLowSince  = 0;      // first report at or below MIN_ERG_CADENCE in the current low run (0: none)
+  bool spinUpArmed         = false;  // a real stop was seen; hold increases until cadence settles
+  uint32_t spinUpSince     = 0;      // when cadence first rose above MIN_ERG_CADENCE after the stop (0: not yet)
+  bool spinUpEased         = false;  // the one-time reduction toward a lower restored target was considered
+  bool spinUpSeekPending   = false;  // the hold ended; force one setpoint seek once no seek/wait is active
+  double spinUpRidingCadence = 0;    // ~5 s average of riding cadence, frozen during stops (for easing off)
+  uint32_t spinUpRidingAt    = 0;
+  static constexpr int SPIN_UP_SAMPLES = 32;
+  uint32_t spinUpSampleAt[SPIN_UP_SAMPLES] = {};
+  int spinUpSampleCadence[SPIN_UP_SAMPLES] = {};
+  int spinUpSampleCount = 0, spinUpSampleNext = 0;
+  bool _spinUpHold(uint32_t now);
+  void _resetSpinUp();
+  bool _spinUpCadenceSettled(uint32_t now, int cadence);
+  void _spinUpEase(int cadence);
   uint32_t tableSeekStartedAt       = 0;
   int32_t tableSeekOffset           = 0;
   uint32_t tableSeekArrivedAt       = 0;

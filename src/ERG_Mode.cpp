@@ -55,6 +55,7 @@ void ErgMode::prepareMode() {
   offsetSettledAt = offsetPosition = offsetCadence = 0;
   feedbackEarlyRetreatTarget              = INT32_MIN;
   feedbackUpdateValid                     = false;
+  _resetSpinUp();
   prevWatts.setTarget(0);
   ergTimer = millis();
   if (active) {
@@ -166,8 +167,17 @@ void ErgMode::runERG() {
   // correction frequency, independently of table housekeeping.
   const auto powerSample    = rtConfig->watts.getValueSample();
   const bool newPowerSample = prevWatts.getValueSample().timestamp != powerSample.timestamp;
+  // Spin-up after a real stop: do not add resistance while the rider's cadence is still rising. Easing off is
+  // still allowed. Riding without a stop of ERG_SPINUP_STOP_MS never arms this.
+  const bool spinUpHold     = _spinUpHold(static_cast<uint32_t>(millis())) && powerSample.value < rtConfig->watts.getTarget();
+  // After the hold, seek once at the settled cadence. Applied here, once no seek or feedback wait is active, so a
+  // wait that ends (and records prevWatts) cannot erase it.
+  if (spinUpSeekPending && !spinUpHold && !isTableSeeking() && !feedbackWaiting) {
+    spinUpSeekPending = false;
+    prevWatts.setTarget(0);
+  }
   const bool targetChanged  = prevWatts.getTarget() != rtConfig->watts.getTarget();
-  if (rtConfig->cad.getValue() > MIN_ERG_CADENCE / 2 && (newPowerSample || targetChanged) && rtConfig->getFTMSMode() == FitnessMachineControlPointProcedure::SetTargetPower &&
+  if (!spinUpHold && rtConfig->cad.getValue() > MIN_ERG_CADENCE / 2 && (newPowerSample || targetChanged) && rtConfig->getFTMSMode() == FitnessMachineControlPointProcedure::SetTargetPower &&
       (spinBLEClient.connectedPM || rtConfig->watts.getTarget() || rtConfig->watts.getSimulate()) && !isTableSeeking() && !feedbackWaiting) {
     computeErg();
   }
@@ -1017,6 +1027,97 @@ bool ErgMode::_steppedHold(int measuredError) {
     steppedErrorSince = now;
   }
   if (now - steppedErrorSince < ERG_STEPPED_PERSIST_MS) return true;
+  return false;
+}
+
+void ErgMode::_resetSpinUp() {
+  spinUpLowSince = spinUpSince = spinUpRidingAt = 0;
+  spinUpRidingCadence = 0;
+  spinUpArmed = spinUpEased = spinUpSeekPending = false;
+  spinUpSampleCount = spinUpSampleNext = 0;
+}
+
+// Rolling stability: every cadence report of the last ERG_SPINUP_STABLE_MS lies within ERG_SPINUP_CADENCE_RANGE_RPM,
+// and the window is full (the rider has been above MIN_ERG_CADENCE that long).
+bool ErgMode::_spinUpCadenceSettled(uint32_t now, int cadence) {
+  const int last = (spinUpSampleNext + SPIN_UP_SAMPLES - 1) % SPIN_UP_SAMPLES;
+  if (spinUpSampleCount == 0 || now - spinUpSampleAt[last] >= ERG_SPINUP_SAMPLE_MS) {
+    spinUpSampleAt[spinUpSampleNext]      = now;
+    spinUpSampleCadence[spinUpSampleNext] = cadence;
+    spinUpSampleNext                      = (spinUpSampleNext + 1) % SPIN_UP_SAMPLES;
+    if (spinUpSampleCount < SPIN_UP_SAMPLES) ++spinUpSampleCount;
+  }
+  if (now - spinUpSince < ERG_SPINUP_STABLE_MS) return false;
+  int low = cadence, high = cadence;
+  for (int i = 0; i < spinUpSampleCount; ++i) {
+    if (now - spinUpSampleAt[i] > ERG_SPINUP_STABLE_MS) continue;
+    low  = std::min(low, spinUpSampleCadence[i]);
+    high = std::max(high, spinUpSampleCadence[i]);
+  }
+  return high - low <= ERG_SPINUP_CADENCE_RANGE_RPM;
+}
+
+// Once per hold: if the restored target needs less resistance than the knob holds (e.g. the app lowered the target
+// while the rider was stopped), move straight to the table position for the new target at the rider's pre-stop
+// cadence (or the current one, if higher). Higher cadence means less resistance, so this can only ease off.
+void ErgMode::_spinUpEase(int cadence) {
+  spinUpEased = true;
+  // _tableHasSeekSupport() judges the current (spin-up) cadence; the lookup below is at the riding cadence instead
+  // and returns RETURN_ERROR without table support there. A lower position only ever eases off.
+  if (!rtConfig->getHomed() || isTableSeeking() || feedbackWaiting) return;
+  const int target = rtConfig->watts.getTarget();
+  const int easeCadence = std::max(cadence, static_cast<int>(spinUpRidingCadence));
+  if (target <= 0 || easeCadence <= MIN_ERG_CADENCE) return;
+  const int32_t position = _constrainedTablePosition(target, easeCadence);
+  if (position == RETURN_ERROR || position <= rtConfig->getMinStep() || position >= ss2k->getCurrentPosition() - ERG_TABLE_SETTLED_POSITION_STEPS) {
+    SS2K_LOG(ERG_MODE_LOG_TAG, "Spin-up: no easing for %dw at %d rpm (table %ld, knob %ld)", target, easeCadence, static_cast<long>(position),
+             static_cast<long>(ss2k->getCurrentPosition()));
+    return;
+  }
+  SS2K_LOG(ERG_MODE_LOG_TAG, "Spin-up: target %dw needs less resistance; easing to %ld at %d rpm", target, static_cast<long>(position), easeCadence);
+  mode = Mode::DECREASING;
+  _updateValues(static_cast<float>(position));
+}
+
+// Tracks stops and spin-ups; true while ERG should not add resistance. When the hold ends, one setpoint seek at the
+// settled cadence is queued (spinUpSeekPending, applied in runERG).
+bool ErgMode::_spinUpHold(uint32_t now) {
+  const int cadence = rtConfig->cad.getValue();
+  if (rtConfig->getFTMSMode() != FitnessMachineControlPointProcedure::SetTargetPower) {
+    _resetSpinUp();
+    return false;
+  }
+  if (cadence <= MIN_ERG_CADENCE) {
+    if (spinUpLowSince == 0) spinUpLowSince = now == 0 ? 1 : now;
+    if (!spinUpArmed && now - spinUpLowSince >= ERG_SPINUP_STOP_MS) {
+      spinUpArmed       = true;
+      spinUpEased       = false;
+      spinUpSeekPending = false;
+      SS2K_LOG(ERG_MODE_LOG_TAG, "Stopped for %lums; holding resistance until cadence settles", static_cast<unsigned long>(now - spinUpLowSince));
+    }
+    spinUpSince       = 0;  // a renewed stop restarts the spin-up
+    spinUpSampleCount = spinUpSampleNext = 0;
+    return spinUpArmed;
+  }
+  spinUpLowSince = 0;
+  if (!spinUpArmed) {
+    // Track the riding cadence (~5 s average) so a later spin-up can ease off at the cadence the rider will return to.
+    const double dt = spinUpRidingAt == 0 ? 0 : std::min(1.0, (now - spinUpRidingAt) / 1000.0);
+    spinUpRidingCadence = spinUpRidingAt == 0 ? cadence : spinUpRidingCadence + dt / (5.0 + dt) * (cadence - spinUpRidingCadence);
+    spinUpRidingAt      = now == 0 ? 1 : now;
+    return false;
+  }
+  if (spinUpSince == 0) spinUpSince = now == 0 ? 1 : now;
+  if (!spinUpEased && rtConfig->watts.getTarget() != userConfig->getMinWatts()) _spinUpEase(cadence);
+  const bool settled = _spinUpCadenceSettled(now, cadence) && std::abs(responseTrend) < ERG_SPINUP_TREND_WPS;
+  const bool expired = now - spinUpSince >= ERG_SPINUP_MAX_MS;
+  if (!settled && !expired) return true;
+  spinUpArmed       = false;
+  spinUpSince       = 0;
+  spinUpSeekPending = true;
+  // The spin-up's rising power is not a response to a move: do not let it brake the seek.
+  responseTrend = responsePreviousTrend = 0;
+  SS2K_LOG(ERG_MODE_LOG_TAG, "Spin-up complete at %d rpm (%s); seeking target %dw", cadence, settled ? "stable" : "timeout", rtConfig->watts.getTarget());
   return false;
 }
 

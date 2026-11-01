@@ -93,6 +93,23 @@ constexpr int ERG_FEEDBACK_WORSENING_WATTS = 25;
 constexpr int ERG_TABLE_CORRECTION_WATTS = 44;
 // Cadence change from the last reference that can start a trusted maintenance seek; in-flight seeks track smaller changes too.
 constexpr int ERG_TABLE_CADENCE_SEEK_RPM = POWERTABLE_CAD_INCREMENT;
+// Spin-up after a real stop. A seek sized for the rising 20-60 rpm spin-up cadence overshoots once the rider
+// reaches their normal cadence (simulated restart at 165 W: 332-339 W peak), so after a stop ERG does not add
+// resistance until cadence has settled, then seeks once at the settled cadence. Easing off toward a lower
+// restored target is still allowed.
+// A stop is cadence at or below MIN_ERG_CADENCE for this long: brief coasts and single zero-cadence reports
+// (common from crank meters and Grupetto) must not freeze ERG mid-ride.
+constexpr uint32_t ERG_SPINUP_STOP_MS = 2500;
+// The hold ends once the cadence reports of the last ERG_SPINUP_STABLE_MS all lie within ERG_SPINUP_CADENCE_RANGE_RPM
+// of each other (a rolling window, so steady jitter of +-4 RPM still settles) and power has stopped rising with the
+// spin-up (|trend| below ERG_SPINUP_TREND_WPS), so the seek is not braked by the spin-up's own power trend,
+constexpr uint32_t ERG_SPINUP_STABLE_MS = 2000;
+constexpr int ERG_SPINUP_CADENCE_RANGE_RPM = 8;
+constexpr double ERG_SPINUP_TREND_WPS = 2.0;
+// or at the latest this long after cadence first rose above MIN_ERG_CADENCE.
+constexpr uint32_t ERG_SPINUP_MAX_MS = 6000;
+// Minimum spacing of the cadence samples kept for the rolling stability window.
+constexpr uint32_t ERG_SPINUP_SAMPLE_MS = 100;
 // Cadence change from the reference before a trusted seek or proportional feedback compensates; smaller changes accumulate.
 // Keeps 1 RPM sensor/rider jitter from moving the motor.
 constexpr int ERG_CADENCE_FOLLOW_DEADBAND_RPM = 2;
