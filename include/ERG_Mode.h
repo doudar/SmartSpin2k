@@ -33,6 +33,7 @@ class ErgMode {
   void resetTableConfidence() {
     tableConfidence.reset();
     tableSeekState               = TableSeekState::INACTIVE;
+    tableSeekDropCadence         = false;
     tableSeekFirstArrivalValid   = false;
     tableSeekHadHighTarget       = false;
     mode                         = Mode::MAINTAIN;
@@ -148,6 +149,13 @@ class ErgMode {
   uint32_t steppedErrorSince        = 0;
   bool _steppedHold(int measuredError);
   bool _hasSteppedFeedback() const;
+  // Recovery drops with stepped feedback are sized at the rider's held cadence (ERG_STEPPED_DROP_CADENCE_ALLOWANCE_RPM).
+  ErgControl::CadenceHistory cadenceHistory;
+  int historyTarget         = 0;
+  uint32_t historySettledAt = 0;     // when power last came within ERG_STEPPED_IMMEDIATE_WATTS of historyTarget (0: not)
+  bool tableSeekDropCadence = false; // the active seek used a held cadence below the rider's current cadence
+  void _recordCadenceHistory(bool holding);
+  int _dropSeekCadence(int target, int cadence, const char*& source);
 
   // calculate incline if setpoint (from Zwift) changes
   int32_t _setPointChangeState();
@@ -167,7 +175,7 @@ class ErgMode {
   bool _tableTargetIsUsable(int watts, int cadence) const;
   int32_t _constrainedTablePosition(int watts, int cadence) const;
   void _scoreTable(int watts, int cadence, bool accurate);
-  void _startTrustedTableSeek(int32_t position);
+  void _startTrustedTableSeek(int32_t position, int seekCadence = -1);
   void _handleTrustedTableSeek();
   void _stopTrustedTableSeek(const char* reason, bool seedPidFromTable = false, bool acquireFeedback = false);
   unsigned long _trustedTableMoveDeadline(int32_t position) const;

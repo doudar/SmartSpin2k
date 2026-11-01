@@ -142,6 +142,24 @@ constexpr int ERG_STEPPED_IMMEDIATE_WATTS = 10;
 constexpr uint32_t ERG_STEPPED_PERSIST_MS = 1500;
 // Resistance feedback older than this does not enable the hold.
 constexpr uint32_t ERG_STEPPED_FEEDBACK_MAX_AGE_MS = 3000;
+// Recovery drops with stepped feedback: size the drop at the cadence the rider held at about the new target
+// (or the typical recent cadence), not the effort's still-elevated cadence. Riders settle back from a hard
+// effort's 95-101 RPM to 88-90 RPM within seconds; a drop sized at the effort cadence left the brake a level or
+// two light and dipped power 15-20 W below the recovery target. The remembered cadence is floored at the current
+// cadence minus this allowance, so a slow warm-up cadence cannot size a heavy "drop" for a rider now spinning fast.
+constexpr int ERG_STEPPED_DROP_CADENCE_ALLOWANCE_RPM = 8;
+// Spacing and memory of the cadence history (2 s samples, 10 minutes).
+constexpr uint32_t ERG_STEPPED_HISTORY_SAMPLE_MS = 2000;
+constexpr uint32_t ERG_STEPPED_HISTORY_MEMORY_MS = 600000;
+// A held cadence needs this many settled samples within 10% of the new target (16 s).
+constexpr int ERG_STEPPED_HELD_MIN_SAMPLES = 8;
+// The typical cadence is the median of the last two minutes and needs this many samples (50 s).
+constexpr uint32_t ERG_STEPPED_TYPICAL_WINDOW_MS = 120000;
+constexpr int ERG_STEPPED_TYPICAL_MIN_SAMPLES = 25;
+// Samples below this cadence are ignored (stops, spin-ups).
+constexpr int ERG_STEPPED_HISTORY_MIN_CADENCE = 50;
+// A target counts as settled for the held-cadence history after this long within ERG_STEPPED_IMMEDIATE_WATTS.
+constexpr uint32_t ERG_STEPPED_HISTORY_SETTLE_MS = 4500;
 // ******************************************************************************
 
 namespace ErgControl {

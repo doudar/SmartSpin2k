@@ -327,4 +327,52 @@ inline double clampGain(double gain, double sensitivity) {
   return std::max(minimumGain, std::min(gain, maximumGain));
 }
 
+// Cadence history for sizing recovery drops on stepped-resistance bikes (see ERG_STEPPED_DROP_CADENCE_ALLOWANCE_RPM).
+// Fixed-size ring of 2 s samples; a sample carries the settled target watts, or 0 when ERG was not settled.
+class CadenceHistory {
+ public:
+  static constexpr int CAPACITY = static_cast<int>(ERG_STEPPED_HISTORY_MEMORY_MS / ERG_STEPPED_HISTORY_SAMPLE_MS);
+
+  void clear() { count = next = 0; }
+
+  void record(uint32_t now, int cadence, int settledWatts) {
+    if (cadence < ERG_STEPPED_HISTORY_MIN_CADENCE || cadence > 255) return;
+    if (count > 0 && now - time[(next + CAPACITY - 1) % CAPACITY] < ERG_STEPPED_HISTORY_SAMPLE_MS) return;
+    time[next]    = now;
+    rpm[next]     = static_cast<uint8_t>(cadence);
+    watts[next]   = static_cast<uint16_t>(std::max(0, std::min(settledWatts, 65535)));
+    next          = (next + 1) % CAPACITY;
+    if (count < CAPACITY) ++count;
+  }
+
+  // Median cadence held while settled within 10% of watts in the last ten minutes, or -1.
+  int cadenceAt(int targetWatts, uint32_t now) const {
+    return _median(now, ERG_STEPPED_HISTORY_MEMORY_MS, targetWatts, ERG_STEPPED_HELD_MIN_SAMPLES);
+  }
+
+  // Median cadence of the last two minutes, or -1.
+  int typicalCadence(uint32_t now) const { return _median(now, ERG_STEPPED_TYPICAL_WINDOW_MS, 0, ERG_STEPPED_TYPICAL_MIN_SAMPLES); }
+
+ private:
+  uint32_t time[CAPACITY] = {};
+  uint8_t rpm[CAPACITY]   = {};
+  uint16_t watts[CAPACITY] = {};
+  // Median scratch space. Kept with the (heap-allocated) controller, not on the small maintenance-task stack.
+  mutable uint8_t values[CAPACITY] = {};
+  int count = 0, next = 0;
+
+  int _median(uint32_t now, uint32_t window, int targetWatts, int minimum) const {
+    int n = 0;
+    for (int k = 0; k < count; ++k) {
+      const int index = (next + CAPACITY - 1 - k) % CAPACITY;
+      if (now - time[index] > window) break;  // newest first; older entries are older still
+      if (targetWatts > 0 && (watts[index] == 0 || std::abs(static_cast<int>(watts[index]) - targetWatts) * 10 > targetWatts)) continue;
+      values[n++] = rpm[index];
+    }
+    if (n < minimum) return -1;
+    std::sort(values, values + n);
+    return n % 2 ? values[n / 2] : (values[n / 2 - 1] + values[n / 2] + 1) / 2;
+  }
+};
+
 }  // namespace ErgControl

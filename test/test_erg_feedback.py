@@ -1270,6 +1270,45 @@ int main(int argc,char** argv) {
     printf("stepped_feedback_gate: move without %.1f, with %.1f, stale %.1f\n",moved[0],moved[1],moved[2]); fflush(stdout);
     assert(moved[1]==0);
     assert(moved[0]==moved[2]);
+  } else if(scenario=="stepped_drop_cadence") {
+    // 0004: with fresh Grupetto feedback a recovery drop is sized at the cadence the rider held at the recovery
+    // target (89 rpm), not the effort's 97 rpm, and the seek does not follow the elevated cadence while it settles.
+    // Run 2 rides the effort at 105 rpm: the held 89 rpm is floored at 105-8 = 97 rpm. Without feedback (run 0)
+    // the drop is sized at the current cadence exactly as before.
+    int drop[3]={0,0,0}, lowest[3]={0,0,0};
+    for(int run=0;run<3;++run) {
+      const uint32_t o=1000000u*run;
+      logs.clear(); clockMs=o+100; controller.resetTableConfidence(); controller.prepareMode(); setup(155,155); userConfig->setERGSensitivity(3);
+      table.sloped=true; table.cadenceSlope=-100; table.lookupResult=motor.current-500;   // lookup(155, 89 rpm) = motor
+      const bool feedback=run!=0;
+      const int effort=run==2?105:97;
+      auto feed=[&](uint32_t t){ if(feedback) { clockMs=t; rtConfig->resistance.setValue(40,false); } };
+      rtConfig->cad.setValue(89);
+      for(uint32_t t=1000;t<=61000;t+=1000) { feed(o+t); step(o+t,155); }
+      assert(logged("now trusted"));
+      rtConfig->cad.setValue(effort); rtConfig->watts.setTarget(300);
+      for(uint32_t t=62000;t<=92000;t+=1000) { feed(o+t); step(o+t,t==62000?155:300); }
+      assert(!controller.isTableSeeking());
+      const int before=motor.current, atEffort=table.lookup(300,effort);
+      const int used=table.lookup(155,feedback?(run==2?97:89):effort);
+      rtConfig->watts.setTarget(155); feed(o+93000); step(o+93000,300,false);
+      drop[run]=rtConfig->getTargetIncline();
+      // The seek may anchor on the present observation; either way only the sizing cadence differs between runs.
+      assert(drop[run]==used || drop[run]==before+used-atEffort);
+      assert(controller.isTableSeeking());
+      lowest[run]=drop[run];
+      for(int k=0;k<6;++k) {
+        const uint32_t t=o+93300+k*300; rtConfig->cad.setValue(effort-k); feed(t); step(t,250-k*15);
+        lowest[run]=std::min(lowest[run],static_cast<int>(rtConfig->getTargetIncline()));
+      }
+      if(feedback) {
+        assert(logged(run==1?"Recovery drop sized at held cadence 89rpm (rider now 97rpm)":"Recovery drop sized at floored cadence 97rpm (rider now 105rpm)"));
+        assert(lowest[run]==drop[run]);   // no follow toward the effort cadence's lighter position
+      } else {
+        assert(!logged("Recovery drop sized"));
+      }
+    }
+    printf("stepped_drop_cadence: drop without %d, held %d, floored %d (lowest %d/%d/%d)\n",drop[0],drop[1],drop[2],lowest[0],lowest[1],lowest[2]); fflush(stdout);
   } else if(scenario=="mode_change") {
     setup(); controller.prepareMode(); step(1000,196); step(2000,198);
     rtConfig->setFTMSMode(17); controller.prepareMode(); step(2100,198);
@@ -1805,7 +1844,7 @@ class TestErgFeedback(unittest.TestCase):
         for scenario in ["ride_handoff", "crossing_and_safety", "reduction_safety", "worsening_reduction", "ordinary_reduction",
                          "new_target", "cadence_stop", "cadence_coast_step", "cadence_stop_real", "spinup_noisy_cadence",
                          "spinup_timeout", "spinup_power_trend", "spinup_lower_target", "spinup_target_change_during_hold",
-                         "spinup_mode_reset", "stepped_feedback_gate",
+                         "spinup_mode_reset", "stepped_feedback_gate", "stepped_drop_cadence",
                          "mode_change", "missing_feedback", "movement_timeout", "no_table", "pid_no_wait_decrease", "small_error",
                          "clamped_move", "clock_wrap", "trusted_seek", "trusted_seek_late_uptime", "simulation_1000", "simulation_2000", "simulation_3000",
                          "simulation_missing_2000", "trust_transients", "stale_seek", "seek_deadline", "sparse_seventy", "extrapolated_cadence",

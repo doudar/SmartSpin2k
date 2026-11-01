@@ -56,6 +56,8 @@ void ErgMode::prepareMode() {
   feedbackEarlyRetreatTarget              = INT32_MIN;
   feedbackUpdateValid                     = false;
   _resetSpinUp();
+  tableSeekDropCadence = false;
+  historySettledAt     = 0;
   prevWatts.setTarget(0);
   ergTimer = millis();
   if (active) {
@@ -176,6 +178,7 @@ void ErgMode::runERG() {
     spinUpSeekPending = false;
     prevWatts.setTarget(0);
   }
+  _recordCadenceHistory(spinUpHold);
   const bool targetChanged  = prevWatts.getTarget() != rtConfig->watts.getTarget();
   if (!spinUpHold && rtConfig->cad.getValue() > MIN_ERG_CADENCE / 2 && (newPowerSample || targetChanged) && rtConfig->getFTMSMode() == FitnessMachineControlPointProcedure::SetTargetPower &&
       (spinBLEClient.connectedPM || rtConfig->watts.getTarget() || rtConfig->watts.getSimulate()) && !isTableSeeking() && !feedbackWaiting) {
@@ -328,10 +331,13 @@ int32_t ErgMode::_setPointChangeState() {
     // coverage. Approach the near side of the power window there and let
     // measured feedback finish the transition. Retain ordinary table seeks
     // when the cadence-curve estimate is unavailable.
-    const bool extrapolatedCurve = !_tableTargetIsWithinMeasuredBounds(currentTarget, currentCadence) &&
-                                   ErgControl::constrainedTablePosition(powerTable->ptData, currentTarget, currentCadence) != RETURN_ERROR;
+    // A stepped-feedback recovery drop is sized at the cadence the rider will settle back to.
+    const char* cadenceSource    = "current";
+    const int seekCadence        = _dropSeekCadence(currentTarget, currentCadence, cadenceSource);
+    const bool extrapolatedCurve = !_tableTargetIsWithinMeasuredBounds(currentTarget, seekCadence) &&
+                                   ErgControl::constrainedTablePosition(powerTable->ptData, currentTarget, seekCadence) != RETURN_ERROR;
     const int seekWatts          = currentTarget + (extrapolatedCurve ? (mode == Mode::INCREASING ? -ERG_MODE_PID_WINDOW : ERG_MODE_PID_WINDOW) : 0);
-    int32_t tableResult          = _constrainedTablePosition(seekWatts, currentCadence);
+    int32_t tableResult          = _constrainedTablePosition(seekWatts, seekCadence);
     // Preserve the local feedback offset for a large step only when the
     // present power/cadence observation is quiet and the motor has stopped.
     if (tableResult != RETURN_ERROR && abs(currentTarget - prevWatts.getTarget()) > ERG_TABLE_CORRECTION_WATTS && !ss2k->stepperIsRunning &&
@@ -359,7 +365,10 @@ int32_t ErgMode::_setPointChangeState() {
     const bool insideTravel      = tableResult > rtConfig->getMinStep() && tableResult < rtConfig->getMaxStep();
     const bool movesTowardTarget = (mode == Mode::INCREASING && tableResult > ss2k->getCurrentPosition()) || (mode == Mode::DECREASING && tableResult < ss2k->getCurrentPosition());
     if (tableResult != RETURN_ERROR && tableResult >= 0 && insideTravel && movesTowardTarget) {
-      _startTrustedTableSeek(tableResult);
+      if (seekCadence != currentCadence) {
+        SS2K_LOG(ERG_MODE_LOG_TAG, "Recovery drop sized at %s cadence %drpm (rider now %drpm)", cadenceSource, seekCadence, currentCadence);
+      }
+      _startTrustedTableSeek(tableResult, seekCadence);
       return tableResult;
     }
     SS2K_LOG(ERG_MODE_LOG_TAG, "Trusted table result was unusable at %dw/%drpm; using conservative seek", currentTarget, currentCadence);
@@ -623,7 +632,7 @@ unsigned long ErgMode::_trustedTableMoveDeadline(int32_t position) const {
   return millis() + estimatedMove + ERG_TABLE_SETTLE_TIMEOUT_MS;
 }
 
-void ErgMode::_startTrustedTableSeek(int32_t position) {
+void ErgMode::_startTrustedTableSeek(int32_t position, int seekCadence) {
   boundedSeekTransition = true;
   tableCorrectionNeedsProgress = true;
   if (!isTableSeeking() && !feedbackWaiting) controlMinimum = controlMaximum = ss2k->getCurrentPosition();
@@ -631,7 +640,8 @@ void ErgMode::_startTrustedTableSeek(int32_t position) {
   tableSeekState             = TableSeekState::MOVING;
   tableSeekTargetWatts       = rtConfig->watts.getTarget();
   tableSeekHadHighTarget     = tableSeekTargetWatts > ErgControl::HIGH_GAIN_WATTS;
-  tableSeekCadence           = rtConfig->cad.getValue();
+  tableSeekCadence           = seekCadence > 0 ? seekCadence : rtConfig->cad.getValue();
+  tableSeekDropCadence       = tableSeekCadence < rtConfig->cad.getValue();
   tableSeekPosition          = position;
   tableSeekLastWatts         = INT32_MIN;
   tableSeekStableMatches     = 0;
@@ -671,6 +681,7 @@ void ErgMode::_stopTrustedTableSeek(const char* reason, bool seedPidFromTable, b
   tableSeekPidSeedValid    = seedPidFromTable;
   tableSeekPidSeedPosition = tableSeekPosition;
   tableSeekState           = TableSeekState::INACTIVE;
+  tableSeekDropCadence     = false;
   tableSeekStableMatches   = 0;
   tableSeekStableMisses    = 0;
   tableSeekLastWatts       = INT32_MIN;
@@ -734,7 +745,10 @@ void ErgMode::_handleTrustedTableSeek() {
   // not move the motor while a slow drift is still followed. Power measured
   // while the motor is moving can lag the new cadence and position; it must
   // not turn a valid feed-forward adjustment into a PID handoff.
-  if (targetAmended || abs(cadence - tableSeekCadence) >= ERG_CADENCE_FOLLOW_DEADBAND_RPM) {
+  // A drop sized at the held cadence does not follow the effort's elevated cadence while the rider settles
+  // back toward it; once cadence reaches the held cadence the seek follows cadence as usual.
+  if (tableSeekDropCadence && (targetAmended || cadence <= tableSeekCadence)) tableSeekDropCadence = false;
+  if (!tableSeekDropCadence && (targetAmended || abs(cadence - tableSeekCadence) >= ERG_CADENCE_FOLLOW_DEADBAND_RPM)) {
     if (!_tableTargetIsTrusted(tableSeekTargetWatts, cadence)) {
       _stopTrustedTableSeek("cadence lookup is no longer usable", true, true);
       return;
@@ -1006,6 +1020,57 @@ bool ErgMode::_hasSteppedFeedback() const {
   const auto resistance = rtConfig->resistance.getValueSample();
   return !resistance.simulate && resistance.timestamp != 0 && resistance.value > 0 &&
          static_cast<uint32_t>(millis()) - resistance.timestamp <= ERG_STEPPED_FEEDBACK_MAX_AGE_MS;
+}
+
+// Keep the rider's cadence history for sizing recovery drops. Samples are marked settled once power has stayed
+// within ERG_STEPPED_IMMEDIATE_WATTS of an unchanged target for ERG_STEPPED_HISTORY_SETTLE_MS outside any seek,
+// feedback wait or spin-up hold.
+void ErgMode::_recordCadenceHistory(bool holding) {
+  const uint32_t now = millis();
+  const int target   = rtConfig->watts.getTarget();
+  const bool erg     = rtConfig->getFTMSMode() == FitnessMachineControlPointProcedure::SetTargetPower;
+  if (!erg || !_hasSteppedFeedback()) {
+    historySettledAt = 0;
+    return;
+  }
+  const bool near = target > 0 && abs(rtConfig->watts.getValue() - target) < ERG_STEPPED_IMMEDIATE_WATTS;
+  if (target != historyTarget || !near || holding || isTableSeeking() || feedbackWaiting) {
+    historyTarget    = target;
+    historySettledAt = near && !holding && !isTableSeeking() && !feedbackWaiting ? now : 0;
+  } else if (historySettledAt == 0) {
+    historySettledAt = now;
+  }
+  const bool settled = historySettledAt != 0 && now - historySettledAt >= ERG_STEPPED_HISTORY_SETTLE_MS;
+  cadenceHistory.record(now, rtConfig->cad.getValue(), settled ? target : 0);
+}
+
+// The cadence used to size a table seek. Only a real easing-off with fresh stepped feedback changes it: a lower
+// target than before, with measured power still above it. Then the held (or typical) cadence is used, floored at
+// the current cadence minus ERG_STEPPED_DROP_CADENCE_ALLOWANCE_RPM. Otherwise, and on other bikes, the current cadence.
+int ErgMode::_dropSeekCadence(int target, int cadence, const char*& source) {
+  source               = "current";
+  const int previous   = prevWatts.getTarget();
+  if (!_hasSteppedFeedback() || previous <= 0 || target >= previous || rtConfig->watts.getValue() <= target) return cadence;
+  const uint32_t now = millis();
+  int remembered     = cadenceHistory.cadenceAt(target, now);
+  source             = "held";
+  if (remembered < 0) {
+    remembered = cadenceHistory.typicalCadence(now);
+    source     = "typical";
+  }
+  if (remembered < 0) {
+    source = "current";
+    return cadence;
+  }
+  const int floor = cadence - ERG_STEPPED_DROP_CADENCE_ALLOWANCE_RPM;
+  if (floor > remembered) source = "floored";
+  const int chosen = std::max(remembered, floor);
+  // Sizing at a higher cadence than the rider's would lighten the drop further; that is not this fix's job.
+  if (chosen >= cadence || !_tableTargetIsTrusted(target, chosen)) {
+    source = "current";
+    return cadence;
+  }
+  return chosen;
 }
 
 bool ErgMode::_steppedHold(int measuredError) {
