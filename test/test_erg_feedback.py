@@ -1271,17 +1271,21 @@ int main(int argc,char** argv) {
     assert(moved[1]==0);
     assert(moved[0]==moved[2]);
   } else if(scenario=="stepped_drop_cadence") {
-    // 0004: with fresh Grupetto feedback a recovery drop is sized at the cadence the rider held at the recovery
-    // target (89 rpm), not the effort's 97 rpm, and the seek does not follow the elevated cadence while it settles.
-    // Run 2 rides the effort at 105 rpm: the held 89 rpm is floored at 105-8 = 97 rpm. Without feedback (run 0)
-    // the drop is sized at the current cadence exactly as before.
-    int drop[3]={0,0,0}, lowest[3]={0,0,0};
-    for(int run=0;run<3;++run) {
+    // 0004/0005: with fresh Grupetto feedback a recovery drop is sized at the cadence the rider held at the recovery
+    // target (89 rpm), not the cadence at the drop, and the seek does not follow the rider's cadence while it moves
+    // toward the held cadence. Run 1: effort at 97 rpm -> held 89. Run 2: effort at 105 rpm -> floored at
+    // 105-15 = 90. Run 3: a low-cadence climb at 72 rpm -> held 89, above the current cadence. Without feedback
+    // (run 0) the drop is sized at the current cadence exactly as before.
+    const int efforts[4]={97,97,105,72}, sized[4]={97,89,90,89}, settleTo[4]={89,89,91,89};
+    const char* expectLog[4]={"","Recovery drop sized at held cadence 89rpm (rider now 97rpm)",
+                              "Recovery drop sized at floored cadence 90rpm (rider now 105rpm)","Recovery drop sized at held cadence 89rpm (rider now 72rpm)"};
+    int drop[4]={0,0,0,0};
+    for(int run=0;run<4;++run) {
       const uint32_t o=1000000u*run;
       logs.clear(); clockMs=o+100; controller.resetTableConfidence(); controller.prepareMode(); setup(155,155); userConfig->setERGSensitivity(3);
       table.sloped=true; table.cadenceSlope=-100; table.lookupResult=motor.current-500;   // lookup(155, 89 rpm) = motor
       const bool feedback=run!=0;
-      const int effort=run==2?105:97;
+      const int effort=efforts[run];
       auto feed=[&](uint32_t t){ if(feedback) { clockMs=t; rtConfig->resistance.setValue(40,false); } };
       rtConfig->cad.setValue(89);
       for(uint32_t t=1000;t<=61000;t+=1000) { feed(o+t); step(o+t,155); }
@@ -1289,26 +1293,113 @@ int main(int argc,char** argv) {
       rtConfig->cad.setValue(effort); rtConfig->watts.setTarget(300);
       for(uint32_t t=62000;t<=92000;t+=1000) { feed(o+t); step(o+t,t==62000?155:300); }
       assert(!controller.isTableSeeking());
-      const int before=motor.current, atEffort=table.lookup(300,effort);
-      const int used=table.lookup(155,feedback?(run==2?97:89):effort);
+      const int before=motor.current, atEffort=table.lookup(300,effort), used=table.lookup(155,sized[run]);
       rtConfig->watts.setTarget(155); feed(o+93000); step(o+93000,300,false);
       drop[run]=rtConfig->getTargetIncline();
       // The seek may anchor on the present observation; either way only the sizing cadence differs between runs.
       assert(drop[run]==used || drop[run]==before+used-atEffort);
       assert(controller.isTableSeeking());
-      lowest[run]=drop[run];
-      for(int k=0;k<6;++k) {
-        const uint32_t t=o+93300+k*300; rtConfig->cad.setValue(effort-k); feed(t); step(t,250-k*15);
-        lowest[run]=std::min(lowest[run],static_cast<int>(rtConfig->getTargetIncline()));
+      int lowest=drop[run], highest=drop[run];
+      for(int k=1;k<=6;++k) {
+        const uint32_t t=o+93000+k*300; rtConfig->cad.setValue(effort+(settleTo[run]-effort)*k/6); feed(t); step(t,250-k*15);
+        if(!controller.isTableSeeking()) break;   // after the seek, ordinary feedback owns the knob
+        lowest=std::min(lowest,static_cast<int>(rtConfig->getTargetIncline())); highest=std::max(highest,static_cast<int>(rtConfig->getTargetIncline()));
       }
       if(feedback) {
-        assert(logged(run==1?"Recovery drop sized at held cadence 89rpm (rider now 97rpm)":"Recovery drop sized at floored cadence 97rpm (rider now 105rpm)"));
-        assert(lowest[run]==drop[run]);   // no follow toward the effort cadence's lighter position
+        assert(logged(expectLog[run]));
+        assert(lowest==drop[run] && highest==drop[run]);   // the seek does not follow the rider toward the held cadence
       } else {
         assert(!logged("Recovery drop sized"));
       }
     }
-    printf("stepped_drop_cadence: drop without %d, held %d, floored %d (lowest %d/%d/%d)\n",drop[0],drop[1],drop[2],lowest[0],lowest[1],lowest[2]); fflush(stdout);
+    printf("stepped_drop_cadence: drop without %d, held %d, floored %d, after low-cadence climb %d\n",drop[0],drop[1],drop[2],drop[3]); fflush(stdout);
+  } else if(scenario=="brake_hold") {
+    // 0005: braking the flywheel from 88 rpm: the reported cadence only falls to ~48 rpm (never <= MIN_ERG_CADENCE
+    // for 2.5 s). ERG must not add resistance for the low cadence; once cadence settles again it seeks once.
+    setup(165,165); table.sloped=true; table.cadenceSlope=-100; table.lookupResult=motor.current+600;  // lookup(165, 88)
+    rtConfig->cad.setValue(88);
+    for(uint32_t t=1000;t<=20000;t+=500) step(t,165);
+    const float before=rtConfig->getTargetIncline();
+    const int cadences[]={60,48,48,48,48,66,82,86,88,88,88,88,88,88,88,88,88,88,88,88,88};
+    uint32_t t=20300; float highest=before;
+    for(int c:cadences) { rtConfig->cad.setValue(c); step(t,c<80?60:165); highest=std::max(highest,static_cast<float>(rtConfig->getTargetIncline())); t+=300; }
+    assert(logged("Cadence fell from 88 to"));
+    assert(logged("Spin-up complete at 88 rpm"));
+    printf("brake_hold: before %.0f, highest while braking %.0f\n",before,highest); fflush(stdout);
+    assert(highest<=before+ERG_MODE_PID_WINDOW);
+  } else if(scenario=="rv_low_cadence_drill") {
+    // Review: rider at 92 rpm drops to 60 rpm within ~1.5 s (low-cadence drill, standing climb) and stays there.
+    // Power is below target because the knob has not been turned up for the lower cadence.
+    setup(200,200); table.sloped=true; table.cadenceSlope=-100; table.lookupResult=motor.current-(200-155)*12-(92-94)*(-100);  // lookup(200,92)=motor
+    rtConfig->cad.setValue(92);
+    for(uint32_t t=1000;t<=20000;t+=500) step(t,200);
+    const float before=rtConfig->getTargetIncline();
+    printf("before %.0f lookup(200,60)=%d\n",before,table.lookup(200,60));
+    const int ramp[]={85,76,68,60};
+    uint32_t t=20300;
+    for(int c:ramp){ rtConfig->cad.setValue(c); step(t,180); t+=300; }
+    rtConfig->cad.setValue(60);
+    int completes=0, eases=0, fell=0; float lo=1e9, hi=-1e9; float prev=rtConfig->getTargetIncline(); int reversals=0; int dir=0;
+    for(;t<=80000;t+=300){ step(t,150);
+      const float p=rtConfig->getTargetIncline(); lo=std::min(lo,p); hi=std::max(hi,p);
+      int d = p>prev?1:p<prev?-1:0; if(d!=0 && dir!=0 && d!=dir) ++reversals; if(d!=0) dir=d; prev=p; }
+    for(const auto& e:logs){ if(e.find("Spin-up complete")!=std::string::npos) ++completes; if(e.find("easing to")!=std::string::npos) ++eases; if(e.find("Cadence fell from")!=std::string::npos) ++fell; }
+    printf("rv_low_cadence_drill: fell=%d completes=%d eases=%d reversals=%d knob lo %.0f hi %.0f final %.0f (before %.0f)\n",fell,completes,eases,reversals,lo,hi,rtConfig->getTargetIncline(),before); fflush(stdout);
+    for(const auto& e:logs) if(e.find("Spin-up")!=std::string::npos||e.find("Cadence fell")!=std::string::npos) printf("  LOG %s\n",e.c_str());
+    assert(fell<=1);          // the collapse must be detected at most once
+    assert(completes<=1);     // one hold, one seek
+    assert(reversals<=1);     // no oscillation of the knob
+  } else if(scenario=="rv_stop_then_slow_restart") {
+    // Review: a real stop from 90 rpm; the rider restarts and settles at 62 rpm (a slower cadence than before the stop).
+    setup(200,200); table.sloped=true; table.cadenceSlope=-100; table.lookupResult=motor.current-(200-155)*12-(90-94)*(-100);
+    rtConfig->cad.setValue(90);
+    for(uint32_t t=1000;t<=20000;t+=500) step(t,200);
+    rtConfig->cad.setValue(0);
+    uint32_t t=20300; for(;t<=23500;t+=300) step(t,20);
+    assert(logged("Stopped for"));
+    const int ramp[]={30,45,55,62};
+    for(int c:ramp){ rtConfig->cad.setValue(c); step(t,80); t+=300; }
+    rtConfig->cad.setValue(62);
+    int completes=0, eases=0, fell=0; float prev=rtConfig->getTargetIncline(); int reversals=0; int dir=0;
+    for(;t<=80000;t+=300){ step(t,150);
+      const float p=rtConfig->getTargetIncline(); int d = p>prev?1:p<prev?-1:0; if(d!=0 && dir!=0 && d!=dir) ++reversals; if(d!=0) dir=d; prev=p; }
+    for(const auto& e:logs){ if(e.find("Spin-up complete")!=std::string::npos) ++completes; if(e.find("easing to")!=std::string::npos) ++eases; if(e.find("Cadence fell from")!=std::string::npos) ++fell; }
+    printf("rv_stop_then_slow_restart: fell=%d completes=%d eases=%d reversals=%d final %.0f\n",fell,completes,eases,reversals,rtConfig->getTargetIncline()); fflush(stdout);
+    for(const auto& e:logs) if(e.find("Spin-up")!=std::string::npos||e.find("Cadence fell")!=std::string::npos||e.find("Stopped")!=std::string::npos) printf("  LOG %s\n",e.c_str());
+    assert(fell==0);
+    assert(completes==1);
+    assert(reversals<=1);
+  } else if(scenario=="rv_single_sample_glitch") {
+    // Review: one cadence report of 0 (sensor dropout) then normal riding: no hold, no stall of corrections.
+    setup(200,200); table.sloped=true; table.cadenceSlope=-100; table.lookupResult=motor.current-(200-155)*12-(90-94)*(-100);
+    rtConfig->cad.setValue(90);
+    for(uint32_t t=1000;t<=20000;t+=500) step(t,200);
+    rtConfig->cad.setValue(0); step(20300,190);
+    rtConfig->cad.setValue(90); step(20600,190);
+    const float before=rtConfig->getTargetIncline();
+    for(uint32_t t=20900;t<=26000;t+=300) step(t,190);
+    printf("rv_single_sample_glitch: fell=%d before %.0f after %.0f\n",(int)logged("Cadence fell from"),before,rtConfig->getTargetIncline()); fflush(stdout);
+    assert(!logged("Cadence fell from"));
+    assert(rtConfig->getTargetIncline()>before);
+  } else if(scenario=="rv_sprint_end") {
+    // Review: a 20 s sprint at 125 rpm (target 400 W) ends; the app drops the target to 180 W and the rider settles at 85 rpm.
+    setup(180,180); table.sloped=true; table.cadenceSlope=-100; table.lookupResult=motor.current-(180-155)*12-(88-94)*(-100);
+    rtConfig->cad.setValue(88);
+    for(uint32_t t=1000;t<=20000;t+=500) step(t,180);
+    rtConfig->watts.setTarget(400); rtConfig->cad.setValue(130);
+    for(uint32_t t=20500;t<=40000;t+=500) step(t,t==20500?180:400);
+    rtConfig->watts.setTarget(180);
+    const int ramp[]={120,105,92,85};
+    uint32_t t=40300; for(int c:ramp){ rtConfig->cad.setValue(c); step(t,400-(c<100?150:0)); t+=300; }
+    rtConfig->cad.setValue(85);
+    int completes=0, eases=0, fell=0; float prev=rtConfig->getTargetIncline(); int reversals=0; int dir=0;
+    for(;t<=100000;t+=300){ step(t,170);
+      const float p=rtConfig->getTargetIncline(); int d = p>prev?1:p<prev?-1:0; if(d!=0 && dir!=0 && d!=dir) ++reversals; if(d!=0) dir=d; prev=p; }
+    for(const auto& e:logs){ if(e.find("Spin-up complete")!=std::string::npos) ++completes; if(e.find("easing to")!=std::string::npos) ++eases; if(e.find("Cadence fell from")!=std::string::npos) ++fell; }
+    printf("rv_sprint_end: fell=%d completes=%d eases=%d reversals=%d final %.0f lookup(180,85)=%d\n",fell,completes,eases,reversals,rtConfig->getTargetIncline(),table.lookup(180,85)); fflush(stdout);
+    for(const auto& e:logs) if(e.find("Spin-up")!=std::string::npos||e.find("Cadence fell")!=std::string::npos) printf("  LOG %s\n",e.c_str());
+    fflush(stdout);
+    assert(fell==0);
   } else if(scenario=="mode_change") {
     setup(); controller.prepareMode(); step(1000,196); step(2000,198);
     rtConfig->setFTMSMode(17); controller.prepareMode(); step(2100,198);
@@ -1844,7 +1935,7 @@ class TestErgFeedback(unittest.TestCase):
         for scenario in ["ride_handoff", "crossing_and_safety", "reduction_safety", "worsening_reduction", "ordinary_reduction",
                          "new_target", "cadence_stop", "cadence_coast_step", "cadence_stop_real", "spinup_noisy_cadence",
                          "spinup_timeout", "spinup_power_trend", "spinup_lower_target", "spinup_target_change_during_hold",
-                         "spinup_mode_reset", "stepped_feedback_gate", "stepped_drop_cadence",
+                         "spinup_mode_reset", "stepped_feedback_gate", "stepped_drop_cadence", "brake_hold", "rv_low_cadence_drill", "rv_stop_then_slow_restart", "rv_single_sample_glitch", "rv_sprint_end",
                          "mode_change", "missing_feedback", "movement_timeout", "no_table", "pid_no_wait_decrease", "small_error",
                          "clamped_move", "clock_wrap", "trusted_seek", "trusted_seek_late_uptime", "simulation_1000", "simulation_2000", "simulation_3000",
                          "simulation_missing_2000", "trust_transients", "stale_seek", "seek_deadline", "sparse_seventy", "extrapolated_cadence",

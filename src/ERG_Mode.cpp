@@ -641,7 +641,8 @@ void ErgMode::_startTrustedTableSeek(int32_t position, int seekCadence) {
   tableSeekTargetWatts       = rtConfig->watts.getTarget();
   tableSeekHadHighTarget     = tableSeekTargetWatts > ErgControl::HIGH_GAIN_WATTS;
   tableSeekCadence           = seekCadence > 0 ? seekCadence : rtConfig->cad.getValue();
-  tableSeekDropCadence       = tableSeekCadence < rtConfig->cad.getValue();
+  tableSeekDropCadence       = tableSeekCadence != rtConfig->cad.getValue();
+  tableSeekDropDirection     = tableSeekCadence < rtConfig->cad.getValue() ? -1 : 1;
   tableSeekPosition          = position;
   tableSeekLastWatts         = INT32_MIN;
   tableSeekStableMatches     = 0;
@@ -745,9 +746,9 @@ void ErgMode::_handleTrustedTableSeek() {
   // not move the motor while a slow drift is still followed. Power measured
   // while the motor is moving can lag the new cadence and position; it must
   // not turn a valid feed-forward adjustment into a PID handoff.
-  // A drop sized at the held cadence does not follow the effort's elevated cadence while the rider settles
-  // back toward it; once cadence reaches the held cadence the seek follows cadence as usual.
-  if (tableSeekDropCadence && (targetAmended || cadence <= tableSeekCadence)) tableSeekDropCadence = false;
+  // A drop sized at the held cadence does not follow the rider's cadence while it moves toward the held cadence
+  // (down from a fast effort, or up from a low-cadence climb); once it gets there the seek follows cadence as usual.
+  if (tableSeekDropCadence && (targetAmended || cadence * tableSeekDropDirection >= tableSeekCadence * tableSeekDropDirection)) tableSeekDropCadence = false;
   if (!tableSeekDropCadence && (targetAmended || abs(cadence - tableSeekCadence) >= ERG_CADENCE_FOLLOW_DEADBAND_RPM)) {
     if (!_tableTargetIsTrusted(tableSeekTargetWatts, cadence)) {
       _stopTrustedTableSeek("cadence lookup is no longer usable", true, true);
@@ -1045,8 +1046,9 @@ void ErgMode::_recordCadenceHistory(bool holding) {
 }
 
 // The cadence used to size a table seek. Only a real easing-off with fresh stepped feedback changes it: a lower
-// target than before, with measured power still above it. Then the held (or typical) cadence is used, floored at
-// the current cadence minus ERG_STEPPED_DROP_CADENCE_ALLOWANCE_RPM. Otherwise, and on other bikes, the current cadence.
+// target than before, with measured power still above it. Then the held (or typical) cadence is used, between the
+// current cadence minus ERG_STEPPED_DROP_CADENCE_ALLOWANCE_RPM and plus ERG_STEPPED_DROP_CADENCE_RISE_MAX_RPM.
+// Otherwise, and on other bikes, the current cadence.
 int ErgMode::_dropSeekCadence(int target, int cadence, const char*& source) {
   source               = "current";
   const int previous   = prevWatts.getTarget();
@@ -1062,11 +1064,13 @@ int ErgMode::_dropSeekCadence(int target, int cadence, const char*& source) {
     source = "current";
     return cadence;
   }
-  const int floor = cadence - ERG_STEPPED_DROP_CADENCE_ALLOWANCE_RPM;
+  const int floor   = cadence - ERG_STEPPED_DROP_CADENCE_ALLOWANCE_RPM;
+  const int ceiling = cadence + ERG_STEPPED_DROP_CADENCE_RISE_MAX_RPM;
   if (floor > remembered) source = "floored";
-  const int chosen = std::max(remembered, floor);
-  // Sizing at a higher cadence than the rider's would lighten the drop further; that is not this fix's job.
-  if (chosen >= cadence || !_tableTargetIsTrusted(target, chosen)) {
+  if (remembered > ceiling) source = "capped";
+  // A held cadence above the rider's is a recovery after a low-cadence climb: the rider spins back up to it.
+  const int chosen = std::min(ceiling, std::max(remembered, floor));
+  if (chosen == cadence || !_tableTargetIsTrusted(target, chosen)) {
     source = "current";
     return cadence;
   }
@@ -1096,9 +1100,10 @@ bool ErgMode::_steppedHold(int measuredError) {
 }
 
 void ErgMode::_resetSpinUp() {
-  spinUpLowSince = spinUpSince = spinUpRidingAt = 0;
+  spinUpLowSince = spinUpSince = spinUpRidingAt = spinUpSlowdownSince = 0;
+  spinUpSlowdownTarget = -1;
   spinUpRidingCadence = 0;
-  spinUpArmed = spinUpEased = spinUpSeekPending = false;
+  spinUpArmed = spinUpEased = spinUpSeekPending = spinUpFromSlowdown = false;
   spinUpSampleCount = spinUpSampleNext = 0;
 }
 
@@ -1154,10 +1159,12 @@ bool ErgMode::_spinUpHold(uint32_t now) {
   }
   if (cadence <= MIN_ERG_CADENCE) {
     if (spinUpLowSince == 0) spinUpLowSince = now == 0 ? 1 : now;
+    if (now - spinUpLowSince >= ERG_SPINUP_STOP_MS) spinUpFromSlowdown = false;  // a slowdown that became a real stop
     if (!spinUpArmed && now - spinUpLowSince >= ERG_SPINUP_STOP_MS) {
       spinUpArmed       = true;
       spinUpEased       = false;
       spinUpSeekPending = false;
+      spinUpFromSlowdown   = false;
       SS2K_LOG(ERG_MODE_LOG_TAG, "Stopped for %lums; holding resistance until cadence settles", static_cast<unsigned long>(now - spinUpLowSince));
     }
     spinUpSince       = 0;  // a renewed stop restarts the spin-up
@@ -1165,6 +1172,29 @@ bool ErgMode::_spinUpHold(uint32_t now) {
     return spinUpArmed;
   }
   spinUpLowSince = 0;
+  // A sudden collapse from the riding cadence (braking the flywheel; Bike+/fixed-gear bikes cannot coast) holds like a
+  // stop. Not right after a target change: a rider settling from a sprint (125 -> 85 rpm as the target drops) is not braking.
+  if (rtConfig->watts.getTarget() != spinUpSlowdownTarget) {
+    spinUpSlowdownTarget      = rtConfig->watts.getTarget();
+    spinUpSlowdownTargetSince = now == 0 ? 1 : now;
+  }
+  if (!spinUpArmed && spinUpRidingAt != 0 && now - spinUpSlowdownTargetSince >= ERG_SLOWDOWN_AFTER_TARGET_MS && cadence <= spinUpRidingCadence - ERG_SLOWDOWN_DROP_RPM &&
+      cadence * 100 <= spinUpRidingCadence * (100 - ERG_SLOWDOWN_DROP_PERCENT)) {
+    if (spinUpSlowdownSince == 0) spinUpSlowdownSince = now == 0 ? 1 : now;
+    if (now - spinUpSlowdownSince >= ERG_SLOWDOWN_CONFIRM_MS) {
+      spinUpArmed       = true;
+      spinUpEased       = false;
+      spinUpSeekPending = false;
+      spinUpSince       = 0;
+      spinUpSampleCount = spinUpSampleNext = 0;
+      spinUpSlowdownSince  = 0;
+      spinUpFromSlowdown   = true;
+      SS2K_LOG(ERG_MODE_LOG_TAG, "Cadence fell from %d to %d rpm; holding resistance until cadence settles", static_cast<int>(std::lround(spinUpRidingCadence)), cadence);
+    }
+    // Add no resistance while the collapse is being confirmed either: a brief glitch only delays a correction.
+    return true;
+  }
+  spinUpSlowdownSince = 0;
   if (!spinUpArmed) {
     // Track the riding cadence (~5 s average) so a later spin-up can ease off at the cadence the rider will return to.
     const double dt = spinUpRidingAt == 0 ? 0 : std::min(1.0, (now - spinUpRidingAt) / 1000.0);
@@ -1173,13 +1203,19 @@ bool ErgMode::_spinUpHold(uint32_t now) {
     return false;
   }
   if (spinUpSince == 0) spinUpSince = now == 0 ? 1 : now;
-  if (!spinUpEased && rtConfig->watts.getTarget() != userConfig->getMinWatts()) _spinUpEase(cadence);
+  // Easing toward a lower restored target is for a real stop; a slowdown keeps the target it was riding.
+  if (!spinUpEased && !spinUpFromSlowdown && rtConfig->watts.getTarget() != userConfig->getMinWatts()) _spinUpEase(cadence);
   const bool settled = _spinUpCadenceSettled(now, cadence) && std::abs(responseTrend) < ERG_SPINUP_TREND_WPS;
   const bool expired = now - spinUpSince >= ERG_SPINUP_MAX_MS;
   if (!settled && !expired) return true;
   spinUpArmed       = false;
   spinUpSince       = 0;
   spinUpSeekPending = true;
+  spinUpFromSlowdown   = false;
+  // The cadence the rider settled at is the new riding baseline: a lower settled cadence must not re-arm the slowdown hold
+  // (independent review: a 92 -> 60 rpm drill re-armed it every ~4 s).
+  spinUpRidingCadence = cadence;
+  spinUpRidingAt      = now == 0 ? 1 : now;
   // The spin-up's rising power is not a response to a move: do not let it brake the seek.
   responseTrend = responsePreviousTrend = 0;
   SS2K_LOG(ERG_MODE_LOG_TAG, "Spin-up complete at %d rpm (%s); seeking target %dw", cadence, settled ? "stable" : "timeout", rtConfig->watts.getTarget());

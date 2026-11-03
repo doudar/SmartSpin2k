@@ -108,6 +108,17 @@ constexpr int ERG_SPINUP_CADENCE_RANGE_RPM = 8;
 constexpr double ERG_SPINUP_TREND_WPS = 2.0;
 // or at the latest this long after cadence first rose above MIN_ERG_CADENCE.
 constexpr uint32_t ERG_SPINUP_MAX_MS = 6000;
+// A sudden cadence collapse while riding (braking the flywheel; Bike+ and other fixed-gear bikes cannot coast) arms
+// the same hold as a stop: cadence
+// at least ERG_SLOWDOWN_DROP_RPM and ERG_SLOWDOWN_DROP_PERCENT below the ~5 s riding average for ERG_SLOWDOWN_CONFIRM_MS
+// (no resistance is added while that is being confirmed).
+// The Bike+ cadence report only fell from 88 to ~48 rpm when braked to a stop, so the stop rule (<= MIN_ERG_CADENCE
+// for 2.5 s) never armed; ERG added resistance for the low cadence and the restart hit ~300 W at 82 rpm.
+constexpr int ERG_SLOWDOWN_DROP_RPM = 25;
+constexpr int ERG_SLOWDOWN_DROP_PERCENT = 30;
+constexpr uint32_t ERG_SLOWDOWN_CONFIRM_MS = 1000;
+// No slowdown is detected within this long of a target change (a rider settling after an interval is not braking).
+constexpr uint32_t ERG_SLOWDOWN_AFTER_TARGET_MS = 5000;
 // Minimum spacing of the cadence samples kept for the rolling stability window.
 constexpr uint32_t ERG_SPINUP_SAMPLE_MS = 100;
 // Cadence change from the reference before a trusted seek or proportional feedback compensates; smaller changes accumulate.
@@ -147,7 +158,11 @@ constexpr uint32_t ERG_STEPPED_FEEDBACK_MAX_AGE_MS = 3000;
 // effort's 95-101 RPM to 88-90 RPM within seconds; a drop sized at the effort cadence left the brake a level or
 // two light and dipped power 15-20 W below the recovery target. The remembered cadence is floored at the current
 // cadence minus this allowance, so a slow warm-up cadence cannot size a heavy "drop" for a rider now spinning fast.
-constexpr int ERG_STEPPED_DROP_CADENCE_ALLOWANCE_RPM = 8;
+// 15 rpm covers efforts ridden at 100-105 rpm that settle to 88-90 rpm (8 rpm left those drops a level light).
+constexpr int ERG_STEPPED_DROP_CADENCE_ALLOWANCE_RPM = 15;
+// A drop may also be sized above the current cadence (a low-cadence climb followed by a normal-cadence recovery),
+// by at most this much.
+constexpr int ERG_STEPPED_DROP_CADENCE_RISE_MAX_RPM = 25;
 // Spacing and memory of the cadence history (2 s samples, 10 minutes).
 constexpr uint32_t ERG_STEPPED_HISTORY_SAMPLE_MS = 2000;
 constexpr uint32_t ERG_STEPPED_HISTORY_MEMORY_MS = 600000;

@@ -102,6 +102,10 @@ class ErgMode {
   int32_t confidencePosition        = 0;
   int cadenceReference              = 0;
   // Spin-up after a real stop (see ERG_SPINUP_* in ERG_Mode_Settings.h).
+  bool spinUpFromSlowdown     = false; // the active hold was armed by a sudden slowdown, not a stop (no easing)
+  uint32_t spinUpSlowdownSince       = 0;   // first report of a sudden cadence collapse while riding (0: none)
+  int spinUpSlowdownTarget           = -1;  // target seen by the slowdown rule, and since when (it needs a settled target)
+  uint32_t spinUpSlowdownTargetSince = 0;
   uint32_t spinUpLowSince  = 0;      // first report at or below MIN_ERG_CADENCE in the current low run (0: none)
   bool spinUpArmed         = false;  // a real stop was seen; hold increases until cadence settles
   uint32_t spinUpSince     = 0;      // when cadence first rose above MIN_ERG_CADENCE after the stop (0: not yet)
@@ -153,7 +157,8 @@ class ErgMode {
   ErgControl::CadenceHistory cadenceHistory;
   int historyTarget         = 0;
   uint32_t historySettledAt = 0;     // when power last came within ERG_STEPPED_IMMEDIATE_WATTS of historyTarget (0: not)
-  bool tableSeekDropCadence = false; // the active seek used a held cadence below the rider's current cadence
+  bool tableSeekDropCadence = false; // the active seek used a held cadence instead of the rider's current cadence
+  int tableSeekDropDirection = 0;    // -1: held cadence below the rider's (settling down), +1: above (spinning back up)
   void _recordCadenceHistory(bool holding);
   int _dropSeekCadence(int target, int cadence, const char*& source);
 
