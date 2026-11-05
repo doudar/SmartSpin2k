@@ -93,14 +93,92 @@ constexpr int ERG_FEEDBACK_WORSENING_WATTS = 25;
 constexpr int ERG_TABLE_CORRECTION_WATTS = 44;
 // Cadence change from the last reference that can start a trusted maintenance seek; in-flight seeks track smaller changes too.
 constexpr int ERG_TABLE_CADENCE_SEEK_RPM = POWERTABLE_CAD_INCREMENT;
+// Spin-up after a real stop. A seek sized for the rising 20-60 rpm spin-up cadence overshoots once the rider
+// reaches their normal cadence (simulated restart at 165 W: 332-339 W peak), so after a stop ERG does not add
+// resistance until cadence has settled, then seeks once at the settled cadence. Easing off toward a lower
+// restored target is still allowed.
+// A stop is cadence at or below MIN_ERG_CADENCE for this long: brief coasts and single zero-cadence reports
+// (common from crank meters and Grupetto) must not freeze ERG mid-ride.
+constexpr uint32_t ERG_SPINUP_STOP_MS = 2500;
+// The hold ends once the cadence reports of the last ERG_SPINUP_STABLE_MS all lie within ERG_SPINUP_CADENCE_RANGE_RPM
+// of each other (a rolling window, so steady jitter of +-4 RPM still settles) and power has stopped rising with the
+// spin-up (|trend| below ERG_SPINUP_TREND_WPS), so the seek is not braked by the spin-up's own power trend,
+constexpr uint32_t ERG_SPINUP_STABLE_MS = 2000;
+constexpr int ERG_SPINUP_CADENCE_RANGE_RPM = 8;
+constexpr double ERG_SPINUP_TREND_WPS = 2.0;
+// or at the latest this long after cadence first rose above MIN_ERG_CADENCE.
+constexpr uint32_t ERG_SPINUP_MAX_MS = 6000;
+// A sudden cadence collapse while riding (braking the flywheel; Bike+ and other fixed-gear bikes cannot coast) arms
+// the same hold as a stop: cadence
+// at least ERG_SLOWDOWN_DROP_RPM and ERG_SLOWDOWN_DROP_PERCENT below the ~5 s riding average for ERG_SLOWDOWN_CONFIRM_MS
+// (no resistance is added while that is being confirmed).
+// The Bike+ cadence report only fell from 88 to ~48 rpm when braked to a stop, so the stop rule (<= MIN_ERG_CADENCE
+// for 2.5 s) never armed; ERG added resistance for the low cadence and the restart hit ~300 W at 82 rpm.
+constexpr int ERG_SLOWDOWN_DROP_RPM = 25;
+constexpr int ERG_SLOWDOWN_DROP_PERCENT = 30;
+constexpr uint32_t ERG_SLOWDOWN_CONFIRM_MS = 1000;
+// No slowdown is detected within this long of a target change (a rider settling after an interval is not braking).
+constexpr uint32_t ERG_SLOWDOWN_AFTER_TARGET_MS = 5000;
+// The stability window is tracked as ERG_SPINUP_BUCKETS buckets of ERG_SPINUP_BUCKET_MS (cadence range per bucket),
+// covering ERG_SPINUP_STABLE_MS plus one bucket: 40 bytes instead of a sample ring.
+constexpr uint32_t ERG_SPINUP_BUCKET_MS = 500;
+constexpr int ERG_SPINUP_BUCKETS = 5;
 // Cadence change from the reference before a trusted seek or proportional feedback compensates; smaller changes accumulate.
 // Keeps 1 RPM sensor/rider jitter from moving the motor.
 constexpr int ERG_CADENCE_FOLLOW_DEADBAND_RPM = 2;
 // Maximum cadence change proportional feedback compensates in one update; power feedback corrects any remainder.
 // A surge caused by a resistance drop must not immediately remove more resistance.
 constexpr int ERG_CADENCE_COMPENSATION_MAX_RPM = 3;
+// Fraction of the table-predicted cadence move applied by steady-state cadence compensation on bikes that
+// report stepped resistance (Grupetto on a Peloton Bike+). There a full move on a 2 RPM change crossed a whole
+// resistance level and overshot power by 12-18 W; half the move lets power feedback finish the correction.
+// Other bikes keep the full move (1.0).
+constexpr double ERG_STEPPED_CADENCE_COMPENSATION_GAIN = 0.5;
 // Blend the measured cadence-curve estimate with the normal forward lookup.
 constexpr double ERG_TABLE_CURVE_BLEND = 0.5;
+// ******************************************************************************
+
+// ******************************************************************************
+// Steady-state hold for bikes with stepped resistance (Peloton Bike+ via Grupetto)
+// The Bike+ brake moves in whole 1% levels (about 5-8 W at 160-220 W, 90 RPM), so
+// small knob corrections only creep toward the next level and then jump past the
+// target. When fresh Grupetto resistance feedback shows a stepped brake, hold the
+// knob after a transition settles, as Grupetto's own ERG does. Moderate errors
+// must persist before a correction; large errors are corrected immediately.
+// Transitions, table seeks and bikes without resistance feedback are unaffected.
+// ******************************************************************************
+// Hold the knob while power is within this many watts of target.
+constexpr int ERG_STEPPED_HOLD_WATTS = 4;
+// Errors at or above this many watts are corrected without waiting.
+constexpr int ERG_STEPPED_IMMEDIATE_WATTS = 10;
+// A moderate error must stay on one side of the target this long before correcting.
+constexpr uint32_t ERG_STEPPED_PERSIST_MS = 1500;
+// Resistance feedback older than this does not enable the hold.
+constexpr uint32_t ERG_STEPPED_FEEDBACK_MAX_AGE_MS = 3000;
+// Recovery drops with stepped feedback: size the drop at the cadence the rider held at about the new target
+// (or the typical recent cadence), not the effort's still-elevated cadence. Riders settle back from a hard
+// effort's 95-101 RPM to 88-90 RPM within seconds; a drop sized at the effort cadence left the brake a level or
+// two light and dipped power 15-20 W below the recovery target. The remembered cadence is floored at the current
+// cadence minus this allowance, so a slow warm-up cadence cannot size a heavy "drop" for a rider now spinning fast.
+// 15 rpm covers efforts ridden at 100-105 rpm that settle to 88-90 rpm (8 rpm left those drops a level light).
+constexpr int ERG_STEPPED_DROP_CADENCE_ALLOWANCE_RPM = 15;
+// A drop may also be sized above the current cadence (a low-cadence climb followed by a normal-cadence recovery),
+// by at most this much.
+constexpr int ERG_STEPPED_DROP_CADENCE_RISE_MAX_RPM = 25;
+// Spacing and memory of the cadence history (2 s samples, 10 minutes).
+constexpr uint32_t ERG_STEPPED_HISTORY_SAMPLE_MS = 2000;
+constexpr uint32_t ERG_STEPPED_HISTORY_MEMORY_MS = 600000;
+// A held cadence needs this many settled samples within 10% of the new target (16 s).
+constexpr int ERG_STEPPED_HELD_MIN_SAMPLES = 8;
+// Settled targets remembered at once (a recovery, a threshold, and a couple of others).
+constexpr int ERG_STEPPED_HELD_SLOTS = 4;
+// The typical cadence is the mean of the last two minutes and needs this many samples (50 s).
+constexpr uint32_t ERG_STEPPED_TYPICAL_WINDOW_MS = 120000;
+constexpr int ERG_STEPPED_TYPICAL_MIN_SAMPLES = 25;
+// Samples below this cadence are ignored (stops, spin-ups).
+constexpr int ERG_STEPPED_HISTORY_MIN_CADENCE = 50;
+// A target counts as settled for the held-cadence history after this long within ERG_STEPPED_IMMEDIATE_WATTS.
+constexpr uint32_t ERG_STEPPED_HISTORY_SETTLE_MS = 4500;
 // ******************************************************************************
 
 namespace ErgControl {

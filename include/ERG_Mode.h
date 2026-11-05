@@ -33,6 +33,7 @@ class ErgMode {
   void resetTableConfidence() {
     tableConfidence.reset();
     tableSeekState               = TableSeekState::INACTIVE;
+    tableSeekDropCadence         = false;
     tableSeekFirstArrivalValid   = false;
     tableSeekHadHighTarget       = false;
     mode                         = Mode::MAINTAIN;
@@ -100,6 +101,29 @@ class ErgMode {
   uint32_t confidenceSettledAt      = 0;
   int32_t confidencePosition        = 0;
   int cadenceReference              = 0;
+  // Spin-up after a real stop (see ERG_SPINUP_* in ERG_Mode_Settings.h).
+  bool spinUpFromSlowdown     = false; // the active hold was armed by a sudden slowdown, not a stop (no easing)
+  uint32_t spinUpSlowdownSince       = 0;   // first report of a sudden cadence collapse while riding (0: none)
+  int spinUpSlowdownTarget           = -1;  // target seen by the slowdown rule, and since when (it needs a settled target)
+  uint32_t spinUpSlowdownTargetSince = 0;
+  uint32_t spinUpLowSince  = 0;      // first report at or below MIN_ERG_CADENCE in the current low run (0: none)
+  bool spinUpArmed         = false;  // a real stop was seen; hold increases until cadence settles
+  uint32_t spinUpSince     = 0;      // when cadence first rose above MIN_ERG_CADENCE after the stop (0: not yet)
+  bool spinUpEased         = false;  // the one-time reduction toward a lower restored target was considered
+  bool spinUpSeekPending   = false;  // the hold ended; force one setpoint seek once no seek/wait is active
+  double spinUpRidingCadence = 0;    // ~5 s average of riding cadence, frozen during stops (for easing off)
+  uint32_t spinUpRidingAt    = 0;
+  // Rolling stability window as ERG_SPINUP_BUCKETS buckets of ERG_SPINUP_BUCKET_MS, each the cadence range seen in it.
+  struct SpinUpBucket {
+    uint32_t at;
+    int16_t low, high;
+  };
+  SpinUpBucket spinUpBuckets[ERG_SPINUP_BUCKETS] = {};
+  uint8_t spinUpBucketCount = 0, spinUpBucketNext = 0;
+  bool _spinUpHold(uint32_t now);
+  void _resetSpinUp();
+  bool _spinUpCadenceSettled(uint32_t now, int cadence);
+  void _spinUpEase(int cadence);
   uint32_t tableSeekStartedAt       = 0;
   int32_t tableSeekOffset           = 0;
   uint32_t tableSeekArrivedAt       = 0;
@@ -127,6 +151,20 @@ class ErgMode {
   uint32_t feedbackUpdatedAt        = 0;
   int32_t controlMinimum            = 0;
   int32_t controlMaximum            = 0;
+  // Stepped-resistance steady-state hold: side and start of a persisting moderate error.
+  int steppedErrorSign              = 0;
+  uint32_t steppedErrorSince        = 0;
+  bool _steppedHold(int measuredError);
+  bool _hasSteppedFeedback() const;
+  // Recovery drops with stepped feedback are sized at the rider's held cadence (ERG_STEPPED_DROP_CADENCE_ALLOWANCE_RPM).
+  // Allocated on the first fresh Grupetto feedback; other bikes never pay for it.
+  ErgControl::CadenceHistory* cadenceHistory = nullptr;
+  int historyTarget         = 0;
+  uint32_t historySettledAt = 0;     // when power last came within ERG_STEPPED_IMMEDIATE_WATTS of historyTarget (0: not)
+  bool tableSeekDropCadence = false; // the active seek used a held cadence instead of the rider's current cadence
+  int tableSeekDropDirection = 0;    // -1: held cadence below the rider's (settling down), +1: above (spinning back up)
+  void _recordCadenceHistory(bool holding);
+  int _dropSeekCadence(int target, int cadence, const char*& source);
 
   // calculate incline if setpoint (from Zwift) changes
   int32_t _setPointChangeState();
@@ -146,7 +184,7 @@ class ErgMode {
   bool _tableTargetIsUsable(int watts, int cadence) const;
   int32_t _constrainedTablePosition(int watts, int cadence) const;
   void _scoreTable(int watts, int cadence, bool accurate);
-  void _startTrustedTableSeek(int32_t position);
+  void _startTrustedTableSeek(int32_t position, int seekCadence = -1);
   void _handleTrustedTableSeek();
   void _stopTrustedTableSeek(const char* reason, bool seedPidFromTable = false, bool acquireFeedback = false);
   unsigned long _trustedTableMoveDeadline(int32_t position) const;
