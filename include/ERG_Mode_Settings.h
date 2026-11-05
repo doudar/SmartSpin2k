@@ -119,8 +119,10 @@ constexpr int ERG_SLOWDOWN_DROP_PERCENT = 30;
 constexpr uint32_t ERG_SLOWDOWN_CONFIRM_MS = 1000;
 // No slowdown is detected within this long of a target change (a rider settling after an interval is not braking).
 constexpr uint32_t ERG_SLOWDOWN_AFTER_TARGET_MS = 5000;
-// Minimum spacing of the cadence samples kept for the rolling stability window.
-constexpr uint32_t ERG_SPINUP_SAMPLE_MS = 100;
+// The stability window is tracked as ERG_SPINUP_BUCKETS buckets of ERG_SPINUP_BUCKET_MS (cadence range per bucket),
+// covering ERG_SPINUP_STABLE_MS plus one bucket: 40 bytes instead of a sample ring.
+constexpr uint32_t ERG_SPINUP_BUCKET_MS = 500;
+constexpr int ERG_SPINUP_BUCKETS = 5;
 // Cadence change from the reference before a trusted seek or proportional feedback compensates; smaller changes accumulate.
 // Keeps 1 RPM sensor/rider jitter from moving the motor.
 constexpr int ERG_CADENCE_FOLLOW_DEADBAND_RPM = 2;
@@ -168,7 +170,9 @@ constexpr uint32_t ERG_STEPPED_HISTORY_SAMPLE_MS = 2000;
 constexpr uint32_t ERG_STEPPED_HISTORY_MEMORY_MS = 600000;
 // A held cadence needs this many settled samples within 10% of the new target (16 s).
 constexpr int ERG_STEPPED_HELD_MIN_SAMPLES = 8;
-// The typical cadence is the median of the last two minutes and needs this many samples (50 s).
+// Settled targets remembered at once (a recovery, a threshold, and a couple of others).
+constexpr int ERG_STEPPED_HELD_SLOTS = 4;
+// The typical cadence is the mean of the last two minutes and needs this many samples (50 s).
 constexpr uint32_t ERG_STEPPED_TYPICAL_WINDOW_MS = 120000;
 constexpr int ERG_STEPPED_TYPICAL_MIN_SAMPLES = 25;
 // Samples below this cadence are ignored (stops, spin-ups).

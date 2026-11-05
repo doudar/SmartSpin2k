@@ -6,6 +6,7 @@
  */
 
 #include "ERG_Mode.h"
+#include <new>
 #include "SS2KLog.h"
 #include "Main.h"
 #include "Power_Table.h"
@@ -1034,6 +1035,9 @@ void ErgMode::_recordCadenceHistory(bool holding) {
     historySettledAt = 0;
     return;
   }
+  // First Grupetto feedback: allocate the (small) cadence memory. Without it, drops keep the current cadence.
+  if (cadenceHistory == nullptr) cadenceHistory = new (std::nothrow) ErgControl::CadenceHistory();
+  if (cadenceHistory == nullptr) return;
   const bool near = target > 0 && abs(rtConfig->watts.getValue() - target) < ERG_STEPPED_IMMEDIATE_WATTS;
   if (target != historyTarget || !near || holding || isTableSeeking() || feedbackWaiting) {
     historyTarget    = target;
@@ -1042,7 +1046,7 @@ void ErgMode::_recordCadenceHistory(bool holding) {
     historySettledAt = now;
   }
   const bool settled = historySettledAt != 0 && now - historySettledAt >= ERG_STEPPED_HISTORY_SETTLE_MS;
-  cadenceHistory.record(now, rtConfig->cad.getValue(), settled ? target : 0);
+  cadenceHistory->record(now, rtConfig->cad.getValue(), settled ? target : 0);
 }
 
 // The cadence used to size a table seek. Only a real easing-off with fresh stepped feedback changes it: a lower
@@ -1052,12 +1056,12 @@ void ErgMode::_recordCadenceHistory(bool holding) {
 int ErgMode::_dropSeekCadence(int target, int cadence, const char*& source) {
   source               = "current";
   const int previous   = prevWatts.getTarget();
-  if (!_hasSteppedFeedback() || previous <= 0 || target >= previous || rtConfig->watts.getValue() <= target) return cadence;
+  if (cadenceHistory == nullptr || !_hasSteppedFeedback() || previous <= 0 || target >= previous || rtConfig->watts.getValue() <= target) return cadence;
   const uint32_t now = millis();
-  int remembered     = cadenceHistory.cadenceAt(target, now);
+  int remembered     = cadenceHistory->cadenceAt(target, now);
   source             = "held";
   if (remembered < 0) {
-    remembered = cadenceHistory.typicalCadence(now);
+    remembered = cadenceHistory->typicalCadence(now);
     source     = "typical";
   }
   if (remembered < 0) {
@@ -1104,25 +1108,30 @@ void ErgMode::_resetSpinUp() {
   spinUpSlowdownTarget = -1;
   spinUpRidingCadence = 0;
   spinUpArmed = spinUpEased = spinUpSeekPending = spinUpFromSlowdown = false;
-  spinUpSampleCount = spinUpSampleNext = 0;
+  spinUpBucketCount = spinUpBucketNext = 0;
 }
 
 // Rolling stability: every cadence report of the last ERG_SPINUP_STABLE_MS lies within ERG_SPINUP_CADENCE_RANGE_RPM,
 // and the window is full (the rider has been above MIN_ERG_CADENCE that long).
 bool ErgMode::_spinUpCadenceSettled(uint32_t now, int cadence) {
-  const int last = (spinUpSampleNext + SPIN_UP_SAMPLES - 1) % SPIN_UP_SAMPLES;
-  if (spinUpSampleCount == 0 || now - spinUpSampleAt[last] >= ERG_SPINUP_SAMPLE_MS) {
-    spinUpSampleAt[spinUpSampleNext]      = now;
-    spinUpSampleCadence[spinUpSampleNext] = cadence;
-    spinUpSampleNext                      = (spinUpSampleNext + 1) % SPIN_UP_SAMPLES;
-    if (spinUpSampleCount < SPIN_UP_SAMPLES) ++spinUpSampleCount;
+  // Bucket the reports: a new bucket every ERG_SPINUP_BUCKET_MS, each holding the range of cadence seen in it.
+  SpinUpBucket* bucket = spinUpBucketCount == 0 ? nullptr : &spinUpBuckets[(spinUpBucketNext + ERG_SPINUP_BUCKETS - 1) % ERG_SPINUP_BUCKETS];
+  if (bucket == nullptr || now - bucket->at >= ERG_SPINUP_BUCKET_MS) {
+    spinUpBuckets[spinUpBucketNext] = SpinUpBucket{now, static_cast<int16_t>(cadence), static_cast<int16_t>(cadence)};
+    spinUpBucketNext                = (spinUpBucketNext + 1) % ERG_SPINUP_BUCKETS;
+    if (spinUpBucketCount < ERG_SPINUP_BUCKETS) ++spinUpBucketCount;
+  } else {
+    bucket->low  = std::min<int16_t>(bucket->low, cadence);
+    bucket->high = std::max<int16_t>(bucket->high, cadence);
   }
   if (now - spinUpSince < ERG_SPINUP_STABLE_MS) return false;
+  // Every report of the last ERG_SPINUP_STABLE_MS (rounded out to whole buckets) lies within the allowed range.
   int low = cadence, high = cadence;
-  for (int i = 0; i < spinUpSampleCount; ++i) {
-    if (now - spinUpSampleAt[i] > ERG_SPINUP_STABLE_MS) continue;
-    low  = std::min(low, spinUpSampleCadence[i]);
-    high = std::max(high, spinUpSampleCadence[i]);
+  for (int i = 0; i < spinUpBucketCount; ++i) {
+    const SpinUpBucket& b = spinUpBuckets[i];
+    if (now - b.at > ERG_SPINUP_STABLE_MS + ERG_SPINUP_BUCKET_MS) continue;
+    low  = std::min<int>(low, b.low);
+    high = std::max<int>(high, b.high);
   }
   return high - low <= ERG_SPINUP_CADENCE_RANGE_RPM;
 }
@@ -1168,7 +1177,7 @@ bool ErgMode::_spinUpHold(uint32_t now) {
       SS2K_LOG(ERG_MODE_LOG_TAG, "Stopped for %lums; holding resistance until cadence settles", static_cast<unsigned long>(now - spinUpLowSince));
     }
     spinUpSince       = 0;  // a renewed stop restarts the spin-up
-    spinUpSampleCount = spinUpSampleNext = 0;
+    spinUpBucketCount = spinUpBucketNext = 0;
     return spinUpArmed;
   }
   spinUpLowSince = 0;
@@ -1186,7 +1195,7 @@ bool ErgMode::_spinUpHold(uint32_t now) {
       spinUpEased       = false;
       spinUpSeekPending = false;
       spinUpSince       = 0;
-      spinUpSampleCount = spinUpSampleNext = 0;
+      spinUpBucketCount = spinUpBucketNext = 0;
       spinUpSlowdownSince  = 0;
       spinUpFromSlowdown   = true;
       SS2K_LOG(ERG_MODE_LOG_TAG, "Cadence fell from %d to %d rpm; holding resistance until cadence settles", static_cast<int>(std::lround(spinUpRidingCadence)), cadence);

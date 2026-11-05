@@ -113,10 +113,13 @@ class ErgMode {
   bool spinUpSeekPending   = false;  // the hold ended; force one setpoint seek once no seek/wait is active
   double spinUpRidingCadence = 0;    // ~5 s average of riding cadence, frozen during stops (for easing off)
   uint32_t spinUpRidingAt    = 0;
-  static constexpr int SPIN_UP_SAMPLES = 32;
-  uint32_t spinUpSampleAt[SPIN_UP_SAMPLES] = {};
-  int spinUpSampleCadence[SPIN_UP_SAMPLES] = {};
-  int spinUpSampleCount = 0, spinUpSampleNext = 0;
+  // Rolling stability window as ERG_SPINUP_BUCKETS buckets of ERG_SPINUP_BUCKET_MS, each the cadence range seen in it.
+  struct SpinUpBucket {
+    uint32_t at;
+    int16_t low, high;
+  };
+  SpinUpBucket spinUpBuckets[ERG_SPINUP_BUCKETS] = {};
+  uint8_t spinUpBucketCount = 0, spinUpBucketNext = 0;
   bool _spinUpHold(uint32_t now);
   void _resetSpinUp();
   bool _spinUpCadenceSettled(uint32_t now, int cadence);
@@ -154,7 +157,8 @@ class ErgMode {
   bool _steppedHold(int measuredError);
   bool _hasSteppedFeedback() const;
   // Recovery drops with stepped feedback are sized at the rider's held cadence (ERG_STEPPED_DROP_CADENCE_ALLOWANCE_RPM).
-  ErgControl::CadenceHistory cadenceHistory;
+  // Allocated on the first fresh Grupetto feedback; other bikes never pay for it.
+  ErgControl::CadenceHistory* cadenceHistory = nullptr;
   int historyTarget         = 0;
   uint32_t historySettledAt = 0;     // when power last came within ERG_STEPPED_IMMEDIATE_WATTS of historyTarget (0: not)
   bool tableSeekDropCadence = false; // the active seek used a held cadence instead of the rider's current cadence

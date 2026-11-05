@@ -327,52 +327,68 @@ inline double clampGain(double gain, double sensitivity) {
   return std::max(minimumGain, std::min(gain, maximumGain));
 }
 
-// Cadence history for sizing recovery drops on stepped-resistance bikes (see ERG_STEPPED_DROP_CADENCE_ALLOWANCE_RPM).
-// Fixed-size ring of 2 s samples; a sample carries the settled target watts, or 0 when ERG was not settled.
+// Cadence memory for sizing recovery drops on stepped-resistance bikes (see ERG_STEPPED_DROP_CADENCE_ALLOWANCE_RPM).
+// Kept small (about 60 bytes) and only allocated once Grupetto feedback is seen: a few settled-target slots, each a
+// running mean of the cadence held while ERG was settled near that target, plus a ~2 minute mean of all riding cadence.
 class CadenceHistory {
  public:
-  static constexpr int CAPACITY = static_cast<int>(ERG_STEPPED_HISTORY_MEMORY_MS / ERG_STEPPED_HISTORY_SAMPLE_MS);
+  static constexpr int SLOTS = ERG_STEPPED_HELD_SLOTS;
 
-  void clear() { count = next = 0; }
-
+  // One sample every ERG_STEPPED_HISTORY_SAMPLE_MS. settledWatts is the target ERG was settled on, or 0.
   void record(uint32_t now, int cadence, int settledWatts) {
     if (cadence < ERG_STEPPED_HISTORY_MIN_CADENCE || cadence > 255) return;
-    if (count > 0 && now - time[(next + CAPACITY - 1) % CAPACITY] < ERG_STEPPED_HISTORY_SAMPLE_MS) return;
-    time[next]    = now;
-    rpm[next]     = static_cast<uint8_t>(cadence);
-    watts[next]   = static_cast<uint16_t>(std::max(0, std::min(settledWatts, 65535)));
-    next          = (next + 1) % CAPACITY;
-    if (count < CAPACITY) ++count;
+    if (lastAt != 0 && now - lastAt < ERG_STEPPED_HISTORY_SAMPLE_MS) return;
+    lastAt = now == 0 ? 1 : now;
+    // Typical cadence: running mean over the last ~2 minutes of samples.
+    if (typicalCount < TYPICAL_SAMPLES) ++typicalCount;
+    typical16 += (cadence * 16 - typical16) / typicalCount;
+    typicalAt = lastAt;
+    if (settledWatts <= 0) return;
+    Slot* slot = nullptr;
+    for (auto& candidate : slots)
+      if (candidate.count != 0 && _near(candidate.watts, settledWatts) && !_expired(candidate, now)) slot = &candidate;
+    if (slot == nullptr) {  // reuse an empty, expired or least recently updated slot
+      slot = &slots[0];
+      for (auto& candidate : slots)
+        if (candidate.count == 0 || _expired(candidate, now) || now - candidate.at > now - slot->at) slot = &candidate;
+      *slot = Slot{static_cast<uint16_t>(std::min(settledWatts, 65535)), 0, 0, 0};
+    }
+    if (slot->count < HELD_SAMPLES) ++slot->count;
+    slot->cadence16 += (cadence * 16 - slot->cadence16) / slot->count;
+    slot->at = lastAt;
   }
 
-  // Median cadence held while settled within 10% of watts in the last ten minutes, or -1.
+  // Mean cadence held while settled within 10% of targetWatts in the last ten minutes, or -1.
   int cadenceAt(int targetWatts, uint32_t now) const {
-    return _median(now, ERG_STEPPED_HISTORY_MEMORY_MS, targetWatts, ERG_STEPPED_HELD_MIN_SAMPLES);
+    for (const auto& slot : slots)
+      if (slot.count >= ERG_STEPPED_HELD_MIN_SAMPLES && _near(slot.watts, targetWatts) && !_expired(slot, now)) return (slot.cadence16 + 8) / 16;
+    return -1;
   }
 
-  // Median cadence of the last two minutes, or -1.
-  int typicalCadence(uint32_t now) const { return _median(now, ERG_STEPPED_TYPICAL_WINDOW_MS, 0, ERG_STEPPED_TYPICAL_MIN_SAMPLES); }
+  // Mean riding cadence of the last ~2 minutes, or -1 (needs ERG_STEPPED_TYPICAL_MIN_SAMPLES fresh samples).
+  int typicalCadence(uint32_t now) const {
+    if (typicalCount < ERG_STEPPED_TYPICAL_MIN_SAMPLES || now - typicalAt > ERG_STEPPED_TYPICAL_WINDOW_MS) return -1;
+    return (typical16 + 8) / 16;
+  }
 
  private:
-  uint32_t time[CAPACITY] = {};
-  uint8_t rpm[CAPACITY]   = {};
-  uint16_t watts[CAPACITY] = {};
-  // Median scratch space. Kept with the (heap-allocated) controller, not on the small maintenance-task stack.
-  mutable uint8_t values[CAPACITY] = {};
-  int count = 0, next = 0;
+  // Running means weigh up to this many recent samples (2 s apart): ~1 minute per settled target, ~2 minutes typical.
+  static constexpr uint8_t HELD_SAMPLES    = 30;
+  static constexpr uint8_t TYPICAL_SAMPLES = ERG_STEPPED_TYPICAL_WINDOW_MS / ERG_STEPPED_HISTORY_SAMPLE_MS;
+  struct Slot {
+    uint16_t watts;
+    int16_t cadence16;  // cadence in 1/16 rpm
+    uint8_t count;
+    uint32_t at;
+  };
+  Slot slots[SLOTS]    = {};
+  uint32_t lastAt      = 0;
+  uint32_t typicalAt   = 0;
+  int16_t typical16    = 0;
+  uint8_t typicalCount = 0;
 
-  int _median(uint32_t now, uint32_t window, int targetWatts, int minimum) const {
-    int n = 0;
-    for (int k = 0; k < count; ++k) {
-      const int index = (next + CAPACITY - 1 - k) % CAPACITY;
-      if (now - time[index] > window) break;  // newest first; older entries are older still
-      if (targetWatts > 0 && (watts[index] == 0 || std::abs(static_cast<int>(watts[index]) - targetWatts) * 10 > targetWatts)) continue;
-      values[n++] = rpm[index];
-    }
-    if (n < minimum) return -1;
-    std::sort(values, values + n);
-    return n % 2 ? values[n / 2] : (values[n / 2 - 1] + values[n / 2] + 1) / 2;
-  }
+  static bool _near(int slotWatts, int watts) { return std::abs(slotWatts - watts) * 10 <= watts; }
+  static bool _expired(const Slot& slot, uint32_t now) { return now - slot.at > ERG_STEPPED_HISTORY_MEMORY_MS; }
 };
 
 }  // namespace ErgControl
