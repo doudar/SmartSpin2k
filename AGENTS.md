@@ -14,6 +14,7 @@ SmartSpin2k is ESP32 firmware for converting a spin bike into a BLE smart traine
 - Serves a web UI from `data/` over WiFi/LittleFS.
 - Runs a DirCon TCP bridge for BLE-like service discovery, reads, writes, and notifications over WiFi.
 - Drives a TMC2209/FastAccelStepper motor to change resistance.
+- Runs on a ram limited microcontroller. Limit ram usage and always look for methods to decrease ram usage. 
 
 Primary software directories:
 
@@ -680,3 +681,9 @@ Useful commands:
 Prefer `rg` over slower recursive tools.
 
 Forward power-table lookup repairs flat or nearly-flat extrapolation using the existing minimum endpoint position span (20 stored units). Borrow only the equal-torque position change from reliable monotone informative rows, anchored at the recipient measured edge, and retain the original cadence blend. Do not add the discarded weak slope or replace the edge with a donor absolute position. Preserve exact anchors, in-range interpolation, and raw no-donor fallback. Behavioral tests cover one-watt public-controller ramps, both edges, donor thresholds, malformed rows, and inverse behavior. Fixed-table extrapolation is continuous; arbitrary learned-table changes and inconsistent rows still do not certify a physical surface.
+
+## Code Review
+
+- Perform a through review with special emphasis on items that may produce increased processor time or stack/heap usage. 
+- In your comments, provide an estimate of cycles increased/decreased as well as stack and heap increases or decreases.
+- Check to make sure that methods aren't duplicated and if a newly added method could instead recycle an existing method with minor modification. This extends to both variables and functions. 
