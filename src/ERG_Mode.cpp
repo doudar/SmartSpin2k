@@ -1141,12 +1141,18 @@ bool ErgMode::_spinUpCadenceSettled(uint32_t now, int cadence) {
 // cadence (or the current one, if higher). Higher cadence means less resistance, so this can only ease off.
 void ErgMode::_spinUpEase(int cadence) {
   spinUpEased = true;
-  // _tableHasSeekSupport() judges the current (spin-up) cadence; the lookup below is at the riding cadence instead
-  // and returns RETURN_ERROR without table support there. A lower position only ever eases off.
+  // _tableHasSeekSupport() judges the current (spin-up) cadence; support is checked below at the riding cadence the
+  // move is sized for. A lower position only ever eases off.
   if (!rtConfig->getHomed() || isTableSeeking() || feedbackWaiting) return;
   const int target = rtConfig->watts.getTarget();
   const int easeCadence = std::max(cadence, static_cast<int>(spinUpRidingCadence));
   if (target <= 0 || easeCadence <= MIN_ERG_CADENCE) return;
+  // A table-sized move needs seek support at the cadence it is sized for (two supported rows, or a constrained
+  // curve there); a non-error forward lookup from an incomplete table is not enough (Codex review, #775).
+  if (!powerTable->hasErgSeekSupport() && ErgControl::constrainedTablePosition(powerTable->ptData, target, easeCadence) == RETURN_ERROR) {
+    SS2K_LOG(ERG_MODE_LOG_TAG, "Spin-up: no easing for %dw at %d rpm (no table support)", target, easeCadence);
+    return;
+  }
   const int32_t position = _constrainedTablePosition(target, easeCadence);
   if (position == RETURN_ERROR || position <= rtConfig->getMinStep() || position >= ss2k->getCurrentPosition() - ERG_TABLE_SETTLED_POSITION_STEPS) {
     SS2K_LOG(ERG_MODE_LOG_TAG, "Spin-up: no easing for %dw at %d rpm (table %ld, knob %ld)", target, easeCadence, static_cast<long>(position),
@@ -1156,6 +1162,10 @@ void ErgMode::_spinUpEase(int cadence) {
   SS2K_LOG(ERG_MODE_LOG_TAG, "Spin-up: target %dw needs less resistance; easing to %ld at %d rpm", target, static_cast<long>(position), easeCadence);
   mode = Mode::DECREASING;
   _updateValues(static_cast<float>(position));
+  // Like any table-based correction: wait for the move and its power response before another correction, and
+  // reference the cadence the move was sized for, so a rising cadence is not compensated a second time.
+  cadenceReference = easeCadence;
+  _startFeedbackWait();
 }
 
 // Tracks stops and spin-ups; true while ERG should not add resistance. When the hold ends, one setpoint seek at the

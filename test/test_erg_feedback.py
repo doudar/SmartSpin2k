@@ -1231,6 +1231,42 @@ int main(int argc,char** argv) {
     const float eased=rtConfig->getTargetIncline();
     assert(eased<hard);
     for(int t=16600;t<=17800;t+=300) { rtConfig->cad.setValue(60+(t-16600)/60); step(t,90); assert(rtConfig->getTargetIncline()<=eased); }
+  } else if(scenario=="spinup_ease_needs_support") {
+    // Codex review (#775): with a homed but incomplete table (one reliable cadence row) the forward lookup still
+    // returns a position, but table-driven moves require seek support. A restart must not ease by table there.
+    setup(150,200); table.surface=true;
+    for(int watts:{90,180,270}) { auto& e=table.ptData.tableRow[(90-60)/5].tableEntry[watts/30]; e.targetPosition=400+watts/3; e.readings=3; }
+    assert(!table.hasErgSeekSupport());
+    rtConfig->cad.setValue(90);
+    for(int t=1000;t<=8000;t+=1000) step(t,190);
+    const float before=rtConfig->getTargetIncline();
+    rtConfig->cad.setValue(0);
+    for(int t=8100;t<=11100;t+=300) step(t,30);
+    assert(logged("holding resistance until cadence settles"));
+    rtConfig->cad.setValue(45); step(11400,60);
+    printf("spinup_ease_needs_support: before %.0f after restart %.0f\n",before,rtConfig->getTargetIncline()); fflush(stdout);
+    assert(!logged("needs less resistance; easing"));
+    assert(rtConfig->getTargetIncline()>=before);
+  } else if(scenario=="spinup_ease_waits_for_response") {
+    // Codex review (#775): an ease toward a lower restored target (310 -> 150 W, sized at the remembered 85 rpm)
+    // is a table-sized move. Delayed power still above target must not trigger another cadence-sized move before
+    // the ease's own response is acquired, and the cadence reference is the ease cadence (not compensated twice).
+    setup(196,310); table.sloped=true; table.wattSlope=12; table.cadenceSlope=-30; table.lookupResult=11866;
+    rtConfig->cad.setValue(85);
+    motor.current=motor.target=13996; rtConfig->setTargetIncline(13996);
+    for(int t=1000;t<=12000;t+=1000) step(t,308);
+    rtConfig->cad.setValue(0);
+    for(int t=12100;t<=15100;t+=300) step(t,40);
+    rtConfig->watts.setTarget(150);
+    for(int t=15400;t<=16000;t+=300) step(t,30);
+    rtConfig->cad.setValue(60); step(16300,200);
+    assert(logged("needs less resistance; easing"));
+    const float eased=rtConfig->getTargetIncline();
+    int moves=0;
+    for(int t=16600;t<=18400;t+=300) { rtConfig->cad.setValue(t<17200?75:85); step(t,200); if(rtConfig->getTargetIncline()!=eased) ++moves; }
+    printf("spinup_ease_waits_for_response: eased %.0f, now %.0f, moves before acquisition %d\n",eased,rtConfig->getTargetIncline(),moves); fflush(stdout);
+    assert(logged("ERG feedback wait"));
+    assert(moves==0);
   } else if(scenario=="spinup_target_change_during_hold") {
     // A new target during the hold is not applied as an increase until the hold ends; then one seek.
     beginSeek(); step(2000,198); rtConfig->cad.setValue(0);
@@ -1934,7 +1970,7 @@ class TestErgFeedback(unittest.TestCase):
     def test_production_erg_feedback_wait(self):
         for scenario in ["ride_handoff", "crossing_and_safety", "reduction_safety", "worsening_reduction", "ordinary_reduction",
                          "new_target", "cadence_stop", "cadence_coast_step", "cadence_stop_real", "spinup_noisy_cadence",
-                         "spinup_timeout", "spinup_power_trend", "spinup_lower_target", "spinup_target_change_during_hold",
+                         "spinup_timeout", "spinup_power_trend", "spinup_lower_target", "spinup_target_change_during_hold", "spinup_ease_needs_support", "spinup_ease_waits_for_response",
                          "spinup_mode_reset", "stepped_feedback_gate", "stepped_drop_cadence", "brake_hold", "rv_low_cadence_drill", "rv_stop_then_slow_restart", "rv_single_sample_glitch", "rv_sprint_end",
                          "mode_change", "missing_feedback", "movement_timeout", "no_table", "pid_no_wait_decrease", "small_error",
                          "clamped_move", "clock_wrap", "trusted_seek", "trusted_seek_late_uptime", "simulation_1000", "simulation_2000", "simulation_3000",
