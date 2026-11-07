@@ -96,6 +96,11 @@ struct SS2K {
   bool usePowerTableForPower() { return false; }
   bool stepperSafetyReady() { return true; }
   int32_t simulationTargetPosition() { return targetPosition; }
+  // Local SIM gearing is covered by test_gearing_integration.py. This adapter
+  // exercises ERG and never enables the wired-Peloton edge/gear handoff.
+  int32_t ftmsSimulationOffset = 0;
+  bool localGearingSelected() const { return false; }
+  int32_t gearTargetPosition(int) const { return targetPosition; }
   void _resistanceMove() { std::abort(); } // This harness deliberately accepts ERG only.
   void updateStealthChop(bool) {}
   void updateStepperPower(int) {}

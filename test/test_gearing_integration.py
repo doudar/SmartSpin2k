@@ -26,12 +26,15 @@ class TestGearingIntegration(unittest.TestCase):
         parameters = (ROOT / "src/SmartSpin_parameters.cpp").read_text(encoding="utf-8")
         table_source = (ROOT / "src/Power_Table.cpp").read_text(encoding="utf-8")
         fitness_source = (ROOT / "src/BLE_Fitness_Machine_Service.cpp").read_text(encoding="utf-8")
+        collector = (ROOT / "src/SensorCollector.cpp").read_text(encoding="utf-8")
         production = "\n".join([
             function(parameters, "void userParameters::setDefaults("),
             *[function(gearing, signature) for signature in (
                 "void SS2K::resetStartingGear(", "VirtualGearing::Gears SS2K::activeGearRatios(", "bool SS2K::usePowerTableForPower(", "bool SS2K::localGearingSelected(",
                 "int32_t SS2K::gearTargetPosition(", "int32_t SS2K::simulationTargetPosition(")],
             function(main, "void SS2K::FTMSModeShiftModifier("),
+            function(main, "bool SS2K::pelotonConnected("),
+            function(collector, "void collectAndSet("),
             function(table_source, "void PowerTable::clearRuntime("),
             function(table_source, "void PowerTable::setStepperMinMax("),
             function(fitness_source, "int BLE_Fitness_Machine_Service::calculateResistanceFromPosition("),
@@ -42,7 +45,11 @@ class TestGearingIntegration(unittest.TestCase):
 #include <cassert>
 #include <cmath>
 #include <cstring>
+#include <memory>
+#include <vector>
 #include <Arduino.h>
+#include "Constants.h"
+#include "sensors/PelotonData.h"
 uint32_t clockMs = 1;
 unsigned long testMillis() { return clockMs; }
 #define millis testMillis
@@ -53,6 +60,7 @@ unsigned long testMillis() { return clockMs; }
 #include "PowerTable_Helpers.h"
 #define ARDUINO_ISR_ATTR
 #define SS2K_LOG(...) ((void)0)
+#define SS2K_LOGD(...) ((void)0)
 using std::max;
 enum ButtonState { RELEASED, PRESSED };
 /* CONTROLLER */;
@@ -77,13 +85,15 @@ struct HomingSafetyPause {
 };
 struct Motor {
   int32_t pos = 0;
+  int32_t queuedTarget = 0;
+  bool followTarget = true;
   int commands = 0;
   int32_t getCurrentPosition() { return pos; }
   void setCurrentPosition(int32_t value) { pos = value; }
   bool isRunning() { return false; }
   void forceStop() {}
   void stopMove() {}
-  int moveTo(int32_t value) { ++commands; pos = value; return 0; }
+  int moveTo(int32_t value) { ++commands; queuedTarget = value; if (followTarget) pos = value; return 0; }
   void move(int32_t delta, bool) { moveTo(pos + delta); }
   void enableOutputs() {}
   void setAutoEnable(bool) {}
@@ -101,6 +111,9 @@ struct BLE_ss2kCustomCharacteristic { static void notify(int) {} };
 constexpr int BLE_shifterPosition = 6;
 constexpr int LOG_INTERVAL = 1000;
 struct Client {
+  struct Device { std::string uniqueName; uint32_t lastDataUpdateTime = 0; bool isGrupetto = false; };
+  Device myBLEDevices[NUM_BLE_DEVICES];
+  bool connectedHRM = false, connectedCD = false, connectedPM = false, connectedSpeed = false;
   int32_t forwardedTarget = 0;
   void FTMSControlPointWrite(const uint8_t*, int) { forwardedTarget = ss2k->simulationTargetPosition(); }
 } spinBLEClient;
@@ -136,7 +149,8 @@ void userParameters::saveToLittleFS() { ++saved; }
 void SS2K::setLEDEnabled(bool) {}
 void SS2K::setupTMCStepperDriver(bool) {}
 void SS2K::updateStepperPower(int) {}
-void SS2K::updateStepperSpeed(int) {}
+int appliedSpeed = 0;
+void SS2K::updateStepperSpeed(int speed) { appliedSpeed = speed; }
 bool SS2K::stepperSafetyReady() { return safetyReady; }
 bool SS2K::_findEndStop(bool upper) { motor.pos = upper ? 20000 : -1000; return failedMechanicalEnd != int(upper); }
 // Isolate orchestration from the independently tested sensor search.
@@ -176,7 +190,33 @@ template<class IO> struct Search {
   Failure failure() { return Failure::Timeout; }
 };
 }
+// Use the production parser with an explicit clock; fake only factory routing
+// and BLE feedback so the serial -> collector -> motor path stays real.
+struct BleFeedback : PelotonData {
+  bool hasResistance() override { return true; }
+  int getResistance() override { return 63; }
+};
+struct Factory {
+  std::shared_ptr<PelotonData> peloton = std::make_shared<PelotonData>();
+  std::shared_ptr<BleFeedback> ble = std::make_shared<BleFeedback>();
+  std::shared_ptr<SensorData> getSensorData(const NimBLEUUID& uuid, const std::string&, uint8_t* data, size_t size) {
+    if (uuid == PELOTON_DATA_UUID) {
+      peloton->decode(data, size, clockMs);
+      return peloton;
+    }
+    return ble;
+  }
+} sensorDataFactory;
 /* FIRMWARE */
+void wireResistance(int level) {
+  const std::string digits = std::to_string(level);
+  std::vector<uint8_t> packet{PELOTON_HEADER, PELOTON_RES_ID, static_cast<uint8_t>(digits.size())};
+  packet.insert(packet.end(), digits.rbegin(), digits.rend());
+  uint8_t checksum = 0;
+  for (auto byte : packet) checksum += byte;
+  packet.push_back(checksum);
+  collectAndSet(PELOTON_DATA_UUID, PELOTON_DATA_UUID, "Peloton", packet.data(), packet.size());
+}
 void initializeStartupPosition() {
   /* STARTUP POSITION */
 }
@@ -215,6 +255,126 @@ void assertGear(int gear) {
   assert(controller.getLastShifterPosition() == gear);
 }
 int main() {
+  // Wired resistance must survive collector filtering even with an external
+  // power meter, while unrelated BLE resistance remains ignored.
+  for (const char* meter : {NONE, ANY, "External power meter"}) {
+    reset();
+    config.setConnectedPowerMeter(meter);
+    config.setStepperSpeed(3000);
+    runtime.watts.setValue(210);
+    runtime.cad.setValue(80);
+    controller.pelotonIsConnected = true;
+    controller.externalControl = true;
+    for (int level : {0, 4, 5, 10, 20, 50, 80, 98, 100}) {
+      wireResistance(level);
+      assert(runtime.resistance.getValue() == level && !runtime.resistance.getSimulate());
+      assert(controller.pelotonConnected());
+      assert(runtime.getMinResistance() == MIN_PELOTON_RESISTANCE);
+      assert(runtime.getMaxResistance() == MAX_PELOTON_RESISTANCE);
+      assert(runtime.watts.getValue() == 210 && runtime.cad.getValue() == 80);
+      for (int direction : {-1, 1}) {
+        runtime.setMinStep(0);
+        runtime.setMaxStep(20000);
+        motor.pos = 1000;
+        controller.setTargetPosition(1000 + direction * 100);
+        controller.moveStepper();
+        const bool towardLowerEdge = level >= MIN_PELOTON_RESISTANCE && level < MAX_PELOTON_RESISTANCE * 0.2 && direction < 0;
+        const bool towardUpperEdge = level <= MAX_PELOTON_RESISTANCE && level > MAX_PELOTON_RESISTANCE * 0.8 && direction > 0;
+        assert((appliedSpeed < 3000) == (towardLowerEdge || towardUpperEdge));
+        if (level < MIN_PELOTON_RESISTANCE && direction < 0) assert(motor.pos == 1020);
+        else if (level > MAX_PELOTON_RESISTANCE && direction > 0) assert(motor.pos == 980);
+        else if ((level == MIN_PELOTON_RESISTANCE && direction < 0) || (level == MAX_PELOTON_RESISTANCE && direction > 0)) assert(motor.pos == 1000);
+        else assert(motor.pos == 1000 + direction * 100);
+      }
+    }
+    const NimBLEUUID bike = FITNESSMACHINEINDOORBIKEDATA_UUID;
+    collectAndSet(bike, FITNESSMACHINESERVICE_UUID, "Other bike", nullptr, 0);
+    assert(runtime.resistance.getValue() == 100);
+    spinBLEClient.myBLEDevices[0].uniqueName = "Name-locked Grupetto";
+    spinBLEClient.myBLEDevices[0].isGrupetto = true;
+    collectAndSet(bike, FITNESSMACHINESERVICE_UUID, "Name-locked Grupetto", nullptr, 0);
+    assert(runtime.resistance.getValue() == 63 && !runtime.resistance.getSimulate());
+    spinBLEClient.myBLEDevices[0].isGrupetto = false;
+  }
+  // Serial resistance must not select FTMS homing, even with a BLE meter and
+  // an advertised 0..100 resistance range. Test startup and full calibration.
+  for (const char* meter : {NONE, ANY, "External power meter"}) {
+    for (bool full : {false, true}) {
+      reset();
+      config.setConnectedPowerMeter(meter);
+      controller.pelotonIsConnected = true;
+      wireResistance(50);
+      controller.goHome(full);
+      assert(runtime.getHomed() && !controller.homingFallback);
+      assert(fullSearches == 0 && mapSearches == 0 && recoveries == 0);
+      assert(runtime.getMinStep() == 0 && runtime.getMaxStep() == (full ? 19900 : 20000));
+      assert(runtime.resistance.getValue() == 50 && !runtime.resistance.getSimulate());
+    }
+  }
+  // Replay a rapid multi-gear downshift with 300 ms resistance reports and a
+  // speed-limited motor. The retained edge must survive feedback recovery and
+  // periodic power-table limit maintenance without revisiting the low target.
+  reset();
+  config.setShiftStep(1000);
+  config.setStepperSpeed(6000);
+  runtime.setMinStep(-DEFAULT_STEPPER_TRAVEL);
+  runtime.setMaxStep(DEFAULT_STEPPER_TRAVEL);
+  controller.pelotonIsConnected = true;
+  controller.resetStartingGear();
+  controller.FTMSModeShiftModifier();
+  motor.pos = 8000;
+  motor.followTarget = false;
+  runtime.setShifterPosition(2);
+  controller.FTMSModeShiftModifier();
+  int32_t heldPosition = 0;
+  for (int tick = 0; tick < 1200; ++tick) {
+    clockMs += 10;
+    if (tick % 30 == 0) {
+      const int level = std::max(0, std::min(100, (motor.pos - 6000) / 200));
+      wireResistance(level);
+      assert(runtime.resistance.getValue() == level); // No 1 s safety lag.
+      controller.pelotonConnected();
+    }
+    if (tick % 50 == 0) table.setStepperMinMax();
+    controller.moveStepper();
+    const int travel = std::max(1, appliedSpeed / 100);
+    motor.pos += std::max(-travel, std::min(travel, motor.queuedTarget - motor.pos));
+    assert(motor.pos > 6000); // Physical zero in this test plant.
+    if (tick == 1000) heldPosition = motor.pos;
+    if (tick > 1000) assert(motor.pos == heldPosition); // No yo-yo or equality creep.
+  }
+  const int32_t retainedMinimum = runtime.getMinStep();
+  wireResistance(0);
+  table.setStepperMinMax();
+  assert(runtime.getMinStep() == retainedMinimum);
+  wireResistance(6);
+  runtime.setShifterPosition(1);
+  controller.FTMSModeShiftModifier();
+  assertGear(2); // Existing shift blocker uses the retained limit.
+  runtime.setShifterPosition(3);
+  controller.FTMSModeShiftModifier();
+  controller.moveStepper();
+  assert(motor.queuedTarget > heldPosition); // One upshift escapes the held edge.
+  runtime.setFTMSMode(FitnessMachineControlPointProcedure::SetTargetPower);
+  runtime.setTargetIncline(2000);
+  controller.moveStepper();
+  assert(motor.queuedTarget >= retainedMinimum); // ERG shares the final clamp.
+
+  // The upper edge uses the same shared clamp and must also remain held after
+  // resistance returns inside the allowed range, including external commands.
+  reset();
+  controller.pelotonIsConnected = true;
+  controller.externalControl = true;
+  motor.pos = 10000;
+  for (int level : {99, 98, 97, 98, 97}) {
+    wireResistance(level);
+    controller.pelotonConnected();
+    controller.setTargetPosition(30000);
+    controller.moveStepper();
+    if (level == 99) heldPosition = motor.pos;
+    else assert(motor.pos == heldPosition);
+    table.setStepperMinMax();
+  }
   // No calibration: power-on gear 8 is the existing knob position. First shifts
   // move one step either way, and mode changes retain the same gear origin.
   reset();
@@ -651,6 +811,9 @@ int main() {
                 "-I" + str(ROOT / "include"), "-I" + str(ROOT / "lib/SS2K/include"),
                 "-I" + str(ROOT / "lib/ArduinoCompat/include"), str(cpp), "-o", str(exe),
                 str(ROOT / "src/PowerTable_Helpers.cpp"),
+                str(ROOT / "lib/SS2K/src/sensors/PelotonData.cpp"),
+                str(ROOT / "lib/SS2K/src/sensors/SensorData.cpp"),
+                str(ROOT / "lib/ArduinoCompat/src/NimBLEUUID.cpp"),
             ], check=True)
             subprocess.run([str(exe)], check=True)
 

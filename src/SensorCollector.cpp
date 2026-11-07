@@ -100,9 +100,11 @@ void collectAndSet(const NimBLEUUID& charUUID, const NimBLEUUID& serviceUUID, co
     SENSOR_LOG_APPEND(" SD(%.2f)", fmodf(sensorData->getSpeed(), 1000.0));
   }
 
-  if (sensorData->hasResistance() && isGrupetto) {  // Grupetto resistance feedback enables FTMS homing.
-      rtConfig->resistance.setValue(sensorData->getResistance(), false);  // Publish value and real-data flag together.
-      SENSOR_LOG_APPEND(" RS(%d)", sensorData->getResistance() % 1000);
+  // Wired Peloton feedback also drives the resistance limits and edge slowdown,
+  // even when a separate BLE power meter supplies watts/cadence.
+  if (sensorData->hasResistance() && (isGrupetto || charUUID == PELOTON_DATA_UUID)) {
+    rtConfig->resistance.setValue(sensorData->getResistance(), false);  // Publish value and real-data flag together.
+    SENSOR_LOG_APPEND(" RS(%d)", sensorData->getResistance() % 1000);
   }
 
   // adding incline so that i can plot it

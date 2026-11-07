@@ -38,7 +38,7 @@ class PelotonData : public SensorData {
     }
     float average() const { return static_cast<float>(sum) / count; }
   };
-  Accumulator pendingPower, pendingCadence, pendingResistance;
+  Accumulator pendingPower, pendingCadence;
   uint32_t windowStart = 0;
   bool collecting = false;
   bool receivedCadence = false;
