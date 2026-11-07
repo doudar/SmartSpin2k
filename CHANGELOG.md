@@ -10,6 +10,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Added
 
 ### Changed
+
+### Hardware
+
+
+## [26.10.18]
+
+### Added
+
+### Changed
 - Restore wired Peloton resistance feedback for lower/upper resistance protection and direction-dependent slowdown near the limits, including when using an external BLE power meter. Keep wired Peloton homing on mechanical end-stop detection.
 - Publish wired Peloton resistance immediately, retain edge positions in shared travel limits to prevent repeated dives below the minimum, and apply slowdown before motor dispatch. Reuse the SIM offset so one shift away leaves the guarded edge; keep power/cadence averaging.
 - Automatically include changelog highlights and linked commits since the previous release tag in release notes, alongside GitHub's PR list; retain the full change list when rebuilding the same day's release.
