@@ -20,8 +20,9 @@
 HardwareSerial stepperSerial(2);
 // Construct after hardware detection so the selected board's sense resistor is used.
 static TMC2209Stepper* driver = nullptr;
-FastAccelStepperEngine engine = FastAccelStepperEngine();
-FastAccelStepper* stepper     = NULL;
+static SS2KStepper pulseStepper;
+static MotorStepper logicalStepper;
+MotorStepper* stepper = nullptr;
 
 extern Board currentBoard;
 
@@ -89,11 +90,8 @@ class HomingSafetyPause {
     portENTER_CRITICAL(&enableMux);
     homingActive      = true;
     portEXIT_CRITICAL(&enableMux);
-    // Cadence normally selects manual enable, but FastAccelStepper retains its
-    // earlier auto-disable countdown when that mode changes. Homing skips the
-    // maintenance enableOutputs() calls; a long dwell can therefore disable EN
-    // while subsequent commands still advance the software position. Always
-    // let homing moves refresh the countdown and re-enable an expired output.
+    // Homing skips maintenance's cadence-based enable calls. Its moves must
+    // re-enable outputs after long dwells and refresh the automatic idle timer.
     if (stepper) stepper->setAutoEnable(true);
   }
   ~HomingSafetyPause() {
@@ -114,7 +112,7 @@ class HomingSafetyPause {
 bool guardedEnablePin(uint8_t pin, uint8_t value) {
   portENTER_CRITICAL(&enableMux);
   bool level = (!homingActive && motorInhibited) || value == HIGH;
-  digitalWrite(pin & ~PIN_EXTERNAL_FLAG, level ? HIGH : LOW);
+  digitalWrite(pin, level ? HIGH : LOW);
   portEXIT_CRITICAL(&enableMux);
   return level;
 }
@@ -125,7 +123,7 @@ void applyMotorInterlock(bool resumeAfterHoming) {
   if (!inhibit && !ss2k->stepperSafetyReady() && stepper) {
     // Discard any movement submitted while blocked. Reset enable bookkeeping
     // before opening the gate after cadence selected manual enable mode.
-    stepper->forceStopAndNewPosition(stepper->getCurrentPosition());
+    stepper->forceStopAtCurrentPosition();
     stepper->disableOutputs();
     stepper->setAutoEnable(true);
   }
@@ -138,7 +136,7 @@ void applyMotorInterlock(bool resumeAfterHoming) {
   portEXIT_CRITICAL(&enableMux);
   if (newlyInhibited) {
     if (stepper) {
-      stepper->forceStopAndNewPosition(stepper->getCurrentPosition());
+      stepper->forceStopAtCurrentPosition();
       stepper->disableOutputs();  // Also reset auto-enable's cached enable timer.
     }
     SS2K_LOG(MAIN_LOG_TAG, "Motor inhibited: TMC configured=%d, TMC thermal stop=%d, S3 stop=%d; EN held high", driverConfigured, tmcProtection.disabled(), s3MotorInhibited);
@@ -481,21 +479,19 @@ void SS2K::setupTMCStepperDriver(bool reset) {
   if (!driver) {
     driver = new TMC2209Stepper(&stepperSerial, currentBoard.rSense, 0b00);
   }
-  const bool initializeFastAccel = !reset || stepper == nullptr;
+  const bool initializePulseGenerator = !reset || stepper == nullptr;
 
-  // FastAccelStepper only owns the ESP32 pulse-generation peripheral; it does
+  // The pulse generator only owns the ESP32 pulse-generation peripheral; it does
   // not require a responding TMC UART. Initialize it even when the physical
   // driver is absent so runtime setting writes cannot encounter a null object.
-  if (initializeFastAccel) {
-    engine.init();
-    stepper = engine.stepperConnectToPin(currentBoard.stepPin);
+  if (initializePulseGenerator) {
+    stepper = logicalStepper.attach(pulseStepper.begin(currentBoard.stepPin, guardedEnablePin) ? &pulseStepper : nullptr);
     if (stepper == nullptr) {
-      SS2K_LOG(MAIN_LOG_TAG, "Unable to initialize FastAccelStepper on pin %u", static_cast<unsigned>(currentBoard.stepPin));
+      SS2K_LOG(MAIN_LOG_TAG, "Unable to initialize MCPWM/PCNT step generator on pin %u", static_cast<unsigned>(currentBoard.stepPin));
       return;
     }
     stepper->setDirectionPin(currentBoard.dirPin, userConfig->getStepperDir());
-    engine.setExternalCallForPin(guardedEnablePin);
-    stepper->setEnablePin(currentBoard.enablePin | PIN_EXTERNAL_FLAG);
+    stepper->setEnablePin(currentBoard.enablePin);
     stepper->setAutoEnable(true);
     stepper->setSpeedInHz(DEFAULT_STEPPER_SPEED);
     stepper->setAcceleration(STEPPER_ACCELERATION);
@@ -542,7 +538,7 @@ void SS2K::setupTMCStepperDriver(bool reset) {
   }
   driver->pdn_disable(true);       // Use PDN pin to enable UART communication instead of grounding signal
   driver->mstep_reg_select(true);  // Use register instead of ms1&ms2 pins for microstep selection
-  driver->microsteps(4);           // Set microsteps to 1/4
+  driver->microsteps(MotorStepper::microsteps);  // LogicalStepper preserves quarter-step firmware units.
   driver->iholddelay(5);           // Controls the number of clock cycles for motor power down after standstill is detected
   driver->TPOWERDOWN(16);          // delay until hold current (0-255). 255 = 5.6s, 2 is minimum for StealthChop.
   driver->toff(5);                 // needs >0 for driver enable. 1-15 controls duration of slow decay phase of pwm.
@@ -1230,7 +1226,7 @@ void SS2K::updateStealthChop(bool coolStepEnabled) {
  */
 void SS2K::updateStepperSpeed(int speed) {
   if (stepper == nullptr) {
-    SS2K_LOG(MAIN_LOG_TAG, "Skipping stepper speed update because FastAccelStepper is unavailable");
+    SS2K_LOG(MAIN_LOG_TAG, "Skipping stepper speed update because the pulse generator is unavailable");
     return;
   }
 

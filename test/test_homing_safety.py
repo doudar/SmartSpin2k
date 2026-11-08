@@ -28,7 +28,7 @@ class TestHomingSafety(unittest.TestCase):
 #define SS2K_LOG(...) ((void)0)
 #define portENTER_CRITICAL(mux) ((void)0)
 #define portEXIT_CRITICAL(mux) ((void)0)
-constexpr int HIGH = 1, LOW = 0, PIN_EXTERNAL_FLAG = 0x80;
+constexpr int HIGH = 1, LOW = 0;
 constexpr float HOLD_PWR_SCALER = 0.1f;
 int enableMux = 0, enableLevel = HIGH, lockDepth = 0;
 uint32_t clockMs = 1000;
@@ -55,12 +55,12 @@ struct Motor {
   bool queued = false;
   int stops = 0;
   int getCurrentPosition() { return 123; }
-  void forceStopAndNewPosition(int) {
+  void forceStopAtCurrentPosition() {
     assert(enableLevel == HIGH);
     queued = false;
     ++stops;
   }
-  void disableOutputs() { guardedEnablePin(currentBoard.enablePin | PIN_EXTERNAL_FLAG, HIGH); }
+  void disableOutputs() { guardedEnablePin(currentBoard.enablePin, HIGH); }
   void setAutoEnable(bool) {}
 } motor;
 Motor* stepper = &motor;
@@ -83,7 +83,7 @@ void homing(bool earlyReturn) {
   // Homing's original current restores and enable bypass remain available.
   requestedCurrent = 200;
   if (driver) hardware.appliedCurrent = config.current;
-  guardedEnablePin(currentBoard.enablePin | PIN_EXTERNAL_FLAG, LOW);
+  guardedEnablePin(currentBoard.enablePin, LOW);
   assert(enableLevel == LOW);
   if (stepper) motor.queued = true; // Final return-to-zero move, or an early exit.
   if (earlyReturn) return;

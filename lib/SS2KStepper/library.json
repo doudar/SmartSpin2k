@@ -1,0 +1,8 @@
+{
+  "name": "SS2KStepper",
+  "version": "0.1.0",
+  "description": "Single-axis ESP-IDF MCPWM/PCNT controller for SmartSpin2k",
+  "frameworks": ["espidf", "arduino"],
+  "platforms": "espressif32",
+  "build": {"srcDir": ".", "includeDir": "."}
+}
