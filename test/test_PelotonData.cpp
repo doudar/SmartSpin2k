@@ -40,17 +40,22 @@ void TestPelotonData::test_window_averages_and_boundaries() {
   decode(sensor, PELOTON_POW_ID, 1000, 0);
   decode(sensor, PELOTON_CAD_ID, 80, 20);
   decode(sensor, PELOTON_RES_ID, 40, 40);
+  TEST_ASSERT_TRUE(sensor.hasResistance());
+  TEST_ASSERT_EQUAL_INT(40, sensor.getResistance());
   decode(sensor, PELOTON_POW_ID, 3000, 500);
   decode(sensor, PELOTON_CAD_ID, 100, 600);
   decode(sensor, PELOTON_RES_ID, 44, 999);
-  assertNoFreshData(sensor);
+  TEST_ASSERT_TRUE(sensor.hasResistance());
+  TEST_ASSERT_EQUAL_INT(44, sensor.getResistance());
+  TEST_ASSERT_FALSE(sensor.hasPower());
+  TEST_ASSERT_FALSE(sensor.hasCadence());
   decode(sensor, PELOTON_POW_ID, 9000, 1000);
   TEST_ASSERT_TRUE(sensor.hasPower());
   TEST_ASSERT_TRUE(sensor.hasCadence());
-  TEST_ASSERT_TRUE(sensor.hasResistance());
+  TEST_ASSERT_FALSE(sensor.hasResistance());
   TEST_ASSERT_EQUAL_INT(200, sensor.getPower());
   TEST_ASSERT_EQUAL_FLOAT(90, sensor.getCadence());
-  TEST_ASSERT_EQUAL_INT(42, sensor.getResistance());
+  TEST_ASSERT_EQUAL_INT(44, sensor.getResistance());
   decode(sensor, PELOTON_CAD_ID, 60, 1100);
   assertNoFreshData(sensor);
   decode(sensor, PELOTON_CAD_ID, 70, 2000);
@@ -60,6 +65,16 @@ void TestPelotonData::test_window_averages_and_boundaries() {
   decode(sensor, PELOTON_RES_ID, 40, 3000);
   TEST_ASSERT_FALSE(sensor.hasPower());  // Empty power windows cannot refresh held watts.
   TEST_ASSERT_TRUE(sensor.hasCadence());
+  TEST_ASSERT_TRUE(sensor.hasResistance());
+  // Safety feedback must not wait for, or be diluted by, an averaging window.
+  decode(sensor, PELOTON_RES_ID, 5, 3001);
+  TEST_ASSERT_TRUE(sensor.hasResistance());
+  TEST_ASSERT_EQUAL_INT(5, sensor.getResistance());
+  decode(sensor, PELOTON_RES_ID, 0, 3002);
+  TEST_ASSERT_TRUE(sensor.hasResistance());
+  TEST_ASSERT_EQUAL_INT(0, sensor.getResistance());
+  TEST_ASSERT_FALSE(sensor.hasPower());
+  TEST_ASSERT_FALSE(sensor.hasCadence());
 }
 
 void TestPelotonData::test_independent_counts_precision_and_stops() {
@@ -75,10 +90,12 @@ void TestPelotonData::test_independent_counts_precision_and_stops() {
   TEST_ASSERT_EQUAL_INT(42, sensor.getResistance());
   decode(sensor, PELOTON_POW_ID, 0, 1010);
   decode(sensor, PELOTON_RES_ID, 0, 1020);
+  TEST_ASSERT_TRUE(sensor.hasResistance());
+  TEST_ASSERT_EQUAL_INT(0, sensor.getResistance());
   decode(sensor, PELOTON_POW_ID, 4000, 2000);
   TEST_ASSERT_TRUE(sensor.hasPower());
   TEST_ASSERT_TRUE(sensor.hasCadence());
-  TEST_ASSERT_TRUE(sensor.hasResistance());
+  TEST_ASSERT_FALSE(sensor.hasResistance());
   TEST_ASSERT_EQUAL_INT(0, sensor.getPower());
   TEST_ASSERT_EQUAL_FLOAT(0, sensor.getCadence());
   TEST_ASSERT_EQUAL_INT(0, sensor.getResistance());
@@ -119,6 +136,8 @@ void TestPelotonData::test_gap_wrap_and_device_isolation() {
 void TestPelotonData::test_invalid_packets_do_not_refresh_or_pollute() {
   PelotonData sensor;
   decode(sensor, PELOTON_POW_ID, 1000, 0);
+  decode(sensor, PELOTON_RES_ID, 50, 10);
+  TEST_ASSERT_TRUE(sensor.hasResistance());
   auto bytes = packet(PELOTON_POW_ID, 3000);
   sensor.decode(bytes.data(), bytes.size() - 1, 500);
   assertNoFreshData(sensor);

@@ -135,9 +135,13 @@ void PowerTable::setStepperMinMax() {
   }
 
   // Failed homing always uses watt-derived limits, even with real resistance feedback.
-  if (!ss2k->homingFallback && rtConfig->resistance.getValue() > 0 && !rtConfig->resistance.getSimulate()) {
-    rtConfig->setMinStep(-DEFAULT_STEPPER_TRAVEL);
-    rtConfig->setMaxStep(DEFAULT_STEPPER_TRAVEL);
+  if (!ss2k->homingFallback && !rtConfig->resistance.getSimulate() && (ss2k->pelotonIsConnected || rtConfig->resistance.getValue() > 0)) {
+    // Wired Peloton learns conservative edge positions in moveStepper().
+    // Keep those limits even at zero resistance and between power-table passes.
+    if (!ss2k->pelotonIsConnected) {
+      rtConfig->setMinStep(-DEFAULT_STEPPER_TRAVEL);
+      rtConfig->setMaxStep(DEFAULT_STEPPER_TRAVEL);
+    }
     SS2K_LOG(POWERTABLE_LOG_TAG, "Using Resistance Travel Limits");
     return;
   }

@@ -41,7 +41,7 @@ void PelotonData::decode(uint8_t *data, size_t length) {
 }
 
 void PelotonData::decode(uint8_t *data, size_t length, uint32_t now) {
-  // Fresh flags describe one completed window, never held values from it.
+  // Power/cadence describe a completed window; resistance is immediate safety feedback.
   receivedCadence = receivedPower = receivedResistance = false;
   if (data == nullptr || length < 4 || data[0] != PELOTON_HEADER) return;
   const uint8_t payload_length = data[2];
@@ -73,7 +73,8 @@ void PelotonData::decode(uint8_t *data, size_t length, uint32_t now) {
 
     case PELOTON_RES_ID:
       if (value > 100) return;
-      destination = &pendingResistance;
+      resistance = static_cast<int>(value);
+      receivedResistance = true;
       break;
 
     case PELOTON_RES_ID2:
@@ -91,15 +92,13 @@ void PelotonData::decode(uint8_t *data, size_t length, uint32_t now) {
     if (collecting && elapsed < 2 * averageWindowMs) {
       receivedPower = pendingPower.count != 0;
       receivedCadence = pendingCadence.count != 0;
-      receivedResistance = pendingResistance.count != 0;
       if (receivedPower) power = std::lround(pendingPower.average() / 10.0f);
       if (receivedCadence) cadence = pendingCadence.average();
-      if (receivedResistance) resistance = std::lround(pendingResistance.average());
     }
-    pendingPower = pendingCadence = pendingResistance = {};
+    pendingPower = pendingCadence = {};
     windowStart = now;
     collecting = true;
   }
   // Keep wire precision until publication; each field has its own denominator.
-  destination->add(value);
+  if (destination) destination->add(value);
 }

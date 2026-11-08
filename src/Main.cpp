@@ -370,38 +370,6 @@ void SS2K::maintenanceLoop(void*) {
     ss2k->updateLED();
     // If we're in ERG mode, modify shift commands to inc/dec the target watts instead.
 
-    // If we have a resistance bike attached, slow down when we're close to the limits.
-    if (stepper && ss2k->pelotonIsConnected && !rtConfig->getHomed() && !spinBLEServer.spinDownFlag) {
-      int speed           = userConfig->getStepperSpeed();
-      float resistance    = rtConfig->resistance.getValue();
-      float maxResistance = rtConfig->getMaxResistance();
-
-      // Slow down when resistance is within 20% of the lower limit
-      if (resistance < (maxResistance * 0.2)) {
-        float factor = resistance / (maxResistance * 0.2);
-        speed        = static_cast<int>(factor * userConfig->getStepperSpeed());
-        if (speed < 500) {
-          speed = 500;
-        }
-        if (ss2k->targetPosition > stepper->getCurrentPosition()) {
-          speed = userConfig->getStepperSpeed();
-        }
-      }
-
-      // Slow down when resistance is within 20% of the upper limit
-      if (resistance > (maxResistance * 0.8)) {
-        float factor = (maxResistance - resistance) / (maxResistance * 0.2);
-        speed        = static_cast<int>(factor * userConfig->getStepperSpeed());
-        if (speed < 500) {
-          speed = 500;
-        }
-        if (ss2k->targetPosition < stepper->getCurrentPosition()) {
-          speed = userConfig->getStepperSpeed();
-        }
-      }
-      ss2k->updateStepperSpeed(speed);
-    }
-
     // Handle flag set for rebooting
     if (ss2k->rebootFlag) {
       static bool _loopOnce = false;

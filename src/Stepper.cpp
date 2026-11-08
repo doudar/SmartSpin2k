@@ -347,26 +347,70 @@ void SS2K::moveStepper() {
       ss2k->syncMode = false;
     }
 
-    if (ss2k->pelotonIsConnected && !rtConfig->getHomed() && !ss2k->homingFallback) {
-      // Peloton + not homed: gently walk away from the edges unless the user is actively shifting past them
-      if (rtConfig->resistance.getValue() < rtConfig->getMinResistance()) {  // Below allowed resistance
-        // Nudge upward unless the user already asked to move higher
-        if (ss2k->targetPosition <= ss2k->getCurrentPosition()) {
-          ss2k->targetPosition = ss2k->getCurrentPosition() + 20;
+    const bool pelotonLimits = ss2k->pelotonIsConnected && !rtConfig->getHomed() && !ss2k->homingFallback && !rtConfig->resistance.getSimulate();
+    if (pelotonLimits) {
+      // Retain the edge in the shared travel limits: resuming the old gear target
+      // as soon as resistance recovers would repeatedly drive back into the edge.
+      const int resistance = rtConfig->resistance.getValue();
+      // Shared clamps keep one step inside a boundary. Offset the recorded edge
+      // accordingly so equality holds position instead of creeping every pass.
+      if (resistance <= rtConfig->getMinResistance()) {
+        const int64_t minimum = static_cast<int64_t>(ss2k->currentPosition) + (resistance < rtConfig->getMinResistance() ? 20 : 0) - 1;
+        if (minimum > rtConfig->getMinStep() && minimum < rtConfig->getMaxStep()) rtConfig->setMinStep(minimum);
+      }
+      if (resistance >= rtConfig->getMaxResistance()) {
+        const int64_t maximum = static_cast<int64_t>(ss2k->currentPosition) - (resistance > rtConfig->getMaxResistance() ? 20 : 0) + 1;
+        if (maximum < rtConfig->getMaxStep() && maximum > rtConfig->getMinStep()) rtConfig->setMaxStep(maximum);
+      }
+    }
+    // Keep every target inside the known or provisional range, including a
+    // Peloton edge retained above and commands from ERG or external control.
+    if (ss2k->targetPosition < rtConfig->getMinStep()) {
+      ss2k->targetPosition = rtConfig->getMinStep() + 1;
+    } else if (ss2k->targetPosition > rtConfig->getMaxStep()) {
+      ss2k->targetPosition = rtConfig->getMaxStep() - 1;
+    }
+
+    if (pelotonLimits && ss2k->localGearingSelected()) {
+      const int32_t requested = ss2k->gearTargetPosition(rtConfig->getShifterPosition());
+      if (requested < rtConfig->getMinStep() || requested > rtConfig->getMaxStep()) {
+        // Keep the accepted gear at its guarded position using the existing SIM
+        // offset, so a single shift away works after a queued multi-gear move.
+        const int64_t offset = static_cast<int64_t>(ss2k->ftmsSimulationOffset) + ss2k->targetPosition - requested;
+        if (offset >= INT32_MIN && offset <= INT32_MAX) ss2k->ftmsSimulationOffset = static_cast<int32_t>(offset);
+      }
+    }
+
+    // If we have a resistance bike attached, slow down when we're close to the limits.
+    if (stepper && ss2k->pelotonIsConnected && !rtConfig->getHomed() && !spinBLEServer.spinDownFlag) {
+      int speed           = userConfig->getStepperSpeed();
+      float resistance    = rtConfig->resistance.getValue();
+      float maxResistance = rtConfig->getMaxResistance();
+
+      // Slow down when resistance is within 20% of the lower limit
+      if (resistance < (maxResistance * 0.2)) {
+        float factor = resistance / (maxResistance * 0.2);
+        speed        = static_cast<int>(factor * userConfig->getStepperSpeed());
+        if (speed < 500) {
+          speed = 500;
+        }
+        if (ss2k->targetPosition > stepper->getCurrentPosition()) {
+          speed = userConfig->getStepperSpeed();
         }
       }
-      if (rtConfig->resistance.getValue() > rtConfig->getMaxResistance()) {
-        // Nudge downward unless the user already asked to move lower
-        if (ss2k->targetPosition > ss2k->getCurrentPosition()) {
-          ss2k->targetPosition = ss2k->getCurrentPosition() - 20;
+
+      // Slow down when resistance is within 20% of the upper limit
+      if (resistance > (maxResistance * 0.8)) {
+        float factor = (maxResistance - resistance) / (maxResistance * 0.2);
+        speed        = static_cast<int>(factor * userConfig->getStepperSpeed());
+        if (speed < 500) {
+          speed = 500;
+        }
+        if (ss2k->targetPosition < stepper->getCurrentPosition()) {
+          speed = userConfig->getStepperSpeed();
         }
       }
-    } else {  // Keep target inside the known or provisional range.
-      if (ss2k->targetPosition < rtConfig->getMinStep()) {
-        ss2k->targetPosition = rtConfig->getMinStep() + 1;
-      } else if (ss2k->targetPosition > rtConfig->getMaxStep()) {
-        ss2k->targetPosition = rtConfig->getMaxStep() - 1;
-      }
+      ss2k->updateStepperSpeed(speed);
     }
 
     stepper->moveTo(ss2k->targetPosition);
@@ -958,7 +1002,10 @@ void SS2K::goHome(bool bothDirections) {
     ++powerTable->positionEpoch;
   }
   ergMode->resetTableConfidence();
-  const bool useFTMSHoming = !rtConfig->resistance.getSimulate() && strcmp(userConfig->getConnectedPowerMeter(), NONE) != 0 && rtConfig->resistance.getMax() > 0;
+  // Wired Peloton resistance is useful for control, but home it with the faster
+  // mechanical end stops, including when an external BLE power meter is selected.
+  const bool useFTMSHoming = !ss2k->pelotonIsConnected && !rtConfig->resistance.getSimulate() &&
+                             strcmp(userConfig->getConnectedPowerMeter(), NONE) != 0 && rtConfig->resistance.getMax() > 0;
   if (bothDirections) {
     fitnessMachineService.spinDown(FitnessMachineStatus::SpinDown_SpinDownRequested);
   }
