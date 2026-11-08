@@ -113,7 +113,7 @@ class Bridge:
         if row != ["F", "128", str(payload[0]), "1"]:
             raise RuntimeError(f"FTMS procedure failed: {row}")
 
-    def tick(self, now_ms, watts, cadence, fresh, target=-1, load=0, *, cadence_fresh=None):
+    def tick(self, now_ms, watts, cadence, fresh, target=-1, load=0, *, cadence_fresh=None, resistance=-1):
         # Separate component-level samples. This pipe is NOT a BLE transport.
         mask = (1 if fresh else 0) | (2 if (fresh if cadence_fresh is None else cadence_fresh) else 0)
         if self.packet_ingress:
@@ -122,7 +122,7 @@ class Bridge:
                 self.control(struct.pack("<Bh", 5, round(target)))
             watts = cadence = mask = 0
             target = -1
-        row = self.exchange(f"T {now_ms} {round(watts)} {round(cadence)} {mask} {target} {load}")
+        row = self.exchange(f"T {now_ms} {round(watts)} {round(cadence)} {mask} {target} {load}" + (f" {int(resistance)}" if resistance >= 0 else ""))
         if row[0] != "T" or len(row) != 9:
             raise RuntimeError(f"Malformed bridge reply: {row}")
         self.now_ms = now_ms

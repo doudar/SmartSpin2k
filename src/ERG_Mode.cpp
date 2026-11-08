@@ -6,6 +6,7 @@
  */
 
 #include "ERG_Mode.h"
+#include <new>
 #include "SS2KLog.h"
 #include "Main.h"
 #include "Power_Table.h"
@@ -55,6 +56,9 @@ void ErgMode::prepareMode() {
   offsetSettledAt = offsetPosition = offsetCadence = 0;
   feedbackEarlyRetreatTarget              = INT32_MIN;
   feedbackUpdateValid                     = false;
+  _resetSpinUp();
+  tableSeekDropCadence = false;
+  historySettledAt     = 0;
   prevWatts.setTarget(0);
   ergTimer = millis();
   if (active) {
@@ -166,8 +170,18 @@ void ErgMode::runERG() {
   // correction frequency, independently of table housekeeping.
   const auto powerSample    = rtConfig->watts.getValueSample();
   const bool newPowerSample = prevWatts.getValueSample().timestamp != powerSample.timestamp;
+  // Spin-up after a real stop: do not add resistance while the rider's cadence is still rising. Easing off is
+  // still allowed. Riding without a stop of ERG_SPINUP_STOP_MS never arms this.
+  const bool spinUpHold     = _spinUpHold(static_cast<uint32_t>(millis())) && powerSample.value < rtConfig->watts.getTarget();
+  // After the hold, seek once at the settled cadence. Applied here, once no seek or feedback wait is active, so a
+  // wait that ends (and records prevWatts) cannot erase it.
+  if (spinUpSeekPending && !spinUpHold && !isTableSeeking() && !feedbackWaiting) {
+    spinUpSeekPending = false;
+    prevWatts.setTarget(0);
+  }
+  _recordCadenceHistory(spinUpHold);
   const bool targetChanged  = prevWatts.getTarget() != rtConfig->watts.getTarget();
-  if (rtConfig->cad.getValue() > MIN_ERG_CADENCE / 2 && (newPowerSample || targetChanged) && rtConfig->getFTMSMode() == FitnessMachineControlPointProcedure::SetTargetPower &&
+  if (!spinUpHold && rtConfig->cad.getValue() > MIN_ERG_CADENCE / 2 && (newPowerSample || targetChanged) && rtConfig->getFTMSMode() == FitnessMachineControlPointProcedure::SetTargetPower &&
       (spinBLEClient.connectedPM || rtConfig->watts.getTarget() || rtConfig->watts.getSimulate()) && !isTableSeeking() && !feedbackWaiting) {
     computeErg();
   }
@@ -318,10 +332,13 @@ int32_t ErgMode::_setPointChangeState() {
     // coverage. Approach the near side of the power window there and let
     // measured feedback finish the transition. Retain ordinary table seeks
     // when the cadence-curve estimate is unavailable.
-    const bool extrapolatedCurve = !_tableTargetIsWithinMeasuredBounds(currentTarget, currentCadence) &&
-                                   ErgControl::constrainedTablePosition(powerTable->ptData, currentTarget, currentCadence) != RETURN_ERROR;
+    // A stepped-feedback recovery drop is sized at the cadence the rider will settle back to.
+    const char* cadenceSource    = "current";
+    const int seekCadence        = _dropSeekCadence(currentTarget, currentCadence, cadenceSource);
+    const bool extrapolatedCurve = !_tableTargetIsWithinMeasuredBounds(currentTarget, seekCadence) &&
+                                   ErgControl::constrainedTablePosition(powerTable->ptData, currentTarget, seekCadence) != RETURN_ERROR;
     const int seekWatts          = currentTarget + (extrapolatedCurve ? (mode == Mode::INCREASING ? -ERG_MODE_PID_WINDOW : ERG_MODE_PID_WINDOW) : 0);
-    int32_t tableResult          = _constrainedTablePosition(seekWatts, currentCadence);
+    int32_t tableResult          = _constrainedTablePosition(seekWatts, seekCadence);
     // Preserve the local feedback offset for a large step only when the
     // present power/cadence observation is quiet and the motor has stopped.
     if (tableResult != RETURN_ERROR && abs(currentTarget - prevWatts.getTarget()) > ERG_TABLE_CORRECTION_WATTS && !ss2k->stepperIsRunning &&
@@ -349,7 +366,10 @@ int32_t ErgMode::_setPointChangeState() {
     const bool insideTravel      = tableResult > rtConfig->getMinStep() && tableResult < rtConfig->getMaxStep();
     const bool movesTowardTarget = (mode == Mode::INCREASING && tableResult > ss2k->getCurrentPosition()) || (mode == Mode::DECREASING && tableResult < ss2k->getCurrentPosition());
     if (tableResult != RETURN_ERROR && tableResult >= 0 && insideTravel && movesTowardTarget) {
-      _startTrustedTableSeek(tableResult);
+      if (seekCadence != currentCadence) {
+        SS2K_LOG(ERG_MODE_LOG_TAG, "Recovery drop sized at %s cadence %drpm (rider now %drpm)", cadenceSource, seekCadence, currentCadence);
+      }
+      _startTrustedTableSeek(tableResult, seekCadence);
       return tableResult;
     }
     SS2K_LOG(ERG_MODE_LOG_TAG, "Trusted table result was unusable at %dw/%drpm; using conservative seek", currentTarget, currentCadence);
@@ -613,7 +633,7 @@ unsigned long ErgMode::_trustedTableMoveDeadline(int32_t position) const {
   return millis() + estimatedMove + ERG_TABLE_SETTLE_TIMEOUT_MS;
 }
 
-void ErgMode::_startTrustedTableSeek(int32_t position) {
+void ErgMode::_startTrustedTableSeek(int32_t position, int seekCadence) {
   boundedSeekTransition = true;
   tableCorrectionNeedsProgress = true;
   if (!isTableSeeking() && !feedbackWaiting) controlMinimum = controlMaximum = ss2k->getCurrentPosition();
@@ -621,7 +641,9 @@ void ErgMode::_startTrustedTableSeek(int32_t position) {
   tableSeekState             = TableSeekState::MOVING;
   tableSeekTargetWatts       = rtConfig->watts.getTarget();
   tableSeekHadHighTarget     = tableSeekTargetWatts > ErgControl::HIGH_GAIN_WATTS;
-  tableSeekCadence           = rtConfig->cad.getValue();
+  tableSeekCadence           = seekCadence > 0 ? seekCadence : rtConfig->cad.getValue();
+  tableSeekDropCadence       = tableSeekCadence != rtConfig->cad.getValue();
+  tableSeekDropDirection     = tableSeekCadence < rtConfig->cad.getValue() ? -1 : 1;
   tableSeekPosition          = position;
   tableSeekLastWatts         = INT32_MIN;
   tableSeekStableMatches     = 0;
@@ -661,6 +683,7 @@ void ErgMode::_stopTrustedTableSeek(const char* reason, bool seedPidFromTable, b
   tableSeekPidSeedValid    = seedPidFromTable;
   tableSeekPidSeedPosition = tableSeekPosition;
   tableSeekState           = TableSeekState::INACTIVE;
+  tableSeekDropCadence     = false;
   tableSeekStableMatches   = 0;
   tableSeekStableMisses    = 0;
   tableSeekLastWatts       = INT32_MIN;
@@ -724,7 +747,10 @@ void ErgMode::_handleTrustedTableSeek() {
   // not move the motor while a slow drift is still followed. Power measured
   // while the motor is moving can lag the new cadence and position; it must
   // not turn a valid feed-forward adjustment into a PID handoff.
-  if (targetAmended || abs(cadence - tableSeekCadence) >= ERG_CADENCE_FOLLOW_DEADBAND_RPM) {
+  // A drop sized at the held cadence does not follow the rider's cadence while it moves toward the held cadence
+  // (down from a fast effort, or up from a low-cadence climb); once it gets there the seek follows cadence as usual.
+  if (tableSeekDropCadence && (targetAmended || cadence * tableSeekDropDirection >= tableSeekCadence * tableSeekDropDirection)) tableSeekDropCadence = false;
+  if (!tableSeekDropCadence && (targetAmended || abs(cadence - tableSeekCadence) >= ERG_CADENCE_FOLLOW_DEADBAND_RPM)) {
     if (!_tableTargetIsTrusted(tableSeekTargetWatts, cadence)) {
       _stopTrustedTableSeek("cadence lookup is no longer usable", true, true);
       return;
@@ -849,6 +875,7 @@ int32_t ErgMode::_inSetpointState() {
     if (target <= ErgControl::HIGH_GAIN_WATTS) highPowerTransition = false;
     tableCorrectionNeedsProgress = false;
   }
+  if (_steppedHold(measuredError)) return static_cast<int32_t>(rtConfig->getTargetIncline());
   if ((tableCorrectionNeedsProgress || transitionTarget == target) && (measuredError * sustainedTrend <= 0 || abs(measuredError) <= ErgControl::ERG_TRANSIENT_APPROACH_WATTS) &&
       std::abs(sustainedTrend) >= ErgControl::ERG_TRANSIENT_MIN_TREND_WPS) {
     const int projectedError = measuredError - static_cast<int>(std::round(sustainedTrend * ErgControl::ERG_TRANSIENT_BRAKING_SECONDS));
@@ -950,7 +977,9 @@ int32_t ErgMode::_inSetpointState() {
     // Cap the compensation: a surge that the last resistance drop caused would otherwise remove more resistance at once.
     // _updateValues() refreshes the reference after a move, so power feedback corrects the remainder.
     const int cadenceDelta   = std::max(-ERG_CADENCE_COMPENSATION_MAX_RPM, std::min(ERG_CADENCE_COMPENSATION_MAX_RPM, cadence - cadenceReference));
-    const double cadenceMove = cadenceSlope * cadenceDelta;
+    // Stepped-resistance bikes apply half the move (see ERG_STEPPED_CADENCE_COMPENSATION_GAIN); others the full move.
+    const double cadenceGain = _hasSteppedFeedback() ? ERG_STEPPED_CADENCE_COMPENSATION_GAIN : 1.0;
+    const double cadenceMove = cadenceGain * cadenceSlope * cadenceDelta;
     const bool diverging     = measuredError * sustainedTrend < 0 && std::abs(sustainedTrend) >= ErgControl::ERG_TRANSIENT_MIN_TREND_WPS;
     // Delayed watts can still show a confirmed worsening residual. Do not
     // add resistance into a growing overshoot (or remove it into a growing
@@ -958,8 +987,12 @@ int32_t ErgMode::_inSetpointState() {
     if ((abs(measuredError) <= ErgControl::ERG_TRANSIENT_APPROACH_WATTS && !diverging) || cadenceMove * measuredError >= 0) {
       newIncline += cadenceMove;
       SS2K_LOG(ERG_MODE_LOG_TAG, "Cadence compensation: %d -> %drpm, applied %+drpm, %+.0f steps", cadenceReference, cadence, cadenceDelta, cadenceMove);
-      // Consume the applied cadence change even if feedback exactly cancels its move.
-      cadenceReference += cadenceDelta;
+      // Consume the applied part of the cadence change even if feedback exactly cancels its move. With the
+      // stepped half gain only half is consumed. The 1 RPM remainder of a 2-3 RPM change is inside the follow
+      // deadband, so it survives the move and is compensated on a later update if it persists; after a larger
+      // (capped) change _updateValues() refreshes the reference to the current cadence and power feedback
+      // corrects the rest (simulated Bike+, 3 seeds: mean error 7.79 W vs 7.96 W when consuming the full change).
+      cadenceReference += static_cast<int>(std::lround(cadenceGain * cadenceDelta));
     }
   }
   newIncline = std::max(static_cast<float>(ss2k->getCurrentPosition() - maxChange), std::min(static_cast<float>(ss2k->getCurrentPosition() + maxChange), newIncline));
@@ -981,6 +1014,231 @@ int32_t ErgMode::_inSetpointState() {
   }
 
   return newIncline;
+}
+
+// Fresh, real resistance-level feedback (Grupetto). This is "Grupetto feedback is present", not a measured
+// test that the brake is stepped: Grupetto on an original Peloton Bike also qualifies.
+bool ErgMode::_hasSteppedFeedback() const {
+  const auto resistance = rtConfig->resistance.getValueSample();
+  return !resistance.simulate && resistance.timestamp != 0 && resistance.value > 0 &&
+         static_cast<uint32_t>(millis()) - resistance.timestamp <= ERG_STEPPED_FEEDBACK_MAX_AGE_MS;
+}
+
+// Keep the rider's cadence history for sizing recovery drops. Samples are marked settled once power has stayed
+// within ERG_STEPPED_IMMEDIATE_WATTS of an unchanged target for ERG_STEPPED_HISTORY_SETTLE_MS outside any seek,
+// feedback wait or spin-up hold.
+void ErgMode::_recordCadenceHistory(bool holding) {
+  const uint32_t now = millis();
+  const int target   = rtConfig->watts.getTarget();
+  const bool erg     = rtConfig->getFTMSMode() == FitnessMachineControlPointProcedure::SetTargetPower;
+  if (!erg || !_hasSteppedFeedback()) {
+    historySettledAt = 0;
+    return;
+  }
+  // First Grupetto feedback: allocate the (small) cadence memory. Without it, drops keep the current cadence.
+  if (cadenceHistory == nullptr) cadenceHistory = new (std::nothrow) ErgControl::CadenceHistory();
+  if (cadenceHistory == nullptr) return;
+  const bool near = target > 0 && abs(rtConfig->watts.getValue() - target) < ERG_STEPPED_IMMEDIATE_WATTS;
+  if (target != historyTarget || !near || holding || isTableSeeking() || feedbackWaiting) {
+    historyTarget    = target;
+    historySettledAt = near && !holding && !isTableSeeking() && !feedbackWaiting ? now : 0;
+  } else if (historySettledAt == 0) {
+    historySettledAt = now;
+  }
+  const bool settled = historySettledAt != 0 && now - historySettledAt >= ERG_STEPPED_HISTORY_SETTLE_MS;
+  cadenceHistory->record(now, rtConfig->cad.getValue(), settled ? target : 0);
+}
+
+// The cadence used to size a table seek. Only a real easing-off with fresh stepped feedback changes it: a lower
+// target than before, with measured power still above it. Then the held (or typical) cadence is used, between the
+// current cadence minus ERG_STEPPED_DROP_CADENCE_ALLOWANCE_RPM and plus ERG_STEPPED_DROP_CADENCE_RISE_MAX_RPM.
+// Otherwise, and on other bikes, the current cadence.
+int ErgMode::_dropSeekCadence(int target, int cadence, const char*& source) {
+  source               = "current";
+  const int previous   = prevWatts.getTarget();
+  if (cadenceHistory == nullptr || !_hasSteppedFeedback() || previous <= 0 || target >= previous || rtConfig->watts.getValue() <= target) return cadence;
+  const uint32_t now = millis();
+  int remembered     = cadenceHistory->cadenceAt(target, now);
+  source             = "held";
+  if (remembered < 0) {
+    remembered = cadenceHistory->typicalCadence(now);
+    source     = "typical";
+  }
+  if (remembered < 0) {
+    source = "current";
+    return cadence;
+  }
+  const int floor   = cadence - ERG_STEPPED_DROP_CADENCE_ALLOWANCE_RPM;
+  const int ceiling = cadence + ERG_STEPPED_DROP_CADENCE_RISE_MAX_RPM;
+  if (floor > remembered) source = "floored";
+  if (remembered > ceiling) source = "capped";
+  // A held cadence above the rider's is a recovery after a low-cadence climb: the rider spins back up to it.
+  const int chosen = std::min(ceiling, std::max(remembered, floor));
+  if (chosen == cadence || !_tableTargetIsTrusted(target, chosen)) {
+    source = "current";
+    return cadence;
+  }
+  return chosen;
+}
+
+bool ErgMode::_steppedHold(int measuredError) {
+  // Only bikes reporting real resistance levels through Grupetto qualify (see _hasSteppedFeedback()).
+  const bool stepped = _hasSteppedFeedback();
+  // Never hold while a transition, table move or recovery still owns the knob.
+  if (!stepped || transitionTarget != INT32_MIN || tableCorrectionNeedsProgress || abs(measuredError) >= ERG_STEPPED_IMMEDIATE_WATTS) {
+    steppedErrorSign = 0;
+    return false;
+  }
+  if (abs(measuredError) <= ERG_STEPPED_HOLD_WATTS) {
+    steppedErrorSign = 0;
+    return true;
+  }
+  const int sign     = measuredError > 0 ? 1 : -1;
+  const uint32_t now = millis();
+  if (sign != steppedErrorSign) {
+    steppedErrorSign  = sign;
+    steppedErrorSince = now;
+  }
+  if (now - steppedErrorSince < ERG_STEPPED_PERSIST_MS) return true;
+  return false;
+}
+
+void ErgMode::_resetSpinUp() {
+  spinUpLowSince = spinUpSince = spinUpRidingAt = spinUpSlowdownSince = 0;
+  spinUpSlowdownTarget = -1;
+  spinUpRidingCadence = 0;
+  spinUpArmed = spinUpEased = spinUpSeekPending = spinUpFromSlowdown = false;
+  spinUpBucketCount = spinUpBucketNext = 0;
+}
+
+// Rolling stability: every cadence report of the last ERG_SPINUP_STABLE_MS lies within ERG_SPINUP_CADENCE_RANGE_RPM,
+// and the window is full (the rider has been above MIN_ERG_CADENCE that long).
+bool ErgMode::_spinUpCadenceSettled(uint32_t now, int cadence) {
+  // Bucket the reports: a new bucket every ERG_SPINUP_BUCKET_MS, each holding the range of cadence seen in it.
+  SpinUpBucket* bucket = spinUpBucketCount == 0 ? nullptr : &spinUpBuckets[(spinUpBucketNext + ERG_SPINUP_BUCKETS - 1) % ERG_SPINUP_BUCKETS];
+  if (bucket == nullptr || now - bucket->at >= ERG_SPINUP_BUCKET_MS) {
+    spinUpBuckets[spinUpBucketNext] = SpinUpBucket{now, static_cast<int16_t>(cadence), static_cast<int16_t>(cadence)};
+    spinUpBucketNext                = (spinUpBucketNext + 1) % ERG_SPINUP_BUCKETS;
+    if (spinUpBucketCount < ERG_SPINUP_BUCKETS) ++spinUpBucketCount;
+  } else {
+    bucket->low  = std::min<int16_t>(bucket->low, cadence);
+    bucket->high = std::max<int16_t>(bucket->high, cadence);
+  }
+  if (now - spinUpSince < ERG_SPINUP_STABLE_MS) return false;
+  // Every report of the last ERG_SPINUP_STABLE_MS (rounded out to whole buckets) lies within the allowed range.
+  int low = cadence, high = cadence;
+  for (int i = 0; i < spinUpBucketCount; ++i) {
+    const SpinUpBucket& b = spinUpBuckets[i];
+    if (now - b.at > ERG_SPINUP_STABLE_MS + ERG_SPINUP_BUCKET_MS) continue;
+    low  = std::min<int>(low, b.low);
+    high = std::max<int>(high, b.high);
+  }
+  return high - low <= ERG_SPINUP_CADENCE_RANGE_RPM;
+}
+
+// Once per hold: if the restored target needs less resistance than the knob holds (e.g. the app lowered the target
+// while the rider was stopped), move straight to the table position for the new target at the rider's pre-stop
+// cadence (or the current one, if higher). Higher cadence means less resistance, so this can only ease off.
+void ErgMode::_spinUpEase(int cadence) {
+  spinUpEased = true;
+  // _tableHasSeekSupport() judges the current (spin-up) cadence; support is checked below at the riding cadence the
+  // move is sized for. A lower position only ever eases off.
+  if (!rtConfig->getHomed() || isTableSeeking() || feedbackWaiting) return;
+  const int target = rtConfig->watts.getTarget();
+  const int easeCadence = std::max(cadence, static_cast<int>(spinUpRidingCadence));
+  if (target <= 0 || easeCadence <= MIN_ERG_CADENCE) return;
+  // A table-sized move needs seek support at the cadence it is sized for (two supported rows, or a constrained
+  // curve there); a non-error forward lookup from an incomplete table is not enough (Codex review, #775).
+  if (!powerTable->hasErgSeekSupport() && ErgControl::constrainedTablePosition(powerTable->ptData, target, easeCadence) == RETURN_ERROR) {
+    SS2K_LOG(ERG_MODE_LOG_TAG, "Spin-up: no easing for %dw at %d rpm (no table support)", target, easeCadence);
+    return;
+  }
+  const int32_t position = _constrainedTablePosition(target, easeCadence);
+  if (position == RETURN_ERROR || position <= rtConfig->getMinStep() || position >= ss2k->getCurrentPosition() - ERG_TABLE_SETTLED_POSITION_STEPS) {
+    SS2K_LOG(ERG_MODE_LOG_TAG, "Spin-up: no easing for %dw at %d rpm (table %ld, knob %ld)", target, easeCadence, static_cast<long>(position),
+             static_cast<long>(ss2k->getCurrentPosition()));
+    return;
+  }
+  SS2K_LOG(ERG_MODE_LOG_TAG, "Spin-up: target %dw needs less resistance; easing to %ld at %d rpm", target, static_cast<long>(position), easeCadence);
+  mode = Mode::DECREASING;
+  _updateValues(static_cast<float>(position));
+  // Like any table-based correction: wait for the move and its power response before another correction, and
+  // reference the cadence the move was sized for, so a rising cadence is not compensated a second time.
+  cadenceReference = easeCadence;
+  _startFeedbackWait();
+}
+
+// Tracks stops and spin-ups; true while ERG should not add resistance. When the hold ends, one setpoint seek at the
+// settled cadence is queued (spinUpSeekPending, applied in runERG).
+bool ErgMode::_spinUpHold(uint32_t now) {
+  const int cadence = rtConfig->cad.getValue();
+  if (rtConfig->getFTMSMode() != FitnessMachineControlPointProcedure::SetTargetPower) {
+    _resetSpinUp();
+    return false;
+  }
+  if (cadence <= MIN_ERG_CADENCE) {
+    if (spinUpLowSince == 0) spinUpLowSince = now == 0 ? 1 : now;
+    if (now - spinUpLowSince >= ERG_SPINUP_STOP_MS) spinUpFromSlowdown = false;  // a slowdown that became a real stop
+    if (!spinUpArmed && now - spinUpLowSince >= ERG_SPINUP_STOP_MS) {
+      spinUpArmed       = true;
+      spinUpEased       = false;
+      spinUpSeekPending = false;
+      spinUpFromSlowdown   = false;
+      SS2K_LOG(ERG_MODE_LOG_TAG, "Stopped for %lums; holding resistance until cadence settles", static_cast<unsigned long>(now - spinUpLowSince));
+    }
+    spinUpSince       = 0;  // a renewed stop restarts the spin-up
+    spinUpBucketCount = spinUpBucketNext = 0;
+    return spinUpArmed;
+  }
+  spinUpLowSince = 0;
+  // A sudden collapse from the riding cadence (braking the flywheel; Bike+/fixed-gear bikes cannot coast) holds like a
+  // stop. Not right after a target change: a rider settling from a sprint (125 -> 85 rpm as the target drops) is not braking.
+  if (rtConfig->watts.getTarget() != spinUpSlowdownTarget) {
+    spinUpSlowdownTarget      = rtConfig->watts.getTarget();
+    spinUpSlowdownTargetSince = now == 0 ? 1 : now;
+  }
+  if (!spinUpArmed && spinUpRidingAt != 0 && now - spinUpSlowdownTargetSince >= ERG_SLOWDOWN_AFTER_TARGET_MS && cadence <= spinUpRidingCadence - ERG_SLOWDOWN_DROP_RPM &&
+      cadence * 100 <= spinUpRidingCadence * (100 - ERG_SLOWDOWN_DROP_PERCENT)) {
+    if (spinUpSlowdownSince == 0) spinUpSlowdownSince = now == 0 ? 1 : now;
+    if (now - spinUpSlowdownSince >= ERG_SLOWDOWN_CONFIRM_MS) {
+      spinUpArmed       = true;
+      spinUpEased       = false;
+      spinUpSeekPending = false;
+      spinUpSince       = 0;
+      spinUpBucketCount = spinUpBucketNext = 0;
+      spinUpSlowdownSince  = 0;
+      spinUpFromSlowdown   = true;
+      SS2K_LOG(ERG_MODE_LOG_TAG, "Cadence fell from %d to %d rpm; holding resistance until cadence settles", static_cast<int>(std::lround(spinUpRidingCadence)), cadence);
+    }
+    // Add no resistance while the collapse is being confirmed either: a brief glitch only delays a correction.
+    return true;
+  }
+  spinUpSlowdownSince = 0;
+  if (!spinUpArmed) {
+    // Track the riding cadence (~5 s average) so a later spin-up can ease off at the cadence the rider will return to.
+    const double dt = spinUpRidingAt == 0 ? 0 : std::min(1.0, (now - spinUpRidingAt) / 1000.0);
+    spinUpRidingCadence = spinUpRidingAt == 0 ? cadence : spinUpRidingCadence + dt / (5.0 + dt) * (cadence - spinUpRidingCadence);
+    spinUpRidingAt      = now == 0 ? 1 : now;
+    return false;
+  }
+  if (spinUpSince == 0) spinUpSince = now == 0 ? 1 : now;
+  // Easing toward a lower restored target is for a real stop; a slowdown keeps the target it was riding.
+  if (!spinUpEased && !spinUpFromSlowdown && rtConfig->watts.getTarget() != userConfig->getMinWatts()) _spinUpEase(cadence);
+  const bool settled = _spinUpCadenceSettled(now, cadence) && std::abs(responseTrend) < ERG_SPINUP_TREND_WPS;
+  const bool expired = now - spinUpSince >= ERG_SPINUP_MAX_MS;
+  if (!settled && !expired) return true;
+  spinUpArmed       = false;
+  spinUpSince       = 0;
+  spinUpSeekPending = true;
+  spinUpFromSlowdown   = false;
+  // The cadence the rider settled at is the new riding baseline: a lower settled cadence must not re-arm the slowdown hold
+  // (independent review: a 92 -> 60 rpm drill re-armed it every ~4 s).
+  spinUpRidingCadence = cadence;
+  spinUpRidingAt      = now == 0 ? 1 : now;
+  // The spin-up's rising power is not a response to a move: do not let it brake the seek.
+  responseTrend = responsePreviousTrend = 0;
+  SS2K_LOG(ERG_MODE_LOG_TAG, "Spin-up complete at %d rpm (%s); seeking target %dw", cadence, settled ? "stable" : "timeout", rtConfig->watts.getTarget());
+  return false;
 }
 
 int32_t ErgMode::_tableCorrection(int watts, int target, int cadence) {

@@ -99,7 +99,7 @@ def run(workout, config, exe, output, *, seed=27, speed=0, tick_ms=20, sensitivi
             else:
                 held_power, held_cadence, cadence_fresh = bike.power, bike.cadence, fresh
             result = bridge.tick(1000+stamp, held_power, held_cadence, fresh, command, bike.load,
-                                 cadence_fresh=cadence_fresh)
+                                 cadence_fresh=cadence_fresh, resistance=bike.resistance)
             pulses, counter, target, cells, seeking, effective_target, min_step, max_step = result
             if fresh or asynchronous:
                 # bike.position has not yet received this tick's pulses; align the counter with it.
