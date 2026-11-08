@@ -57,13 +57,13 @@ jobs:
         run: python -m ss2k_sim compare --firmware-root candidate --candidate-root candidate --baseline-root baseline --output candidate/test/output/paired --seeds 7
       - name: Preserve exact baseline resolution
         if: always()
-        uses: actions/upload-artifact@v6
+        uses: actions/upload-artifact@v7
         with:
           name: baseline-selection-${{ github.sha }}
           path: baseline-selection.json
       - name: Preserve every result, including failures
         if: always()
-        uses: actions/upload-artifact@v6
+        uses: actions/upload-artifact@v7
         with:
           name: paired-controller-performance-${{ github.sha }}
           path: candidate/test/output/paired
