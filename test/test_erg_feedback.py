@@ -1349,6 +1349,30 @@ int main(int argc,char** argv) {
       }
     }
     printf("stepped_drop_cadence: drop without %d, held %d, floored %d, after low-cadence climb %d\n",drop[0],drop[1],drop[2],drop[3]); fflush(stdout);
+  } else if(scenario=="stepped_drop_cadence_recent") {
+    // Nov 8: a warm-up at 88 rpm at the recovery target, then riding at 72 rpm. The recovery cadence must follow
+    // the most recent riding at that target, not the warm-up: the old ~1 minute mean still said 81-82 rpm after
+    // 40 s at 72. The effort is ridden at 78 rpm (inside the 15 rpm allowance) so the drop is always history-sized
+    // and logged. A single 110 rpm sample during the 72 rpm stretch must not move the held cadence by much.
+    setup(155,155); userConfig->setERGSensitivity(3);
+    table.sloped=true; table.cadenceSlope=-100; table.lookupResult=motor.current-500;
+    auto feed=[&](uint32_t t){ clockMs=t; rtConfig->resistance.setValue(40,false); };
+    rtConfig->cad.setValue(88);
+    for(uint32_t t=1000;t<=61000;t+=1000) { feed(t); step(t,155); }
+    for(uint32_t t=62000;t<=101000;t+=1000) { rtConfig->cad.setValue(t==90000?110:72); feed(t); step(t,155); }
+    rtConfig->cad.setValue(78); rtConfig->watts.setTarget(300);
+    for(uint32_t t=102000;t<=132000;t+=1000) { feed(t); step(t,t==102000?155:300); }
+    logs.clear();
+    rtConfig->watts.setTarget(155); feed(133000); step(133000,300,false);
+    assert(logged("Recovery drop sized at held cadence"));
+    int held=-1;
+    for(const auto& line: logs) {
+      const auto at=line.find("held cadence ");
+      if(at!=std::string::npos) held=std::atoi(line.c_str()+at+13);
+    }
+    printf("stepped_drop_cadence_recent: recovery sized at %d rpm (rider rode 72 rpm, now 78)\n",held); fflush(stdout);
+    // 73 rpm without the spike; the 110 rpm sample 11 s before the drop adds at most 2 (unlimited: ~78; old code: 82).
+    assert(held>=70 && held<=75);
   } else if(scenario=="brake_hold") {
     // 0005: braking the flywheel from 88 rpm: the reported cadence only falls to ~48 rpm (never <= MIN_ERG_CADENCE
     // for 2.5 s). ERG must not add resistance for the low cadence; once cadence settles again it seeks once.
@@ -1971,7 +1995,7 @@ class TestErgFeedback(unittest.TestCase):
         for scenario in ["ride_handoff", "crossing_and_safety", "reduction_safety", "worsening_reduction", "ordinary_reduction",
                          "new_target", "cadence_stop", "cadence_coast_step", "cadence_stop_real", "spinup_noisy_cadence",
                          "spinup_timeout", "spinup_power_trend", "spinup_lower_target", "spinup_target_change_during_hold", "spinup_ease_needs_support", "spinup_ease_waits_for_response",
-                         "spinup_mode_reset", "stepped_feedback_gate", "stepped_drop_cadence", "brake_hold", "rv_low_cadence_drill", "rv_stop_then_slow_restart", "rv_single_sample_glitch", "rv_sprint_end",
+                         "spinup_mode_reset", "stepped_feedback_gate", "stepped_drop_cadence", "stepped_drop_cadence_recent", "brake_hold", "rv_low_cadence_drill", "rv_stop_then_slow_restart", "rv_single_sample_glitch", "rv_sprint_end",
                          "mode_change", "missing_feedback", "movement_timeout", "no_table", "pid_no_wait_decrease", "small_error",
                          "clamped_move", "clock_wrap", "trusted_seek", "trusted_seek_late_uptime", "simulation_1000", "simulation_2000", "simulation_3000",
                          "simulation_missing_2000", "trust_transients", "stale_seek", "seek_deadline", "sparse_seventy", "extrapolated_cadence",
