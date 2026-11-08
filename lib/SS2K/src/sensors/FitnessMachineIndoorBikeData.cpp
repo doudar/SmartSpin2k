@@ -68,23 +68,45 @@ int FitnessMachineIndoorBikeData::getResistance() {
 }
 
 void FitnessMachineIndoorBikeData::decode(uint8_t *data, size_t length) {
-  int flags         = get_le16(&data[0]);
-  uint8_t dataIndex = 2;
+  // A notification is a complete snapshot.  Clear cached values first, then
+  // only publish a parsed snapshot when every flagged field is present.
+  for (int typeIndex = Types::InstantaneousSpeed; typeIndex <= Types::RemainingTime; typeIndex++) {
+    values[typeIndex] = nan("");
+  }
+
+  if (data == nullptr || length < 2) {
+    return;
+  }
+
+  double_t parsed[FieldCount];
+  for (int typeIndex = Types::InstantaneousSpeed; typeIndex <= Types::RemainingTime; typeIndex++) {
+    parsed[typeIndex] = nan("");
+  }
+
+  uint16_t flags    = get_le16(&data[0]);
+  size_t dataIndex  = 2;
   for (int typeIndex = Types::InstantaneousSpeed; typeIndex <= Types::RemainingTime; typeIndex++) {
     if (bitRead(flags, flagBitIndices[typeIndex]) == flagEnabledValues[typeIndex]) {
-      uint8_t byteSize = byteSizes[typeIndex];
+      size_t byteSize = byteSizes[typeIndex];
+      if (byteSize > length - dataIndex) {
+        return;
+      }
+
       int value        = data[dataIndex];
-      for (int dataOffset = 1; dataOffset < byteSize; dataOffset++) {
+      for (size_t dataOffset = 1; dataOffset < byteSize; dataOffset++) {
         uint8_t dataByte = data[dataIndex + dataOffset];
         value |= (dataByte << (dataOffset * 8));
       }
       dataIndex += byteSize;
       value             = convert(value, byteSize, signedFlags[typeIndex]);
       double_t result   = std::round(value * resolutions[typeIndex] * 10.0) / 10.0;
-      values[typeIndex] = result;
+      parsed[typeIndex] = result;
       continue;
     }
-    values[typeIndex] = nanf("");
+  }
+
+  for (int typeIndex = Types::InstantaneousSpeed; typeIndex <= Types::RemainingTime; typeIndex++) {
+    values[typeIndex] = parsed[typeIndex];
   }
 }
 

@@ -23,6 +23,8 @@ class test_fitnessMachineIndoorBikeData {
   static void test_parses_power(void);
   static void test_parses_cadence(void);
   static void test_parses_heartrate(void);
+  static void test_walks_all_flagged_fields(void);
+  static void test_rejects_short_or_null_notifications(void);
 };
 
 class test_cyclePowerData {

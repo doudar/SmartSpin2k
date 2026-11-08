@@ -50,6 +50,8 @@ void setup() {
     RUN_TEST(test.test_parses_heartrate);
     RUN_TEST(test.test_parses_cadence);
     RUN_TEST(test.test_parses_power);
+    RUN_TEST(test.test_walks_all_flagged_fields);
+    RUN_TEST(test.test_rejects_short_or_null_notifications);
   }
 
   // Cycle Power Tests
