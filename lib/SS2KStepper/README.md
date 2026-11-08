@@ -36,6 +36,12 @@ The slow periodic stack-watermark scan also has a small stack-size-dependent cos
 
 Host tests exercise real planner/controller code with a timed peripheral model:
 `test_stepper_plan.py`, `test_stepper_controller.py`, `test_stepper_units.py`.
+`test_stepper_position.py` injects PCNT rollover between production position-reader
+register accesses. Position reads retry when the latched limit flag changes;
+repeated selections of the same auto-enable policy preserve the idle countdown.
+Estimated review-fix cost: 5–15 cycles for the policy comparison (unchanged calls
+skip the tick read), tens of cycles and at most 4 extra stack bytes per uncontended
+position read, no additional static RAM or heap. These are unmeasured estimates.
 Electrical pulse width/count and interrupt latency still require hardware testing.
 
 Validation on 2026-11-08: classic ESP32 and S3 release builds passed; 143 Python

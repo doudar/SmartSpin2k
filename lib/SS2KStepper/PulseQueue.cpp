@@ -128,9 +128,16 @@ int32_t currentPosition(PulseQueue* q) {
   if (q->read == q->write) return q->tailPosition;
   const Pulse& current = q->entries[q->read % PulseQueue::capacity];
   if (!current.steps) return current.start;
-  uint32_t count = PCNT.cnt_unit[q->counterId].COUNT_VALUE;
-  // A high-limit event resets the hardware counter before the ISR advances read.
-  if (PCNT.int_st.val & (1u << q->counterId)) count += current.steps;
+  const uint32_t bit = 1u << q->counterId;
+  uint32_t count, limit;
+  // mux blocks the ISR, not PCNT: a high-limit edge can reset the counter
+  // between register reads. Retry that crossing so pre-reset pulses are never
+  // added to a completed batch. The flag stays latched while mux is held.
+  do {
+    limit = PCNT.int_st.val & bit;
+    count = PCNT.cnt_unit[q->counterId].COUNT_VALUE;
+  } while (limit != (PCNT.int_st.val & bit));
+  if (limit) count += current.steps;
   return static_cast<int32_t>(static_cast<int64_t>(current.start) + (current.forward ? static_cast<int64_t>(count) : -static_cast<int64_t>(count)));
 }
 }  // namespace

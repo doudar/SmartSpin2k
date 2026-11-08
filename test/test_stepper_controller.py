@@ -144,7 +144,21 @@ int main() {
   motor.setDelayToDisable(10); vTaskDelay(20); assert(!ss2k_motor::physicalEnabled);
   motor.moveTo(3900); finish(3900); assert(ss2k_motor::physicalEnabled);
   motor.setAutoEnable(false); vTaskDelay(40); assert(ss2k_motor::physicalEnabled);
-  motor.setAutoEnable(true); vTaskDelay(40); assert(!ss2k_motor::physicalEnabled);
+  motor.setAutoEnable(true);
+  vTaskDelay(4); assert(ss2k_motor::physicalEnabled); // A policy transition starts a fresh timeout.
+  for (int i = 0; i < 100; ++i) { motor.setAutoEnable(true); vTaskDelay(4); }
+  assert(!ss2k_motor::physicalEnabled); // Repeated maintenance calls must not postpone disable.
+  motor.moveTo(3901); finish(3901); assert(ss2k_motor::physicalEnabled);
+  for (int i = 0; i < 100; ++i) { motor.setAutoEnable(true); vTaskDelay(4); }
+  assert(!ss2k_motor::physicalEnabled);
+  motor.moveTo(3900); finish(3900);
+  motor.setAutoEnable(false);
+  for (int i = 0; i < 100; ++i) { motor.setAutoEnable(false); vTaskDelay(4); }
+  assert(ss2k_motor::physicalEnabled);
+  // Tick wrap must not extend the transition's idle timeout.
+  nowMs = UINT32_MAX - 5;
+  motor.setAutoEnable(true); vTaskDelay(4); assert(ss2k_motor::physicalEnabled);
+  motor.setAutoEnable(true); vTaskDelay(8); assert(!ss2k_motor::physicalEnabled);
   inhibited = true; motor.moveTo(5000); vTaskDelay(4);
   assert(!motor.isRunning() && motor.getCurrentPosition() == 3900);
   inhibited = false; motor.moveTo(4000); finish(4000);

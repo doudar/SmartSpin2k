@@ -21,6 +21,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Changed
 - Use 1/16 motor microstepping while preserving existing movement distances, speed, acceleration, settings and power-table units through a motor adapter.
 - Replace FastAccelStepper with a small native C++ single-motor controller using ESP-IDF MCPWM/PCNT on classic ESP32 and ESP32-S3. Keep a fixed command queue and a 3000-byte task stack; report stack headroom and heap diagnostics.
+- Preserve the motor idle-disable countdown across repeated maintenance calls and prevent position double-counting when the hardware pulse counter rolls over during a read.
 
 ### Hardware
 

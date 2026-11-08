@@ -130,5 +130,10 @@ void SS2KStepper::setDirectionPin(uint8_t pin, bool forward) { Lock lock(*this);
 void SS2KStepper::setEnablePin(uint8_t pin) { Lock lock(*this); enablePin_ = pin; enable(false); }
 bool SS2KStepper::enableOutputs() { Lock lock(*this); return enable(true); }
 bool SS2KStepper::disableOutputs() { Lock lock(*this); return enable(false); }
-void SS2KStepper::setAutoEnable(bool value) { Lock lock(*this); autoEnable_ = value; lastActive_ = xTaskGetTickCount(); }
+void SS2KStepper::setAutoEnable(bool value) {
+  Lock lock(*this);
+  if (autoEnable_ == value) return;
+  autoEnable_ = value;
+  lastActive_ = xTaskGetTickCount();
+}
 void SS2KStepper::setDelayToDisable(uint16_t milliseconds) { Lock lock(*this); disableDelay_ = milliseconds; }
