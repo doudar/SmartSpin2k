@@ -49,7 +49,9 @@
     let websocket;
     let logEntries = [];
     let updateCounter = 0;
-    const maxLogentries = 1000;
+    // Keep a whole ride for "Save Log" (~150 lines/min while riding ERG), but render only the newest lines.
+    const maxLogentries = 6000;
+    const maxDisplayedLogEntries = 1000;
     const createdGroups = { settings: false, runtime: false };
 
     document.addEventListener("visibilitychange", onVisibilityChanged);
@@ -196,10 +198,12 @@
           logEntries.push(evt.data);
 
           if (logEntries.length > maxLogentries) {
-            logEntries = logEntries.slice(1, logEntries.length - 10);
+            // Drop the oldest entries. (slice(1, length - 10) dropped the 10 newest each time, so once full
+            // the page kept only about 1 in 11 new lines.)
+            logEntries.splice(0, logEntries.length - maxLogentries);
           }
 
-          debugElement.innerHTML = logEntries.join("<br>");
+          debugElement.innerHTML = logEntries.slice(-maxDisplayedLogEntries).join("<br>");
 
           if (followElement.checked) {
             debugElement.scrollTop = debugElement.scrollHeight - debugElement.clientHeight;
@@ -222,8 +226,8 @@
     });
 
     document.getElementById('saveLogButton').addEventListener('click', () => {
-      const debugElement = document.getElementById('debug');
-      logContent = debugElement.textContent;
+      // Save every kept entry, not only the lines on screen.
+      logContent = logEntries.join('');
       logContent = logContent.replace(/(\[\s*\d+\])/g, '\n$1');
       const blob = new Blob([logContent], { type: 'text/plain' });
       const url = URL.createObjectURL(blob);
