@@ -341,7 +341,7 @@ class CadenceHistory {
     lastAt = now == 0 ? 1 : now;
     // Typical cadence: running mean over the last ~2 minutes of samples.
     if (typicalCount < TYPICAL_SAMPLES) ++typicalCount;
-    typical16 += (cadence * 16 - typical16) / typicalCount;
+    typical16 += _meanStep(cadence * 16 - typical16, typicalCount, INT16_MAX);
     typicalAt = lastAt;
     if (settledWatts <= 0) return;
     Slot* slot = nullptr;
@@ -354,7 +354,9 @@ class CadenceHistory {
       *slot = Slot{static_cast<uint16_t>(std::min(settledWatts, 65535)), 0, 0, 0};
     }
     if (slot->count < HELD_SAMPLES) ++slot->count;
-    slot->cadence16 += (cadence * 16 - slot->cadence16) / slot->count;
+    // The step limit applies once the mean is established; the first samples set it.
+    const int heldStepLimit = slot->count > HELD_WEIGHT ? HELD_MAX_STEP16 : INT16_MAX;
+    slot->cadence16 += _meanStep(cadence * 16 - slot->cadence16, std::min<int>(slot->count, HELD_WEIGHT), heldStepLimit);
     slot->at = lastAt;
   }
 
@@ -372,8 +374,16 @@ class CadenceHistory {
   }
 
  private:
-  // Running means weigh up to this many recent samples (2 s apart): ~1 minute per settled target, ~2 minutes typical.
-  static constexpr uint8_t HELD_SAMPLES    = 30;
+  // Settled samples counted per target (2 s apart; at least ERG_STEPPED_HELD_MIN_SAMPLES before a slot is used).
+  static constexpr uint8_t HELD_SAMPLES = 30;
+  // The held cadence is a running mean weighing 1/HELD_WEIGHT per sample (time constant ~12 s, effectively the last
+  // ~20 s of settled riding), so it follows the most recent recovery. The old ~1 minute weight (30 samples) kept an
+  // 88 rpm warm-up for most of a ride ridden at 72 rpm and sized each recovery for 77-86 rpm (Nov 8: undershoots of
+  // 20-31 W). Once established, a single sample moves it at most HELD_MAX_STEP16 (3 rpm), so one cadence spike
+  // cannot resize the next recovery.
+  static constexpr uint8_t HELD_WEIGHT     = 6;
+  static constexpr int HELD_MAX_STEP16     = 3 * 16;
+  // The typical cadence weighs ~2 minutes of samples.
   static constexpr uint8_t TYPICAL_SAMPLES = ERG_STEPPED_TYPICAL_WINDOW_MS / ERG_STEPPED_HISTORY_SAMPLE_MS;
   struct Slot {
     uint16_t watts;
@@ -387,6 +397,13 @@ class CadenceHistory {
   int16_t typical16    = 0;
   uint8_t typicalCount = 0;
 
+  // One running-mean step, rounded to nearest (truncation stalled a mean up to weight/16 rpm short of the cadence
+  // being ridden: 3.7 rpm for the typical mean), limited to +/-maxStep.
+  static int _meanStep(int diff, int weight, int maxStep) {
+    const int half = weight / 2;
+    const int step = (diff >= 0 ? diff + half : diff - half) / weight;
+    return std::max(-maxStep, std::min(maxStep, step));
+  }
   static bool _near(int slotWatts, int watts) { return std::abs(slotWatts - watts) * 10 <= watts; }
   static bool _expired(const Slot& slot, uint32_t now) { return now - slot.at > ERG_STEPPED_HISTORY_MEMORY_MS; }
 };

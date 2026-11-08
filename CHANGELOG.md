@@ -10,6 +10,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Added
 
 ### Changed
+- Stepped-resistance recovery drops (Peloton Bike+ via Grupetto) follow the cadence most recently held at the recovery target (about the last 20 s of settled riding) instead of a ~1 minute mean, so a change of riding style no longer sizes recoveries for the old cadence. One cadence spike moves it at most 3 rpm, and the held and typical cadence means round instead of truncating.
 
 ### Hardware
 
