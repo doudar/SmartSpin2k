@@ -31,7 +31,8 @@ Probe probe(Driver& driver) {
 #include <Arduino.h>
 #include <HardwareSerial.h>
 #include <TMCStepper.h>
-#include "FastAccelStepper.h"
+#include "SS2KStepper.h"
+#include "LogicalStepper.h"
 
 constexpr int LOG_INTERVAL = 1000;
 
@@ -42,6 +43,6 @@ struct HomingSgBaseline {
 
 extern HardwareSerial stepperSerial;
 void initializeStepperSerial(bool restart = false);
-extern FastAccelStepperEngine engine;
-extern FastAccelStepper* stepper;
+using MotorStepper = LogicalStepper<SS2KStepper>;
+extern MotorStepper* stepper;
 #endif

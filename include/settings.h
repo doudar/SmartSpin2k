@@ -67,10 +67,10 @@ const char* const DEFAULT_PASSWORD = "password";
 // Default Shift Step. The amount to move the stepper motor for a shift press.
 #define DEFAULT_SHIFT_STEP 1200
 
-// Stepper Acceleration in steps/s^2
+// Stepper acceleration in logical quarter-steps/s^2 (scaled at the motor boundary).
 #define STEPPER_ACCELERATION 3000
 
-// Stepper Max Speed in steps/s
+// Stepper max speed in logical quarter-steps/s (scaled at the motor boundary).
 #define DEFAULT_STEPPER_SPEED 3500
 
 // Stepper Hold Power Scaler. Divides the RMS current to get hold current.
