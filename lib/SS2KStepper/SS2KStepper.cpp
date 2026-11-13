@@ -1,5 +1,10 @@
-// Copyright (C) 2026 Anthony Doud & Joel Baranick
-// SPDX-License-Identifier: GPL-2.0-only
+/*
+ * Copyright (C) 2020  Anthony Doud & Joel Baranick
+ * All rights reserved
+ *
+ * SPDX-License-Identifier: GPL-2.0-only
+ */
+
 #include "SS2KStepper.h"
 
 bool SS2KStepper::begin(uint8_t stepPin, bool (*callback)(uint8_t, uint8_t)) {

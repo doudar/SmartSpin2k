@@ -1,6 +1,7 @@
 // MCPWM/PCNT timing adapted from FastAccelStepper 2.0.1, commit f0fac8d6.
 // Copyright (c) 2020 J.Kiemes; Copyright (C) 2026 Anthony Doud & Joel Baranick
 // SPDX-License-Identifier: MIT
+// SKIP LICENSE INSERTION to preserve this file's MIT license.
 // See LICENSE.timing. Only ESP32/S3, one motor, ESP-IDF 5.5 are supported here.
 #include "PulseQueue.h"
 #include <driver/gpio.h>
