@@ -10,7 +10,9 @@
 // Only the single-axis operations consumed by SmartSpin2k. No Arduino dependency.
 class SS2KStepper {
  public:
-  static constexpr uint32_t stackBytes = 3000;
+  // The initial S3 motion test peaked at 824 bytes. Keep over 1 KB of margin;
+  // continuous moves reuse the task's bounded call stack and fixed queue.
+  static constexpr uint32_t stackBytes = 2048;
   bool begin(uint8_t stepPin, bool (*enablePinCallback)(uint8_t, uint8_t));
   int32_t getCurrentPosition();
   void setCurrentPosition(int32_t value);

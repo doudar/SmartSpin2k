@@ -12,7 +12,7 @@ drains to a stopped output on underrun; planning then restarts from rest. Long
 intervals use low-output pause entries. Direction changes have a 200 us setup
 pause. The supported speed range is 1–200,000 pulses/s (up to 50,000 logical units/s).
 There are no per-move heap allocations. A mutex serializes controller calls;
-a separate spinlock protects task/ISR queue access. One 3000-byte FreeRTOS task
+a separate spinlock protects task/ISR queue access. One 2048-byte FreeRTOS task
 feeds the queue every 4 ms; the hardware supplies pulse timing.
 
 The low-level pulse timing in `PulseQueue.cpp` is adapted from the MIT-licensed
@@ -25,8 +25,9 @@ The PCNT handle-prefix/register implementation is guarded to ESP-IDF 5.5 and
 classic ESP32/S3. Review it before upgrading the SDK or adding another MCPWM user.
 
 RAM: one statically held controller/queue and mutex; IDF peripheral objects,
-task TCB and 3000-byte stack are allocated once at initialization. The stack
-budget is 3000 bytes smaller than upstream 2.0.1. Static RAM alone does not measure
+task TCB and 2048-byte stack are allocated once at initialization. The stack
+budget is 952 bytes smaller than develop's 3000-byte allocation and 3952 bytes
+smaller than upstream 2.0.1's 6000-byte allocation. Static RAM alone does not measure
 the total heap saving. At cruise, about 500 queue interrupts and planner batches/s
 are expected rather than an interrupt per pulse. Planner square roots and locking
 add CPU work; cycle savings versus FastAccelStepper have not been measured.
@@ -50,3 +51,9 @@ host tests passed with two pre-existing expected failures. An S3 test at simulat
 The task's minimum unused stack was 2176 of 3000 bytes (824-byte peak usage),
 unchanged through both shifts; available heap recovered after the test. This is a
 short motion/memory check, not full homing or electrical pulse-count qualification.
+
+The subsequent 2048-byte budget leaves 1224 bytes above that observed peak; it
+has not yet been profiled on hardware. Continuous moves reuse the same bounded
+call chain and fixed queue, so stack usage does not accumulate with move count or
+duration. Less common paths can still increase the observed peak; retain watermark
+checks during reversals, stops, homing, and recovery before reducing it further.

@@ -110,7 +110,7 @@ void finish(int32_t target) {
 }
 int main() {
   assert(motor.begin(5, enablePin));
-  assert(taskStack == 3000);
+  assert(taskStack == 2048);
   motor.setDirectionPin(6, true); motor.setEnablePin(7);
   motor.setAutoEnable(true);
   motor.moveTo(4000); finish(4000);
