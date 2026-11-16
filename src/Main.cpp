@@ -441,7 +441,12 @@ void SS2K::maintenanceLoop(void*) {
       }
 #endif  // DEBUG_STACK
       // Connection state changes infrequently, so keep it out of the one-second rider status record.
-      SS2K_LOG(MAIN_LOG_TAG, "DEV PM=%d CAD=%d HRM=%d", spinBLEClient.connectedPM, spinBLEClient.connectedCD, spinBLEClient.connectedHRM);
+      // ESP-IDF reports the minimum unused stack in bytes. Sample only on this
+      // slow diagnostic pass; never pass nullptr (which would measure this task).
+      const int stepperStackFree = stepper ? stepper->stackFree() : -1;
+      SS2K_LOG(MAIN_LOG_TAG, "DEV PM=%d CAD=%d HRM=%d STEP=%s STEP_STACK_FREE=%d HEAP=%u HEAP_MIN=%u BLOCK=%u", spinBLEClient.connectedPM,
+               spinBLEClient.connectedCD, spinBLEClient.connectedHRM, stepper ? stepper->driverTypeString() : "unavailable", stepperStackFree,
+               esp_get_free_heap_size(), esp_get_minimum_free_heap_size(), heap_caps_get_largest_free_block(MALLOC_CAP_8BIT));
       maintenanceTimer = millis();
     }
 
@@ -449,6 +454,10 @@ void SS2K::maintenanceLoop(void*) {
       // Log rider status for diagnostics and ride analysis.
       SS2K_LOG(MAIN_LOG_TAG, "W=%d C=%d H=%d G=%d R=%d P=%d->%d", rtConfig->watts.getValue(), rtConfig->cad.getValue(), rtConfig->hr.getValue(),
                rtConfig->getShifterPosition(), rtConfig->resistance.getValue(), ss2k->getCurrentPosition(), ss2k->getTargetPosition());
+      if (stepper && ss2k->stepperIsRunning) {
+        SS2K_LOG(MAIN_LOG_TAG, "MOTOR_MEM STACK_FREE=%d HEAP=%u HEAP_MIN=%u BLOCK=%u", stepper->stackFree(), esp_get_free_heap_size(),
+                 esp_get_minimum_free_heap_size(), heap_caps_get_largest_free_block(MALLOC_CAP_8BIT));
+      }
 
       riderStatusLogTimer = millis();
     }
