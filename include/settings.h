@@ -68,7 +68,7 @@ const char* const DEFAULT_PASSWORD = "password";
 #define DEFAULT_SHIFT_STEP 1200
 
 // Stepper acceleration in logical quarter-steps/s^2 (scaled at the motor boundary).
-#define STEPPER_ACCELERATION 3000
+#define STEPPER_ACCELERATION 16000
 
 // Stepper max speed in logical quarter-steps/s (scaled at the motor boundary).
 #define DEFAULT_STEPPER_SPEED 3500
