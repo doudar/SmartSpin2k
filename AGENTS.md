@@ -594,6 +594,8 @@ Primary files: `src/SS2KLog.cpp`, `include/SS2KLog.h`, `src/*Appender.cpp`.
 
 Use `SS2K_LOG*` macros rather than raw `Serial.printf` unless matching nearby code or during very low-level diagnostics. Log sinks:
 
+On ESP32-S3, `Serial` is the Arduino core's USB Serial/JTAG `HWCDC`. Its default 100 ms TX timeout makes each write wait up to two seconds when a host is attached but not reading, which stalled the maintenance loop (4 s per log line; web requests timed out). `app_main()` sets `Serial.setTxTimeoutMs(0)` before `Serial.begin()`, so output that does not fit the 256-byte TX buffer is dropped; do not restore a blocking timeout or call `Serial.flush()` (with a zero timeout it discards the buffer). The log handler sends each line and its CRLF as one write so they are kept or dropped together.
+
 - Serial/log handler.
 - UDP when enabled.
 - WebSocket.
