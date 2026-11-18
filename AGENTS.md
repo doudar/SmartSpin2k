@@ -176,7 +176,7 @@ Live state. Key fields:
 
 Persisted user config. Key fields:
 
-- Firmware/device/WiFi: update URL, device name, auto update, SSID/password.
+- Device/WiFi: device name, SSID/password.
 - Stepper tuning: `shiftStep`, `stepperPower`, `stepperSpeed`, `stepperDir`, `stealthChop`, `homingSensitivity`.
 - Control tuning: `inclineMultiplier`, `powerCorrectionFactor`, `ERGSensitivity`.
 - ERG/power table bounds: `minWatts`, `maxWatts`, `pTab4Pwr`, `hMin`, `hMax`.
@@ -349,7 +349,7 @@ Protocol:
 
 The giant switch in `BLE_ss2kCustomCharacteristic::process()` maps variable IDs to `userConfig`, `rtConfig`, and `ss2k` fields. Examples:
 
-- Firmware URL, device name, WiFi SSID/password.
+- Device name, WiFi SSID/password.
 - Simulated watts/cadence/heart rate/speed.
 - Simulate flags.
 - FTMS mode and target watts.
@@ -362,6 +362,8 @@ The giant switch in `BLE_ss2kCustomCharacteristic::process()` maps variable IDs 
 - `pTab4Pwr`, UDP logging, BLE logging.
 
 `parseNemit()` compares current config/runtime values against static old copies and sends one notification per call for changed values. Some changes, like `hMin`/`hMax`, trigger `userConfig->saveToLittleFS()`. Turning `pTab4Pwr` on sets `spinBLEServer.spinDownFlag = 1` to trigger homing.
+
+The WiFi password is write-only. `returnJSON()` is the client serialization (HTTP `/configJSON`, `0x31` snapshot): it always carries `"password": ""` plus `passwordSet` (stored value differs from `DEFAULT_PASSWORD`), because older web pages/apps copy the `password` key into their field and re-save it. Only `saveToLittleFS()` writes the real value; never add a secret to `returnJSON()`. Reads of `0x13` and its write responses succeed with no value (no echo), empty password writes (BLE/DirCon/HTTP) keep the stored one, the password has no change notification, and the `CUSTOM_CHAR_DEBUG` dump omits its payload. IDs `0x01` and `0x11` are retired (error; never reuse). `0x36` is the read-only capability report (`version, LE32 bits`); add a bit there for client-visible protocol changes instead of having apps test version strings. `test_settings_client_json.py` and `test_custom_characteristic_secrets.py` cover this.
 
 Custom-characteristic BLE writes and indication-status callbacks enqueue work for `processPendingEvents()` on the fast maintenance pass, before motor dispatch, retaining the firmware-update quiet gate. Drain at most the bounded queue capacity per pass. `update()` on the periodic BLE server pass only paces DirCon settings snapshot chunks. Do not run the settings switch/JSON serialization or send the next snapshot chunk inside `nimble_host`: its 4 KB stack overflowed during a custom indication. Connection generation tokens discard stale queued work, and snapshot acknowledgments must match the owning connection. DirCon calls the shared processor directly from maintenance. Variable-length response/debug buffers belong on the heap. `test/test_custom_characteristic_events.py` covers deferred callbacks, queue bounds, peer isolation and handle reuse.
 

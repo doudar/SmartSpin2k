@@ -63,7 +63,7 @@ From BLE_common.h
 //custom characteristic codes
 | Variable                 |uint8_t| type| Notes                                             |
 |--------------------------|:-----:|-----|---------------------------------------------------|
-|BLE_firmwareUpdateURL     |0x01   |     |Not Implemented                                    |
+|(retired)                 |0x01   |     |Retired; returns error. Do not reuse.              |
 |BLE_incline               |0x02   |float|incline from app                                   |
 |BLE_simulatedWatts        |0x03   |int  |simulated or read watts                            |
 |BLE_simulatedHr           |0x04   |int  |simulated or read HR                               |
@@ -79,9 +79,9 @@ From BLE_common.h
 |BLE_simulateWatts         |0x0E   |bool |                                                   |    
 |BLE_simulateCad           |0x0F   |bool |                                                   |
 |BLE_FTMSMode               |0x10   |bool |                                                   |
-|BLE_autoUpdate            |0x11   |bool |Deprecated compatibility field; always off         |
+|(retired)                 |0x11   |     |Retired; returns error. Do not reuse.              |
 |BLE_ssid                  |0x12   |     |Not Implemented                                    |
-|BLE_password              |0x13   |     |Not Implemented                                    |
+|BLE_password              |0x13   |str  |Write-only WiFi password; reads and write responses return success with no value; an empty write keeps the stored password|
 |BLE_foundDevices          |0x14   |     |Not Implemented                                    |
 |BLE_connectedPowerMeter   |0x15   |     |Not Implemented                                    |
 |BLE_connectedHeartMonitor |0x16   |     |Not Implemented                                    |
@@ -97,6 +97,7 @@ From BLE_common.h
 |BLE_allSettings           |0x31   |JSON |Read-only chunked snapshot of all user settings         |
 |BLE_gearTeeth             |0x34   |array|Packed front/rear tooth pairs; metadata/indexed reads |
 |BLE_gearPreset            |0x35   |uint16|0 = tooth profile/Unlimited, 1 = Mixed Terrain 1x24 |
+|BLE_capabilities          |0x36   |bytes|Read-only capability report: version + uint32 LE bits (see below)|
 
 *syncMode will disable the movement of the stepper motor by forcing stepperPosition = targetPosition prior to the motor control. While this mode is enabled, it allows the client to set parameters like incline and shifterPosition without moving the motor from it's current position. Once the parameters are set, this mode should be turned back off and SS2K will resume normal operation.
 
@@ -131,7 +132,7 @@ All-settings snapshot (BLE or DirCon):
 | 5 | 2 | Total chunk count, little-endian |
 | 7 | remainder | UTF-8 JSON bytes |
 
-The client validates that it received chunks `0` through `chunk count - 1`, concatenates the bytes after each header, and parses the result as JSON. If the connection closes or a chunk is missing, discard the partial snapshot and issue the read command again. Unknown JSON properties should be ignored so newly added settings remain backward compatible. The snapshot includes sensitive settings such as the Wi-Fi password, consistent with the existing individual password read command.
+The client validates that it received chunks `0` through `chunk count - 1`, concatenates the bytes after each header, and parses the result as JSON. If the connection closes or a chunk is missing, discard the partial snapshot and issue the read command again. Unknown JSON properties should be ignored so newly added settings remain backward compatible. The snapshot never contains the stored WiFi password: `"password"` is always an empty string (kept for older clients) and the boolean `passwordSet` is true when a non-default password is stored. `firmwareUpdateURL` and `autoUpdate` are no longer present.
 
 BLE requests and snapshot acknowledgments are queued for the maintenance task;
 an ATT write completion does not mean the settings operation has completed. Wait
@@ -146,6 +147,7 @@ Gear profiles are persisted on both targets and used for ratio-based stepper
 shifting. Shift Amount sets the motor distance for the median positive ratio gap.
 See [VirtualGearing.md](VirtualGearing.md). The experimental rider-weight ID 0x33
 is retired and returns an unsupported/error response; it must not be reused.
+IDs 0x01 (firmware update URL) and 0x11 (auto-update) are retired the same way.
 
 ### Gear tooth pairs (`0x34`)
 
@@ -198,3 +200,17 @@ limits still apply. No companion-app changes are included here.
 Preset 1 persists as `gearPreset: 1` and `gearTeeth: []`. Its exact 24 ratios are
 built into firmware; it reports one rear gear axis, starts at gear 8, and uses
 the same median-gap Shift Amount mapping as tooth profiles. Save with `02 18`.
+
+## Capability report (`0x36`)
+
+Read-only report of optional firmware behaviours.
+
+- Client writes: `0x01, 0x36`
+- Device answers: `0x80, 0x36, <version>, <capability bits>` (7 bytes). The version is `0x01`; the bits are an unsigned 32-bit little-endian field.
+- Writes return `0xFF, 0x36`.
+
+| Bit | Meaning |
+|-----|---------|
+| 0 | Password write-only: the device never returns the stored WiFi password |
+
+Later capabilities take the next bits; bits are never reused. Clients must ignore unknown bits and any extra trailing bytes, and must treat an error response (older firmware) as "no capabilities".

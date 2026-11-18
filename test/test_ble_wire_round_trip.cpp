@@ -146,11 +146,12 @@ void TestBleWireRoundTrip::test_dircon_uuid_round_trip(void) {
 void TestBleWireRoundTrip::test_all_custom_characteristic_formats(void) {
   unsigned formatCounts[CustomUnknown + 1] = {0};
 
-  for (uint8_t id = BLE_firmwareUpdateURL; id <= BLE_gearPreset; ++id) {
+  for (uint8_t id = 0x01; id <= BLE_capabilities; ++id) {
     const CustomCharacteristicValueFormat format = customCharacteristicValueFormat(id);
-    // 0x33 was the retired experimental rider-weight field. Keep the wire ID
-    // reserved so a future field cannot accidentally reinterpret old writes.
-    if (id == 0x33) {
+    // 0x01 (firmware update URL), 0x11 (auto-update) and 0x33 (experimental
+    // rider weight) are retired. Keep the wire IDs reserved so a future field
+    // cannot accidentally reinterpret old writes.
+    if (id == 0x01 || id == 0x11 || id == 0x33) {
       TEST_ASSERT_EQUAL(CustomUnknown, format);
       continue;
     }
@@ -214,6 +215,16 @@ void TestBleWireRoundTrip::test_all_custom_characteristic_formats(void) {
         TEST_ASSERT_EQUAL_UINT16(4545, get_le16(value + 1));
         break;
       }
+      case CustomCapabilities: {
+        uint8_t report[7] = {cc_success, id, CUSTOM_CAPABILITIES_VERSION, 0, 0, 0, 0};
+        put_le32(&report[3], 0x80000001UL);
+        TEST_ASSERT_EQUAL_UINT8(CUSTOM_CAPABILITIES_VERSION, report[2]);
+        TEST_ASSERT_EQUAL_UINT32(0x80000001UL, get_le32(&report[3]));
+        uint8_t current[4] = {0, 0, 0, 0};
+        put_le32(current, customCharacteristicCapabilities());
+        TEST_ASSERT_TRUE((get_le32(current) & CUSTOM_CAPABILITY_PASSWORD_WRITE_ONLY) != 0);
+        break;
+      }
       case CustomAction:
         // Action characteristics carry only operation and ID, so there is no value to round-trip.
         break;
@@ -224,16 +235,17 @@ void TestBleWireRoundTrip::test_all_custom_characteristic_formats(void) {
   }
 
   TEST_ASSERT_EQUAL_UINT(6, formatCounts[CustomAction]);
-  TEST_ASSERT_EQUAL_UINT(11, formatCounts[CustomBoolean]);
+  TEST_ASSERT_EQUAL_UINT(10, formatCounts[CustomBoolean]);
   TEST_ASSERT_EQUAL_UINT(15, formatCounts[CustomUnsigned16]);
   TEST_ASSERT_EQUAL_UINT(3, formatCounts[CustomSigned16]);
   TEST_ASSERT_EQUAL_UINT(3, formatCounts[CustomSigned32]);
-  TEST_ASSERT_EQUAL_UINT(9, formatCounts[CustomString]);
+  TEST_ASSERT_EQUAL_UINT(8, formatCounts[CustomString]);
   TEST_ASSERT_EQUAL_UINT(1, formatCounts[CustomPowerTableRow]);
   TEST_ASSERT_EQUAL_UINT(1, formatCounts[CustomSettingsSnapshot]);
   TEST_ASSERT_EQUAL_UINT(1, formatCounts[CustomScanResultStream]);
   TEST_ASSERT_EQUAL_UINT(1, formatCounts[CustomBooleanWriteStringRead]);
   TEST_ASSERT_EQUAL_UINT(1, formatCounts[CustomGearTeeth]);
+  TEST_ASSERT_EQUAL_UINT(1, formatCounts[CustomCapabilities]);
 }
 
 void TestBleWireRoundTrip::test_ftms_round_trip(void) {

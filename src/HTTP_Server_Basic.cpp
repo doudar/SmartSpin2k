@@ -535,7 +535,6 @@ void stopWifi() {
 }
 
 void HTTP_Server::start() {
-  server.enableCORS(true);
   server.onNotFound(handleIndexFile);
 
   /***************************Begin Handlers*******************/
@@ -902,9 +901,10 @@ void HTTP_Server::settingsProcessor() {
     tString.trim();
     userConfig->setSsid(tString);
   }
-  if (!server.arg("password").isEmpty()) {
-    tString = server.arg("password");
-    tString.trim();
+  // An absent, empty or whitespace-only password keeps the stored one. The value is never logged.
+  tString = server.arg("password");
+  tString.trim();
+  if (!tString.isEmpty()) {
     userConfig->setPassword(tString);
   }
   if (!server.arg("deviceName").isEmpty()) {

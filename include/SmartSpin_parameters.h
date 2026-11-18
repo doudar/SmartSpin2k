@@ -162,14 +162,12 @@ class userParameters {
 #ifndef PLATFORMIO_ENV_NATIVE
   mutable portMUX_TYPE gearMutex = portMUX_INITIALIZER_UNLOCKED;
 #endif
-  String firmwareUpdateURL;
   String deviceName;
   int shiftStep;
   bool stealthChop;
   float inclineMultiplier;
   float powerCorrectionFactor;
   float ERGSensitivity;
-  bool autoUpdate;  // Deprecated compatibility field; boot-time firmware OTA is disabled.
   int stepperPower;
   int maxWatts;
   int minWatts;
@@ -223,9 +221,6 @@ class userParameters {
     return true;
   }
 
-  void setFirmwareUpdateURL(String fURL) { firmwareUpdateURL = fURL; }
-  const char* getFirmwareUpdateURL() { return firmwareUpdateURL.c_str(); }
-
   void setDeviceName(String dvn) { deviceName = dvn; }
   const char* getDeviceName() { return deviceName.c_str(); }
 
@@ -247,17 +242,13 @@ class userParameters {
   float getERGSensitivity() { return ERGSensitivity; }
   void setERGSensitivity(float ergS) { ERGSensitivity = ergS; }
 
-  void setAutoUpdate(bool atd) {
-    (void)atd;
-    autoUpdate = false;
-  }
-  bool getAutoUpdate() { return autoUpdate; }
-
   void setSsid(String sid) { ssid = sid; }
   const char* getSsid() { return ssid.c_str(); }
 
   void setPassword(String pwd) { password = pwd; }
   const char* getPassword() { return password.c_str(); }
+  // True when the stored password differs from the factory default; reveals neither value nor length.
+  bool isPasswordSet() const { return strcmp(password.c_str(), DEFAULT_PASSWORD) != 0; }
 
   void setConnectedPowerMeter(String cpm) { connectedPowerMeter = cpm; }
   const char* getConnectedPowerMeter() { return connectedPowerMeter.c_str(); }
