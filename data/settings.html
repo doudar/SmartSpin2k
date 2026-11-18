@@ -65,8 +65,8 @@
         type: 'password',
         title: 'WiFi Password',
         tooltip: 'Network password',
-        tooltipText: 'Password for the WiFi network.',
-        defaultValue: 'loading'
+        tooltipText: 'Password for the WiFi network. Leave it blank to keep the stored password.',
+        defaultValue: ''
       },
       deviceName: {
         type: 'text',
@@ -288,7 +288,8 @@
       if (isPassword) {
         html += `
           <div class="input-group" style="padding: 0.5rem;">
-            <input type="${isPassword ? 'password' : 'text'}" id="${id}" name="${id}" value="${config.defaultValue}" />
+            <input type="${isPassword ? 'password' : 'text'}" id="${id}" name="${id}" value="${config.defaultValue}" placeholder="Leave blank to keep the current password" autocomplete="new-password" />
+            <small id="passwordStatus"></small>
             <label style="display: flex; align-items: center; gap: 0.5rem; margin-top: 0.5rem;">
               <input type="checkbox" id="showpassword" name="showpassword" onclick="toggleShowPassword()">
               Show Password
@@ -414,7 +415,12 @@
         if (this.readyState == 4 && this.status == 200) {
           var obj = JSON.parse(this.responseText);
           document.getElementById('gearTeeth').disabled = false;
+          const passwordStatus = document.getElementById('passwordStatus');
+          if (passwordStatus && obj.passwordSet !== undefined) {
+            passwordStatus.textContent = obj.passwordSet ? 'A WiFi password is stored.' : 'No WiFi password is stored (default in use).';
+          }
           for (const key in obj) {
+            if (key === 'password') continue; // never copy the password into the field
             const el = document.getElementById(key);
             if (el) {
               if (key === 'gearTeeth') {

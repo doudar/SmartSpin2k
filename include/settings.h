@@ -13,11 +13,6 @@ const char* const DEVICE_NAME = "SmartSpin2k";
 // Default WiFi Password
 const char* const DEFAULT_PASSWORD = "password";
 
-// default URL To get Updates From.
-// If changed you'll also need to get a root certificate from the new server
-// and put it in /include/cert.h
-#define FW_UPDATEURL "https://raw.githubusercontent.com/doudar/OTAUpdates/main/"
-
 // Target-specific OTA names prevent cross-flashing firmware or filesystems.
 #if defined(SMARTSPIN2K_S3)
 #define FW_VERSIONFILE "S3version.txt"

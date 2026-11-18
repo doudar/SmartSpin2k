@@ -108,7 +108,7 @@ String OTAServerIndex =
     "if(originalOrigin!==recoveryOrigin){origins.push(originalOrigin);}"
     "var controller=new AbortController();"
     "var timeout=setTimeout(()=>controller.abort(),1500);"
-    "Promise.all(origins.map(origin=>fetch(origin+'/configJSON',{cache:'no-store',signal:controller.signal}).then(r=>({origin:origin,ok:r.ok})).catch(()=>({origin:origin,ok:false})))).then(results=>{"
+    "Promise.all(origins.map(origin=>fetch(origin+'/configJSON',{cache:'no-store',mode:'no-cors',signal:controller.signal}).then(r=>({origin:origin,ok:r.ok||r.type==='opaque'})).catch(()=>({origin:origin,ok:false})))).then(results=>{"
     "var live=results.find(result=>result.ok);"
     "if(live&&(down||Date.now()-started>8000)){"
     "clearInterval(poll);"

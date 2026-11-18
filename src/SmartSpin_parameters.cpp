@@ -49,7 +49,6 @@ JsonDocument doc;
 void userParameters::setDefaults() {
   const VirtualGearing::Gears defaults;
   setGearProfile(defaults);
-  firmwareUpdateURL     = FW_UPDATEURL;
   deviceName            = DEVICE_NAME;
   shiftStep             = DEFAULT_SHIFT_STEP;
   stealthChop           = STEALTHCHOP;
@@ -58,7 +57,6 @@ void userParameters::setDefaults() {
   inclineMultiplier     = INCLINE_MULTIPLIER;
   powerCorrectionFactor = 1.0;
   ERGSensitivity        = ERG_SENSITIVITY;
-  autoUpdate            = false;
   ssid                  = DEVICE_NAME;
   password              = DEFAULT_PASSWORD;
   connectedPowerMeter   = CONNECTED_POWER_METER;
@@ -78,6 +76,7 @@ void userParameters::setDefaults() {
 
 //---------------------------------------------------------------------------------
 //-- return all config as one a single JSON string
+// This output goes to clients (HTTP, BLE, DirCon). Never add secrets here.
 String userParameters::returnJSON() {
   // Allocate a temporary JsonDocument
   // Don't forget to change the capacity to match your requirements.
@@ -85,7 +84,6 @@ String userParameters::returnJSON() {
  JsonDocument doc;
   // Set the values in the document
 
-  doc["firmwareUpdateURL"]     = firmwareUpdateURL;
   doc["firmwareVersion"]       = FIRMWARE_VERSION;
   doc["deviceName"]            = deviceName;
   doc["shiftStep"]             = shiftStep;
@@ -101,9 +99,11 @@ String userParameters::returnJSON() {
   doc["inclineMultiplier"]     = inclineMultiplier;
   doc["powerCorrectionFactor"] = powerCorrectionFactor;
   doc["ERGSensitivity"]        = ERGSensitivity;
-  doc["autoUpdate"]            = autoUpdate;
   doc["ssid"]                  = ssid;
-  doc["password"]              = password;
+  // The key stays present but empty on purpose: older web pages and apps copy it into their password field,
+  // and a missing key would leave stale text there that they would then save back.
+  doc["password"]              = "";
+  doc["passwordSet"]           = isPasswordSet();
   doc["connectedPowerMeter"]   = connectedPowerMeter;
   doc["connectedHeartMonitor"] = connectedHeartMonitor;
   doc["connectedRemote"]       = connectedRemote;
@@ -124,6 +124,7 @@ String userParameters::returnJSON() {
 }
 
 //-- Saves all parameters to LittleFS
+// This is the storage serialisation: it keeps the real password and is never sent to clients.
 void userParameters::saveToLittleFS() {
   // Delete existing file, otherwise the configuration is appended to the file
   LittleFS.remove(configFILENAME);
@@ -144,7 +145,6 @@ void userParameters::saveToLittleFS() {
   // Set the values in the document
   // commented items are not needed in save file
 
-  doc["firmwareUpdateURL"]     = firmwareUpdateURL;
   doc["deviceName"]            = deviceName;
   doc["shiftStep"]             = shiftStep;
   const VirtualGearing::Gears gears = getGearProfile();
@@ -159,7 +159,6 @@ void userParameters::saveToLittleFS() {
   doc["inclineMultiplier"]     = inclineMultiplier;
   doc["powerCorrectionFactor"] = powerCorrectionFactor;
   doc["ERGSensitivity"]        = ERGSensitivity;
-  doc["autoUpdate"]            = autoUpdate;
   doc["ssid"]                  = ssid;
   doc["password"]              = password;
   doc["connectedPowerMeter"]   = connectedPowerMeter;
@@ -217,13 +216,11 @@ JsonDocument doc;
   }
 
   // Copy values from the JsonDocument to the Config
-  setFirmwareUpdateURL(doc["firmwareUpdateURL"]);
   setDeviceName(doc["deviceName"]);
   setShiftStep(doc["shiftStep"]);
   setStepperPower(doc["stepperPower"]);
   setStealthChop(doc["stealthChop"]);
   setInclineMultiplier(doc["inclineMultiplier"]);
-  setAutoUpdate(doc["autoUpdate"]);
   setSsid(doc["ssid"]);
   setPassword(doc["password"]);
   setConnectedPowerMeter(doc["connectedPowerMeter"]);

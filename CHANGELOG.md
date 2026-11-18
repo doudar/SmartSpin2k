@@ -8,8 +8,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+- Custom characteristic `0x36` reports firmware capabilities as a versioned bit field (first bit: write-only WiFi password).
 
 ### Changed
+- The stored WiFi password can no longer be read back: `/configJSON`, the settings snapshot (`0x31`) and reads of `0x13` return no password, and password changes are no longer notified. Settings JSON adds `passwordSet`. An empty or missing password in a settings save keeps the stored one; the web settings page shows the field empty.
+- Retire the unused firmware update URL (`0x01`) and auto-update (`0x11`) settings; both IDs now return an error and are no longer stored.
+- The web server no longer sends permissive cross-origin (CORS) headers.
 - Status page debug log keeps the newest entries when full (it was discarding 10 of every 11 new lines after the first 1,000) and holds up to 6,000 lines so "Save Log" covers a whole ride; the page still renders the newest 1,000.
 
 ### Hardware

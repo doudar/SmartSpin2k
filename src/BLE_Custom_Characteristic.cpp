@@ -425,6 +425,8 @@ void BLE_ss2kCustomCharacteristic::process(const std::string& rxValue, uint16_t 
   if (written > 0) logBufLength += std::min(written, remaining - 1); \
 } while (0)
   int length                = rxValue.length();
+  // A password write is never dumped beyond its two header bytes.
+  if (rxValue[0] == cc_write && static_cast<uint8_t>(rxValue[1]) == BLE_password) length = 2;
   const int kLogBufCapacity = (rxValue.length() * 3) + 60;  // Hex bytes include a separating space.
   std::vector<char> logStorage(kLogBufCapacity);
   char* logBuf = logStorage.data();
@@ -475,20 +477,6 @@ void BLE_ss2kCustomCharacteristic::process(const std::string& rxValue, uint16_t 
   }
 
   switch (rxValue[1]) {
-    case BLE_firmwareUpdateURL:  // 0x01
-      LOG_BUF_APPEND("<-Firmware Update URL");
-      if (rxValue[0] == cc_read) {
-        returnValue[0] = cc_success;
-        returnString   = userConfig->getFirmwareUpdateURL();
-      } else if (rxValue[0] == cc_write) {
-        returnValue[0] = cc_success;
-        String str     = reinterpret_cast<const char*>(pData);
-        str.remove(0, 2);
-        userConfig->setFirmwareUpdateURL(str);
-        LOG_BUF_APPEND("(%s)", userConfig->getFirmwareUpdateURL());
-      }
-      break;
-
     case BLE_incline: {  // 0x02
       LOG_BUF_APPEND("<-incline");
       if (rxValue[0] == cc_read) {
@@ -705,20 +693,6 @@ void BLE_ss2kCustomCharacteristic::process(const std::string& rxValue, uint16_t 
       }
       break;
 
-    case BLE_autoUpdate:  // 0x11
-      LOG_BUF_APPEND("<-autoUpdate");
-      if (rxValue[0] == cc_read) {
-        returnValue[0] = cc_success;
-        returnValue[2] = (uint8_t)(userConfig->getAutoUpdate());
-        returnLength += 1;
-      }
-      if (rxValue[0] == cc_write) {
-        returnValue[0] = cc_success;
-        userConfig->setAutoUpdate(rxValue[2]);
-        LOG_BUF_APPEND("(%s)", userConfig->getAutoUpdate() ? "true" : "false");
-      }
-      break;
-
     case BLE_ssid:  // 0x12
       LOG_BUF_APPEND("<-ssid");
       if (rxValue[0] == cc_read) {
@@ -736,13 +710,16 @@ void BLE_ss2kCustomCharacteristic::process(const std::string& rxValue, uint16_t 
     case BLE_password:  // 0x13
       LOG_BUF_APPEND("<-password");
       if (rxValue[0] == cc_read) {
+        // The stored password is never returned: success with no value bytes.
         returnValue[0] = cc_success;
-        returnString   = userConfig->getPassword();
+        returnLength   = 2;
       } else if (rxValue[0] == cc_write) {
         returnValue[0] = cc_success;
+        returnLength   = 2;  // Unlike other writes, the response never echoes the value.
         String str     = reinterpret_cast<const char*>(pData);
         str.remove(0, 2);
-        userConfig->setPassword(str);
+        // An empty write keeps the stored password.
+        if (str.length() > 0) userConfig->setPassword(str);
         LOG_BUF_APPEND("(%s)", "******");
       }
       break;
@@ -1178,6 +1155,17 @@ void BLE_ss2kCustomCharacteristic::process(const std::string& rxValue, uint16_t 
       break;
     }
 
+    case BLE_capabilities:  // 0x36
+      returnLength = 2;
+      if (rxValue[0] == cc_read && rxValue.size() == 2) {
+        returnValue.resize(7);  // The default 2-byte-read buffer is 6 bytes.
+        returnValue[0] = cc_success;
+        returnValue[2] = CUSTOM_CAPABILITIES_VERSION;
+        put_le32(&returnValue[3], customCharacteristicCapabilities());
+        returnLength = 7;
+      }
+      break;
+
     default:
       LOG_BUF_APPEND("<-Unknown Characteristic");
       returnValue[0] = cc_error;
@@ -1215,12 +1203,6 @@ void BLE_ss2kCustomCharacteristic::parseNemit() {
     return;
   }
 
-  if (strcmp(userConfig->getFirmwareUpdateURL(), _oldParams.getFirmwareUpdateURL()) != 0) {
-    _oldParams.setFirmwareUpdateURL(userConfig->getFirmwareUpdateURL());
-    BLE_ss2kCustomCharacteristic::notify(BLE_firmwareUpdateURL);
-    return;
-  }
-
   if (strcmp(userConfig->getDeviceName(), _oldParams.getDeviceName()) != 0) {
     _oldParams.setDeviceName(userConfig->getDeviceName());
     BLE_ss2kCustomCharacteristic::notify(BLE_deviceName);
@@ -1254,12 +1236,6 @@ void BLE_ss2kCustomCharacteristic::parseNemit() {
   if (strcmp(userConfig->getSsid(), _oldParams.getSsid()) != 0) {
     _oldParams.setSsid(userConfig->getSsid());
     BLE_ss2kCustomCharacteristic::notify(BLE_ssid);
-    return;
-  }
-
-  if (strcmp(userConfig->getPassword(), _oldParams.getPassword()) != 0) {
-    _oldParams.setPassword(userConfig->getPassword());
-    BLE_ss2kCustomCharacteristic::notify(BLE_password);
     return;
   }
 

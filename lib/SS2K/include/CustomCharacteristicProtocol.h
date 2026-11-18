@@ -17,7 +17,7 @@ static const uint8_t cc_error   = 0xFF;
 
 // Custom-characteristic variable identifiers. Keep these values stable, including
 // reserved IDs. Tests verify that each assigned ID has an explicit wire format.
-static const uint8_t BLE_firmwareUpdateURL     = 0x01;
+// 0x01 was the retired firmware update URL setting; do not reuse.
 static const uint8_t BLE_incline               = 0x02;
 static const uint8_t BLE_simulatedWatts        = 0x03;
 static const uint8_t BLE_simulatedHr           = 0x04;
@@ -33,7 +33,7 @@ static const uint8_t BLE_simulateHr            = 0x0D;
 static const uint8_t BLE_simulateWatts         = 0x0E;
 static const uint8_t BLE_simulateCad           = 0x0F;
 static const uint8_t BLE_FTMSMode              = 0x10;
-static const uint8_t BLE_autoUpdate            = 0x11;
+// 0x11 was the retired auto-update setting; do not reuse.
 static const uint8_t BLE_ssid                  = 0x12;
 static const uint8_t BLE_password              = 0x13;
 static const uint8_t BLE_foundDevices          = 0x14;
@@ -70,6 +70,14 @@ static const uint8_t BLE_scanResults           = 0x32;
 // 0x33 was the retired experimental rider-weight setting; do not reuse.
 static const uint8_t BLE_gearTeeth             = 0x34;
 static const uint8_t BLE_gearPreset            = 0x35;
+static const uint8_t BLE_capabilities          = 0x36;
+
+// Capability report (read-only): version byte followed by a little-endian uint32 bit field.
+static const uint8_t CUSTOM_CAPABILITIES_VERSION = 0x01;
+// Later capabilities take the next bits; bits are never reused.
+static const uint32_t CUSTOM_CAPABILITY_PASSWORD_WRITE_ONLY = 1UL << 0;
+
+inline uint32_t customCharacteristicCapabilities() { return CUSTOM_CAPABILITY_PASSWORD_WRITE_ONLY; }
 
 enum CustomCharacteristicValueFormat : uint8_t {
   CustomAction,
@@ -83,12 +91,12 @@ enum CustomCharacteristicValueFormat : uint8_t {
   CustomScanResultStream,
   CustomBooleanWriteStringRead,
   CustomGearTeeth,
+  CustomCapabilities,
   CustomUnknown
 };
 
 inline CustomCharacteristicValueFormat customCharacteristicValueFormat(uint8_t id) {
   switch (id) {
-    case BLE_firmwareUpdateURL:
     case BLE_deviceName:
     case BLE_ssid:
     case BLE_password:
@@ -122,7 +130,6 @@ inline CustomCharacteristicValueFormat customCharacteristicValueFormat(uint8_t i
     case BLE_simulateHr:
     case BLE_simulateWatts:
     case BLE_simulateCad:
-    case BLE_autoUpdate:
     case BLE_externalControl:
     case BLE_syncMode:
     case BLE_shiftDir:
@@ -146,6 +153,7 @@ inline CustomCharacteristicValueFormat customCharacteristicValueFormat(uint8_t i
     case BLE_allSettings: return CustomSettingsSnapshot;
     case BLE_scanResults: return CustomScanResultStream;
     case BLE_gearTeeth: return CustomGearTeeth;
+    case BLE_capabilities: return CustomCapabilities;
     default: return CustomUnknown;
   }
 }
