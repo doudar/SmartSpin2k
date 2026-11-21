@@ -36,6 +36,12 @@ To get started with SmartSpin2k, you will need the following:
 
 Once you have these materials, you can follow the [these instructions](https://github.com/doudar/SS2k-Hardware/blob/main/SS2kR3BuildingInstructions.pdf) to build your own SmartSpin2k. If you'd prefer to buy a pre-assembled kit, we have them for sale at [SmartSpin2k.com](https://www.smartspin2k.com/purchase-kits) 
 
+## Pairing the companion app
+
+Open SS2kConfigApp and connect to the trainer. For a new or factory-reset trainer, start with Bluetooth. When the app prompts you, press and hold both shifters together for two seconds. The app can now read settings, configure WiFi and install firmware. Each additional phone or computer pairs separately.
+
+The saved pairing works over Bluetooth and over DirCon on the same WiFi network. It survives reboots and firmware updates. To remove one pairing, connect with that app and choose **Forget**. A factory reset clears all pairings and settings. Workout apps can still use standard trainer services such as FTMS without pairing with SS2kConfigApp.
+
 ## Features
 
 SmartSpin2k offers a number of features, including:

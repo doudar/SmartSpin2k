@@ -99,11 +99,9 @@ Terrain 1x24 has no real tooth combinations; the profile represents a single
 supported. Validation and median calculation finish before publication under a
 short critical section. Both bounded formats use the same motor mapping above.
 
-HTTP `/send_settings` accepts `gearTeeth` as a packed-pair JSON array and
-`gearPreset` as 0 or 1, and `shiftStep` through its existing field. Submit either
-`gearTeeth` or `gearPreset` in one request, not both. A tooth-array write exits
-the built-in preset. Invalid profiles return HTTP 400 without
-replacing the current profile. Old saved rider weight fields are ignored and
+A paired companion app configures gearing over BLE or DirCon. A tooth-array
+write exits the built-in preset. Invalid profiles preserve the current
+profile. Old saved rider weight fields are ignored and
 disappear on resave. The experimental rider-weight custom ID 0x33 is retired.
 
 Custom characteristic 0x34 provides metadata/indexed reads and atomic tooth-pair

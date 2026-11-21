@@ -13,34 +13,11 @@ const char* const DEVICE_NAME = "SmartSpin2k";
 // Default WiFi Password
 const char* const DEFAULT_PASSWORD = "password";
 
-// Target-specific OTA names prevent cross-flashing firmware or filesystems.
-#if defined(SMARTSPIN2K_S3)
-#define FW_VERSIONFILE "S3version.txt"
-#define FW_BINFILE     "S3firmware.bin"
-#define FS_BINFILE     "S3littlefs.bin"
-#else
-#define FW_VERSIONFILE "version.txt"
-#define FW_BINFILE     "firmware.bin"
-#define FS_BINFILE     "littlefs.bin"
-#endif
-
-// Web assets follow the filesystem layout for the selected firmware target.
-#if defined(SMARTSPIN2K_S3)
-#define DATA_UPDATEURL "https://raw.githubusercontent.com/doudar/SmartSpin2k/develop/data_s3"
-#else
-#define DATA_UPDATEURL "https://raw.githubusercontent.com/doudar/SmartSpin2k/develop/data"
-#endif
-
-#define DATA_FILELIST "/list.json"
-
 // name of local file to save configuration in LittleFS
 #define configFILENAME "/config.txt"
 
 // name of the local file to save the torque table.
 #define POWER_TABLE_FILENAME "/PowerTable.txt"
-
-// name of the local file to save build version for OTA WiFi issue handling
-#define BUILD_VERSION_FILENAME "/build_version.txt"
 
 // Default Incline Multiplier.
 // Incline multiplier is the multiple required to convert incline received from the remote client (percent grade*100)
@@ -143,8 +120,6 @@ const char* const DEFAULT_PASSWORD = "password";
 // Number of devices that can be connected to the Client (myBLEDevices size)
 #define NUM_BLE_DEVICES 3
 
-// loop speed for the Webserver
-#define WEBSERVER_DELAY 12
 
 // BLE Device Generic Names
 constexpr const char* NONE = "none";

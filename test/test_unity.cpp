@@ -113,13 +113,13 @@ void setup() {
     RUN_TEST(test.test_case_insensitive_device_matching);
   }
 
-  // BLE Firmware Update Protocol Tests
+  // Paired custom firmware stream tests
   {
-    TestBleFirmwareUpdateProtocol test;
-    RUN_TEST(test.test_parses_start_packet);
-    RUN_TEST(test.test_rejects_invalid_start_packets);
-    RUN_TEST(test.test_encodes_status_packet);
-    RUN_TEST(test.test_transfer_timeout);
+    TestSettingsStreamProtocol test;
+    RUN_TEST(test.test_begin_shape);
+    RUN_TEST(test.test_chunk_bounds);
+    RUN_TEST(test.test_offset_response);
+    RUN_TEST(test.test_finish_and_abort);
   }
 
   // Shared endian helper tests

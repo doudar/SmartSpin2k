@@ -7,7 +7,6 @@
 
 #pragma once
 
-#include "HTTP_Server_Basic.h"
 #include "SmartSpin_parameters.h"
 #include "BLE_Common.h"
 // #include "LittleFS_Upgrade.h"
@@ -82,9 +81,9 @@ class SS2K {
   void setLastShifterPosition(int sp) { lastShifterPosition = sp; }
 
   void resetIfShiftersHeld();
+  void applyFactoryReset();
   void startTasks();
   void stopTasks();
-  void restartWifi();
   void setupTMCStepperDriver(bool reset = false);
   void updateHardwareSafety();
   void updateDriverSafety(int s3CurrentPercent, bool s3Disabled);

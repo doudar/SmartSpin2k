@@ -10,8 +10,8 @@ SmartSpin2k is ESP32 firmware for converting a spin bike into a BLE smart traine
 
 - Reads local shifter buttons and optional Peloton aux serial data.
 - Acts as a BLE client for power meters, cadence sensors, heart-rate monitors, FTMS trainers, HID remotes, Echelon, Flywheel, and Peloton-like data.
-- Acts as a BLE server exposing cycling power, cycling speed/cadence, heart rate, FTMS, device info, firmware update, and SmartSpin2k custom characteristics.
-- Serves a web UI from `data/` over WiFi/LittleFS.
+- Acts as a BLE server exposing cycling power, cycling speed/cadence, heart rate, FTMS, device info, and the SmartSpin2k custom characteristic.
+- Configures settings over the companion app. LittleFS stores configuration and the power table.
 - Runs a DirCon TCP bridge for BLE-like service discovery, reads, writes, and notifications over WiFi.
 - Drives a TMC2209/SS2KStepper motor to change resistance.
 - Runs on a ram limited microcontroller. Limit ram usage and always look for methods to decrease ram usage. 
@@ -23,8 +23,7 @@ Primary software directories:
 - `lib/SS2K/`: core sensor parsing library used by firmware and native tests.
 - `lib/ArduinoCompat/`: native-test compatibility shims.
 - `test/`: Unity tests for the pioarduino native environment.
-- `data/`: web interface assets for classic ESP32 filesystem images.
-- `data_s3/`: ESP32-S3 filesystem assets; initially mirrors `data/` but may grow independently.
+- `data/` and `data_s3/` are frozen web assets fetched by older firmware. Preserve these URLs for existing devices. New releases do not package or serve them.
 - `.github/copilot-instructions.md`: older agent/build notes that may still be useful.
 
 ## Build And Test
@@ -35,7 +34,6 @@ The commands remain `pio` and `platformio`; configuration remains in `platformio
 
 - Build firmware: `pio run --environment release`
 - Build ESP32-S3 firmware: `pio run --environment S3release`
-- Build filesystem: `pio run --target buildfs`
 - Run native tests: `pio test --environment native`
 - Native local builds/tests run the ERG regression through `extra_scripts = post:scripts/erg_sim/native_hook.py`; install simulator requirements into pioarduino's Python environment. The hook runs even on an up-to-date build, fails on simulator failure/missing dependencies, and saves graphs/grades under `test/output/erg_regression/`. It skips GitHub Actions; standalone Python discovery skips this optional suite if its dependencies are absent.
 - CI runs full native/Python behavior on Linux for every PR via `scripts/ci_host_tests.py`; dependencies are installed and skips fail. Windows/macOS run compiled packet and async IO smoke only for host-tooling changes (manual dispatch checks all hosts). ESP32/S3 release compilation remains separate in `build.yml`.
@@ -45,24 +43,21 @@ The commands remain `pio` and `platformio`; configuration remains in `platformio
 
 If `pio` is not on `PATH`, check the active virtual environment or the IDE-managed Core: `~/.platformio/penv/bin/pio` on macOS/Linux, or `$env:USERPROFILE\.platformio\penv\Scripts\pio.exe` on Windows. Use the absolute executable when available. Verify the selected Python environment with `python -m pip show pioarduino`; `pio --version` alone does not identify which distribution owns the command. If the launcher points to a missing or inaccessible Python executable, report that environment problem. Native tests are expected to run locally.
 
-S3 firmware and filesystem builds use `S3firmware.bin` and `S3littlefs.bin` as their native pioarduino output/upload names. They also create `S3partitions.bin` and `S3bootloader.bin` copies for releases; the generic partition and bootloader intermediates remain because pioarduino's flash uploader depends on those names.
-The GitHub release archive includes firmware, merged factory, LittleFS, partition-table, and bootloader binaries for both classic ESP32 and ESP32-S3 targets.
+S3 builds use `S3firmware.bin`, `S3partitions.bin` and `S3bootloader.bin` for releases. Keep the generic bootloader and partition intermediates for the pioarduino uploader.
+The GitHub release archive includes firmware, merged factory, partition-table, and bootloader binaries for both classic ESP32 and ESP32-S3 targets.
 Release notes use `scripts/release_notes.py` to include nonempty Unreleased/current-version changelog entries and all non-merge commits since the latest reachable date-version tag, excluding the current release tag for same-day rebuilds. Keep full checkout history (`fetch-depth: 0`); GitHub's generated PR/contributor list is appended separately.
 GitHub Actions exports `SS2K_FIRMWARE_VERSION` from the date-based release tag before invoking pioarduino. `git_tag_macro.py` requires that override in Actions so published firmware never receives a `git describe` commit suffix; local builds retain branch/commit version details.
-The release workflow runs `cert_updater.py` once before firmware builds and stops with an explicit CI error if certificate validation or writing fails; a validated unchanged certificate is success. Local pioarduino builds use the checked-in `include/cert.h` and do not perform network-dependent certificate updates. `pre_build_cleanup.py` only removes generated ESP-IDF certificate-bundle artifacts; it skips cleanup for IDE inspection, envdump and clean targets.
 CI installs `pioarduino==6.1.19` from `requirements-ci.txt`; it still provides the `platformio` and `pio` commands. Use this fork's SCons 4.8.1 with pioarduino 55.03.311; upstream PlatformIO's newer SCons 4.11.1 conflicts with this platform's tool installation. CI cache restore prefixes include the requirements hash to avoid mixing Core/tool versions.
 
 Windows builds use `scripts/windows_ldgen.py` to launch ESP-IDF's linker-script generator directly, bypassing cmd.exe's 8191-character command limit. The fragment list can exceed that limit with long package paths; other build commands keep the normal SCons launcher.
 
-`sdkconfig.defaults` owns the shared Arduino/ESP-IDF feature selection; `sdkconfig.s3.defaults` adds S3 flash/PSRAM settings. Keep that policy in all four `sdkconfig.<environment>` files and the classic ESP32 `sdkconfig` fallback: defaults do not override an existing configuration. Run `python scripts/check_sdkconfig.py` after config changes and regenerate/build each affected environment with the pinned toolchain. Keep board-specific BLE memory/security tuning and debug/logging choices when aligning features. Generated `sdkconfig*.old` backups are ignored. SPI is required by TMCStepper, AsyncUDP by DNSServer, and Hash by WebServer. NimBLE's optional application services and Arduino BLE are unnecessary because the firmware uses esp-nimble-cpp and its own services. `CMakeLists.txt` excludes unused IDF provisioning, MQTT, and HTTP server stacks; Arduino WebServer/HTTPClient and ESP-IDF app_update remain in use.
+`sdkconfig.defaults` owns the shared Arduino/ESP-IDF feature selection; `sdkconfig.s3.defaults` adds S3 flash/PSRAM settings. Keep that policy in all four `sdkconfig.<environment>` files and the classic ESP32 `sdkconfig` fallback: defaults do not override an existing configuration. Run `python scripts/check_sdkconfig.py` after config changes and regenerate/build each affected environment with the pinned toolchain. Keep board-specific BLE memory/security tuning and debug/logging choices when aligning features. Generated `sdkconfig*.old` backups are ignored. SPI is required by TMCStepper. NimBLE's optional application services and Arduino BLE are unnecessary because the firmware uses esp-nimble-cpp and its own services. `CMakeLists.txt` excludes unused IDF provisioning, MQTT, and HTTP server stacks; ESP-IDF app_update handles firmware images.
 
 Concurrent firmware builds in one checkout race on `managed_components/` and `.pio/`. When other agents are building, use an isolated checkout or source snapshot with its own generated dependencies and build outputs; do not clean their shared build directories.
 
-Filesystem builds stage deterministic gzip copies of every HTML/CSS source file under the environment build directory. They also refresh the checked-in `.gz` companions and `list.json` in `data/` or `data_s3/`, which are consumed by repository-based automatic OTA updates.
-
 Important timing/network notes:
 
-- pioarduino firmware/filesystem builds and USB flashing are supported from the Codex environment when the local toolchain is available. Local builds normally finish in under five minutes.
+- pioarduino firmware builds and USB flashing are supported from the Codex environment when the local toolchain is available. Local builds normally finish in under five minutes.
 - Locate an attached ESP32-S3's current USB CDC port with `pio device list` (typically `/dev/cu.usbmodem*` on macOS or `COM*` on Windows). A debug build (`S3debug`, with `__DEBUG__` and `SERIAL_CUSTOM_CHARACTERISTIC`) can be observed with `pio device monitor -p <port>`. Serial monitoring is read-only, while uploading a debug build is an explicit device mutation and should only be done when the task authorizes it.
 - Anthony prefers no application/flash backup before uploads; skip backups unless he explicitly requests one. Still verify device identity and the active slot, and preserve NVS/LittleFS with application-only flashing.
 - When testing attached hardware, do not switch the development machine's WiFi connection to the SmartSpin2k access point: that network has no internet access, while builds and tooling may require internet service. Communicate with the device over USB unless the user explicitly directs otherwise. Preserve the device's stored WiFi/LittleFS/NVS settings by preferring application-partition-only flashing (S3 app offset `0x60000`).
@@ -98,7 +93,7 @@ Most runtime state is global and initialized in `src/Main.cpp`:
 - `SpinBLEClient spinBLEClient`: BLE client manager and connected sensor slots.
 - `SpinBLEServer spinBLEServer`: BLE server manager and server write queue.
 - `Board currentBoard`: selected at boot by analog hardware revision voltage.
-- `UdpAppender`, `WebSocketAppender`, `BleAppender`: log sinks registered with `LogHandler`.
+- `UdpAppender`, `BleAppender`: log sinks registered with `LogHandler`.
 
 Because the firmware uses FreeRTOS tasks and callbacks, treat these globals as shared state. Many setters have side effects through timestamps, saved config, BLE notifications, or stepper behavior.
 
@@ -113,23 +108,23 @@ Boot sequence:
 3. Start stepper serial and optional aux serial for Peloton.
 4. Mount LittleFS.
 5. Load and re-save `userConfig`.
-6. Start configured WiFi in STA mode without waiting; only unconfigured devices start an AP. Check for missing web files before BLE.
+6. Start configured WiFi in STA mode without waiting; unconfigured units wait for credentials over BLE.
 7. Configure GPIO pins.
 8. Initialize LED state; commanded-reboot quiet mode uses RTC memory so true power cycles still show startup blink behavior.
 9. Configure TMC/SS2KStepper via `SS2K::setupTMCStepperDriver()`.
 10. Register log appenders.
 11. Start BLE via `setupBLE()`.
-12. Start the web server. The maintenance loop starts mDNS and DirCon after WiFi has an IP address.
+12. The maintenance loop starts mDNS and DirCon after WiFi has an IP address.
 13. Create `SS2K::maintenanceLoop` task.
 
 `SS2K::maintenanceLoop()` is the main cooperative loop. It roughly does:
 
-- Every `BLE_NOTIFY_DELAY`: `BLECommunications()`, flush logs, websocket loop.
+- Every `BLE_NOTIFY_DELAY`: `BLECommunications()`, flush logs.
 - If not updating and not in spindown: `ss2k->FTMSModeShiftModifier()`, `ss2k->moveStepper()`, `ergMode->runERG()`.
 - Periodically poll Peloton aux serial via `txSerial()`.
 - Always handle local shifter button state.
 - Notify changed custom-characteristic values via `BLE_ss2kCustomCharacteristic::parseNemit()`.
-- Update HTTP clients and DirCon.
+- Update DirCon.
 - Update LED status/diagnostics.
 - Slow stepper near Peloton resistance limits when unhomed.
 - Handle reboot/default-reset/save flags.
@@ -311,7 +306,7 @@ Primary files: `src/BLE_Server.cpp`, `src/BLE_Fitness_Machine_Service.cpp`, serv
 - Fitness Machine
 - SmartSpin2k custom characteristic
 - Device Information
-- BLE firmware update
+- Firmware streaming runs inside the paired settings characteristic.
 
 The primary BLE advertisement carries the current WiFi IPv4 address in versioned SmartSpin2k manufacturer data.
 The device name and 128-bit SmartSpin2k service UUID are kept in the scan response to stay within the legacy advertisement size limit.
@@ -345,7 +340,7 @@ Protocol:
 - `cc_read` reads a variable.
 - `cc_write` writes a variable.
 - Responses generally start with `cc_success` or `cc_error`, followed by the variable id and bytes/string.
-- Reading `BLE_allSettings` returns a versioned, MTU-sized sequence of indications whose payloads concatenate into the JSON from `userConfig->returnJSON()`.
+- Reading `BLE_allSettings` returns a versioned sequence of encrypted notification chunks whose payloads concatenate into the JSON from `userConfig->returnJSON()`.
 
 The giant switch in `BLE_ss2kCustomCharacteristic::process()` maps variable IDs to `userConfig`, `rtConfig`, and `ss2k` fields. Examples:
 
@@ -363,13 +358,13 @@ The giant switch in `BLE_ss2kCustomCharacteristic::process()` maps variable IDs 
 
 `parseNemit()` compares current config/runtime values against static old copies and sends one notification per call for changed values. Some changes, like `hMin`/`hMax`, trigger `userConfig->saveToLittleFS()`. Turning `pTab4Pwr` on sets `spinBLEServer.spinDownFlag = 1` to trigger homing.
 
-The WiFi password is write-only. `returnJSON()` is the client serialization (HTTP `/configJSON`, `0x31` snapshot): it always carries `"password": ""` plus `passwordSet` (stored value differs from `DEFAULT_PASSWORD`), because older web pages/apps copy the `password` key into their field and re-save it. Only `saveToLittleFS()` writes the real value; never add a secret to `returnJSON()`. Reads of `0x13` and its write responses succeed with no value (no echo), empty password writes (BLE/DirCon/HTTP) keep the stored one, the password has no change notification, and the `CUSTOM_CHAR_DEBUG` dump omits its payload. IDs `0x01` and `0x11` are retired (error; never reuse). `0x36` is the read-only capability report (`version, LE32 bits`); add a bit there for client-visible protocol changes instead of having apps test version strings. `test_settings_client_json.py` and `test_custom_characteristic_secrets.py` cover this.
+The WiFi password is write-only. `returnJSON()` is the client serialization (`0x31` snapshot): it always carries `"password": ""` plus `passwordSet` (stored value differs from `DEFAULT_PASSWORD`), because older web pages/apps copy the `password` key into their field and re-save it. Only `saveToLittleFS()` writes the real value; never add a secret to `returnJSON()`. Reads of `0x13` and its write responses succeed with no value (no echo), empty password writes (BLE/DirCon) keep the stored one, the password has no change notification, and the `CUSTOM_CHAR_DEBUG` dump omits its payload. IDs `0x01` and `0x11` are retired (error; never reuse). `0x36` is the read-only capability report (`version, LE32 bits`); add a bit there for client-visible protocol changes instead of having apps test version strings. `test_settings_client_json.py` and `test_custom_characteristic_secrets.py` cover this.
 
-Custom-characteristic BLE writes and indication-status callbacks enqueue work for `processPendingEvents()` on the fast maintenance pass, before motor dispatch, retaining the firmware-update quiet gate. Drain at most the bounded queue capacity per pass. `update()` on the periodic BLE server pass only paces DirCon settings snapshot chunks. Do not run the settings switch/JSON serialization or send the next snapshot chunk inside `nimble_host`: its 4 KB stack overflowed during a custom indication. Connection generation tokens discard stale queued work, and snapshot acknowledgments must match the owning connection. DirCon calls the shared processor directly from maintenance. Variable-length response/debug buffers belong on the heap. `test/test_custom_characteristic_events.py` covers deferred callbacks, queue bounds, peer isolation and handle reuse.
+Both transports enter `PairedSettings::receive()`. BLE callbacks enqueue on a bounded queue and the maintenance task drains it even during OTA. Connection generations and explicit DirCon disconnects invalidate connection-specific sessions. Reads, writes, scan results, logs, and snapshot chunks use per-peer encryption. Keep all secret-bearing values off the shared GATT attribute and broadcast path. Use the generated SS2kProtocol definitions under `lib/SS2kProtocol`, and update the upstream library before syncing generated artifacts. Firmware streaming lives in `SettingsUpdate.cpp`. Production builds omit the USB-only `SS2K_TEST_PAIR_BUTTONS` fixture.
 
 When adding a custom characteristic variable:
 
-1. Add/confirm the ID in `include/BLE_Custom_Characteristic.h`.
+1. Add the ID and wire schema in SS2kProtocol, regenerate, then sync the consumer snapshot.
 2. Update `process()` read/write behavior.
 3. Update `parseNemit()` if clients need change notifications.
 4. Update `CustomCharacteristic.md`.
@@ -439,7 +434,7 @@ Stepper safety:
 
 `lib/SS2K/include/VirtualGearing.h` maps ratios derived from sorted tooth pairs to integer motor offsets. `shiftStep` is the distance for the median positive adjacent ratio gap; even medians average the middle two gaps. Gear 1 has zero offset; duplicates share offsets, all-identical profiles stay at zero, and absolute calculation avoids rounding drift. `src/VirtualGearing.cpp` adds the existing terrain incline offset. Both boards use this in local simulation/inclination modes without weight, cadence, calibration/trust gating, or timed effects. Full targets pass through `moveStepper()` travel clamps. ERG, resistance, external control and app-owned shifting retain their own behavior. Unlimited is the default: an empty profile gives fixed `shifterPosition * shiftStep` offsets, no logical gear bounds, and start gear 8 at both startup and successful homing. After initial driver setup, boot assigns the current stepper coordinate and controller current/target to the starting gear offset without moving the motor (Unlimited: `8 * shiftStep`; bounded: ratio offset). Homing replaces that provisional coordinate; driver recovery must not reapply it. Bounded profiles start at `max(1, gearCount / 3)` rounded down (24 gears: 8; 12/13 gears: 4) at both startup and homing, and clamp to the profile count. FTMS and mechanical homing both apply the selected starting gear from the calibrated zero, not from the final search position. Homing owns both the successful start-gear reset and the Unlimited gear-0 fallback after failure/abort; the BLE caller must not reset gears a second time. Other control modes retain their legacy reset. Cache only accepted local gears after travel checks so a rejected Unlimited shift cannot return after a mode change. Motor travel guards apply in both modes. Median calculation happens before the profile's short publication lock.
 
-Tooth profiles persist `gearTeeth` pairs (`front * 100 + rear`, 5332 = 53x32) with `gearPreset: 0`; an empty array selects Unlimited. Named `gearPreset: 1` selects the exact Mixed Terrain 1x24 ratios with no fabricated teeth and an empty persisted tooth array. Both bounded formats use the existing median-gap motor mapping. Arbitrary/legacy ratio-array profiles are unsupported. Custom ID 0x34 accepts pairs using count/LE16 writes and metadata/indexed reads; writing pairs exits the named preset, while tooth reads during preset 1 return an error. ID 0x35 reads/selects the preset as LE16 (writing 0 selects Unlimited). Profile changes notify 0x35 plus 0x34 when tooth-based. Full 26-gear BLE writes need MTU >=58; reads fit MTU 23. HTTP accepts either gear field per request; keep both web trees synchronized. The web also supplies All-Rounder 48/35 x 10–33 as ordinary tooth pairs. ID 0x33 is retired. See `VirtualGearing.md` and `CustomCharacteristic.md`; run native tests and both firmware/filesystem builds for changes unless the user requests otherwise.
+Tooth profiles persist `gearTeeth` pairs (`front * 100 + rear`, 5332 = 53x32) with `gearPreset: 0`; an empty array selects Unlimited. Named `gearPreset: 1` selects the exact Mixed Terrain 1x24 ratios with no fabricated teeth and an empty persisted tooth array. Both bounded formats use the existing median-gap motor mapping. Arbitrary/legacy ratio-array profiles are unsupported. Custom ID 0x34 accepts pairs using count/LE16 writes and metadata/indexed reads; writing pairs exits the named preset, while tooth reads during preset 1 return an error. ID 0x35 reads/selects the preset as LE16 (writing 0 selects Unlimited). Profile changes notify 0x35 plus 0x34 when tooth-based. Full 26-gear BLE writes need MTU >=58; reads fit MTU 23. ID 0x33 is retired. See `VirtualGearing.md` and `CustomCharacteristic.md`; run native tests and both firmware builds for changes unless the user requests otherwise.
 
 ## ERG Mode
 
@@ -572,23 +567,9 @@ DirCon uses static buffers and fixed client/subscription arrays. Be cautious wit
 Outbound DirCon frames use bounded per-client queues and are drained with non-blocking socket sends only from `DirConManager::update()`. Keep responses and notifications on that path so slow or vanished TCP peers cannot block firmware tasks or interleave frames.
 DirCon notification broadcasts check for an active subscribed recipient before encoding, avoiding unnecessary dynamic allocations during BLE scans.
 
-## HTTP/Web UI
+## WiFi station
 
-Primary files: `src/HTTP_Server_Basic.cpp`, `include/HTTP_Server_Basic.h`, `data/*`.
-
-Responsibilities:
-
-- Start/stop WiFi (`startWifi()`, `stopWifi()`) and poll connectivity in `updateWifi()` from the existing maintenance task. Configured devices remain in STA mode. Auto-reconnect is disabled so failed station attempts are paced: up to three app-initiated attempts 15 seconds apart, then a 60-second pause before another burst. The Arduino core still performs one unconditional first-connect retry after a disconnect. AP mode is reserved for an unconfigured SSID. mDNS and DirCon start only after an IP is available and stop on station loss. Clock sync is polled without a startup wait. No additional task stack is allocated.
-- Serve LittleFS web assets and built-in OTA pages.
-- Before BLE starts, boot checks the local `list.json`. If every listed asset exists, no TLS connection is created and WiFi startup does not wait. Only when files are missing, `HTTP_Server::syncWebServerFiles()` waits up to ten seconds for the station and repairs synchronously before BLE starts. If the station remains unavailable, normal startup continues in STA mode.
-- Browser-uploaded firmware uses the low-level ESP-IDF OTA API, and filesystem images stream directly to the LittleFS partition with sector-at-a-time erases. Neither path uses Arduino `Update` or its 4 KiB heap allocation on memory-constrained classic ESP32 builds. Filesystem uploads must exactly match the partition size; arbitrary file uploads are rejected.
-- Web filesystem repair fetches the remote `list.json`, downloads only missing assets, and installs the fetched manifest only after repair succeeds. It never performs boot-time version upgrades or prunes existing files.
-- Downloads use bounded HTTP/TLS timeouts and temporary files so partial assets are never served. Repair completes before BLE allocation/scanning, avoiding their peak internal-RAM loads overlapping on classic ESP32.
-- Settings JSON/API behavior through `settingsProcessor()`.
-- Periodic web client update through `webClientUpdate()`.
-- BLE scanner page support.
-
-Web UI changes usually need matching firmware handlers when adding settings. Config fields are not automatically exposed unless `settingsProcessor()` and/or the custom BLE characteristic know about them.
+`src/WifiStation.cpp` starts a configured station without blocking BLE. Station loss stops DirCon and mDNS and clears the advertised IP. Retries run 15 seconds apart in groups of three with a 60-second pause. Keep `CONFIG_ESP_WIFI_SOFTAP_SUPPORT` disabled. Arduino 3.3.11 requests an AP interface even in station-only mode, so the adapter returns an empty AP slot. The maintenance task restarts mDNS and DirCon once a station address is available.
 
 ## Logging
 
@@ -598,7 +579,6 @@ Use `SS2K_LOG*` macros rather than raw `Serial.printf` unless matching nearby co
 
 - Serial/log handler.
 - UDP when enabled.
-- WebSocket.
 - BLE custom logging through `BleAppender`.
 
 `DEBUG_BLE_TX_RX`, `CUSTOM_CHAR_DEBUG`, `DEBUG_POWERTABLE`, `DEBUG_DIRCON_MESSAGES`, and `DEBUG_STACK` in `settings.h` unlock extra diagnostics. Be aware that verbose BLE/Peloton logging can be noisy or timing-sensitive.
@@ -607,7 +587,7 @@ Use `SS2K_LOG*` macros rather than raw `Serial.printf` unless matching nearby co
 
 `include/settings.h` is central. It contains:
 
-- Firmware update URLs and LittleFS filenames.
+- LittleFS filenames.
 - Device/WiFi defaults.
 - Stepper power, speed, acceleration, travel, and driver tuning.
 - ERG constants and compile-time feature flags.
@@ -636,8 +616,7 @@ Adding a persisted setting:
 1. Add field/getter/setter/default in `userParameters`.
 2. Update `setDefaults()`, `returnJSON()`, `saveToLittleFS()`, `loadFromLittleFS()`.
 3. Add custom characteristic read/write/notify if the app controls it.
-4. Add HTTP settings support if the web UI controls it.
-5. Consider whether a live change needs immediate side effects, like updating stepper speed/power.
+4. Consider whether a live change needs immediate side effects, like updating stepper speed/power.
 
 Changing ERG or resistance behavior:
 
@@ -672,8 +651,7 @@ Changing BLE server characteristics:
 - `spinBLEServer.writeCache` is shared by BLE writes and DirCon writes.
 - `spinDownFlag` is a state machine trigger, not just a bool: `1` means home/startup-ish, `2+` means full spindown/homing.
 - `externalControl` bypasses normal target calculation but final state can still be affected by sync/clamping code.
-- Firmware OTA paths validate the incoming `esp_image_header_t` chip ID before starting flash writes; filesystem images are intentionally exempt from application-image validation.
-- BLE firmware OTA uses a length-aware versioned protocol documented in `BLEFirmwareUpdateProtocol.md`. It accepts variable data chunk sizes through writes with or without response, incrementally verifies CRC-32, and reports phase/error/byte-count status only through the firmware service control characteristic. Apps must wait for `Updating` before sending data; `Preparing` releases sensor links and erases the inactive partition outside the NimBLE callback. The server requests an ATT MTU exchange on connection and retries at OTA START, but transfers remain valid at MTU 23. Failed, aborted, disconnected, or 30-second-stalled transfers abort the inactive OTA handle and schedule a reboot; the boot partition is not changed until verification succeeds.
+- Firmware updates use the paired custom characteristic over either transport. The device validates chip ID and size, checks a streaming SHA-256 digest and verifies the ESP image before changing the boot partition. Owner disconnect or 30 seconds without progress discards the transfer. See `BLEFirmwareUpdateProtocol.md`.
 - Stepper UART initialization drives TX high for 20 ms before starting hardware UART. Outside homing, setup/recovery checks CRC-valid `IOIN.VERSION` of `0x20` (TMC2225/TMC2208) or `0x21` (TMC2209) with one idle-high recovery attempt, then checks that setup writes advance IFCNT. Runtime polling has no IFCNT gate. Do not infer UART failure from zero `DRV_STATUS`; status must remain independent of connectivity. Homing retains its original `test_connection()` check. Safety events use always-enabled SS2K_LOG so release builds retain failure reasons. SmartSpin2k pins the doudar/TMCStepper fork to a tested commit; the library accepts valid zero-CRC replies (including IFCNT=174) and rejects missing/corrupt replies. The library owns its UART regression in tests/test_uart_read.py. Run python -B -m unittest discover -s test -p test_tmc_recovery.py for firmware polling/recovery regression tests. Initial OTP handling retains `test_connection()` and a separate CRC-valid/progressing `IFCNT` check; if that fails, irreversible OTP access is skipped. If `OTP_IHOLD` is verified as unprogrammed, firmware programs byte 2/bit 5 for the 9% standalone hold-current default, while incompatible existing OTP values are never modified.
 - Many BLE and motor changes cannot be fully validated without hardware.
 

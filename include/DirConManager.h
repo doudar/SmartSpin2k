@@ -31,6 +31,8 @@
 
 // Result struct populated by service write handler callbacks
 struct DirConWriteResult {
+  uint16_t clientIndex = 0;
+  std::vector<uint8_t> privateResponse;
   bool updateResponseData;           // If true, response includes characteristic's current value
   NimBLEUUID autoSubscribeUuids[4];  // UUIDs to auto-subscribe the client to
   size_t autoSubscribeCount;         // Number of valid entries in autoSubscribeUuids
@@ -50,6 +52,7 @@ typedef void (*DirConAdvertiseHandler)(const NimBLEUUID& serviceUuid);
 
 class DirConManager {
  public:
+  static bool notifyCustomPeer(size_t peer, const uint8_t* data, size_t n);
   static bool start();
   static void stop();
   static void update();

@@ -1,13 +1,14 @@
-Please use and refer to the following notes for use of the custom characteristic:
+# SmartSpin2k settings over BLE and DirCon
 
-Custom Characteristic for userConfig Variable manipulation via BLE
+The settings service UUID is `77776277-7877-7774-4466-896665500000`. The custom characteristic UUID is `77776277-7877-7774-4466-896665500001`. DirCon advertises the same service over mDNS.
 
-SMARTSPIN2K_SERVICE_UUID        "77776277-7877-7774-4466-896665500000"
-SMARTSPIN2K_CHARACTERISTIC_UUID "77776277-7877-7774-4466-896665500001"
+Subscribe to notifications on the custom characteristic, then send the public capability query `01 36`. Bit 1 selects the paired settings protocol. Pairing, reconnect, fragmentation and record constants are maintained in SS2kProtocol. The settings examples below show the **plaintext inside an authenticated record**. Standard trainer services continue to operate independently.
 
-The same service and characteristic are published in the DirCon mDNS service.
-A DirCon client sends the protocol bytes in a characteristic-write request and receives the custom-characteristic response bytes in that write response.
-Subscribed DirCon clients also receive changed-value notifications.
+On first connection, the companion selects a fresh P-256 key and asks the rider to release both shifters and then hold them together for two seconds. The device accepts one pairing candidate at a time for up to one minute. A competing request cancels both candidates. The shared secret is derived independently at each endpoint. The firmware retains up to eight companions in NVS until the rider forgets a companion or resets the trainer. Holding both shifters during boot performs the factory reset. Holding them after the app prompts performs pairing.
+
+On reconnection, each transport proves possession of the stored root key. Fresh random challenges derive independent per-direction AES-128-CCM traffic keys. An authenticated record adds 13 bytes and uses the ESP32 AES accelerator. The firmware accepts only the public capability query and handshake frames outside the encrypted channel. BLE sends replies as notifications. DirCon returns a synchronous reply in the write response when it fits, and sends asynchronous or fragmented replies as notifications on the originating socket. Unsolicited changes use inner status `81`. Responses use `80` or `ff`.
+
+This button-only commissioning method establishes physical presence. An active intermediary able to intercept and replace the initial public keys can relay this first exchange. Pair the device on a trusted local connection.
 
 The primary BLE advertisement includes the current Wi-Fi IPv4 address in manufacturer-specific data.
 The device name and SmartSpin2k service UUID remain in the scan response. The payload is:
@@ -32,7 +33,7 @@ Client Writes:
 0x02, 0x06, 0x07, 0x01
 (operator, variable, LSO, MSO)
 
-Server will then indicate:
+Authenticated reply:
 0x80, 0x06, 0x07, 0x01 
 (success),(simulatedSpeed),(LSO),(MSO)
 
@@ -40,7 +41,7 @@ Example to read (0x01) from simulatedSpeed (0x06)
 
 Client Writes:
 0x01, 0x06
-Server will then indicate:
+Authenticated reply:
 0x80, 0x06, 0x07, 0x01 
 (success),(simulatedSpeed),(0x07),(0x01)
 
@@ -55,11 +56,11 @@ Written:
   uint8_t read        = 0x01;  // value to request read operation
   uint8_t write       = 0x02;  // Value to request write operation
   
-Indicated:
+Response status:
   uint8_t error       = 0xff;  // value server error/unable
   uint8_t success     = 0x80;  // value for success
 
-From BLE_common.h
+The generated SS2kProtocol definitions describe each command.
 //custom characteristic codes
 | Variable                 |uint8_t| type| Notes                                             |
 |--------------------------|:-----:|-----|---------------------------------------------------|
@@ -97,7 +98,9 @@ From BLE_common.h
 |BLE_allSettings           |0x31   |JSON |Read-only chunked snapshot of all user settings         |
 |BLE_gearTeeth             |0x34   |array|Packed front/rear tooth pairs; metadata/indexed reads |
 |BLE_gearPreset            |0x35   |uint16|0 = tooth profile/Unlimited, 1 = Mixed Terrain 1x24 |
-|BLE_capabilities          |0x36   |bytes|Read-only capability report: version + uint32 LE bits (see below)|
+|BLE_capabilities          |0x36   |bytes|Read-only capability report, version + uint32 LE bits|
+|Forget peer |0x37 |action|Revokes the requesting companion on every transport|
+|Firmware stream |0x38 |bytes|Authenticated begin, chunk, finish and abort commands|
 
 *syncMode will disable the movement of the stepper motor by forcing stepperPosition = targetPosition prior to the motor control. While this mode is enabled, it allows the client to set parameters like incline and shifterPosition without moving the motor from it's current position. Once the parameters are set, this mode should be turned back off and SS2K will resume normal operation.
 
@@ -106,7 +109,7 @@ The first power-table row write (`02 27 <row> <little-endian int16 positions...>
 
 This characteristic also notifies when a shift is preformed or the button is pressed. 
 
-See code for more references/info in BLE_Server.cpp starting on line 534
+The firmware dispatches settings in `src/BLE_Custom_Characteristic.cpp`.
 
 Hardware-version example:
 
@@ -116,11 +119,8 @@ Hardware-version example:
 
 All-settings snapshot (BLE or DirCon):
 
-- Client writes `0x01, 0x31`. BLE clients subscribe to indications on the custom characteristic.
-  A DirCon client receives the first chunk in the characteristic-write response and is automatically subscribed for the remaining chunks.
-- The server serializes `userConfig->returnJSON()` once.
-  Over BLE, it sends MTU-sized indications sequentially and waits for each acknowledgement before sending the next.
-- Over DirCon, chunks use the same framing and arrive as characteristic notifications after the first write-response chunk.
+- Subscribe before sending the encrypted read `01 31`.
+- The server serializes `userConfig->returnJSON()` once and sends ordered chunks to the authenticated requesting session. The first DirCon chunk normally arrives in the write response. Further chunks arrive as notifications.
 - Every snapshot chunk begins with this seven-byte header:
 
 | Offset | Size | Meaning |
@@ -134,12 +134,7 @@ All-settings snapshot (BLE or DirCon):
 
 The client validates that it received chunks `0` through `chunk count - 1`, concatenates the bytes after each header, and parses the result as JSON. If the connection closes or a chunk is missing, discard the partial snapshot and issue the read command again. Unknown JSON properties should be ignored so newly added settings remain backward compatible. The snapshot never contains the stored WiFi password: `"password"` is always an empty string (kept for older clients) and the boolean `passwordSet` is true when a non-default password is stored. `firmwareUpdateURL` and `autoUpdate` are no longer present.
 
-BLE requests and snapshot acknowledgments are queued for the maintenance task;
-an ATT write completion does not mean the settings operation has completed. Wait
-for the custom-characteristic response before sending the next request. A bounded
-queue logs overflow and drops excess events. Disconnects invalidate queued work,
-and a snapshot accepts acknowledgments only from its connection/session. Snapshot
-transfers expire after five seconds without progress. The wire format is unchanged.
+BLE writes are queued on the maintenance task. Wait for the authenticated custom reply before sending the next request. Disconnecting invalidates the session and its queued work.
 
 ## Virtual gearing settings (firmware API)
 
@@ -169,14 +164,12 @@ both metadata and indexed tooth reads return `FF 34` because it has no tooth pai
   `80 34 <count> <index> <pair LE16>`. Out-of-range indexes return `FF 34`.
 - Changed-value notification: `80 34 <count>`, including edits that keep the
   count or ratios unchanged. Refresh indexed reads or the all-settings snapshot.
-- A 26-gear write is 55 bytes, requiring ATT MTU **58 or larger** for a single
-  normal BLE write. Reads, notifications and all-settings snapshots work at
-  MTU 23. DirCon has no ATT limit.
+- A 26-gear write uses 55 bytes before encryption. Secure fragmentation supports the BLE minimum MTU of 23.
 - Example: `02 34 02 C7 14 D4 14` submits 53x19 and 53x32; success `80 34 02`.
   After sorting, reading index 0 with `01 34 00` returns `80 34 02 00 D4 14`.
 
 After updating over BLE/DirCon, send the existing save command `02 18` to persist
-it. Firmware-hosted web settings save automatically. Persistence and config
+it. Persistence and config
 snapshots include `gearPreset` and `gearTeeth`; arbitrary ratio-only test profiles
 are not supported.
 In local simulation/inclination modes, `BLE_shifterPosition` uses **1-based**
@@ -193,7 +186,7 @@ limits still apply. No companion-app changes are included here.
 - Select Unlimited: `02 35 00 00`; response `80 35 00 00`. To select a bounded
   tooth profile instead, write its pairs through 0x34.
 - Unknown preset IDs or invalid lengths return `FF 35` without changing the profile.
-- Every profile change notifies `80 35 <preset LE16>`; tooth profiles also notify
+- Every profile change notifies `81 35 <preset LE16>`; tooth profiles also notify
   0x34 metadata. Reading value 0 alone does not distinguish Unlimited from a
   bounded tooth profile: read 0x34 as well.
 
@@ -211,6 +204,7 @@ Read-only report of optional firmware behaviours.
 
 | Bit | Meaning |
 |-----|---------|
-| 0 | Password write-only: the device never returns the stored WiFi password |
+| 0 | The device keeps the stored WiFi password private |
+| 1 | Paired settings and authenticated firmware streaming |
 
 Later capabilities take the next bits; bits are never reused. Clients must ignore unknown bits and any extra trailing bytes, and must treat an error response (older firmware) as "no capabilities".

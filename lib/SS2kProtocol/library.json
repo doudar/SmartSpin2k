@@ -1,0 +1,12 @@
+{
+  "name": "SS2kProtocol",
+  "version": "0.2.0",
+  "description": "Portable SmartSpin2k custom characteristic protocol",
+  "license": "GPL-2.0-only",
+  "frameworks": "*",
+  "platforms": "*",
+  "build": {
+    "srcDir": "c/src",
+    "includeDir": "c/include"
+  }
+}
