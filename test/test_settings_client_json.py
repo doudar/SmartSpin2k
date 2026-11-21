@@ -29,30 +29,7 @@ class TestSettingsClientJson(unittest.TestCase):
             "bool userParameters::setGearTeethJSON(",
         ))
         harness = r'''
-#include <cassert>
-#include <cstring>
-#include <string>
-#include <ArduinoJson.h>
-#include "SmartSpin_parameters.h"
-#define SS2K_LOG(...) ((void)0)
-#define FILE_WRITE 1
-std::string fileContents;
-struct File {
-  size_t position=0;
-  bool valid=true;
-  operator bool() const { return valid; }
-  int read() { return position < fileContents.size() ? static_cast<unsigned char>(fileContents[position++]) : -1; }
-  size_t readBytes(char* out,size_t length) {
-    size_t n=0; while(n<length && position<fileContents.size()) out[n++]=fileContents[position++]; return n;
-  }
-  size_t write(uint8_t c) { fileContents.push_back(c); return 1; }
-  size_t write(const uint8_t* data,size_t length) { fileContents.append(reinterpret_cast<const char*>(data),length); return length; }
-  void close() {}
-};
-struct MemoryFS {
-  void remove(const char*) { fileContents.clear(); }
-  File open(const char*,int mode=0) { File file; file.valid=mode || !fileContents.empty(); return file; }
-} LittleFS;
+#include "persisted_settings_fakes.h"
 PRODUCTION
 int main() {
   const std::string secret = "s3cret-Value!";
@@ -106,7 +83,7 @@ int main() {
             exe = Path(directory) / "test.exe"
             cpp.write_text(harness, encoding="utf-8")
             subprocess.run([compiler, "-std=c++17", "-DPLATFORMIO_ENV_NATIVE", '-DFIRMWARE_VERSION="test"',
-                            "-I" + str(ROOT / "include"), "-I" + str(ROOT / "lib/SS2K/include"),
+                            "-I" + str(ROOT / "test"), "-I" + str(ROOT / "include"), "-I" + str(ROOT / "lib/SS2K/include"),
                             "-I" + str(ROOT / "lib/ArduinoCompat/include"), "-I" + str(libraries[0].parent),
                             str(cpp), "-o", str(exe)], check=True)
             subprocess.run([str(exe)], check=True)

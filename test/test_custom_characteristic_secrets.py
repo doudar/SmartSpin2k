@@ -72,7 +72,7 @@ std::vector<uint8_t> run(const std::string& rxValue) {
       break;
   }
 @@RESPONSE@@
-  return fakeCharacteristic.value;
+  return returnValue;
 }
 
 std::string req(uint8_t op, uint8_t id, const std::string& value = "") {
@@ -106,7 +106,7 @@ int main() {
   assert(userConfig->password == "new-pass");
 
   reply = run(req(cc_read, BLE_capabilities));
-  assert(same(reply, {0x80, 0x36, 0x01, 0x01, 0x00, 0x00, 0x00}));
+  assert(same(reply, {0x80, 0x36, 0x01, 0x03, 0x00, 0x00, 0x00}));
   reply = run(req(cc_write, BLE_capabilities));
   assert(same(reply, {0xFF, 0x36}));
   reply = run(req(cc_write, BLE_capabilities, std::string("\x01\x00\x00\x00", 4)));
@@ -132,7 +132,7 @@ class TestCustomCharacteristicSecrets(unittest.TestCase):
         start = source.index("  size_t returnLength = rxValue.length();")
         prelude = source[start:source.index("  size_t requiredLength", start)]
         tail_start = source.index('  if (returnString == "") {')
-        response = source[tail_start:source.index("\n  if (indicateResponse)", tail_start)]
+        response = source[tail_start:source.index("\n  return returnValue;", tail_start)]
         harness = (HARNESS.replace("@@PRELUDE@@", prelude)
                    .replace("@@PASSWORD@@", case_block(source, "case BLE_password:"))
                    .replace("@@CAPABILITIES@@", case_block(source, "case BLE_capabilities:"))
@@ -148,7 +148,7 @@ class TestCustomCharacteristicSecrets(unittest.TestCase):
             subprocess.run([compiler, "-x", "c", "-I" + include, "-c",
                             str(ROOT / "lib/ArduinoCompat/src/os/endian.c"), "-o", str(endian)], check=True)
             subprocess.run([compiler, "-std=c++17", "-I" + str(ROOT / "lib/SS2K/include"), "-I" + include,
-                            str(cpp), str(endian), "-o", str(exe)], check=True)
+                            "-I" + str(ROOT / "lib/SS2kProtocol/c/include"), str(cpp), str(endian), "-o", str(exe)], check=True)
             result = subprocess.run([str(exe)], capture_output=True, text=True)
             self.assertEqual(result.returncode, 0, result.stderr)
 
@@ -157,13 +157,13 @@ class TestCustomCharacteristicSecrets(unittest.TestCase):
         notify = function(source, "void BLE_ss2kCustomCharacteristic::parseNemit(")
         for forbidden in ("BLE_password", "getPassword", "FirmwareUpdateURL"):
             self.assertNotIn(forbidden, notify)
-        process = function(source, "void BLE_ss2kCustomCharacteristic::process(")
+        process = function(source, "std::vector<uint8_t> BLE_ss2kCustomCharacteristic::process(")
         self.assertNotIn("getPassword(", process)
         for forbidden in ("getAutoUpdate", "setAutoUpdate", "FirmwareUpdateURL", "BLE_autoUpdate"):
             self.assertNotIn(forbidden, source)
 
     def test_debug_dump_masks_password_writes(self):
-        process = function(self.source, "void BLE_ss2kCustomCharacteristic::process(")
+        process = function(self.source, "std::vector<uint8_t> BLE_ss2kCustomCharacteristic::process(")
         self.assertIn("BLE_password) length = 2;", process)
         self.assertLess(process.index("BLE_password) length = 2;"), process.index("ss2k_log_hex_to_buffer("))
 

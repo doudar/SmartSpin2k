@@ -97,9 +97,6 @@ void logCharacteristic(char* buffer, const size_t bufferCapacity, const byte* da
 void calculateInstPwrFromHR();
 
 // BLE FIRMWARE UPDATER
-void BLEFirmwareSetup(NimBLEServer* pServer);
-void BLEFirmwareUpdateLoop();
-void BLEFirmwareUpdateOnDisconnect(uint16_t connectionHandle);
 void BLERequestMtuExchange(uint16_t connectionHandle);
 
 // *****************************Client*****************************

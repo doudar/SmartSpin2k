@@ -6,7 +6,7 @@ CONFIG_MBEDTLS_KEY_EXCHANGE_PSK=y
 CONFIG_BOOTLOADER_COMPILER_OPTIMIZATION_SIZE=y
 
 # Keep the same Arduino library selection in every firmware environment.
-# SPI is required by TMCStepper; AsyncUDP by DNSServer; Hash by WebServer.
+# SPI is required by TMCStepper.
 # esp-nimble-cpp supplies BLE, and firmware OTA uses ESP-IDF app_update directly.
 CONFIG_ARDUINO_SELECTIVE_COMPILATION=y
 CONFIG_ARDUINO_SELECTIVE_SPI=y
@@ -14,14 +14,14 @@ CONFIG_ARDUINO_SELECTIVE_Preferences=y
 CONFIG_ARDUINO_SELECTIVE_FS=y
 CONFIG_ARDUINO_SELECTIVE_LittleFS=y
 CONFIG_ARDUINO_SELECTIVE_Network=y
-CONFIG_ARDUINO_SELECTIVE_Hash=y
-CONFIG_ARDUINO_SELECTIVE_AsyncUDP=y
-CONFIG_ARDUINO_SELECTIVE_DNSServer=y
+# CONFIG_ARDUINO_SELECTIVE_Hash is not set
+# CONFIG_ARDUINO_SELECTIVE_AsyncUDP is not set
+# CONFIG_ARDUINO_SELECTIVE_DNSServer is not set
 CONFIG_ARDUINO_SELECTIVE_ESPmDNS=y
-CONFIG_ARDUINO_SELECTIVE_HTTPClient=y
-CONFIG_ARDUINO_SELECTIVE_WebServer=y
+# CONFIG_ARDUINO_SELECTIVE_HTTPClient is not set
+# CONFIG_ARDUINO_SELECTIVE_WebServer is not set
 CONFIG_ARDUINO_SELECTIVE_WiFi=y
-CONFIG_ARDUINO_SELECTIVE_NetworkClientSecure=y
+# CONFIG_ARDUINO_SELECTIVE_NetworkClientSecure is not set
 # CONFIG_ARDUINO_SELECTIVE_Wire is not set
 # CONFIG_ARDUINO_SELECTIVE_ESP_SR is not set
 # CONFIG_ARDUINO_SELECTIVE_ESP_Video is not set
@@ -46,7 +46,8 @@ CONFIG_ARDUINO_SELECTIVE_NetworkClientSecure=y
 # CONFIG_ARDUINO_SELECTIVE_OpenThread is not set
 # CONFIG_ARDUINO_SELECTIVE_Insights is not set
 
-# Wi-Fi station/AP and our own settings UI are the only network setup paths.
+# Provision the Wi-Fi station over the paired custom characteristic.
+# CONFIG_ESP_WIFI_SOFTAP_SUPPORT is not set
 # CONFIG_ETH_USE_ESP32_EMAC is not set
 # CONFIG_ETH_USE_SPI_ETHERNET is not set
 # CONFIG_ETH_USE_OPENETH is not set
@@ -83,3 +84,5 @@ CONFIG_BT_NIMBLE_GAP_SERVICE=y
 # Classic ESP32 has 4 MB total flash, including both OTA slots and LittleFS.
 CONFIG_ESPTOOLPY_FLASHSIZE_4MB=y
 CONFIG_ESPTOOLPY_FLASHSIZE="4MB"
+
+CONFIG_MBEDTLS_HKDF_C=y

@@ -57,7 +57,7 @@ std::string bleAdvertisementName(const char* deviceName) {
 }
 
 bool addIpAddressToAdvertisement(NimBLEAdvertising* advertising) {
-  IPAddress ipAddress = WiFi.status() == WL_CONNECTED ? WiFi.localIP() : WiFi.softAPIP();
+  IPAddress ipAddress = WiFi.status() == WL_CONNECTED ? WiFi.localIP() : IPAddress();
   const uint8_t manufacturerData[] = {
       0xff, 0xff,  // Reserved Bluetooth SIG company identifier for development/testing.
       'S', 'S',    // SmartSpin2k payload marker.
@@ -139,7 +139,7 @@ void startBLEServer() {
   }
 
   // sb20Service.begin();
-  BLEFirmwareSetup(spinBLEServer.pServer);
+
 
   // const std::string fitnessData = {0b00000001, 0b00100000, 0b00000000};
   // pAdvertising->setServiceData(FITNESSMACHINESERVICE_UUID, fitnessData);
@@ -176,8 +176,7 @@ void SpinBLEServer::update() {
   cyclingPowerService.update();
   cyclingSpeedCadenceService.update();
   fitnessMachineService.update();
-  // DirCon snapshot pacing only; deferred BLE callbacks run in the fast loop.
-  ss2kCustomCharacteristic.update();
+
   // OpenBikeControl sends event-driven notifications from shift handlers.
   // sb20Service.notify();
 }
@@ -257,7 +256,7 @@ void MyServerCallbacks::onDisconnect(NimBLEServer* pServer, NimBLEConnInfo& conn
   BLE_ss2kCustomCharacteristic::onDisconnect(connInfo.getConnHandle());
   SS2K_LOG(BLE_SERVER_LOG_TAG, "Bluetooth Remote Client Disconnected. Reason: %d (%s) Remaining Clients: %d", reason, NimBLEUtils::returnCodeToString(reason),
            pServer->getConnectedCount());
-  BLEFirmwareUpdateOnDisconnect(connInfo.getConnHandle());
+
   BLEDevice::startAdvertising();
 }
 

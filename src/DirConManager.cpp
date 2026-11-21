@@ -6,6 +6,7 @@
  */
 
 #include "DirConManager.h"
+#include "PairedSettings.h"
 #include "SS2KLog.h"
 #include <algorithm>
 #include <Constants.h>
@@ -181,6 +182,7 @@ void DirConManager::stop() {
     // Prevent other tasks from queuing more notifications while clients close.
     started = false;
 
+    for (size_t i = 0; i < DIRCON_MAX_CLIENTS; ++i) PairedSettings::disconnect(PairedSettings::DIRCON_BASE + i);
     // Stop TCP server and disconnect clients
     if (tcpServer != nullptr) {
       tcpServer->close();
@@ -411,6 +413,7 @@ void DirConManager::closeClient(size_t clientIndex, const char* reason) {
     return;
   }
 
+  PairedSettings::disconnect(PairedSettings::DIRCON_BASE + clientIndex);
   String clientIP = dirConClients[clientIndex].remoteIP().toString();
 
   xSemaphoreTake(s_outboundMutex, portMAX_DELAY);
@@ -701,13 +704,16 @@ bool DirConManager::processDirConMessage(DirConMessage* message, size_t clientIn
       }
 
       // Write the value (setValue doesn't return a status in NimBLE)
-      characteristic->setValue(message->AdditionalData.data(), message->AdditionalData.size());
+      if (!characteristic->getUUID().equals(SMARTSPIN2K_CHARACTERISTIC_UUID))
+        characteristic->setValue(message->AdditionalData.data(), message->AdditionalData.size());
 
       // Let registered services handle the write via callbacks
       for (size_t i = 0; i < registeredServiceCount; i++) {
         if (registeredServices[i].writeHandler != nullptr) {
           DirConWriteResult writeResult;
+          writeResult.clientIndex = clientIndex;
           if (registeredServices[i].writeHandler(characteristic, message->AdditionalData.data(), message->AdditionalData.size(), &writeResult)) {
+            response.AdditionalData.swap(writeResult.privateResponse);
             if (writeResult.updateResponseData) {
               response.AdditionalData = characteristic->getValue();
             }
@@ -813,6 +819,17 @@ void DirConManager::sendResponse(DirConMessage* message, size_t clientIndex) {
   } else {
     SS2K_LOG(DIRCON_LOG_TAG, "Error: No encoded message to send");
   }
+}
+
+bool DirConManager::notifyCustomPeer(size_t peer, const uint8_t* data, size_t n) {
+  if (!started || peer >= DIRCON_MAX_CLIENTS) return false;
+  DirConMessage message;
+  message.Identifier = DIRCON_MSGID_UNSOLICITED_CHARACTERISTIC_NOTIFICATION;
+  message.UUID = SMARTSPIN2K_CHARACTERISTIC_UUID;
+  message.AdditionalData.assign(data, data + n);
+  auto frame = message.encode(0);
+  // Once a secure record or fragment is queued it must stay in order.
+  return frame && queueOutboundFrame(peer, frame->data(), frame->size(), false, &message.UUID);
 }
 
 void DirConManager::notifyCharacteristic(const NimBLEUUID& serviceUuid, const NimBLEUUID& characteristicUuid, const uint8_t* data, size_t length, bool onlySubscribers) {

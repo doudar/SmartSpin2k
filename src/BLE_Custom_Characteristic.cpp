@@ -5,84 +5,6 @@
  * SPDX-License-Identifier: GPL-2.0-only
  */
 
-/*
-
-Custom Characteristic for userConfig Variable manipulation via BLE
-
-**Overview:**
-This characteristic allows for reading and writing various user configuration parameters via BLE. The format for writing and reading data follows a specific protocol.
-
-**Writing Data:**
-- Format:
-  0x02, <variable>, <LSO>, <MSO>
-  - 0x02: Operator for write
-  - <variable>: The identifier for the variable to be written
-  - <LSO>: Least significant byte of the value
-  - <MSO>: Most significant byte of the value
-
-- Example:
-  To write 26.3 kph to simulatedSpeed:
-  - Convert 26.3 to an integer by multiplying by 10: 263
-  - Convert 263 to hexadecimal: 0x0107
-  - Swap bytes for little-endian format: 0x07, 0x01
-  - Write command: 0x02, 0x06, 0x07, 0x01
-
-**Reading Data:**
-- Format:
-  0x01, <variable>
-  - 0x01: Operator for read
-  - <variable>: The identifier for the variable to be read
-
-- Example:
-  To read the value of simulatedSpeed:
-  - Read command: 0x01, 0x06
-
-**Server Response:**
-- For both read and write operations, the server responds with:
-  0x80, <variable>, <LSO>, <MSO>
-  - 0x80: Status indicating success
-  - <variable>: The identifier for the variable
-  - <LSO>: Least significant byte of the value
-  - <MSO>: Most significant byte of the value
-
-**Detailed Variable Handling:**
-- Some float values are multiplied by 10 or 100 for transmission.
-- True values are > 00, and false values are 00.
-
-**Examples for Other Variables:**
-
-1. Incline (0x02):
-   - Read command: 0x01, 0x02
-   - Server response for 5.5% incline:
-     - Stored as integer: 55 (multiplied by 10)
-     - Hexadecimal: 0x0037
-     - Little-endian: 0x37, 0x00
-     - Response: 0x80, 0x02, 0x37, 0x00
-
-2. Simulated Watts (0x03):
-   - Read command: 0x01, 0x03
-   - Server response for 200 watts:
-     - Integer: 200
-     - Hexadecimal: 0x00C8
-     - Little-endian: 0xC8, 0x00
-     - Response: 0x80, 0x03, 0xC8, 0x00
-
-3. Simulated Heart Rate (0x04):
-   - Read command: 0x01, 0x04
-   - Server response for 75 bpm:
-     - Integer: 75
-     - Hexadecimal: 0x004B
-     - Little-endian: 0x4B, 0x00
-     - Response: 0x80, 0x04, 0x4B, 0x00
-
-4. Device Name (0x07):
-   - Read command: 0x01, 0x07
-   - Server response for "MyDevice":
-     - ASCII for "MyDevice": 0x4D, 0x79, 0x44, 0x65, 0x76, 0x69, 0x63, 0x65
-     - Response: 0x80, 0x07, 0x4D, 0x79, 0x44, 0x65, 0x76, 0x69, 0x63, 0x65
-
-*/
-
 #include <BLE_Common.h>
 #include <Power_Table.h>
 #include <BLE_Custom_Characteristic.h>
@@ -92,249 +14,49 @@ This characteristic allows for reading and writing various user configuration pa
 #include "ByteUtils.h"
 #include "ScanResultProtocol.h"
 #include "CustomCharacteristicEvents.h"
+#include "PairedSettings.h"
 #include <algorithm>
 #include <vector>
 
 extern BleAppender bleAppender;
 
 namespace {
-constexpr uint8_t SETTINGS_SNAPSHOT_VERSION              = 1;
-constexpr size_t SETTINGS_SNAPSHOT_HEADER_LENGTH         = 7;
-constexpr unsigned long SETTINGS_SNAPSHOT_TIMEOUT_MILLIS = 5000;
-constexpr size_t DIRCON_SETTINGS_SNAPSHOT_PAYLOAD_LENGTH = 200;
-
-struct SettingsSnapshotTransfer {
-  std::string json;
-  size_t offset              = 0;
-  size_t payloadLength       = 0;
-  uint16_t chunk             = 0;
-  uint16_t chunkCount        = 0;
-  uint16_t connHandle        = BLE_HS_CONN_HANDLE_NONE;
-  uint64_t session           = 0;
-  unsigned long lastActivity = 0;
-  bool active                = false;
-};
-
-SettingsSnapshotTransfer settingsSnapshot;
 CustomCharacteristicEvents<CONFIG_BT_NIMBLE_MAX_CONNECTIONS> bleEvents;
-SettingsSnapshotTransfer dirConSettingsSnapshot;
-uint16_t scanResultId       = 0;
-uint16_t scanResultSequence = 0;
-
-void resetSettingsSnapshot() { settingsSnapshot = SettingsSnapshotTransfer(); }
+uint16_t scanResultId = 0, scanResultSequence = 0;
 
 void sendScanResultPayload(ScanResultProtocol::Event event, uint16_t sequence, const std::vector<uint8_t>& payload = {}) {
-  NimBLEServer* server = NimBLEDevice::getServer();
-  if (server == nullptr) return;
-  NimBLEService* service = server->getServiceByUUID(SMARTSPIN2K_SERVICE_UUID);
-  if (service == nullptr) return;
-  NimBLECharacteristic* characteristic = service->getCharacteristic(SMARTSPIN2K_CHARACTERISTIC_UUID);
-  if (characteristic == nullptr) return;
-
-  // Fragment independently for every BLE peer because negotiated MTUs can
-  // differ. This keeps even the 23-byte minimum MTU valid without retaining a
-  // scan-wide JSON document in firmware memory.
-  for (const uint16_t connHandle : server->getPeerDevices()) {
-    const uint16_t mtu             = server->getPeerMTU(connHandle);
-    const size_t attPayload        = mtu > 3 ? mtu - 3 : 20;
-    const size_t fragmentMax       = attPayload > ScanResultProtocol::HEADER_LENGTH ? attPayload - ScanResultProtocol::HEADER_LENGTH : 1;
-    const size_t fragmentCountSize = payload.empty() ? 1 : (payload.size() + fragmentMax - 1) / fragmentMax;
-    if (fragmentCountSize > UINT8_MAX) {
-      SS2K_LOGE(CUSTOM_CHAR_LOG_TAG, "Scan result %u requires too many fragments", static_cast<unsigned>(sequence));
-      continue;
-    }
-
-    const uint8_t fragmentCount = static_cast<uint8_t>(fragmentCountSize);
-    for (uint8_t fragment = 0; fragment < fragmentCount; ++fragment) {
-      const size_t offset         = fragment * fragmentMax;
-      const size_t length         = payload.empty() ? 0 : std::min(fragmentMax, payload.size() - offset);
-      std::vector<uint8_t> packet = ScanResultProtocol::makePacket(event, scanResultId, sequence, fragment, fragmentCount, length == 0 ? nullptr : payload.data() + offset, length);
-      if (!characteristic->notify(packet.data(), packet.size(), connHandle)) {
-        SS2K_LOGW(CUSTOM_CHAR_LOG_TAG, "Failed to send scan result %u fragment %u/%u", static_cast<unsigned>(sequence), static_cast<unsigned>(fragment + 1),
-                  static_cast<unsigned>(fragmentCount));
-        break;
-      }
-    }
-  }
-
-  // DirCon is a framed TCP transport and does not need ATT fragmentation.
-  if (payload.size() <= UINT8_MAX) {
-    std::vector<uint8_t> packet = ScanResultProtocol::makePacket(event, scanResultId, sequence, 0, 1, payload.data(), payload.size());
-    DirConManager::notifyCharacteristic(service->getUUID(), characteristic->getUUID(), packet.data(), packet.size());
-  }
-}
-
-std::vector<uint8_t> makeSettingsSnapshotChunk(SettingsSnapshotTransfer& snapshot) {
-  size_t remaining   = snapshot.json.length() - snapshot.offset;
-  size_t payloadSize = std::min(snapshot.payloadLength, remaining);
-  std::vector<uint8_t> packet(SETTINGS_SNAPSHOT_HEADER_LENGTH + payloadSize);
-  packet[0] = cc_success;
-  packet[1] = BLE_allSettings;
-  packet[2] = SETTINGS_SNAPSHOT_VERSION;
-  put_le16(&packet[3], snapshot.chunk);
-  put_le16(&packet[5], snapshot.chunkCount);
-  std::copy_n(snapshot.json.data() + snapshot.offset, payloadSize, packet.begin() + SETTINGS_SNAPSHOT_HEADER_LENGTH);
-
-  snapshot.offset += payloadSize;
-  snapshot.chunk++;
-  snapshot.lastActivity = millis();
-  return packet;
-}
-
-bool sendNextSettingsSnapshotChunk(NimBLECharacteristic* characteristic) {
-  if (!settingsSnapshot.active || settingsSnapshot.chunk >= settingsSnapshot.chunkCount) return false;
-
-  const uint16_t chunkNumber  = settingsSnapshot.chunk;
-  std::vector<uint8_t> packet = makeSettingsSnapshotChunk(settingsSnapshot);
-
-  if (!characteristic->indicate(packet.data(), packet.size(), settingsSnapshot.connHandle)) {
-    SS2K_LOGE(CUSTOM_CHAR_LOG_TAG, "Failed to send settings snapshot chunk %u/%u", static_cast<unsigned>(chunkNumber + 1), static_cast<unsigned>(settingsSnapshot.chunkCount));
-    resetSettingsSnapshot();
-    return false;
-  }
-
-  return true;
-}
-
-void startSettingsSnapshot(NimBLECharacteristic* characteristic, uint16_t connHandle, uint16_t mtu) {
-  if (settingsSnapshot.active) {
-    if (millis() - settingsSnapshot.lastActivity <= SETTINGS_SNAPSHOT_TIMEOUT_MILLIS) {
-      SS2K_LOGW(CUSTOM_CHAR_LOG_TAG, "Ignoring settings snapshot request while another transfer is active");
-      return;
-    }
-    SS2K_LOGW(CUSTOM_CHAR_LOG_TAG, "Replacing stale settings snapshot transfer");
-    resetSettingsSnapshot();
-  }
-
-  String json         = userConfig->returnJSON();
-  size_t attPayload   = mtu > 3 ? mtu - 3 : 20;
-  size_t chunkPayload = attPayload > SETTINGS_SNAPSHOT_HEADER_LENGTH ? attPayload - SETTINGS_SNAPSHOT_HEADER_LENGTH : 1;
-  size_t chunkCount   = (json.length() + chunkPayload - 1) / chunkPayload;
-  if (chunkCount == 0 || chunkCount > UINT16_MAX) {
-    SS2K_LOGE(CUSTOM_CHAR_LOG_TAG, "Settings snapshot is too large to send");
-    return;
-  }
-
-  settingsSnapshot.json.assign(json.c_str(), json.length());
-  settingsSnapshot.payloadLength = chunkPayload;
-  settingsSnapshot.chunkCount    = static_cast<uint16_t>(chunkCount);
-  settingsSnapshot.connHandle    = connHandle;
-  settingsSnapshot.lastActivity  = millis();
-  settingsSnapshot.active        = true;
-  SS2K_LOG(CUSTOM_CHAR_LOG_TAG, "Sending %zu-byte settings snapshot in %u chunks (MTU %u)", settingsSnapshot.json.length(), static_cast<unsigned>(settingsSnapshot.chunkCount),
-           static_cast<unsigned>(mtu));
-  sendNextSettingsSnapshotChunk(characteristic);
-}
-
-void handleSettingsSnapshotStatus(NimBLECharacteristic* characteristic, int code) {
-  if (!settingsSnapshot.active) return;
-
-  if (code != BLE_HS_EDONE) {
-    SS2K_LOGE(CUSTOM_CHAR_LOG_TAG, "Settings snapshot indication failed with status %d", code);
-    resetSettingsSnapshot();
-    return;
-  }
-
-  settingsSnapshot.lastActivity = millis();
-
-  if (settingsSnapshot.chunk >= settingsSnapshot.chunkCount) {
-    SS2K_LOG(CUSTOM_CHAR_LOG_TAG, "Settings snapshot transfer complete");
-    resetSettingsSnapshot();
-    return;
-  }
-
-  sendNextSettingsSnapshotChunk(characteristic);
-}
-
-void startDirConSettingsSnapshot(NimBLECharacteristic* characteristic) {
-  String json       = userConfig->returnJSON();
-  size_t chunkCount = (json.length() + DIRCON_SETTINGS_SNAPSHOT_PAYLOAD_LENGTH - 1) / DIRCON_SETTINGS_SNAPSHOT_PAYLOAD_LENGTH;
-  if (chunkCount == 0 || chunkCount > UINT16_MAX) {
-    const uint8_t error[] = {cc_error, BLE_allSettings};
-    characteristic->setValue(error, sizeof(error));
-    return;
-  }
-
-  dirConSettingsSnapshot               = SettingsSnapshotTransfer();
-  dirConSettingsSnapshot.json          = std::string(json.c_str(), json.length());
-  dirConSettingsSnapshot.payloadLength = DIRCON_SETTINGS_SNAPSHOT_PAYLOAD_LENGTH;
-  dirConSettingsSnapshot.chunkCount    = static_cast<uint16_t>(chunkCount);
-  dirConSettingsSnapshot.lastActivity  = millis();
-  dirConSettingsSnapshot.active        = true;
-
-  // The first chunk is returned in the DirCon write response. Remaining chunks
-  // are sent as notifications from update(), after the client is subscribed.
-  std::vector<uint8_t> packet = makeSettingsSnapshotChunk(dirConSettingsSnapshot);
-  characteristic->setValue(packet.data(), packet.size());
+  if (!PairedSettings::hasRecipients()) return;
+  auto packet = ScanResultProtocol::makePacket(event, scanResultId, sequence, 0, 1, payload.data(), payload.size());
+  PairedSettings::publish(std::move(packet));
 }
 }  // namespace
 
 void BLE_ss2kCustomCharacteristic::setupService(NimBLEServer* pServer) {
   pSmartSpin2kService = pServer->createService(SMARTSPIN2K_SERVICE_UUID);
-  smartSpin2kCharacteristic =
-      pSmartSpin2kService->createCharacteristic(SMARTSPIN2K_CHARACTERISTIC_UUID, NIMBLE_PROPERTY::WRITE | NIMBLE_PROPERTY::INDICATE | NIMBLE_PROPERTY::NOTIFY);
-  smartSpin2kCharacteristic->setValue(ss2kCustomCharacteristicValue, sizeof(ss2kCustomCharacteristicValue));
+  smartSpin2kCharacteristic = pSmartSpin2kService->createCharacteristic(SMARTSPIN2K_CHARACTERISTIC_UUID, NIMBLE_PROPERTY::WRITE | NIMBLE_PROPERTY::NOTIFY | NIMBLE_PROPERTY::INDICATE);
   smartSpin2kCharacteristic->setCallbacks(new ss2kCustomCharacteristicCallbacks());
-
-  DirConManager::registerService(pSmartSpin2kService->getUUID(), [](NimBLECharacteristic* characteristic, const uint8_t* data, size_t length, DirConWriteResult* result) -> bool {
+  PairedSettings::initialize([](uint16_t peer, uint64_t generation, const uint8_t* data, size_t n) {
+    if (peer >= PairedSettings::DIRCON_BASE) return DirConManager::notifyCustomPeer(peer - PairedSettings::DIRCON_BASE, data, n);
+    if (!bleEvents.connected(peer, generation)) return false;
+    return ss2kCustomCharacteristic.smartSpin2kCharacteristic->notify(data, n, peer);
+  }, [](uint16_t peer, uint64_t session) {
+    return peer >= PairedSettings::DIRCON_BASE || bleEvents.connected(peer, session);
+  }, process);
+  DirConManager::registerService(pSmartSpin2kService->getUUID(), [](NimBLECharacteristic* characteristic, const uint8_t* data, size_t length, DirConWriteResult* result) {
     if (!characteristic->getUUID().equals(SMARTSPIN2K_CHARACTERISTIC_UUID)) return false;
-
-    if (length < 2) {
-      const uint8_t error[] = {cc_error};
-      characteristic->setValue(error, sizeof(error));
-      result->updateResponseData = true;
-      return true;
-    }
-
-    std::string request(reinterpret_cast<const char*>(data), length);
-    BLE_ss2kCustomCharacteristic::process(request, BLE_HS_CONN_HANDLE_NONE, 23, false);
-    result->updateResponseData = true;
-    if (data[0] == cc_read && data[1] == BLE_allSettings) {
-      result->autoSubscribeUuids[0] = characteristic->getUUID();
-      result->autoSubscribeCount    = 1;
-    }
+    PairedSettings::receive(PairedSettings::DIRCON_BASE + result->clientIndex, 1, DIRCON_SEND_BUFFER_SIZE - 22, data, length, &result->privateResponse);
     return true;
   });
 }
 
 void BLE_ss2kCustomCharacteristic::processPendingEvents() {
-  // Keep parsing, JSON serialization and indication sends off nimble_host.
-  // Snapshot state is owned by this maintenance task, including acknowledgments.
-  if (settingsSnapshot.active &&
-      (!bleEvents.connected(settingsSnapshot.connHandle, settingsSnapshot.session) ||
-       millis() - settingsSnapshot.lastActivity > SETTINGS_SNAPSHOT_TIMEOUT_MILLIS)) {
-    resetSettingsSnapshot();
-  }
+  PairedSettings::tick();
   decltype(bleEvents)::Event event;
   for (size_t i = 0; i < decltype(bleEvents)::CAPACITY && bleEvents.pop(event); ++i) {
-    if (event.isStatus) {
-      if (settingsSnapshot.active && event.peer == settingsSnapshot.connHandle && event.session == settingsSnapshot.session) {
-        handleSettingsSnapshotStatus(smartSpin2kCharacteristic, event.status);
-      }
-    } else {
-      process(event.value, event.peer, event.mtu);
-      if (settingsSnapshot.active && settingsSnapshot.connHandle == event.peer && !settingsSnapshot.session) settingsSnapshot.session = event.session;
-    }
+    if (!event.isStatus) PairedSettings::receive(event.peer, event.session, std::min<size_t>(512, event.mtu - 3), reinterpret_cast<const uint8_t*>(event.value.data()), event.value.size(), nullptr);
   }
   const unsigned dropped = bleEvents.takeDropped();
-  if (dropped) SS2K_LOGW(CUSTOM_CHAR_LOG_TAG, "BLE settings event queue full; dropped %u event(s)", dropped);
-}
-
-void BLE_ss2kCustomCharacteristic::update() {
-  if (!dirConSettingsSnapshot.active) return;
-
-  if (dirConSettingsSnapshot.chunk >= dirConSettingsSnapshot.chunkCount) {
-    dirConSettingsSnapshot = SettingsSnapshotTransfer();
-    return;
-  }
-
-  std::vector<uint8_t> packet = makeSettingsSnapshotChunk(dirConSettingsSnapshot);
-  smartSpin2kCharacteristic->setValue(packet.data(), packet.size());
-  DirConManager::notifyCharacteristic(pSmartSpin2kService->getUUID(), smartSpin2kCharacteristic->getUUID(), packet.data(), packet.size());
-
-  if (dirConSettingsSnapshot.chunk >= dirConSettingsSnapshot.chunkCount) {
-    dirConSettingsSnapshot = SettingsSnapshotTransfer();
-  }
+  if (dropped) SS2K_LOGW(CUSTOM_CHAR_LOG_TAG, "Settings queue full; dropped %u event(s)", dropped);
 }
 
 void ss2kCustomCharacteristicCallbacks::onWrite(NimBLECharacteristic* pCharacteristic, NimBLEConnInfo& connInfo) {
@@ -364,21 +86,10 @@ void ss2kCustomCharacteristicCallbacks::onStatus(NimBLECharacteristic* pCharacte
 }
 
 void BLE_ss2kCustomCharacteristic::notify(char _item, int tableRow) {
-  if (settingsSnapshot.active || dirConSettingsSnapshot.active) return;
-
-  // regular non power table update
-  std::string returnValue = {cc_read, _item};
-  if (tableRow > -1) {
-    returnValue += (uint8_t)tableRow;
-  }
-  process(returnValue);
-
-  NimBLEService* service = NimBLEDevice::getServer()->getServiceByUUID(SMARTSPIN2K_SERVICE_UUID);
-  if (service == nullptr) return;
-  NimBLECharacteristic* characteristic = service->getCharacteristic(SMARTSPIN2K_CHARACTERISTIC_UUID);
-  if (characteristic == nullptr) return;
-  NimBLEAttValue value = characteristic->getValue();
-  DirConManager::notifyCharacteristic(service->getUUID(), characteristic->getUUID(), value.data(), value.size());
+  if (!PairedSettings::hasRecipients()) return;
+  std::string read = {cc_read, _item};
+  if (tableRow >= 0) read += static_cast<char>(tableRow);
+  PairedSettings::publish(process(read));
 }
 
 void BLE_ss2kCustomCharacteristic::beginScanResults() {
@@ -389,6 +100,7 @@ void BLE_ss2kCustomCharacteristic::beginScanResults() {
 }
 
 void BLE_ss2kCustomCharacteristic::notifyScanResult(const String& name, const NimBLEUUID& serviceUuid) {
+  if (!PairedSettings::hasRecipients()) return;
   const std::string uuid          = serviceUuid.toString();
   const std::vector<uint8_t> body = ScanResultProtocol::makeDeviceBody(uuid, std::string(name.c_str(), name.length()));
   sendScanResultPayload(ScanResultProtocol::Event::Device, scanResultSequence, body);
@@ -397,25 +109,8 @@ void BLE_ss2kCustomCharacteristic::notifyScanResult(const String& name, const Ni
 
 void BLE_ss2kCustomCharacteristic::endScanResults() { sendScanResultPayload(ScanResultProtocol::Event::End, scanResultSequence); }
 
-void BLE_ss2kCustomCharacteristic::process(const std::string& rxValue, uint16_t connHandle, uint16_t mtu, bool indicateResponse) {
-  // Find the Characteristic
-  if (rxValue.length() < 2 || NimBLEDevice::getServer()->getServiceByUUID(SMARTSPIN2K_SERVICE_UUID) == nullptr) {
-    return;
-  }
-  NimBLECharacteristic* pCharacteristic = NimBLEDevice::getServer()->getServiceByUUID(SMARTSPIN2K_SERVICE_UUID)->getCharacteristic(SMARTSPIN2K_CHARACTERISTIC_UUID);
-
-  if (rxValue[0] == cc_read && static_cast<uint8_t>(rxValue[1]) == BLE_allSettings) {
-    if (indicateResponse) {
-      startSettingsSnapshot(pCharacteristic, connHandle, mtu);
-    } else {
-      startDirConSettingsSnapshot(pCharacteristic);
-    }
-    return;
-  }
-
-  // Avoid interleaving legacy responses with an acknowledged snapshot transfer.
-  if (settingsSnapshot.active) return;
-
+std::vector<uint8_t> BLE_ss2kCustomCharacteristic::process(const std::string& rxValue) {
+  if (rxValue.size() < 2) return {};
   const uint8_t* pData = reinterpret_cast<const uint8_t*>(rxValue.data());
 
 #ifdef CUSTOM_CHAR_DEBUG
@@ -471,9 +166,7 @@ void BLE_ss2kCustomCharacteristic::process(const std::string& rxValue, uint16_t 
   }
 
   if (rxValue.length() < requiredLength) {
-    pCharacteristic->setValue(returnValue.data(), 2);
-    if (indicateResponse) pCharacteristic->indicate(connHandle);
-    return;
+    return {cc_error, static_cast<uint8_t>(rxValue[1])};
   }
 
   switch (rxValue[1]) {
@@ -779,7 +472,9 @@ void BLE_ss2kCustomCharacteristic::process(const std::string& rxValue, uint16_t 
 #ifdef CUSTOM_CHAR_DEBUG
         SS2K_LOG(CUSTOM_CHAR_LOG_TAG, "%s", logBuf);
 #endif
-        return;  // Return here and let SpinBLEServer::notifyShift() handle the return to prevent duplicate notifications.
+        returnValue[0] = cc_success;
+        returnLength = 4;
+        put_le16s(&returnValue[2], rtConfig->getShifterPosition());
       }
       break;
 
@@ -1176,18 +871,16 @@ void BLE_ss2kCustomCharacteristic::process(const std::string& rxValue, uint16_t 
   SS2K_LOG(CUSTOM_CHAR_LOG_TAG, "%s", logBuf);
 #endif
   if (returnString == "") {
-    pCharacteristic->setValue(returnValue.data(), returnLength);
+    returnValue.resize(returnLength);
   } else {  // Need to send a string instead
     returnValue.resize(returnString.length() + 2);
     returnValue[0] = cc_success;
     returnValue[1] = rxValue[1];
     std::copy(returnString.begin(), returnString.end(), returnValue.begin() + 2);
-    pCharacteristic->setValue(returnValue.data(), returnValue.size());
+
   }
 
-  if (indicateResponse) {
-    pCharacteristic->indicate(connHandle);
-  }
+  return returnValue;
 }
 
 // iterate through all smartspin user parameters and notify the specific one if changed

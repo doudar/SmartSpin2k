@@ -1,6 +1,6 @@
 # SmartSpin2k - ESP32 Smart Trainer Firmware
 
-SmartSpin2k is an ESP32-based DIY smart trainer project that converts any spin bike into a connected fitness device compatible with Zwift, TrainerRoad, and other training apps. The firmware controls stepper motor resistance, handles BLE communication, serves a web interface, and manages sensor data.
+SmartSpin2k is an ESP32-based DIY smart trainer project that converts any spin bike into a connected fitness device compatible with Zwift, TrainerRoad, and other training apps. The firmware controls stepper motor resistance, handles BLE communication, and manages sensor data.
 
 Read `AGENTS.md` for current repository guidance; this file supplements its build and validation notes.
 
@@ -17,7 +17,6 @@ Use pioarduino Core and the `pioarduino.pioarduino-ide` VS Code extension. The C
 ### Build the Firmware
 - **CRITICAL**: Build takes 15-45 minutes depending on network connectivity. NEVER CANCEL. Set timeout to 60+ minutes.
 - `pio run --environment release` -- builds ESP32 firmware. NEVER CANCEL: Build takes 15-45 minutes on first run due to platform/toolchain downloads.
-- `pio run --target buildfs` -- builds filesystem. Takes 2-5 minutes.
 - **Network Issues**: If platform downloads fail with HTTPClientError, this is due to firewall/network restrictions. The build cannot proceed without internet access to download ESP32 toolchain.
 
 ### Testing
@@ -31,13 +30,10 @@ Use pioarduino Core and the `pioarduino.pioarduino-ide` VS Code extension. The C
 - `pio check -e debug` -- runs cppcheck static analysis on debug environment. Takes 2-5 minutes. **Network Issues**: May fail with HTTPClientError due to platform download restrictions.
 - Python build scripts (always work):
   - `python git_tag_macro.py` -- generates firmware version from git tags
-  - `python build_date_macro.py` -- generates build timestamp  
-  - `python cert_updater.py` -- updates SSL certificates (may fail with network issues)
 
 ### Run the Application
 - **Build First**: Always complete the bootstrap and build steps before attempting to run.
 - The application runs on ESP32 hardware - cannot be executed in the sandbox environment.
-- Web interface available at device IP on port 80 when running on hardware.
 - BLE services broadcast as "SmartSpin2k" when running on hardware.
 
 ## Validation
@@ -66,7 +62,7 @@ Key directories and their purpose:
 /lib/SS2K/src        -- Core library with sensor parsing and data structures
 /include             -- Header files and configuration
 /test                -- Unity unit tests for native environment
-/data                -- Web interface HTML/CSS files
+/data                -- Frozen assets for older firmware
 /Hardware            -- migrated to https://github.com/doudar/SS2k-Hardware
 /.github/workflows   -- CI/CD pipeline definitions
 ```
@@ -82,16 +78,14 @@ Key directories and their purpose:
 External libraries loaded automatically by pioarduino:
 - NimBLE-ESP32 for Bluetooth Low Energy
 - TMCStepper for stepper motor control
-- FastAccelStepper for smooth motor movement
-- ArduinoJson for configuration and web API
-- ArduinoWebsockets for real-time web communication
+- SS2KStepper for motor control
+- ArduinoJson for configuration
 
 ### Configuration
 - Default device name: "SmartSpin2k"
 - Default WiFi password: "password"
-- Web interface served on port 80
 - BLE service UUID: "77776277-7877-7774-4466-896665500000"
-- Over-the-air update URL: configured in settings.h
+- Firmware updates stream over the paired custom characteristic.
 
 ### Hardware Compatibility
 - ESP32 DevKit v1 board (primary target)
@@ -101,7 +95,6 @@ External libraries loaded automatically by pioarduino:
 
 ### Known Issues and Limitations
 - **Network Connectivity**: Platform and toolchain downloads may fail due to firewall restrictions. All build commands (`pio run`, `pio test`, `pio check`) require internet access on first run.
-- **SSL Certificates**: cert_updater.py may fail to fetch current certificates due to network restrictions
 - **Hardware Testing**: Cannot test actual motor control or BLE communication without physical hardware
 - **Build Times**: Initial builds require internet access and take 15-45 minutes due to large platform downloads
 
@@ -109,7 +102,6 @@ External libraries loaded automatically by pioarduino:
 - **HTTPClientError during build**: This indicates network/firewall restrictions preventing platform downloads. No workaround available in restricted environments.
 - **Platform not found**: Run `pio pkg install -e release` and `pio pkg install -e S3release` to install the pioarduino ESP32 platform and dependencies pinned in `platformio.ini` (requires internet).
 - **Test failures**: Ensure you're running tests in native environment: `pio test -e native`
-- **SSL certificate warnings**: Update certificates with `python cert_updater.py` or manually update `include/cert.h`
 - **Build flag errors**: The Python scripts in build_flags must execute successfully. Test them individually if build fails.
 
 ### Environment Verification
@@ -122,13 +114,11 @@ python -m pip show pioarduino
 # Verify project configuration
 pio project config
 # Test build scripts
-python git_tag_macro.py && python build_date_macro.py
+python git_tag_macro.py
 ```
 
 ### Debugging Tips
 - Use `pio device monitor` to view serial output when connected to ESP32 hardware
-- Check `include/cert.h` if experiencing SSL errors during firmware updates
 - Monitor memory usage with DEBUG_STACK enabled in settings.h
-- BLE debugging available through web interface at `/develop.html`
 
 Always run `pre-commit run --all-files` before completing changes to ensure code meets project standards.

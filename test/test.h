@@ -94,16 +94,17 @@ class TestAdevName2UniqueName {
   static void test_case_insensitive_device_matching(void);
 };
 
-class TestBleFirmwareUpdateProtocol {
+class TestSettingsStreamProtocol {
  public:
-  static void test_parses_start_packet(void);
-  static void test_rejects_invalid_start_packets(void);
-  static void test_encodes_status_packet(void);
-  static void test_transfer_timeout(void);
+  static void test_begin_shape(void);
+  static void test_chunk_bounds(void);
+  static void test_offset_response(void);
+  static void test_finish_and_abort(void);
 };
 
 class TestEndian {
  public:
+  static void test_protocol_endian_interoperability();
   static void test_little_endian_signed_decode_and_round_trip(void);
 };
 
