@@ -41,6 +41,8 @@ ss2k_result ss2k_encode_scalar_write(uint8_t id, int64_t value,
 ss2k_result ss2k_encode_response(uint8_t status, uint8_t id, ss2k_reply_kind kind,
   const uint8_t *payload, size_t payload_length, uint8_t *out, size_t capacity, size_t *written);
 /* Context is required: logging write ACKs are bool; logging reads are text.
+ * Authenticated, decrypted 0x81 packets require SS2K_NOTIFICATION; legacy
+ * notifications use 0x80. view->status preserves the original wire status.
  * legacy_boolean_echo accepts a second, zero padding byte only on write ACKs.
  * Errors return SS2K_REMOTE_ERROR even for an unknown ID; view then holds error bytes.
  */

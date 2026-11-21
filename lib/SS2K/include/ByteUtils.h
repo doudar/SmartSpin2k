@@ -12,8 +12,8 @@
 
 // The underlying endian API deliberately exposes unsigned bit patterns. These
 // wrappers make two's-complement signed protocol fields explicit at call sites.
-inline void put_le16s(void* buffer, int16_t value) { put_le16(buffer, static_cast<uint16_t>(value)); }
-inline void put_le32s(void* buffer, int32_t value) { put_le32(buffer, static_cast<uint32_t>(value)); }
-inline int16_t get_le16s(const void* buffer) { return static_cast<int16_t>(get_le16(buffer)); }
-inline int32_t get_le32s(const void* buffer) { return static_cast<int32_t>(get_le32(buffer)); }
+static inline void put_le16s(void* buffer, int16_t value) { put_le16(buffer, (uint16_t)value); }
+static inline void put_le32s(void* buffer, int32_t value) { put_le32(buffer, (uint32_t)value); }
+static inline int16_t get_le16s(const void* buffer) { return (int16_t)get_le16(buffer); }
+static inline int32_t get_le32s(const void* buffer) { return (int32_t)get_le32(buffer); }
 

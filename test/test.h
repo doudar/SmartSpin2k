@@ -104,6 +104,7 @@ class TestSettingsStreamProtocol {
 
 class TestEndian {
  public:
+  static void test_protocol_endian_interoperability();
   static void test_little_endian_signed_decode_and_round_trip(void);
 };
 

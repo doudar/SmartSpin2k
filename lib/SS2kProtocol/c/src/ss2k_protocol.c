@@ -16,6 +16,14 @@ const ss2k_descriptor *ss2k_find(uint8_t id) {
   return NULL;
 }
 
+#if defined(SS2K_PROTOCOL_USE_BYTEUTILS) && SS2K_PROTOCOL_USE_BYTEUTILS
+#include <ByteUtils.h>
+uint16_t ss2k_get_u16(const uint8_t *p) { return get_le16(p); }
+int16_t ss2k_get_i16(const uint8_t *p) { return get_le16s(p); }
+int32_t ss2k_get_i32(const uint8_t *p) { return get_le32s(p); }
+void ss2k_put_u16(uint8_t *p, uint16_t v) { put_le16(p, v); }
+void ss2k_put_i32(uint8_t *p, int32_t v) { put_le32s(p, v); }
+#else
 uint16_t ss2k_get_u16(const uint8_t *p) {
   return (uint16_t)((uint16_t)p[0] | ((uint16_t)p[1] << 8));
 }
@@ -36,6 +44,8 @@ void ss2k_put_i32(uint8_t *p, int32_t value) {
   p[0] = (uint8_t)v; p[1] = (uint8_t)(v >> 8);
   p[2] = (uint8_t)(v >> 16); p[3] = (uint8_t)(v >> 24);
 }
+
+#endif
 
 static int valid_pair(uint16_t pair) {
   unsigned front = pair / SS2K_GEAR_PAIR_MULTIPLIER;
@@ -152,6 +162,10 @@ ss2k_result ss2k_encode_scalar_write(uint8_t id, int64_t value, uint8_t *out, si
   }
   return ss2k_encode_request(SS2K_WRITE, id, p, n, out, capacity, written);
 }
+static int success_for_kind(uint8_t status, ss2k_reply_kind kind) {
+  return status == SS2K_SUCCESS || (status == SS2K_SECURE_NOTIFICATION && kind == SS2K_NOTIFICATION);
+}
+
 ss2k_result ss2k_decode_response(const uint8_t *p, size_t n, ss2k_reply_kind kind,
     int legacy_boolean_echo, ss2k_packet *view) {
   const ss2k_descriptor *d;
@@ -162,7 +176,7 @@ ss2k_result ss2k_decode_response(const uint8_t *p, size_t n, ss2k_reply_kind kin
     view->status = p[0]; view->id = p[1]; view->payload = p + 2; view->payload_length = n - 2;
     return SS2K_REMOTE_ERROR;
   }
-  if (p[0] != SS2K_SUCCESS) return SS2K_INVALID;
+  if (!success_for_kind(p[0], kind)) return SS2K_INVALID;
   d = ss2k_find(p[1]);
   if (!d) return SS2K_UNKNOWN_ID;
   f = (ss2k_format)(kind == SS2K_REPLY_READ ? d->read_response : kind == SS2K_REPLY_WRITE ? d->write_response : d->notification);
@@ -173,7 +187,7 @@ ss2k_result ss2k_decode_response(const uint8_t *p, size_t n, ss2k_reply_kind kin
   return SS2K_OK;
 }
 ss2k_result ss2k_decode_scalar(const ss2k_packet *view, int64_t *value) {
-  if (!view || !value || view->status != SS2K_SUCCESS || !valid_payload(view->format, view->payload, view->payload_length, 0)) return SS2K_INVALID;
+  if (!view || !value || (view->status != SS2K_SUCCESS && view->status != SS2K_SECURE_NOTIFICATION) || !valid_payload(view->format, view->payload, view->payload_length, 0)) return SS2K_INVALID;
   switch (view->format) {
     case SS2K_FORMAT_BOOL: *value = view->payload[0] != 0; break;
     case SS2K_FORMAT_U16: *value = ss2k_get_u16(view->payload); break;
@@ -192,7 +206,7 @@ ss2k_result ss2k_encode_response(uint8_t status, uint8_t id, ss2k_reply_kind kin
   *written = 0;
   if ((n && !p) || kind < SS2K_REPLY_READ || kind > SS2K_NOTIFICATION) return SS2K_INVALID;
   if (status != SS2K_ERROR) {
-    if (status != SS2K_SUCCESS) return SS2K_INVALID;
+    if (!success_for_kind(status, kind)) return SS2K_INVALID;
     d = ss2k_find(id);
     if (!d) return SS2K_UNKNOWN_ID;
     f = (ss2k_format)(kind == SS2K_REPLY_READ ? d->read_response : kind == SS2K_REPLY_WRITE ? d->write_response : d->notification);

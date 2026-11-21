@@ -70,6 +70,7 @@ Native tests cover sensor parsing, BLE device-name stability logic, firmware-upd
 
 - Native Arduino types/timing come from the repository-owned `lib/ArduinoCompat`; the suite does not use ArduinoFake. Keep this shim and test filesystem setup portable across Apple Clang/POSIX and Windows native toolchains.
 - Multi-byte protocol fields use `lib/SS2K/include/ByteUtils.h`, which wraps the platform `os/endian.h` implementation and adds explicit signed helpers such as `get_le16s()`/`put_le32s()`. ArduinoCompat supplies `os/endian.h` for native tests; do not add another endian implementation.
+- Firmware and native environments compile the vendored C codec with `SS2K_PROTOCOL_USE_BYTEUTILS=1`. Use the same flag and ArduinoCompat's `os/endian.c` when compiling that codec directly for firmware host tests.
 - `test/data/active_ride_log.txt` is the shared native power-table/ERG fixture, replayed independently through `test/test_data_helpers.h`. `test/data/erg_reference_20260927.csv` is the separate sanitized FIT/log reference for the Python bike simulator; generated tables, plots and audit reports belong under ignored `test/output/`.
 
 - `src/Power_Table.cpp` or `src/PowerTable_Helpers.cpp`, run `pio test -e native`.

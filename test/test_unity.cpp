@@ -126,6 +126,7 @@ void setup() {
   {
     TestEndian test;
     RUN_TEST(test.test_little_endian_signed_decode_and_round_trip);
+    RUN_TEST(test.test_protocol_endian_interoperability);
   }
 
   // BLE protocol encode/decode round-trip tests
