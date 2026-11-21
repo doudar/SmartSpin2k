@@ -8,6 +8,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+- Firmware releases include a signed manifest for automatic downloads and detached signatures for manual ESP32 and ESP32-S3 application updates.
 
 ### Changed
 

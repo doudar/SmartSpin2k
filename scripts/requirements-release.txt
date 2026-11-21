@@ -1,0 +1,2 @@
+# Release signer and its disposable-key integration tests.
+cryptography==50.0.2
