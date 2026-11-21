@@ -5,6 +5,7 @@ import subprocess
 import tempfile
 import unittest
 
+from protocol_headers import protocol_include
 from test_tmc_recovery import function
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -67,5 +68,5 @@ int main() {
             cpp.write_text(harness)
             compiler=shutil.which('g++')
             self.assertIsNotNone(compiler)
-            subprocess.run([compiler,'-std=c++17','-I'+str(ROOT/'lib/SS2kProtocol/c/include'),str(cpp),'-o',str(exe)],check=True)
+            subprocess.run([compiler,'-std=c++17','-I'+str(protocol_include(ROOT)),str(cpp),'-o',str(exe)],check=True)
             subprocess.run([str(exe)],check=True)

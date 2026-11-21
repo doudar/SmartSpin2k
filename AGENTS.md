@@ -34,6 +34,7 @@ The commands remain `pio` and `platformio`; configuration remains in `platformio
 
 - Build firmware: `pio run --environment release`
 - Build ESP32-S3 firmware: `pio run --environment S3release`
+- Install dependencies for standalone custom protocol tests with `pio pkg install -e native`. PlatformIO fetches the exact public SS2kProtocol Git revision in `[protocol].lib_dep` for both boards and the native test environment.
 - Run native tests: `pio test --environment native`
 - Native local builds/tests run the ERG regression through `extra_scripts = post:scripts/erg_sim/native_hook.py`; install simulator requirements into pioarduino's Python environment. The hook runs even on an up-to-date build, fails on simulator failure/missing dependencies, and saves graphs/grades under `test/output/erg_regression/`. It skips GitHub Actions; standalone Python discovery skips this optional suite if its dependencies are absent.
 - CI runs full native/Python behavior on Linux for every PR via `scripts/ci_host_tests.py`; dependencies are installed and skips fail. Windows/macOS run compiled packet and async IO smoke only for host-tooling changes (manual dispatch checks all hosts). ESP32/S3 release compilation remains separate in `build.yml`.
@@ -70,7 +71,7 @@ Native tests cover sensor parsing, BLE device-name stability logic, firmware-upd
 
 - Native Arduino types/timing come from the repository-owned `lib/ArduinoCompat`; the suite does not use ArduinoFake. Keep this shim and test filesystem setup portable across Apple Clang/POSIX and Windows native toolchains.
 - Multi-byte protocol fields use `lib/SS2K/include/ByteUtils.h`, which wraps the platform `os/endian.h` implementation and adds explicit signed helpers such as `get_le16s()`/`put_le32s()`. ArduinoCompat supplies `os/endian.h` for native tests; do not add another endian implementation.
-- Firmware and native environments compile the vendored C codec with `SS2K_PROTOCOL_USE_BYTEUTILS=1`. Use the same flag and ArduinoCompat's `os/endian.c` when compiling that codec directly for firmware host tests.
+- Firmware and native environments compile the upstream C codec with `SS2K_PROTOCOL_USE_BYTEUTILS=1`. Use the same flag and ArduinoCompat's `os/endian.c` when compiling that codec directly for firmware host tests.
 - `test/data/active_ride_log.txt` is the shared native power-table/ERG fixture, replayed independently through `test/test_data_helpers.h`. `test/data/erg_reference_20260927.csv` is the separate sanitized FIT/log reference for the Python bike simulator; generated tables, plots and audit reports belong under ignored `test/output/`.
 
 - `src/Power_Table.cpp` or `src/PowerTable_Helpers.cpp`, run `pio test -e native`.
@@ -362,7 +363,7 @@ The giant switch in `BLE_ss2kCustomCharacteristic::process()` maps variable IDs 
 
 The WiFi password is write-only. `returnJSON()` is the client serialization (`0x31` snapshot): it always carries `"password": ""` plus `passwordSet` (stored value differs from `DEFAULT_PASSWORD`), because older web pages/apps copy the `password` key into their field and re-save it. Only `saveToLittleFS()` writes the real value; never add a secret to `returnJSON()`. Reads of `0x13` and its write responses succeed with no value (no echo), empty password writes (BLE/DirCon) keep the stored one, the password has no change notification, and the `CUSTOM_CHAR_DEBUG` dump omits its payload. IDs `0x01` and `0x11` are retired (error; never reuse). `0x36` is the read-only capability report (`version, LE32 bits`); add a bit there for client-visible protocol changes instead of having apps test version strings. `test_settings_client_json.py` and `test_custom_characteristic_secrets.py` cover this.
 
-Both transports enter `PairedSettings::receive()`. BLE callbacks enqueue on a bounded queue and the maintenance task drains it even during OTA. Connection generations and explicit DirCon disconnects invalidate connection-specific sessions. Reads, writes, scan results, logs, and snapshot chunks use per-peer encryption. Keep all secret-bearing values off the shared GATT attribute and broadcast path. Use the generated SS2kProtocol definitions under `lib/SS2kProtocol`, and update the upstream library before syncing generated artifacts. Firmware streaming lives in `SettingsUpdate.cpp`. Production builds omit the USB-only `SS2K_TEST_PAIR_BUTTONS` fixture.
+Both transports enter `PairedSettings::receive()`. BLE callbacks enqueue on a bounded queue and the maintenance task drains it even during OTA. Connection generations and explicit DirCon disconnects invalidate connection-specific sessions. Reads, writes, scan results, logs, and snapshot chunks use per-peer encryption. Keep all secret-bearing values off the shared GATT attribute and broadcast path. Use the public SS2kProtocol headers. Update the upstream library first, then update the pinned commit in `platformio.ini`. Firmware streaming lives in `SettingsUpdate.cpp`. Production builds omit the USB-only `SS2K_TEST_PAIR_BUTTONS` fixture.
 
 When adding a custom characteristic variable:
 

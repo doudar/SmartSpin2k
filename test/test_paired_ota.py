@@ -5,6 +5,8 @@ import subprocess
 import tempfile
 import unittest
 
+from protocol_headers import protocol_include
+
 ROOT = Path(__file__).resolve().parents[1]
 
 
@@ -116,7 +118,7 @@ int main() {
 """)
             compiler=shutil.which('g++')
             self.assertIsNotNone(compiler)
-            includes=[path,ROOT/'include',ROOT/'lib/SS2kProtocol/c/include',ROOT/'lib/SS2K/include',ROOT/'lib/ArduinoCompat/include']
+            includes=[path,ROOT/'include',protocol_include(ROOT),ROOT/'lib/SS2K/include',ROOT/'lib/ArduinoCompat/include']
             (path/'endian.c').write_bytes((ROOT/'lib/ArduinoCompat/src/os/endian.c').read_bytes())
             obj=path/'endian.o'
             subprocess.run([compiler,'-x','c','-I'+str(includes[-1]),'-c',str(path/'endian.c'),'-o',str(obj)],check=True)

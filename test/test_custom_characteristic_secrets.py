@@ -12,6 +12,7 @@ import subprocess
 import tempfile
 import unittest
 
+from protocol_headers import protocol_include
 from test_tmc_recovery import function
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -148,7 +149,7 @@ class TestCustomCharacteristicSecrets(unittest.TestCase):
             subprocess.run([compiler, "-x", "c", "-I" + include, "-c",
                             str(ROOT / "lib/ArduinoCompat/src/os/endian.c"), "-o", str(endian)], check=True)
             subprocess.run([compiler, "-std=c++17", "-I" + str(ROOT / "lib/SS2K/include"), "-I" + include,
-                            "-I" + str(ROOT / "lib/SS2kProtocol/c/include"), str(cpp), str(endian), "-o", str(exe)], check=True)
+                            "-I" + str(protocol_include(ROOT)), str(cpp), str(endian), "-o", str(exe)], check=True)
             result = subprocess.run([str(exe)], capture_output=True, text=True)
             self.assertEqual(result.returncode, 0, result.stderr)
 

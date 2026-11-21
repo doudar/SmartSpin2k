@@ -6,6 +6,7 @@
  */
 
 #include "DirConManager.h"
+#include "BLE_Custom_Characteristic.h"
 #include "PairedSettings.h"
 #include "SS2KLog.h"
 #include <algorithm>

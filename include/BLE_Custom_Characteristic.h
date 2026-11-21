@@ -9,7 +9,10 @@
 
 #include <NimBLEDevice.h>
 #include "BLE_Common.h"
-#include "CustomCharacteristicProtocol.h"
+#include <CustomCharacteristicProtocol.h>
+
+#define SMARTSPIN2K_SERVICE_UUID        NimBLEUUID(SS2K_SERVICE_UUID)
+#define SMARTSPIN2K_CHARACTERISTIC_UUID NimBLEUUID(SS2K_CHARACTERISTIC_UUID)
 
 class BLE_ss2kCustomCharacteristic {
  public:

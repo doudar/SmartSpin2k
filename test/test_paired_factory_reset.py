@@ -5,6 +5,7 @@ import subprocess
 import tempfile
 import unittest
 
+from protocol_headers import protocol_include
 from test_custom_characteristic_secrets import case_block
 from test_tmc_recovery import function
 
@@ -105,6 +106,6 @@ int main() {
         with tempfile.TemporaryDirectory() as tmp:
             cpp, exe = Path(tmp)/'reset.cpp', Path(tmp)/'reset.exe'
             cpp.write_text(harness)
-            inc = [ROOT/'test',ROOT/'include',ROOT/'lib/SS2K/include',ROOT/'lib/SS2kProtocol/c/include',ROOT/'lib/ArduinoCompat/include',libraries[0].parent]
+            inc = [ROOT/'test',ROOT/'include',ROOT/'lib/SS2K/include',protocol_include(ROOT),ROOT/'lib/ArduinoCompat/include',libraries[0].parent]
             subprocess.run([compiler,'-std=c++17','-DPLATFORMIO_ENV_NATIVE','-DFIRMWARE_VERSION="test"',*['-I'+str(p) for p in inc],str(cpp),'-o',str(exe)],check=True)
             subprocess.run([str(exe)],check=True)

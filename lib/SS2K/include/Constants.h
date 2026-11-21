@@ -8,11 +8,6 @@
 #pragma once
 
 #include <NimBLEUUID.h>
-#include "../../SS2kProtocol/c/include/ss2k_protocol_generated.h"
-
-// SmartSpin2k custom UUID's
-#define SMARTSPIN2K_SERVICE_UUID        NimBLEUUID(SS2K_SERVICE_UUID)
-#define SMARTSPIN2K_CHARACTERISTIC_UUID NimBLEUUID(SS2K_CHARACTERISTIC_UUID)
 
 // Device Information Service
 #define DEVICE_INFORMATION_SERVICE_UUID NimBLEUUID((uint16_t)0x180A)

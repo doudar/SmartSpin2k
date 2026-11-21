@@ -2,7 +2,7 @@
 
 The settings service UUID is `77776277-7877-7774-4466-896665500000`. The custom characteristic UUID is `77776277-7877-7774-4466-896665500001`. DirCon advertises the same service over mDNS.
 
-Subscribe to notifications on the custom characteristic, then send the public capability query `01 36`. Bit 1 selects the paired settings protocol. Pairing, reconnect, fragmentation and record constants are maintained in SS2kProtocol. The settings examples below show the **plaintext inside an authenticated record**. Standard trainer services continue to operate independently.
+Subscribe to notifications on the custom characteristic, then send the public capability query `01 36`. Bit 1 selects the paired settings protocol. Pairing, reconnect, fragmentation and record constants are maintained in the [SS2kProtocol library](https://github.com/doudar/SS2kProtocol), pinned by commit in `platformio.ini`. The settings examples below show the **plaintext inside an authenticated record**. Standard trainer services continue to operate independently.
 
 On first connection, the companion selects a fresh P-256 key and asks the rider to release both shifters and then hold them together for two seconds. The device accepts one pairing candidate at a time for up to one minute. A competing request cancels both candidates. The shared secret is derived independently at each endpoint. The firmware retains up to eight companions in NVS until the rider forgets a companion or resets the trainer. Holding both shifters during boot performs the factory reset. Holding them after the app prompts performs pairing.
 
