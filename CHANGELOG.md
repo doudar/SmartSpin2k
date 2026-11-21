@@ -8,6 +8,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+
+### Changed
+
+### Hardware
+
+
+## [26.11.18]
+
+### Added
 - Pair the companion app by holding both shifters. Paired apps can manage settings and stream firmware over BLE or DirCon.
 - Custom characteristic `0x36` reports firmware capabilities as a versioned bit field (first bit: write-only WiFi password).
 
