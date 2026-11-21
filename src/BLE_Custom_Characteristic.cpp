@@ -33,7 +33,8 @@ void sendScanResultPayload(ScanResultProtocol::Event event, uint16_t sequence, c
 
 void BLE_ss2kCustomCharacteristic::setupService(NimBLEServer* pServer) {
   pSmartSpin2kService = pServer->createService(SMARTSPIN2K_SERVICE_UUID);
-  smartSpin2kCharacteristic = pSmartSpin2kService->createCharacteristic(SMARTSPIN2K_CHARACTERISTIC_UUID, NIMBLE_PROPERTY::WRITE | NIMBLE_PROPERTY::NOTIFY | NIMBLE_PROPERTY::INDICATE);
+  smartSpin2kCharacteristic = pSmartSpin2kService->createCharacteristic(SMARTSPIN2K_CHARACTERISTIC_UUID,
+      NIMBLE_PROPERTY::WRITE | NIMBLE_PROPERTY::WRITE_NR | NIMBLE_PROPERTY::NOTIFY | NIMBLE_PROPERTY::INDICATE);
   smartSpin2kCharacteristic->setCallbacks(new ss2kCustomCharacteristicCallbacks());
   PairedSettings::initialize([](uint16_t peer, uint64_t generation, const uint8_t* data, size_t n) {
     if (peer >= PairedSettings::DIRCON_BASE) return DirConManager::notifyCustomPeer(peer - PairedSettings::DIRCON_BASE, data, n);
@@ -53,7 +54,17 @@ void BLE_ss2kCustomCharacteristic::processPendingEvents() {
   PairedSettings::tick();
   decltype(bleEvents)::Event event;
   for (size_t i = 0; i < decltype(bleEvents)::CAPACITY && bleEvents.pop(event); ++i) {
-    if (!event.isStatus) PairedSettings::receive(event.peer, event.session, std::min<size_t>(512, event.mtu - 3), reinterpret_cast<const uint8_t*>(event.value.data()), event.value.size(), nullptr);
+    if (!event.isStatus) {
+      const bool wasUpdating = ss2k->isUpdating;
+      PairedSettings::receive(event.peer, event.session, std::min<size_t>(512, event.mtu - 3), reinterpret_cast<const uint8_t*>(event.value.data()), event.value.size(), nullptr);
+      if (!wasUpdating && ss2k->isUpdating) {
+        auto server = NimBLEDevice::getServer();
+        server->setDataLen(event.peer, 251);
+        // Ask for 15–30 ms intervals on the updater link only. The central decides.
+        auto info = server->getPeerInfoByHandle(event.peer);
+        if (info.getConnInterval() > 24 || info.getConnLatency() > 0) server->updateConnParams(event.peer, 12, 24, 0, info.getConnTimeout());
+      }
+    }
   }
   const unsigned dropped = bleEvents.takeDropped();
   if (dropped) SS2K_LOGW(CUSTOM_CHAR_LOG_TAG, "Settings queue full; dropped %u event(s)", dropped);
@@ -856,7 +867,7 @@ std::vector<uint8_t> BLE_ss2kCustomCharacteristic::process(const std::string& rx
         returnValue.resize(7);  // The default 2-byte-read buffer is 6 bytes.
         returnValue[0] = cc_success;
         returnValue[2] = CUSTOM_CAPABILITIES_VERSION;
-        put_le32(&returnValue[3], customCharacteristicCapabilities());
+        put_le32(&returnValue[3], customCharacteristicCapabilities() | SS2K_CAP_DIRCON_OTA_2K | SS2K_CAP_BLE_OTA_WINDOW4);
         returnLength = 7;
       }
       break;

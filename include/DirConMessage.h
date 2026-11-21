@@ -49,6 +49,9 @@ public:
     NimBLEUUID UUID;
     std::vector<NimBLEUUID> AdditionalUUIDs;
     std::vector<uint8_t> AdditionalData;
+    // Borrowed from the current receive frame until synchronous write dispatch finishes.
+    const uint8_t* writeValue = nullptr;
+    size_t writeSize = 0;
     bool Request = false;
     
     // Encode message for sending to client

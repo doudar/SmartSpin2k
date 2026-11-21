@@ -310,7 +310,7 @@ void SS2K::maintenanceLoop(void*) {
   static uint32_t hardwareSafetyTimer      = millis();
 
   while (true) {
-    delay(10);
+    delay(ss2k->isUpdating ? 1 : 10);
     updateWifi();
     // Keep thermal protection active during updates; the check defers during homing.
     if (uint32_t(millis() - hardwareSafetyTimer) >= ThermalSafety::POLL_INTERVAL_MS) {
@@ -356,7 +356,7 @@ void SS2K::maintenanceLoop(void*) {
     ss2k->handleShiftButtons();
 
     // send BLE notification for any userConfig values that changed.
-    BLE_ss2kCustomCharacteristic::parseNemit();
+    if (!ss2k->isUpdating) BLE_ss2kCustomCharacteristic::parseNemit();
     // Update DirCon protocol
     DirConManager::update();
     ss2k->updateLED();

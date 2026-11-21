@@ -91,8 +91,6 @@ class DirConManager {
   static void closeClient(size_t clientIndex, const char* reason);
   static bool queueOutboundFrame(size_t clientIndex, const uint8_t* data, size_t length, bool notification, const NimBLEUUID* requiredSubscription = nullptr);
   static void configureClientSocket(WiFiClient& client);
-  static uint8_t receiveBuffer[DIRCON_MAX_CLIENTS][DIRCON_RECEIVE_BUFFER_SIZE];
-  static size_t receiveBufferLength[DIRCON_MAX_CLIENTS];
 
   // Message handling
   static bool processDirConMessage(DirConMessage* message, size_t clientIndex);

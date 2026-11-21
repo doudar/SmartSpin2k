@@ -68,7 +68,7 @@ int esp_ota_set_boot_partition(const esp_partition_t*);
 #include <cstring>
 using Bytes=std::vector<uint8_t>;
 Device device; Device* ss2k=&device;
-esp_partition_t partition{1024}; Bytes flash;
+esp_partition_t partition{8192}; Bytes flash;
 bool live=false, booted=false;
 uint32_t tickCount=0;
 uint32_t millis() { return tickCount; }
@@ -82,10 +82,11 @@ Bytes command(Bytes p,int who=7) {return SettingsUpdate::command(who,p.data(),p.
 Bytes image(95,0x21);
 Bytes begin() {
   Bytes packet(39);packet[0]=2;packet[1]=SS2K_ID_FIRMWARE_STREAM;packet[2]=SS2K_OTA_BEGIN;
-  packet[3]=image.size();uint8_t sum=0;for(auto b:image)sum+=b;std::fill(packet.begin()+7,packet.end(),sum);return packet;
+  for(unsigned i=0;i<4;++i)packet[3+i]=image.size()>>(8*i);
+  uint8_t sum=0;for(auto b:image)sum+=b;std::fill(packet.begin()+7,packet.end(),sum);return packet;
 }
 Bytes chunk(size_t start,size_t n) {
-  Bytes c{2,SS2K_ID_FIRMWARE_STREAM,SS2K_OTA_CHUNK,uint8_t(start),0,0,0};
+  Bytes c{2,SS2K_ID_FIRMWARE_STREAM,SS2K_OTA_CHUNK,uint8_t(start),uint8_t(start>>8),uint8_t(start>>16),uint8_t(start>>24)};
   c.insert(c.end(),image.begin()+start,image.begin()+start+n);return c;
 }
 int main() {
@@ -114,6 +115,14 @@ int main() {
  assert(command(begin())[0]==128);assert(command(finish)[0]==255 && !live && !booted);
  assert(command(begin())[0]==128);
  assert(command({2,SS2K_ID_FIRMWARE_STREAM,SS2K_OTA_ABORT})[0]==128 && !live && !booted);
+ image.resize(SS2K_DIRCON_OTA_CHUNK_BYTES*2+17,0xa3);
+ assert(command(begin())[0]==128 && SettingsUpdate::owns(7) && !SettingsUpdate::owns(8));
+ for(size_t offset=0;offset<image.size();) {
+   const auto length=std::min<size_t>(SS2K_DIRCON_OTA_CHUNK_BYTES,image.size()-offset);
+   const auto ack=command(chunk(offset,length));offset+=length;
+   assert(ack[0]==128 && (ack[3]+256*ack[4])==offset && flash.size()==offset);
+ }
+ assert(command(finish)[0]==128 && booted && flash==image && !SettingsUpdate::owns(7));
 }
 """)
             compiler=shutil.which('g++')

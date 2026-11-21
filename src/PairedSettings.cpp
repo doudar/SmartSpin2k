@@ -216,14 +216,18 @@ bool send(Peer& p, const Bytes& packet, Bytes* immediate) {
       *immediate = packet;
       return true;
     }
-    return emitFrame(p.id, p.generation, packet.data(), packet.size());
+    // NimBLE may run out of TX buffers during a burst. Keep the original
+    // ciphertext/sequence until notify succeeds, before any subsequent ACK.
+    if (emitFrame(p.id, p.generation, packet.data(), packet.size())) return true;
   }
   if (!p.outbound) {
     p.outbound = std::make_unique<std::vector<Bytes>>();
     p.lastSend = millis();
   }
   // Never interleave records on an ordered fragment stream.
-  if (p.outbound->size() >= 4) return false;
+  // Up to four already-queued fragmented settings records can precede the OTA
+  // window. Each additional update acknowledgement is only 20 wire bytes.
+  if (p.outbound->size() >= 4 + (SettingsUpdate::owns(p.id) ? SS2K_BLE_OTA_WINDOW : 0)) return false;
   p.outbound->push_back(packet);
   return true;
 }
@@ -324,8 +328,8 @@ void publishNext(Peer& p) {
   if (packet) seal(p, *packet);
 }
 
-void dataPacket(Peer& p, const uint8_t* packet, size_t n, Bytes* immediate) {
-  if (p.state != State::Ready || n < 15 || n > maximumWire) return;
+void dataPacket(Peer& p, const uint8_t* packet, size_t n, Bytes* immediate, bool largeOta = false) {
+  if (p.state != State::Ready || n < 15 || n > (largeOta ? SS2K_DIRCON_OTA_MAX_WIRE : maximumWire)) return;
   uint32_t seq = get_le32(packet + 1);
   if (p.hasRx && seq <= p.lastRx) return;
   Bytes plain(n - SS2K_SECURE_OVERHEAD);
@@ -335,7 +339,8 @@ void dataPacket(Peer& p, const uint8_t* packet, size_t n, Bytes* immediate) {
   }
   p.lastRx = seq;
   p.hasRx  = true;
-  if (ss2k_validate_request(plain.data(), plain.size()) != SS2K_OK) {
+  const auto valid = largeOta ? ss2k_validate_dircon_ota_chunk(plain.data(), plain.size()) : ss2k_validate_request(plain.data(), plain.size());
+  if (valid != SS2K_OK) {
     seal(p, {SS2K_ERROR, plain[1]}, immediate);
     return;
   }
@@ -471,12 +476,18 @@ void initialize(Emit emit, Alive alive, Dispatch handlers) {
 }
 void receive(uint16_t peer, uint64_t gen, size_t capacity, const uint8_t* bytes, size_t n, Bytes* immediate) {
   std::lock_guard<std::recursive_mutex> lock(mutex);
-  if (!n || n > capacity || capacity < 20 || !isAlive(peer, gen)) return;
+  if (!n || capacity < 20 || !isAlive(peer, gen)) return;
   auto it = std::find_if(peers.begin(), peers.end(), [&](const Peer& p) { return p.id == peer; });
   if (it != peers.end() && it->generation != gen) {
     clear(*it);
     peers.erase(it);
     it = peers.end();
+  }
+  if (n > capacity) {
+    if (peer >= DIRCON_BASE && it != peers.end() && it->state == State::Ready && !it->fragmentState.next &&
+        SettingsUpdate::owns(peer) && bytes[0] == SS2K_SECURE_DATA)
+      dataPacket(*it, bytes, n, immediate, true);
+    return;
   }
   if (it == peers.end()) it = peers.emplace(peers.end(), Peer{peer, gen, 0, capacity});
   Peer& p    = *it;

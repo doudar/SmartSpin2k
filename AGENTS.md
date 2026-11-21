@@ -367,7 +367,7 @@ Both transports enter `PairedSettings::receive()`. BLE callbacks enqueue on a bo
 
 When adding a custom characteristic variable:
 
-1. Add the ID and wire schema in SS2kProtocol, regenerate, then sync the consumer snapshot.
+1. Add the ID and wire schema in SS2kProtocol, regenerate, then update the public Git dependency pin in `platformio.ini`.
 2. Update `process()` read/write behavior.
 3. Update `parseNemit()` if clients need change notifications.
 4. Update `CustomCharacteristic.md`.

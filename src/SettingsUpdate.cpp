@@ -91,6 +91,8 @@ bool finish() {
 }
 }  // namespace
 
+bool SettingsUpdate::owns(uint16_t peer) { return transfer.partition && transfer.owner == peer; }
+
 std::vector<uint8_t> SettingsUpdate::command(uint16_t peer, const uint8_t* p, size_t n) {
   uint8_t op      = n >= 3 ? p[2] : 0xff;
   bool ok         = false;

@@ -30,6 +30,7 @@ struct Peer {
 uint32_t now=1;
 uint32_t millis(){return now;}
 bool alive=true, blocked=true;
+namespace SettingsUpdate {bool updating=false; bool owns(uint16_t){return updating;}}
 bool isAlive(uint16_t id,uint64_t generation){return alive && id==7 && generation==2;}
 std::vector<Bytes> frames;
 bool emitFrame(uint16_t peer,uint64_t generation,const uint8_t* b,size_t n){
@@ -61,6 +62,12 @@ int main() {
  assert(decoded==std::vector<Bytes>({record,ack}));assert(frames.size()==32);
  alive=false;assert(!send(peer,record,nullptr));assert(!peer.outbound);
  alive=true;assert(send(peer,record,nullptr));blocked=true;now+=5001;flush(peer);assert(!peer.outbound);
+ // Backpressure on a single-value notification retains its original sequence.
+ frames.clear(); SettingsUpdate::updating=true;
+ for(uint8_t i=0;i<SS2K_BLE_OTA_WINDOW;++i) assert(send(peer,{SS2K_SECURE_DATA,i},nullptr));
+ blocked=false;
+ for(uint8_t i=0;i<SS2K_BLE_OTA_WINDOW;++i){flush(peer); assert(frames.at(i).at(1)==i);}
+ assert(!peer.outbound);
 }
 """.replace('@SEND@',function(source,'bool send(Peer&')).replace('@FLUSH@',function(source,'void flush(Peer&'))
         with tempfile.TemporaryDirectory() as temp:

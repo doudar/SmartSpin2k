@@ -6,6 +6,10 @@
  */
 
 #include "DirConManager.h"
+#include "DirConFrameReader.h"
+#include "DirConUUIDCodec.h"
+#include "SettingsUpdate.h"
+#include "ss2k_secure.h"
 #include "BLE_Custom_Characteristic.h"
 #include "PairedSettings.h"
 #include "SS2KLog.h"
@@ -22,8 +26,6 @@ String DirConManager::statusMessage = "";
 WiFiClient DirConManager::dirConClients[DIRCON_MAX_CLIENTS];
 bool DirConManager::clientActive[DIRCON_MAX_CLIENTS] = {false};
 WiFiServer* DirConManager::tcpServer = nullptr;
-uint8_t DirConManager::receiveBuffer[DIRCON_MAX_CLIENTS][DIRCON_RECEIVE_BUFFER_SIZE];
-size_t DirConManager::receiveBufferLength[DIRCON_MAX_CLIENTS] = {0};
 uint8_t DirConManager::lastSequenceNumber[DIRCON_MAX_CLIENTS] = {0};
 Subscription DirConManager::clientSubscriptions[DIRCON_MAX_CLIENTS][DIRCON_MAX_CHARACTERISTICS];
 DirConManager::ServiceRegistration DirConManager::registeredServices[DIRCON_MAX_SERVICES] = {};
@@ -34,6 +36,11 @@ static char uuidListBuffer[128] = "";
 static size_t uuidListLength    = 0;
 
 namespace {
+
+using FrameReader = DirConFrameReader<DIRCON_RECEIVE_BUFFER_SIZE>;
+FrameReader readers[DIRCON_MAX_CLIENTS];
+constexpr size_t valueOffset = DIRCON_MESSAGE_HEADER_LENGTH + 16;
+constexpr size_t maxFramesPerPass = 4;
 
 struct DirConOutboundFrame {
   size_t length     = 0;
@@ -144,7 +151,7 @@ bool DirConManager::start() {
   xSemaphoreTake(s_outboundMutex, portMAX_DELAY);
   for (int i = 0; i < DIRCON_MAX_CLIENTS; i++) {
     clientActive[i]        = false;
-    receiveBufferLength[i] = 0;
+    readers[i].reset();
     lastSequenceNumber[i]  = 0;
     resetOutboundQueue(i);
     for (int j = 0; j < DIRCON_MAX_CHARACTERISTICS; j++) {
@@ -195,7 +202,7 @@ void DirConManager::stop() {
     for (int i = 0; i < DIRCON_MAX_CLIENTS; i++) {
       dirConClients[i].stop();
       clientActive[i]        = false;
-      receiveBufferLength[i] = 0;
+      readers[i].reset();
       resetOutboundQueue(i);
       for (int j = 0; j < DIRCON_MAX_CHARACTERISTICS; j++) {
         clientSubscriptions[i][j].active = false;
@@ -209,19 +216,14 @@ void DirConManager::stop() {
 }
 
 void DirConManager::update() {
-  // Return immediately unless DIRCON_MANAGER_DELAY has passed.
+  if (!started) return;
   static unsigned long lastUpdate = 0;
-  if (millis() - lastUpdate < DIRCON_MANAGER_DELAY) {
+  if (millis() - lastUpdate >= DIRCON_MANAGER_DELAY) {
+    lastUpdate = millis();
+    checkForNewClients();
+  } else if (!ss2k->isUpdating) {
     return;
   }
-  lastUpdate = millis();
-
-  if (!started) {
-    return;
-  }
-
-  // Check for new clients
-  checkForNewClients();
 
   // Handle data from connected clients
   handleClientData();
@@ -374,7 +376,7 @@ void DirConManager::checkForNewClients() {
       clientIndex      = i;
 
       // Clear receive buffer and subscription state
-      receiveBufferLength[i] = 0;
+      readers[i].reset();
       lastSequenceNumber[i]  = 0;
       resetOutboundQueue(i);
       for (int j = 0; j < DIRCON_MAX_CHARACTERISTICS; j++) {
@@ -398,6 +400,7 @@ void DirConManager::checkForNewClients() {
 }
 
 void DirConManager::configureClientSocket(WiFiClient& client) {
+  client.setNoDelay(true);
   int keepAliveIdle     = DIRCON_TCP_KEEPIDLE_SECONDS;
   int keepAliveInterval = DIRCON_TCP_KEEPINTVL_SECONDS;
   int keepAliveCount    = DIRCON_TCP_KEEPCNT;
@@ -420,7 +423,7 @@ void DirConManager::closeClient(size_t clientIndex, const char* reason) {
   xSemaphoreTake(s_outboundMutex, portMAX_DELAY);
   dirConClients[clientIndex].stop();
   clientActive[clientIndex]        = false;
-  receiveBufferLength[clientIndex] = 0;
+  readers[clientIndex].reset();
   resetOutboundQueue(clientIndex);
   for (int j = 0; j < DIRCON_MAX_CHARACTERISTICS; j++) {
     clientSubscriptions[clientIndex][j].active = false;
@@ -442,46 +445,32 @@ void DirConManager::handleClientData() {
       continue;
     }
 
-    // Check if data is available
-    if (dirConClients[i].available()) {
-      // Read available data into buffer
-      while (dirConClients[i].available() && receiveBufferLength[i] < DIRCON_RECEIVE_BUFFER_SIZE) {
-        receiveBuffer[i][receiveBufferLength[i]] = dirConClients[i].read();
-        receiveBufferLength[i]++;
+    auto& reader = readers[i];
+    const uint16_t peer = PairedSettings::DIRCON_BASE + i;
+    for (size_t count = 0; count < maxFramesPerPass; ++count) {
+      const bool updating = SettingsUpdate::owns(peer);
+      const size_t limit = updating ? valueOffset + SS2K_DIRCON_OTA_MAX_WIRE : DIRCON_RECEIVE_BUFFER_SIZE;
+      auto result = reader.read(dirConClients[i], limit);
+      if (result == FrameReader::Pending) break;
+      if (result == FrameReader::Invalid) {
+        closeClient(i, "invalid or oversized TCP frame");
+        break;
       }
-
-      // Process messages in buffer
-      size_t processedBytes = 0;
-      while (processedBytes < receiveBufferLength[i]) {
-        DirConMessage message;
-        size_t parsedBytes = message.parse(receiveBuffer[i] + processedBytes, receiveBufferLength[i] - processedBytes, lastSequenceNumber[i]);
-
-        if (parsedBytes == 0) {
-          // Keep an incomplete TCP frame buffered until the remaining bytes arrive.
-          // Complete invalid frames return their frame length so they are discarded.
-          break;
-        }
-
-        // Process the message
-        if (message.Identifier != DIRCON_MSGID_ERROR) {
-          lastSequenceNumber[i] = message.SequenceNumber;
-          processDirConMessage(&message, i);
-        }
-
-        processedBytes += parsedBytes;
+      uint8_t* frame = reader.data();
+      if (reader.size() > DIRCON_RECEIVE_BUFFER_SIZE &&
+          (frame[0] != 1 || frame[1] != DIRCON_MSGID_WRITE_CHARACTERISTIC || frame[3] != DIRCON_RESPCODE_SUCCESS_REQUEST ||
+           frame[valueOffset] != SS2K_SECURE_DATA || !DirConUUIDCodec::fromBytes(frame + DIRCON_MESSAGE_HEADER_LENGTH).equals(SMARTSPIN2K_CHARACTERISTIC_UUID))) {
+        closeClient(i, "invalid extended update frame");
+        break;
       }
-
-      // Remove processed bytes from buffer
-      if (processedBytes > 0) {
-        if (processedBytes < receiveBufferLength[i]) {
-          // Move remaining bytes to beginning of buffer
-          memmove(receiveBuffer[i], receiveBuffer[i] + processedBytes, receiveBufferLength[i] - processedBytes);
-          receiveBufferLength[i] -= processedBytes;
-        } else {
-          // All bytes processed
-          receiveBufferLength[i] = 0;
-        }
+      DirConMessage message;
+      if (message.parse(frame, reader.size(), lastSequenceNumber[i]) && message.Identifier != DIRCON_MSGID_ERROR) {
+        lastSequenceNumber[i] = message.SequenceNumber;
+        processDirConMessage(&message, i);
       }
+      reader.consume();
+      // A single flash write can already take an entire sector-erase interval.
+      if (updating) break;
     }
   }
 }
@@ -571,7 +560,8 @@ void DirConManager::drainOutboundQueues() {
     if (outbound.closeRequested) {
       shouldClose = true;
       closeReason = "outbound queue exhausted";
-    } else if (outbound.count > 0) {
+    }
+    for (size_t i = 0; !shouldClose && outbound.count && i < maxFramesPerPass; ++i) {
       DirConOutboundFrame& frame = outbound.frames[0];
       int socketFd                = dirConClients[clientIndex].fd();
       ssize_t sent;
@@ -587,6 +577,8 @@ void DirConManager::drainOutboundQueues() {
             outbound.frames[i] = outbound.frames[i + 1];
           }
           outbound.count--;
+        } else {
+          break;
         }
       } else if (sent == 0) {
         shouldClose = true;
@@ -597,6 +589,8 @@ void DirConManager::drainOutboundQueues() {
       } else if (millis() - outbound.lastProgressMs >= DIRCON_SEND_STALL_TIMEOUT_MS) {
         shouldClose = true;
         closeReason = "outbound send stalled";
+      } else {
+        break;  // Wait for the socket to become writable.
       }
     }
     xSemaphoreGive(s_outboundMutex);
@@ -706,14 +700,14 @@ bool DirConManager::processDirConMessage(DirConMessage* message, size_t clientIn
 
       // Write the value (setValue doesn't return a status in NimBLE)
       if (!characteristic->getUUID().equals(SMARTSPIN2K_CHARACTERISTIC_UUID))
-        characteristic->setValue(message->AdditionalData.data(), message->AdditionalData.size());
+        characteristic->setValue(message->writeValue, message->writeSize);
 
       // Let registered services handle the write via callbacks
       for (size_t i = 0; i < registeredServiceCount; i++) {
         if (registeredServices[i].writeHandler != nullptr) {
           DirConWriteResult writeResult;
           writeResult.clientIndex = clientIndex;
-          if (registeredServices[i].writeHandler(characteristic, message->AdditionalData.data(), message->AdditionalData.size(), &writeResult)) {
+          if (registeredServices[i].writeHandler(characteristic, message->writeValue, message->writeSize, &writeResult)) {
             response.AdditionalData.swap(writeResult.privateResponse);
             if (writeResult.updateResponseData) {
               response.AdditionalData = characteristic->getValue();
@@ -806,7 +800,8 @@ void DirConManager::sendResponse(DirConMessage* message, size_t clientIndex) {
       const std::string uuid = compactDirConUuid(message->UUID);
       SS2K_LOG(DIRCON_LOG_TAG, "TX chars c%u s%u %s %s %uU/%uB", static_cast<unsigned>(clientIndex), static_cast<unsigned>(message->SequenceNumber), uuid.c_str(), result,
                static_cast<unsigned>(message->AdditionalUUIDs.size()), static_cast<unsigned>(encodedMessage->size()));
-    } else {
+    } else if (!(ss2k->isUpdating && message->Identifier == DIRCON_MSGID_WRITE_CHARACTERISTIC && message->UUID.equals(SMARTSPIN2K_CHARACTERISTIC_UUID) &&
+                 message->ResponseCode == DIRCON_RESPCODE_SUCCESS_REQUEST)) {
       const std::string uuid = compactDirConUuid(message->UUID);
       char payloadPreview[12] = "";
       formatPayloadPreview(message->AdditionalData, payloadPreview, sizeof(payloadPreview));

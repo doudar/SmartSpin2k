@@ -107,7 +107,7 @@ int main() {
   assert(userConfig->password == "new-pass");
 
   reply = run(req(cc_read, BLE_capabilities));
-  assert(same(reply, {0x80, 0x36, 0x01, 0x03, 0x00, 0x00, 0x00}));
+  assert(same(reply, {0x80, 0x36, 0x01, 0x0f, 0x00, 0x00, 0x00}));
   reply = run(req(cc_write, BLE_capabilities));
   assert(same(reply, {0xFF, 0x36}));
   reply = run(req(cc_write, BLE_capabilities, std::string("\x01\x00\x00\x00", 4)));

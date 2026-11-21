@@ -206,5 +206,9 @@ Read-only report of optional firmware behaviours.
 |-----|---------|
 | 0 | The device keeps the stored WiFi password private |
 | 1 | Paired settings and authenticated firmware streaming |
+| 2 | The authenticated DirCon updater can send one complete encrypted record carrying up to 2,048 image bytes after its successful BEGIN |
+| 3 | The authenticated BLE updater can have up to four single-value, write-without-response chunks awaiting encrypted offset acknowledgments |
+
+The app checks the associated capability for each transport. BLE also requires the characteristic to advertise write without response. Fragmented BLE writes and older peers use the existing stop-and-wait transfer. The receiver acknowledges each chunk after accepting its bytes and checks the entire image before selecting the new boot partition.
 
 Later capabilities take the next bits; bits are never reused. Clients must ignore unknown bits and any extra trailing bytes, and must treat an error response (older firmware) as "no capabilities".
