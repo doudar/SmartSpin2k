@@ -160,6 +160,12 @@ void SS2K::stopTasks() {
 extern "C" void app_main() {
   initArduino();
   // Serial port for debugging purposes
+#if ARDUINO_USB_CDC_ON_BOOT && ARDUINO_USB_MODE
+  // Serial is the S3's USB Serial/JTAG port. By default each write waits up to two
+  // seconds while a host is attached but not reading, which starves the maintenance
+  // loop (web, DirCon, BLE, motor). Drop output that does not fit instead of waiting.
+  Serial.setTxTimeoutMs(0);
+#endif
   Serial.begin(115200);
 
   BaseType_t taskCreated = xTaskCreatePinnedToCore(SS2K::maintenanceLoop,     /* Task function. */

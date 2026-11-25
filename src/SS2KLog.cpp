@@ -71,12 +71,18 @@ void LogHandler::writev(esp_log_level_t level, const char *module, const char *f
     bytesToSend = buffer_size - 1;
   }
 
-  // Default logger -> write all to serial if connected
-  if (Serial) {
-    Serial.println(buffer);
-  }
-
   xMessageBufferSend(_messageBufferHandle, buffer, bytesToSend, 0);
+
+  // Default logger -> write all to serial if connected. One write per line, so a
+  // line and its ending are kept or dropped together when USB CDC has no room.
+  if (Serial) {
+    if (bytesToSend > buffer_size - 2) {
+      bytesToSend = buffer_size - 2;
+    }
+    buffer[bytesToSend++] = '\r';
+    buffer[bytesToSend++] = '\n';
+    Serial.write(buffer, bytesToSend);
+  }
   xSemaphoreGive(_logBufferMutex);
 }
 
