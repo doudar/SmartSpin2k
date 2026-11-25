@@ -146,7 +146,7 @@ void TestBleWireRoundTrip::test_dircon_uuid_round_trip(void) {
 void TestBleWireRoundTrip::test_all_custom_characteristic_formats(void) {
   unsigned formatCounts[CustomUnknown + 1] = {0};
 
-  for (uint8_t id = 0x01; id <= BLE_capabilities; ++id) {
+  for (uint8_t id = 0x01; id <= SS2K_ID_FIRMWARE_STREAM; ++id) {
     const CustomCharacteristicValueFormat format = customCharacteristicValueFormat(id);
     // 0x01 (firmware update URL), 0x11 (auto-update) and 0x33 (experimental
     // rider weight) are retired. Keep the wire IDs reserved so a future field
@@ -228,13 +228,16 @@ void TestBleWireRoundTrip::test_all_custom_characteristic_formats(void) {
       case CustomAction:
         // Action characteristics carry only operation and ID, so there is no value to round-trip.
         break;
+      case CustomFirmwareStream:
+        TEST_ASSERT_EQUAL_UINT8(SS2K_ID_FIRMWARE_STREAM, id);
+        break;
       case CustomUnknown:
         TEST_FAIL_MESSAGE("unexpected custom characteristic format");
         break;
     }
   }
 
-  TEST_ASSERT_EQUAL_UINT(6, formatCounts[CustomAction]);
+  TEST_ASSERT_EQUAL_UINT(7, formatCounts[CustomAction]);
   TEST_ASSERT_EQUAL_UINT(10, formatCounts[CustomBoolean]);
   TEST_ASSERT_EQUAL_UINT(15, formatCounts[CustomUnsigned16]);
   TEST_ASSERT_EQUAL_UINT(3, formatCounts[CustomSigned16]);
@@ -246,6 +249,7 @@ void TestBleWireRoundTrip::test_all_custom_characteristic_formats(void) {
   TEST_ASSERT_EQUAL_UINT(1, formatCounts[CustomBooleanWriteStringRead]);
   TEST_ASSERT_EQUAL_UINT(1, formatCounts[CustomGearTeeth]);
   TEST_ASSERT_EQUAL_UINT(1, formatCounts[CustomCapabilities]);
+  TEST_ASSERT_EQUAL_UINT(1, formatCounts[CustomFirmwareStream]);
 }
 
 void TestBleWireRoundTrip::test_ftms_round_trip(void) {

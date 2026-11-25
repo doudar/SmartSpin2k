@@ -9,20 +9,20 @@
 
 #include <NimBLEDevice.h>
 #include "BLE_Common.h"
-#include "CustomCharacteristicProtocol.h"
+#include <CustomCharacteristicProtocol.h>
+
+#define SMARTSPIN2K_SERVICE_UUID        NimBLEUUID(SS2K_SERVICE_UUID)
+#define SMARTSPIN2K_CHARACTERISTIC_UUID NimBLEUUID(SS2K_CHARACTERISTIC_UUID)
 
 class BLE_ss2kCustomCharacteristic {
  public:
   void setupService(NimBLEServer *pServer);
   // Fast maintenance pass: bounded BLE write/status queue and snapshot timeout.
   void processPendingEvents();
-  // Periodic server pass: pace DirCon settings snapshot chunks.
-  void update();
   static void onConnect(uint16_t connHandle);
   static void onDisconnect(uint16_t connHandle);
   // Runs from maintenance/DirCon; BLE callbacks enqueue requests for processPendingEvents().
-  static void process(const std::string& rxValue, uint16_t connHandle = BLE_HS_CONN_HANDLE_NONE, uint16_t mtu = 23,
-                      bool indicateResponse = true);
+  static std::vector<uint8_t> process(const std::string& request);
   // Custom Characteristic value that needs to be notified
   static void notify(char _item, int tableRow = -1);
   static void beginScanResults();

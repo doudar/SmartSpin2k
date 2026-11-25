@@ -249,10 +249,9 @@ size_t DirConMessage::parse(uint8_t* data, size_t len, uint8_t sequenceNumber) {
         this->UUID = DirConUUIDCodec::fromBytes(data + DIRCON_MESSAGE_HEADER_LENGTH);
         parsedBytes += 16;
         this->Request = this->isRequest(sequenceNumber);
-        for (size_t dataIndex = 0; dataIndex < (this->Length - 16); dataIndex++) {
-          this->AdditionalData.push_back((uint8_t)data[DIRCON_MESSAGE_HEADER_LENGTH + dataIndex + 16]);
-          parsedBytes += 1;
-        }
+        writeValue = data + parsedBytes;
+        writeSize = this->Length - 16;
+        parsedBytes += writeSize;
       } else {
         SS2K_LOG(DIRCON_LOG_TAG, "Error parsing DirCon message: Length %d < 16", this->Length);
         this->Identifier = DIRCON_MSGID_ERROR;

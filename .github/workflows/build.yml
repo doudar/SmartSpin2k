@@ -6,11 +6,17 @@ on:
       - develop
 
 permissions:
-  contents: write
+  contents: read
+
+concurrency:
+  group: firmware-release
+  cancel-in-progress: false
 
 jobs:
   build:
     runs-on: ubuntu-latest
+    outputs:
+      tag: ${{ steps.date.outputs.date }}
     steps:
       - uses: actions/checkout@v7
         with:
@@ -61,53 +67,82 @@ jobs:
           platformio pkg install -e S3release
       - name: Check pre-commit hooks
         uses: pre-commit/action@v3.0.1
-      - name: Refresh GitHub TLS certificate
-        run: |
-          if ! python cert_updater.py; then
-            echo "::error file=cert_updater.py::GitHub TLS certificate refresh failed. Firmware build and release stopped; inspect the certificate updater output above."
-            exit 1
-          fi
       - name: Build firmware
         run: platformio run -e release
-      - name: Build filesystem
-        run: platformio run -e release --target buildfs
       - name: Build S3 firmware
         run: platformio run -e S3release
-      - name: Build S3 filesystem
-        run: platformio run -e S3release --target buildfs
-      - name: Create artifacts
+      - name: Stage firmware binaries for the signing job
         run: |
-          cp ./.pio/build/release/firmware.bin firmware.bin
-          cp ./.pio/build/release/firmware.factory.bin firmware.factory.bin
-          cp ./.pio/build/release/littlefs.bin littlefs.bin
-          cp ./.pio/build/release/partitions.bin partitions.bin
-          cp ./.pio/build/release/bootloader.bin bootloader.bin
-          cp ./.pio/build/S3release/S3firmware.bin S3firmware.bin
-          cp ./.pio/build/S3release/S3firmware.factory.bin S3firmware.factory.bin
-          cp ./.pio/build/S3release/S3littlefs.bin S3littlefs.bin
-          cp ./.pio/build/S3release/S3partitions.bin S3partitions.bin
-          cp ./.pio/build/S3release/S3bootloader.bin S3bootloader.bin
-          7z a SmartSpin2kFirmware-${{ steps.date.outputs.date }}.bin.zip firmware.bin firmware.factory.bin littlefs.bin partitions.bin bootloader.bin S3firmware.bin S3firmware.factory.bin S3littlefs.bin S3partitions.bin S3bootloader.bin
-      - name: Archive
-        uses: actions/upload-artifact@v7
+          mkdir -p release-inputs/{release,S3release}
+          cp .pio/build/release/{firmware.bin,firmware.factory.bin,partitions.bin,bootloader.bin} release-inputs/release/
+          cp .pio/build/S3release/{S3firmware.bin,S3firmware.factory.bin,S3partitions.bin,S3bootloader.bin} release-inputs/S3release/
+      - uses: actions/upload-artifact@v7
         with:
-          name: all-artifacts
-          path: SmartSpin2kFirmware-${{ steps.date.outputs.date }}.bin.zip
-      - name: Download Artifacts
-        uses: actions/download-artifact@v8
+          name: firmware-build-inputs
+          path: release-inputs/
+          if-no-files-found: error
+          retention-days: 1
+
+  sign:
+    needs: build
+    runs-on: ubuntu-latest
+    env:
+      SOURCE_TAG: ${{ needs.build.outputs.tag }}
+    steps:
+      - uses: actions/checkout@v7
         with:
-          name: all-artifacts
-      - name: Get tag info
-        id: tag_info
-        run: echo "SOURCE_TAG=${{ steps.date.outputs.date }}" >> $GITHUB_OUTPUT
-      - name: Generate release notes
+          persist-credentials: false
+      - uses: actions/setup-python@v7
+        with:
+          python-version: '3.11'
+      - run: |
+          python -m pip install --only-binary=:all: -r scripts/requirements-release.txt
+      - uses: actions/download-artifact@v8
+        with:
+          name: firmware-build-inputs
+          path: release-inputs
+      - name: Sign release with the pinned publisher key
         env:
-          SOURCE_TAG: ${{ steps.tag_info.outputs.SOURCE_TAG }}
+          SS2K_PRIVATE_KEY: ${{ secrets.SS2K_PRIVATE_KEY }}
+          SS2K_KEY_PASS: ${{ secrets.SS2K_KEY_PASS }}
+        run: python scripts/sign_release.py sign --tag "$SOURCE_TAG" --build-dir release-inputs
+      - uses: actions/upload-artifact@v7
+        with:
+          name: all-artifacts
+          path: |
+            signed-release/SmartSpin2kFirmware-${{ needs.build.outputs.tag }}.bin.zip
+            signed-release/firmware-manifest.json
+            signed-release/firmware-manifest.sig
+          if-no-files-found: error
+
+  publish:
+    needs: [build, sign]
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    env:
+      SOURCE_TAG: ${{ needs.build.outputs.tag }}
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - uses: actions/setup-python@v7
+        with:
+          python-version: '3.11'
+      - run: |
+          python -m pip install --only-binary=:all: -r scripts/requirements-release.txt
+      - uses: actions/download-artifact@v8
+        with:
+          name: all-artifacts
+          path: signed-release
+      - name: Verify downloaded public assets before publishing
+        run: python scripts/sign_release.py verify --tag "$SOURCE_TAG"
+      - name: Generate release notes
         run: python scripts/release_notes.py --tag "$SOURCE_TAG" --repository "$GITHUB_REPOSITORY" --output release-notes.md
       - name: Remove obsolete standalone factory assets
         env:
           GH_TOKEN: ${{ github.token }}
-          SOURCE_TAG: ${{ steps.tag_info.outputs.SOURCE_TAG }}
         run: |
           if gh release view "$SOURCE_TAG" > /dev/null 2>&1; then
             for asset in firmware.factory.bin S3firmware.factory.bin; do
@@ -121,20 +156,20 @@ jobs:
         # are included alongside GitHub's generated PR/contributor list.
         uses: softprops/action-gh-release@v3
         with:
-          tag_name: ${{ steps.tag_info.outputs.SOURCE_TAG }}
+          tag_name: ${{ needs.build.outputs.tag }}
           target_commitish: ${{ github.sha }}
-          name: SmartSpin2k ${{ steps.tag_info.outputs.SOURCE_TAG }}
+          name: SmartSpin2k ${{ needs.build.outputs.tag }}
           draft: false
           prerelease: false
           generate_release_notes: true
           overwrite_files: true
           body_path: release-notes.md
+          fail_on_unmatched_files: true
           files: |
-            SmartSpin2kFirmware-${{ steps.date.outputs.date }}.bin.zip
+            signed-release/SmartSpin2kFirmware-${{ needs.build.outputs.tag }}.bin.zip
+            signed-release/firmware-manifest.json
+            signed-release/firmware-manifest.sig
       - name: Update changelog
         uses: thomaseizinger/keep-a-changelog-new-release@v3
         with:
-          version: ${{ steps.date.outputs.date }}
-
-
-      
+          version: ${{ needs.build.outputs.tag }}

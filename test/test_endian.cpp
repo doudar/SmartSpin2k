@@ -6,6 +6,7 @@
  */
 
 #include <unity.h>
+#include <ss2k_protocol.h>
 
 #include "ByteUtils.h"
 #include "test.h"
@@ -35,4 +36,21 @@ void TestEndian::test_little_endian_signed_decode_and_round_trip(void) {
   put_be16(encodedBigEndian, 0xBEEF);
   const uint8_t expectedBigEndian[] = {0xBE, 0xEF};
   TEST_ASSERT_EQUAL_UINT8_ARRAY(expectedBigEndian, encodedBigEndian, sizeof(encodedBigEndian));
+}
+
+void TestEndian::test_protocol_endian_interoperability() {
+  // Network fields can start at any byte offset.
+  uint8_t buffer[6] = {0};
+  uint8_t* field = buffer + 1;
+  ss2k_put_u16(field, UINT16_MAX);
+  TEST_ASSERT_EQUAL_UINT16(UINT16_MAX, get_le16(field));
+  TEST_ASSERT_EQUAL_INT16(-1, ss2k_get_i16(field));
+  put_le16s(field, INT16_MIN);
+  TEST_ASSERT_EQUAL_UINT16(0x8000, ss2k_get_u16(field));
+  ss2k_put_i32(field, INT32_MIN);
+  TEST_ASSERT_EQUAL_INT32(INT32_MIN, get_le32s(field));
+  put_le32s(field, INT32_MAX);
+  TEST_ASSERT_EQUAL_INT32(INT32_MAX, ss2k_get_i32(field));
+  TEST_ASSERT_EQUAL_UINT8(0, buffer[0]);
+  TEST_ASSERT_EQUAL_UINT8(0, buffer[5]);
 }

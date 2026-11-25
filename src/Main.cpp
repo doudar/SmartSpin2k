@@ -17,9 +17,10 @@
 #include "ERG_Mode.h"
 #include "Power_Table.h"
 #include "UdpAppender.h"
-#include "WebsocketAppender.h"
+#include "WifiStation.h"
 #include "BleAppender.h"
 #include "BLE_Custom_Characteristic.h"
+#include "PairedSettings.h"
 #include "BLE_Definitions.h"
 #include <Constants.h>
 #include "settings.h"
@@ -92,11 +93,11 @@ void processSerialCustomCharacteristic() {
         }
 
         if (valid && requestLength >= 2 && request[1] != BLE_allSettings) {
-          BLE_ss2kCustomCharacteristic::process(std::string(reinterpret_cast<const char*>(request), requestLength), BLE_HS_CONN_HANDLE_NONE, 23, false);
+          auto response = BLE_ss2kCustomCharacteristic::process(std::string(reinterpret_cast<const char*>(request), requestLength));
           NimBLEService* service = NimBLEDevice::getServer()->getServiceByUUID(SMARTSPIN2K_SERVICE_UUID);
           NimBLECharacteristic* characteristic = service == nullptr ? nullptr : service->getCharacteristic(SMARTSPIN2K_CHARACTERISTIC_UUID);
           if (characteristic != nullptr) {
-            NimBLEAttValue response = characteristic->getValue();
+
             Serial.print("cc_response");
             for (size_t i = 0; i < response.size(); ++i) {
               Serial.printf(" %02x", response[i]);
@@ -142,7 +143,6 @@ void keepLedOffAfterReboot() {
 
 ///////////// Log Appender /////////////
 UdpAppender udpAppender;
-WebSocketAppender webSocketAppender;
 BleAppender bleAppender;
 
 ///////////// BEGIN SETUP /////////////
@@ -223,11 +223,11 @@ void SS2K::finishSetup() {
   }
   // Initialize LittleFS
   SS2K_LOG(MAIN_LOG_TAG, "Mounting Filesystem");
-  if (!LittleFS.begin(false)) {
-    SS2K_LOG(MAIN_LOG_TAG, "An Error has occurred while mounting LittleFS.");
-    LittleFS.format();  // Format so that the settings can be saved.
-    delay(100);         // Provide some time for the format to happen.
+  if (!LittleFS.begin(true)) {
+    SS2K_LOGE(MAIN_LOG_TAG, "Unable to mount configuration filesystem");
   }
+
+  ss2k->resetDefaultsFlag = PairedSettings::resetPending();
 
   // Load Config
   userConfig->loadFromLittleFS();
@@ -252,7 +252,6 @@ void SS2K::finishSetup() {
 
   // Start WiFi early, then let the maintenance loop finish network setup.
   startWifi();
-  httpServer.syncWebServerFiles();
 
   pinMode(currentBoard.shiftUpPin, INPUT_PULLUP);    // Push-Button with input Pullup
   pinMode(currentBoard.shiftDownPin, INPUT_PULLUP);  // Push-Button with input Pullup
@@ -284,12 +283,10 @@ void SS2K::finishSetup() {
 
   digitalWrite(currentBoard.ledPin, LOW);
   // Configure and Initialize Logger
-  logHandler.addAppender(&webSocketAppender);
   logHandler.addAppender(&udpAppender);
   logHandler.addAppender(&bleAppender);
   logHandler.initialize();
   ss2k->startTasks();
-  httpServer.start();
   updateWifi();
 
 #ifdef TEST_PTAB4PWR
@@ -319,14 +316,14 @@ void SS2K::maintenanceLoop(void*) {
   static uint32_t hardwareSafetyTimer      = millis();
 
   while (true) {
-    delay(10);
+    delay(ss2k->isUpdating ? 1 : 10);
     updateWifi();
     // Keep thermal protection active during updates; the check defers during homing.
     if (uint32_t(millis() - hardwareSafetyTimer) >= ThermalSafety::POLL_INTERVAL_MS) {
       hardwareSafetyTimer = millis();
       ss2k->updateHardwareSafety();
     }
-    BLEFirmwareUpdateLoop();
+    ss2kCustomCharacteristic.processPendingEvents();
     ss2k->syncFtmsPosition();
 
 #ifdef SERIAL_CUSTOM_CHARACTERISTIC
@@ -335,15 +332,11 @@ void SS2K::maintenanceLoop(void*) {
 
     // be quiet while updating via BLE
     if (!ss2k->isUpdating) {
-      // Drain deferred BLE settings callbacks before shift/motor processing,
-      // without waiting for the periodic telemetry timer or using nimble_host.
-      ss2kCustomCharacteristic.processPendingEvents();
       static unsigned long bleTimer = millis();
       // 500ms
       if ((millis() - bleTimer) > BLE_NOTIFY_DELAY) {
         BLECommunications();
         logHandler.writeLogs();
-        webSocketAppender.Loop();
         bleTimer = millis();
       }
       // Don't do these if updating and in spindown mode.
@@ -369,8 +362,7 @@ void SS2K::maintenanceLoop(void*) {
     ss2k->handleShiftButtons();
 
     // send BLE notification for any userConfig values that changed.
-    BLE_ss2kCustomCharacteristic::parseNemit();
-    httpServer.webClientUpdate();
+    if (!ss2k->isUpdating) BLE_ss2kCustomCharacteristic::parseNemit();
     // Update DirCon protocol
     DirConManager::update();
     ss2k->updateLED();
@@ -391,12 +383,11 @@ void SS2K::maintenanceLoop(void*) {
 
     // Handle a flag set to reset SmartSpin2k to defaults
     if (ss2k->resetDefaultsFlag) {
-      LittleFS.format();
-      userConfig->setDefaults();
-      powerTable->reset();
-      userConfig->saveToLittleFS();
-      ss2k->resetDefaultsFlag = false;
-      ss2k->rebootFlag        = true;
+      static uint32_t lastAttempt = millis() - 1000;
+      if (uint32_t(millis() - lastAttempt) >= 1000) {
+        lastAttempt = millis();
+        ss2k->applyFactoryReset();
+      }
     }
 
     // required to set a flag instead of directly calling the function for saving from BLE_Custom Characteristic.
@@ -425,7 +416,6 @@ void SS2K::maintenanceLoop(void*) {
           keepLedOffAfterReboot();
           ss2k->rebootFlag = true;
           logHandler.writeLogs();
-          webSocketAppender.Loop();
         }
       } else {
         // Fresh active readings restart the full inactivity window.
@@ -645,20 +635,32 @@ void SS2K::FTMSModeShiftModifier() {
   if (localSelected) localGear = rtConfig->getShifterPosition();
 }
 
-void SS2K::restartWifi() {
-  httpServer.stop();
-  delay(100);
-  stopWifi();
-  delay(100);
-  startWifi();
-  refreshBLEAdvertisementIp();
-  httpServer.start();
-  updateWifi();
-}
-
 void SS2K::handleShiftButtons() {
   int upButtonIsPressed   = !digitalRead(currentBoard.shiftUpPin);
   int downButtonIsPressed = !digitalRead(currentBoard.shiftDownPin);
+
+#ifndef UNIT_TEST
+#ifdef SS2K_TEST_PAIR_BUTTONS
+  // Physical USB fixture only. Production/debug environments omit this flag.
+  static char command[20];
+  static size_t length = 0;
+  static uint32_t simulatedAt = 0;
+  static bool simulating = false;
+  while (Serial.available()) {
+    int c = Serial.read();
+    if (c == '\n') {
+      command[length] = 0;
+      if (!strcmp(command, "pair-buttons")) { simulating = true; simulatedAt = millis(); }
+      length = 0;
+    } else if (c != '\r' && length < sizeof(command) - 1) command[length++] = c;
+  }
+  if (simulating) {
+    simulating = uint32_t(millis() - simulatedAt) < 3000;
+    upButtonIsPressed = downButtonIsPressed = simulating;
+  }
+#endif
+  if (PairedSettings::buttons(upButtonIsPressed, downButtonIsPressed)) return;
+#endif
 
   // --- UP Button State Machine ---
   if (upButtonIsPressed && ss2k->upButtonState == RELEASED) {
@@ -687,6 +689,18 @@ void SS2K::handleShiftButtons() {
   }
 }
 
+// Mark the reset durably before formatting. A power cut between LittleFS
+// and NVS writes resumes the same reset on the next boot.
+void SS2K::applyFactoryReset() {
+  if (!PairedSettings::beginReset() || !resetWifiSettings() || !LittleFS.format()) return;
+  userConfig->setDefaults();
+  powerTable->reset();
+  userConfig->saveToLittleFS();
+  if (!PairedSettings::finishReset()) return;
+  resetDefaultsFlag = false;
+  rebootFlag = true;
+}
+
 void SS2K::resetIfShiftersHeld() {
   if ((digitalRead(currentBoard.shiftUpPin) == LOW) && (digitalRead(currentBoard.shiftDownPin) == LOW)) {
     SS2K_LOG(MAIN_LOG_TAG, "Resetting to defaults via shifter buttons.");
@@ -695,14 +709,7 @@ void SS2K::resetIfShiftersHeld() {
       delay(200);
       digitalWrite(currentBoard.ledPin, LOW);
     }
-    for (int i = 0; i < 20; i++) {
-      LittleFS.format();
-      userConfig->setDefaults();
-      delay(200);
-      userConfig->saveToLittleFS();
-      delay(200);
-    }
-    ESP.restart();
+    ss2k->resetDefaultsFlag = true;
   }
 }
 
