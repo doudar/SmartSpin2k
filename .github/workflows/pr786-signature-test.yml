@@ -1,0 +1,89 @@
+name: PR 786 signed firmware test
+
+on:
+  push:
+    branches: [codex/signature-test-pr786-5ecd9970]
+
+permissions:
+  contents: read
+
+env:
+  SOURCE_COMMIT: 5ecd9970e8344f9d53c884797b327c93e0438297
+  SS2K_FIRMWARE_VERSION: 26.11.27-pr786-5ecd9970
+  PACKAGE_DATE: '26.11.27'
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        include:
+          - environment: release
+            prefix: ''
+          - environment: S3release
+            prefix: S3
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: ${{ env.SOURCE_COMMIT }}
+          persist-credentials: false
+      - uses: actions/cache/restore@v6
+        with:
+          path: ~/.platformio
+          key: ${{ runner.os }}-platformio-v2-${{ hashFiles('requirements-ci.txt') }}-${{ hashFiles('platformio.ini', '.github/workflows/build.yml') }}
+          restore-keys: |
+            ${{ runner.os }}-platformio-v2-${{ hashFiles('requirements-ci.txt') }}-
+      - uses: actions/setup-python@v7
+        with:
+          python-version: '3.11'
+      - run: python -m pip install -r requirements-ci.txt
+      - name: Compile and stage the application and factory files
+        env:
+          BOARD: ${{ matrix.environment }}
+          PREFIX: ${{ matrix.prefix }}
+        run: |
+          platformio run -e "$BOARD"
+          mkdir -p "stage/$BOARD"
+          for file in firmware.bin firmware.factory.bin partitions.bin bootloader.bin; do
+            cp ".pio/build/$BOARD/$PREFIX$file" "stage/$BOARD/"
+          done
+      - uses: actions/upload-artifact@v7
+        with:
+          name: inputs-${{ matrix.environment }}
+          path: stage/${{ matrix.environment }}/
+          if-no-files-found: error
+          retention-days: 1
+
+  sign:
+    needs: build
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: ${{ env.SOURCE_COMMIT }}
+          persist-credentials: false
+      - uses: actions/setup-python@v7
+        with:
+          python-version: '3.11'
+      - run: python -m pip install --only-binary=:all: -r scripts/requirements-release.txt
+      - uses: actions/download-artifact@v8
+        with:
+          name: inputs-release
+          path: release-inputs/release
+      - uses: actions/download-artifact@v8
+        with:
+          name: inputs-S3release
+          path: release-inputs/S3release
+      - name: Sign both application images and the manifest
+        env:
+          SS2K_PRIVATE_KEY: ${{ secrets.SS2K_PRIVATE_KEY }}
+          SS2K_KEY_PASS: ${{ secrets.SS2K_KEY_PASS }}
+        run: python scripts/sign_release.py sign --tag "$PACKAGE_DATE" --build-dir release-inputs
+      - name: Verify the bundle with the pinned public key
+        run: python scripts/sign_release.py verify --tag "$PACKAGE_DATE"
+      - uses: actions/upload-artifact@v7
+        with:
+          name: signed-firmware-pr786-5ecd9970
+          path: signed-release/
+          if-no-files-found: error
+          retention-days: 14
